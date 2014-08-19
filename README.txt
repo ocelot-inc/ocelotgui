@@ -3,12 +3,11 @@ Ocelot ocelotgui
 
 Version 0.1.0
 
-This is a release of Ocelot GUI (ocelotgui),
-a GPL-license database client.
-Read file LICENSE.GPL to see the terms of the license.
+This is Ocelot GUI (ocelotgui), a GPL-license database client.
 
 Copyright (c) 2014, Ocelot Computer Services Inc.
 All rights reserved.
+Read file LICENSE.GPL to see the terms of the license.
 
 The file manual.htm has instructions for end users.
 
@@ -41,6 +40,27 @@ export LD_LIBRARY_PATH=[path to directory that contains libmysqlclient.so]
 
 The installation examples that follow do not assume that libmysqlclient.so
 is already installed.
+
+Getting the ocelotgui source and executable files
+-------------------------------------------------
+
+The official location of the project is on github:
+https://github.com/ocelot-inc/ocelotgui
+This is where the latest source files are. This is what can be "cloned".
+
+The releases for ocelot-inc/ocelotgui are elsewhere on github:
+https://github.com/pgulutzan/ocelotgui/releases
+A release includes the source files as of the release time,
+and also two binary (executable) files.
+Although the release does not have the "latest" source which is
+in ocelot-inc/ocelotgui, the existence of the executables
+might be convenient. A release file is highlighted in green
+by github and is named ocelotgui.tar.gz. Thus relesae 0.1.0 is at
+https://github.com/pgulutzan/ocelotgui/releases/download/0.1.0/ocelotgui.tar.gz
+
+The installation examples that follow assume that download is
+of a release.
+
 
 An installation with Ubuntu 12.04, 64-bit
 -----------------------------------------
@@ -163,7 +183,6 @@ sudo apt-get install qt4-qmake
 sudo apt-get install libqt4-dev
 cd [path to ocelotgui source files]
 make clean
-sudo apt-get install qt4-qmake
 /usr/bin/qmake-qt4 -config release
 make
 
