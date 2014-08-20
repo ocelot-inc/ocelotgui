@@ -1621,10 +1621,9 @@ int MainWindow::execute_client_statement()
   /* USE or \u: mysql equivalent. */
   if (statement_type == TOKEN_KEYWORD_USE)
   {
-    /* Todo: if database name is in quotes or delimited, strip. Stripping might be necessary in lots of cases. */
     QString s;
     int mysql_select_db_result;
-    if ((i2 >= 2) && (sub_token_types[0] != TOKEN_KEYWORD_USE)) s= text.mid(sub_token_offsets[1], sub_token_lengths[1]);
+    if ((i2 >= 2) && (sub_token_types[0] == TOKEN_KEYWORD_USE)) s= text.mid(sub_token_offsets[1], sub_token_lengths[1]);
     else if (i2 >= 3) s= text.mid(sub_token_offsets[2], sub_token_lengths[2]);
     else
     {
@@ -1632,6 +1631,8 @@ int MainWindow::execute_client_statement()
       statement_edit_widget->result= tr("Error. USE statement has no argument.");
       return 1;
     }
+    /* If database name is in quotes or delimited, strip. Todo: stripping might be necessary in lots of cases. */
+    s= connect_stripper(s);
     int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
     char *query= new char[query_len + 1];
     memcpy(query, s.toUtf8().constData(), query_len + 1);
@@ -3795,9 +3796,12 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
 
 
 /*
-  Remove ''s or ""s around a QString, then remove lead or trail spaces.
+  Remove ''s or ""s or ``s around a QString, then remove lead or trail spaces.
+  Called for connect, and also for things like USE `test`.
   I didn't say remove lead or trail whitespace, so QString "trimmed()" is no good.
-  todo: I am fairly sure that I need this in other places too.
+  todo: I'm not sure that `` (tildes) should be removed for my.cnf values, check that
+  todo: I am fairly sure that I need to call this from other places too.
+  todo: Does not look for 'xxx''yyy'. should it?
 */
 QString MainWindow::connect_stripper (QString value_to_strip)
 {
@@ -3805,6 +3809,7 @@ QString MainWindow::connect_stripper (QString value_to_strip)
   int s_length;
   char c_singlequote[2];
   char c_doublequote[2];
+  char c_grave_accent[2]; /* Grave Accent is the Unicode term for `. MySQL calls it backtick. */
 
   s= value_to_strip;
   s_length= s.count();
@@ -3812,8 +3817,10 @@ QString MainWindow::connect_stripper (QString value_to_strip)
   {
     c_singlequote[0]= 0x27; c_singlequote[1]= 0;
     c_doublequote[0]= 0x22; c_doublequote[1]= 0;
+    c_grave_accent[0]= 0x60; c_grave_accent[1]= 0;
     if (((s.mid(0, 1) == QString(c_singlequote)) && (s.mid(s_length - 1, 1) == QString(c_singlequote)))
-    ||  ((s.mid(0, 1) == QString(c_doublequote)) && (s.mid(s_length - 1, 1) == QString(c_doublequote))))
+    ||  ((s.mid(0, 1) == QString(c_doublequote)) && (s.mid(s_length - 1, 1) == QString(c_doublequote)))
+    ||  ((s.mid(0, 1) == QString(c_grave_accent)) && (s.mid(s_length - 1, 1) == QString(c_grave_accent))))
     {
       s= s.mid(1, s_length - 2);
       while ((s.count() > 0) && (s.mid(0, 1) == " "))

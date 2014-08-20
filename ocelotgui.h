@@ -698,7 +698,7 @@ public:
   unsigned int result_column_count;
   long unsigned int result_row_count;
   unsigned long *lengths;
-  unsigned int *grid_column_widths;                         /* dynamic-sized list of widths */
+  unsigned long *grid_column_widths;                         /* dynamic-sized list of widths */
   unsigned int *grid_column_heights;                        /* dynamic-sized list of heights */
   unsigned long r;
   MYSQL_ROW row;
@@ -786,7 +786,7 @@ ResultGrid(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent): QWidget
   text_edit_widgets= new QTextEdit*[(result_row_count + 1) * result_column_count]; /* Plain? */
   text_edit_layouts= new QHBoxLayout*[(result_row_count + 1) * result_column_count];
   text_edit_frames= new TextEditFrame*[(result_row_count + 1) * result_column_count];
-  grid_column_widths= new unsigned int[result_column_count];
+  grid_column_widths= new long unsigned int[result_column_count];
   grid_column_heights= new unsigned int[result_column_count];
   /* ... */
 
