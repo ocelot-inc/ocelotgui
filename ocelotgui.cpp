@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.1.0 Alpha
-   Last modified: August 10 2014
+   Version: 0.1.2 Alpha
+   Last modified: August 23 2014
 */
 
 /*
@@ -356,9 +356,11 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   if (obj != statement_edit_widget) return false;
   if (event->type() != QEvent::KeyPress) return false;
   QKeyEvent *key= static_cast<QKeyEvent *>(event);
+
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
-  if (main_statement_type >= TOKEN_KEYWORD_QUESTIONMARK)
+  /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
+  if ((main_statement_type >= TOKEN_KEYWORD_QUESTIONMARK) || (key->modifiers() & Qt::ControlModifier))
   {
     emit action_execute();
     return true;
