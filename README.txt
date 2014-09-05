@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-Version 0.1.1
+Version 0.1.3
 
 This is Ocelot GUI (ocelotgui), a GPL-license database client.
 

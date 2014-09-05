@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.1.2 Alpha
-   Last modified: August 23 2014
+   Version: 0.1.3 Alpha
+   Last modified: September 5 2014
 */
 
 /*
@@ -396,7 +396,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   History
   =======
 
-  The history widget history_edit_widget is a read-only QTextEdit
+  The history widget history_edit_widget is an editable QTextEdit
   which contains retired statements + errors/warnings, scrolling
   so it looks not much different from the mysql retired-statement
   scrolling. However, our history does not include result sets.
@@ -411,25 +411,298 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   ocelot_history_includes_warnings                 default no
 
   The statement is always followed by an error message,
-  but @ocelot_history_includes_wsarnings is affected by ...
+  but @ocelot_history_includes_warnings is affected by ...
   warnings  (\W) Show warnings after every statement.
   nowarning (\w) Don't show warnings after every statement.
   If the prompt is included, then we should be saving time-of-day
   for the first statement-line prompt and doing prompt_translate()
   for each line of the statement when we copy it out.
-  It should be possible to say up-arrow and get a prior statement,
-  but that's not really coming from  history, it's an illusion.
+  In mysql client it's possible to say up-arrow and get a prior statement,
+  but we have up-arrow for different purposes, probably PgUp|PgDown is better,
+  or alt+up-arrow|alt+down-arrow.
   I didn't see a need to make the widget with a subclass of QTextEdit.
-  I forget why history_edit_widget is QTextEdit when statement_edit_widget
-  is CodeEditor which is derived from QPlainTextEdit.
+  The history_edit_widget is QTextEdit, differing from statement_edit_widget
+  which is CodeEditor which is derived from QPlainTextEdit.
+
+  History menu items / commands:
+  * The usual edit menu items = cut, copy, paste, etc.
+    Therefore we don't really need to limit history size, users can clear.
+  * PgUp + PgDn
+    * are menu items for "previous statement" / "next statement"
+    * disable if there's no previous / next
+    * if done on statement widget, brings in from history -- dunno if history should scroll when that happens
+    ? when bringing in from history to statement, don't re-execute
+    * if user executes a restated statement, there's a behaviour choice: now the restated statement is last statement, or now the last-picked statement is still last statement
+  * Open | Save | Close | Delete
+    * file items, with the intent of keeping history
+    * you can go back in history by going back in a file
+    * format should be the same as MySQL log history
+      ? but in that case, should display look like MySQL log too?
+    * Save means "save what's being shown, so it's affected by Hide
+  * Find | Goto
+    * you need these menu items for history soon, so might as well have them for statements too
+  * Hide prompt + Hide result + Hide result set
+  + Settings: History Widget: Colors and Fonts has different colors for prompt/statement/result/result set
+
+  Comments unrelated to HTML work:
+  Possible difficulty: our history is statement-at-a-time, not screen-at-a-time", if there are multi statements
+  Certain statements might be suppressed
+    * should Quit and Source go in history?
+    * should only data-change statements go in history?
+    * should client-statements be suppressed?
+    * this is a "Filter" matter
+    ? to what extent is this useful for audit?
+    Wherever there's a menu item, there should also be a client-statement
+    * history must include comments even if they're not sent to the server (there's some mysql-option for that)
+    * Delimiter might change, so when you copy from history to statement, what should you do?
+    * When the debugger comes in, statements done by the debugger are a special history category
+
+  HTML in the history widget
+  Unlike statement_edit_widget, history_edit_widget is QTextEdit and allows rich text.
+  History is an editable QTextEdit which contains HTML.
+  Each history entry has: prompt, statement, result, and possibly result set.
+  (Result set is unimplemented but will be mentioned in these comments;
+  eventually it will be something that appears like mysql client result set.)
+  There are two kinds of markup:
+  (1) <span style="...">...</span> for changes to color + font.
+      Currently this is only used for history prompt bgcolor = statement prompt bgcolor.
+  (2) <a name='[mark]'> for showing what kind of text follows.
+      The markups are <a name='STATEMENT START'> ... <a name='STATEMENT END'>
+                <a name='PROMPT START'> ... <a name='PROMPT END'>
+                <a name='RESULT'> (ends when statement ends)
+                <a name='ENTITY'> (always an entity for a single & character)
+      Digia does not document or guarantee what it will do with <a>
+      and we're not using it for its intended function as anchor.
+      Example: "SELECT * FROM t <br> WHERE x < '&';" becomes
+      <a name='STATEMENT START'>
+      <span ...><a name='PROMPT'>mysql&gt;<a name='PROMPT END'></span>
+      SELECT * FROM t <br>
+      <a name='PROMPT'>&gt;<a name='PROMPT END'>
+      WHERE a &lt; '<a name='ENTITY'>&amp;';
+      <span ...><a name='RESULT'>OK</span>
+      <a name='STATEMENT END'>
+  Handle PgUp | PgDn by picking up next | previous STATEMENT START ... END.
+  When copying to history, change < and > and & to entities but mark if '&'.
+    Also: change ' and " to entities.
+  When copying from history, change entities to < and > and & unless marked.
+  Todo: hide prompt + result by putting whole thing within <a name='...'>.
+  In order to see the HTML, say:
+    QMessageBox msgBox;
+    msgBox.setTextFormat(Qt::PlainText);
+    msgBox.setText(history_edit_widget->toHtml());
+    msgBox.exec();
+  History is editable.
+    If the user inputs "<" when editing the history,
+    change that to an entity immediately -- but maybe Qt will do that.
+  Idea: use QTextCursor to change cursor in history if PgUp|PgDn in statement.
+  Idea: multiple types of result: warning, error, result set
 */
+
 void MainWindow::create_widget_history()
 {
   history_edit_widget= new QTextEdit();
-  history_edit_widget->setReadOnly(true);
+  history_edit_widget->setReadOnly(false);       /* if history shouldn't be editable, set to "true" here */
   history_edit_widget->hide();                   /* hidden until a statement is executed */
   ocelot_history_includes_warnings= 0;           /* include warning(s) returned from statement? default = no. */
+  history_markup_make_strings();
   return;
+}
+
+
+/*
+  Set the strings that will be used for markup comments in history widget.
+  Call history_markup_make_strings() at program start.
+  Todo: At the moment these could be constants but I don't think they always will be.
+  Note: <br> in history_markup_statement_start is necessary; else prompt_start is ignored.
+*/
+void MainWindow::history_markup_make_strings()
+{
+  history_markup_statement_start= "<a name=\"STATEMENT START\"></a><br>";
+  history_markup_statement_end=   "<a name=\"STATEMENT END\"></a>";
+  history_markup_prompt_start=    "<a name=\"PROMPT START\"></a>";
+  history_markup_prompt_end=      "<a name=\"PROMPT END\"></a>";
+  history_markup_result=          "<a name=\"RESULT\"></a>";
+  history_markup_entity=          "<a name=\"ENTITY\"></a>";
+}
+
+
+/* The following will append the statement to history, line-at-a-time with prompts. */
+/* It seems to work except that the prompt is not right-justified. */
+/* Todo: right justify. Make it optional to show the prompt, unless prompt can be hidden. */
+void MainWindow::history_markup_append()
+{
+  QString plainTextEditContents;
+  QStringList statement_lines;
+  int statement_line_index;
+  QString history_statement;
+
+  plainTextEditContents= query_utf16; /* Todo: consider: why bother copying rather than using query_uitf16? */
+  statement_lines= plainTextEditContents.split("\n");
+  //statement_line_index= 0;                                                          /* Todo throw this useless line away */
+  /* Todo: There should be a better way to ensure that Qt realizes the whole widget is rich text. */
+  /* Todo: Some of this could be at start of history_edit_widget but what would happen if I cleared the whole area? */
+  /* Todo: background-color of prompt could be settable for history widget, rather than = statement background color. */
+  /* Todo: there's a weird bug that splits prompt into 'm' and 'ysql>', but the output still looks okay. */
+  history_statement= "<i></i>";                                           /* hint that what's coming is HTML */
+  history_statement.append(history_markup_statement_start);
+
+  for (statement_line_index= 0; statement_line_index < statement_lines.count(); ++statement_line_index)
+  {
+    history_statement.append("<span style=\" background-color:");
+    history_statement.append(ocelot_statement_prompt_background_color);
+    history_statement.append(";\">");
+    history_statement.append(history_markup_prompt_start);
+    history_statement.append(history_markup_copy_for_history(statement_edit_widget->prompt_translate(statement_line_index + 1)));
+    history_statement.append(history_markup_prompt_end);
+    history_statement.append("</span>");
+    history_statement.append(history_markup_copy_for_history(statement_lines[statement_line_index]));
+    history_statement.append("<br>");
+  }
+
+  history_statement.append(history_markup_result);
+  history_statement.append(history_markup_copy_for_history(statement_edit_widget->result)); /* the main "OK" or error message */
+  history_statement.append(history_markup_statement_end);
+
+  history_edit_widget->append(history_statement);
+
+  history_markup_counter= 0;
+}
+
+/* When copying to history, change < and > and & and " to entities. */
+QString MainWindow::history_markup_copy_for_history(QString inputs)
+{
+  QString outputs;
+  QString c;
+  int i;
+
+  outputs= "";
+  for (i= 0; i < inputs.length(); ++i)
+  {
+    c= inputs.mid(i, 1);
+    if (c == "<") c= "&lt;";
+    if (c == ">") c= "&gt;";
+    if (c == "&") c= "&amp;";
+    if (c == "\"") c= "&quot;";
+    outputs.append(c);
+  }
+  return outputs;
+}
+
+/* In response to edit menu "Previous statement" or "Next statement",
+   make statement widget contents = a previous statement from history,
+   without executing.
+   When copying from history, change entities to < and > and & and "
+   But the job is much bigger than that.
+   Find "STATEMENT START".
+   Start copying.
+   Skip everything between "PROMPT START" and "PROMPT END".
+   Stop copying when you see "RESULT".
+*/
+void MainWindow::history_markup_previous()
+{
+  ++history_markup_counter;
+  if (history_markup_previous_or_next() == -1) --history_markup_counter;
+}
+
+
+void MainWindow::history_markup_next()
+{
+  --history_markup_counter;
+  if (history_markup_previous_or_next() == -1) ++history_markup_counter;
+}
+
+
+int MainWindow::history_markup_previous_or_next()
+{
+  QString outputs;
+  QString final_outputs;
+  int index_of_prompt_end;
+  int index_of_a_gt, index_of_lt_a;
+  int i;
+  QString c;
+  int search_start_point;
+
+  QString s;
+  int index_of_statement_start;
+  int index_of_result;
+
+  s= history_edit_widget->toHtml();
+  search_start_point= -1;                                                    /* search starting from end of string */
+  for (i= 0;;)
+  {
+    index_of_statement_start= s.lastIndexOf("\"STATEMENT START\"", search_start_point);
+    if (index_of_statement_start == -1) return -1;                           /* (statement start not found) */
+    index_of_result= s.indexOf("\"RESULT\"", index_of_statement_start);
+    if (index_of_result == -1) return -1;                                    /* (result not found) */
+    ++i;
+    if (i >= history_markup_counter) break;                                  /* (we're at the right SELECT) */
+    search_start_point= index_of_statement_start - 1;                        /* keep going back */
+  }
+  outputs= "";
+
+  s= s.mid(index_of_statement_start, index_of_result - index_of_statement_start);
+
+  /* At this point s = whatever's between statement start and result */
+  /* But there might be a series of repeat(prompt-start prompt-end real-statement) till result */
+  for (;;)
+  {
+    index_of_prompt_end= s.indexOf("\"PROMPT END\"", 0);
+    if (index_of_prompt_end == -1) break;
+    index_of_a_gt= s.indexOf("a>", index_of_prompt_end) + 2;
+    if (index_of_a_gt == -1) break;
+    index_of_lt_a= s.indexOf("<a", index_of_a_gt);
+    if (index_of_lt_a == -1) break;
+    outputs.append(s.mid(index_of_a_gt, index_of_lt_a - index_of_a_gt));
+    s= s.mid(index_of_a_gt, -1);
+  }
+
+  /* At this point outputs = the statement but it might contain entities
+     so reverse whatever happened in history_markup_copy_for_history(),
+     and change <br> back to \r.
+     Todo: check what happens if original statement contains an entity.
+  */
+  final_outputs= "";
+  for (i= 0; i < outputs.length(); ++i)
+  {
+    if (outputs.mid(i, 4) == "<br>")
+    {
+      final_outputs.append("\r");
+      i+= 3;
+    }
+    else if (outputs.mid(i, 6) == "<br />")
+    {
+      final_outputs.append("\r");
+      i+= 5;
+    }
+    else if (outputs.mid(i, 4) == "&lt;")
+    {
+      final_outputs.append("<");
+      i+= 3;
+    }
+    else if (outputs.mid(i, 4) == "&gt;")
+    {
+      final_outputs.append(">");
+      i+= 3;
+    }
+    else if (outputs.mid(i, 5) == "&amp;")
+    {
+      final_outputs.append("&");
+      i+= 4;
+    }
+    else if (outputs.mid(i, 6) == "&quot;")
+    {
+      final_outputs.append("\"");
+      i+= 5;
+    }
+    else
+    {
+      c= outputs.mid(i, 1);
+      final_outputs.append(c);
+    }
+  }
+
+  statement_edit_widget->setPlainText(final_outputs);
+  return 0;
 }
 
 
@@ -502,6 +775,14 @@ void MainWindow::create_menu()
 
   connect(statement_edit_widget->document(), SIGNAL(undoAvailable(bool)),menu_edit_action_undo, SLOT(setEnabled(bool)));
   connect(statement_edit_widget->document(), SIGNAL(redoAvailable(bool)),menu_edit_action_redo, SLOT(setEnabled(bool)));
+
+  menu_edit_action_history_markup_previous= menu_edit->addAction(tr("Previous statement"));
+  connect(menu_edit_action_history_markup_previous, SIGNAL(triggered()), this, SLOT(history_markup_previous()));
+  menu_edit_action_history_markup_previous->setShortcut(QKeySequence(tr("Ctrl+P")));
+
+  menu_edit_action_history_markup_next= menu_edit->addAction(tr("Next statement"));
+  connect(menu_edit_action_history_markup_next, SIGNAL(triggered()), this, SLOT(history_markup_next()));
+  menu_edit_action_history_markup_next->setShortcut(QKeySequence(tr("Ctrl+N")));
 
   menu_run= ui->menuBar->addMenu(tr("Run"));
   menu_run_action_execute= menu_run->addAction(tr("Execute"));
@@ -765,7 +1046,7 @@ void MainWindow::create_the_manual_widget()
   the_manual_text_edit->setText("\
 <BR><h1>The ocelotgui user manual</h1>  \
 <BR>  \
-<BR>Version 0.1.0, August 10 2014  \
+<BR>Version 0.1.3, September 5 2014  \
 <BR>  \
 <BR>  \
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -911,11 +1192,13 @@ with '[line number] mariadb>'.  \
 <BR>  \
 <BR>Once a statement has been executed, a copy of the statement text  \
 and the diagnostic result (for example: 0.04 seconds, OK) will  \
-be placed in the history widget. The history widget is read-only,  \
-has no special area for the prompt, and simply fills up so that  \
+be placed in the history widget. Everything in the history widget  \
+is editable including the prompt, and it simply fills up so that  \
 after a while the older statements are scrolled off the screen.  \
-Thus its only function is to show what recent statements and  \
-results were.  \
+Thus its main function is to show what recent statements and  \
+results were. Statements in the history can be retrieved while  \
+the focus is on the statement widget, by selecting 'Previous statement'  \
+or 'Next statement' menu items.  \
 <BR>  \
 <BR><h2>Result widget</h2>  \
 <BR>  \
@@ -1491,21 +1774,9 @@ void MainWindow::action_execute_one_statement()
 
   /* statement is over */
 
-  /* The following will append the statement to history, line-at-a-time with prompts. */
-  /* It seems to work except that the prompt is not right-justified. */
-  /* Todo: right justify. Make it optional to show the prompt. */
-  QString plainTextEditContents= query_utf16; /* Todo: consider: why bother copying rather than using query_uitf16? */
-  QStringList lines= plainTextEditContents.split("\n");
-  int line_index= 0;
-  for (line_index= 0; line_index < lines.count(); ++line_index)
-  {
-    QString sline= statement_edit_widget->prompt_translate(line_index + 1);
-    sline.append(lines[line_index]);
-    history_edit_widget->append(sline);
-  }
-
-  history_edit_widget->append(statement_edit_widget->result);             /* the main "OK" or error message */
+  history_markup_append(); /* add prompt+statemen+result to history, with markup */
 }
+
 
 /*
  Handle "client statements" -- statements that the client itself executes.

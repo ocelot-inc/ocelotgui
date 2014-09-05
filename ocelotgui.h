@@ -155,6 +155,13 @@ public:
   QString row_form_title;                /* for row_form */
   QString row_form_message;              /* for row_form */
 
+  QString history_markup_statement_start;    /* for markup */
+  QString history_markup_statement_end;      /* for markup */
+  QString history_markup_prompt_start;       /* for markup */
+  QString history_markup_prompt_end;         /* for markup */
+  QString history_markup_result;             /* for markup */
+  QString history_markup_entity;             /* for markup */
+
 public slots:
   void action_connect();
   void action_connect_once(QString);
@@ -169,6 +176,8 @@ public slots:
   void action_grid();
   void action_history();
   void action_main();
+  void history_markup_previous();
+  void history_markup_next();
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
@@ -176,6 +185,7 @@ protected:
 private:
   Ui::MainWindow *ui;
 
+  int history_markup_previous_or_next();
   void create_widget_history();
   void create_widget_statement();
   void create_menu();
@@ -202,6 +212,10 @@ private:
   void create_the_manual_widget();
   int get_next_statement_in_string();
   void action_execute_one_statement();
+
+  void history_markup_make_strings();
+  void history_markup_append();
+  QString history_markup_copy_for_history(QString);
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
 
@@ -506,6 +520,8 @@ private:
     QAction *menu_edit_action_undo;
     QAction *menu_edit_action_redo;
     QAction *menu_edit_action_select_all;
+    QAction *menu_edit_action_history_markup_previous;
+    QAction *menu_edit_action_history_markup_next;
   QMenu *menu_run;
     QAction *menu_run_action_execute;
   QMenu *menu_settings;
@@ -526,6 +542,8 @@ private:
   ResultGrid *result_grid_table_widget;
 
   unsigned long result_row_count;
+
+  int history_markup_counter; /* 0 when execute, +1 when "previous statement", -1 for "next statement" */
 
   int  main_token_offsets[MAX_TOKENS];
   int  main_token_lengths[MAX_TOKENS];
@@ -568,6 +586,8 @@ private:
   /* unsigned int ocelot_grid_max_desired_width_in_chars; */
   int ocelot_history_includes_warnings;   /* affects history */
 };
+
+
 
 #endif // MAINWINDOW_H
 

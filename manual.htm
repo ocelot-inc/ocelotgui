@@ -1,6 +1,6 @@
 <BR><h1>The ocelotgui user manual</h1>  
 <BR>  
-<BR>Version 0.1.2, August 23 2014  
+<BR>Version 0.1.3, September 5 2014  
 <BR>  
 <BR>  
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  
@@ -146,11 +146,13 @@ with '[line number] mariadb>'.
 <BR>  
 <BR>Once a statement has been executed, a copy of the statement text  
 and the diagnostic result (for example: 0.04 seconds, OK) will  
-be placed in the history widget. The history widget is read-only,  
-has no special area for the prompt, and simply fills up so that  
+be placed in the history widget. Everything in the history widget  
+is editable including the prompt, and it simply fills up so that  
 after a while the older statements are scrolled off the screen.  
-Thus its only function is to show what recent statements and  
-results were.  
+Thus its main function is to show what recent statements and  
+results were. Statements in the history can be retrieved while  
+the focus is on the statement widget, by selecting 'Previous statement'  
+or "Next statement" menu items.  
 <BR>  
 <BR><h2>Result widget</h2>  
 <BR>  
