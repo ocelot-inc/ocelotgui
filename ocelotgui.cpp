@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.1.3 Alpha
-   Last modified: September 5 2014
+   Version: 0.2.0 Alpha
+   Last modified: December 10 2014
 */
 
 /*
@@ -351,6 +351,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   if (obj == result_grid_table_widget)
   {
     if (event->type() == QEvent::FontChange) return (result_grid_table_widget->fontchange_event());
+    if (event->type() == QEvent::Show) return (result_grid_table_widget->show_event());
   }
 
   if (obj != statement_edit_widget) return false;
@@ -1455,7 +1456,10 @@ void MainWindow::make_style_strings()
 
   ocelot_grid_style_string= "color:"; ocelot_grid_style_string.append(ocelot_grid_color);
   ocelot_grid_style_string.append(";background-color:"); ocelot_grid_style_string.append(ocelot_grid_background_color);
-  ocelot_grid_style_string.append(";border:1px solid "); ocelot_grid_style_string.append(ocelot_grid_border_color);
+  ocelot_grid_style_string.append(";border:");
+  ocelot_grid_style_string.append(ocelot_grid_cell_border_size);
+  ocelot_grid_style_string.append("px solid ");
+  ocelot_grid_style_string.append(ocelot_grid_border_color);
   ocelot_grid_style_string.append(";font-family:"); ocelot_grid_style_string.append(ocelot_grid_font_family);
   ocelot_grid_style_string.append(";font-size:"); ocelot_grid_style_string.append(ocelot_grid_font_size);
   ocelot_grid_style_string.append("pt;font-style:"); ocelot_grid_style_string.append(ocelot_grid_font_style);
@@ -1463,7 +1467,10 @@ void MainWindow::make_style_strings()
 
   ocelot_grid_header_style_string= "color:"; ocelot_grid_header_style_string.append(ocelot_grid_color);
   ocelot_grid_header_style_string.append(";background-color:"); ocelot_grid_header_style_string.append(ocelot_grid_header_background_color);
-  ocelot_grid_header_style_string.append(";border:1px solid "); ocelot_grid_header_style_string.append(ocelot_grid_border_color);
+  ocelot_grid_header_style_string.append(";border:");
+  ocelot_grid_header_style_string.append(ocelot_grid_cell_border_size);
+  ocelot_grid_header_style_string.append("px solid ");
+  ocelot_grid_header_style_string.append(ocelot_grid_border_color);
   ocelot_grid_header_style_string.append(";font-family:"); ocelot_grid_header_style_string.append(ocelot_grid_font_family);
   ocelot_grid_header_style_string.append(";font-size:"); ocelot_grid_header_style_string.append(ocelot_grid_font_size);
   ocelot_grid_header_style_string.append("pt;font-style:"); ocelot_grid_header_style_string.append(ocelot_grid_font_style);
@@ -1756,10 +1763,9 @@ void MainWindow::action_execute_one_statement()
             printf("Pseudo-assertion: main_window already has a layout\n"); exit(1);
           }
           main_window->setLayout(main_layout);
-
+          /* 2014-12-10 Following line was shifted -- it used to come after the show(). */
+          result_grid_table_widget->installEventFilter(this);                      /* must catch fontChange, show, etc. */
           result_grid_table_widget->show();    /* Todo: consider: isn't this obsolete? Isn't this being shown too early? */
-          result_grid_table_widget->installEventFilter(this);                      /* must catch fontChange etc. */
-
           /*
             The vertical scroll bar for result_grid_table_widget,
             i.e. grid_vertical_scroll_bar, is created during the initial setup.
@@ -1900,7 +1906,6 @@ int MainWindow::execute_client_statement()
     else if (i2 >= 3) s= text.mid(sub_token_offsets[2], sub_token_lengths[2]);
     else
     {
-      /* Todo: test whether this error goes to history */
       statement_edit_widget->result= tr("Error. USE statement has no argument.");
       return 1;
     }
@@ -2199,12 +2204,12 @@ void MainWindow::put_diagnostics_in_result()
       sprintf(mysql_error_and_state, " %llu rows affected", mysql_affected_rows(&mysql));
       s1.append(mysql_error_and_state);
     }
-    printf("info=%s.\n", mysql_info(&mysql));
+    //printf("info=%s.\n", mysql_info(&mysql));
     /* Add to display: how long the statement took, to nearest tenth of a second. Todo: fix calculation. */
     qint64 statement_end_time= QDateTime::currentMSecsSinceEpoch();
     qint64 elapsed_time= statement_end_time - statement_edit_widget->start_time;
     long int elapsed_time_as_long_int= (long int) elapsed_time;
-    float elapsed_time_as_float= (float) elapsed_time_as_long_int / 100;
+    float elapsed_time_as_float= (float) elapsed_time_as_long_int / 1000;
     sprintf(mysql_error_and_state, "(%.1f seconds)", elapsed_time_as_float);
     s1.append(mysql_error_and_state);
     if (mysql_warning_count(&mysql) > 0)
@@ -3178,7 +3183,8 @@ int MainWindow::connect_mysql()
 
   if (the_connect())
   {
-    statement_edit_widget->result= tr("Failed to connect. Use menu item File|Connect to try again");
+    put_diagnostics_in_result();
+    statement_edit_widget->result.append(tr("Failed to connect. Use menu item File|Connect to try again"));
     return 1;
   }
   statement_edit_widget->result= tr("OK");
@@ -3598,10 +3604,16 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
     /* if (event->x() <= border_size) {
        widget_side= LEFT;
        setCursor(Qt::SizeHorCursor); }
-    else */ if (event->x() >= width() - border_size)
+    else */
+    if (event->x() >= width() - border_size)
     {       /* perhaps this should be 1 rather than border_size? */
       widget_side= RIGHT;
       setCursor(Qt::SizeHorCursor);
+    }
+    else if (event->y() >= height() - border_size)
+    {       /* perhaps this should be 1 rather than border_size? */
+      widget_side= BOTTOM;
+      setCursor(Qt::SizeVerCursor);
     }
   }
   if (left_mouse_button_was_pressed == 0) return;      /* if mouse left button was never pressed, or was released, do nothing */
@@ -3624,6 +3636,31 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
       }
     }
   }
+  if (widget_side == BOTTOM)
+  {
+    if (event->y() > minimum_height)
+    {
+      /*
+        The following extra 'if' exists because Qt was displaying warnings like
+        "QWidget::setMinimumSize: (/TextEditFrame) Negative sizes (-4,45) are not possible"
+        when someone grabs the bottom and drags to the left
+      */
+      if (event->x() >= minimum_width)
+      {
+        /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
+        ancestor_result_grid_widget->grid_column_heights[ancestor_column_number]= event->y();
+        int xheight;
+        for (long unsigned int xrow= 0; xrow < ancestor_result_grid_widget->grid_actual_grid_height_in_rows; ++xrow)
+        {
+          TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_column_number];
+          if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_column_number];
+          if (xrow == 0) xheight= f->height();
+          f->setFixedSize(event->x(), xheight);
+        }
+      }
+    }
+  }
+
 }
 
 
@@ -3805,6 +3842,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_silent= 0;
   ocelot_no_beep= 0;
   ocelot_wait= 0;
+  ocelot_default_character_set= "";
 
   {
     struct passwd *pw;
@@ -4153,6 +4191,7 @@ QString MainWindow::connect_stripper (QString value_to_strip)
   silent ocelot_silent
   no_beep ocelot_no_beep
   wait ocelot_wait
+  default-character-set ocelot_default_character_set
 */
 void MainWindow::connect_set_variable(QString token0, QString token2)
 {
@@ -4308,6 +4347,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_defaults_file= token2;
     return;
   }
+  if (strcmp(token0_as_utf8, "default_character_set") == 0)
+  {
+    ocelot_default_character_set= token2;
+    return;
+  }
 }
 
 
@@ -4349,6 +4393,7 @@ void MainWindow::connect_make_statement()
   if (ocelot_silent > 0) statement_text= statement_text + " silent";
   if (ocelot_no_beep > 0) statement_text= statement_text + "no_beep";
   if (ocelot_wait > 0) statement_text= statement_text + "wait";
+  if (ocelot_default_character_set > "") statement_text= statement_text + "default_character_set=" + ocelot_default_character_set;
   msgBox.setText(statement_text);
   msgBox.exec();
 }
@@ -4430,48 +4475,47 @@ int MainWindow::options_and_connect(char *host, char *database, char *user, char
 
 int MainWindow::the_connect()
 {
-    int x;
+  int x;
 
-    /* See comment "UTF8 Conversion" */
-    int tmp_host_len= ocelot_host.toUtf8().size();
-    char *tmp_host= new char[tmp_host_len + 1];
-    memcpy(tmp_host, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
-    int tmp_database_len= ocelot_database.toUtf8().size();
-    char *tmp_database= new char[tmp_database_len + 1];
-    memcpy(tmp_database, ocelot_database.toUtf8().constData(), tmp_database_len + 1);
-    int tmp_user_len= ocelot_user.toUtf8().size();
-    char *tmp_user= new char[tmp_user_len + 1];
-    memcpy(tmp_user, ocelot_user.toUtf8().constData(), tmp_user_len + 1);
-    int tmp_password_len= ocelot_password.toUtf8().size();
-    char *tmp_password= new char[tmp_password_len + 1];
-    memcpy(tmp_password, ocelot_password.toUtf8().constData(), tmp_password_len + 1);
-    int tmp_init_command_len= ocelot_init_command.toUtf8().size();
-    char *tmp_init_command= new char[tmp_init_command_len + 1];
-    memcpy(tmp_init_command, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
+  /* See comment "UTF8 Conversion" */
+  int tmp_host_len= ocelot_host.toUtf8().size();
+  char *tmp_host= new char[tmp_host_len + 1];
+  memcpy(tmp_host, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
+  int tmp_database_len= ocelot_database.toUtf8().size();
+  char *tmp_database= new char[tmp_database_len + 1];
+  memcpy(tmp_database, ocelot_database.toUtf8().constData(), tmp_database_len + 1);
+  int tmp_user_len= ocelot_user.toUtf8().size();
+  char *tmp_user= new char[tmp_user_len + 1];
+  memcpy(tmp_user, ocelot_user.toUtf8().constData(), tmp_user_len + 1);
+  int tmp_password_len= ocelot_password.toUtf8().size();
+  char *tmp_password= new char[tmp_password_len + 1];
+  memcpy(tmp_password, ocelot_password.toUtf8().constData(), tmp_password_len + 1);
+  int tmp_init_command_len= ocelot_init_command.toUtf8().size();
+  char *tmp_init_command= new char[tmp_init_command_len + 1];
+  memcpy(tmp_init_command, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
 
-    int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
-    char *tmp_plugin_dir= new char[tmp_plugin_dir_len + 1];
-    memcpy(tmp_plugin_dir, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
+  int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
+  char *tmp_plugin_dir= new char[tmp_plugin_dir_len + 1];
+  memcpy(tmp_plugin_dir, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
 
-    int tmp_default_auth_len= ocelot_default_auth.toUtf8().size();
-    char *tmp_default_auth= new char[tmp_default_auth_len + 1];
-    memcpy(tmp_default_auth, ocelot_default_auth.toUtf8().constData(), tmp_default_auth_len + 1);
+  int tmp_default_auth_len= ocelot_default_auth.toUtf8().size();
+  char *tmp_default_auth= new char[tmp_default_auth_len + 1];
+  memcpy(tmp_default_auth, ocelot_default_auth.toUtf8().constData(), tmp_default_auth_len + 1);
+  int tmp_unix_socket_len= ocelot_unix_socket.toUtf8().size();
+  char *tmp_unix_socket= new char[tmp_unix_socket_len + 1];
+  memcpy(tmp_unix_socket, ocelot_unix_socket.toUtf8().constData(), tmp_unix_socket_len + 1);
 
-    int tmp_unix_socket_len= ocelot_unix_socket.toUtf8().size();
-    char *tmp_unix_socket= new char[tmp_unix_socket_len + 1];
-    memcpy(tmp_unix_socket, ocelot_unix_socket.toUtf8().constData(), tmp_unix_socket_len + 1);
+  x= options_and_connect(tmp_host, tmp_database, tmp_user, tmp_password,
+                      tmp_init_command, tmp_plugin_dir, tmp_default_auth, tmp_unix_socket);
 
-    x= options_and_connect(tmp_host, tmp_database, tmp_user, tmp_password,
-                        tmp_init_command, tmp_plugin_dir, tmp_default_auth, tmp_unix_socket);
-
-    delete []tmp_unix_socket;
-    delete []tmp_default_auth;
-    delete []tmp_plugin_dir;
-    delete []tmp_init_command;
-    delete []tmp_password;
-    delete []tmp_user;
-    delete []tmp_database;
-    delete []tmp_host;
-    return x;
+  delete []tmp_unix_socket;
+  delete []tmp_default_auth;
+  delete []tmp_plugin_dir;
+  delete []tmp_init_command;
+  delete []tmp_password;
+  delete []tmp_user;
+  delete []tmp_database;
+  delete []tmp_host;
+  return x;
 }
 

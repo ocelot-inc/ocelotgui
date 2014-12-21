@@ -146,6 +146,7 @@ public:
   unsigned short int ocelot_silent;          /* for CONNECT */
   unsigned short int ocelot_no_beep;         /* for CONNECT */
   unsigned short int ocelot_wait;            /* for CONNECT */
+  QString ocelot_default_character_set;      /* for CONNECT. not used. */
 
   QString *row_form_label;               /* for row_form */
   int *row_form_type;                    /* for row_form */
@@ -605,6 +606,7 @@ public:
 
   int border_size;
   int minimum_width;
+  int minimum_height;
   ResultGrid *ancestor_result_grid_widget;
   int ancestor_column_number;
 
@@ -616,7 +618,7 @@ protected:
 private:
   int left_mouse_button_was_pressed;
   int widget_side;
-  enum {LEFT= 1, RIGHT= 2};
+  enum {LEFT= 1, RIGHT= 2, TOP= 3, BOTTOM= 4};
 
 };
 
@@ -660,7 +662,7 @@ private:
   QEvent::Resize
   QEvent::ShowToParent                     a child widget has been shown
   QEvent::StyleChange                      I don't think this matters
-  ... Also, user might resize columns or rows if we finally allow resizing, somehow..
+  ... Also, user might resize columns or rows via dragging.
 */
 
 /*
@@ -681,8 +683,11 @@ private:
   the QFrame. In this implementation only right|left dragging of the subclassed QFrame, called TextEditFrame, is allowed.
   Todo: Mr Osipov had routines for resizing with keyboard control, and I should add that.
   Todo: up|down dragging, although vertical shrinking will not mean that more rows appear on the screen.
+        Up|down dragging "works" now but is undocumented, and still needs fixes for:
+          todo: minimum height (currently doesn't look right), bottom drag line size, bottom drag line color
+          todo: change height of all columns in the row, not just current column in all rows
   Todo: make border width user-settable, also on the Settings menu.
-  Todo: vertical resizing. I've read that "Correct place to do special layout management is overridden resizeEvent."
+  Todo: vertical resizing currently looks odd. I've read that "Correct place to do special layout management is overridden resizeEvent."
   Todo: test with a frame that has been scrolled horizontally so half of it is not visible, while there's a scoll bar.
   Todo: There can be a bit of flicker during drag though I doubt that anyone will care.
   Todo: Figure out what effect Tab key should have. Notice that for form_box we say setTabChangesFocus(true).
@@ -719,14 +724,16 @@ public:
   long unsigned int result_row_count;
   unsigned long *lengths;
   unsigned long *grid_column_widths;                         /* dynamic-sized list of widths */
-  unsigned int *grid_column_heights;                        /* dynamic-sized list of heights */
+  unsigned int *grid_column_heights;                         /* dynamic-sized list of heights */
+  unsigned char *grid_column_dbms_sources;                   /* dynamic-sized list of sources */
+  unsigned short int *grid_column_dbms_field_numbers;        /* dynamic-sized list of field numbers */
   unsigned long r;
   MYSQL_ROW row;
 
   MYSQL_FIELD *fields;
   QScrollArea *grid_scroll_area;
   QScrollBar *grid_vertical_scroll_bar;
-  int grid_vertical_scroll_bar_value;
+  int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
   QTextEdit **text_edit_widgets; /* Todo: consider using plaintext */ /* dynamic-sized list of pointers to QPlainTextEdit widgets */
   QHBoxLayout **text_edit_layouts;
   TextEditFrame **text_edit_frames;
@@ -753,6 +760,7 @@ public:
   unsigned int ocelot_grid_max_column_height_in_lines;         /* used when calculating cell height + width */
 
   int ocelot_grid_cell_right_drag_line_size_as_int;
+  int ocelot_grid_cell_border_size_as_int;
   QString ocelot_grid_color;
   QString ocelot_grid_background_color;
   QString ocelot_grid_cell_right_drag_line_color;
@@ -772,6 +780,8 @@ ResultGrid(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent): QWidget
   text_edit_frames= 0;
   grid_column_widths= 0;
   grid_column_heights= 0;
+  grid_column_dbms_sources= 0;
+  grid_column_dbms_field_numbers= 0;
   grid_vertical_scroll_bar= 0;
   grid_scroll_area= 0;
   /* grid_layout= 0; */
@@ -793,7 +803,7 @@ ResultGrid(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent): QWidget
   ocelot_grid_background_color= parent->ocelot_grid_background_color;
   /* ocelot_grid_cell_right_drag_line_size_as_int= parent->ocelot_grid_cell_right_drag_line_size.toInt(); */
   /* ocelot_grid_cell_right_drag_line_color= parent->ocelot_grid_cell_right_drag_line_color; */
-  result_column_count= mysql_num_fields(grid_mysql_res);           /* this will be the width of the grid */
+  dbms_set_result_column_count();                                  /* this will be the width of the grid */
   result_row_count= mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
 
   /*
@@ -808,9 +818,11 @@ ResultGrid(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent): QWidget
   text_edit_frames= new TextEditFrame*[(result_row_count + 1) * result_column_count];
   grid_column_widths= new long unsigned int[result_column_count];
   grid_column_heights= new unsigned int[result_column_count];
+  grid_column_dbms_sources= new unsigned char[result_column_count];
+  grid_column_dbms_field_numbers= new unsigned short int[result_column_count];
   /* ... */
 
-  fields= mysql_fetch_fields(grid_mysql_res);
+  dbms_set_grid_column_sources();                                             /* Todo: this could return an error? */
 
   grid_scroll_area= new QScrollArea(this);                                    /* Todo: see why parent can't be client */
   grid_vertical_scroll_bar= new QScrollBar();                                 /* Todo: check if it's bad that this has no parent */
@@ -848,8 +860,10 @@ void put_widgets_in_layouts(QFont *saved_font)
 
   ocelot_grid_cell_right_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_right_drag_line_size.toInt();
   ocelot_grid_cell_right_drag_line_color= copy_of_parent->ocelot_grid_cell_right_drag_line_color;
+  ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
 
-  grid_column_size_calc(saved_font); /* get grid_column_widths[] and grid_column_heights[] */
+  grid_column_size_calc(saved_font, ocelot_grid_cell_border_size_as_int,
+                        ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
 
   /*
     grid_actual_grid_height_in_rows = # of rows that are actually showable at a time,
@@ -876,7 +890,7 @@ void put_widgets_in_layouts(QFont *saved_font)
       text_edit_widgets[ki]->setCursor(Qt::ArrowCursor); /* See Note#1 above */
       text_edit_layouts[ki]= new QHBoxLayout();
 
-      text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_right_drag_line_size_as_int, 0));
+      text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_right_drag_line_size_as_int, ocelot_grid_cell_right_drag_line_size_as_int));
       text_edit_layouts[ki]->addWidget(text_edit_widgets[ki]);
       text_edit_frames[ki]= new TextEditFrame(this, this, column_number);
       /*
@@ -887,12 +901,15 @@ void put_widgets_in_layouts(QFont *saved_font)
       */
       QString frame_color_setting= "TextEditFrame {background-color: ";
       frame_color_setting.append(ocelot_grid_cell_right_drag_line_color);
+      frame_color_setting.append(";border: 0px");              /* TEST !! */
       frame_color_setting.append("}");
       text_edit_frames[ki]->setStyleSheet(frame_color_setting);
 
       /* Todo: I'm not sure exactly where the following three lines should go. Consider moving them. */
+      /* border_size and minimum_width and minimum_height are used by mouseMoveEvent */
       text_edit_frames[ki]->border_size= 10 + border_size;    /* Todo: should just be border_size!! */
       text_edit_frames[ki]->minimum_width= fm.width("W") * 3 + border_size;
+      text_edit_frames[ki]->minimum_height= fm.height() * 2 + border_size; /* todo: this is probably too much */
       text_edit_frames[ki]->setLayout(text_edit_layouts[ki]);
     }
   }
@@ -913,7 +930,13 @@ void put_widgets_in_layouts(QFont *saved_font)
     grid_row_layouts[xxrow_number]->setContentsMargins(QMargins(0, 0, 0, 0));
     grid_row_widgets[xxrow_number]= new QWidget(client);
   }
-  grid_main_layout= new QVBoxLayout(client);
+  /*
+    Just a note for the archives ...
+    Originally I had "grid_main_layout= new QVBoxLayout(client);" here.
+    I didn't realize that caused the equivalent of client->setLayout(), apparently.
+    So the later pseudo-assertion (checking if client->layout() != 0) happened. Don't need that.
+  */
+  grid_main_layout= new QVBoxLayout();
   grid_main_layout->setContentsMargins(QMargins(0, 0, 0, 0));   /* this overrides style settings, I suppose */
 
   grid_main_layout->setSpacing(0);                          /* ?? premature? */
@@ -948,7 +971,7 @@ void put_widgets_in_layouts(QFont *saved_font)
         so I'll wrap only for non-number.
       */
       /* Todo: some other types e.g. BLOBs might also need special handling. */
-      if ((xrow > 0) && (fields[col].flags & NUM_FLAG))
+      if ((xrow > 0) && (dbms_get_field_flag(col) & NUM_FLAG))
       {
         l->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
         l->setAlignment(Qt::AlignRight);
@@ -958,9 +981,18 @@ void put_widgets_in_layouts(QFont *saved_font)
       /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
       if (xrow == 0)
       {
-        f->setFixedSize(grid_column_widths[col], max_height_of_a_char + (border_size * 2) + 9);
-        f->setMaximumHeight(max_height_of_a_char+(border_size * 2) + 10);
-        f->setMinimumHeight(max_height_of_a_char+(border_size * 2) + 10);
+//        f->setFixedSize(grid_column_widths[col], max_height_of_a_char + (border_size * 2) + 9);
+//        f->setMaximumHeight(max_height_of_a_char+(border_size * 2) + 10);
+//        f->setMinimumHeight(max_height_of_a_char+(border_size * 2) + 10);
+          f->setFixedSize(grid_column_widths[col], max_height_of_a_char
+                                                   + ocelot_grid_cell_border_size_as_int * 2
+                                                   + ocelot_grid_cell_right_drag_line_size_as_int);
+          f->setMaximumHeight(max_height_of_a_char
+                              + ocelot_grid_cell_border_size_as_int * 2
+                              + ocelot_grid_cell_right_drag_line_size_as_int);
+          f->setMinimumHeight(max_height_of_a_char
+                              + ocelot_grid_cell_border_size_as_int * 2
+                              + ocelot_grid_cell_right_drag_line_size_as_int);
       }
       else
       {
@@ -968,6 +1000,9 @@ void put_widgets_in_layouts(QFont *saved_font)
         f->setFixedSize(grid_column_widths[col], grid_column_heights[col]);
         f->setMaximumHeight(grid_column_heights[col]);
         f->setMinimumHeight(grid_column_heights[col]);
+//          f->setFixedSize(grid_column_widths[col], grid_height_of_highest_column_in_pixels);
+//          f->setMaximumHeight(grid_height_of_highest_column_in_pixels);
+//          f->setMinimumHeight(grid_height_of_highest_column_in_pixels);
       }
       f->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);   /* This doesn't seem to do anything */
       /* l->setMinimumWidth(1); */
@@ -977,7 +1012,6 @@ void put_widgets_in_layouts(QFont *saved_font)
         And is there a way to find out what stylesheet settings are in use by QTableWidget?
       */
       /* l->setStyleSheet("border: 1px solid yellow"); */ /* just so I know the size of the border. Todo: user-settable? */
-
       grid_row_layouts[xrow]->addWidget(f, 0, Qt::AlignTop | Qt::AlignLeft);
 
       l->updateGeometry();
@@ -1009,7 +1043,13 @@ void put_widgets_in_layouts(QFont *saved_font)
   /* This doesn't work. Done too early? */
   /* client->setStyleSheet(copy_of_parent->ocelot_grid_style_string); */
 
-  client->show();                                          /* Without this, grid becomes blank after font change */
+  /*
+    Before client->show(), client->height()=30 and height()=30.
+    After client->show(), client->height()=something big e.g. 1098 and height()=30.
+    But client = the grid itself rather than the result grid widget?
+    Without client->show(), grid becomes blank after a font change.
+  */
+  client->show();
 
   grid_scroll_area->setWidget(client);
   grid_scroll_area->setWidgetResizable(true);              /* Without this, the QTextEdit widget heights won't change */
@@ -1062,7 +1102,8 @@ void put_widgets_in_layouts(QFont *saved_font)
   /* grid_vertical_scroll_bar_value= 0; */
   /* grid_vertical_scroll_bar= grid_scroll_area->verticalScrollBar(); */
 
-  vertical_bar_show_as_needed();
+  /* 2014-12-10: Moved this call to show_event() because height() isn't known until show happens. */
+  /* vertical_bar_show_as_needed(); */
 
   /*
     grid detail rows
@@ -1082,11 +1123,12 @@ void put_widgets_in_layouts(QFont *saved_font)
      p.setColor(QPalette::Base, QColor(copy_of_parent->ocelot_grid_header_background_color));
      text_edit_widgets[0*result_column_count+i]->setPalette(p);
      */
-    QString yy= fields[i].name; /* Todo: use name_length somehow so we don't get fooled by \0 */
+    QString yy= dbms_get_field_name(i); /* fields[i].name; */ /* Todo: use name_length somehow so we don't get fooled by \0 */
     text_edit_widgets[0 * result_column_count + i]->setPlainText(yy);
   }
 
   fill_detail_widgets();                                             /* details */
+
 }
 
 
@@ -1109,7 +1151,7 @@ void put_widgets_in_layouts(QFont *saved_font)
 */
 
 /*
-  We know the defined width (fields[i].length)
+  We know the defined width (dbms_get_field_length will give us fields[i].length)
   and the number of columns
   (result_column_count).
   We don't want to exceed the maximum grid width if we can help it.
@@ -1132,11 +1174,18 @@ void put_widgets_in_layouts(QFont *saved_font)
         Width is now too much.
 */
 /*
-  In the calculations, "+(border_size*2)" exists but it's assumed that border_size = 1,
-  but I don't know whether that's always true. Eventually we'll try to ensure
-  that it is, using setStyleSheet, see above.
+   Extra size
+   I'm saying "if width<2 then width=2" and "if height<2 then height=2".
+   If I don't, then the drag line doesn't appear.
+   It seems I don't need to do this if drag line size = 0.
+   Todo: Maybe the problem is that Qt is allowing for a scroll bar,
+   but in that case the addition should be size of scroll bar
+   rather than size of char, i.e. QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent)
+   and in that case the scroll bar policy could be changed too.
+   Todo: Other than that, I can't figure out what else is screwing up the
+   calculations, but perhaps lineSpacing() shouldn't be added if there is only one line.
 */
-void grid_column_size_calc(QFont *saved_font)
+void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_right_drag_line_size_as_int)
 {
   unsigned int i;
   /* long unsigned int tmp_column_lengths[MAX_COLUMNS]; */
@@ -1162,10 +1211,21 @@ void grid_column_size_calc(QFont *saved_font)
   */
   for (i= 0; i < result_column_count; ++i)
   {
-    grid_column_widths[i]= this->fields[i].name_length;
-    if (grid_column_widths[i] < fields[i].length) grid_column_widths[i]= fields[i].length;
+    grid_column_widths[i]= dbms_get_field_name_length(i); /* this->fields[i].name_length; */
+    if (grid_column_widths[i] < dbms_get_field_length(i)) grid_column_widths[i]= dbms_get_field_length(i); /* fields[i].length */
+
+    /* For explanation of next line, see comment "Extra size". */
+    if ((grid_column_widths[i] < 2) && (ocelot_grid_cell_right_drag_line_size_as_int > 0)) grid_column_widths[i]= 2;
+
     ++grid_column_widths[i]; /* ?? something do do with border width, I suppose */
-    grid_column_widths[i]= grid_column_widths[i] * max_width_of_a_char+(border_size * 2) + 10; /* to pixels */
+
+//    grid_column_widths[i]= grid_column_widths[i] * max_width_of_a_char+(border_size * 2) + 10; /* to pixels */
+
+
+    grid_column_widths[i]= (grid_column_widths[i] * max_width_of_a_char)
+                            + ocelot_grid_cell_border_size_as_int * 2
+                            + ocelot_grid_cell_right_drag_line_size_as_int;
+
     sum_tmp_column_lengths+= grid_column_widths[i];
   }
 
@@ -1186,7 +1246,10 @@ void grid_column_size_calc(QFont *saved_font)
     sum_amount_reduced= 0;
     for (i= 0; i < result_column_count; ++i)
     {
-      unsigned int min_width= (fields[i].name_length + 1) * max_width_of_a_char + border_size * 2;
+      unsigned int min_width= (dbms_get_field_name_length(i) + 1) * max_width_of_a_char /* fields[i].name_length */
+              + ocelot_grid_cell_border_size_as_int * 2
+              + ocelot_grid_cell_right_drag_line_size_as_int;
+//              + border_size * 2;
       if (grid_column_widths[i] <= min_width) continue;
       max_reduction= grid_column_widths[i] - min_width;
       if (grid_column_widths[i] >= (sum_tmp_column_lengths / result_column_count))
@@ -1207,14 +1270,14 @@ void grid_column_size_calc(QFont *saved_font)
   grid_actual_row_height_in_lines= 1;
 
   /*
-    Each column's height = fields[i].length / grid_column_widths[i] rounded up.
+    Each column's height = (dbms_get_field_length(i) i.e. fields[i].length) / grid_column_widths[i] rounded up.
     If that's greater than the user-defined maximum, reduce to user-defined maximum
     (the QTextEdit will get a vertical scroll bar if there's an overflow).
   */
   for (i= 0; i < result_column_count; ++i)
   {
-    grid_column_heights[i]= (fields[i].length*max_width_of_a_char) / grid_column_widths[i];
-    if ((grid_column_heights[i] * grid_column_widths[i]) < fields[i].length) ++grid_column_heights[i];
+    grid_column_heights[i]= (dbms_get_field_length(i) * max_width_of_a_char) / grid_column_widths[i]; /* fields[i].length */
+    if ((grid_column_heights[i] * grid_column_widths[i]) < dbms_get_field_length(i)) ++grid_column_heights[i];
     if (grid_column_heights[i] > ocelot_grid_max_column_height_in_lines) grid_column_heights[i]= ocelot_grid_max_column_height_in_lines;
     if (grid_column_heights[i] > grid_actual_row_height_in_lines) grid_actual_row_height_in_lines= grid_column_heights[i];
   }
@@ -1222,9 +1285,16 @@ void grid_column_size_calc(QFont *saved_font)
   grid_height_of_highest_column_in_pixels= 0;
 
   /* Warning: header-height calculation is also "*(max_height_of_a_char+(border_size*2))", in a different place. */
+  /* This calculation of height is horrendously difficult, and still does not seem to be exactly right. */
   for (i= 0; i < result_column_count; ++i)
   {
-    grid_column_heights[i]= (grid_column_heights[i] * (max_height_of_a_char+(border_size * 2))) + 9;
+//    grid_column_heights[i]= (grid_column_heights[i] * (max_height_of_a_char+(border_size * 2))) + 9;
+    /* For explanation of next line, see comment "Extra size". */
+    if ((grid_column_heights[i] < 2) && (ocelot_grid_cell_right_drag_line_size_as_int > 0)) grid_column_heights[i]= 2;
+    grid_column_heights[i]= (grid_column_heights[i] * max_height_of_a_char)
+                            + ocelot_grid_cell_border_size_as_int * 2
+                            + ocelot_grid_cell_right_drag_line_size_as_int;
+
     if (grid_column_heights[i] > grid_height_of_highest_column_in_pixels)
     {
       grid_height_of_highest_column_in_pixels= grid_column_heights[i];
@@ -1284,7 +1354,7 @@ void fill_detail_widgets()
       for (i= 0; i < result_column_count; ++i)
       {
         /* if (lengths[i]>result_max_column_lengths[i]) result_max_column_lengths[i]= lengths[i]; */
-        yy= row[i];
+        yy= dbms_get_field_value(grid_vertical_scroll_bar_value + r, i); /* row[i]; */
         text_edit_widgets[(r + 1) * result_column_count + i]->setPlainText(yy);
       text_edit_frames[(r + 1) * result_column_count + i]->show();
       }
@@ -1293,7 +1363,12 @@ void fill_detail_widgets()
 }
 
 
-/* Todo: bug: when I switched to Kacst Poster 28pt bold italic, I got scroll bars -- calculations 1 pixel off? */
+/*
+  Called from eventfilter
+  "    if (event->type() == QEvent::FontChange) return (result_grid_table_widget->fontchange_event());"
+  Todo: bug: when I switched to Kacst Poster 28pt bold italic, I got scroll bars -- calculations 1 pixel off?
+        (not repeated recently, maybe it's fixed now)
+*/
 int fontchange_event()
 {
   remove_layouts();
@@ -1304,11 +1379,26 @@ int fontchange_event()
 
 
 /*
+  Called from eventfilter
+  "    if (event->type() == QEvent::Show) return (result_grid_table_widget->show_event());"
+  This is the more appropriate place to decide about the vertical scroll bar because now height is known.
+  Todo: catch QEvent::Resize() too!!
+*/
+bool show_event()
+{
+  vertical_bar_show_as_needed();
+  return false;           /* We want the show to happen so pass it on */
+}
+
+
+/*
   Remove all frame widgets from layouts, then delete layouts.
   We'll make them again by calling put_widgets_in_layouts() immediately after this.
   We are going to delete the widgets, we are going to put them all back.
   And if anybody is wondering "why delete and remake?", it's because I had an
   insoluble problem when I was merely scrolling and changing QTextEdit contents.
+  Todo: Check how much is unnecessary -- perhaps some widgets are deleted
+        automatically because they have parents which are deleted.
 */
 void remove_layouts()
 {
@@ -1327,25 +1417,38 @@ void remove_layouts()
         text_edit_layouts[ki]->removeWidget(text_edit_widgets[ki]);
         grid_row_layouts[xrow]->removeWidget(text_edit_frames[ki]);
         delete text_edit_widgets[ki];
+        if (text_edit_layouts[ki]->takeAt(0) != 0) printf("Pseudo-assertion: undeleted text_edit_layouts[ki] layout item\n");
         delete text_edit_layouts[ki];
+        if (text_edit_frames[ki]->layout() != 0) printf("Pseudo-assertion: text_edit_frames[ki] layout not removed\n");
         delete text_edit_frames[ki];
       }
       grid_main_layout->removeWidget(grid_row_widgets[xrow]);
+      if (grid_row_layouts[xrow]->takeAt(0) != 0) printf("Pseudo-assertion: undeleted grid_row_layouts[xrow] layout item\n");
       delete grid_row_layouts[xrow];
+      if (grid_row_widgets[xrow]->layout() != 0) printf("Pseudo-assertion: grid_row_widgets[xrow] layout not removed\n");
       delete grid_row_widgets[xrow];
     }
     /* Todo: fix: grid_main_layout is still the layout of client */
   }
-  /* Todo: check whether to delete grid_scroll_area and grid_vertical_scroll_bar -- but I think garbage_collect() does that. */
+  /* Todo: check whether to delete grid_scroll_area and grid_vertical_scroll_bar -- but I think garbage_collect(), below, does that. */
   if (hbox_layout != 0)
   {
-    hbox_layout->removeWidget(grid_scroll_area);
     hbox_layout->removeWidget(grid_vertical_scroll_bar);
+    hbox_layout->removeWidget(grid_scroll_area);
   }
   /* Todo: think whether it would be best to set grid_layout=0 after deleting grid_layout, etc. */
   /* if (grid_layout != 0) delete grid_layout; */
-  if (hbox_layout != 0) delete hbox_layout;
-  if (grid_main_layout != 0) delete grid_main_layout;
+  if (hbox_layout != 0)
+  {
+    if (hbox_layout->takeAt(0) != 0) printf("Pseudo-assertion: undeleted hbox_layout item\n");
+    delete hbox_layout;
+  }
+  if (grid_main_layout != 0)
+  {
+    if (grid_main_layout->takeAt(0) != 0) printf("Pseudo-assertion: undeleted grid_main_layout item\n");
+    delete grid_main_layout;
+    if (client->layout() != 0) printf("Pseudo-assertion: client layout not removed\n");
+  }
 }
 
 
@@ -1370,6 +1473,8 @@ void garbage_collect()
   }
   if (grid_column_widths != 0) delete [] grid_column_widths;
   if (grid_column_heights != 0) delete [] grid_column_heights;
+  if (grid_column_dbms_sources != 0) delete [] grid_column_dbms_sources;
+  if (grid_column_dbms_field_numbers != 0) delete [] grid_column_dbms_field_numbers;
 
   if (grid_vertical_scroll_bar != 0) delete grid_vertical_scroll_bar;
   if (grid_scroll_area != 0) delete grid_scroll_area;
@@ -1381,7 +1486,7 @@ void garbage_collect()
   Todo: I'm not sure whether this is adequate if there's a horizontal scroll bar.
   Todo: I'm not sure whether this is adequate if there's a widget header.
   Todo: I'm not sure whether the calculation should involve result_row_count  + 1 (to include the header).
-  Todo: Call this not only when created, but also if font change, column/row size change, resize.
+  Todo: Call this not only when show, but also if font change, column/row size change, resize.
   Todo: Look for a bug! I noticed that vertical scroll bar was missing after a font change. Didn't repeat.
 */
 void vertical_bar_show_as_needed()
@@ -1390,10 +1495,147 @@ void vertical_bar_show_as_needed()
 
   h= 0;
   if (result_row_count > 1) h+= grid_height_of_highest_column_in_pixels * result_row_count;
-
   if (h > height()) grid_vertical_scroll_bar->show();
   else  grid_vertical_scroll_bar->hide();
 }
+
+/*
+  The functions that start with "dbms_" are supposed to be low level.
+  Eventually there might be "#if mysql ... #endif" code inside them.
+  Eventually there might be a separate class with all dbms-related calls.
+  But we're still a long way from having dbms-independent code here.
+  We have these new lists, which are created when we make the grid and deleted when we stop:
+    grid_column_dbms_sources[].       = DBMS_SOURCE_IS_MYSQL_FIELD or DBMS_SOURCE_IS_ROW_NUMBER
+    grid_column_dbms_field_numbers[]. = mysql field number, or irrelevant
+  The idea is that any column can be special, that is, can have a source other than
+  the DBMS field. So far the only special column is the row number, experimentally.
+*/
+
+/*
+  Ordinarily DBMS_ROW_NUMBER_TEST is 0 = off.
+  Turn it to 1 = on if testing to get row numbers as leftmost column.
+  Todo: If it's 1, then the test will succeed, but is this really the way you want to do things?
+  Maybe it's something for "Settings".
+  Maybe it should be in the background like a header.
+  Maybe you really need "select ocelot.row_number(), * from t;" i.e. you want an application-level function.
+*/
+#define DBMS_ROW_NUMBER_TEST 0
+
+#define DBMS_SOURCE_IS_MYSQL_FIELD 0
+#define DBMS_SOURCE_IS_ROW_NUMBER  1
+
+/*
+  dbms_set_result_column_count() gets the number of columns in the grid
+  It might be the same as the number of fields returned by mysql_num_fields().
+  But if there is an additional field for row-number, ++.
+  Todo: check if this will crash if somebody changes the setting for row numbers (if we allow that)?
+*/
+void dbms_set_result_column_count()
+{
+  result_column_count= mysql_num_fields(grid_mysql_res);           /* this will be the width of the grid */
+  if (DBMS_ROW_NUMBER_TEST == 1) ++result_column_count;
+}
+
+void dbms_set_grid_column_sources()
+{
+  unsigned int column_number;
+  unsigned int dbms_field_number;
+
+  fields= mysql_fetch_fields(grid_mysql_res);
+  dbms_field_number= 0;
+  for (column_number= 0; column_number < result_column_count; ++column_number)
+  {
+    if (column_number == 0 && DBMS_ROW_NUMBER_TEST == 1) grid_column_dbms_sources[column_number]= DBMS_SOURCE_IS_ROW_NUMBER;
+    else
+    {
+      grid_column_dbms_sources[column_number]= DBMS_SOURCE_IS_MYSQL_FIELD;            /* i.e. use mysql field# */
+      grid_column_dbms_field_numbers[column_number]= dbms_field_number;
+      ++dbms_field_number;
+    }
+  }
+}
+
+unsigned int dbms_get_field_length(unsigned int column_number)
+{
+  QString s;
+  unsigned int dbms_field_number;
+
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
+  {
+    dbms_field_number= grid_column_dbms_field_numbers[column_number];
+    return fields[dbms_field_number].length;
+  }
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
+  {
+    s= QString::number(result_row_count);
+    return s.length();
+  }
+  return 0; /* to avoid "control reaches end of non-void function" warning */
+}
+
+unsigned int dbms_get_field_flag(unsigned int column_number)
+{
+  unsigned int dbms_field_number;
+
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
+  {
+    dbms_field_number= grid_column_dbms_field_numbers[column_number];
+    return fields[dbms_field_number].flags;
+  }
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
+    return NUM_FLAG;
+  return 0; /* to avoid "control reaches end of non-void function" warning */
+}
+
+
+QString dbms_get_field_name(unsigned int column_number)
+{
+  unsigned int dbms_field_number;
+
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
+  {
+    dbms_field_number= grid_column_dbms_field_numbers[column_number];
+    return fields[dbms_field_number].name;
+  }
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
+    return "row_number";
+  return ""; /* to avoid "control reaches end of non-void function" warning */
+}
+
+unsigned int dbms_get_field_name_length(unsigned int column_number)
+{
+  unsigned int dbms_field_number;
+
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
+  {
+    dbms_field_number= grid_column_dbms_field_numbers[column_number];
+    return fields[dbms_field_number].name_length;
+  }
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
+    return 10; /* i.e. length of "row_number" */
+  return 0; /* to avoid "control reaches end of non-void function" warning */
+}
+
+
+QString dbms_get_field_value(int row_number, unsigned int column_number)
+{
+  QString s;
+  unsigned int dbms_field_number;
+
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
+  {
+    dbms_field_number= grid_column_dbms_field_numbers[column_number];
+    return row[dbms_field_number];
+  }
+  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
+  {
+    s= QString::number(row_number);
+    return s;
+  }
+  return ""; /* to avoid "control reaches end of non-void function" warning */
+}
+
+
 
 public slots:
 private:

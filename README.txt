@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-Version 0.1.3
+Version 0.2.0
 
 This is Ocelot GUI (ocelotgui), a GPL-license database client.
 
@@ -55,7 +55,7 @@ and also two binary (executable) files.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, the existence of the executables
 might be convenient. A release file is highlighted in green
-by github and is named ocelotgui.tar.gz. Thus relesae 0.1.1 is at
+by github and is named ocelotgui.tar.gz. Thus release 0.1.1 is at
 https://github.com/pgulutzan/ocelotgui/releases/download/0.1.1/ocelotgui.tar.gz
 
 The installation examples that follow assume that download is
