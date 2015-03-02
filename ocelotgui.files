@@ -1,0 +1,5 @@
+install_sql.cpp
+moc_ocelotgui.cpp
+ocelotgui.cpp
+ocelotgui.h
+ui_ocelotgui.h

@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.2.0 Alpha
-   Last modified: December 10 2014
+   Version: 0.3.0 Alpha
+   Last modified: March 1 2015
 */
 
 /*
@@ -65,6 +65,45 @@
  ** $QT_END_LICENSE$
 */
 
+#ifdef DEBUGGER
+/*
+  The routine named debug_mdbug_install inside this program is taken and modified from
+  https://launchpad.net/mdbug, specifically http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/install.sql,
+  and therefore MDBug's maker's copyright and GPL version 2 license provisions
+  are reproduced below. These provisions apply only for the
+  part of the debug_mdbug_install routine which is marked within the program.
+  The program as a whole is copyrighted by Ocelot and
+  licensed under GPL version 2 as stated above.
+
+  This file is part of MDBug.
+
+  (c) Copyright 2012 Hewlett-Packard Development Company, L.P.
+
+  This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License
+  as published by the Free Software Foundation; version 2 of the License.
+
+  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License along with this program; if not, see
+  <http://www.gnu.org/licenses>.
+
+  Linking MDBug statically or dynamically with other modules is making a combined work based on MDBug. Thus, the terms and
+  conditions of the GNU General Public License cover the whole combination.
+
+  In addition, as a special exception, the copyright holders of MDBug give you permission to combine MDBug with free
+  software programs or libraries that are released under the GNU LGPL and with code included in the standard release
+  of Eclipse under the Eclipse Public License version 1.0 (or modified versions of such code, with unchanged license).
+  You may copy and distribute such a system following the terms of the GNU GPL for MDBug and the licenses of the other
+  code concerned, provided that you include the source code of that other code when and as the GNU GPL requires
+  distribution of source code.
+
+  Note that people who make modified versions of MDBug are not obligated to grant this special exception for their
+  modified versions; it is their choice whether to do so. The GNU General Public License gives permission to release a
+  modified version without this exception; this exception also makes it possible to release a modified version which
+  carries forward this exception.
+*/
+#endif
 
 /*
   General comments
@@ -155,7 +194,43 @@
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
 
-MYSQL mysql; /* Global */
+
+  unsigned short ocelot_port;                /* for CONNECT */
+  unsigned long int ocelot_connect_timeout;  /* for CONNECT */
+  unsigned short ocelot_compress;            /* for CONNECT */
+  unsigned short ocelot_secure_auth;         /* for CONNECT */
+  unsigned short ocelot_local_infile;        /* for CONNECT */
+  unsigned short ocelot_safe_updates;        /* for CONNECT */
+  unsigned long int ocelot_select_limit;     /* for CONNECT */
+  unsigned long int ocelot_max_join_size;    /* for CONNECT */
+  unsigned short int ocelot_silent;          /* for CONNECT */
+  unsigned short int ocelot_no_beep;         /* for CONNECT */
+  unsigned short int ocelot_wait;            /* for CONNECT */
+  unsigned int ocelot_protocol_as_int;       /* for CONNECT */
+  char ocelot_host_as_utf8[512];
+  char ocelot_database_as_utf8[512];
+  char ocelot_user_as_utf8[512];
+  char ocelot_password_as_utf8[512];
+  char ocelot_init_command_as_utf8[512];
+  char ocelot_plugin_dir_as_utf8[512];
+  char ocelot_default_auth_as_utf8[512];
+  char ocelot_unix_socket_as_utf8[512];
+  char ocelot_default_character_set_as_utf8[512];
+  int options_and_connect(unsigned int connection_number);
+
+/* Whenever you see STRING_LENGTH_512, think: here's a fixed arbitrary allocation, which should be be fixed up. */
+#define STRING_LENGTH_512 512
+
+/* Global mysql definitions */
+#define MYSQL_MAIN_CONNECTION 0
+#define MYSQL_DEBUGGER_CONNECTION 1
+#ifdef DEBUGGER
+  MYSQL mysql[2];
+  static int connected[2]= {0, 0};
+#else
+  MYSQL mysql[1];
+  static int connected[1]= {0};
+#endif
 
 int main(int argc, char *argv[])
 {
@@ -190,15 +265,24 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   /* Probably result_grid_table_widget_saved_font only matters if the connection dialog box has to go up. */
   QFont tmp_font;
-  QFont *saved_font;
+//  QFont *saved_font;
   tmp_font= this->font();
-  saved_font=&tmp_font;
-  result_grid_table_widget= new ResultGrid(0, saved_font, this);
+//  saved_font=&tmp_font;
+//  result_grid_table_widget= new ResultGrid(0, saved_font, this);
+  result_grid_table_widget= new ResultGrid(this);
+  /* 2014-12-10 Following line was shifted -- it used to come after the show(). */
+  result_grid_table_widget->installEventFilter(this);                      /* must catch fontChange, show, etc. */
+
+  result_grid_table_widget->grid_vertical_scroll_bar->installEventFilter(this);
+  result_grid_table_widget->hide();
 
   main_layout= new QVBoxLayout();               /* todo: do I need to say "this"? */
 
   create_widget_history();
   create_widget_statement();
+#ifdef DEBUGGER
+  create_widget_debug();
+#endif
 
   main_window= new QWidget();
 
@@ -230,6 +314,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   main_layout->addWidget(history_edit_widget);
   main_layout->addWidget(result_grid_table_widget);
   main_layout->addWidget(statement_edit_widget);
+#ifdef DEBUGGER
+  main_layout->addWidget(debug_top_widget);
+#endif
 
   main_window->setLayout(main_layout);
   setCentralWidget(main_window);
@@ -332,27 +419,47 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
   QString text;
 
-  if (obj == result_grid_table_widget->grid_vertical_scroll_bar)
-  {
-    /*
-      Probably some of these events don't cause scroll bar value to change,
-      I've only seen that happen for MouseMove and MouseButtonRelease.
-      But that's harmless, it only means we call scroll_event for nothing.
-    */
-    if ((event->type() == QEvent::KeyPress)
-    ||  (event->type() == QEvent::KeyRelease)
-    ||  (event->type() == QEvent::MouseButtonDblClick)
-    ||  (event->type() == QEvent::MouseButtonPress)
-    ||  (event->type() == QEvent::MouseButtonRelease)
-    ||  (event->type() == QEvent::MouseMove)
-    ||  (event->type() == QEvent::MouseTrackingChange)) return (result_grid_table_widget->scroll_event());
-  }
+//  if (obj == result_grid_table_widget->grid_vertical_scroll_bar)
+//  {
+//    /* BING */
+//    /*
+//      Probably some of these events don't cause scroll bar value to change,
+//      I've only seen that happen for MouseMove and MouseButtonRelease.
+//      But that's harmless, it only means we call scroll_event for nothing.
+//    */
+//    if ((event->type() == QEvent::KeyPress)
+//    ||  (event->type() == QEvent::KeyRelease)
+//    ||  (event->type() == QEvent::MouseButtonDblClick)
+//    ||  (event->type() == QEvent::MouseButtonPress)
+//    ||  (event->type() == QEvent::MouseButtonRelease)
+//    ||  (event->type() == QEvent::MouseMove)
+//    ||  (event->type() == QEvent::MouseTrackingChange)) return (result_grid_table_widget->scroll_event());
+//  }
 
   if (obj == result_grid_table_widget)
   {
     if (event->type() == QEvent::FontChange) return (result_grid_table_widget->fontchange_event());
     if (event->type() == QEvent::Show) return (result_grid_table_widget->show_event());
   }
+
+  if (obj == result_grid_table_widget->grid_vertical_scroll_bar)
+  {
+    return (result_grid_table_widget->vertical_scroll_bar_event());
+  }
+
+#ifdef DEBUGGER
+  for (int debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
+  {
+    if (obj == debug_widget[debug_widget_index])
+    {
+      if (event->type() == QEvent::MouseButtonPress)
+      {
+        action_debug_mousebuttonpress(event, debug_widget_index);
+        return false;
+      }
+    }
+  }
+#endif
 
   if (obj != statement_edit_widget) return false;
   if (event->type() != QEvent::KeyPress) return false;
@@ -800,6 +907,77 @@ void MainWindow::create_menu()
   connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
   connect(menu_settings_action_main, SIGNAL(triggered()), this, SLOT(action_main()));
 
+#ifdef DEBUGGER
+  menu_debug= ui->menuBar->addMenu(tr("Debug"));
+
+//  menu_debug_action_install= menu_debug->addAction(tr("Install"));
+//  connect(menu_debug_action_install, SIGNAL(triggered()), this, SLOT(action_debug_install()));
+//  menu_debug_action_install->setShortcut(QKeySequence(tr("Alt+A")));
+
+//  menu_debug_action_setup= menu_debug->addAction(tr("Setup"));
+//  connect(menu_debug_action_setup, SIGNAL(triggered()), this, SLOT(action_debug_setup()));
+//  menu_debug_action_setup->setShortcut(QKeySequence(tr("Alt+5")));
+
+//  menu_debug_action_debug= menu_debug->addAction(tr("Debug"));
+//  connect(menu_debug_action_debug, SIGNAL(triggered()), this, SLOT(action_debug_debug()));
+//  menu_debug_action_debug->setShortcut(QKeySequence(tr("Alt+3")));
+
+  menu_debug_action_breakpoint= menu_debug->addAction(tr("Breakpoint"));
+  connect(menu_debug_action_breakpoint, SIGNAL(triggered()), this, SLOT(action_debug_breakpoint()));
+  menu_debug_action_breakpoint->setShortcut(QKeySequence(tr("Alt+1")));
+
+  menu_debug_action_continue= menu_debug->addAction(tr("Continue"));
+  connect(menu_debug_action_continue, SIGNAL(triggered()), this, SLOT(action_debug_continue()));
+  menu_debug_action_continue->setShortcut(QKeySequence(tr("Alt+2")));
+
+//  menu_debug_action_leave= menu_debug->addAction(tr("Leave"));
+//  connect(menu_debug_action_leave, SIGNAL(triggered()), this, SLOT(action_debug_leave()));
+//  menu_debug_action_leave->setShortcut(QKeySequence(tr("Alt+B")));
+
+  menu_debug_action_next= menu_debug->addAction(tr("Next"));
+  connect(menu_debug_action_next, SIGNAL(triggered()), this, SLOT(action_debug_next()));
+  menu_debug_action_next->setShortcut(QKeySequence(tr("Alt+3")));
+
+//  menu_debug_action_skip= menu_debug->addAction(tr("Skip"));
+//  connect(menu_debug_action_skip, SIGNAL(triggered()), this, SLOT(action_debug_skip()));
+//  menu_debug_action_skip->setShortcut(QKeySequence(tr("Alt+4")));
+
+  menu_debug_action_step= menu_debug->addAction(tr("Step"));
+  connect(menu_debug_action_step, SIGNAL(triggered()), this, SLOT(action_debug_step()));
+  menu_debug_action_step->setShortcut(QKeySequence(tr("Alt+5")));
+
+  menu_debug_action_clear= menu_debug->addAction(tr("Clear"));
+  connect(menu_debug_action_clear, SIGNAL(triggered()), this, SLOT(action_debug_clear()));
+  menu_debug_action_clear->setShortcut(QKeySequence(tr("Alt+6")));
+
+//  menu_debug_action_delete= menu_debug->addAction(tr("Delete"));
+//  connect(menu_debug_action_delete, SIGNAL(triggered()), this, SLOT(action_debug_delete()));
+//  menu_debug_action_delete->setShortcut(QKeySequence(tr("Alt+G")));
+
+  menu_debug_action_exit= menu_debug->addAction(tr("Exit"));
+  connect(menu_debug_action_exit, SIGNAL(triggered()), this, SLOT(action_debug_exit()));
+  menu_debug_action_exit->setShortcut(QKeySequence(tr("Alt+7")));
+
+  menu_debug_action_information= menu_debug->addAction(tr("Information"));
+  connect(menu_debug_action_information, SIGNAL(triggered()), this, SLOT(action_debug_information()));
+  menu_debug_action_information->setShortcut(QKeySequence(tr("Alt+8")));
+
+  menu_debug_action_refresh_server_variables= menu_debug->addAction(tr("Refresh server variables"));
+  connect(menu_debug_action_refresh_server_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_server_variables()));
+  menu_debug_action_refresh_server_variables->setShortcut(QKeySequence(tr("Alt+9")));
+
+  menu_debug_action_refresh_user_variables= menu_debug->addAction(tr("Refresh user variables"));
+  connect(menu_debug_action_refresh_user_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_user_variables()));
+  menu_debug_action_refresh_user_variables->setShortcut(QKeySequence(tr("Alt+0")));
+
+  menu_debug_action_refresh_variables= menu_debug->addAction(tr("Refresh variables"));
+  connect(menu_debug_action_refresh_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_variables()));
+  menu_debug_action_refresh_variables->setShortcut(QKeySequence(tr("Alt+A")));
+
+  debug_menu_enable_or_disable(TOKEN_KEYWORD_BEGIN); /* Disable most of debug menu */
+
+#endif
+
   menu_help= ui->menuBar->addMenu(tr("Help"));
   menu_help_action_about= menu_help->addAction(tr("About"));
   connect(menu_help_action_about, SIGNAL(triggered()), this, SLOT(action_about()));
@@ -849,7 +1027,7 @@ void MainWindow::action_statement_edit_widget_text_changed()
            text.size(),
            &main_token_lengths, &main_token_offsets, MAX_TOKENS,(QChar*)"33333", 1, ocelot_delimiter_str, 1);
 
-  tokens_to_keywords();
+  tokens_to_keywords(text);
 
   /* This "sets" the colour, it does not "merge" it. */
   /* Do not try to set underlines, they won't go away. */
@@ -935,11 +1113,26 @@ void MainWindow::action_connect()
 
 void MainWindow::action_connect_once(QString message)
 {
-  row_form_label= new QString[10];
-  row_form_type= new int[10];
-  row_form_is_password= new int[10];
-  row_form_data= new QString[10];
-  row_form_width= new QString[10];
+  int column_count;
+  QString *row_form_label;
+  int *row_form_type;
+  int *row_form_is_password;
+  QString *row_form_data;
+  QString *row_form_width;
+  QString row_form_title;
+  QString row_form_message;
+
+  row_form_label= 0;
+  row_form_type= 0;
+  row_form_is_password= 0;
+  row_form_data= 0;
+  row_form_width= 0;
+  column_count= 8;
+  row_form_label= new QString[column_count];
+  row_form_type= new int[column_count];
+  row_form_is_password= new int[column_count];
+  row_form_data= new QString[column_count];
+  row_form_width= new QString[column_count];
 
   row_form_label[0]= "host"; row_form_type[0]= 0; row_form_is_password[0]= 0; row_form_data[0]= ocelot_host; row_form_width[0]= 80;
   row_form_label[1]= "port"; row_form_type[1]= NUM_FLAG; row_form_is_password[1]= 0; row_form_data[1]= QString::number(ocelot_port); row_form_width[1]= 4;
@@ -958,19 +1151,23 @@ void MainWindow::action_connect_once(QString message)
   tmp_font= result_grid_table_widget->font();
   saved_font=&tmp_font;
 
-  Row_form_box *co= new Row_form_box(saved_font, this);
+  Row_form_box *co= new Row_form_box(saved_font, column_count, row_form_label,
+//                                     row_form_type,
+                                     row_form_is_password, row_form_data,
+//                                     row_form_width,
+                                     row_form_title, row_form_message, this);
   co->exec();
 
   if (co->is_ok == 1)
   {
-    ocelot_host= row_form_data[0];
-    ocelot_port= row_form_data[1].toInt();
-    ocelot_user= row_form_data[2];
-    ocelot_database= row_form_data[3];
-    ocelot_unix_socket= row_form_data[4];
-    ocelot_password= row_form_data[5];
-    ocelot_protocol= row_form_data[6];
-    ocelot_init_command= row_form_data[7];
+    ocelot_host= row_form_data[0].trimmed();
+    ocelot_port= row_form_data[1].trimmed().toInt();
+    ocelot_user= row_form_data[2].trimmed();
+    ocelot_database= row_form_data[3].trimmed();
+    ocelot_unix_socket= row_form_data[4].trimmed();
+    ocelot_password= row_form_data[5].trimmed();
+    ocelot_protocol= row_form_data[6].trimmed(); ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
+    ocelot_init_command= row_form_data[7].trimmed();
     //ocelot_default_auth= row_form_data[8];           /* Todo: this is disabled but should work with MySQL 5.6+ */
     /* This should ensure that a record goes to the history widget */
     /* Todo: clear statement_edit_widget first */
@@ -984,11 +1181,11 @@ void MainWindow::action_connect_once(QString message)
   }
   delete(co);
 
-  delete [] row_form_width;
-  delete [] row_form_data;
-  delete [] row_form_is_password;
-  delete [] row_form_type;
-  delete [] row_form_label;
+  if (row_form_width != 0) delete [] row_form_width;
+  if (row_form_type != 0) delete [] row_form_data;
+  if (row_form_is_password != 0)  delete [] row_form_is_password;
+  if (row_form_type != 0) delete [] row_form_type;
+  if (row_form_label != 0) delete [] row_form_label;
 }
 
 
@@ -999,8 +1196,14 @@ void MainWindow::action_connect_once(QString message)
 */
 void MainWindow::action_exit()
 {
+#ifdef DEBUGGER
+  /* Get rid of debuggee if it's still around. */
+  /* Todo: this might not be enough. Maybe you should be intercepting the "close window" event. */
+  action_debug_exit();
+#endif
   close();
 }
+
 
 /* Todo: consider adding   //printf(qVersion()); */
 void MainWindow::action_about()
@@ -1023,6 +1226,7 @@ You should have received a copy of the GNU General Public License \
 along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.");
     msgBox.exec();
 }
+
 
 /*
   the_manual_widget will be shown when user clicks Help | The Manual.
@@ -1047,7 +1251,7 @@ void MainWindow::create_the_manual_widget()
   the_manual_text_edit->setText("\
 <BR><h1>The ocelotgui user manual</h1>  \
 <BR>  \
-<BR>Version 0.1.3, September 5 2014  \
+<BR>Version 0.3.0, March 1 2015  \
 <BR>  \
 <BR>  \
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -1074,6 +1278,7 @@ a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.  \
 Some of its features are: syntax highlighting, user-settable colors  \
 and fonts for each part of the screen, and result-set displays  \
 with multi-line rows and resizable columns.  \
+NEW: And a debugger, see section 'Debugger'.  \
 <BR>  \
 <BR><h2>The company, the product, and the status</h2>  \
 <BR>  \
@@ -1237,7 +1442,7 @@ or Ctrl+X, Edit|Copy , Edit|Cut, Edit|Copy, Edit|Paste,  \
 and Edit|Select All work in the conventional manner,  \
 except Edit|Redo which can only redo the last change.  \
 <BR>  \
-<BR>Run|Execute or Ctrl+E causes execution of whatever is in the  \
+<BR>Run|Execute or Ctrl+E or Ctrl+Enter causes execution of whatever is in the  \
 statement widget.  \
 <BR>  \
 <BR>Settings|Statement Widget: Colors + Fonts,  \
@@ -1257,6 +1462,30 @@ in the result widget.  \
 <BR>Help|About will show the license and copyright and version.  \
 Help|Manual will show the manual.  \
 <BR>  \
+<BR><h2>Debugger</h2>  \
+NEW: it's possible to debug stored procedures and functions.  \
+This version of ocelotgui incorporates MDBug  \
+(read about MDBug at http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt).  \
+All debugger insructions can be entered on the ocelotgui command line;  \
+some operations can also be done via the Debug menu or by clicking on the stored-procedure display.  \
+Currently-supported instructions are:  \
+<BR>$install -- this is always the first thing to do  \
+<BR>$setup routine_name [, routine_name ...] -- prepares so '$debug routine_name' is possible  \
+<BR>$debug routine_name -- starts a debug session, shows routines in a tabbed widget  \
+<BR>$breakpoint routine_name line_number or Debug|breakpoint -- sets a breakpoint  \
+<BR>$clear routine_name line_number -- clears a breakpoint  \
+<BR>$next or Debug|Next -- goes to next executable line, without dropping into subroutines  \
+<BR>$step or Debug|Step -- goes to next executable line, will drop into subroutines  \
+<BR>$continue or Debug|Continue -- executes until breakpoint or until end of procedure  \
+<BR>$refresh breakpoints -- refreshes xxxmdbug.breakpoints table  \
+<BR>$refresh server_variables -- refreshes xxxmdbug.server_variables table  \
+<BR>$refresh variables -- refreshes xxxmdbug.variables table  \
+<BR>$refresh user_variables -- refereshes xxxmdbug.user_variables table  \
+<BR>$exit or Debug|Exit -- stops a debug session  \
+<BR>  \
+For a walk through a debugger example, with screenshots, see  \
+this blog post: ocelot.ca/blog/the-ocelotgui-debugger.  \
+<BR>  \
 <BR><h2>Contact</h2>  \
 <BR>  \
 <BR>Bug reports and feature requests may go on  \
@@ -1269,7 +1498,6 @@ This manual will also be available on ocelot.ca soon.  \
 <BR>Any contributions will be appreciated.  \
   ");
   }
-
 
 void MainWindow::action_the_manual()
 {
@@ -1337,60 +1565,139 @@ void MainWindow::action_undo()
    See also http://www.w3.org/TR/SVG/types.html#ColorKeywords "recognized color keyword names".
 */
 /* Note: the result of se->exec() will be QDialog::Rejected regardless which button was pushed, but that's OK. */
+
 void MainWindow::action_statement()
 {
-  Settings *se= new Settings(0, this);
+  Settings *se= new Settings(STATEMENT_WIDGET, this);
   int result= se->exec();
   if (result == QDialog::Rejected || result >= 0)
   {
-    make_style_strings();
-    statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
-    statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
+    //make_style_strings();
+    //statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+    /* For each changed Settings item, produce and execute a settings-change statement. */
+    action_change_one_setting(ocelot_statement_color, new_ocelot_statement_color,"ocelot_statement_color");
+    action_change_one_setting(ocelot_statement_background_color,new_ocelot_statement_background_color,"ocelot_statement_background_color");
+    action_change_one_setting(ocelot_statement_border_color,new_ocelot_statement_border_color,"ocelot_statement_border_color");
+    action_change_one_setting(ocelot_statement_font_family,new_ocelot_statement_font_family,"ocelot_statement_font_family");
+    action_change_one_setting(ocelot_statement_font_size,new_ocelot_statement_font_size,"ocelot_statement_font_size");
+    action_change_one_setting(ocelot_statement_font_style,new_ocelot_statement_font_style,"ocelot_statement_font_style");
+    action_change_one_setting(ocelot_statement_font_weight,new_ocelot_statement_font_weight,"ocelot_statement_font_weight");
+    action_change_one_setting(ocelot_statement_highlight_literal_color,new_ocelot_statement_highlight_literal_color,"ocelot_statement_highlight_literal_color");
+    action_change_one_setting(ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color,"ocelot_statement_highlight_identifier_color");
+    action_change_one_setting(ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color,"ocelot_statement_highlight_comment_color");
+    action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,"ocelot_statement_highlight_operator_color");
+    action_change_one_setting(ocelot_statement_highlight_reserved_color, new_ocelot_statement_highlight_reserved_color,"ocelot_statement_highlight_reserved_color");
+    action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,"ocelot_statement_prompt_background_color");
+
+    /* Todo: consider: maybe you hve to do a restore like this */
+    //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
+    //tokenize(text.data(),
+    //         text.size(),
+    //         &main_token_lengths, &main_token_offsets, MAX_TOKENS,(QChar*)"33333", 1, ocelot_delimiter_str, 1);
+    //tokens_to_keywords(text);
+    /* statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color); */
     statement_edit_widget->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_color);
     action_statement_edit_widget_text_changed();            /* only for highlight? repaint so new highlighting will appear */
   }
   delete(se);
 }
 
-
+/*
+  Todo: the setstylesheet here takes a long time because there are so many child widgets.
+  One way to speed it up could be: invalidate the text_edit_frames the way you do for content
+*/
 void MainWindow::action_grid()
 {
-  Settings *se= new Settings(1, this);
+  Settings *se= new Settings(GRID_WIDGET, this);
   int result= se->exec();
   if (result == QDialog::Rejected || result >= 0)
   {
-    make_style_strings();
-    result_grid_table_widget->setStyleSheet(ocelot_grid_style_string);
+    //make_style_strings();                                                      /* I think this should be commented out */
+    //result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+    /* For each changed Settings item, produce and execute a settings-change statement. */
+    action_change_one_setting(ocelot_grid_color, new_ocelot_grid_color, "ocelot_grid_color");
+    action_change_one_setting(ocelot_grid_border_color, new_ocelot_grid_border_color, "ocelot_grid_border_color");
+    action_change_one_setting(ocelot_grid_background_color, new_ocelot_grid_background_color, "ocelot_grid_background_color");
+    action_change_one_setting(ocelot_grid_header_background_color, new_ocelot_grid_header_background_color, "ocelot_grid_header_background_color");
+    action_change_one_setting(ocelot_grid_font_family, new_ocelot_grid_font_family, "ocelot_grid_font_family");
+    action_change_one_setting(ocelot_grid_font_size, new_ocelot_grid_font_size, "ocelot_grid_font_size");
+    action_change_one_setting(ocelot_grid_font_style, new_ocelot_grid_font_style, "ocelot_grid_font_style");
+    action_change_one_setting(ocelot_grid_font_weight, new_ocelot_grid_font_weight, "ocelot_grid_font_weight");
+    action_change_one_setting(ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color, "ocelot_grid_cell_border_color");
+    action_change_one_setting(ocelot_grid_cell_right_drag_line_color, new_ocelot_grid_cell_right_drag_line_color, "ocelot_grid_cell_right_drag_line_color");
+    action_change_one_setting(ocelot_grid_border_size, new_ocelot_grid_border_size, "ocelot_grid_border_size");
+    action_change_one_setting(ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size, "ocelot_grid_cell_border_size");
+    action_change_one_setting(ocelot_grid_cell_right_drag_line_size, new_ocelot_grid_cell_right_drag_line_size, "ocelot_grid_cell_right_drag_line_size");
   }
   delete(se);
 }
-
 
 void MainWindow::action_history()
 {
-  Settings *se= new Settings(2, this);
+  Settings *se= new Settings(HISTORY_WIDGET, this);
   int result= se->exec();
   if (result == QDialog::Rejected || result >= 0)
   {
-    make_style_strings();
-    history_edit_widget->setStyleSheet(ocelot_history_style_string);
+    //make_style_strings();
+    //history_edit_widget->setStyleSheet(ocelot_history_style_string);
+    action_change_one_setting(ocelot_history_color, new_ocelot_history_color, "ocelot_history_color");
+    action_change_one_setting(ocelot_history_background_color, new_ocelot_history_background_color, "ocelot_history_background_color");
+    action_change_one_setting(ocelot_history_border_color, new_ocelot_history_border_color, "ocelot_history_border_color");
+    action_change_one_setting(ocelot_history_font_family, new_ocelot_history_font_family, "ocelot_history_font_family");
+    action_change_one_setting(ocelot_history_font_size, new_ocelot_history_font_size, "ocelot_history_font_size");
+    action_change_one_setting(ocelot_history_font_style, new_ocelot_history_font_style, "ocelot_history_font_style");
+    action_change_one_setting(ocelot_history_font_weight, new_ocelot_history_font_weight, "ocelot_history_font_weight");
   }
   delete(se);
 }
-
 
 /* Todo: consider: maybe changing should only affect menuBar so there's no inheriting. */
 void MainWindow::action_main()
 {
-  Settings *se= new Settings(3, this);
+  Settings *se= new Settings(MAIN_WIDGET, this);
   int result= se->exec();
   if (result == QDialog::Rejected || result >= 0)
   {
-    make_style_strings();
-    main_window->setStyleSheet(ocelot_main_style_string);
-    ui->menuBar->setStyleSheet(ocelot_main_style_string);
+    //make_style_strings();
+    //main_window->setStyleSheet(ocelot_main_style_string);
+    //ui->menuBar->setStyleSheet(ocelot_main_style_string);
+      action_change_one_setting(ocelot_main_color, new_ocelot_main_color, "ocelot_main_color");
+      action_change_one_setting(ocelot_main_background_color, new_ocelot_main_background_color, "ocelot_main_background_color");
+      action_change_one_setting(ocelot_main_border_color, new_ocelot_main_border_color, "ocelot_main_border_color");
+      action_change_one_setting(ocelot_main_font_family, new_ocelot_main_font_family, "ocelot_main_font_family");
+      action_change_one_setting(ocelot_main_font_size, new_ocelot_main_font_size, "ocelot_main_font_size");
+      action_change_one_setting(ocelot_main_font_style, new_ocelot_main_font_style, "ocelot_main_font_style");
+      action_change_one_setting(ocelot_main_font_weight, new_ocelot_main_font_weight, "ocelot_main_font_weight");
   }
   delete(se);
+}
+
+
+/*
+  If a Settings-menu use has caused a change:
+  Produce a settings-change SQL statement, e.g.
+  SET @ocelot_statement_background_color = 'red'
+  and execute it.
+*/
+void MainWindow::action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting)
+{
+  if (old_setting != new_setting)
+  {
+    QString text;
+    old_setting= new_setting;
+    main_token_number= 0;
+    text= "SET @";
+    text.append(name_of_setting);
+    text.append(" = '");
+    text.append(new_setting);
+    text.append("'");
+    main_token_count_in_statement= 4;
+    tokenize(text.data(),
+             text.size(),
+             &main_token_lengths, &main_token_offsets, MAX_TOKENS,(QChar*)"33333", 1, ocelot_delimiter_str, 1);
+    tokens_to_keywords(text);
+    action_execute_one_statement(text);
+  }
 }
 
 
@@ -1411,7 +1718,7 @@ void MainWindow::set_current_colors_and_font()
   ocelot_statement_font_family= font.family();
   if (font.italic()) ocelot_statement_font_style= "italic"; else ocelot_statement_font_style= "normal";
   ocelot_statement_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-  if (font.Bold) ocelot_statement_font_weight= "bold"; else ocelot_statement_font_weight= "normal";
+  if (font.weight() >= QFont::Bold) ocelot_statement_font_weight= "bold"; else ocelot_statement_font_weight= "normal";
 
   ocelot_grid_color= result_grid_table_widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_grid_background_color=result_grid_table_widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
@@ -1419,7 +1726,7 @@ void MainWindow::set_current_colors_and_font()
   ocelot_grid_font_family= font.family();
   if (font.italic()) ocelot_grid_font_style= "italic"; else ocelot_grid_font_style= "normal";
   ocelot_grid_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-  if (font.Bold) ocelot_grid_font_weight= "bold"; else ocelot_grid_font_weight= "normal";
+  if (font.weight() >= QFont::Bold) ocelot_grid_font_weight= "bold"; else ocelot_grid_font_weight= "normal";
 
   ocelot_history_color= history_edit_widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_history_background_color=history_edit_widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
@@ -1427,7 +1734,7 @@ void MainWindow::set_current_colors_and_font()
   ocelot_history_font_family= font.family();
   if (font.italic()) ocelot_history_font_style= "italic"; else ocelot_history_font_style= "normal";
   ocelot_history_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-  if (font.Bold) ocelot_history_font_weight= "bold"; else ocelot_history_font_weight= "normal";
+  if (font.weight() >= QFont::Bold) ocelot_history_font_weight= "bold"; else ocelot_history_font_weight= "normal";
 
   ocelot_main_color= main_window->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_main_background_color= main_window->palette().color(QPalette::Window).name(); /* = QPalette::Background */
@@ -1435,7 +1742,7 @@ void MainWindow::set_current_colors_and_font()
   ocelot_main_font_family= font.family();
   if (font.italic()) ocelot_main_font_style= "italic"; else ocelot_main_font_style= "normal";
   ocelot_main_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-  if (font.Bold) ocelot_main_font_weight= "bold"; else ocelot_main_font_weight= "normal";
+  if (font.weight() >= QFont::Bold) ocelot_main_font_weight= "bold"; else ocelot_main_font_weight= "normal";
 }
 
 
@@ -1546,7 +1853,6 @@ int MainWindow::get_next_statement_in_string()
     ||  (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)) is_maybe_in_compound_statement= 1;
     if (is_maybe_in_compound_statement == 1)
     {
-      printf("in_compound_statment\n");
       if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
       ||  (main_token_types[i] == TOKEN_KEYWORD_ELSEIF)
       ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
@@ -1554,12 +1860,10 @@ int MainWindow::get_next_statement_in_string()
       ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
       ||  (main_token_types[i] == TOKEN_KEYWORD_WHILE))
       {
-        printf("  ++begin_count\n");
         ++begin_count;
       }
       if (main_token_types[i] == TOKEN_KEYWORD_END)
       {
-        printf("  --begin_count\n");
         --begin_count;
       }
     }
@@ -1589,6 +1893,2398 @@ int MainWindow::get_next_statement_in_string()
 //  ;
 //}
 
+/*
+  select_1_row() is a convenience routine, made because frequently there are single-row selects.
+  And if they are multiple-row selects, we can always do them one-at-a-time with limit and offset clauses.
+  Pass: select statement. Return: unexpected_error, expected to be ""
+  And up to 5 string variables from the first row that gets selected.
+  This should be used only if you know that no fields are null.
+*/
+QString select_1_row_result_1, select_1_row_result_2, select_1_row_result_3, select_1_row_result_4, select_1_row_result_5;
+QString MainWindow::select_1_row(const char *select_statement)
+{
+  MYSQL_RES *res= NULL;
+  MYSQL_ROW row= NULL;
+  const char *unexpected_error= NULL;
+  QString s;
+  unsigned int num_fields;
+
+  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], select_statement, strlen(select_statement)))
+  {
+    unexpected_error= "select failed";
+  }
+
+  if (unexpected_error == NULL)
+  {
+    res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+    if (res == NULL)
+    {
+      unexpected_error= "mysql_store_result failed";
+    }
+  }
+
+  if (unexpected_error == NULL)
+  {
+    num_fields= mysql_num_fields(res);
+  }
+
+  if (unexpected_error == NULL)
+  {
+    row= mysql_fetch_row(res);
+    if (row == NULL)
+    {
+      unexpected_error= "mysql_fetch row failed"; /* Beware! Look for a proc that compares routine with this string value! */
+    }
+    else
+    {
+      if (num_fields > 0) select_1_row_result_1= QString::fromUtf8(row[0]);
+      if (num_fields > 1) select_1_row_result_2= QString::fromUtf8(row[1]);
+      if (num_fields > 2) select_1_row_result_3= QString::fromUtf8(row[2]);
+      if (num_fields > 3) select_1_row_result_4= QString::fromUtf8(row[3]);
+      if (num_fields > 4) select_1_row_result_5= QString::fromUtf8(row[4]);
+    }
+  }
+
+  if (res != NULL) mysql_free_result(res);
+
+  if (unexpected_error != NULL) s= unexpected_error;
+  else s= "";
+
+  return s;
+}
+
+
+#ifdef DEBUGGER
+
+/*
+  Debug
+
+  Re debug_top_widget: It's a QWidget which contains a status line and debug_tab_widget.
+
+  Re debug_tab_widget: It's a QTabWidget which may contain more than one debug_widget.
+
+  Re debug_widget: it's derived from CodeEditor just as statement_edit_widget is, and it uses the
+  same stylesheet as statement_edit_widget. It starts hidden, but debug|initialize shows it.
+  It will contain the text of a procedure which is being debugged.
+  Actually debug_widget[] occurs 10 times -- todo: there's no check for overflow.
+
+  Re statements that come via statement_edit_widget: suppose the statement is "$DEB p8;".
+  During tokens_to_keywords() we recognize that this is TOKEN_KEYWORD_DEBUG_DEBUG and highlight appropriately.
+  During execute_client_statement(), after we check if statement_type == TOKEN_DEBUG_DEBUG_DEBUG and find that
+  it's true, there's a call to action_debug_debug() followed by "return 1". When we're in action_debug_debug(),
+  we have access to main_tokens so we can say things like "QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);".
+*/
+
+/* This means "while debugger is going check status 20 times per second" (50 = 50 milliseconds). */
+#define DEBUG_TIMER_INTERVAL 50
+
+#define DEBUGGEE_STATE_0 0
+#define DEBUGGEE_STATE_CONNECT_THREAD_STARTED 1
+#define DEBUGGEE_STATE_BECOME_DEBUGEE_CONNECTION 2
+#define DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP 3
+#define DEBUGGEE_STATE_CONNECT_FAILED -1
+#define DEBUGGEE_STATE_MYSQL_REAL_QUERY_ERROR -2
+#define DEBUGGEE_STATE_MYSQL_STORE_RESULT_ERROR -3
+#define DEBUGGEE_STATE_MYSQL_FETCH_ROW_ERROR -4
+#define DEBUGGEE_STATE_BECOME_DEBUGGEE_CONNECTION_ERROR -5
+#define DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR -6
+#define DEBUGGEE_STATE_END -7
+
+char debuggee_channel_name[128]= "";
+int volatile debuggee_state= DEBUGGEE_STATE_0;
+char debuggee_state_error[STRING_LENGTH_512]= "";
+char debuggee_information_status_debugger_name[32];
+char debuggee_information_status_debugger_version[8];
+char debuggee_information_status_timestamp_of_status_message[32];
+char debuggee_information_status_number_of_status_message[8];
+char debuggee_information_status_icc_count[8];
+char debuggee_information_status_schema_identifier[256];
+char debuggee_information_status_routine_identifier[256];
+char debuggee_information_status_line_number[8];
+char debuggee_information_status_is_at_breakpoint[8];
+char debuggee_information_status_is_at_tbreakpoint[8];
+char debuggee_information_status_is_at_routine_exit[8];
+char debuggee_information_status_stack_depth[8];
+char debuggee_information_status_last_command[256];
+char debuggee_information_status_last_command_result[256];
+char debuggee_information_status_commands_count[8];
+
+QString debug_routine_schema_name[DEBUG_TAB_WIDGET_MAX + 1];
+QString debug_routine_name[DEBUG_TAB_WIDGET_MAX + 1];
+
+QString debug_q_schema_name_in_statement;
+QString debug_q_routine_name_in_statement;
+
+QTimer *debug_timer;                                    /* For calling action_debug_timer_status() every 1/10 seconds */
+int debug_timer_old_line_number;
+char debug_timer_old_schema_identifier[256];
+char debug_timer_old_routine_identifier[256];
+int volatile debuggee_connection_id;                             /* Save this if you need to kill the debuggee (an unusual need) */
+int debug_timer_old_commands_count;
+int debug_timer_old_number_of_status_message;
+int debug_timer_old_icc_count;
+int debug_timer_old_debug_widget_index;
+
+
+/*
+  Enable or disable debug menu items.
+  If debug succeeds: most items after debug are enabled. (Todo: eventually all should be enabled.)
+  If exit succeeds: most items after debug are disabled.
+*/
+void MainWindow::debug_menu_enable_or_disable(int statement_type)
+{
+  bool e;
+
+  if (statement_type == TOKEN_KEYWORD_BEGIN) e= false;
+  if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG) e= true;
+  if (statement_type == TOKEN_KEYWORD_DEBUG_EXIT) e= false;
+
+//  menu_debug_action_install->setEnabled(e);
+//  menu_debug_action_setup->setEnabled(e);
+//  menu_debug_action_debug->setEnabled(e);
+  menu_debug_action_breakpoint->setEnabled(e);
+  menu_debug_action_continue->setEnabled(e);
+//  menu_debug_action_leave->setEnabled(e);
+  menu_debug_action_next->setEnabled(e);
+//  menu_debug_action_skip->setEnabled(e);
+  menu_debug_action_step->setEnabled(e);
+  menu_debug_action_clear->setEnabled(e);
+//  menu_debug_action_delete->setEnabled(e);
+  menu_debug_action_exit->setEnabled(e);                                      /* everything after debug goes gray after this succeeds */
+  menu_debug_action_information->setEnabled(e);
+  menu_debug_action_refresh_server_variables->setEnabled(e);
+  menu_debug_action_refresh_user_variables->setEnabled(e);
+  menu_debug_action_refresh_variables->setEnabled(e);
+}
+
+void MainWindow::create_widget_debug()
+{
+  /* We make debug_tab_widget now but we don't expect anyone to see it until debug|setup happens. */
+  /* Todo: should you create with an initially-hidden flag? */
+  debug_top_widget= new QWidget();
+  debug_top_widget->hide();                         /* hidden until debug|initialize is executed */
+
+  /*
+    Todo: check: am I doing it right by saying parent = debug_top_widget
+    i.e. will automatic delete happen when debug_top_widget is deleted?
+    or will there be a memory leak?
+    Hmm, why do I care? I don't delete debug_top_widget anyway, do I?
+    Hmm Hmm, yes I do but it must be an error.
+  */
+
+  debug_line_widget= new QLineEdit(debug_top_widget);
+  debug_line_widget->setText("Debugger Status = Inactive");
+  debug_tab_widget= new QTabWidget(debug_top_widget);
+
+  debug_top_widget_layout= new QVBoxLayout(debug_top_widget);
+  debug_top_widget_layout->addWidget(debug_line_widget);
+  debug_top_widget_layout->addWidget(debug_tab_widget);
+  debug_top_widget->setLayout(debug_top_widget_layout);
+
+  /* We make debug_timer now but we don't start it until debug status can be shown. */
+  debug_timer= new QTimer(this);
+  connect(debug_timer, SIGNAL(timeout()), this, SLOT(action_debug_timer_status()));
+}
+
+
+#include <pthread.h>
+
+/*
+  The debuggee is a separate thread and makes its own connection using ocelot_ parameters just like the main connection.
+  Problem: debuggee_thread() cannot be in MainWindow (at least, I didn't figure out how to make it in MainWindow).
+  That explains why I made a lot of things global.
+  Todo: Check: Why do you end statements with ";"?
+  Todo: If an error occurs, copy the whole thing into a fixed-size char so debugger can see it.
+        And notice that the result is that the thread ends, so beware of racing and worry about cleanup.
+*/
+
+void* debuggee_thread(void* unused)
+{
+  (void) unused; /* suppress "unused parameter" warning */
+  char call_statement[512];
+  int is_connected= 0;
+  MYSQL_RES *debug_res= NULL;
+  MYSQL_ROW debug_row= NULL;
+  const char *unexpected_error= NULL;
+
+  debuggee_connection_id= 0;
+
+  memset(debuggee_state_error, 0, STRING_LENGTH_512);
+  debuggee_state= DEBUGGEE_STATE_CONNECT_THREAD_STARTED;
+
+  for (;;)
+  {
+    /*
+      The debuggee connection.
+      I don't think I need to say mysql_init(&mysql[connection_number]);
+      Todo: the_connect() could easily fail: parameters are changed, # of connections = max, password no longer works, etc.
+            ... so you should try to pass back a better explanation if the_connect() fails here.
+    */
+    if (options_and_connect(MYSQL_DEBUGGER_CONNECTION))
+    {
+       debuggee_state= DEBUGGEE_STATE_CONNECT_FAILED;
+       strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+       break;
+    }
+
+    is_connected= 1;
+
+    /* Get connection_id(). This is only in case regular "exit" fails and we have to issue a kill statement. */
+    strcpy(call_statement, "select connection_id();");
+    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    {
+      debuggee_state= DEBUGGEE_STATE_MYSQL_REAL_QUERY_ERROR;
+      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      break;
+    }
+    debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+    if (debug_res == NULL)
+    {
+      debuggee_state= DEBUGGEE_STATE_MYSQL_STORE_RESULT_ERROR;
+      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      break;
+    }
+    debug_row= mysql_fetch_row(debug_res);
+    if (debug_row == NULL)
+    {
+      debuggee_state= DEBUGGEE_STATE_MYSQL_FETCH_ROW_ERROR;
+      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      mysql_free_result(debug_res);
+      break;
+    }
+    debuggee_connection_id= atoi(debug_row[0]);
+    mysql_free_result(debug_res);
+
+    strcpy(call_statement, "call xxxmdbug.become_debuggee_connection('");
+    strcat(call_statement, debuggee_channel_name);
+    strcat(call_statement, "');");
+    debuggee_state= DEBUGGEE_STATE_BECOME_DEBUGEE_CONNECTION;
+    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    {
+      debuggee_state= DEBUGGEE_STATE_BECOME_DEBUGGEE_CONNECTION_ERROR;
+      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      break;
+    }
+
+    /*
+      Originally we just had debuggee_wait_loop here.
+      Then the PREPARE+EXECUTE failed because of a procedure that contained a SELECT.
+      So I replaced debuggee_wait_loop()'s PREPARE with "LEAVE".
+      The actual execution will be done here in C.
+      Todo: Replace all debuggee_wait_loop() with a C routine.
+      Todo: Catch errors -- debuggee_wait_loop() didn't necessarily end via LEAVE x.
+    */
+
+    strcpy(call_statement, "call xxxmdbug.debuggee_wait_loop();");
+    debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP;
+    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    {
+      debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
+      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      break;
+    }
+    {
+      char xxxmdbug_status_last_command_result[512];
+      if (mysql_query(&mysql[MYSQL_DEBUGGER_CONNECTION], "select @xxxmdbug_status_last_command_result"))
+      {
+        /* This can happen, for example if debug command failed. */
+        debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
+        unexpected_error=" select @xxxmdbug_status_last_command_result failed";
+        strcpy(debuggee_state_error, "no result from last command");
+        break;
+      }
+      debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+      if (debug_res == NULL)
+      {
+        unexpected_error= "mysql_store_result failed";
+      }
+      if (mysql_num_fields(debug_res) != 1)
+      {
+        unexpected_error= "wrong field count";
+        mysql_free_result(debug_res);
+        break;
+      }
+      debug_row= mysql_fetch_row(debug_res);
+      if (debug_row == NULL)
+      {
+        unexpected_error= "mysql_fetch_row failed";
+        mysql_free_result(debug_res);
+       break;
+      }
+      strcpy(xxxmdbug_status_last_command_result, debug_row[0]);
+      mysql_free_result(debug_res);
+      /* There are various errors that xxxmdbug.check_surrogate_routine could have returned. */
+      if ((strstr(xxxmdbug_status_last_command_result,"Error reading setup log") != 0)
+       || (strstr(xxxmdbug_status_last_command_result,"is incorrect format for a surrogate identifier") != 0)
+       || (strstr(xxxmdbug_status_last_command_result,"is not found once in xxxmdbug.setup_log") != 0)
+       || (strstr(xxxmdbug_status_last_command_result,"was set up with an older debugger version") != 0)
+       || (strstr(xxxmdbug_status_last_command_result,"original was not found") != 0)
+       || (strstr(xxxmdbug_status_last_command_result,"original was altered") != 0)
+       || (strstr(xxxmdbug_status_last_command_result,"surrogate was not found") != 0))
+      {
+        debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
+        strncpy(debuggee_state_error, xxxmdbug_status_last_command_result, STRING_LENGTH_512 - 1);
+        break;
+      }
+    }
+    if (mysql_query(&mysql[MYSQL_DEBUGGER_CONNECTION], "select @xxxmdbug_what_to_call"))
+    {
+      unexpected_error=" select @xxxmdbug_what_to_call failed";
+      break;
+    }
+    debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+    if (debug_res == NULL)
+    {
+      unexpected_error= "mysql_store_result failed";
+    }
+    if (mysql_num_fields(debug_res) != 1)
+    {
+      unexpected_error= "wrong field count";
+      mysql_free_result(debug_res);
+      break;
+    }
+    debug_row= mysql_fetch_row(debug_res);
+    if (debug_row == NULL)
+    {
+      unexpected_error= "mysql_fetch_row failed";
+      mysql_free_result(debug_res);
+      break;
+    }
+    strcpy(call_statement, debug_row[0]);
+    mysql_free_result(debug_res);
+
+    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    {
+      debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
+      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+    }
+    else
+    {
+        /*
+          Following is pretty much the same as for MYSQL_MAIN_CONNECTION.
+          We're just throwing result sets away. NB: the statement has not
+          really ended -- when there's a result set MySQL temporarily drops
+          out of the procedure, and resumes during each iteration of this loop.
+          Todo: we can put each result into the result grid widget as it comes;
+          we'll have to decide whether the debugger should do it, or the main.
+        */
+        if (mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
+        {
+          debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+          if (debug_res != 0)
+          {
+            mysql_free_result(debug_res);
+
+            if (mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
+            {
+              while (mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0)
+              {
+                debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+                if (debug_res != 0) mysql_free_result(debug_res);
+              }
+              debug_res= 0;
+            }
+          }
+        }
+
+      debuggee_state= DEBUGGEE_STATE_END;
+    }
+    break;
+  }
+
+  /* Todo: Even after failure, get rid of result sets. But, oddly, mysql_next_result() never returns anything. */
+  /* This just would throw any results away, which is what happens also with MYSQL_MAIN_CONNECTION. */
+  /* What I'd have liked to do is: have the main connection put the result set up on the main screen. */
+  //while (mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0) ;
+  //if (mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
+  //{
+  //  while (mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0)
+  //  {
+  //    debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+  //    if (debug_res != 0) mysql_free_result(debug_res);
+  //  }
+  //  debug_res= 0;
+  //}
+  if (unexpected_error != NULL)
+  {
+    strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+  }
+
+  /* Cleanup */
+  /* Shut the connection, which seems to cause disconnect automatically. */
+  if (is_connected == 1) mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+
+  /* Typically we'll reach this point with last_command_result = "debuggee_wait_loop() termination" */
+
+  /* Here I am overwriting DEBUGGEE_WAIT_LOOP_ERROR / DEBUGGEE_STATE_END. Maybe they're informative but they caused trouble. */
+  //debuggee_state= DEBUGGEE_STATE_0;
+
+  /* The thread will end, but mysql[MYSQL_DEBUGGER_CONNECTION] will still exist. */
+  return ((void*) NULL);
+}
+
+
+/*
+  Debug|Install -- install the debugger routines and tables in xxxmdbug.
+  The actual CREATE statements are all xxxmdbug_install_sql in
+  a separate file, install_sql.cpp, so that it's clear what the HP-licence part is.
+  debug|install menu item is commented out, one must say $INSTALL
+  Todo: decide what to do if it's already installed.
+  Todo: privilege check
+  Todo: what we really should be doing: passing the original command, in all cases.
+*/
+//void MainWindow::action_debug_install()
+//{
+//  statement_edit_widget->setPlainText("$INSTALL");
+//  action_execute();
+//}
+
+void MainWindow::debug_install_go()
+{
+  char x[32768];
+  char command_string[2048];
+  QString qstring_error_message;
+
+  if (debug_error((char*)"") != 0) return;
+
+  qstring_error_message= debug_privilege_check(TOKEN_KEYWORD_DEBUG_INSTALL);
+  if (qstring_error_message != "")
+  {
+    strcpy(command_string, qstring_error_message.toUtf8());
+    if (debug_error(command_string) != 0) return; /* setup wouldn't be able to operate so fail */
+  }
+
+
+  if (debug_mdbug_install_sql(&mysql[MYSQL_MAIN_CONNECTION], x) < 0)
+  {
+      put_diagnostics_in_result();
+      return;
+    //if (debug_error((char*)"Install failed") != 0) return;
+  }
+  put_diagnostics_in_result();
+}
+
+/* For copyright and license notice of debug_mdbug_install function contents, see beginning of this program. */
+void debug_mdbug_install()
+{
+  ;
+}
+/* End of debug_mdbug_install. End of effect of licence of debug_mdbug_install_function contents. */
+
+
+/*
+  Debug|Setup
+  Todo: This should put up a list box with the routines which the user can execute. No hard coding of test.p8 and test.p9.
+        Or, it should look in the log for the last setup by this user, and re-do it.
+  Todo: Shortcut = Same as last time.
+  Todo: Search for schema name not just routine name.
+  Todo: We require SELECT access on mysql.proc. We could change the install_sql.cpp routines so that $setup accesses
+        a view of mysql.proc, and have a WHERE clause that restricts to only some procedures.
+  Format =  CALL xxxmdbug.setup('[option] object name list');
+  debug|setup menu item is removed, one must say $SETUP ...
+*/
+//void MainWindow::action_debug_setup()
+//{
+//  char call_statement[512]; /* Todo: this is dangerously small. */
+//  int debug_widget_index;
+//  QString routine_schema_name[DEBUG_TAB_WIDGET_MAX + 1];
+//  QString routine_name[DEBUG_TAB_WIDGET_MAX + 1];
+//
+//  /*
+//    TODO: Put up a list box with the routines that the user has a right to execute.
+//    Allow user to pick which ones will go in routine_names[], which will be what is used for setup().
+//    Max = DEBUG_TAB_WIDGET_MAX.
+//  */
+//
+//  routine_schema_name[0]= "test";
+//  routine_schema_name[1]= "test";
+//  routine_name[0]= "p8";
+//  routine_name[1]= "p9";
+//  routine_name[2]= "";
+//
+//  /* Make a setup statement. Example possibility = CALL xxxmdbug.setup('test.p8',test.p9'). */
+//  strcpy(call_statement, "CALL xxxmdbug.setup('");
+//  for (debug_widget_index= 0; ; ++debug_widget_index)
+//  {
+//    if (strcmp(routine_name[debug_widget_index].toUtf8(), "") == 0) break;
+//    if (debug_widget_index > 0) strcat(call_statement, ",");
+//    strcat(call_statement, routine_schema_name[debug_widget_index].toUtf8());
+//    strcat(call_statement, ".");
+//    strcat(call_statement, routine_name[debug_widget_index].toUtf8());
+//  }
+//  strcat(call_statement, "');");
+//  printf("call_statement=%s\n", call_statement);
+//
+//  statement_edit_widget->setPlainText(call_statement);
+//  emit action_execute();
+//}
+
+
+/* Todo: $setup does a GET_LOCK() so that two users won't do $setup at the same time. Figure out a better way. */
+void MainWindow::debug_setup_go(QString text)
+{
+  char command_string[512];
+  int index_of_number_1, index_of_number_2;
+  QString qstring_error_message;
+  QString q_routine_schema, q_routine_name;
+
+  /* Todo: Check that 'install' has happened -- but for now it's OK, at least we return some sort of error. */
+  /* Todo: use debug_error instead, provided debug_error gets rid of any problematic ''s */
+  qstring_error_message= debug_privilege_check(TOKEN_KEYWORD_DEBUG_SETUP);
+  if (qstring_error_message != "")
+  {
+    strcpy(command_string, qstring_error_message.toUtf8());
+    if (debug_error(command_string) != 0) return; /* setup wouldn't be able to operate so fail */
+  }
+
+  if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
+  {
+    if (debug_error(command_string) != 0) return;
+  }
+
+  q_routine_schema= debug_q_schema_name_in_statement;
+  q_routine_name= debug_q_routine_name_in_statement;
+
+  if ((q_routine_schema == "") || (q_routine_name == ""))
+  {
+    if (debug_error((char*)"Missing routine name(s). Expected syntax is: $setup routine-name [, routine-name ...]") != 0) return;
+  }
+
+  /* Todo: since yes there is a bug, but we want to get this out, just release the lock instead of doing the right thing. */
+  {
+    QString result_string= select_1_row("SELECT is_free_lock('xxxmdbug_lock')");
+    if (select_1_row_result_1.toInt() != 0)
+    {
+      //if (debug_error((char*)"Another user has done $setup and caused a lock. This might be an ocelotgui bug.") != 0) return;
+      result_string= select_1_row("SELECT release_lock('xxxmdbug_lock')");
+    }
+  }
+
+  /* Throw away the first word i.e. "$setup" and execute "call xxxmdbug.setup('...')". */
+  char call_statement[512 + 128];
+  strcpy(call_statement, "call xxxmdbug.setup('");
+  strcat(call_statement, strstr(command_string, " ") + 1);
+  strcat(call_statement, "')");
+
+  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  {
+    put_diagnostics_in_result();
+    return;
+    //if (debug_error((char*)"call xxxmdbug.setup() failed.") != 0) return;
+  }
+  debug_setup_mysql_proc_insert();
+}
+
+
+/*
+  The following routine replaces the procedures xxxmdbug.mysql_proc_insert()
+  and xxxmdbug.mysql_proc_insert_caller() in install_sql.cpp, which are no
+  longer called from xxxmdbug.setup(). The effect is the same,
+  but there is no INSERT into a mysql-database table.
+  Also: definition_of_surrogate_routine will have three statements: DROP IF EXISTS, SET, CREATE.
+        I could execute them all at once, but prefer to separate. Assume original name didn't contain ;.
+        ... For icc_core routines the SET statement might be missing, I don't know why.
+*/
+void MainWindow::debug_setup_mysql_proc_insert()
+{
+  char command[512];
+  MYSQL_RES *res= NULL;
+  MYSQL_ROW row= NULL;
+  const char *unexpected_error= NULL;
+  unsigned int num_fields;
+  unsigned int num_rows;
+  QString definition_of_surrogate_routine;
+  int it_is_ok_if_proc_is_already_there;
+
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from xxxmdbug.routines");
+  res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  if (res != NULL)
+  {
+    num_rows= mysql_num_rows(res);
+    mysql_free_result(res);
+    if (num_rows - 3 >= DEBUG_TAB_WIDGET_MAX)
+    {
+      sprintf(command, "SIGNAL SQLSTATE '05678' SET message_text='$setup generated %d surrogates but the current maximum is %d'", num_rows - 3, DEBUG_TAB_WIDGET_MAX - 1);
+      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+      put_diagnostics_in_result();
+      return;
+    }
+  }
+
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SET @xxxmdbug_saved_sql_mode=@@sql_mode");
+  /*
+    Go through all the rows of mysql.proc twice.
+    In the first iteration, we try to drop and create. If a create fails, we need a second iteration.
+    In the second iteration, we try to drop but not create (this is to get rid of earlier successful creates)..
+  */
+  int index_of_semicolon, index_of_set, index_of_create;
+  QString first_query, second_query, third_query;
+  int second_iteration_is_necessary= 0;
+  for (int iteration=0; iteration <= 1; ++iteration)
+  {
+    if ((iteration == 1) && (second_iteration_is_necessary == 0))
+    {
+      break;
+    }
+    res= NULL;
+    row= NULL;
+
+    strcpy(command,
+    "SELECT TRIM(BOTH '`' FROM schema_identifier_of_original),"
+    "       TRIM(BOTH '`' FROM routine_identifier_of_original),"
+    "       TRIM(BOTH '`' FROM routine_identifier_of_surrogate),"
+    "       definition_of_surrogate_routine,"
+    "       offset_of_begin "
+    "FROM xxxmdbug.routines");
+
+    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], command, strlen(command)))
+    {
+      unexpected_error= "select failed";
+    }
+    if (unexpected_error == NULL)
+    {
+      res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+      if (res == NULL) unexpected_error= "mysql_store_result failed";
+    }
+    if (unexpected_error == NULL)
+    {
+      num_fields= mysql_num_fields(res);
+      if (num_fields != 5) unexpected_error= "wrong field count";
+    }
+
+    if (unexpected_error == NULL)
+    {
+      for (;;)
+      {
+        row= mysql_fetch_row(res);
+        if (row == NULL) break;
+        it_is_ok_if_proc_is_already_there= 0;
+        /* todo: make sure row[2] i.e. routine_identifier_of_surrogate is not null */
+        if ((strcmp(row[2], "icc_process_user_command_r_server_variables") == 0)
+         || (strcmp(row[2], "icc_process_user_command_set_server_variables") == 0))
+        {
+          /* We will not insert icc_process_user_command_r_server_variables
+             or icc_process_user_command_set_server_variables into mysql.proc
+             if it already exists. This is okay as long as there is no change of
+             DBMS server version or engine or plugin. But recommend always:
+             DROP PROCEDURE xxxmdbug.icc_process_user_command_r_server_variables; */
+          it_is_ok_if_proc_is_already_there= 1;
+        }
+        else
+        {
+          /* MDBug might not care if the routine definition was blank, but we do. */
+          char tmp[512];
+          MYSQL_RES *res_2= NULL;
+          MYSQL_ROW row_2= NULL;
+          unsigned int num_rows_2= 0;
+          strcpy(tmp, "select routine_definition from information_schema.routines where routine_schema='");
+          strcat(tmp, row[0]);
+          strcat(tmp, "' and routine_name='");
+          strcat(tmp, row[1]);
+          strcat(tmp, "'");
+          if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp)) num_rows_2= 0;
+          else
+          {
+            res_2= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+            if (res_2 != NULL)
+            {
+              num_rows_2= mysql_num_rows(res_2);
+            }
+          }
+          if (num_rows_2 == 1)
+          {
+            row_2= mysql_fetch_row(res_2);
+            if ((row_2 == NULL) || (row_2[0] == NULL) || (strcmp(row_2[0],"") == 0))
+            {
+              char command[512];
+              mysql_free_result(res_2);
+              strcpy(tmp, "Could not get a routine definition for ");
+              strcat(tmp, row[0]);
+              strcat(tmp, ".");
+              strcat(tmp, row[1]);
+              strcat(tmp, ". Are you the routine creator and/or do you have SELECT privilege for mysql.proc?");
+              /* Todo: merge this sort of stuff into debug_error() */
+              sprintf(command, "SIGNAL sqlstate '05678' set message_text = '%s'", tmp);
+              mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+              unexpected_error= "create failed";
+              put_diagnostics_in_result();
+              second_iteration_is_necessary= 1;
+              break;
+            }
+          }
+          if (res_2 != NULL) mysql_free_result(res_2);
+        }
+        definition_of_surrogate_routine= QString::fromUtf8(row[3]);
+        index_of_semicolon= definition_of_surrogate_routine.indexOf(";");
+        index_of_set= definition_of_surrogate_routine.indexOf("SET session sql_mode = '", index_of_semicolon);
+        if (index_of_set == -1) index_of_create= definition_of_surrogate_routine.indexOf("CREATE ", index_of_semicolon);
+        else index_of_create= definition_of_surrogate_routine.indexOf("CREATE ", index_of_set);
+        if (index_of_create == -1) unexpected_error= "bad definition_of_surrogate_routine";
+        if (unexpected_error == NULL)
+        {
+          if (index_of_set == -1) first_query= definition_of_surrogate_routine.mid(0, index_of_create - 1);
+          else first_query= definition_of_surrogate_routine.mid(0, index_of_set - 1);
+          if (index_of_set != -1) second_query= definition_of_surrogate_routine.mid(index_of_set, index_of_create - index_of_set);
+          third_query= definition_of_surrogate_routine.mid(index_of_create, -1);
+          if (it_is_ok_if_proc_is_already_there == 0)
+          {
+            if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], first_query.toUtf8(), strlen(first_query.toUtf8())))
+            {
+              /* Actually, a failed drop will have to be considered to be okay. */
+            }
+          }
+          if ((unexpected_error == NULL) && (index_of_set != -1))
+          {
+            if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], second_query.toUtf8(), strlen(second_query.toUtf8())))
+            {
+              unexpected_error= "set failed";
+              break;
+            }
+          }
+          if (unexpected_error == NULL)
+          {
+            if (iteration == 0)
+            {
+              if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], third_query.toUtf8(), strlen(third_query.toUtf8())))
+              {
+                /* If there's an error, the diagnostics here should go all the way back up to the user. */
+                if (it_is_ok_if_proc_is_already_there == 0)
+                {
+                  unexpected_error= "create failed";
+                  put_diagnostics_in_result();
+                  second_iteration_is_necessary= 1;
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  if (res != NULL) mysql_free_result(res);
+  }
+
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "set session sql_mode=@xxxmdbug_saved_sql_mode");
+
+  if (unexpected_error != NULL)
+  {
+    if (strcmp(unexpected_error, "create failed") ==0) return; /* we already have the diagnostics */
+    sprintf(command, "SIGNAL SQLSTATE '05678' SET message_text='%s'", unexpected_error);
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+  }
+  put_diagnostics_in_result();
+}
+
+
+/*
+  debug_privilege_check() -- check in advance whether some debuggee-related privileges exist
+  It will be more convenient if the user is told in advance, and is told multiple problems at once.
+  Of course I could search for the grants, but it's easier to try it and see what happens.
+  However, this doesn't consider all possibilities and is only called before initializing.
+  To see if you have execute privilege, see if you can select from information_schema.routines, rather than execute.
+  A variant of that would be selecting where routine_definition > '' if you want to look for all privileges.
+  As well as the checks here, $setup also needs routine_definition > '' i.e. you must be routine creator
+  or you must have select privilege on mysql.proc.
+  Todo: check other possible things that the debuggee could do, and check all routines not just xxxmdbug.command.
+        one way would be to say 'command' OR 'other_routine' ... but putting into a loop would be better, I think.
+  Todo: xxxmdbug.command calls xxxmdbug.privilege_checks which will generate a signal,
+        but I'm wondering whether it's good because it sends messages using init_connect every time.
+  statement_type = TOKEN_KEYWORD_DEBUG_DEBUG or TOKEN_KEYWORD_DEBUG_SETUP or TOKEN_KEYWORD_DEBUG_INSTALL.
+*/
+QString MainWindow::debug_privilege_check(int statement_type)
+{
+  QString s= "";
+  char call_statement[512];
+  unsigned int num_rows;
+  MYSQL_RES *res;
+  QString result_string;
+
+  if (is_mysql_connected != 1)
+  {
+    s.append("Not connected");
+    return s;
+  }
+
+  if (statement_type == TOKEN_KEYWORD_DEBUG_INSTALL)
+  {
+    /* Somebody has to have said: grant create, drop, create routine, alter routine, select, insert, update, delete, select on xxxmdbug.* ... */
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create database xxxmdbug");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need create privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop table if exists xxxmdbug.xxxmdbug");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create table xxxmdbug.xxxmdbug (s1 int)");
+    if ((s == "") && (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142)) s.append("Need create privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.xxxmdbug'");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'insert into xxxmdbug.xxxmdbug values (1)'");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need insert privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'delete from xxxmdbug.xxxmdbug'");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need delete privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'update xxxmdbug.xxxmdbug set s1 = 1'");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need update privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop table xxxmdbug.xxxmdbug");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need drop privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop procedure if exists xxxmdbug.xxxmdbug");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create procedure xxxmdbug.xxxmdbug () set @a = 1");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create routine privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop procedure xxxmdbug.xxxmdbug");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1370) s.append("Need alter routine privilege on xxxmdbug.*. ");
+    return s;
+  }
+
+  /* First make sure xxxmdbug exists */
+  num_rows= 0;
+  if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from information_schema.schemata where schema_name = 'xxxmdbug'"))
+  {
+    s.append("Cannot select from information_schema");
+    return s;
+  }
+  res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  if (res != NULL)
+  {
+    num_rows= mysql_num_rows(res);
+    mysql_free_result(res);
+  }
+  if (num_rows != 1)
+  {
+    s.append("Cannot access database xxxmdbug. Check that $install was done and privileges were granted.");
+    return s;
+  }
+
+  if ((statement_type == TOKEN_KEYWORD_DEBUG_DEBUG) || (statement_type == TOKEN_KEYWORD_DEBUG_SETUP))
+  {
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.readme union all select * from xxxmdbug.copyright'");/* Returns 1142 if SELECT denied */
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'create temporary table xxxmdbug.xxxmdbug_tmp (s1 int)'");/* Returns 1044 if CREATE TEMPORARY denied */
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create temporary privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+  }
+
+  if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG)
+  {
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'set global init_connect = @@init_connect'");/* Returns 1227 if you need SUPER */
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1227) s.append("Need super privilege. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'call xxxmdbug.command()'");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need execute privilege on xxxmdbug.command. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+  }
+
+  if (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)
+  {
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare stmt1 from 'select * from mysql.proc'");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on mysql.proc. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'create table xxxmdbug.xxxmdbug_nontmp (s1 int)'");/* Returns 1044 if CREATE TEMPORARY denied */
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create privilege on xxxmdbug.*. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+
+    /* Can't prepare create-routine statements so test by actually creating and dropping a trivial for-test-only routine */
+    sprintf(call_statement, "create procedure xxxmdbug.xxxmdbugp () set @=@a");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement);
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create routine privilege on xxxmdbug.*. ");
+    else
+    {
+      sprintf(call_statement, "drop procedure xxxmdbug.xxxmdbugp");
+      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement);
+      if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need drop routine privilege on xxxmdbug.*. ");
+    }
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'call xxxmdbug.setup()'");
+    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need execute privilege on xxxmdbug.setup. ");
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+
+    result_string= select_1_row("select count(*) from information_schema.tables where table_schema = 'xxxmdbug' and table_name = 'setup_log'" );
+    if (result_string != "") s.append(result_string);
+    else if (select_1_row_result_1.toInt() != 0)
+    {
+      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.setup_log'");
+      if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need select privilege on xxxmdbug.setup_log. ");
+      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'insert into setup_log select * from xxxmdbug.setup_log'");
+      if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need insert privilege on xxxmdbug.setup_log. ");
+      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+      /* Todo: Find out why repair table is sometimes necessary. I know it can get corrupted but don't yet know why. */
+      if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "repair table xxxmdbug.setup_log"))
+      {
+        s.append("Repair Table xxxmdbug.setup_log failed");
+      }
+      else
+      {
+        res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+        if (res != NULL) mysql_free_result(res);
+      }
+    }
+  }
+
+  /* TODO: Following isn't good. */
+
+  result_string= select_1_row("select count(*) from information_schema.routines where routine_schema = 'xxxmdbug' and routine_name = 'command'" );
+  if (result_string != "") s.append(result_string);
+  else if (select_1_row_result_1.toInt() == 0) s.append("Need execute privilege for xxxmdbug.*. ");
+  return s;
+}
+
+
+/*
+  Called from: debug_debug_go(), debug_breakpoint_or_clear_go(), or other debug_ routines that might contain arguments.
+  An SQL statement may contain comments, plus semicolon and/or delimiter, which should be stripped before passing to xxxmdbug.
+  Also these procedures need to know: which tokens (if any) are for schema, routine, start line number, end line number.
+  For example from "$DEBUG x.y -- comment;", we want to produce "debug x.y" and the offsets of x and y.
+  Possible are: breakpoint/tbreakpoint location information [condition information]
+                clear [schema_identifier[.routine_identifier]] line_number_minimum [-line_number_maximum]
+                debug [schema_identifier[.routine_identifier]
+                delete breakpoint number
+  This does not detect syntax errors, we assume xxxmdbug.command() will return an error immediately for a syntax error.
+  So it's not really a parse, but should find the tokens that matter.
+  Todo: see if confusion happens if there's condition information, or parameters enclosed inside ''s.
+  If there is clearly an error, debug_parse_statement() returns -1 and command_string has an error message.
+*/
+int MainWindow::debug_parse_statement(QString text,
+                           char *command_string,
+                           int *index_of_number_1,
+                           int *index_of_number_2)
+{
+  char token[512];
+  int i, s_len;
+  int token_type;
+  QString s;
+//  int index_of_dot= -1;
+//  int index_of_minus= -1;
+  int statement_type= 0;
+  //bool left_parenthesis_seen= false;
+  bool name_is_expected= false; /* true if syntax demands [schema_name.]routine_name at this point */
+  char default_schema_name[512];
+
+  strcpy(default_schema_name, "");
+  debug_q_schema_name_in_statement="";
+  debug_q_routine_name_in_statement="";
+  *index_of_number_1= -1;
+  *index_of_number_2= -1;
+  strcpy(command_string, "");
+  for (i= 0; main_token_lengths[i] != 0; ++i)
+  {
+    token_type= main_token_types[i];
+    if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (token_type == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (token_type == TOKEN_TYPE_COMMENT_WITH_MINUS)) continue;
+    s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+
+    if ((token_type >= TOKEN_KEYWORD_DEBUG_BREAKPOINT)
+     && (token_type <= TOKEN_KEYWORD_DEBUG_TBREAKPOINT)
+     && (strcmp(command_string, "") == 0))
+    {
+      /* We're at the first word, which is the statement type. Write it in full. */
+      statement_type= token_type;
+      if (token_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT) { strcpy(command_string, "breakpoint"); name_is_expected= true; }
+      if (token_type == TOKEN_KEYWORD_DEBUG_CLEAR) { strcpy(command_string, "clear"); name_is_expected= true; }
+      if (token_type == TOKEN_KEYWORD_DEBUG_CONTINUE) strcpy(command_string, "continue");
+      if (token_type == TOKEN_KEYWORD_DEBUG_DEBUG) { strcpy(command_string, "debug"); name_is_expected= true; }
+      if (token_type == TOKEN_KEYWORD_DEBUG_DELETE) strcpy(command_string, "delete");
+      if (token_type == TOKEN_KEYWORD_DEBUG_EXECUTE) strcpy(command_string, "execute");
+      if (token_type == TOKEN_KEYWORD_DEBUG_EXIT) strcpy(command_string, "exit");
+      if (token_type == TOKEN_KEYWORD_DEBUG_INFORMATION) strcpy(command_string, "information");
+      if (token_type == TOKEN_KEYWORD_DEBUG_INSTALL) strcpy(command_string, "install");
+      if (token_type == TOKEN_KEYWORD_DEBUG_LEAVE) strcpy(command_string, "leave");
+      if (token_type == TOKEN_KEYWORD_DEBUG_NEXT) strcpy(command_string, "next");
+      if (token_type == TOKEN_KEYWORD_DEBUG_REFRESH) strcpy(command_string, "refresh");
+      if (token_type == TOKEN_KEYWORD_DEBUG_SET) strcpy(command_string, "set");
+      if (token_type == TOKEN_KEYWORD_DEBUG_SETUP) { strcpy(command_string, "setup"); name_is_expected= true; }
+      if (token_type == TOKEN_KEYWORD_DEBUG_SKIP) strcpy(command_string, "skip");
+      if (token_type == TOKEN_KEYWORD_DEBUG_SOURCE) strcpy(command_string, "source");
+      if (token_type == TOKEN_KEYWORD_DEBUG_STEP) strcpy(command_string, "step");
+      if (token_type == TOKEN_KEYWORD_DEBUG_TBREAKPOINT) { strcpy(command_string, "tbreakpoint"); name_is_expected= true; }
+      continue;
+    }
+
+    s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    s_len= s.toUtf8().size(); /* See comment "UTF8 Conversion" */
+    if (s_len + 1 >= 512) { strcpy(command_string, "overflow"); return -1; }
+    memcpy(token, s.toUtf8().constData(), s_len);
+    token[s_len]= 0;
+    if (token[0] == ';') continue;
+    if (s == ocelot_delimiter_str) continue;
+//    if (token[0] == '.') index_of_dot= i;
+//    if (token[0] == '-') index_of_minus= i;
+//    if (token[0] == '(') left_parenthesis_seen= true;
+    if (name_is_expected)
+    {
+      if ((token_type == TOKEN_TYPE_OTHER)
+       || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
+      {
+        /* It's possibly a routine name, and we're expecting a routine name. */
+        char tmp_schema_name[512];
+        char tmp_routine_name[512];
+        int s2_len;
+        QString s2;
+        if (text.mid(main_token_offsets[i + 1], 1) == ".")
+        {
+          /* schema-name . routine_name */
+          if ((main_token_types[i + 2] == TOKEN_TYPE_OTHER)
+           || (main_token_types[i + 2] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
+          {
+            strcpy(tmp_schema_name, token);
+            s2= text.mid(main_token_offsets[i + 2], main_token_lengths[i + 2]);
+            s2_len= s2.toUtf8().size(); /* See comment "UTF8 Conversion" */
+            if (s2_len + 1 + s_len + 1 >= 512) { strcpy(command_string, "overflow"); return -1; }
+            memcpy(tmp_routine_name, s2.toUtf8().constData(), s2_len);
+            tmp_routine_name[s2_len]= 0;
+            i+= 2;
+          }
+          else
+          {
+            strcpy(command_string, "Expected routine-name after .");
+            return -1;
+          }
+        }
+        else
+        {
+          /* Just routine name. Fill in [default schema name]. Todo: shouldn't require a server request so frequently. */
+          if (strcmp(default_schema_name, "") == 0)
+          {
+            QString result_string;
+            select_1_row_result_1= "";
+            result_string= select_1_row("select database()");
+            if (result_string != "") { strcpy(command_string, "Need to know default database but select database() failed"); return -1; }
+            if (select_1_row_result_1== "") { strcpy(command_string, "Need to know default database but select database() returned nothing"); return -1; }
+            s2= select_1_row_result_1;
+            s2_len= s2.toUtf8().size();
+            if (s2_len + 1 + s_len + 1 >= 512) { strcpy(command_string, "overflow"); return -1; }
+            memcpy(default_schema_name, s2.toUtf8().constData(), s2_len);
+            default_schema_name[s2_len]= 0;
+          }
+          strcpy(tmp_routine_name, token);
+          strcpy(tmp_schema_name, default_schema_name);
+        }
+        name_is_expected= false;
+        strcpy(token, tmp_schema_name);
+        strcat(token, ".");
+        strcat(token, tmp_routine_name);
+
+        {
+          QString result_string;
+          char query_for_select_check[512];
+          sprintf(query_for_select_check, "select count(*) from information_schema.routines where routine_schema='%s' and routine_name='%s'", tmp_schema_name, tmp_routine_name);
+          result_string= select_1_row(query_for_select_check);
+          if (result_string != "") { strcpy(command_string, "Tried to check routine name but select from information_schema.routines failed"); return -1; }
+          if (select_1_row_result_1.toInt() == 0)
+          {
+            sprintf(command_string, "Could not find routine %s.%s", tmp_schema_name, tmp_routine_name);
+            return -1;
+          }
+
+        }
+
+        debug_q_schema_name_in_statement= tmp_schema_name;
+        debug_q_routine_name_in_statement= tmp_routine_name;
+      }
+      else
+      {
+        /* It's not possibly a routine identifier, and we're expecting a routine identifier. */
+        strcpy(command_string, "Expected a routine name"); return -1;
+      }
+    }
+    if ((token[0] == ',') && (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)) name_is_expected= true;
+
+    if (token_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
+    {
+      if (*index_of_number_1 == -1) *index_of_number_1= i;
+      else if (*index_of_number_2 == -1) *index_of_number_2= i;
+    }
+    if (strlen(command_string) + strlen(token) + 1 >= 512) { strcpy(command_string, "overflow"); return -1; }
+    if (strcmp(command_string, "") != 0) strcat(command_string, " ");
+    strcat(command_string, token);
+  }
+  return 0;
+}
+
+
+/*
+  First: find the surrogate routine that debuggee will call (if it's not there, error = you should call setup).
+  Todo: schema_name could be '.' i.e. default
+  Then: put up debug_top_widget
+  Then: execute xxxmdbug.command(...,'debug ...')
+  Todo: check that surrogate routine is not obsolete, i.e. timestamp is after original routine's timestamp
+  Todo: check that everything in the group is present and executable
+  Todo: check that user is the same ... but how can you do that? Is it only in setup_log?
+  Todo: get rid of initialize() from menu
+  Todo: when starting, make sure debuggee is not already running -- even a finished routine is not over
+  Todo: if clicking causes you to get to action_debug_debug() you must generate a $DEBUG statement -- but how click a list??
+*/
+//void MainWindow::action_debug_debug()
+//{
+//  /* Figure out what the parameter should be -- it's not text, eh? */
+//  QString parameter;
+//  debug_debug_go(parameter);
+//}
+
+
+/*
+  Call debug_error((char*)"error-text") whenever, in one of the debug routines, you encounter an error.
+  Call debug_error((char*)"") regardless, at the start of a debug routine, so basic prerequisite checks can happen.
+  For example, if the user says "$debug test.x" and there is no surrogate for x, we want the user to see:
+  Error 1644 (05678) Surrogate not found.
+  TODO: make sure all the debug-routine failures go through here!
+  Todo: if the error is due to a failure of the last call, add what that last call's error message was.
+*/
+int MainWindow::debug_error(char *text)
+{
+  char command[2048];
+
+//  unsigned int statement_type;
+
+  if (is_mysql_connected == 0)
+  {
+    /* Unfortunately this might not get through. */
+    statement_edit_widget->result= tr("ERROR not connected");
+    return 1;
+  }
+
+  if (debuggee_state < 0)
+  {
+    char tmp_string[STRING_LENGTH_512]="";
+    char tmp_string_2[STRING_LENGTH_512 + 64];
+    if (debuggee_state != DEBUGGEE_STATE_END)
+    {
+      /* debuggee_state_error should tell us something, but remove all ' first */
+      strcpy(tmp_string, debuggee_state_error);
+      for (int i= 0; tmp_string[i] != '\0'; ++i) if (tmp_string[i] == '\047') tmp_string[i]= ' ';
+    }
+    sprintf(tmp_string_2, "SIGNAL sqlstate '05678' set message_text = '%s %d. %s'", "debuggee_state:", debuggee_state, tmp_string);
+    if (debuggee_state == DEBUGGEE_STATE_END)
+    {
+      sprintf(tmp_string_2, "SIGNAL sqlstate '05678' set message_text = 'Routine has stopped. Suggested next step is: $EXIT'");
+    }
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp_string_2);
+    put_diagnostics_in_result();
+    return 1;
+  }
+
+
+  if (strcmp(text,"") != 0)
+  {
+    sprintf(command, "SIGNAL sqlstate '05678' set message_text = '%s'", text);
+    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+    put_diagnostics_in_result();
+    return 1;
+  }
+
+  return 0;
+}
+
+
+/* $DEBUG [schema.]routine [(parameters)] */
+void MainWindow::debug_debug_go(QString text) /* called from execute_client_statement() or action_debug_debug() */
+{
+  char routine_schema[512];
+  char routine_name[512];
+  char call_statement[512];
+  QString result_string;
+  QString qstring_error_message;
+  int current_widget_index;
+  QString q_routine_schema, q_routine_name;
+
+  char command_string[2048];
+  int index_of_number_1, index_of_number_2;
+
+  /* Todo: Check that 'debug' has not happened */
+
+  if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
+  {
+    if (debug_error(command_string) != 0) return;
+  }
+
+  q_routine_schema= debug_q_schema_name_in_statement;
+  q_routine_name= debug_q_routine_name_in_statement;
+
+  if ((q_routine_schema == "") || (q_routine_name == ""))
+  {
+    if (debug_error((char*)"Missing routine name") != 0) return;
+  }
+
+  /* This is in case an error left tab widget up. Todo: Examine if other debuggee errors should get the same treatment. */
+  if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR)
+  {
+    debug_exit_go(1);
+  }
+
+  if (debuggee_state < 0) debuggee_state= DEBUGGEE_STATE_0;
+  if (debuggee_state == DEBUGGEE_STATE_END) debuggee_state= DEBUGGEE_STATE_0;
+  if (debug_error((char*)"") != 0) return;
+
+
+  strcpy(routine_schema, q_routine_schema.toUtf8());
+  strcpy(routine_name, q_routine_name.toUtf8());
+
+  if (debuggee_state > 0)
+  {
+    if (debug_error((char*)"Debug is already running. Use Debug|exit to stop it. This could be temporary.") != 0) return;
+  }
+
+  qstring_error_message= debug_privilege_check(TOKEN_KEYWORD_DEBUG_DEBUG);
+  if (qstring_error_message != "")
+  {
+    strcpy(command_string, qstring_error_message.toUtf8());
+    if (debug_error(command_string) != 0) return; /* debuggee wouldn't be able to operate so fail */
+  }
+
+  /* Call xxxmdbug.debuggee_get_surrogate_name */
+  strcpy(call_statement, "CALL xxxmdbug.debuggee_get_surrogate_name('");
+  strcat(call_statement, routine_name);
+  strcat(call_statement, "','");
+  strcat(call_statement, routine_schema);
+  strcat(call_statement, "',@schema_identifier,@surrogate_routine_identifier,@routine_type,@remainder_of_original_name)");
+  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  {
+    if (debug_error((char*)"Surrogate not found. Probably $setup wasn't done for a group including this routine.") != 0) return;
+  }
+  result_string= select_1_row("select @schema_identifier, concat(left(@surrogate_routine_identifier,11), '%'), @routine_type, @remainder_of_original_name, isnull(@schema_identifier)");
+  if (result_string != "")
+  {
+    char char_result_string[512];
+    strcpy(char_result_string, result_string.toUtf8());
+    if (debug_error(char_result_string) != 0) return;
+  }
+  /* select_1_row_result_1 = @schema_identifier. select_1_row_result_2 = left(@surrogate_routine_identifier,11) || '%'. */
+
+  /* Todo: this checks whether select returned null, good. But it should make even more certain that $debug will succeed. */
+  if (select_1_row_result_5.toInt() == 1)
+  {
+    if (debug_error((char*)"Surrogate not found. Perhaps $setup was not done?") != 0) return;
+  }
+
+  QString routine_schema_name_for_search= select_1_row_result_1;
+  QString routine_name_for_search= select_1_row_result_2;
+
+  /*
+    This will find all surrogate routines which have the same prefix, xxxmdbug___
+    That means they're in the same group. Ignore icc_core.
+    Get only the part that's not part of the prefix.
+    Interesting idea: you could have a way to show both the surrogate and the original.
+  */
+  int i, j;
+  char i_as_string[10];
+  /* Todo: n should not be hard-coded here, it limits us to only 10 routines can be searched */
+  for (i= 0, j= 0; i < DEBUG_TAB_WIDGET_MAX; ++i)
+  {
+    sprintf(i_as_string, "%d", i);
+    strcpy(call_statement, "select routine_schema, right(routine_name,length(routine_name)-12) from information_schema.routines ");
+    strcat(call_statement, "where routine_schema = '");
+    strcat(call_statement, routine_schema_name_for_search.toUtf8());
+    strcat(call_statement, "' and routine_name like '");
+    strcat(call_statement, routine_name_for_search.toUtf8());
+    strcat(call_statement, "' order by routine_name limit 1 offset ");
+    strcat(call_statement, i_as_string);
+    result_string= select_1_row(call_statement);
+    if (result_string != "")
+    {
+      char char_result_string[512];
+      if (result_string == "mysql_fetch row failed") break;
+      strcpy(char_result_string, result_string.toUtf8());
+      if (debug_error(char_result_string) != 0) return;
+    }
+    if (select_1_row_result_2 != "icc_core")
+    {
+      /* Todo: debug_routine_schema_name and debug_routine_name are global so setup() will ruin them. Fix that! */
+      debug_routine_schema_name[j]= select_1_row_result_1;
+      debug_routine_name[j]= select_1_row_result_2;
+      ++j;
+    }
+  }
+
+  /* Todo: check: can this crash if there are DEBUG_TAB_WIDGET_MAX routines? Is this unnecessary if there are DEBUG_TAB_WIDGET_MAX routines? */
+  debug_routine_name[j]= "";
+
+  int debug_widget_index;
+
+  /* Todo: check if this is useless. You're supposed to have called debug_delete_tab_widgets[] during $exit. */
+  for (debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
+  {
+    debug_widget[debug_widget_index]= 0;
+  }
+
+  /* After this point, some items that get created are persistent, so be sure to clear them if there's an error. */
+
+  //MYSQL_RES *debug_res;
+  //MYSQL_ROW row;
+  QString routine_definition;
+  current_widget_index= -1;
+  for (debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
+  {
+    if (strcmp(debug_routine_name[debug_widget_index].toUtf8(), "") == 0) break;
+    strcpy(call_statement, "select routine_definition from information_schema.routines where routine_schema = '");
+    strcat(call_statement, debug_routine_schema_name[debug_widget_index].toUtf8());
+    strcat(call_statement, "' and routine_name = '");
+    strcat(call_statement, debug_routine_name[debug_widget_index].toUtf8());
+    strcat(call_statement, "'");
+    QString error_return= select_1_row(call_statement);
+    if (error_return != "")
+    {
+      debug_delete_tab_widgets();                          /* delete already-made widgets. Rest of 'exit' shouldn't happen. */
+      strcpy(call_statement, error_return.toUtf8());
+      strcat(call_statement, " Could not find a routine in the $setup group: ");
+      strcat(call_statement, debug_routine_schema_name[debug_widget_index].toUtf8());
+      strcat(call_statement,".");
+      strcat(call_statement, debug_routine_name[debug_widget_index].toUtf8());
+      debug_error(call_statement);                         /* Todo: you forgot to look for icc_core */
+      return;
+    }
+    routine_definition= select_1_row_result_1;             /* = information_schema.routines.routine_definition */
+
+    if (routine_definition == "")
+    {
+      debug_delete_tab_widgets();
+      strcpy(call_statement, "Could not get a routine definition for ");
+      strcat(call_statement, debug_routine_name[debug_widget_index].toUtf8());
+      strcat(call_statement, ". Are you the routine creator and/or do you have SELECT privilege for mysql.proc?");
+      if (debug_error(call_statement)) return;
+    }
+
+    debug_widget[debug_widget_index]= new CodeEditor();
+    debug_widget[debug_widget_index]->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
+    debug_widget[debug_widget_index]->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_color);
+
+    debug_maintain_prompt(0, debug_widget_index, 0); /* clear prompt_as_input_by_user */
+
+    /* todo: call 'refresh breakpoints' and debug_maintain_prompt() for breakpoints that already have been set up. */
+    debug_widget[debug_widget_index]->prompt_default= (QString)"\\2 \\L";
+    debug_widget[debug_widget_index]->result= (QString)"ABCDEFG";
+    debug_widget[debug_widget_index]->setPlainText(routine_definition);
+
+    debug_widget[debug_widget_index]->setReadOnly(false);                 /* if debug shouldn't be editable, set to "true" here */
+    debug_widget[debug_widget_index]->installEventFilter(this);           /* is this necessary? */
+    debug_tab_widget->addTab(debug_widget[debug_widget_index], debug_routine_name[debug_widget_index]);
+    if ((debug_routine_name[debug_widget_index] == q_routine_name) && (debug_routine_schema_name[debug_widget_index] == q_routine_schema))
+    {
+      current_widget_index= debug_widget_index;
+    }
+  }
+
+  if (current_widget_index == -1)
+  {
+    debug_delete_tab_widgets();
+    if (debug_error((char*)"routine is missing")) return;
+  }
+
+  debug_tab_widget->setCurrentIndex(current_widget_index);
+
+  /* Getting ready to create a separate thread for the debugger and 'attach' to it */
+
+  char error_message[512];
+
+  debuggee_state= DEBUGGEE_STATE_0;
+
+  /*
+    We want a channel name that will differ from what others might choose.
+    Arbitrary decitision = debug_channel_name will be "ch#" || connection-number-of-main-connection.
+    It could be uniquified beyond that if necessary, e.g. add user name.
+    Todo: this could be moved so it doesn't happen every time $debug happens. */
+
+  sprintf(debuggee_channel_name, "ch#%d", statement_edit_widget->dbms_connection_id);
+
+  pthread_t thread_id;
+
+  /* Create a debuggee thread. */
+  /* Todo: consider whether it would have been better to use the Qt QThread function */
+  pthread_create(&thread_id, NULL, &debuggee_thread, NULL);
+
+  /*
+    Wait till debuggee has indicated that it is about to call debuggee_wait_loop().
+    Todo: Give a better diagnostic if this doesn't happen.
+    Todo: Is it possible to fail anyway? If so, sleep + repeat?
+    Todo: This gives up after 1 second. Maybe on a heavily loaded machine that's too early?
+  */
+  for (int k= 0; k < 100; ++k)
+  {
+    QThread48::msleep(10);
+    if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP) break;
+  }
+  QThread48::msleep(10); /* in case debuggee_wait_loop() fails immediately */
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    /* Todo: if somehow (bizarrely) debuggee_state >= 0, then the thread did not end and needs to be stopped. */
+    debug_delete_tab_widgets();
+    sprintf(error_message, "Debuggee not responding. Code = %d. Thread has not been stopped.\n", debuggee_state);
+    if (debug_error(error_message) != 0) return;
+  }
+
+  /*
+    Attach to the debuggee.
+    Todo: Check: is it possible for this to fail because thread has not connected yet? If so, sleep + repeat?
+    Todo: Check: why use insertPlainText not setPlainText?
+  */
+
+  strcpy(call_statement, "call xxxmdbug.command('");
+  strcat(call_statement, debuggee_channel_name);
+  strcat(call_statement, "', 'attach');\n");
+
+  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  {
+    /* Attach failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
+    put_diagnostics_in_result();
+    debug_exit_go(1); /* This tries to tell the debuggee to stop, because we're giving up. */
+    return;
+  }
+
+  debug_timer_old_line_number= -1;
+  debug_timer_old_schema_identifier[0]= '\0';
+  debug_timer_old_routine_identifier[0]= '\0';
+  debug_timer_old_commands_count= -1;
+  debug_timer_old_number_of_status_message= -1;
+  debug_timer_old_icc_count= -1;
+  debug_timer_old_debug_widget_index= -1;
+  debug_timer->start(DEBUG_TIMER_INTERVAL);
+
+  /* By the way, we fill in [schema.] if it's missing, because otherwise default would be 'test'. */
+
+  //  strcpy(call_statement, "debug ");
+  //if (strcmp(routine_schema, "") != 0)
+  //{
+  //  strcat(call_statement, routine_schema);
+  //  strcat(call_statement, ".");
+  //}
+  //strcat(call_statement, routine_name);
+  if (debug_call_xxxmdbug_command(command_string) != 0)
+  {
+    /* Debug failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
+    put_diagnostics_in_result();
+    debug_exit_go(1); /* This tries to tell the debuggee to stop, because we're giving up. */
+    return;
+  }
+  put_diagnostics_in_result();
+
+  /* TODO: next line was removed TEMPORARILY. But maybe highlighting will occur due to temporary breakpoint? */
+  //debug_highlight_line(); /* highlight the first line. todo: should be the first executable line, no? */
+  debug_top_widget->show(); /* Is this necessary? I think so because initially debug_window should be hidden. */
+
+  debug_menu_enable_or_disable(TOKEN_KEYWORD_DEBUG_DEBUG);             /* Until now most debug menu items were gray. */
+}
+
+
+/*
+  Change the contents of debug_widget[debug_widget_index]->prompt_as_input_by_user.
+  action: 0 = initialize/clear, 1 = add breakpoint, 2 = delete breakpoint, 3 = add tbreakpoint
+  line_number: irrelevant if action == 0, else line number for add/clear
+  We have to set the prompt -- the separated-from-the-text stuff on the left -- so that it shows
+  the line numbers with \2 \L, and shows the breakpoints with K(line-number).
+  We avoid 'refresh breakpoints' because it waits for debuggee to be free; hope it doesn't get out of synch.
+  We should end up with something like "\2 \L \K(5,red,Ⓑ) \K(4,red,Ⓑ)" if there are breakpoints on line 5 and line 4.
+  Todo: Even if we're doing adds, do all the deletes first so that if this is called twice there won't be a duplicate.
+        (Todo: I think the debuggee would not make duplicates, but that needs checking.)
+  Todo: breakpoint and tbreakpoint look the same in this scheme.
+*/
+void MainWindow::debug_maintain_prompt(int action, int debug_widget_index, int line_number)
+{
+  if (action == 0)                                                         /* clear */
+  {
+    debug_widget[debug_widget_index]->prompt_as_input_by_user= (QString)"\\2 \\L";
+    return;
+  }
+  QString prompt_including_symbol;
+  QString breakpoint_symbol;
+
+  prompt_including_symbol= (QString)" \\K(";
+  prompt_including_symbol.append(QString::number(line_number));
+  breakpoint_symbol= QChar(0x24b7);                                        /* CIRCLED LATIN CAPITAL LETTER B */
+  prompt_including_symbol.append(",red,");
+  prompt_including_symbol.append(breakpoint_symbol);
+  prompt_including_symbol.append(")");
+
+  if (action == 2)                                                        /* delete (well, actually: clear */
+  {
+    /* I don't expect that indexOf() could return -1, and I ignore it if it does happen. */
+    int index_of_prompt;
+    index_of_prompt= debug_widget[debug_widget_index]->prompt_default.indexOf(prompt_including_symbol);
+    if (index_of_prompt >= 0) debug_widget[debug_widget_index]->prompt_default.remove(index_of_prompt, prompt_including_symbol.size());
+    index_of_prompt= debug_widget[debug_widget_index]->prompt_as_input_by_user.indexOf(prompt_including_symbol);
+    if (index_of_prompt >= 0) debug_widget[debug_widget_index]->prompt_as_input_by_user.remove(index_of_prompt, prompt_including_symbol.size());
+  }
+  if ((action == 1) || (action == 3))                                    /* add */
+  {
+    debug_widget[debug_widget_index]->prompt_default.append(prompt_including_symbol);
+    debug_widget[debug_widget_index]->prompt_as_input_by_user.append(prompt_including_symbol);
+  }
+}
+
+
+/*
+  Find out what is current routine and current line, put a symbol beside it.
+  Execute a command e.g. "debug test.p8 5".
+  So far: we get block_number = current line number - 1.
+  Todo: we don't show the B in a circle!
+  Do not confuse with action_mousebuttonpress which also generates "$breakpoint ...".
+*/
+void MainWindow::action_debug_breakpoint()
+{
+  char command[512];
+  int line_number;
+  char line_number_as_string[10];
+
+  int debug_widget_index= debug_tab_widget->currentIndex();
+  /* I can't imagine how currentIndex() could be == -1, but if it is, do nothing. */
+  if (debug_widget_index < 0) return;
+  line_number= debug_widget[debug_widget_index]->block_number + 1;
+  sprintf(line_number_as_string, "%d", line_number);
+  strcpy(command, "$BREAKPOINT ");
+  strcat(command, debug_routine_schema_name[debug_widget_index].toUtf8());
+  strcat(command,".");
+  strcat(command, debug_routine_name[debug_widget_index].toUtf8());
+  strcat(command, " ");
+  strcat(command, line_number_as_string);
+
+  statement_edit_widget->setPlainText(command);
+  action_execute();
+}
+
+
+/*
+  "breakpoint" and "clear" and "tbreakpoint" have the same argument syntax so we use the same routine for all,
+  passing statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT or TOKEN_KEYWORD_DEBUG_CLEAR.
+*/
+void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
+{
+  char command_string[512];
+  int index_of_number_1, index_of_number_2;
+  QString routine_name;
+  QString schema_name;
+
+  /* Todo: Check that 'debug' has happened */
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_error((char*)"No debug session in progress") != 0) return;
+  }
+
+  if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
+  {
+    if (debug_error((char*)"Overflow") != 0) return;
+  }
+  schema_name= debug_q_schema_name_in_statement;
+  routine_name= debug_q_routine_name_in_statement;
+
+  if ((schema_name == "") || (routine_name == ""))
+  {
+    if (debug_error((char*)"Missing routine name") != 0) return;
+  }
+
+  if (debug_error((char*)"") != 0) return;
+
+  if (debug_call_xxxmdbug_command(command_string) != 0)
+  {
+    put_diagnostics_in_result();
+    return;
+  }
+
+  /* Figure out line number and debug_widget_index from the index variables. */
+  /* Todo: This is failing to compare schema name. */
+
+  int debug_widget_index;
+
+  for (debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
+  {
+    if (debug_widget[debug_widget_index] != 0)
+    {
+      if ((QString::compare(routine_name, debug_routine_name[debug_widget_index]) == 0)
+       && (QString::compare(schema_name, debug_routine_schema_name[debug_widget_index]) == 0)) break;
+    }
+  }
+
+  if (debug_widget_index == DEBUG_TAB_WIDGET_MAX)
+  {
+    if (debug_error((char*)"No such routine") != 0) return;
+  }
+
+  int line_number_1, line_number_2;
+  QString q_line_number;
+  q_line_number= text.mid(main_token_offsets[index_of_number_1], main_token_lengths[index_of_number_1]);
+  line_number_1= q_line_number.toInt();
+  if (index_of_number_2 == -1) line_number_2= line_number_1;
+  else
+  {
+    q_line_number= text.mid(main_token_offsets[index_of_number_2], main_token_lengths[index_of_number_2]);
+    line_number_2= q_line_number.toInt();
+  }
+
+  for (int i= line_number_1; i <= line_number_2; ++i)
+  {
+    if (i > debug_widget[debug_widget_index]->blockCount())
+    {
+      break;
+    }
+    if (statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT) debug_maintain_prompt(1, debug_widget_index, i);
+    if (statement_type == TOKEN_KEYWORD_DEBUG_CLEAR) debug_maintain_prompt(2, debug_widget_index, i);
+    if (statement_type == TOKEN_KEYWORD_DEBUG_TBREAKPOINT) debug_maintain_prompt(3, debug_widget_index, i);
+  }
+  /*
+    Todo: I have had trouble, sometimes the breakpoint symbols don't show up unless I click on the line.
+          I think that one of these kludges is helping, but I don't know if it always helps,
+          and I don't know which of the two lines is actually fixing the problem,
+          and I don't know whether there's a better way. So find out, eh?
+  */
+  debug_widget[debug_widget_index]->repaint();
+  debug_widget[debug_widget_index]->viewport()->update();
+  put_diagnostics_in_result();
+}
+
+
+/*
+  Todo: The problem with "delete n" is we don't know which breakpoint is n.
+  Of course it's in xxxmdbug.breakpoints, but "r breakpoints" only works if we're at a breakpoint.
+*/
+void MainWindow::debug_delete_go()
+{
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  put_diagnostics_in_result();
+}
+
+
+/*
+  We will get here if mouse button pressed on debug_tab_widget (we don't know which debug_widget yet, possibly none of them).
+  What's it good for? Probably this will be the main way to set a breakpoint.
+  I think we'll need to find a right mousebutton press and put up a menu.
+  But maybe it would be better if debug_window had a menu bar.
+  In ddd, one of the many options is: double-click. But I didn't succeed with doubleclick.
+  Todo: figure out what to do if there's already a breakpoint here. Clear it? Right now we're just duplicating it.
+*/
+void MainWindow::action_debug_mousebuttonpress(QEvent *event, int which_debug_widget_index)
+{
+  int line_number;
+  char command[512];
+  char schema_name[512];
+  char routine_name[512];
+  int debug_widget_index;
+
+  QMouseEvent *mouse_event= static_cast<QMouseEvent*> (event);            /* Get line number where mousepress happened */
+  QPoint point= mouse_event->pos();
+  debug_widget_index= debug_tab_widget->currentIndex();
+  /* I saw a crash once so maybe these checks aren't to paranoid. But I don't know whether they avoid the crash. */
+  if (debug_widget_index == -1) return;                                   /* Check for an impossible condition */
+  if (debug_widget_index > DEBUG_TAB_WIDGET_MAX) return;                  /* "" */
+  if (which_debug_widget_index >= debug_tab_widget->count()) return;      /* "" */
+  if (which_debug_widget_index != debug_widget_index) return;             /* "" */
+  QTextCursor text_cursor= debug_widget[debug_widget_index]->cursorForPosition(point);
+  line_number= text_cursor.blockNumber() + 1;
+
+  strcpy(schema_name, debug_routine_schema_name[debug_widget_index].toUtf8());
+  strcpy(routine_name, debug_routine_name[debug_widget_index].toUtf8());
+
+  sprintf(command, "$breakpoint %s.%s %d", schema_name, routine_name, line_number);
+
+  statement_edit_widget->setPlainText(command);                           /* Execute "$breakpoint ..." */
+  action_execute();
+}
+
+
+/*
+  Debug|Clear
+  Similar code is in action_debug_breakpoint().
+  Do not confuse with Debug|Delete: "$delete 5" clears a breakpoint #5.
+  Todo: Check that somewhere something says debug_maintain_prompt(2, debug_widget_index, line_number);
+*/
+void MainWindow::action_debug_clear()
+{
+  char command[512];
+  int line_number;
+  char line_number_as_string[10];
+
+  int debug_widget_index= debug_tab_widget->currentIndex();
+  /* I can't imagine how currentIndex() could be == -1, but if it is, do nothing. */
+  if (debug_widget_index < 0) return;
+  line_number= debug_widget[debug_widget_index]->block_number + 1;
+  sprintf(line_number_as_string, "%d", line_number);
+  strcpy(command, "$CLEAR ");
+  strcat(command, debug_routine_schema_name[debug_widget_index].toUtf8());
+  strcat(command,".");
+  strcat(command, debug_routine_name[debug_widget_index].toUtf8());
+  strcat(command, " ");
+  strcat(command, line_number_as_string);
+
+  statement_edit_widget->setPlainText(command);
+  action_execute();
+}
+
+
+/*
+  Debug|Continue -- "CALL xxxmdbug.command([channel-name],'continue');" as a client statement
+*/
+void MainWindow::action_debug_continue()
+{
+  statement_edit_widget->setPlainText("$CONTINUE");
+  action_execute();
+}
+
+/*
+  Debug|Step
+  This is much like Debug|Continue, but we don't care if we end up on a permanent breakpoint.
+*/
+void MainWindow::action_debug_step()
+{
+  statement_edit_widget->setPlainText("$STEP");
+  action_execute();
+}
+
+/*
+  Debug|Leave
+*/
+//void MainWindow::action_debug_leave()
+//{
+//    statement_edit_widget->setPlainText("$LEAVE");
+//    action_execute();
+//}
+
+void MainWindow::debug_leave_go()
+{
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  put_diagnostics_in_result();
+}
+
+
+void MainWindow::debug_skip_go()
+{
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  put_diagnostics_in_result();
+}
+
+
+void MainWindow::debug_source_go()
+{
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  put_diagnostics_in_result();
+}
+
+void MainWindow::debug_set_go()
+{
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  put_diagnostics_in_result();
+}
+
+
+/*
+  $execute sql-statement
+  todo: this will fail if first token is a comment
+  todo: get rid of this, it fails
+*/
+void MainWindow::debug_execute_go()
+{
+//  QString s;
+//  char command_string[5120];
+//
+//  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+//  {
+//    if (debug_error((char*)"No debug session in progress") != 0) return;
+//  }
+//  if (debug_error((char*)"") != 0) return;
+//
+//  s= "execute ";
+//  s.append(text.right(text.length() - (main_token_offsets[main_token_number] + main_token_lengths[main_token_number])));
+//  QMessageBox msgbox;
+//  msgbox.setText(s);
+//  msgbox.exec();
+//  strcpy(command_string, s.toUtf8());
+//  printf("command_string=%s.\n", command_string);
+//  debug_call_xxxmdbug_command(s.toUtf8());
+//  put_diagnostics_in_result();
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  put_diagnostics_in_result();
+}
+
+
+/* For: $next, $continue, $refresh */
+/* The following could be used for all the $... statements where one merely passes the command on to the debuggee */
+/* We strip the comments and the ; but if there's junk after the first word it will cause an error, as it should. */
+/* Todo: Should you add a semicolon? */
+void MainWindow::debug_other_go(QString text)
+{
+  char command_string[512];
+  int index_of_number_1, index_of_number_2;
+  QString q_schema_name, q_routine_name;
+
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_error((char*)"No debug session in progress") != 0) return;
+  }
+  if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
+  {
+    if (debug_error((char*)"Overflow") != 0) return;
+    return;
+  }
+  q_schema_name= debug_q_schema_name_in_statement;
+  q_routine_name= debug_q_routine_name_in_statement;
+
+  if (debug_error((char*)"") != 0) return;
+  if (debug_call_xxxmdbug_command(command_string) != 0) return;
+  put_diagnostics_in_result();
+}
+
+
+/*
+  Debug|Next
+*/
+void MainWindow::action_debug_next()
+{
+ statement_edit_widget->setPlainText("$NEXT");
+ action_execute();
+}
+
+
+/*
+  Debug|Skip
+  Commented out -- not working at this time
+*/
+//void MainWindow::action_debug_skip()
+//{
+//  statement_edit_widget->setPlainText("$SKIP");
+//  action_execute();
+//}
+
+
+/*
+  Given 'information status' schema + routine name, find out what the tab number is and make it current.
+  Then change the cursor to point to a particular line.
+  After the cursor is set to the line, the CodeEditor's highlightCurrentLine wil highlight it.
+  Remember, blockNumber() is base 0
+  Todo: If the call was completed, you shouldn't be here -- the line number will be too big!
+  Todo: Make sure highlight line goes off if execution switches to a different routine's tab. (I think that's okay now.)
+*/
+void MainWindow::debug_highlight_line()
+{
+  QTextCursor cursor;
+  int debug_widget_index;
+  int new_line_number;
+  QString debuggee_schema_identifier;
+  QString debuggee_routine_identifier;
+
+  for (debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
+  {
+    debuggee_schema_identifier= debuggee_information_status_schema_identifier;
+    debuggee_schema_identifier= connect_stripper(debuggee_schema_identifier);
+    debuggee_routine_identifier= debuggee_information_status_routine_identifier;
+    debuggee_routine_identifier= connect_stripper(debuggee_routine_identifier);
+    if (QString::compare(debuggee_schema_identifier, debug_routine_schema_name[debug_widget_index]) == 0)
+    {
+      if (QString::compare(debuggee_routine_identifier, debug_routine_name[debug_widget_index]) == 0)
+      {
+        break; /* now we know that debug_widget_index is for the tab of the routine the debuggee's at */
+      }
+    }
+  }
+
+  if (debug_widget_index >= DEBUG_TAB_WIDGET_MAX)
+  {
+    /* I think it's impossible that routine won't be there, but if it isn't, do nothing. */
+    /* Well, not quite impossible -- schema or routine might be "unknown" or "". That's probably harmless. */
+    /* Todo: Change status line, on supposition that the routine has not started or has ended. */
+    return;
+  }
+
+  debug_tab_widget->setCurrentWidget(debug_widget[debug_widget_index]);
+
+  new_line_number= atoi(debuggee_information_status_line_number);
+
+  --new_line_number;
+
+  if (new_line_number < 0) new_line_number= 0; /* Probably this is unnecessary */
+
+  /*
+    Something like QTextCursor::HighlightCurrentLine. Make the background light red.
+    This cancels the "current line" background (which is light yellow), and can be cancelled by it -- I think that's okay.
+  */
+
+  /* If this is a different debug_widget than the last one, this should turn highlight off for the last one. */
+  if (debug_widget_index != debug_timer_old_debug_widget_index)
+  {
+    if (debug_timer_old_debug_widget_index != -1)
+    {
+      if (debug_timer_old_debug_widget_index != -1)
+      {
+        QList<QTextEdit::ExtraSelection> old_extraSelections;
+        debug_widget[debug_timer_old_debug_widget_index]->setExtraSelections(old_extraSelections);
+      }
+    }
+    debug_timer_old_debug_widget_index= debug_widget_index;
+  }
+
+  QList<QTextEdit::ExtraSelection> extraSelections;
+
+  QTextEdit::ExtraSelection selection;
+
+  QColor lineColor= QColor(Qt::red).lighter(160);
+
+  QTextDocument* doc= debug_widget[debug_widget_index]->document();
+  QTextBlock block= doc->findBlockByNumber(new_line_number);
+  int pos= block.position();
+
+  selection.format.setBackground(lineColor);
+  selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+  selection.cursor= QTextCursor(doc);
+  selection.cursor.setPosition(pos, QTextCursor::MoveAnchor);
+  selection.cursor.setPosition(pos+1, QTextCursor::KeepAnchor);
+  selection.cursor.clearSelection();
+  extraSelections.append(selection);
+  debug_widget[debug_widget_index]->setExtraSelections(extraSelections);
+}
+
+
+/*
+  Debug|Delete
+*/
+//void MainWindow::action_debug_delete()
+//{
+//  printf("STUB: delete\n");
+//}
+
+
+/*
+  Debug|Exit
+  = "CALL xxxmdbug.command([channel-name],'exit');" as a client statement
+  Check debuggee_state. If it's not DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP, debuggee_wait_loop() is not going on. THIS APPLIES FOR MANY COMMANDS!
+  Send "exit" command, which should cause debuggee to exit debuggee_wait_loop() and return from the thread function.
+  Wait up to 1 second for "exit" to work.
+  If it didn't work, "kill debuggee-connection-id".
+  TODO: If debuggee fails to respond, it's up to you to kill it.
+  TODO: Call this when main window exits, otherwise the thread's connection is immortal.
+  TODO: I wish there was some way to clear up init_connect now too.
+  Todo: menu item to shut down debugger, and hide debug_tab_widget, close the connection, and kill the thread.
+  Todo: when would you like to get rid of debug_widgets[]?
+  We call debug_menu_enable_or_disable(TOKEN_KEYWORD_DEBUG_EXIT) after calling debug_exit_go().
+*/
+void MainWindow::action_debug_exit()
+{
+    statement_edit_widget->setPlainText("$EXIT");
+    action_execute();
+}
+
+/* flagger == 0 means this is a regular $exit; flagger == 1 means we're getting rid of stuff due to a severe severe error */
+void MainWindow::debug_exit_go(int flagger)
+{
+  char call_statement[512];
+
+  if (flagger == 0)
+  {
+    /* Todo: merge this with debug_error somehow, and make sure nothing's enabled/disabled unless debug/exit succeeded! */
+    if (menu_debug_action_exit->isEnabled() == false)
+    {
+      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "signal sqlstate '05678' set message_text = '$DEBUG not done'");
+      put_diagnostics_in_result();
+      return;
+    }
+  }
+
+  debug_top_widget->hide();
+  debug_timer->stop();
+  /* Todo: more cleanup e.g. kill the debuggee thread, close the connection, even if it's not responding */
+  /* Todo: yet more cleanup if you want to get rid of the setup result */
+
+  debug_delete_tab_widgets();
+
+  if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_call_xxxmdbug_command("exit") != 0)
+    {
+      put_diagnostics_in_result();
+      return;
+    }
+    for (int kk= 0; kk < 10; ++kk) {QThread48::msleep(100); if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP) break; }
+    if ((debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP) && (debuggee_connection_id != 0))
+    {
+      sprintf(call_statement, "kill %d", debuggee_connection_id);
+
+      if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+      {
+        sprintf(call_statement, "SIGNAL SQLSTATE '05678' SET message_text='exit failed and kill failed -- try executing manually: kill %d'", debuggee_connection_id);
+        mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement));
+      }
+    }
+  }
+
+  /* This should erase left-over messages in the pipe, such as the 'i status' message. Probably there's only one. */
+  QString error_return;
+  sprintf(call_statement, "%s%s%s","call xxxmdbug.dbms_pipe_receive('xxxmdbug_",debuggee_channel_name,
+          "', 1, @xxxmdbug_tmp_1, @xxxmdbug_tmp_2)");
+  for (int i= 0; i < 50; ++i)                                              /* 50 is an arbitrary big number */
+  {
+    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement))) break;
+    error_return= select_1_row("select @xxxmdbug_tmp_1");
+    if (error_return != "") break;
+    if (select_1_row_result_1 == "") break;
+  }
+
+  if (flagger == 0)
+  {
+    put_diagnostics_in_result(); /* This should show the result of the final call or select, so it should be "ok" */
+  }
+}
+
+
+/* This is called from $exit, but also might be called from $debug if $debug fails */
+/* We're reversing the effects of "new CodeEditor() and "addTab()" in debug_debug_go(). */
+void MainWindow::debug_delete_tab_widgets()
+{
+  debug_tab_widget->clear(); /* equivalent to removeTab() for all tab widgets */
+  for (int debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
+  {
+    if (debug_widget[debug_widget_index] != 0)
+    {
+      debug_widget[debug_widget_index]->removeEventFilter(this);
+      delete debug_widget[debug_widget_index];
+      debug_widget[debug_widget_index]= 0;
+    }
+  }
+}
+
+
+/*
+  Debug|Information
+*/
+void MainWindow::action_debug_information()
+{
+  if (debug_call_xxxmdbug_command("information status") != 0) return;
+}
+
+
+/*
+  Debug|Refresh server variables
+*/
+void MainWindow::action_debug_refresh_server_variables()
+{
+  if (debug_call_xxxmdbug_command("refresh server variables") != 0) return;
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables");
+  emit action_execute();
+}
+
+
+/*
+  Debug|Refresh user variables
+*/
+void MainWindow::action_debug_refresh_user_variables()
+{
+  if (debug_call_xxxmdbug_command("refresh user variables") != 0) return;
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.user_variables");
+  emit action_execute();
+}
+
+
+/*
+  Debug|Refresh variables
+*/
+void MainWindow::action_debug_refresh_variables()
+{
+  if (debug_call_xxxmdbug_command("refresh variables") != 0) return;
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.variables");
+  emit action_execute();
+}
+
+
+/*
+  Called from: action_debug_exit(), action_debug_debug(), action_debug_information()
+  Make the SQL statement that is actually executed, but don't trouble the user with
+  the details by showing it. For example, if the user said "$DEBUG test.p8", we
+  execute "call xxxmdbug.command('channel#...','debug test.p8')" and return the
+  result from that.
+*/
+int MainWindow::debug_call_xxxmdbug_command(const char *command)
+{
+  char call_statement[512];
+
+  strcpy(call_statement, "call xxxmdbug.command('");
+  strcat(call_statement, debuggee_channel_name);
+  strcat(call_statement, "', '");
+  strcat(call_statement,command);
+  strcat(call_statement, "');\n");
+
+  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  {
+    /* Initially this can happen because we start the timer immediately after we call 'attach'. */
+    put_diagnostics_in_result();
+    return 1;
+  }
+  //put_diagnostics_in_result()???
+
+  /* We no longer try to get the debuggee response with debug_information_status(). */
+  //if (strcmp(command, "information status") != 0)
+  //{
+  //  QString debuggee_response= "Debuggee response = ";
+  //  if (debug_information_status((char *)command) != 0)
+  //    {
+  //    debuggee_response.append("(none). Possibly debuggee is still executing the last command, which was: ");
+  //    debuggee_response.append(debuggee_information_status_last_command);
+  //  }
+  //  else
+  //  {
+  //    debuggee_response.append(debuggee_information_status_last_command_result);
+  //  }
+  //  history_edit_widget->append(debuggee_response);
+  //}
+  return 0;
+}
+
+
+/*
+  INFORMATION STATUS -- internal
+  We should call this after 'attach' or after 'debug' to see whether there's been some success.
+  Most contacts with the debugger should get a quick response, unless the last was 'continue' or 'step ...' (?)
+  ... Actually, check that: maybe 'continue' acknowledges receipt before continuing.
+  ... And I think that 'continue' will still cause messages, if it's inside stored-procedure code that's being debugged.
+*/
+int MainWindow::debug_information_status(char *last_command)
+{
+  int k;
+
+  /* TODO: JUST GET RID OF THIS PROC. I NO LONGER SEE ANY POINT TO IT. */
+
+  for (k= 0; k < 100; ++k)
+  {
+    /*
+       By sleeping, we give the QTimer a chance to call action_debug_timer_status() and update status.
+       But it doesn't work! I guess it's because sleeping doesn't restart the event loop!
+    */
+    QThread48::msleep(100);
+    if (strcmp(debuggee_information_status_last_command, last_command) == 0)
+    {
+      /* todo: this is not enough! you should be checking also if the command number has gone up! */
+      break;
+    }
+  }
+
+  /* k >= 100 means the 100-iteration loop containing a 10-ms sleep has gone by without a match for last_commnd */
+  /* the caller will probably generate a warning */
+  if (k >= 100) return 1; else return 0;
+}
+
+
+/*
+  QTimer *debug_timer: every 100 milliseconds (every 1/10 second), while the debuggee
+  is running, the timer event will invoke action_debug_timer() which updates the status.
+  Todo: Start it when debuggee starts, stop it when debuggee stops.
+  If a new information status message has appeared, display it.
+  Todo: make sure timer is stopped before debug_tab_window is closed.
+  Todo: This won't necessarily catch errors, because of the 1/10 second intervals and
+        because multiple commands can be sent asynchronously. Think of a way!
+        Meanwhile, just say: "If you must know the result, you must wait after each command."
+  Todo: It would be faster to interpret the 'information status' results in C code here,
+        rather than using xxxmdbug.information_status repeatedly.
+        Besides, selecting from xxxmdbug.information_status can change the state of the main mysql connection.
+        Maybe you should create a different connection?
+  Todo: Worry about race conditions. The main thread could look at a status variable before all
+        the status variables are updaated by this function. This might be alleviated by
+        updating the counter last, but some sort of mutex might have to be considered.
+  Todo: Check whether something closes the connection.
+        Maybe it would be safest to say that, once a connection is open, it stays open.
+        Hmm, why is this a worry, since we're doing the searching on main connection not debuggee connection?
+  Todo: I have seen the xxxmdbug.command() cause "send+receive error" meaning a change to init_connect failed.
+        Maybe xxxmdbug.commnd() shouldn't try to change init_connect -- after all, we're not trying to send, only receive.
+
+*/
+void MainWindow::action_debug_timer_status()
+{
+  char call_statement[512];
+  MYSQL_RES *debug_res= NULL;
+  MYSQL_ROW row= NULL;
+  char unexpected_error[512];
+  int unexpected_new_error= 0;
+
+  unexpected_error[0]= '\0';
+  strcpy(call_statement, "call xxxmdbug.command('");
+  strcat(call_statement, debuggee_channel_name);
+  strcat(call_statement, "', 'information status')");
+
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR)
+    {
+      strcpy(unexpected_error, debuggee_state_error);
+      strcat(unexpected_error, ". maybe a new $SETUP needed? cannot continue. Suggested next step is: $EXIT");
+    }
+    else
+    {
+      if ((debuggee_state < 0) || (debuggee_state == DEBUGGEE_STATE_END)) strcpy(unexpected_error, "debuggee_wait_loop ended");
+      else strcpy(unexpected_error, "debuggee_wait_loop() is not happening");
+    }
+  }
+
+  if (unexpected_error[0] == '\0')
+  {
+    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+    {
+      /* Initially this can happen because we start the timer immediately after we call 'attach'. */
+      strcpy(unexpected_error, "i status command failed");
+    }
+  }
+
+  if (unexpected_error[0]== '\0')
+  {
+    const char *query= "select * from xxxmdbug.information_status";
+    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], query, strlen(query)))
+    {
+      strcpy(unexpected_error, "i status command failed (this is not always a severe error)");
+    }
+  }
+
+  if (unexpected_error[0] == '\0')
+  {
+    debug_res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+    if (debug_res == NULL)
+    {
+      strcpy(unexpected_error, "mysql_store_result failed");
+    }
+  }
+
+  if (unexpected_error[0] == '\0')
+  {
+    row= mysql_fetch_row(debug_res);
+    if (row == NULL)
+    {
+      strcpy(unexpected_error, "mysql_fetch row failed");
+    }
+    else
+    {
+      if (mysql_num_fields(debug_res) < 14)
+      {
+        strcpy(unexpected_error, "mysql_num_fields < 14");
+      }
+      else
+      {
+        /* Just kludging -- I think something is overflowing. Todo: Find out what's really going on. */
+        memset(debuggee_information_status_debugger_name, 0, 32);
+        memset(debuggee_information_status_debugger_version, 0, 8);
+        memset(debuggee_information_status_timestamp_of_status_message, 0, 32);
+        memset(debuggee_information_status_number_of_status_message, 0, 8);
+        memset(debuggee_information_status_icc_count, 0, 8);
+        memset(debuggee_information_status_schema_identifier, 0, 256);
+        memset(debuggee_information_status_routine_identifier, 0, 256);
+        memset(debuggee_information_status_line_number, 0, 8);
+        memset(debuggee_information_status_is_at_breakpoint, 0, 8);
+        memset(debuggee_information_status_is_at_tbreakpoint, 0, 8);
+        memset(debuggee_information_status_is_at_routine_exit, 0, 8);
+        memset(debuggee_information_status_stack_depth, 0, 8);
+        memset(debuggee_information_status_last_command, 0, 256);
+        memset(debuggee_information_status_last_command_result, 0, 256);
+        memset(debuggee_information_status_commands_count, 0, 8);
+
+        if (row[0] != NULL) strncpy(debuggee_information_status_debugger_name, row[0], 32 - 1);
+        if (row[1] != NULL) strncpy(debuggee_information_status_debugger_version, row[1], 8 - 1);
+        if (row[2] != NULL) strncpy(debuggee_information_status_timestamp_of_status_message, row[2], 32 - 1);
+        if (row[3] != NULL) strncpy(debuggee_information_status_number_of_status_message, row[3], 8 - 1);
+        if (row[4] != NULL) strncpy(debuggee_information_status_icc_count, row[4], 8 - 1);
+        if (row[5] != NULL) strncpy(debuggee_information_status_schema_identifier, row[5], 256 - 1);
+        if (row[6] != NULL) strncpy(debuggee_information_status_routine_identifier, row[6], 256 - 1);
+        if (row[7] != NULL) strncpy(debuggee_information_status_line_number, row[7], 8 - 1);
+        if (row[8] != NULL) strncpy(debuggee_information_status_is_at_breakpoint, row[8], 8 - 1);
+        if (row[9] != NULL) strncpy(debuggee_information_status_is_at_tbreakpoint, row[9], 8 - 1);
+        if (row[10] != NULL) strncpy(debuggee_information_status_is_at_routine_exit, row[10], 8 - 1);
+        if (row[11] != NULL) strncpy(debuggee_information_status_stack_depth, row[11], 8 - 1);
+        if (row[12] != NULL) strncpy(debuggee_information_status_last_command, row[12], 256 - 1);
+        if (row[13] != NULL) strncpy(debuggee_information_status_last_command_result, row[13], 256 - 1);
+        if (row[14] != NULL) strncpy(debuggee_information_status_commands_count, row[14], 8 - 1);
+      }
+    }
+  }
+
+  if (debug_res != NULL) mysql_free_result(debug_res);
+
+  if (unexpected_error[0] != '\0')
+  {
+    if (strcmp(debuggee_information_status_last_command_result, unexpected_error) != 0)
+    {
+      /* This should be considered as a status change, as if it's a new i status message */
+      unexpected_new_error= 1;
+      strcpy(debuggee_information_status_last_command_result, unexpected_error);
+    }
+  }
+
+  //  printf("debuggee_information_status_debugger_name=%s.\n", debuggee_information_status_debugger_name);
+  //  printf("debuggee_information_status_debugger_version=%s.\n", debuggee_information_status_debugger_version);
+  //  printf("debuggee_information_status_timestamp_of_status_message=%s.\n", debuggee_information_status_timestamp_of_status_message);
+  //  printf("debuggee_information_status_number_of_status_message=%s.\n", debuggee_information_status_number_of_status_message);
+  //  printf("debuggee_information_status_icc_count=%s.\n", debuggee_information_status_icc_count);
+  //  printf("debuggee_information_status_schema_identifier=%s.\n", debuggee_information_status_schema_identifier);
+  //  printf("debuggee_information_status_routine_identifier=%s.\n", debuggee_information_status_routine_identifier);
+  //  printf("debuggee_information_status_line_number=%s.\n", debuggee_information_status_line_number);
+  //  printf("debuggee_information_status_is_at_breakpoint=%s.\n", debuggee_information_status_is_at_breakpoint);
+  //  printf("debuggee_information_status_is_at_tbreakpoint=%s.\n", debuggee_information_status_is_at_tbreakpoint);
+  //  printf("debuggee_information_status_is_at_routine_exit=%s.\n", debuggee_information_status_is_at_routine_exit);
+  //  printf("debuggee_information_status_stack_depth=%s.\n", debuggee_information_status_stack_depth);
+  //  printf("debuggee_information_status_last_command=%s.\n", debuggee_information_status_last_command);
+  //  printf("debuggee_information_status_last_command_result=%s.\n", debuggee_information_status_last_command_result);
+  //  printf("debuggee_information_status_commands_count=%s.\n", debuggee_information_status_commands_count);
+
+  /* If a status message would probably confuse a rational user, change it. */
+    if (strstr(debuggee_information_status_last_command_result, "completed CALL") != NULL)
+      strcpy(debuggee_information_status_last_command_result, "Routine has stopped. Suggested next step is: $EXIT");
+
+    if (strstr(debuggee_information_status_last_command_result, "Failed, the expected command is debug") != NULL)
+      strcpy(debuggee_information_status_last_command_result, "Routine has stopped and continuing past the end is not possible.  Suggested next step is: $EXIT");
+
+  /*
+    Change line_edit i.e. status widget, and maybe change highlight, if there's a new message.
+    It would be extremely wasteful to update every time, i.e. every 1/10 second, if there's no change.
+    Apparently the change that you can depend on is icc_count, not commands_count or number_of_status_message.
+    I don't think there's any need to check whether line number + routine name have changed, but see below.
+  */
+  if ((debug_timer_old_commands_count != atoi(debuggee_information_status_commands_count))
+  ||  (debug_timer_old_number_of_status_message != atoi(debuggee_information_status_last_command))
+  ||  (debug_timer_old_icc_count != atoi(debuggee_information_status_icc_count))
+  ||  (debug_timer_old_line_number != atoi(debuggee_information_status_line_number))
+  ||  (unexpected_new_error == 1))
+  {
+    char result[2048];
+
+    strcpy(result, "Debugger status = ");
+    if (strcmp(debuggee_information_status_schema_identifier, "unknown") != 0)
+    {
+      strcat(result, "(Current position: ");
+      strcat(result, debuggee_information_status_schema_identifier);
+      strcat(result, ".");
+      strcat(result, debuggee_information_status_routine_identifier);
+      strcat(result, " line ");
+      strcat(result, debuggee_information_status_line_number);
+      strcat(result, ")");
+    }
+    strcat(result, "(Last debug command: ");
+    strcat(result, debuggee_information_status_last_command);
+    strcat(result, ", result: ");
+    strcat(result, debuggee_information_status_last_command_result);
+    strcat(result, ")");
+
+    if (strcmp(debuggee_information_status_is_at_breakpoint, "yes") == 0)
+    {
+      strcat(result, "(STOPPED AT BREAKPOINT)");
+    }
+
+    if (strcmp(debuggee_information_status_is_at_routine_exit, "yes") == 0)
+    {
+      strcat(result, "(STOPPED AT ROUTINE EXIT)");
+    }
+
+    debug_line_widget->setText(result);
+
+    /*
+      If and only if the line number or routine name or schema name has changed,
+      highlight i.e. change background color in order to show where we're at now.
+      Formerly this checked "if (strcmp(debuggee_information_status_is_at_breakpoint, "yes") == 0)"
+      i.e. are we at a breakpoint, but I no longer see why that matters.
+      Besides, '$breakpoint' does not move the position.
+    */
+    if ((debug_timer_old_line_number != atoi(debuggee_information_status_line_number))
+     || (strcmp(debug_timer_old_schema_identifier, debuggee_information_status_schema_identifier) == 0)
+     || (strcmp(debug_timer_old_routine_identifier, debuggee_information_status_routine_identifier) == 0))
+    {
+      debug_highlight_line();
+      debug_timer_old_line_number= atoi(debuggee_information_status_line_number);
+      strcpy(debug_timer_old_schema_identifier, debuggee_information_status_schema_identifier);
+      strcpy(debug_timer_old_routine_identifier, debuggee_information_status_routine_identifier);
+    }
+    debug_timer_old_commands_count= atoi(debuggee_information_status_commands_count);
+    debug_timer_old_number_of_status_message= atoi(debuggee_information_status_last_command);
+    debug_timer_old_icc_count= atoi(debuggee_information_status_icc_count);
+  }
+}
+#endif
+
 
 /*
   For menu item "execute" we said (...SLOT(action_execute())));
@@ -1598,18 +4294,24 @@ int MainWindow::get_next_statement_in_string()
 */
 void MainWindow::action_execute()
 {
+  QString text;
+
   main_token_number= 0;
+  text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
 
   for (;;)
   {
     main_token_count_in_statement= get_next_statement_in_string();
     if (main_token_count_in_statement == 0) break;
-    action_execute_one_statement();
+    action_execute_one_statement(text);
     main_token_number+= main_token_count_in_statement;
   }
 
   statement_edit_widget->clear(); /* ?? this is supposed to be a slot. does that matter? */
   widget_sizer();
+
+  /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
+  history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
 
   history_edit_widget->show(); /* Todo: find out if this is really necessary */
 }
@@ -1623,9 +4325,9 @@ void MainWindow::action_execute()
      Should I be saying "delete later" somehow?
      Does memory leak?
 */
-void MainWindow::action_execute_one_statement()
+void MainWindow::action_execute_one_statement(QString text)
 {
-  QString text;
+  //QString text;
   int query_len;
   MYSQL_RES *mysql_res_for_new_result_set;
 
@@ -1652,7 +4354,6 @@ void MainWindow::action_execute_one_statement()
     ... Update: Qt documentation talks about clear() in places, maybe relevantly.
   */
 
-  text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
   /* Apparently there is no need for a call to tokenize() here, it seems certain that it's already been called. */
 
   int query_utf16_len= main_token_offsets[main_token_number+main_token_count_in_statement - 1]
@@ -1666,37 +4367,38 @@ void MainWindow::action_execute_one_statement()
   QString last_token= text.mid(main_token_offsets[main_token_number+main_token_count_in_statement - 1],
                                  length_of_last_token_in_statement);
 
+
   if (last_token == ocelot_delimiter_str)
   {
     query_utf16_copy= text.mid(main_token_offsets[main_token_number], query_utf16_len-length_of_last_token_in_statement);
   }
   else query_utf16_copy= query_utf16;
-
-
-  int ecs= execute_client_statement();
+  statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch(); /* will be used for elapsed-time display */
+  int ecs= execute_client_statement(text);
   if (ecs != 1)
   {
 
     /* The statement was not handled entirely by the client, it must be passed to the DBMS. */
 
-    /* If DBMS is not (yet) connected, except for SET, this is an error. */
+    /* If DBMS is not (yet) connected, except for certain SET @ocelot_... statements, this is an error. */
     if (is_mysql_connected == 0)
     {
-      statement_edit_widget->result= tr("ERROR not connected");
+      if (ecs == 2) statement_edit_widget->result= tr("OK");
+      else statement_edit_widget->result= tr("ERROR not connected");
     }
     else
     {
       query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
-      statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch(); /* will be used for elapsed-time display */
       char *query= new char[query_len + 1];
       memcpy(query, query_utf16_copy.toUtf8().constData(), query_len);
       query[query_len]= 0;
-      if (mysql_real_query(&mysql, query, query_len))
+      if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], query, query_len))
       {
         delete []query;
       }
       else {
         delete []query;
+
         /*
           It was a successful SQL statement, and now look if it returned a result.
           If it did, as determined by looking at the mysql_res that mysql_store_result() returns,
@@ -1710,7 +4412,7 @@ void MainWindow::action_execute_one_statement()
           statement is SELECT SHOW etc.), that would be better.
           Todo: nothing is happening for multiple result sets.
         */
-        mysql_res_for_new_result_set= mysql_store_result(&mysql);
+        mysql_res_for_new_result_set= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
         if (mysql_res_for_new_result_set == 0) {
           /*
             Last statement did not cause a result set. We could hide the grid an shrink the
@@ -1720,8 +4422,12 @@ void MainWindow::action_execute_one_statement()
         }
         else
         {
-          if (mysql_res != 0) mysql_free_result(mysql_res);
+          if (mysql_res != 0)
+          {
+            mysql_free_result(mysql_res); /* This is the place we free if myql_more_results wasn't true, see below. */
+          }
           mysql_res= mysql_res_for_new_result_set;
+
           /* We need to think better what to do if we exceed MAX_COLUMNS */
 
           /*
@@ -1741,6 +4447,10 @@ void MainWindow::action_execute_one_statement()
           main_layout->removeWidget(statement_edit_widget);
           main_layout->removeWidget(result_grid_table_widget);
           main_layout->removeWidget(history_edit_widget);
+#ifdef DEBUGGER
+          /* Todo: check: what about cancelling the earlier addTab of debug_widget[0] etc.? */
+          main_layout->removeWidget(debug_top_widget);
+#endif
           delete main_layout;
 
           result_grid_table_widget->garbage_collect();
@@ -1749,29 +4459,58 @@ void MainWindow::action_execute_one_statement()
           tmp_font= result_grid_table_widget->font();
           saved_font= &tmp_font;
 
-          delete result_grid_table_widget;
+          //delete result_grid_table_widget;
           main_layout= new QVBoxLayout();
 
-          result_grid_table_widget= new ResultGrid(mysql_res, saved_font, this);           /* This does a lot of work. */
-          result_grid_table_widget->setStyleSheet(ocelot_grid_style_string);   /* Todo: check: already done in constructor? */
+          //result_grid_table_widget= new ResultGrid(mysql_res, saved_font, this);           /* This does a lot of work. */
+          //result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);   /* Todo: check: already done in constructor? */
+          result_grid_table_widget->fillup(mysql_res, saved_font, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]));
           main_layout->addWidget(history_edit_widget);
           main_layout->addWidget(result_grid_table_widget);
           main_layout->addWidget(statement_edit_widget);
-
+#ifdef DEBUGGER
+          main_layout->addWidget(debug_top_widget);
+#endif
           if (main_window->layout() != 0)
           {
-            printf("Pseudo-assertion: main_window already has a layout\n"); exit(1);
+            printf("Pseudo-assertion: main_window already has a layout\n");
           }
           main_window->setLayout(main_layout);
-          /* 2014-12-10 Following line was shifted -- it used to come after the show(). */
-          result_grid_table_widget->installEventFilter(this);                      /* must catch fontChange, show, etc. */
+
           result_grid_table_widget->show();    /* Todo: consider: isn't this obsolete? Isn't this being shown too early? */
+
           /*
             The vertical scroll bar for result_grid_table_widget,
             i.e. grid_vertical_scroll_bar, is created during the initial setup.
             Todo: Consider: is it necessary to remove the event filter later?
           */
-          result_grid_table_widget->grid_vertical_scroll_bar->installEventFilter(this);
+//          result_grid_table_widget->grid_vertical_scroll_bar->installEventFilter(this);
+
+
+          /* You must call mysql_next_result() + mysql_free_result() if there are multiple sets */
+          put_diagnostics_in_result(); /* Do this while we still have number of rows */
+          history_markup_append();
+
+          if (mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]))
+          {
+            mysql_free_result(mysql_res);
+            /*
+              We started with CLIENT_MULTI_RESULT flag (not CLIENT_MULTI_STATEMENT).
+              We expect that a CALL to a stored procedure might return multiple result sets
+              plus a status result at the end. The following line just throws away everything
+              except the first result set, to avoid the dreaded out-of-sync error message.
+              If it's an ordinary select, mysql_free_result(mysql_res) happens later, see above.
+              TODO: a tab widget for multiple result sets would be far far far better.
+            */
+            while (mysql_next_result(&mysql[MYSQL_MAIN_CONNECTION]) == 0)
+            {
+              mysql_res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+              if (mysql_res != 0) mysql_free_result(mysql_res);
+            }
+            mysql_res= 0;
+          }
+
+          return;
         }
       }
       put_diagnostics_in_result();
@@ -1780,7 +4519,7 @@ void MainWindow::action_execute_one_statement()
 
   /* statement is over */
 
-  history_markup_append(); /* add prompt+statemen+result to history, with markup */
+  history_markup_append(); /* add prompt+statement+result to history, with markup */
 }
 
 
@@ -1813,7 +4552,7 @@ void MainWindow::action_execute_one_statement()
         and "q| is case sensitive.
 */
 
-int MainWindow::execute_client_statement()
+int MainWindow::execute_client_statement(QString text)
 {
 //  int i= 0;
   int i2= 0;
@@ -1822,12 +4561,12 @@ int MainWindow::execute_client_statement()
   int  sub_token_types[10];
   int is_client_format= 0;
   int true_text_size, true_token_count; /* size and count ignoring delimiter */
-  QString text;                      /* Todo: see if text should be a global */
+  //QString text;                      /* Todo: see if text should be a global */
   unsigned int statement_type;
 
   statement_type= main_token_types[main_token_number];     /* We used to use main_statement_type */
 
-  text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
+  //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
 
   /* Calculate size. Don't count delimiter unless it's a delimiter statement. */
   true_text_size= query_utf16_copy.size();
@@ -1876,7 +4615,7 @@ int MainWindow::execute_client_statement()
   /* Todo: We could easily modify so that we don't need sub_token_..., we could just skip comments. */
   if (statement_type == TOKEN_KEYWORD_CONNECT)
   {
-      if (QString::compare(ocelot_dbms, "mysql", Qt::CaseInsensitive) == 0) connect_mysql();
+      if (QString::compare(ocelot_dbms, "mysql", Qt::CaseInsensitive) == 0) connect_mysql(MYSQL_MAIN_CONNECTION);
       return 1;
   }
 
@@ -1915,7 +4654,7 @@ int MainWindow::execute_client_statement()
     char *query= new char[query_len + 1];
     memcpy(query, s.toUtf8().constData(), query_len + 1);
 
-    mysql_select_db_result= mysql_select_db(&mysql, query);
+    mysql_select_db_result= mysql_select_db(&mysql[MYSQL_MAIN_CONNECTION], query);
     delete []query;
     if (mysql_select_db_result != 0) put_diagnostics_in_result();
     else
@@ -1975,7 +4714,7 @@ int MainWindow::execute_client_statement()
     else if (i2 >= 3) s= text.mid(sub_token_offsets[2], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     else
     {
-      statement_edit_widget->prompt_as_input_by_user=statement_edit_widget->prompt_default;
+      statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
       /* Todo: output a message */
       return 1;
     }
@@ -2091,9 +4830,79 @@ int MainWindow::execute_client_statement()
     statement_edit_widget->result= tr("TEE is not implemented.");
     return 1;
   }
-
-  /* See whether general format is SET @ocelot_... = value ;" */
-  if (i2 > 4)
+#ifdef DEBUGGER
+  if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG)
+  {
+    debug_debug_go(text);
+    return 1;
+  }
+  if ((statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_CLEAR)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_TBREAKPOINT))
+  {
+    debug_breakpoint_or_clear_go(statement_type, text);
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)
+  {
+    debug_setup_go(text);
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_INSTALL)
+  {
+    debug_install_go();
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_EXIT)
+  {
+    debug_exit_go(0);
+    debug_menu_enable_or_disable(TOKEN_KEYWORD_DEBUG_EXIT);
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_DELETE)
+  {
+    debug_delete_go();
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_EXECUTE)
+  {
+    debug_execute_go();
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_LEAVE)
+  {
+    debug_leave_go();
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_SKIP)
+  {
+    debug_skip_go();
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_SET)
+  {
+    debug_set_go();
+    return 1;
+  }
+  if (statement_type == TOKEN_KEYWORD_DEBUG_SOURCE)
+  {
+    debug_source_go();
+    return 1;
+  }
+  if ((statement_type == TOKEN_KEYWORD_DEBUG_CONTINUE)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_EXECUTE)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_INFORMATION)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_NEXT)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_REFRESH)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_STEP))
+  {
+    /* All the other debug commands go to the same place. */
+    debug_other_go(text);
+    return 1;
+  }
+#endif
+  /* See whether general format is SET @ocelot_... = value ;". Read comment with label = "client variables" */
+  if (i2 >= 4)
   {
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
@@ -2102,6 +4911,280 @@ int MainWindow::execute_client_statement()
       {
         /* Todo: we should compare the rest of the tokens too. */
         is_client_format= 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_background_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_border_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_font_family", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_font_size= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_font_style", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_font_weight", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_highlight_literal_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_highlight_literal_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_highlight_identifier_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_highlight_identifier_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_highlight_comment_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_highlight_comment_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_highlight_operator_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_highlight_operator_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_highlight_reserved_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_highlight_reserved_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_prompt_background_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_statement_prompt_background_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_border_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_background_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_header_background_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_header_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_family", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_size", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_style", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_weight", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_border_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_cell_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_right_drag_line_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_cell_right_drag_line_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_border_size", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_border_size", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_cell_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_right_drag_line_size", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_grid_cell_right_drag_line_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_history_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_background_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_history_background_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_border_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_history_border_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_font_family", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_history_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_font_size", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_history_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_font_style", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_history_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_font_weight", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_history_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_main_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_main_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        main_window->setStyleSheet(ocelot_main_style_string);
+        ui->menuBar->setStyleSheet(ocelot_main_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_main_background_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_main_background_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        main_window->setStyleSheet(ocelot_main_style_string);
+        ui->menuBar->setStyleSheet(ocelot_main_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_main_border_color", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_main_border_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        main_window->setStyleSheet(ocelot_main_style_string);
+        ui->menuBar->setStyleSheet(ocelot_main_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_font_family", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_main_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        main_window->setStyleSheet(ocelot_main_style_string);
+        ui->menuBar->setStyleSheet(ocelot_main_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_main_font_size", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_main_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        main_window->setStyleSheet(ocelot_main_style_string);
+        ui->menuBar->setStyleSheet(ocelot_main_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_main_font_style", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_main_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        main_window->setStyleSheet(ocelot_main_style_string);
+        ui->menuBar->setStyleSheet(ocelot_main_style_string);
+        return 2;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_main_font_weight", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_main_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        make_style_strings();
+        main_window->setStyleSheet(ocelot_main_style_string);
+        ui->menuBar->setStyleSheet(ocelot_main_style_string);
+        return 2;
       }
     }
   }
@@ -2188,20 +5271,20 @@ void MainWindow::put_diagnostics_in_result()
   char mysql_error_and_state[50]; /* actually we should need less than 50 */
   QString s1, s2;
 
-  mysql_errno_result= mysql_errno(&mysql);
+  mysql_errno_result= mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]);
   if (mysql_errno_result == 0)
   {
     s1= tr("OK");
 
     /* This should output, e.g. "Records: 3 Duplicates: 0 Warnings: 0" -- but actually nothing happens. */
-    if (mysql_info(&mysql)!=NULL)
+    if (mysql_info(&mysql[MYSQL_MAIN_CONNECTION])!=NULL)
     {
       /* This only works for certain insert, load, alter or update statements */
-      s1.append(tr(mysql_info(&mysql)));
+      s1.append(tr(mysql_info(&mysql[MYSQL_MAIN_CONNECTION])));
     }
     else
     {
-      sprintf(mysql_error_and_state, " %llu rows affected", mysql_affected_rows(&mysql));
+      sprintf(mysql_error_and_state, " %llu rows affected", mysql_affected_rows(&mysql[MYSQL_MAIN_CONNECTION]));
       s1.append(mysql_error_and_state);
     }
     //printf("info=%s.\n", mysql_info(&mysql));
@@ -2212,17 +5295,17 @@ void MainWindow::put_diagnostics_in_result()
     float elapsed_time_as_float= (float) elapsed_time_as_long_int / 1000;
     sprintf(mysql_error_and_state, "(%.1f seconds)", elapsed_time_as_float);
     s1.append(mysql_error_and_state);
-    if (mysql_warning_count(&mysql) > 0)
+    if (mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]) > 0)
     {
       if (ocelot_history_includes_warnings == 1)
       {
-        mysql_query(&mysql, "show warnings");
+        mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "show warnings");
         MYSQL_RES *mysql_res_for_warnings;
         MYSQL_ROW warnings_row;
         QString s;
         // unsigned long connect_lengths[0];
-        mysql_res_for_warnings= mysql_store_result(&mysql);
-        for (unsigned int wi= 0; wi <= mysql_warning_count(&mysql); ++wi)
+        mysql_res_for_warnings= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+        for (unsigned int wi= 0; wi <= mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]); ++wi)
         {
           warnings_row= mysql_fetch_row(mysql_res_for_warnings);
           if (warnings_row!=NULL)
@@ -2230,7 +5313,6 @@ void MainWindow::put_diagnostics_in_result()
             /* lengths= mysql_fetch_lengths(connect_res); */
             sprintf(mysql_error_and_state, "\n%s (%s) %s.", warnings_row[0], warnings_row[1], warnings_row[2]);
             s1.append(mysql_error_and_state);
-            printf("row[0]=%s. row[1]=%s. row[2]=%s.\n", warnings_row[0], warnings_row[1], warnings_row[2]);
           }
         }
         mysql_free_result(mysql_res_for_warnings);
@@ -2240,9 +5322,9 @@ void MainWindow::put_diagnostics_in_result()
   if (mysql_errno_result > 0)
   {
     s1= tr("Error ");
-    sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, mysql_sqlstate(&mysql));
+    sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, mysql_sqlstate(&mysql[MYSQL_MAIN_CONNECTION]));
     s1.append(mysql_error_and_state);
-    s2= mysql_error(&mysql);
+    s2= mysql_error(&mysql[MYSQL_MAIN_CONNECTION]);
     s1.append(s2);
   }
   statement_edit_widget->result= s1;
@@ -2701,7 +5783,7 @@ int MainWindow::token_type(QChar *token, int token_length)
   {
     if ((*token == '-') && (*(token + 1) == '-')) return TOKEN_TYPE_COMMENT_WITH_MINUS;
   }
-  if ((*token > ' ') && (*token < 'A')) return TOKEN_TYPE_OPERATOR;
+  if ((*token > ' ') && (*token < 'A') && (*token != '$')) return TOKEN_TYPE_OPERATOR;
   return TOKEN_TYPE_OTHER;
 }
 
@@ -2713,7 +5795,7 @@ int MainWindow::token_type(QChar *token, int token_length)
   Two compiler-dependent assumptions: bsearch() exists, and char* can be converted to unsigned long.
 */
 /* Todo: use "const" and "static" more often */
-void MainWindow::tokens_to_keywords()
+void MainWindow::tokens_to_keywords(QString text)
 {
   /*
     Sorted list of keywords.
@@ -2730,13 +5812,17 @@ void MainWindow::tokens_to_keywords()
     "AND",
     "AS",
     "ASC",
+    "ASCII",
     "ASENSITIVE",
     "BEFORE",
     "BEGIN",
     "BETWEEN",
     "BIGINT",
     "BINARY",
+    "BIT",
     "BLOB",
+    "BOOL",
+    "BOOLEAN",
     "BOTH",
     "BY",
     "CALL",
@@ -2764,6 +5850,8 @@ void MainWindow::tokens_to_keywords()
     "CURSOR",
     "DATABASE",
     "DATABASES",
+    "DATE",
+    "DATETIME",
     "DAY_HOUR",
     "DAY_MICROSECOND",
     "DAY_MINUTE",
@@ -2792,7 +5880,9 @@ void MainWindow::tokens_to_keywords()
     "ELSEIF",
     "ENCLOSED",
     "END",
+    "ENUM",
     "ESCAPED",
+    "EVENT",
     "EXISTS",
     "EXIT",
     "EXPLAIN",
@@ -2807,6 +5897,8 @@ void MainWindow::tokens_to_keywords()
     "FROM",
     "FULLTEXT",
     "FUNCTION",
+    "GEOMETRY",
+    "GEOMETRYCOLLECTION",
     "GET",
     "GO", /* Ocelot keyword */
     "GRANT",
@@ -2850,10 +5942,12 @@ void MainWindow::tokens_to_keywords()
     "LIMIT",
     "LINEAR",
     "LINES",
+    "LINESTRING",
     "LOAD",
     "LOCALTIME",
     "LOCALTIMESTAMP",
     "LOCK",
+    "LOGFILE",
     "LONG",
     "LONGBLOB",
     "LONGTEXT",
@@ -2871,6 +5965,9 @@ void MainWindow::tokens_to_keywords()
     "MINUTE_SECOND",
     "MOD",
     "MODIFIES",
+    "MULTILINESTRING",
+    "MULTIPOINT",
+    "MULTIPOLYGON",
     "NATURAL",
     "NONBLOCKING",
     "NOPAGER", /* Ocelot keyword */
@@ -2891,6 +5988,8 @@ void MainWindow::tokens_to_keywords()
     "OUTFILE",
     "PAGER", /* Ocelot keyword */
     "PARTITION",
+    "POINT",
+    "POLYGON",
     "PRECISION",
     "PRIMARY",
     "PRINT", /* Ocelot keyword */
@@ -2914,6 +6013,7 @@ void MainWindow::tokens_to_keywords()
     "RESIGNAL",
     "RESTRICT",
     "RETURN",
+    "RETURNS",
     "REVOKE",
     "RIGHT",
     "RLIKE",
@@ -2924,6 +6024,8 @@ void MainWindow::tokens_to_keywords()
     "SELECT",
     "SENSITIVE",
     "SEPARATOR",
+    "SERIAL",
+    "SERVER",
     "SET",
     "SHOW",
     "SIGNAL",
@@ -2944,9 +6046,12 @@ void MainWindow::tokens_to_keywords()
     "STRAIGHT_JOIN",
     "SYSTEM", /* Ocelot keyword */
     "TABLE",
+    "TABLESPACE",
     "TEE", /* Ocelot keyword */
     "TERMINATED",
     "THEN",
+    "TIME",
+    "TIMESTAMP",
     "TINYBLOB",
     "TINYINT",
     "TINYTEXT",
@@ -2955,6 +6060,7 @@ void MainWindow::tokens_to_keywords()
     "TRIGGER",
     "TRUE",
     "UNDO",
+    "UNICODE",
     "UNION",
     "UNIQUE",
     "UNLOCK",
@@ -2971,6 +6077,7 @@ void MainWindow::tokens_to_keywords()
     "VARCHAR",
     "VARCHARACTER",
     "VARYING",
+    "VIEW",
     "WARNINGS", /* Ocelot keyword */
     "WHEN",
     "WHERE",
@@ -2978,10 +6085,11 @@ void MainWindow::tokens_to_keywords()
     "WITH",
     "WRITE",
     "XOR",
+    "YEAR",
     "YEAR_MONTH",
     "ZEROFILL"
   };
-  QString text;
+  //QString text;
   QString s= "";
   int t;
   char *p_item;
@@ -2989,7 +6097,7 @@ void MainWindow::tokens_to_keywords()
   char key2[30 + 1];
   int i, i2;
 
-  text= statement_edit_widget->toPlainText();
+  //text= statement_edit_widget->toPlainText();
   for (i2= 0; main_token_lengths[i2] != 0; ++i2)
   {
     /* Get the next word. */
@@ -3003,14 +6111,41 @@ void MainWindow::tokens_to_keywords()
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < 30); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* Search it with library binary-search. Assume 259 items and everything 30 bytes long. */
-      p_item= (char*) bsearch (key2, strvalues, 259, 30, (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 285 items and everything 30 bytes long. */
+      p_item= (char*) bsearch (key2, strvalues, 285, 30, (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
         index= ((((unsigned long)p_item - (unsigned long)strvalues)) / 30) + TOKEN_KEYWORDS_START;
          main_token_types[i2]= index;
       }
+#ifdef DEBUGGER
+      else
+      {
+        /* It's not in the list, but if it's unambiguously $DEB[UG] etc. then consider it a debug keyword. */
+        if ((key2[0] == '$') && (key2[1] != '\0'))
+        {
+          if (strncmp(key2, "$BREAKPOINT", strlen(key2)) == 0) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_BREAKPOINT;
+          if ((strlen(key2) > 2) && (strncmp(key2, "$CLEAR", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_CLEAR;
+          if ((strlen(key2) > 2) && (strncmp(key2, "$CONTINUE", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_CONTINUE;
+          if ((strlen(key2) > 3) && (strncmp(key2, "$DEBUG", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_DEBUG;
+          if ((strlen(key2) > 3) && (strncmp(key2, "$DELETE", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_DELETE;
+          if ((strlen(key2) > 3) && (strncmp(key2, "$EXECUTE", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_EXECUTE;
+          if ((strlen(key2) > 3) && (strncmp(key2, "$EXIT", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_EXIT;
+          if ((strlen(key2) > 3) && (strncmp(key2, "$INFORMATION", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_INFORMATION;
+          if ((strlen(key2) > 3) && (strncmp(key2, "$INSTALL", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_INSTALL;
+          if (strncmp(key2, "$LEAVE", strlen(key2)) == 0) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_LEAVE;
+          if (strncmp(key2, "$NEXT", strlen(key2)) == 0) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_NEXT;
+          if (strncmp(key2, "$REFRESH", strlen(key2)) == 0) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_REFRESH;
+          if (strcmp(key2, "$SET") == 0) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_SET;
+          if ((strlen(key2) > 4) && (strncmp(key2, "$SETUP", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_SETUP;
+          if ((strlen(key2) > 2) && (strncmp(key2, "$SKIP", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_SKIP;
+          if ((strlen(key2) > 2) && (strncmp(key2, "$SOURCE", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_SOURCE;
+          if ((strlen(key2) > 2) && (strncmp(key2, "$STEP", strlen(key2)) == 0)) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_STEP;
+          if (strncmp(key2, "$TBREAKPOINT", strlen(key2)) == 0) main_token_types[i2]= TOKEN_KEYWORD_DEBUG_TBREAKPOINT;
+        }
+      }
+#endif
     }
   }
 
@@ -3018,62 +6153,11 @@ void MainWindow::tokens_to_keywords()
 
   main_token_types[i2]= 0;
 
-  /*
-    The special cases of BEGIN, DO, END, FUNCTION, ROW. We don't want to mark them as special unless
-    we know they're really serving a non-identifier role in the statment, but they might be,
-    because they're not reserved. This has to be right because later we might count BEGINs
-    minus ENDs in order to figure out whether a compound statement has ended.
-    FUNCTION is a keyword if: previous == CREATE or DROP
-    ROW is a keyword if: previous == EACH
-    DO is a keyword if: last statement-beginner keyword was WHILE
-                        and next is a statement-beginner keyword or a label
-                        (but actually this just checks whether we're within WHILE -- Todo: must fix that someday)
-    END is a keyword if: previous == ; or BEGIN
-    BEGIN is a keyword if: previous ==  ; or : or BEGIN or DO or ELSE or LOOP or ROW or THEN
-                           or previous = ) and word before matching ( is PROCEDURE or FUNCTION or TRIGGER
-                           and next is not :
-  */
-  bool is_in_while= 0;
-  for (int i22= 0; main_token_types[i22] != 0; ++i22)
-  {
-    if (main_token_types[i22] == TOKEN_KEYWORD_FUNCTION)
-    {
-      if ((i22 > 0) && ((main_token_types[i22 - 1] == TOKEN_KEYWORD_CREATE) || (main_token_types[i22 - 1] == TOKEN_KEYWORD_DROP))) ;
-      else main_token_types[i22]= TOKEN_TYPE_OTHER;
-    }
-    if (main_token_types[i22] == TOKEN_KEYWORD_ROW)
-    {
-      if ((i22 > 0) && (main_token_types[i22 - 1] == TOKEN_KEYWORD_EACH)) ;
-      else main_token_types[i22]= TOKEN_TYPE_OTHER;
-    }
-    if (main_token_types[i22] == TOKEN_KEYWORD_WHILE) is_in_while= 1;
-    if (main_token_types[i22] == TOKEN_KEYWORD_DO)
-    {
-      if (is_in_while == 1) is_in_while= 0;
-      else main_token_types[i22]= TOKEN_TYPE_OTHER;
-    }
-    if (main_token_types[i22] == TOKEN_KEYWORD_END)
-    {
-      if ((i22 == 0)
-         || (QString::compare(text.mid(main_token_offsets[i22 - 1], main_token_lengths[i22 - 1]), ";", Qt::CaseInsensitive) == 0)
-         || (main_token_types[i22 - 1] == TOKEN_KEYWORD_BEGIN)) ;
-      else main_token_types[i22]= TOKEN_TYPE_OTHER;
-    }
-    if (main_token_types[i22] == TOKEN_KEYWORD_BEGIN)
-    {
-      if ((i22 > 0) &&
-          ((main_token_types[i22 - 1] == TOKEN_KEYWORD_BEGIN)
-          || (main_token_types[i22 - 1] == TOKEN_KEYWORD_DO)
-          || (main_token_types[i22 - 1] == TOKEN_KEYWORD_ELSE)
-          || (main_token_types[i22 - 1] == TOKEN_KEYWORD_LOOP)
-          || (main_token_types[i22 - 1] == TOKEN_KEYWORD_ROW)
-          || (main_token_types[i22 - 1] == TOKEN_KEYWORD_THEN)
-          || (QString::compare(text.mid(main_token_offsets[i22 - 1], main_token_lengths[i22 - 1]), ";", Qt::CaseInsensitive) == 0)
-          || (QString::compare(text.mid(main_token_offsets[i22 - 1], main_token_lengths[i22 - 1]), ":", Qt::CaseInsensitive) == 0)
-          || (QString::compare(text.mid(main_token_offsets[i22 - 1], main_token_lengths[i22 - 1]), ")", Qt::CaseInsensitive) == 0))) ;
-      else main_token_types[i22]= TOKEN_TYPE_OTHER;
-    }
-  }
+  /* The special cases of BEGIN, DO, END, FUNCTION, ROW. */
+  int i_of_function= -1;
+  int start_of_body= find_start_of_body(text, &i_of_function);
+
+  tokens_to_keywords_revert(start_of_body, i_of_function, text);
 
   /*
     The special case of "?". Although tokenize() says ? is an operator,
@@ -3175,13 +6259,420 @@ void MainWindow::tokens_to_keywords()
 
 
 /*
-  Todo: disconnect old if already connected.
+  Find start of body in CREATE ... FUNCTION|PROCEDURE|TRIGGER statement
+  This is tricky and might need revisiting if syntax changes in later MySQL versions.
+  First find out whether the statement is CREATE ... FUNCTION|PROCEDURE|TRIGGER. A definer clause might have to be skipped.
+  Then if it's CREATE TRIGGER, it's reasonably easy: just skip till past FOR EACH ROW.
+  If it's CREATE PROCEDURE|FUNCTION:
+    skip past ()s
+   (Function) Skip returns clause i.e. skip until anything is seen which is not one of the following:
+      anything within ()s
+      ASCII BIGINT BINARY BIT BLOB BOOL BOOLEAN CHAR CHARACTER CHARSET COLLATE DATE DATETIME DEC
+      DECIMAL DOUBLE ENUM FLOAT
+      GEOMETRY GEOMETRYCOLLECTION INT INTEGER LINESTRING LONGBLOB LONGTEXT MEDIUMBLOB MEDIUMINT MEDIUMTEXT
+      MULTILINESTRING MULTIPOINT MULTIPOLYGON NUMERIC POINT POLYGON PRECISION RETURNS
+      SERIAL SET(...) SMALLINT TIME TIMESTAMP TINYBLOB TINYINT TINYTEXT UNICODE UNSIGNED VARCHAR VARYING YEAR ZEROFILL
+      name if previous is CHARSET | CHARACTER SET | COLLATE
+   (Function or Procedure) Skip words that are in characteristics i.e.
+     COMMENT 'string', LANGUAGE SQL, DETERMINISTIC, NOT DETERMINISTIC,
+     CONTAINS SQL, NO SQL, READS SQL DATA, MODIFIES SQL DATA,
+     SQL SECURITY DEFINER, SQL SECURITY INVOKER
+   Skipping comments too
+   Return: offset for first word of body, or -1 if not-create-routine | body-not-found
 */
-int MainWindow::connect_mysql()
+int MainWindow::find_start_of_body(QString text, int *i_of_function)
 {
-  mysql_init(&mysql); /* Todo: avoid repetition, this is init'd elsewhere. */
+  int i;
+  int create_seen= 0;
+  int procedure_seen= 0;
+  int function_seen= 0;
+  int trigger_seen= 0;
+  int trigger_for_seen= 0;
+  int trigger_row_seen= 0;
+  int parameter_list_seen= 0;
+  int parentheses_count= 0;
+  int characteristic_seen= 0;
+  int data_type_seen= 0;
+  int character_set_seen= 0;
+  int collate_seen= 0;
 
-  if (the_connect())
+  for (i= 0; main_token_lengths[i] != 0; ++i)
+  {
+    if ((main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_MINUS))
+    {
+      continue;
+    }
+    if (trigger_row_seen == 1)
+    {
+      return i;
+    }
+    if (main_token_types[i] == TOKEN_KEYWORD_CREATE)
+    {
+      create_seen= 1;
+      continue;
+    }
+    if (create_seen != 1)
+    {
+      return -1;
+    }
+    if (main_token_types[i] == TOKEN_KEYWORD_PROCEDURE)
+    {
+      procedure_seen= 1;
+      continue;
+    }
+    if (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
+    {
+      function_seen= 1;
+      *i_of_function= i;
+      continue;
+    }
+    if (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)
+    {
+      trigger_seen= 1;
+      continue;
+    }
+    if (trigger_seen == 1)
+    {
+      if (main_token_types[i] == TOKEN_KEYWORD_FOR) trigger_for_seen= 1;
+      if (trigger_for_seen == 1)
+      {
+        if (main_token_types[i] == TOKEN_KEYWORD_ROW) trigger_row_seen= 1;
+      }
+    }
+    if ((function_seen == 1) || (procedure_seen == 1))
+    {
+      if ((parameter_list_seen == 0) && (main_token_types[i] == TOKEN_TYPE_OPERATOR) && (main_token_lengths[i] == 1))
+      {
+        if (text.mid(main_token_offsets[i], main_token_lengths[i]) == "(")
+        {
+          ++parentheses_count;
+          continue;
+        }
+        if (text.mid(main_token_offsets[i], main_token_lengths[i]) == ")")
+        {
+          --parentheses_count;
+          if (parentheses_count == 0)
+          {
+            parameter_list_seen= 1;
+            continue;
+          }
+        }
+      }
+    }
+
+    if ((function_seen == 1) && (parameter_list_seen == 1) && (characteristic_seen == 0))
+    {
+      if (text.mid(main_token_offsets[i], main_token_lengths[i]) == "(")
+      {
+        ++parentheses_count;
+        continue;
+      }
+      if (text.mid(main_token_offsets[i], main_token_lengths[i]) == ")")
+      {
+        --parentheses_count;
+        continue;
+      }
+      if (parentheses_count != 0)
+      {
+        continue;
+      }
+      if (main_token_types[i] == TOKEN_KEYWORD_RETURNS)
+      {
+        continue;
+      }
+      if (data_type_seen == 0)
+      {
+        if ((main_token_types[i] == TOKEN_KEYWORD_ASCII)
+         || (main_token_types[i] == TOKEN_KEYWORD_BIGINT)
+         || (main_token_types[i] == TOKEN_KEYWORD_BINARY)
+         || (main_token_types[i] == TOKEN_KEYWORD_BIT)
+         || (main_token_types[i] == TOKEN_KEYWORD_BLOB)
+         || (main_token_types[i] == TOKEN_KEYWORD_BOOL)
+         || (main_token_types[i] == TOKEN_KEYWORD_BOOLEAN)
+         || (main_token_types[i] == TOKEN_KEYWORD_CHAR)
+         || (main_token_types[i] == TOKEN_KEYWORD_CHARACTER)
+         || (main_token_types[i] == TOKEN_KEYWORD_DATE)
+         || (main_token_types[i] == TOKEN_KEYWORD_DATETIME)
+         || (main_token_types[i] == TOKEN_KEYWORD_DEC)
+         || (main_token_types[i] == TOKEN_KEYWORD_DECIMAL)
+         || (main_token_types[i] == TOKEN_KEYWORD_DOUBLE)
+         || (main_token_types[i] == TOKEN_KEYWORD_ENUM)
+         || (main_token_types[i] == TOKEN_KEYWORD_FLOAT)
+         || (main_token_types[i] == TOKEN_KEYWORD_GEOMETRY)
+         || (main_token_types[i] == TOKEN_KEYWORD_GEOMETRYCOLLECTION)
+         || (main_token_types[i] == TOKEN_KEYWORD_INT)
+         || (main_token_types[i] == TOKEN_KEYWORD_INTEGER)
+         || (main_token_types[i] == TOKEN_KEYWORD_LINESTRING)
+         || (main_token_types[i] == TOKEN_KEYWORD_LONGBLOB)
+         || (main_token_types[i] == TOKEN_KEYWORD_LONGTEXT)
+         || (main_token_types[i] == TOKEN_KEYWORD_MEDIUMBLOB)
+         || (main_token_types[i] == TOKEN_KEYWORD_MEDIUMINT)
+         || (main_token_types[i] == TOKEN_KEYWORD_MEDIUMTEXT)
+         || (main_token_types[i] == TOKEN_KEYWORD_MULTILINESTRING)
+         || (main_token_types[i] == TOKEN_KEYWORD_MULTIPOINT)
+         || (main_token_types[i] == TOKEN_KEYWORD_MULTIPOLYGON)
+         || (main_token_types[i] == TOKEN_KEYWORD_NUMERIC)
+         || (main_token_types[i] == TOKEN_KEYWORD_POINT)
+         || (main_token_types[i] == TOKEN_KEYWORD_POLYGON)
+         || (main_token_types[i] == TOKEN_KEYWORD_SERIAL)
+         || (main_token_types[i] == TOKEN_KEYWORD_SET)
+         || (main_token_types[i] == TOKEN_KEYWORD_SMALLINT)
+         || (main_token_types[i] == TOKEN_KEYWORD_TIME)
+         || (main_token_types[i] == TOKEN_KEYWORD_TIMESTAMP)
+         || (main_token_types[i] == TOKEN_KEYWORD_TINYBLOB)
+         || (main_token_types[i] == TOKEN_KEYWORD_TINYINT)
+         || (main_token_types[i] == TOKEN_KEYWORD_TINYTEXT)
+         || (main_token_types[i] == TOKEN_KEYWORD_UNICODE)
+         || (main_token_types[i] == TOKEN_KEYWORD_VARCHAR)
+         || (main_token_types[i] == TOKEN_KEYWORD_YEAR))
+        {
+          data_type_seen= 1;
+          continue;
+        }
+      }
+      if (data_type_seen == 1)
+      {
+        if ((main_token_types[i] == TOKEN_KEYWORD_PRECISION)
+         || (main_token_types[i] == TOKEN_KEYWORD_VARYING)
+         || (main_token_types[i] == TOKEN_KEYWORD_UNSIGNED)
+         || (main_token_types[i] == TOKEN_KEYWORD_ZEROFILL))
+        {
+          continue;
+        }
+        if ((main_token_types[i] == TOKEN_KEYWORD_CHARSET) || (main_token_types[i] == TOKEN_KEYWORD_CHARACTER))
+        {
+          character_set_seen= 1;
+          continue;
+        }
+        if (main_token_types[i] == TOKEN_KEYWORD_COLLATE)
+        {
+          collate_seen= 1;
+          continue;
+        }
+        if (character_set_seen == 1)
+        {
+          if (main_token_types[i] == TOKEN_KEYWORD_SET)
+          {
+            continue;
+          }
+          character_set_seen= 0;
+          continue;
+        }
+        if (collate_seen == 1)
+        {
+          collate_seen= 0;
+          continue;
+        }
+      }
+    }
+
+    if (((function_seen == 1) || (procedure_seen == 1)) && (parameter_list_seen == 1))
+    {
+      if ((text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "COMMENT")
+       || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "LANGUAGE")
+       || (main_token_types[i] == TOKEN_KEYWORD_SQL)
+       || (main_token_types[i] == TOKEN_KEYWORD_DETERMINISTIC)
+       || (main_token_types[i] == TOKEN_KEYWORD_NOT)
+       || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "CONTAINS")
+       || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "NO")
+       || (main_token_types[i] == TOKEN_KEYWORD_READS)
+       || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "DATA")
+       || (main_token_types[i] == TOKEN_KEYWORD_MODIFIES)
+       || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "SECURITY")
+       || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "DEFINER")
+       || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "INVOKER")
+       || (main_token_types[i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+       || (main_token_types[i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
+      {
+        characteristic_seen= 1;
+        continue;
+      }
+    }
+    if ((main_token_types[i] == TOKEN_KEYWORD_DATABASE)
+     || (main_token_types[i] == TOKEN_KEYWORD_EVENT)
+     || (main_token_types[i] == TOKEN_KEYWORD_INDEX)
+     || (main_token_types[i] == TOKEN_KEYWORD_LOGFILE)
+     || (main_token_types[i] == TOKEN_KEYWORD_SERVER)
+     || (main_token_types[i] == TOKEN_KEYWORD_TABLE)
+     || (main_token_types[i] == TOKEN_KEYWORD_TABLESPACE)
+     || (main_token_types[i] == TOKEN_KEYWORD_VIEW))
+    {
+      if (function_seen + procedure_seen + trigger_seen == 0)
+      {
+        return -1;
+      }
+    }
+    if ((function_seen == 1) || (procedure_seen == 1))
+    {
+      if (parameter_list_seen == 0) continue;
+      return i;
+    }
+  }
+  return -1;
+}
+
+
+/*
+  The special cases of FUNCTION, ROW, DO, END, BEGIN. We don't want to mark them as special unless
+  we know they're really serving a non-identifier role in the statment, but they might be,
+  because they're not reserved. This has to be right because later we might count BEGINs
+  minus ENDs in order to figure out whether a compound statement has ended.
+  FUNCTION is a keyword if: previous == DROP or CREATE [definer=...] or DROP (this is known in advance)
+  ROW is a keyword if: previous == EACH
+  DO is a keyword if: last statement-beginner keyword was WHILE
+                      and next is a statement-beginner keyword or a label
+                      (but actually this just checks whether we're within WHILE -- Todo: must fix that someday)
+  END is a keyword if: previous == ; or BEGIN
+  BEGIN is a keyword if: previous ==  ; or : or BEGIN or DO or ELSE or LOOP or ROW or THEN
+                         or previous = ) and word before matching ( is PROCEDURE or FUNCTION or TRIGGER
+                         and next is not :
+                         or it's first word in main body or handler body, which is what causes most of the difficulties.
+*/
+void MainWindow::tokens_to_keywords_revert(int i_of_body, int i_of_function, QString text)
+{
+  int i;                                                /* index of current token */
+  int i_prev= -1;                                       /* index of last non-comment token */
+  int i_of_while= -1;                                   /* index of last keyword = while */
+
+  for (i= 0; main_token_lengths[i] != 0; ++i)
+  {
+    /* If this is a comment then don't note its position i.e. i_prev is only for non-comment tokens */
+    if ((main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_MINUS))
+    {
+      continue;
+    }
+    if (i_prev != -1)
+    {
+      /* If this is ":" then the last item can't have been a keyword */
+      if (QString::compare(text.mid(main_token_offsets[i], main_token_lengths[i]), ":") == 0)
+      {
+        if ((main_token_types[i_prev] >= TOKEN_KEYWORDS_START))
+        {
+          main_token_types[i_prev]= TOKEN_TYPE_OTHER;
+        }
+      }
+      /* If this is FUNCTION then it's not aa keyword unless previous was DROP or CREATE [definer=...] */
+      if (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
+      {
+        if ((i == i_of_function) || (main_token_types[i_prev] == TOKEN_KEYWORD_DROP)) ;
+        else main_token_types[i]= TOKEN_TYPE_OTHER;
+      }
+      /* If this is ROW then it's not a keyword unless previous was EACH as in FOR EACH ROW */
+      if (main_token_types[i] == TOKEN_KEYWORD_ROW)
+      {
+        if (main_token_types[i_prev] == TOKEN_KEYWORD_EACH) ;
+        else main_token_types[i]= TOKEN_TYPE_OTHER;
+      }
+      /* If this is DO then it's not a keyword unless it's after WHILE (condition) */
+      if (main_token_types[i] == TOKEN_KEYWORD_DO)
+      {
+        if (i_of_while != -1) i_of_while= -1;
+        else main_token_types[i]= TOKEN_TYPE_OTHER;
+      }
+      /* If this is END then it's not a keyword unless previous waa ; or BEGIN */
+      if (main_token_types[i] == TOKEN_KEYWORD_END)
+      {
+        if ((QString::compare(text.mid(main_token_offsets[i_prev], main_token_lengths[i_prev]), ";") == 0)
+        || (main_token_types[i_prev] == TOKEN_KEYWORD_BEGIN)) ;
+        else main_token_types[i]= TOKEN_TYPE_OTHER;
+      }
+      /* If this is BEGIN then it's not a keyword unless it's body start or prev = BEGIN|DO|ELSE|LOOP|ROW|THEN */
+      if (main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+      {
+        if ((i == i_of_body)
+        || (QString::compare(text.mid(main_token_offsets[i_prev], main_token_lengths[i_prev]), ":") == 0)
+        || (QString::compare(text.mid(main_token_offsets[i_prev], main_token_lengths[i_prev]), ";") == 0)
+        || (main_token_types[i_prev] == TOKEN_KEYWORD_BEGIN)
+        || (main_token_types[i_prev] == TOKEN_KEYWORD_DO)
+        || (main_token_types[i_prev] == TOKEN_KEYWORD_ELSE)
+        || (main_token_types[i_prev] == TOKEN_KEYWORD_LOOP)
+        || (main_token_types[i_prev] == TOKEN_KEYWORD_ROW)
+        || (main_token_types[i_prev] == TOKEN_KEYWORD_THEN)) ;
+        else main_token_types[i]= TOKEN_TYPE_OTHER;
+      }
+    }
+    if (main_token_types[i] == TOKEN_KEYWORD_WHILE) i_of_while= i;
+    if ((QString::compare(text.mid(main_token_offsets[i], main_token_lengths[i]), "HANDLER", Qt::CaseInsensitive) == 0)
+     && (main_token_types[next_token(i)] == TOKEN_KEYWORD_FOR))
+    {
+      /* DECLARE ... HANDLER FOR might be followed by BEGIN so we have to find where statement starts */
+      int i_plus_1, i_plus_2, i_plus_3, i_plus_4, i_next;
+      i= next_token(i);
+      for (;;)
+      {
+        i_plus_1= next_token(i);
+        i_plus_2= next_token(i_plus_1);
+        i_plus_3= next_token(i_plus_2);
+        i_plus_4= next_token(i_plus_3);
+        if ((main_token_types[i_plus_1] == TOKEN_KEYWORD_SQLSTATE)
+         && (QString::compare(text.mid(main_token_offsets[i_plus_2], main_token_lengths[i_plus_2]), "VALUE", Qt::CaseInsensitive) == 0))
+        {
+          if (main_token_types[i_plus_3] >= TOKEN_KEYWORDS_START) main_token_types[i_plus_3]= TOKEN_TYPE_OTHER;
+          i_next= i_plus_4;
+        }
+        else if (main_token_types[i_plus_1] == TOKEN_KEYWORD_SQLSTATE)
+        {
+          if (main_token_types[i_plus_2] >= TOKEN_KEYWORDS_START) main_token_types[i_plus_2]= TOKEN_TYPE_OTHER;
+          i_next= i_plus_3;
+        }
+        else if ((main_token_types[i_plus_1] == TOKEN_KEYWORD_NOT)
+         && (QString::compare(text.mid(main_token_offsets[i_plus_2], main_token_lengths[i_plus_2]), "FOUND", Qt::CaseInsensitive) == 0))
+        {
+          i_next= i_plus_3;
+        }
+        else
+        {
+          if (main_token_types[i_plus_1] >= TOKEN_KEYWORDS_START) main_token_types[i_plus_1]= TOKEN_TYPE_OTHER;
+          i_next= i_plus_2;
+        }
+        if (QString::compare(text.mid(main_token_offsets[i_next], main_token_lengths[i_next]), ",") == 0)
+        {
+          i= i_next;
+          continue;
+        }
+        break;
+      }
+      /* now i_next == first_word_in_statement in DECLARE HANDLER, unless syntax is bad, I hope */
+      i= i_next;
+    }
+    i_prev= i;
+  }
+}
+
+/* returns next token after i, skipping comments, but do not go past end */
+int MainWindow::next_token(int i)
+{
+  int i2;
+
+  for (i2= i;;)
+  {
+    if (main_token_lengths[i2] == 0) break;
+    ++i2;
+    if ((main_token_types[i2] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+    || (main_token_types[i2] == TOKEN_TYPE_COMMENT_WITH_SLASH)
+    || (main_token_types[i2] == TOKEN_TYPE_COMMENT_WITH_MINUS))
+    {
+      continue;
+    }
+    break;
+  }
+  return i2;
+}
+
+/*
+  Todo: disconnect old if already connected.
+  TODO: LOTS OF ERROR CHECKS NEEDED IN THIS!
+*/
+int MainWindow::connect_mysql(unsigned int connection_number)
+{
+
+  mysql_init(&mysql[connection_number]); /* Todo: avoid repetition, this is init'd elsewhere. */
+
+  if (the_connect(connection_number))
   {
     put_diagnostics_in_result();
     statement_edit_widget->result.append(tr("Failed to connect. Use menu item File|Connect to try again"));
@@ -3194,15 +6685,16 @@ int MainWindow::connect_mysql()
     Todo: check for errors after these mysql_ calls.
     Not using the mysql_res global, since this is not for user to see.
   */
-  mysql_query(&mysql, "select version(), database(), @@port, current_user()");
+  mysql_query(&mysql[connection_number], "select version(), database(), @@port, current_user(), connection_id()");
   MYSQL_RES *mysql_res_for_connect;
   MYSQL_ROW connect_row;
   QString s;
   int i;
 
   // unsigned long connect_lengths[1];
-  mysql_res_for_connect= mysql_store_result(&mysql);
+  mysql_res_for_connect= mysql_store_result(&mysql[connection_number]);
   connect_row= mysql_fetch_row(mysql_res_for_connect);
+
   /* lengths= mysql_fetch_lengths(mysql_res_for_connect); */
   statement_edit_widget->dbms_version= connect_row[0];
   statement_edit_widget->dbms_database= connect_row[1];
@@ -3212,8 +6704,8 @@ int MainWindow::connect_mysql()
   i= s.indexOf(QRegExp("@"), 0);
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_current_user_without_host= s;
-
-  s= mysql_get_host_info(&mysql);
+  statement_edit_widget->dbms_connection_id=atoi(connect_row[4]);
+  s= mysql_get_host_info(&mysql[connection_number]);
   i= s.indexOf(QRegExp(" "), 0);
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_host= s;
@@ -3224,7 +6716,7 @@ int MainWindow::connect_mysql()
 
 
 /*
-  For copyright and license notice of CodeEditor function, see beginning of this progrma.
+  For copyright and license notice of CodeEditor function, see beginning of this program.
 
   CodeEditor is a widget that inherits QPlainTextEdit.
      Therefore it inherits from QAbstractScrollArea, which has viewports.
@@ -3244,6 +6736,7 @@ int MainWindow::connect_mysql()
     \N                  (todo)                             seems to be "name of server" e.g. mysql or MariaDB
     \2                  Indicates the rest of the prompt gets repeated on all statement lines. Essential if \L is used.
     \L                  Statement line number
+    \K(left-prompt)     See comment before prompt_translate_k()
     For lines 2ff, the prompt becomes > unless there was something after \L, and is right-justified.
     Bug: for "prompt \w", the \w will be taken as a "nowarnings" keyword, because it's the last thing on the line.
     Todo: There are several prompts that require asking the server. The probable way to handle them is:
@@ -3251,6 +6744,13 @@ int MainWindow::connect_mysql()
           mysql_get_host_info() to get the host
           select current_user(), version(), database(), @@port to get other server stuff
 */
+
+/* Following should be multi-occurrence and should be part of CodeEditor */
+/* Todo: Sizes should be dynamic! You'll only see stuff for the first 10 lines with what you've got here! */
+#define K_SIZE 10
+int k_line_number[K_SIZE];
+QColor k_color[K_SIZE];
+QString k_string[K_SIZE];
 
 CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent)
 {
@@ -3277,7 +6777,9 @@ QString CodeEditor::prompt_translate(int line_number_x)
   time_t basetime;
   struct tm * timeinfo;
   char formatted_time[80];
+  int k_index;
 
+  for (k_index= 0; k_index < K_SIZE; ++k_index) k_line_number[k_index]= -1;
   /*
     Todo: Getting date and time is slow.
     You should find out in advance (when user changes the prompt) whether you really will need it.
@@ -3316,6 +6818,15 @@ QString CodeEditor::prompt_translate(int line_number_x)
       if (s_char == "h")        /* \h is for host. */
       {
         s_char= dbms_host;
+      }
+      if (s_char == "K")
+      {
+        int k_result= prompt_translate_k(s, i);
+        if (k_result != 0)
+        {
+          i+= k_result;
+          continue;
+        }
       }
       if (s_char == "L")        /* \L is for line number. Ocelot-only. Most effective if \2 seen. */
       {
@@ -3412,6 +6923,73 @@ QString CodeEditor::prompt_translate(int line_number_x)
   return (s_out);
 }
 
+/*
+  prompt_translate_k() is called from prompt_translate() when \K is seen.
+  The prompt string may contain "\K(line-number,color-name,string)" -- no spaces after K.
+  which will put out a string, at the specified line, with the specified color.
+  The string will be left-justified so it won't interfere with the rest of the prompt.
+  If you want a space between the left and right justification, put ' ' at end of string
+  The string cannot contain ) or ' or ", there are no escapes.
+  A line number may not be specified twice.
+  Erroneous input is ignored.
+  Example: '\K(5,red,B)' means: on line 5, left justified, put 'B'.
+  Width will increase if and only if the line number exists.
+  This is intended for use with debugger breakpoints, but could be used for statements.
+  Todo: find out why this is called a large number of times
+  Todo: really, you should be using the usual parser, not this quickie hack job
+*/
+int CodeEditor::prompt_translate_k(QString s, int i)
+{
+  QString s_char;
+  QString string_for_line_number;
+  QString string_for_color;
+  QString string_for_string;
+  int i_left_parenthesis, i_first_comma, i_second_comma, i_right_parenthesis;
+  int i2;
+
+  i_left_parenthesis= i_first_comma= i_second_comma= i_right_parenthesis= -1;
+  for (i2= i; i2 < s.size(); ++i2)
+  {
+    s_char= s.mid(i2, 1);
+    if ((s_char == "(") && (i_left_parenthesis == -1)) i_left_parenthesis= i2;
+    if ((s_char == ",") && (i_first_comma == -1)) i_first_comma= i2;
+    else if ((s_char == ",") && (i_first_comma != -1) && (i_second_comma == -1)) i_second_comma= i2;
+    if ((s_char == ")") && (i_second_comma != -1) && (i_right_parenthesis == -1)) i_right_parenthesis= i2;
+  }
+
+  if (i_left_parenthesis != i + 1) return 0; /* bad left parenthesis */
+  if (i_first_comma == -1) return 0; /* bad first comma */
+  if (i_second_comma == -1) return 0; /* bad second comma */
+  if (i_right_parenthesis == -1) return 0; /* bad right parenthesis */
+
+  string_for_line_number= s.mid(i_left_parenthesis + 1, (i_first_comma - i_left_parenthesis) - 1);
+  string_for_color= s.mid(i_first_comma + 1, (i_second_comma - i_first_comma) - 1);
+  string_for_string= s.mid(i_second_comma + 1, (i_right_parenthesis - i_second_comma) - 1);
+
+  bool ok;
+  int line_number;
+  line_number= string_for_line_number.toInt(&ok, 10);
+  if ((ok == false) || (line_number <= 0)) return 0; /* bad line number */
+
+  QColor color;
+  color.setNamedColor(string_for_color);
+  if (color.isValid() == false) return 0; /* bad color */
+
+  /* Find an unused point in k_line_number[], set it to line number. If all points are full, too bad. (Will fix soon!) */
+  for (int k_index= 0; k_index < K_SIZE; ++k_index)
+  {
+    if (k_line_number[k_index] == -1)
+    {
+      k_line_number[k_index]= line_number;
+      k_color[k_index]= color;
+      k_string[k_index]= string_for_string;
+      break;
+    }
+  }
+
+  return (i_right_parenthesis - i) + 1;
+}
+
 
 /*
   Set left margin of viewport to the size we need to draw the prompt.
@@ -3437,6 +7015,10 @@ int CodeEditor::prompt_width_calculate()
   line_width_last= fontMetrics().width(sq);
   if (line_width_first < line_width_last) prompt_width= line_width_last;
   else prompt_width= line_width_first;
+#ifdef DEBUGGER
+  /* TEST */
+  prompt_width+= fontMetrics().width("B ");
+#endif
   return prompt_width;
 
   /* Todo: check why this doesn't work -- prompt_width+= fontMetrics().width(this->prompt_current); */
@@ -3492,6 +7074,10 @@ void CodeEditor::resizeEvent(QResizeEvent *e)
   We get to highlightCurrentline because of earlier
   "connect(this, SIGNAL(cursorPositionChanged()), this, SLOT(highlightCurrentLine()));"
   Todo: the hard coding Qt::yellow should instead be something chosen for action_statement().
+  I made one change from the original code:
+    Originally there was a } brace after "extraSelections.append(selection);".
+    I moved it so there is a } brace after "setExtraSelections(extraSelections);".
+    I believe this should only affect debug_widget[], which is read-only except when debug_highlight_line() happens.
 */
 void CodeEditor::highlightCurrentLine()
 {
@@ -3506,6 +7092,9 @@ void CodeEditor::highlightCurrentLine()
     selection.format.setBackground(lineColor);
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
     selection.cursor= textCursor();
+#ifdef DEBUGGER
+    block_number= selection.cursor.blockNumber();                           /* effectively = line number base 0 */
+#endif
     selection.cursor.clearSelection();
     extraSelections.append(selection);
   }
@@ -3553,6 +7142,18 @@ void CodeEditor::prompt_widget_paintevent(QPaintEvent *event)
       prompt_text= prompt_translate(blockNumber + 1);
       QString s= prompt_text;
       /* QString number= QString::number(blockNumber + 1); */
+#ifdef DEBUGGER
+      /* hmm, actually this loop could stop when k_line_number[k_index] == -1 too */
+      for (int k_index= 0; k_index < K_SIZE; ++k_index)
+      {
+        if (blockNumber == k_line_number[k_index] - 1)
+        {
+          painter.setPen(QColor(k_color[k_index]));
+          painter.drawText(0, top, 10, fontMetrics().height(), Qt::AlignLeft, k_string[k_index]);
+          break;
+        }
+      }
+#endif
       painter.setPen(textcolor);
       painter.drawText(0, top, prompt_widget->width(), fontMetrics().height(),
                        Qt::AlignRight, s);
@@ -3570,13 +7171,14 @@ void CodeEditor::prompt_widget_paintevent(QPaintEvent *event)
   TextEditFrame
   This is one of the components of result_grid
 */
-TextEditFrame::TextEditFrame(QWidget *parent, ResultGrid *result_grid_widget, int column_number) :
+TextEditFrame::TextEditFrame(QWidget *parent, ResultGrid *result_grid_widget, unsigned int index) :
     QFrame(parent)
 {
   setMouseTracking(true);
   left_mouse_button_was_pressed= 0;
   ancestor_result_grid_widget= result_grid_widget;
-  ancestor_column_number= column_number;
+  text_edit_frames_index= index;
+  hide();
 }
 
 
@@ -3625,12 +7227,14 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
     if (event->x() > minimum_width)
     {
       /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
-      ancestor_result_grid_widget->grid_column_widths[ancestor_column_number]= event->x();
+      ancestor_result_grid_widget->grid_column_widths[ancestor_grid_column_number]= event->x();
       int xheight;
-      for (long unsigned int xrow= 0; xrow < ancestor_result_grid_widget->grid_actual_grid_height_in_rows; ++xrow)
+      for (long unsigned int xrow= 0;
+           (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
+           ++xrow)
       {
-        TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_column_number];
-        if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_column_number];
+        TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_grid_column_number];
+        if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
         if (xrow == 0) xheight= f->height();
         f->setFixedSize(event->x(), xheight);
       }
@@ -3648,19 +7252,20 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
       if (event->x() >= minimum_width)
       {
         /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
-        ancestor_result_grid_widget->grid_column_heights[ancestor_column_number]= event->y();
+        ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number]= event->y();
         int xheight;
-        for (long unsigned int xrow= 0; xrow < ancestor_result_grid_widget->grid_actual_grid_height_in_rows; ++xrow)
+        for (long unsigned int xrow= 0;
+             (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
+             ++xrow)
         {
-          TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_column_number];
-          if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_column_number];
+          TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_grid_column_number];
+          if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
           if (xrow == 0) xheight= f->height();
           f->setFixedSize(event->x(), xheight);
         }
       }
     }
   }
-
 }
 
 
@@ -3668,6 +7273,42 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
 {
   if (!(event->buttons() != 0)) left_mouse_button_was_pressed= 0;
 }
+
+
+/*
+  This is an event that happens if a result-set grid cell comes into view due to scrolling.
+  It can happen multiple times, and it can happen before we're ready to do anything (mysteriously).
+  But it's great for handling result sets that have many cells, because some actions are slow.
+  For example, setStyleSheet takes 2+ seconds when there are hundreds of child widgets.
+  Todo: only apply setStyleSheet if new cell or if style change
+*/
+void TextEditFrame::paintEvent(QPaintEvent *event)
+{
+  if (event == 0) return; /* this is just to avoid an "unused parameter" warning */
+  if ((is_retrieved_flag == 0) && (ancestor_result_grid_widget->is_paintable == 1))
+  {
+    QTextEdit *text_edit= findChild<QTextEdit *>();
+    if (text_edit != 0)
+    {
+      /*
+        Sometimes spurious text_edit_frames show up as if ready to paint.
+        Todo: find out if there's a known Qt bug that might explain this.
+        It's possible that it no longer happens now that I'm saying "hide()" more often.
+      */
+      if (text_edit_frames_index > ancestor_result_grid_widget->max_text_edit_frames_count)
+      {
+        printf("Trying to paint a texteditframe that isn't in the layout\n");
+      }
+      else
+      {
+        if (pointer_to_content == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+        else text_edit->setText(QString::fromUtf8(pointer_to_content, length));
+      }
+    }
+    is_retrieved_flag= 1;
+  }
+}
+
 
 /*
   CONNECT
@@ -3698,7 +7339,7 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
 
 /* See also http://dev.mysql.com/doc/refman/5.6/en/mysql-command-options.html */
 
-static int connected= 0;
+//static int connected= 0;
 //extern  MYSQL mysql;
 
 /*
@@ -3791,7 +7432,7 @@ static int connected= 0;
 void connect_set_variable(QString token0, QString token2);
 void connect_read_command_line(int argc, char *argv[]);
 void connect_read_my_cnf(const char *file_name);
-QString connect_stripper (QString value_to_strip);
+QString connect_stripper(QString value_to_strip);
 
 #include <pwd.h>
 #include <unistd.h>
@@ -3826,7 +7467,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_comments= 0;
   ocelot_init_command= "";
   ocelot_default_auth= "";
-  ocelot_protocol= "";
+  ocelot_protocol= ""; ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
   ocelot_password_was_specified= 0;
   ocelot_unix_socket= "";
   ocelot_delimiter_str= ";";
@@ -4111,10 +7752,11 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
   Called for connect, and also for things like USE `test`.
   I didn't say remove lead or trail whitespace, so QString "trimmed()" is no good.
   todo: I'm not sure that `` (tildes) should be removed for my.cnf values, check that
+        (we are depending on stripping of ``s when we call connect_stripper() with debuggee information status values)
   todo: I am fairly sure that I need to call this from other places too.
   todo: Does not look for 'xxx''yyy'. should it?
 */
-QString MainWindow::connect_stripper (QString value_to_strip)
+QString MainWindow::connect_stripper(QString value_to_strip)
 {
   QString s;
   int s_length;
@@ -4239,6 +7881,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if ((token0_length >= sizeof("prot")) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
   {
     ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
+    ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
     return;
   }
   if ((token0_length >= sizeof("pas")) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
@@ -4398,124 +8041,145 @@ void MainWindow::connect_make_statement()
   msgBox.exec();
 }
 
-
-int MainWindow::options_and_connect(char *host, char *database, char *user, char *password,
-    char *tmp_init_command,
-    char *plugin_dir,
-    char *default_auth,
-    char *unix_socket)
+#define PROTOCOL_TCP 1
+#define PROTOCOL_SOCKET 2
+#define PROTOCOL_PIPE 3
+#define PROTOCOL_MEMORY 4
+unsigned int MainWindow::get_ocelot_protocol_as_int(QString ocelot_protocol)
 {
-  if (connected != 0)
+  if (QString::compare(ocelot_protocol, "TCP", Qt::CaseInsensitive) == 0) return PROTOCOL_TCP;
+  if (QString::compare(ocelot_protocol, "SOCKET", Qt::CaseInsensitive) == 0) return PROTOCOL_SOCKET;
+  if (QString::compare(ocelot_protocol, "PIPE", Qt::CaseInsensitive) == 0) return PROTOCOL_PIPE;
+  if (QString::compare(ocelot_protocol, "MEMORY", Qt::CaseInsensitive) == 0) return PROTOCOL_MEMORY;
+  return 0;
+}
+
+int options_and_connect(
+    unsigned int connection_number)
+{
+  if (connected[connection_number] != 0)
   {
-    connected= 0;
-    mysql_close(&mysql);
+    connected[connection_number]= 0;
+    mysql_close(&mysql[connection_number]);
   }
-  mysql_init(&mysql);
+  mysql_init(&mysql[connection_number]);
 
-  if (tmp_init_command[0] != '\0') mysql_options(&mysql, MYSQL_INIT_COMMAND, tmp_init_command);
+  if (ocelot_init_command_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, ocelot_init_command_as_utf8);
 
-  if (ocelot_compress != 0) mysql_options(&mysql, MYSQL_OPT_COMPRESS, NULL);
+  if (ocelot_default_character_set_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_NAME, ocelot_default_character_set_as_utf8);
+
+  if (ocelot_compress != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
 
   if (ocelot_connect_timeout != 0)
   {
     unsigned int timeout= ocelot_connect_timeout;
-    mysql_options(&mysql, MYSQL_OPT_CONNECT_TIMEOUT, (char*) &timeout);
+    mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_TIMEOUT, (char*) &timeout);
   }
 
-  if (ocelot_secure_auth > 0) mysql_options(&mysql, MYSQL_SECURE_AUTH, (char *) &ocelot_secure_auth);
-  if (ocelot_local_infile > 0) mysql_options(&mysql, MYSQL_OPT_LOCAL_INFILE, (char*) &ocelot_local_infile);
+  if (ocelot_secure_auth > 0) mysql_options(&mysql[connection_number], MYSQL_SECURE_AUTH, (char *) &ocelot_secure_auth);
+  if (ocelot_local_infile > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_LOCAL_INFILE, (char*) &ocelot_local_infile);
 
-  if (QString::compare(ocelot_protocol, " ") > 0)
-  {
-    #define PROTOCOL_TCP 1
-    #define PROTOCOL_SOCKET 2
-    #define PROTOCOL_PIPE 3
-    #define PROTOCOL_MEMORY 4
-    unsigned int tmp_protocol;
-    tmp_protocol= 0;
-    if (QString::compare(ocelot_protocol, "TCP", Qt::CaseInsensitive) == 0) tmp_protocol= PROTOCOL_TCP;
-    if (QString::compare(ocelot_protocol, "SOCKET", Qt::CaseInsensitive) == 0) tmp_protocol= PROTOCOL_SOCKET;
-    if (QString::compare(ocelot_protocol, "PIPE", Qt::CaseInsensitive) == 0) tmp_protocol= PROTOCOL_PIPE;
-    if (QString::compare(ocelot_protocol, "MEMORY", Qt::CaseInsensitive) == 0) tmp_protocol= PROTOCOL_MEMORY;
-    if (tmp_protocol > 0) mysql_options(&mysql, MYSQL_OPT_PROTOCOL, (char*)&tmp_protocol);
-  }
+  if (ocelot_protocol_as_int > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_PROTOCOL, (char*)&ocelot_protocol_as_int);
 
   if (ocelot_safe_updates != 0)
   {
-    char init_command[100];
+    char init_command[100]; /* todo: the size could be more dynamic here */
     sprintf(init_command,
         "SET sql_select_limit = %lu, sql_safe_updates = 1, max_join_size = %lu",
         ocelot_select_limit, ocelot_max_join_size);
-    mysql_options(&mysql, MYSQL_INIT_COMMAND, init_command);
+    mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, init_command);
   }
 
-/*
-  MYSQL_PLUGIN_DIR and MYSQL_DEFAULT_AUTH are options we should support.
-  But there can be problems building on some distros, because they're
-  relatively recent additions in mysql.h. Todo: support them real soon.
-*/
-//  mysql_options(&mysql, MYSQL_SET_CHARSET_NAME, default_charset);
+  /*
+    MYSQL_PLUGIN_DIR and MYSQL_DEFAULT_AUTH are options we should support.
+    But there can be problems building on some distros, because they're
+    relatively recent additions in mysql.h. Todo: support them real soon.
+  */
+  //  mysql_options(&mysql[], MYSQL_SET_CHARSET_NAME, default_charset);
 
-//  if (*plugin_dir != '\0') mysql_options(&mysql, MYSQL_PLUGIN_DIR, plugin_dir);
+  //  if (*plugin_dir != '\0') mysql_options(&mysql[], MYSQL_PLUGIN_DIR, plugin_dir);
 
-//  if (*default_auth != '\0') mysql_options(&mysql, MYSQL_DEFAULT_AUTH, default_auth);
+  //  if (*default_auth != '\0') mysql_options(&mysql[], MYSQL_DEFAULT_AUTH, default_auth);
 
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
-  if (mysql_real_connect(&mysql, host, user, password,
-                          database, ocelot_port, unix_socket,
+  if (mysql_real_connect(&mysql[connection_number], ocelot_host_as_utf8, ocelot_user_as_utf8, ocelot_password_as_utf8,
+                          ocelot_database_as_utf8, ocelot_port, ocelot_unix_socket_as_utf8,
                           CLIENT_MULTI_RESULTS) == 0)
   {
     /* connect failed. todo: better diagnostics? anyway, user can retry, a dialog box will come up. */
     return -1;					// Retryable
   }
-  connected= 1;
+
+  /*
+    Tell the server: characters from the client are UTF8, characters going to the client are UTF8.
+    This partially overrides --default_character_set, except there's no change to character_set_connection.
+    Todo: Eventually UTF8MB4 will be preferable but check server version before trying that.
+    Todo: We could have an option to receive in UTF16 which is what Qt would prefer.
+    Todo: We should warn or disallow if user tries to change these.
+    Todo: Think what we're going to do with file I/O, e.g. the user might expect it to be ujis.
+    Todo: This makes the server do conversions. Eventually the client could do the conversions but that's lots of work.
+    Todo: Worry that there might be some way to start Qt with different character-set assumptions.
+    Todo: Worry that we haven't got a plan for _latin2 'string' etc. although we could get the server to translate for us
+  */
+  if (mysql_query(&mysql[connection_number], "set character_set_client = utf8")) printf("SET character_set_client failed\n");
+  if (mysql_query(&mysql[connection_number], "set character_set_results = utf8")) printf("SET character_set_results failed\n");
+
+  connected[connection_number]= 1;
   return 0;
 }
 
 
-int MainWindow::the_connect()
+void MainWindow::copy_connect_strings_to_utf8()
+{
+  /* See comment "UTF8 Conversion" */
+  int tmp_host_len= ocelot_host.toUtf8().size();
+  //  char *tmp_host= new char[tmp_host_len + 1];
+  //  memcpy(tmp_host, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
+  memcpy(ocelot_host_as_utf8, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
+  int tmp_database_len= ocelot_database.toUtf8().size();
+  //char *tmp_database= new char[tmp_database_len + 1];
+  memcpy(ocelot_database_as_utf8, ocelot_database.toUtf8().constData(), tmp_database_len + 1);
+  int tmp_user_len= ocelot_user.toUtf8().size();
+  //char *ocelot_user_as_utf8= new char[tmp_user_len + 1];
+  memcpy(ocelot_user_as_utf8, ocelot_user.toUtf8().constData(), tmp_user_len + 1);
+  int tmp_password_len= ocelot_password.toUtf8().size();
+  //char *tmp_password= new char[tmp_password_len + 1];
+  memcpy(ocelot_password_as_utf8, ocelot_password.toUtf8().constData(), tmp_password_len + 1);
+  int tmp_init_command_len= ocelot_init_command.toUtf8().size();
+  //char *tmp_init_command= new char[tmp_init_command_len + 1];
+  memcpy(ocelot_init_command_as_utf8, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
+  int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
+  //char *tmp_plugin_dir= new char[tmp_plugin_dir_len + 1];
+  memcpy(ocelot_plugin_dir_as_utf8, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
+  int tmp_default_auth_len= ocelot_default_auth.toUtf8().size();
+  //char *tmp_default_auth= new char[tmp_default_auth_len + 1];
+  memcpy(ocelot_default_auth_as_utf8, ocelot_default_auth.toUtf8().constData(), tmp_default_auth_len + 1);
+  int tmp_unix_socket_len= ocelot_unix_socket.toUtf8().size();
+  //char *tmp_unix_socket= new char[tmp_unix_socket_len + 1];
+  memcpy(ocelot_unix_socket_as_utf8, ocelot_unix_socket.toUtf8().constData(), tmp_unix_socket_len + 1);
+  int tmp_default_character_set_len= ocelot_default_character_set.toUtf8().size();
+  //char *tmp_default_character_set= new char[tmp_default_character_set_len + 1];
+  memcpy(ocelot_default_character_set_as_utf8, ocelot_default_character_set.toUtf8().constData(), tmp_default_character_set_len + 1);
+}
+
+
+int MainWindow::the_connect(unsigned int connection_number)
 {
   int x;
 
-  /* See comment "UTF8 Conversion" */
-  int tmp_host_len= ocelot_host.toUtf8().size();
-  char *tmp_host= new char[tmp_host_len + 1];
-  memcpy(tmp_host, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
-  int tmp_database_len= ocelot_database.toUtf8().size();
-  char *tmp_database= new char[tmp_database_len + 1];
-  memcpy(tmp_database, ocelot_database.toUtf8().constData(), tmp_database_len + 1);
-  int tmp_user_len= ocelot_user.toUtf8().size();
-  char *tmp_user= new char[tmp_user_len + 1];
-  memcpy(tmp_user, ocelot_user.toUtf8().constData(), tmp_user_len + 1);
-  int tmp_password_len= ocelot_password.toUtf8().size();
-  char *tmp_password= new char[tmp_password_len + 1];
-  memcpy(tmp_password, ocelot_password.toUtf8().constData(), tmp_password_len + 1);
-  int tmp_init_command_len= ocelot_init_command.toUtf8().size();
-  char *tmp_init_command= new char[tmp_init_command_len + 1];
-  memcpy(tmp_init_command, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
+  /* options_and_connect() cannot use QStrings because it is not in MainWindow */
+  copy_connect_strings_to_utf8();
 
-  int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
-  char *tmp_plugin_dir= new char[tmp_plugin_dir_len + 1];
-  memcpy(tmp_plugin_dir, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
+  x= options_and_connect(
+                      connection_number);
 
-  int tmp_default_auth_len= ocelot_default_auth.toUtf8().size();
-  char *tmp_default_auth= new char[tmp_default_auth_len + 1];
-  memcpy(tmp_default_auth, ocelot_default_auth.toUtf8().constData(), tmp_default_auth_len + 1);
-  int tmp_unix_socket_len= ocelot_unix_socket.toUtf8().size();
-  char *tmp_unix_socket= new char[tmp_unix_socket_len + 1];
-  memcpy(tmp_unix_socket, ocelot_unix_socket.toUtf8().constData(), tmp_unix_socket_len + 1);
-
-  x= options_and_connect(tmp_host, tmp_database, tmp_user, tmp_password,
-                      tmp_init_command, tmp_plugin_dir, tmp_default_auth, tmp_unix_socket);
-
-  delete []tmp_unix_socket;
-  delete []tmp_default_auth;
-  delete []tmp_plugin_dir;
-  delete []tmp_init_command;
-  delete []tmp_password;
-  delete []tmp_user;
-  delete []tmp_database;
-  delete []tmp_host;
+//  delete []tmp_unix_socket;
+//  delete []tmp_default_auth;
+//  delete []tmp_plugin_dir;
+//  delete []tmp_init_command;
+//  delete []tmp_password;
+//  delete []tmp_user;
+//  delete []tmp_database;
+//  delete []tmp_host;
   return x;
 }
-

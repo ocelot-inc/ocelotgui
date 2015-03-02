@@ -21,7 +21,8 @@ TARGET = ocelotgui
 TEMPLATE = app
 
 SOURCES +=\
-        ocelotgui.cpp
+        ocelotgui.cpp \
+    install_sql.cpp
 
 HEADERS  += ocelotgui.h
 
@@ -29,8 +30,8 @@ FORMS    += ocelotgui.ui
 
 # Todo: don't hard code these paths, find where mysql.h and libmysqlclient.so should be!
 # Todo: getenv("LD_RUN_PATH") is in the code, but unused.
-INCLUDEPATH += /home/pgulutzan/mariadb-10.0.15/include/mysql
-LIBS += /home/pgulutzan/mariadb-10.0.15//lib/libmysqlclient.so
+INCLUDEPATH += /home/pgulutzan/mariadb-10.0.17/include/mysql
+LIBS += /home/pgulutzan/mariadb-10.0.17//lib/libmysqlclient.so
 # INCLUDEPATH += /home/pgulutzan/mysql-5.5/include
 # LIBS += /home/pgulutzan/mysql-5.5/lib/libmysqlclient.so
 

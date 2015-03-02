@@ -1,6 +1,6 @@
 <BR><h1>The ocelotgui user manual</h1>  
 <BR>  
-<BR>Version 0.2.0, December 10 2014  
+<BR>Version 0.3.0, March 1 2015  
 <BR>  
 <BR>  
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  
@@ -27,6 +27,7 @@ a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
 Some of its features are: syntax highlighting, user-settable colors  
 and fonts for each part of the screen, and result-set displays  
 with multi-line rows and resizable columns.  
+NEW: And a debugger, see section 'Debugger'.  
 <BR>  
 <BR><h2>The company, the product, and the status</h2>  
 <BR>  
@@ -152,7 +153,7 @@ after a while the older statements are scrolled off the screen.
 Thus its main function is to show what recent statements and  
 results were. Statements in the history can be retrieved while  
 the focus is on the statement widget, by selecting 'Previous statement'  
-or "Next statement" menu items.  
+or 'Next statement' menu items.  
 <BR>  
 <BR><h2>Result widget</h2>  
 <BR>  
@@ -209,6 +210,30 @@ in the result widget.
 <BR>  
 <BR>Help|About will show the license and copyright and version.  
 Help|Manual will show the manual.  
+<BR>  
+<BR><h2>Debugger</h2>  
+NEW: it's possible to debug stored procedures and functions.  
+This version of ocelotgui incorporates MDBug  
+(read about MDBug at http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt).  
+All debugger insructions can be entered on the ocelotgui command line;  
+some operations can also be done via the Debug menu or by clicking on the stored-procedure display.  
+Currently-supported instructions are:  
+<BR>$install -- this is always the first thing to do  
+<BR>$setup routine_name [, routine_name ...] -- prepares so '$debug routine_name' is possible  
+<BR>$debug routine_name -- starts a debug session, shows routines in a tabbed widget  
+<BR>$breakpoint routine_name line_number or Debug|breakpoint -- sets a breakpoint  
+<BR>$clear routine_name line_number -- clears a breakpoint  
+<BR>$next or Debug|Next -- goes to next executable line, without dropping into subroutines  
+<BR>$step or Debug|Step -- goes to next executable line, will drop into subroutines  
+<BR>$continue or Debug|Continue -- executes until breakpoint or until end of procedure  
+<BR>$refresh breakpoints -- refreshes xxxmdbug.breakpoints table  
+<BR>$refresh server_variables -- refreshes xxxmdbug.server_variables table  
+<BR>$refresh variables -- refreshes xxxmdbug.variables table  
+<BR>$refresh user_variables -- refereshes xxxmdbug.user_variables table  
+<BR>$exit or Debug|Exit -- stops a debug session  
+<BR>  
+For a walk through a debugger example, with screenshots, see  
+this blog post: ocelot.ca/blog/the-ocelotgui-debugger.  
 <BR>  
 <BR><h2>Contact</h2>  
 <BR>  
