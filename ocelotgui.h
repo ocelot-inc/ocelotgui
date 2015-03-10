@@ -162,33 +162,40 @@ public:
   QString ocelot_main_font_weight, new_ocelot_main_font_weight;
   QString ocelot_main_style_string;
 
-  QString ocelot_host;                       /* for CONNECT */
-//  unsigned short ocelot_port;                /* for CONNECT */ moved!
-  QString ocelot_user;                       /* for CONNECT */
-  QString ocelot_unix_socket;                /* for CONNECT */
-  QString ocelot_password;                   /* for CONNECT */
-  QString ocelot_protocol;                   /* for CONNECT */
-  QString ocelot_init_command;               /* for CONNECT */
-  QString ocelot_default_auth;               /* for CONNECT */
+  /* Strings for CONNECT. These will be converted e.g. ocelot_host to ocelot_host_as_utf8 */
+  QString ocelot_host;
+  QString ocelot_database;
+  QString ocelot_user;
+  QString ocelot_password;
+  QString ocelot_unix_socket;
+  QString ocelot_default_auth;
+  QString ocelot_init_command;
+  QString ocelot_opt_bind;
+  QString ocelot_opt_connect_attr_delete;
+  QString ocelot_opt_ssl;
+  QString ocelot_opt_ssl_ca;
+  QString ocelot_opt_ssl_capath;
+  QString ocelot_opt_ssl_cert;
+  QString ocelot_opt_ssl_cipher;
+  QString ocelot_opt_ssl_crl;
+  QString ocelot_opt_ssl_crlpath;
+  QString ocelot_opt_ssl_key;
+  QString ocelot_plugin_dir;
+  QString ocelot_read_default_file;
+  QString ocelot_read_default_group;
+  QString ocelot_server_public_key;
+  QString ocelot_set_charset_dir;
+  QString ocelot_set_charset_name;           /* was: ocelot_default_character_set */
+  QString ocelot_shared_memory_base_name;
+  QString ocelot_protocol;
   unsigned short ocelot_comments;            /* for CONNECT. not used. */
   unsigned short ocelot_no_defaults;         /* for CONNECT */
   QString ocelot_defaults_file;              /* for CONNECT */
   QString ocelot_defaults_extra_file;        /* for CONNECT */
-//  unsigned long int ocelot_connect_timeout;  /* for CONNECT */ moved!
-//  unsigned short ocelot_compress;            /* for CONNECT */ moved!
-//  unsigned short ocelot_secure_auth;         /* for CONNECT */ moved!
-//  unsigned short ocelot_local_infile;        /* for CONNECT */ moved!
-//  unsigned short ocelot_safe_updates;        /* for CONNECT */ moved!
-  QString ocelot_plugin_dir;                 /* for CONNECT */
-//  unsigned long int ocelot_select_limit;     /* for CONNECT */ moved!
-//  unsigned long int ocelot_max_join_size;    /* for CONNECT */ moved!
-//  unsigned short int ocelot_silent;          /* for CONNECT */ moved!
-//  unsigned short int ocelot_no_beep;         /* for CONNECT */ moved!
-//  unsigned short int ocelot_wait;            /* for CONNECT */ moved!
-  QString ocelot_default_character_set;      /* for CONNECT. not used. */
+
 
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
-  QString ocelot_database;                /* for CONNECT */
+
   QString ocelot_dbms;                    /* for CONNECT */
   int ocelot_grid_detached;
   unsigned int ocelot_grid_max_row_lines;          /* ?? should be unsigned long? */
@@ -207,6 +214,7 @@ public slots:
   void action_connect_once(QString);
   void action_exit();
   void action_execute();
+  void action_kill();
   void action_about();
   void action_the_manual();
   void action_the_manual_close();
@@ -257,6 +265,7 @@ public slots:
   void action_debug_refresh_server_variables();
   void action_debug_refresh_user_variables();
   void action_debug_refresh_variables();
+  void action_debug_refresh_call_stack();
   void action_debug_timer_status();
 #endif
 
@@ -676,6 +685,7 @@ private:
     QAction *menu_edit_action_history_markup_next;
   QMenu *menu_run;
     QAction *menu_run_action_execute;
+    QAction *menu_run_action_kill;
   QMenu *menu_settings;
     QAction *menu_settings_action_statement;
     QAction *menu_settings_action_grid;
@@ -699,6 +709,7 @@ private:
     QAction *menu_debug_action_refresh_server_variables;
     QAction *menu_debug_action_refresh_user_variables;
     QAction *menu_debug_action_refresh_variables;
+    QAction *menu_debug_action_refresh_call_stack;
 #endif
   QMenu *menu_help;
     QAction *menu_help_action_about;
@@ -710,7 +721,10 @@ private:
     QPushButton *the_manual_pushbutton;
 
   /* QTableWidget *grid_table_widget; */
-  ResultGrid *result_grid_table_widget;
+  QTabWidget *result_grid_tab_widget;
+/* It's easy to increase this so more multi results are seen but then start time is longer. */
+#define RESULT_GRID_TAB_WIDGET_MAX 2
+  ResultGrid *result_grid_table_widget[RESULT_GRID_TAB_WIDGET_MAX];
 
   unsigned long result_row_count;
 
@@ -760,7 +774,8 @@ public:
   int ancestor_grid_row_number;
   int length;
   char *pointer_to_content;
-  char is_retrieved_flag;
+  bool is_retrieved_flag;
+  bool is_style_sheet_set_flag;
 
 protected:
   void mousePressEvent(QMouseEvent *event);
@@ -1053,22 +1068,16 @@ void garbage_collect ()
 
 /* THE GRID WIDGET */
 /*
-  Todo: make sure the QTextEdit widgets are plain text, in case somebody enters HTML.
-  Problems:
-      How do I set so there's no space between each row/column?
-*/
-/*
   Re the "cells" of the grid:
   Todo: Originally these were QPlainTextEdit widgets, because QTextEdit
         would insist on expanding long lines. That doesn't seem to be happening any more,
         but we might have to switch back if there are problems.
+        Make sure the QTextEdit widgets are plain text, in case somebody enters HTML.
   Todo: allow change of setTextDirection() based on language or on client variable.
   Todo: see this re trail spaces: http://qt-project.org/doc/qt-4.8/qtextoption.html#Flag-enum
   Todo: although min(column width) = heading width, don't have to make text editable area that wide
   Todo: have to think what to do with control characters, e.g. for tabs should I have
         setTabChangesFocus(true), for others should I allow the effects or display specially.
-  Todo: I don't know if I should do something about setColumnStretch
-  Todo: I don't know if I should do something about setContentsMargins() for the layout
   Todo: I used an eventfilter to detect scrolling because QScrollBar::valueChanged()
         failed, but someday I should find out why and retry.
   Todo: "new" operations should have nothrow checks.
@@ -1112,8 +1121,6 @@ void garbage_collect ()
   Todo: up|down dragging, although vertical shrinking will not mean that more rows appear on the screen.
         Up|down dragging "works" now but is undocumented, and still needs fixes for:
           todo: minimum height (currently doesn't look right), bottom drag line size, bottom drag line color
-          todo: change height of all columns in the row, not just current column in all rows
-  Todo: make border width user-settable, also on the Settings menu.
   Todo: vertical resizing currently looks odd. I've read that "Correct place to do special layout management is overridden resizeEvent."
   Todo: test with a frame that has been scrolled horizontally so half of it is not visible, while there's a scoll bar.
   Todo: There can be a bit of flicker during drag though I doubt that anyone will care.
@@ -1208,6 +1215,7 @@ public:
   QString ocelot_grid_cell_right_drag_line_color;
   unsigned int row_pool_size;
   unsigned int cell_pool_size;
+  QString frame_color_setting;                                 /* based on drag line color */
 
 /* How many rows can fit on the screen? Take a guess. */
 #define RESULT_GRID_WIDGET_MAX_HEIGHT 20
@@ -1252,9 +1260,7 @@ ResultGrid(
   setMaximumHeight(RESULT_GRID_WIDGET_MAX_HEIGHT * 20);
 
   /* We might say "new ResultGrid(0)" merely so we'd have ResultGrid in the middle spot in the layout-> */
-  /* Todo: memory leak? We don't get rid of previous client when we make a new real client. */
 
-  /* TODO: THIS HAS TO BE REDONE BY FILLUP() -- EXPANDED -- IF (result_row_count + 1) * result_column_count > 10000. */
   /* Create the cell pool. */
   /*
     Make the cells. Each cell is one QTextEdit within one QHBoxLayout within one TextEditFrame.
@@ -1306,7 +1312,6 @@ ResultGrid(
   /* grid_vertical_scroll_bar_value= 0; */
   /* grid_vertical_scroll_bar= grid_scroll_area->verticalScrollBar(); */
 
-
   /* Assume there will never be more than 50 columns per row, but this might be resized during fillup */
   pools_resize(0, RESULT_GRID_WIDGET_MAX_HEIGHT, 0, RESULT_GRID_WIDGET_MAX_HEIGHT * 50);
   row_pool_size= RESULT_GRID_WIDGET_MAX_HEIGHT;
@@ -1329,6 +1334,7 @@ ResultGrid(
 
   mysql_res_copy= 0;
   mysql_res_copy_rows= 0;
+  set_frame_color_setting();
 }
 
 
@@ -1449,7 +1455,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   for (unsigned int i_h= 0; i_h < result_column_count; ++i_h)
   {
     if (i_h >= cell_pool_size) break;
-    text_edit_widgets[0 * result_column_count + i_h]->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
+    text_edit_frames[0 * result_column_count + i_h]->is_style_sheet_set_flag= false;
   }
 
   ocelot_grid_color= parent->ocelot_grid_color;
@@ -1509,7 +1515,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
 
   ocelot_grid_cell_right_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_right_drag_line_size.toInt();
-  ocelot_grid_cell_right_drag_line_color= copy_of_parent->ocelot_grid_cell_right_drag_line_color;
+//  ocelot_grid_cell_right_drag_line_color= copy_of_parent->ocelot_grid_cell_right_drag_line_color;
   ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
 
   /*
@@ -1519,10 +1525,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
     todo: why the whole pool rather than just result-row_count + 1?
   */
   QFontMetrics fm= QFontMetrics(*saved_font);
-  QString frame_color_setting= "TextEditFrame {background-color: ";
-  frame_color_setting.append(ocelot_grid_cell_right_drag_line_color);
-  frame_color_setting.append(";border: 0px");              /* TEST !! */
-  frame_color_setting.append("}");
+
   for (xrow= 0; (xrow < result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
   {
     for (unsigned int column_number= 0; column_number < result_column_count; ++column_number)
@@ -1538,7 +1541,9 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
         http://stackoverflow.com/questions/7276330/qt-stylesheet-for-custom-widget.
       */
 
-      text_edit_frames[ki]->setStyleSheet(frame_color_setting);
+      //text_edit_frames[ki]->setStyleSheet(frame_color_setting);
+
+      text_edit_frames[ki]->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);   /* This doesn't seem to do anything */
 
       /* Todo: I'm not sure exactly where the following three lines should go. Consider moving them. */
       /* border_size and minimum_width and minimum_height are used by mouseMoveEvent */
@@ -1552,18 +1557,25 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   QString yy;
   for (unsigned int i_h= 0; i_h < result_column_count; ++i_h)                      /* row 0 is header */
   {
+    text_edit_frames[0 * result_column_count + i_h]->is_style_sheet_set_flag= false;
     /* Todo: we use set>StyleSheet, apparently that's overriding this. */
-    text_edit_widgets[0 * result_column_count + i_h]->setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
+    //text_edit_widgets[0 * result_column_count + i_h]->setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
     /*
     QPalette p= text_edit_widgets[0*result_column_count+i]->palette();
      p.setColor(QPalette::Base, QColor(copy_of_parent->ocelot_grid_header_background_color));
      text_edit_widgets[0*result_column_count+i]->setPalette(p);
      */
-    yy= dbms_get_field_name(i_h); /* fields[i].name; */ /* Todo: use name_length somehow so we don't get fooled by \0 */
-    text_edit_widgets[0 * result_column_count + i_h]->setPlainText(yy);
-    text_edit_frames[0 * result_column_count + i_h]->is_retrieved_flag= 1;
+    //yy= dbms_get_field_name(i_h); /* fields[i].name; */ /* Todo: use name_length somehow so we don't get fooled by \0 */
+
+    /* We don't do the following because header might get lost if there are multiple result sets. */
+    //text_edit_widgets[0 * result_column_count + i_h]->pointer= fields[i].name;
+    //text_edit_widgets[0 * result_column_count + i_h]->length= fields[i].name_length;
+    text_edit_widgets[0 * result_column_count + i_h]->setText(QString::fromUtf8(fields[i_h].name, fields[i_h].name_length));
+
+    //text_edit_widgets[0 * result_column_count + i_h]->setPlainText(yy);
+    text_edit_frames[0 * result_column_count + i_h]->is_retrieved_flag= true;
     text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_column_number= i_h;
-    text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_row_number= 0;
+    text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_row_number= -1;          /* means header row */
   }
 
   /*
@@ -1600,7 +1612,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
 
 //  unsigned int i;
 
-  /* Put the QTextEdit widgets in a layout. Remember row[0] is for the header. */
+  /* Put the QTextEdit widgets in a layout. Remember grid row 0 is for the header. */
   /*
     Re making the row. Each row is [column_count] cells within one QHBoxLayout within one widget.
     grid_row_layout->setSizeConstraint(QLayout::SetMaximumSize) prevents gaps from forming during shrink.
@@ -1642,15 +1654,13 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
 //        f->setFixedSize(grid_column_widths[col], max_height_of_a_char + (border_size * 2) + 9);
 //        f->setMaximumHeight(max_height_of_a_char+(border_size * 2) + 10);
 //        f->setMinimumHeight(max_height_of_a_char+(border_size * 2) + 10);
-          text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], max_height_of_a_char
-                                                   + ocelot_grid_cell_border_size_as_int * 2
-                                                   + ocelot_grid_cell_right_drag_line_size_as_int);
-          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(max_height_of_a_char
-                              + ocelot_grid_cell_border_size_as_int * 2
-                              + ocelot_grid_cell_right_drag_line_size_as_int);
-          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(max_height_of_a_char
-                              + ocelot_grid_cell_border_size_as_int * 2
-                              + ocelot_grid_cell_right_drag_line_size_as_int);
+          int header_height= max_height_of_a_char
+                           + ocelot_grid_cell_border_size_as_int * 2
+                           + ocelot_grid_cell_right_drag_line_size_as_int;
+          if (ocelot_grid_cell_right_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
+          text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
+          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
+          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
       }
       else
       {
@@ -1662,7 +1672,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
 //          f->setMaximumHeight(grid_height_of_highest_column_in_pixels);
 //          f->setMinimumHeight(grid_height_of_highest_column_in_pixels);
       }
-      text_edit_frames[xrow * result_column_count + col]->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);   /* This doesn't seem to do anything */
+//      text_edit_frames[xrow * result_column_count + col]->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);   /* This doesn't seem to do anything */
 
       text_edit_frames[xrow * result_column_count + col]->show();
       /* l->setMinimumWidth(1); */
@@ -1674,7 +1684,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
       /* l->setStyleSheet("border: 1px solid yellow"); */ /* just so I know the size of the border. Todo: user-settable? */
       grid_row_layouts[xrow]->addWidget(text_edit_frames[xrow * result_column_count + col], 0, Qt::AlignTop | Qt::AlignLeft);
 
-      l->updateGeometry();
+ //     l->updateGeometry();    /* removed 2015-03-04. doesn't seem to matter any more */
       }
     }
 
@@ -1705,7 +1715,6 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
 
 //  grid_scroll_area->setWidget(client);
 //  grid_scroll_area->setWidgetResizable(true);              /* Without this, the QTextEdit widget heights won't change */
-
 
   /* area->horizontalScrollBar()->setSingleStep(client->width() / 24); */ /* single-stepping seems pointless */
 }
@@ -1834,6 +1843,8 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
    and in that case the scroll bar policy could be changed too.
    Todo: Other than that, I can't figure out what else is screwing up the
    calculations, but perhaps lineSpacing() shouldn't be added if there is only one line.
+   I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
+   but removing it doesn't solve the problem.
 */
 void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_right_drag_line_size_as_int)
 {
@@ -2082,7 +2093,7 @@ void fill_detail_widgets(int first_row)
           text_edit_frames[ki]->pointer_to_content= row[i];
 //          if (lengths[i] > grid_max_column_widths[i]) grid_max_column_widths[i]= lengths[i];
         }
-        text_edit_frames[ki]->is_retrieved_flag= 0;
+        text_edit_frames[ki]->is_retrieved_flag= false;
         text_edit_frames[ki]->ancestor_grid_column_number= i;
         text_edit_frames[ki]->ancestor_grid_row_number= r;
         text_edit_frames[ki]->show();
@@ -2112,7 +2123,7 @@ void fill_detail_widgets(int first_row)
       row_pointer+= sizeof(lengths[i]);
       text_edit_frames[ki]->pointer_to_content= row_pointer;
       row_pointer+= text_edit_frames[ki]->length;
-      text_edit_frames[ki]->is_retrieved_flag= 0;
+      text_edit_frames[ki]->is_retrieved_flag= false;
       text_edit_frames[ki]->ancestor_grid_column_number= i;
       text_edit_frames[ki]->ancestor_grid_row_number= r;
       text_edit_frames[ki]->show();
@@ -2246,18 +2257,37 @@ void garbage_collect()
 }
 
 
-/*
-  I no longer need this. Setting the parent should affect the children.
-  So the previous code, which looped through the children, is gone.
-  Still, it's regrettable that it's so slow.
-*/
-void set_all_style_sheets(QString ocelot_grid_style_string)
+void set_frame_color_setting()
 {
-  this->setStyleSheet(ocelot_grid_style_string);
+  ocelot_grid_cell_right_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_right_drag_line_size.toInt();
+  ocelot_grid_cell_right_drag_line_color= copy_of_parent->ocelot_grid_cell_right_drag_line_color;
+  frame_color_setting= "TextEditFrame {background-color: ";
+  frame_color_setting.append(ocelot_grid_cell_right_drag_line_color);
+  //frame_color_setting.append(";border: 0px");              /* TEST !! */
+  frame_color_setting.append("}");
+}
+
+
+/*
+  Setting the parent should affect the children.
+  But we don't want all text_edit_frames and text_edit_widgets to change because that is slow.
+  Let us set a flag which causes change at paint time. with setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
+*/
+void set_all_style_sheets()
+{
+
+//  this->setStyleSheet(ocelot_grid_style_string);
   unsigned int i_h;
-  for (i_h= 0; i_h < result_column_count; ++i_h)
+
+  //QFontMetrics fm= QFontMetrics(*saved_font);
+  set_frame_color_setting();
+  for (i_h= 0; i_h < cell_pool_size; ++i_h)
   {
-    text_edit_widgets[0 * result_column_count + i_h]->setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
+    text_edit_frames[i_h]->is_style_sheet_set_flag= false;
+    //text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
+    //text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
+    /* todo: skip following line if ocelot_grid_cell_right_drag_line_size_as_int did not change */
+    text_edit_layouts[i_h]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_right_drag_line_size_as_int, ocelot_grid_cell_right_drag_line_size_as_int));
   }
 }
 
@@ -2417,11 +2447,10 @@ QString dbms_get_field_value(int row_number, unsigned int column_number)
   return ""; /* to avoid "control reaches end of non-void function" warning */
 }
 
-
-
 public slots:
 private:
 };
+
 
 /*********************************************************************************************************/
 
@@ -2706,6 +2735,10 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
     connect(combo_box_for_size[2], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_2(int)));
   }
+
+  /* I could not get result grid border size to work so it is hidden until someday it is figured out -- maybe never */
+  label_for_size[0]->hide();
+  combo_box_for_size[0]->hide();
 
   /* The Cancel and OK buttons */
   widget_3= new QWidget(this);

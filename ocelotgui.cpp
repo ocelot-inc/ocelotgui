@@ -117,6 +117,7 @@
     ocelotgui.pro       small. used by Qt qmake
     ocelotgui.h         headers but also quite a lot of executable
     ocelotgui.cpp       executable
+    install_sql.cpp     for creating debugger routines
     ocelotgui.ui        small. ui = user interface
 
   There are three main widgets, which generally appear top-to-bottom on
@@ -136,7 +137,8 @@
   and "if (x) y" may be preferred to "if (x) <newline> y".
 
   The code was written by Ocelot Computer Services Inc. employees, except
-  for about 50 lines in the CodeEditor section (Digia copyright / BSD license).
+  for about 50 lines in the CodeEditor section (Digia copyright / BSD license),
+  and except for most of the lines in install_sql.cpp (HP copyright / GPL license).
   Other contributors will be acknowledged here and/or in a "Help" display.
 
   The code #includes header files from MySQL/Oracle and from Qt/Digia,
@@ -195,38 +197,67 @@
 #include "ui_ocelotgui.h"
 
 
-  unsigned short ocelot_port;                /* for CONNECT */
-  unsigned long int ocelot_connect_timeout;  /* for CONNECT */
-  unsigned short ocelot_compress;            /* for CONNECT */
-  unsigned short ocelot_secure_auth;         /* for CONNECT */
-  unsigned short ocelot_local_infile;        /* for CONNECT */
+/* Whenever you see STRING_LENGTH_512, think: here's a fixed arbitrary allocation, which should be be fixed up. */
+#define STRING_LENGTH_512 512
+
+/* Connect arguments and options */
+  char ocelot_host_as_utf8[512];                  /* argument */
+  char ocelot_database_as_utf8[512];              /* argument */
+  char ocelot_user_as_utf8[512];                  /* argument */
+  char ocelot_password_as_utf8[512];              /* argument */
+  unsigned short ocelot_port;                     /* argument */
+  char ocelot_unix_socket_as_utf8[512];           /* argument */
+  char ocelot_default_auth_as_utf8[512];          /* for MYSQL_DEFAULT_AUTH */
+  unsigned short ocelot_enable_cleartext_plugin;  /* for MYSQL_ENABLE_CLEARTEXT_PLUGIN */
+  char ocelot_init_command_as_utf8[512];          /* for MYSQL_INIT_COMMAND */
+  char ocelot_opt_bind_as_utf8[STRING_LENGTH_512];/* for MYSQL_OPT_BIND */
+  unsigned short ocelot_opt_can_handle_expired_passwords;/* for MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS */
+  unsigned short ocelot_opt_compress;            /* for MYSQL_OPT_COMPRESS */
+  char ocelot_opt_connect_attr_delete_as_utf8[STRING_LENGTH_512];/* for MYSQL_OPT_CONNECT_ATTR_DELETE */
+  unsigned short int ocelot_opt_connect_attr_reset; /* for MYSQL_OPT_CONNECT_ATTR_RESET */
+  unsigned long int ocelot_opt_connect_timeout;  /* for MYSQL_OPT_CONNECT_TIMEOUT */
+  unsigned short ocelot_opt_local_infile;        /* for MYSQL_OPT_LOCAL_INFILE */
+  unsigned short ocelot_opt_named_pipe;          /* for MYSQL_OPT_NAMED_PIPE */
+  unsigned int ocelot_protocol_as_int;       /* for MYSQL_OPT_PROTOCOL */
+  unsigned int ocelot_opt_read_timeout;          /* for MYSQL_OPT_READ_TIMEOUT */
+  unsigned int ocelot_opt_reconnect;             /* for MYSQL_OPT_RECONNECT */
+  char ocelot_opt_ssl_as_utf8[STRING_LENGTH_512];              /* for CONNECT. --ssl */
+  char ocelot_opt_ssl_ca_as_utf8[STRING_LENGTH_512];           /* for MYSQL_OPT_SSL_CA --ssl-ca */
+  char ocelot_opt_ssl_capath_as_utf8[STRING_LENGTH_512];       /* for MYSQL_OPT_SSL_CAPATH. --ssl-capath */
+  char ocelot_opt_ssl_cert_as_utf8[STRING_LENGTH_512];         /* for MYSQL_OPT_SSL_CERT. --ssl-cert */
+  char ocelot_opt_ssl_cipher_as_utf8[STRING_LENGTH_512];       /* for MYSQL_OPT_SSL_CIPHER. --ssl-cipher */
+  char ocelot_opt_ssl_crl_as_utf8[STRING_LENGTH_512];          /* for MYSQL_OPT_SSL_CRL. --ssl-crl */
+  char ocelot_opt_ssl_crlpath_as_utf8[STRING_LENGTH_512];      /* for MYSQL_OPT_SSL_CRLPATH. --ssl-crlpath */
+  char ocelot_opt_ssl_key_as_utf8[STRING_LENGTH_512];          /* for MYSQL_OPT_SSL_KEY. --ssl-key */
+  unsigned short int ocelot_opt_ssl_verify_server_cert;  /* for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert */
+  unsigned short int ocelot_opt_use_result; /* for MYSQL_OPT_USE_RESULT */
+  unsigned int ocelot_opt_write_timeout; /* for MYSQL_OPT_WRITE_TIMEOUT */
+  char ocelot_plugin_dir_as_utf8[512];       /* for MYSQL_PLUGIN_DIR */
+  char ocelot_read_default_file_as_utf8[512]; /* for MYSQL_READ_DEFAULT_FILE */
+  char ocelot_read_default_group_as_utf8[512];/* for MYSQL_READ_DEFAULT_GROUP */
+  unsigned short int ocelot_report_data_truncation; /* for MYSQL_REPORT_DATA_TRUNCATION */
+  unsigned short ocelot_secure_auth;         /* for MYSQL_SECURE_AUTH */
+  char ocelot_server_public_key_as_utf8[512];/* for MYSQL_SERVER_PUBLIC_KEY */
+  char ocelot_set_charset_dir_as_utf8[512];  /* for MYSQL_SET_CHARSET_DIR */
+  char ocelot_set_charset_name_as_utf8[512]; /* for MYSQL_SET_CHARSET_NAME */
+  char ocelot_shared_memory_base_name_as_utf8[512]; /* for MYSQL_SHARED_MEMORY_BASE_NAME */
+
   unsigned short ocelot_safe_updates;        /* for CONNECT */
   unsigned long int ocelot_select_limit;     /* for CONNECT */
   unsigned long int ocelot_max_join_size;    /* for CONNECT */
   unsigned short int ocelot_silent;          /* for CONNECT */
   unsigned short int ocelot_no_beep;         /* for CONNECT */
   unsigned short int ocelot_wait;            /* for CONNECT */
-  unsigned int ocelot_protocol_as_int;       /* for CONNECT */
-  char ocelot_host_as_utf8[512];
-  char ocelot_database_as_utf8[512];
-  char ocelot_user_as_utf8[512];
-  char ocelot_password_as_utf8[512];
-  char ocelot_init_command_as_utf8[512];
-  char ocelot_plugin_dir_as_utf8[512];
-  char ocelot_default_auth_as_utf8[512];
-  char ocelot_unix_socket_as_utf8[512];
-  char ocelot_default_character_set_as_utf8[512];
-  int options_and_connect(unsigned int connection_number);
 
-/* Whenever you see STRING_LENGTH_512, think: here's a fixed arbitrary allocation, which should be be fixed up. */
-#define STRING_LENGTH_512 512
+  int options_and_connect(unsigned int connection_number);
 
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
 #define MYSQL_DEBUGGER_CONNECTION 1
+#define MYSQL_KILL_CONNECTION 2
 #ifdef DEBUGGER
-  MYSQL mysql[2];
-  static int connected[2]= {0, 0};
+  MYSQL mysql[3];
+  static int connected[3]= {0, 0, 0};
 #else
   MYSQL mysql[1];
   static int connected[1]= {0};
@@ -263,19 +294,33 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   ocelot_statement_prompt_background_color= "lightGray"; /* set early because create_widget_statement() depends on this */
 
+
+  ocelot_grid_border_color= "black";
+  ocelot_grid_header_background_color= "lightGray";
+  ocelot_grid_cell_right_drag_line_color= "lightBlue";
+  ocelot_grid_cell_border_color= "black";
+  ocelot_grid_cell_border_size= "1";
+  ocelot_grid_cell_right_drag_line_size= "5";
   /* Probably result_grid_table_widget_saved_font only matters if the connection dialog box has to go up. */
   QFont tmp_font;
 //  QFont *saved_font;
   tmp_font= this->font();
 //  saved_font=&tmp_font;
 //  result_grid_table_widget= new ResultGrid(0, saved_font, this);
-  result_grid_table_widget= new ResultGrid(this);
-  /* 2014-12-10 Following line was shifted -- it used to come after the show(). */
-  result_grid_table_widget->installEventFilter(this);                      /* must catch fontChange, show, etc. */
 
-  result_grid_table_widget->grid_vertical_scroll_bar->installEventFilter(this);
-  result_grid_table_widget->hide();
-
+  result_grid_tab_widget= new QTabWidget(this);
+  result_grid_tab_widget->hide();
+  for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
+  {
+    result_grid_table_widget[i_r]= new ResultGrid(this);
+    result_grid_tab_widget->addTab(result_grid_table_widget[i_r], QString::number(i_r + 1));
+    result_grid_table_widget[i_r]->hide(); /* Maybe this isn't necessary */
+  }
+  for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
+  {
+    result_grid_table_widget[i_r]->installEventFilter(this); /* must catch fontChange, show, etc. */
+    result_grid_table_widget[i_r]->grid_vertical_scroll_bar->installEventFilter(this);
+  }
   main_layout= new QVBoxLayout();               /* todo: do I need to say "this"? */
 
   create_widget_history();
@@ -300,19 +345,12 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_highlight_operator_color= "lightGreen";
   ocelot_statement_highlight_reserved_color= "magenta";
 
-  ocelot_grid_border_color= "black";
-  ocelot_grid_header_background_color= "lightGray";
-  ocelot_grid_cell_right_drag_line_color= "lightBlue";
-  ocelot_grid_cell_border_color= "black";
-  ocelot_grid_cell_border_size= "1";
-  ocelot_grid_cell_right_drag_line_size= "5";
-
   ocelot_history_border_color= "black";
   ocelot_main_border_color= "black";
 
   make_style_strings();
   main_layout->addWidget(history_edit_widget);
-  main_layout->addWidget(result_grid_table_widget);
+  main_layout->addWidget(result_grid_tab_widget);
   main_layout->addWidget(statement_edit_widget);
 #ifdef DEBUGGER
   main_layout->addWidget(debug_top_widget);
@@ -419,7 +457,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 {
   QString text;
 
-//  if (obj == result_grid_table_widget->grid_vertical_scroll_bar)
+//  if (obj == result_grid_table_widget[0]->grid_vertical_scroll_bar)
 //  {
 //    /* BING */
 //    /*
@@ -436,16 +474,20 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 //    ||  (event->type() == QEvent::MouseTrackingChange)) return (result_grid_table_widget->scroll_event());
 //  }
 
-  if (obj == result_grid_table_widget)
+
+  for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
-    if (event->type() == QEvent::FontChange) return (result_grid_table_widget->fontchange_event());
-    if (event->type() == QEvent::Show) return (result_grid_table_widget->show_event());
+    if (obj == result_grid_table_widget[i_r])
+    {
+      if (event->type() == QEvent::FontChange) return (result_grid_table_widget[i_r]->fontchange_event());
+      if (event->type() == QEvent::Show) return (result_grid_table_widget[i_r]->show_event());
+    }
+    if (obj == result_grid_table_widget[i_r]->grid_vertical_scroll_bar)
+    {
+      return (result_grid_table_widget[i_r]->vertical_scroll_bar_event());
+    }
   }
 
-  if (obj == result_grid_table_widget->grid_vertical_scroll_bar)
-  {
-    return (result_grid_table_widget->vertical_scroll_bar_event());
-  }
 
 #ifdef DEBUGGER
   for (int debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
@@ -896,6 +938,10 @@ void MainWindow::create_menu()
   menu_run_action_execute= menu_run->addAction(tr("Execute"));
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute()));
   menu_run_action_execute->setShortcut(QKeySequence(tr("Ctrl+E")));
+  menu_run_action_kill= menu_run->addAction(tr("Kill"));
+  connect(menu_run_action_kill, SIGNAL(triggered()), this, SLOT(action_kill()));
+  menu_run_action_kill->setShortcut(QKeySequence(tr("Ctrl+C")));
+  menu_run_action_kill->setEnabled(false);
 
   menu_settings= ui->menuBar->addMenu(tr("Settings"));
   menu_settings_action_statement= menu_settings->addAction(tr("Statement Widget: Colors and Fonts"));
@@ -973,6 +1019,10 @@ void MainWindow::create_menu()
   menu_debug_action_refresh_variables= menu_debug->addAction(tr("Refresh variables"));
   connect(menu_debug_action_refresh_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_variables()));
   menu_debug_action_refresh_variables->setShortcut(QKeySequence(tr("Alt+A")));
+
+  menu_debug_action_refresh_call_stack= menu_debug->addAction(tr("Refresh call_stack"));
+  connect(menu_debug_action_refresh_call_stack, SIGNAL(triggered()), this, SLOT(action_debug_refresh_call_stack()));
+  menu_debug_action_refresh_call_stack->setShortcut(QKeySequence(tr("Alt+B")));
 
   debug_menu_enable_or_disable(TOKEN_KEYWORD_BEGIN); /* Disable most of debug menu */
 
@@ -1148,7 +1198,7 @@ void MainWindow::action_connect_once(QString message)
 
   QFont tmp_font;
   QFont *saved_font;
-  tmp_font= result_grid_table_widget->font();
+  tmp_font= result_grid_table_widget[0]->font(); /* assumes each occurrence has same font */
   saved_font=&tmp_font;
 
   Row_form_box *co= new Row_form_box(saved_font, column_count, row_form_label,
@@ -1613,7 +1663,7 @@ void MainWindow::action_grid()
   if (result == QDialog::Rejected || result >= 0)
   {
     //make_style_strings();                                                      /* I think this should be commented out */
-    //result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+    //result_grid_table_widget[0]->set_all_style_sheets();
     /* For each changed Settings item, produce and execute a settings-change statement. */
     action_change_one_setting(ocelot_grid_color, new_ocelot_grid_color, "ocelot_grid_color");
     action_change_one_setting(ocelot_grid_border_color, new_ocelot_grid_border_color, "ocelot_grid_border_color");
@@ -1720,9 +1770,9 @@ void MainWindow::set_current_colors_and_font()
   ocelot_statement_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   if (font.weight() >= QFont::Bold) ocelot_statement_font_weight= "bold"; else ocelot_statement_font_weight= "normal";
 
-  ocelot_grid_color= result_grid_table_widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
-  ocelot_grid_background_color=result_grid_table_widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
-  font= result_grid_table_widget->font();
+  ocelot_grid_color= result_grid_table_widget[0]->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
+  ocelot_grid_background_color=result_grid_table_widget[0]->palette().color(QPalette::Window).name(); /* = QPalette::Background */
+  font= result_grid_table_widget[0]->font();
   ocelot_grid_font_family= font.family();
   if (font.italic()) ocelot_grid_font_style= "italic"; else ocelot_grid_font_style= "normal";
   ocelot_grid_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
@@ -2055,7 +2105,9 @@ void MainWindow::debug_menu_enable_or_disable(int statement_type)
   menu_debug_action_refresh_server_variables->setEnabled(e);
   menu_debug_action_refresh_user_variables->setEnabled(e);
   menu_debug_action_refresh_variables->setEnabled(e);
+  menu_debug_action_refresh_call_stack->setEnabled(e);
 }
+
 
 void MainWindow::create_widget_debug()
 {
@@ -3858,6 +3910,8 @@ void MainWindow::action_debug_exit()
     action_execute();
 }
 
+
+/* todo: somewhere there should be a pthread_join with the thread_id made in debug_debug_go() */
 /* flagger == 0 means this is a regular $exit; flagger == 1 means we're getting rid of stuff due to a severe severe error */
 void MainWindow::debug_exit_go(int flagger)
 {
@@ -3975,6 +4029,17 @@ void MainWindow::action_debug_refresh_variables()
 {
   if (debug_call_xxxmdbug_command("refresh variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.variables");
+  emit action_execute();
+}
+
+
+/*
+  Debug|Refresh call_stack
+*/
+void MainWindow::action_debug_refresh_call_stack()
+{
+  if (debug_call_xxxmdbug_command("refresh call_stack") != 0) return;
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.call_stack");
   emit action_execute();
 }
 
@@ -4285,6 +4350,108 @@ void MainWindow::action_debug_timer_status()
 }
 #endif
 
+#define KILL_STATE_CONNECT_THREAD_STARTED 0
+#define KILL_STATE_CONNECT_FAILED 1
+#define KILL_STATE_IS_CONNECTED 2
+#define KILL_STATE_MYSQL_REAL_QUERY_ERROR 3
+#define KILL_STATE_ENDED 4
+int volatile kill_state;
+int volatile kill_connection_id;
+
+#define LONG_QUERY_STATE_STARTED 0
+#define LONG_QUERY_STATE_ENDED 1
+char *dbms_query;
+int dbms_query_len;
+volatile int dbms_long_query_result;
+volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+
+/*
+  For menu item "Execute|Kill" we must start another thread,
+  which connects and issues a Kill query-id.
+  The kill thread has a subset of the actions of the debug thread so see also debug_thread.
+  Possible variant: keep it alive and use it for monitoring.
+*/
+void* kill_thread(void* unused)
+{
+  (void) unused; /* suppress "unused parameter" warning */
+  char call_statement[512];
+  int is_connected;
+
+  is_connected= 0;
+  kill_state= KILL_STATE_CONNECT_THREAD_STARTED;
+  for (;;)
+  {
+    if (options_and_connect(MYSQL_KILL_CONNECTION))
+    {
+      kill_state= KILL_STATE_CONNECT_FAILED;
+      break;
+    }
+    is_connected= 1;
+    kill_state= KILL_STATE_IS_CONNECTED;
+    sprintf(call_statement, "kill query %d", kill_connection_id);
+    if (mysql_real_query(&mysql[MYSQL_KILL_CONNECTION], call_statement, strlen(call_statement)))
+    {
+      kill_state= KILL_STATE_MYSQL_REAL_QUERY_ERROR;
+      break;
+    }
+    kill_state= KILL_STATE_ENDED;
+    break;
+  }
+  if (is_connected == 1) mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+  printf("call_statement=%s, kill_state=%d.\n", call_statement, kill_state);
+  return ((void*) NULL);
+}
+
+bool is_kill_requested;
+
+void MainWindow::action_kill()
+{
+  pthread_t thread_id;
+
+  if (is_mysql_connected != 1) return; /* impossible */
+  is_kill_requested= true;
+  if (dbms_long_query_state == LONG_QUERY_STATE_STARTED)
+  {
+    kill_connection_id= statement_edit_widget->dbms_connection_id;
+    pthread_create(&thread_id, NULL, &kill_thread, NULL);
+    /* no pthread_join here -- what would be the point of waiting? */
+  }
+}
+
+/*
+  Implementing ^C i.e. control-C i.e. menu item Run|Kill ...
+  Once an SQL statement or SQL statement series has been accepted, user input
+  is restricted to "kill" (a few other events are tolerated but not ones that cause statements),
+  so around the loop inside action_execute() there is some enabling and disabling.
+  SQL statements are done in a separate thread, dbms_long_query();
+  in the main thread there is a wait-loop which stops when the thread ends;
+  the wait-loop includes QApplication::ProcessEvents() so a "Kill" will be seen.
+  "Kill" causes the SQL statement to end (if there's one running).
+  ^C is an appropriate shortcut although it usually means "clip".
+  Kill sets a flag so that if there are multiple statements, they are all aborted.
+  dbms_long_query is only for potentially-slow SQL statements that might need to be killed.
+  Todo: this could be done via a permanently-existing thread or pool of threads.
+  Todo: QThread is more portable than pthread, although it looks harder to understand.
+  Todo: put this together with the dbms_* routines in ocelotgui.h in a separate class.
+*/
+void* dbms_long_query_thread(void* unused)
+{
+ (void) unused; /* suppress "unused parameter" warning */
+
+  dbms_long_query_result= mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
+  dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+  return ((void*) NULL);
+}
+
+void* dbms_long_next_result_thread(void* unused)
+{
+  (void) unused; /* suppress "unused parameter" warning */
+
+  dbms_long_query_result= mysql_next_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+  return ((void*) NULL);
+}
+
 
 /*
   For menu item "execute" we said (...SLOT(action_execute())));
@@ -4299,13 +4466,34 @@ void MainWindow::action_execute()
   main_token_number= 0;
   text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
 
+  /* While executing, we allow no more statements, but a few things are enabled. */
+  menu_file->setEnabled(false);
+  menu_edit->setEnabled(false);
+  menu_run_action_execute->setEnabled(false);
+  menu_run_action_kill->setEnabled(true);
+  menu_settings->setEnabled(false);
+  menu_debug->setEnabled(false);
+  menu_help->setEnabled(false);
+  statement_edit_widget->setReadOnly(true);
+  is_kill_requested= false;
   for (;;)
   {
     main_token_count_in_statement= get_next_statement_in_string();
     if (main_token_count_in_statement == 0) break;
     action_execute_one_statement(text);
+
     main_token_number+= main_token_count_in_statement;
+    if (is_kill_requested == true) break;
   }
+
+  menu_file->setEnabled(true);
+  menu_edit->setEnabled(true);
+  menu_run_action_execute->setEnabled(true);
+  menu_run_action_kill->setEnabled(false);
+  menu_settings->setEnabled(true);
+  menu_debug->setEnabled(true);
+  menu_help->setEnabled(true);
+  statement_edit_widget->setReadOnly(false);
 
   statement_edit_widget->clear(); /* ?? this is supposed to be a slot. does that matter? */
   widget_sizer();
@@ -4315,7 +4503,6 @@ void MainWindow::action_execute()
 
   history_edit_widget->show(); /* Todo: find out if this is really necessary */
 }
-
 
 /*
   Todo: There are a few things yet to be considered.
@@ -4328,7 +4515,6 @@ void MainWindow::action_execute()
 void MainWindow::action_execute_one_statement(QString text)
 {
   //QString text;
-  int query_len;
   MYSQL_RES *mysql_res_for_new_result_set;
 
   ++statement_edit_widget->statement_count;
@@ -4388,16 +4574,27 @@ void MainWindow::action_execute_one_statement(QString text)
     }
     else
     {
-      query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
-      char *query= new char[query_len + 1];
-      memcpy(query, query_utf16_copy.toUtf8().constData(), query_len);
-      query[query_len]= 0;
-      if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], query, query_len))
+      dbms_query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
+      dbms_query= new char[dbms_query_len + 1];
+      memcpy(dbms_query, query_utf16_copy.toUtf8().constData(),dbms_query_len);
+      dbms_query[dbms_query_len]= 0;
+      pthread_t thread_id;
+      dbms_long_query_state= LONG_QUERY_STATE_STARTED;
+      pthread_create(&thread_id, NULL, &dbms_long_query_thread, NULL);
+      for (;;)
       {
-        delete []query;
+        QThread48::msleep(10);
+        if (dbms_long_query_state == LONG_QUERY_STATE_ENDED) break;
+        QApplication::processEvents();
+      }
+      pthread_join(thread_id, NULL);
+
+      if (dbms_long_query_result)
+      {
+        delete []dbms_query;
       }
       else {
-        delete []query;
+        delete []dbms_query;
 
         /*
           It was a successful SQL statement, and now look if it returned a result.
@@ -4410,13 +4607,13 @@ void MainWindow::action_execute_one_statement(QString text)
           That takes up memory. If it were easy to check in advance whether a statement
           caused a result set (e.g. with mysql_next_result or by looking at whether the
           statement is SELECT SHOW etc.), that would be better.
-          Todo: nothing is happening for multiple result sets.
+          Todo: nothing is happening for multiple result sets, we throw away all but the first.
         */
         mysql_res_for_new_result_set= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
         if (mysql_res_for_new_result_set == 0) {
           /*
-            Last statement did not cause a result set. We could hide the grid an shrink the
-            central window with "result_grid_table_widget->hide()", but we don't.
+            Last statement did not cause a result set. We could hide the grid and shrink the
+            central window with "result_grid_table_widget[0]->hide()", but we don't.
           */
           ;
         }
@@ -4432,61 +4629,29 @@ void MainWindow::action_execute_one_statement(QString text)
 
           /*
             Todo: consider whether it would be appropriate to set grid width with
-            result_grid_table_widget->result_column_count= mysql_num_fields(mysql_res);
+            result_grid_table_widget[0]->result_column_count= mysql_num_fields(mysql_res);
             but it may be unnecessary, and may cause a crash in garbage_collect()
           */
 
           result_row_count= mysql_num_rows(mysql_res);                /* this will be the height of the grid */
 
-          /*
-            Destroy the old result_grid_table_widget, and make a new one.
-            The assumption is that all the old widget's children are destroyed,
-            and anything created by "new" from the old widget is garbage-collected.
-            To get the new widget into the old layout, we have to renew the layout.
-          */
-          main_layout->removeWidget(statement_edit_widget);
-          main_layout->removeWidget(result_grid_table_widget);
-          main_layout->removeWidget(history_edit_widget);
-#ifdef DEBUGGER
-          /* Todo: check: what about cancelling the earlier addTab of debug_widget[0] etc.? */
-          main_layout->removeWidget(debug_top_widget);
-#endif
-          delete main_layout;
-
-          result_grid_table_widget->garbage_collect();
+          for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
+          {
+            result_grid_table_widget[i_r]->garbage_collect();
+          }
           QFont tmp_font;
           QFont *saved_font;
-          tmp_font= result_grid_table_widget->font();
+          tmp_font= result_grid_table_widget[0]->font();
           saved_font= &tmp_font;
 
-          //delete result_grid_table_widget;
-          main_layout= new QVBoxLayout();
+          result_grid_table_widget[0]->fillup(mysql_res, saved_font, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]));
 
-          //result_grid_table_widget= new ResultGrid(mysql_res, saved_font, this);           /* This does a lot of work. */
-          //result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);   /* Todo: check: already done in constructor? */
-          result_grid_table_widget->fillup(mysql_res, saved_font, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]));
-          main_layout->addWidget(history_edit_widget);
-          main_layout->addWidget(result_grid_table_widget);
-          main_layout->addWidget(statement_edit_widget);
-#ifdef DEBUGGER
-          main_layout->addWidget(debug_top_widget);
-#endif
-          if (main_window->layout() != 0)
-          {
-            printf("Pseudo-assertion: main_window already has a layout\n");
-          }
-          main_window->setLayout(main_layout);
+          result_grid_tab_widget->setCurrentWidget(result_grid_table_widget[0]);
+          result_grid_tab_widget->tabBar()->hide();
+          result_grid_table_widget[0]->show();
+          result_grid_tab_widget->show(); /* Maybe this only has to happen once */
 
-          result_grid_table_widget->show();    /* Todo: consider: isn't this obsolete? Isn't this being shown too early? */
-
-          /*
-            The vertical scroll bar for result_grid_table_widget,
-            i.e. grid_vertical_scroll_bar, is created during the initial setup.
-            Todo: Consider: is it necessary to remove the event filter later?
-          */
-//          result_grid_table_widget->grid_vertical_scroll_bar->installEventFilter(this);
-
-
+          /* Todo: small bug: elapsed_time calculation happens before mysql_next_result(). */
           /* You must call mysql_next_result() + mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(); /* Do this while we still have number of rows */
           history_markup_append();
@@ -4497,22 +4662,53 @@ void MainWindow::action_execute_one_statement(QString text)
             /*
               We started with CLIENT_MULTI_RESULT flag (not CLIENT_MULTI_STATEMENT).
               We expect that a CALL to a stored procedure might return multiple result sets
-              plus a status result at the end. The following line just throws away everything
-              except the first result set, to avoid the dreaded out-of-sync error message.
+              plus a status result at the end. The following lines try to pick up and display
+              the extra result sets, up to a fixed maximum, and just throw away everything
+              after that, to avoid the dreaded out-of-sync error message.
               If it's an ordinary select, mysql_free_result(mysql_res) happens later, see above.
-              TODO: a tab widget for multiple result sets would be far far far better.
             */
-            while (mysql_next_result(&mysql[MYSQL_MAIN_CONNECTION]) == 0)
+            int result_grid_table_widget_index= 1;
+            for (;;)
             {
+
+              dbms_long_query_state= LONG_QUERY_STATE_STARTED;
+              pthread_create(&thread_id, NULL, &dbms_long_next_result_thread, NULL);
+
+              for (;;)
+              {
+                QThread48::msleep(10);
+                if (dbms_long_query_state == LONG_QUERY_STATE_ENDED) break;
+                QApplication::processEvents();
+              }
+              pthread_join(thread_id, NULL);
+
+              if (dbms_long_query_result != 0) break;
+
               mysql_res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+
+              /* I think the following will help us avoid the "status" return. */
+              if (mysql_res == NULL) continue;
+
+              if (result_grid_table_widget_index < RESULT_GRID_TAB_WIDGET_MAX)
+              {
+                result_grid_tab_widget->tabBar()->show(); /* is this in the wrong place? */
+                result_row_count= mysql_num_rows(mysql_res);                /* this will be the height of the grid */
+                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, saved_font, this, true);
+                result_grid_table_widget[result_grid_table_widget_index]->show();
+                ++result_grid_table_widget_index;
+              }
+
               if (mysql_res != 0) mysql_free_result(mysql_res);
+
             }
             mysql_res= 0;
+
           }
 
           return;
         }
       }
+
       put_diagnostics_in_result();
     }
   }
@@ -4520,6 +4716,7 @@ void MainWindow::action_execute_one_statement(QString text)
   /* statement is over */
 
   history_markup_append(); /* add prompt+statement+result to history, with markup */
+
 }
 
 
@@ -4990,95 +5187,79 @@ int MainWindow::execute_client_statement(QString text)
         statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
         return 2;
       }
+      bool is_result_grid_style_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_color", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_border_color", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_background_color", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_header_background_color", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_header_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_family", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_style", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_font_weight", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_border_color", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_cell_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_right_drag_line_color", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_cell_right_drag_line_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_border_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_border_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_cell_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
-        return 2;
+        is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_grid_cell_right_drag_line_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_grid_cell_right_drag_line_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        is_result_grid_style_changed= true;
+      }
+      if (is_result_grid_style_changed == true)
+      {
         make_style_strings();
-        result_grid_table_widget->set_all_style_sheets(ocelot_grid_style_string);
+        for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
+        {
+          result_grid_table_widget[i_r]->set_all_style_sheets();
+        }
         return 2;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_history_color", Qt::CaseInsensitive) == 0)
@@ -7178,6 +7359,7 @@ TextEditFrame::TextEditFrame(QWidget *parent, ResultGrid *result_grid_widget, un
   left_mouse_button_was_pressed= 0;
   ancestor_result_grid_widget= result_grid_widget;
   text_edit_frames_index= index;
+  is_style_sheet_set_flag= false;
   hide();
 }
 
@@ -7285,27 +7467,37 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
 void TextEditFrame::paintEvent(QPaintEvent *event)
 {
   if (event == 0) return; /* this is just to avoid an "unused parameter" warning */
-  if ((is_retrieved_flag == 0) && (ancestor_result_grid_widget->is_paintable == 1))
+  if (ancestor_result_grid_widget->is_paintable == 1)
   {
-    QTextEdit *text_edit= findChild<QTextEdit *>();
-    if (text_edit != 0)
+    /*
+      Sometimes spurious text_edit_frames show up as if ready to paint.
+      Todo: find out if there's a known Qt bug that might explain this.
+      It's possible that it no longer happens now that I'm saying "hide()" more often.
+    */
+    if (text_edit_frames_index > ancestor_result_grid_widget->max_text_edit_frames_count)
     {
-      /*
-        Sometimes spurious text_edit_frames show up as if ready to paint.
-        Todo: find out if there's a known Qt bug that might explain this.
-        It's possible that it no longer happens now that I'm saying "hide()" more often.
-      */
-      if (text_edit_frames_index > ancestor_result_grid_widget->max_text_edit_frames_count)
+      printf("Trying to paint a texteditframe that isn't in the layout\n");
+    }
+    else
+    {
+      QTextEdit *text_edit= findChild<QTextEdit *>();
+      if (text_edit != 0)
       {
-        printf("Trying to paint a texteditframe that isn't in the layout\n");
-      }
-      else
-      {
-        if (pointer_to_content == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
-        else text_edit->setText(QString::fromUtf8(pointer_to_content, length));
+        if (is_style_sheet_set_flag == false)
+        {
+          setStyleSheet(ancestor_result_grid_widget->frame_color_setting); /* for drag line color */
+          if (ancestor_grid_row_number == -1) text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_header_style_string);
+          else text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_style_string);
+          is_style_sheet_set_flag= true;
+        }
+        if (is_retrieved_flag == false)
+        {
+          if (pointer_to_content == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+          else text_edit->setText(QString::fromUtf8(pointer_to_content, length));
+          is_retrieved_flag= true;
+        }
       }
     }
-    is_retrieved_flag= 1;
   }
 }
 
@@ -7460,30 +7652,59 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_no_defaults= 0;
   ocelot_defaults_file= "";
   ocelot_defaults_extra_file= "";
+
   ocelot_host= "localhost";
-  ocelot_user= "";
   ocelot_database= "";
-  ocelot_port= MYSQL_PORT;
-  ocelot_comments= 0;
-  ocelot_init_command= "";
-  ocelot_default_auth= "";
-  ocelot_protocol= ""; ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
+  ocelot_user= "";
   ocelot_password_was_specified= 0;
+  ocelot_port= MYSQL_PORT;
   ocelot_unix_socket= "";
+  ocelot_unix_socket= "";
+  ocelot_default_auth= "";
+  ocelot_enable_cleartext_plugin= 0;
+  ocelot_init_command= "";
+  ocelot_opt_bind= "";
+  ocelot_opt_can_handle_expired_passwords= 0;
+  ocelot_opt_compress= 0;
+  ocelot_opt_connect_attr_delete= "";
+  ocelot_opt_connect_attr_reset= 0;
+  ocelot_opt_connect_timeout= 0;
+  ocelot_opt_local_infile= 0;
+  ocelot_opt_named_pipe= 0;
+  ocelot_opt_read_timeout= 0;
+  ocelot_opt_reconnect= 0;
+  ocelot_opt_ssl= "";
+  ocelot_opt_ssl_ca= "";
+  ocelot_opt_ssl_capath= "";
+  ocelot_opt_ssl_cert= "";
+  ocelot_opt_ssl_cipher= "";
+  ocelot_opt_ssl_crl= "";
+  ocelot_opt_ssl_crlpath= "";
+  ocelot_opt_ssl_key= "";
+  ocelot_opt_ssl_verify_server_cert= 0;
+  ocelot_opt_use_result= 0;
+  ocelot_opt_write_timeout= 0;
+  ocelot_plugin_dir= "";
+  ocelot_read_default_file= "";
+  ocelot_read_default_group= "";
+  ocelot_report_data_truncation= 0;
+  ocelot_secure_auth= 0;
+  ocelot_server_public_key= "";
+  ocelot_set_charset_dir= "";
+  ocelot_set_charset_name= ""; /* ocelot_default_character_set= "";  */
+  ocelot_shared_memory_base_name= "";
+
+  ocelot_protocol= ""; ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
+
+  ocelot_comments= 0;
   ocelot_delimiter_str= ";";
   ocelot_history_includes_warnings= 0;
-  ocelot_connect_timeout= 0;
-  ocelot_compress= 0;
-  ocelot_secure_auth= 0;
-  ocelot_local_infile= 0;
   ocelot_safe_updates= 0;
-  ocelot_plugin_dir= "";
   ocelot_select_limit= 0;
   ocelot_max_join_size= 0;
   ocelot_silent= 0;
   ocelot_no_beep= 0;
   ocelot_wait= 0;
-  ocelot_default_character_set= "";
 
   {
     struct passwd *pw;
@@ -7799,7 +8020,7 @@ QString MainWindow::connect_stripper(QString value_to_strip)
   For example, if token1="user", token2="=", token3="peter",
   then set ocelot_user = "peter".
   But that would be too simple, eh? So here are some complications:
-  * unambiguous prefixes of option naes are allowed until MySQL 5.7
+  * unambiguous prefixes of option names are allowed until MySQL 5.7
     (this is true for options but not true for values)
     http://dev.mysql.com/doc/refman/5.6/en/program-options.html
   * '-' and '_' are interchangeable
@@ -7822,10 +8043,10 @@ QString MainWindow::connect_stripper(QString value_to_strip)
   defaults-file ocelot_defaults_file
   delimiter ocelot_delimiter_str
   show-warnings ocelot_history_includes_warnings
-  connect_timeout ocelot_connect_timeout
-  compress ocelot_compress
+  connect_timeout ocelot_opt_connect_timeout
+  compress ocelot_opt_compress
   secure_auth ocelot_secure_auth
-  local_infile ocelot_local_infile
+  local_infile ocelot_opt_local_infile
   safe_updates or i_am_a_dummy ocelot_safe_updates
   plugin_dir ocelot_plugin_dir
   select_limit ocelot_select_limit
@@ -7853,35 +8074,14 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_host= token2;
     return;
   }
+  if (strcmp(token0_as_utf8, "database") == 0)
+  {
+    ocelot_database= token2;
+    return;
+  }
   if ((token0_length >= sizeof("us")) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
   {
     ocelot_user= token2;
-    return;
-  }
-  if ((token0_length >= sizeof("so")) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
-  {
-    ocelot_unix_socket= token2;
-    return;
-  }
-  if ((token0_length >= sizeof("po")) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
-  {
-    ocelot_port= token2.toInt();
-    return;
-  }
-  if ((token0_length >= sizeof("comm")) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
-  {
-    ocelot_comments= 1;
-    return;
-  }
-  if ((token0_length >= sizeof("default_a")) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
-  {
-    ocelot_default_auth= token2;
-    return;
-  }
-  if ((token0_length >= sizeof("prot")) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
-  {
-    ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
-    ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
     return;
   }
   if ((token0_length >= sizeof("pas")) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
@@ -7890,49 +8090,257 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_password_was_specified= 1;
     return;
   }
-  if ((token0_length >= sizeof("del")) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
+  if ((token0_length >= sizeof("po")) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
   {
-    ocelot_delimiter_str= token2;
+    ocelot_port= token2.toInt();
     return;
   }
-  if ((token0_length >= sizeof("sh")) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
+  if ((token0_length >= sizeof("so")) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
   {
-    ocelot_history_includes_warnings= 1;
+    ocelot_unix_socket= token2;
     return;
   }
-  if ((token0_length >= sizeof("con")) && (strncmp(token0_as_utf8, "connect_timeout", token0_length) == 0))
+  if ((token0_length >= sizeof("default_a")) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
   {
-    ocelot_connect_timeout= token2.toLong();
+    ocelot_default_auth= token2;
     return;
   }
+  if (strcmp(token0_as_utf8, "enable_cleartext_plugin") == 0)
+  {
+    ocelot_enable_cleartext_plugin= token2.toInt();
+    return;
+  }
+  if (strcmp(token0_as_utf8, "init_command") == 0)
+  {
+    ocelot_init_command= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "bind") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_bind= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "can_handle_expired_passwords") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_can_handle_expired_passwords= 1;
+    return;
+  }
+
   if ((token0_length >= sizeof("comp")) && (strncmp(token0_as_utf8, "compress", token0_length) == 0))
   {
-    ocelot_compress= 1;
+    ocelot_opt_compress= 1;
     return;
   }
-  if ((token0_length >= sizeof("sec")) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "connect_attr_delete") == 0) /* not available in mysql client */
   {
-    ocelot_secure_auth= 1;
+    ocelot_opt_connect_attr_delete= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "connect_attr_reset") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_connect_attr_reset= 1;
+    return;
+  }
+
+  if ((token0_length >= sizeof("con")) && (strncmp(token0_as_utf8, "connect_timeout", token0_length) == 0))
+  {
+    ocelot_opt_connect_timeout= token2.toLong();
     return;
   }
   if ((token0_length >= sizeof("lo")) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
   {
-    ocelot_local_infile= 1;
+    ocelot_opt_local_infile= 1;
     return;
   }
-  if ((token0_length >= sizeof("sa")) && (strncmp(token0_as_utf8, "safe_updates", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "pipe") == 0) /* Not sure about this. Windows. Same as protocol? */
   {
-    ocelot_safe_updates= 1;
+    ocelot_opt_named_pipe= 1;
     return;
   }
-  if ((token0_length >= sizeof("i_")) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
+
+  if ((token0_length >= sizeof("prot")) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
   {
-    ocelot_safe_updates= 1;
+    ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
+    ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
+    return;
+  }
+  if (strcmp(token0_as_utf8, "read_timeout") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_read_timeout= token2.toInt();
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "reconnect") == 0)
+  {
+    ocelot_opt_reconnect= 1;
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "ssl") == 0)
+  {
+    ocelot_opt_ssl= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
+  {
+    ocelot_opt_ssl_ca= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
+  {
+    ocelot_opt_ssl_capath= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
+  {
+    ocelot_opt_ssl_cert= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
+  {
+    ocelot_opt_ssl_cipher= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
+  {
+    ocelot_opt_ssl_crl= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
+  {
+    ocelot_opt_ssl_crlpath= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_key") == 0)
+  {
+    ocelot_opt_ssl_key= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_verify_server_cert") == 0)
+  {
+    ocelot_opt_ssl_verify_server_cert= token2.toInt();
+    return;
+  }
+  if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_use_result= token2.toInt();
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "ssl") == 0)
+  {
+    ocelot_opt_ssl= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
+  {
+    ocelot_opt_ssl_ca= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
+  {
+    ocelot_opt_ssl_capath= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
+  {
+    ocelot_opt_ssl_cert= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
+  {
+    ocelot_opt_ssl_cipher= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
+  {
+    ocelot_opt_ssl_crl= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
+  {
+    ocelot_opt_ssl_crlpath= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_key") == 0)
+  {
+    ocelot_opt_ssl_key= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "write_timeout") == 0)
+  {
+    ocelot_opt_write_timeout= token2.toInt();
     return;
   }
   if ((token0_length >= sizeof("pl")) && (strncmp(token0_as_utf8, "plugin_dir", token0_length) == 0))
   {
     ocelot_plugin_dir= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "read_default_file") == 0) /* not available in mysql client */
+  {
+    ocelot_read_default_file= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "read_default_group") == 0) /* not available in mysql client */
+  {
+    ocelot_read_default_group= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "report_data_truncation") == 0) /* not available in mysql client */
+  {
+    ocelot_report_data_truncation= 1;
+    return;
+  }
+
+  if ((token0_length >= sizeof("sec")) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
+  {
+    ocelot_secure_auth= 1;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "server_public_key") == 0) /* not available in mysql client */
+  {
+    ocelot_server_public_key= token2;
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "character_sets_dir") == 0)
+  {
+    ocelot_set_charset_dir= token2;
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "default_character_set") == 0)
+  {
+    ocelot_set_charset_name= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
+  {
+    ocelot_shared_memory_base_name= token2;
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "no_defaults") == 0)
+  {
+    ocelot_no_defaults= 1;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "defaults_extra_file") == 0)
+  {
+    ocelot_defaults_extra_file= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "defaults_file") == 0)
+  {
+    ocelot_defaults_file= token2;
+    return;
+  }
+
+
+  if ((token0_length >= sizeof("comm")) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
+  {
+    ocelot_comments= 1;
     return;
   }
   if ((token0_length >= sizeof("sel")) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
@@ -7965,36 +8373,27 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_wait= 1;
     return;
   }
-  if (strcmp(token0_as_utf8, "database") == 0)
+  if ((token0_length >= sizeof("sa")) && (strncmp(token0_as_utf8, "safe_updates", token0_length) == 0))
   {
-    ocelot_database= token2;
+    ocelot_safe_updates= 1;
     return;
   }
-  if (strcmp(token0_as_utf8, "init_command") == 0)
+  if ((token0_length >= sizeof("i_")) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
   {
-    ocelot_init_command= token2;
+    ocelot_safe_updates= 1;
     return;
   }
-  if (strcmp(token0_as_utf8, "no_defaults") == 0)
+  if ((token0_length >= sizeof("del")) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
   {
-    ocelot_no_defaults= 1;
+    ocelot_delimiter_str= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "defaults_extra_file") == 0)
+  if ((token0_length >= sizeof("sh")) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
   {
-    ocelot_defaults_extra_file= token2;
+    ocelot_history_includes_warnings= 1;
     return;
   }
-  if (strcmp(token0_as_utf8, "defaults_file") == 0)
-  {
-    ocelot_defaults_file= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "default_character_set") == 0)
-  {
-    ocelot_default_character_set= token2;
-    return;
-  }
+
 }
 
 
@@ -8025,10 +8424,10 @@ void MainWindow::connect_make_statement()
   if (ocelot_unix_socket > "") statement_text= statement_text + " socket=" + ocelot_unix_socket;
   if (ocelot_delimiter_str > "") statement_text= statement_text + " delimiter=" + ocelot_delimiter_str;
   if (ocelot_history_includes_warnings > 0) statement_text= statement_text + " show_warnings";
-  if (ocelot_connect_timeout > 0) statement_text= statement_text + " connect_timeout=" + QString::number(ocelot_connect_timeout);
-  if (ocelot_compress > 0) statement_text= statement_text + " compress";
+  if (ocelot_opt_connect_timeout > 0) statement_text= statement_text + " connect_timeout=" + QString::number(ocelot_opt_connect_timeout);
+  if (ocelot_opt_compress > 0) statement_text= statement_text + " compress";
   if (ocelot_secure_auth > 0) statement_text= statement_text + " secure_auth";
-  if (ocelot_local_infile > 0) statement_text= statement_text + " local_infile";
+  if (ocelot_opt_local_infile > 0) statement_text= statement_text + " local_infile";
   if (ocelot_safe_updates > 0) statement_text= statement_text + " safe_updates";
   if (ocelot_plugin_dir > "") statement_text= statement_text + " plugin_dir=" + ocelot_plugin_dir;
   if (ocelot_select_limit > 0) statement_text= statement_text + " select_limit=" + QString::number(ocelot_select_limit);
@@ -8036,7 +8435,16 @@ void MainWindow::connect_make_statement()
   if (ocelot_silent > 0) statement_text= statement_text + " silent";
   if (ocelot_no_beep > 0) statement_text= statement_text + "no_beep";
   if (ocelot_wait > 0) statement_text= statement_text + "wait";
-  if (ocelot_default_character_set > "") statement_text= statement_text + "default_character_set=" + ocelot_default_character_set;
+  if (ocelot_set_charset_name > "") statement_text= statement_text + "default_character_set=" + ocelot_set_charset_name;
+  if (ocelot_opt_ssl > "") statement_text= statement_text + "ssl=" + ocelot_opt_ssl;
+  if (ocelot_opt_ssl_ca > "") statement_text= statement_text + "ssl_ca=" + ocelot_opt_ssl_ca;
+  if (ocelot_opt_ssl_capath > "") statement_text= statement_text + "ssl_capath=" + ocelot_opt_ssl_capath;
+  if (ocelot_opt_ssl_cert > "") statement_text= statement_text + "ssl_cert=" + ocelot_opt_ssl_cert;
+  if (ocelot_opt_ssl_cipher > "") statement_text= statement_text + "ssl_cipher=" + ocelot_opt_ssl_cipher;
+  if (ocelot_opt_ssl_crl > "") statement_text= statement_text + "ssl_crl=" + ocelot_opt_ssl_crl;
+  if (ocelot_opt_ssl_crlpath > "") statement_text= statement_text + "ssl_crlpath=" + ocelot_opt_ssl_crlpath;
+  if (ocelot_opt_ssl_key > "") statement_text= statement_text + "ssl_key=" + ocelot_opt_ssl_key;
+  if (ocelot_opt_ssl_verify_server_cert > 0) statement_text= statement_text + "ssl_verify_server_cert=" + ocelot_opt_ssl_verify_server_cert;
   msgBox.setText(statement_text);
   msgBox.exec();
 }
@@ -8063,23 +8471,94 @@ int options_and_connect(
     mysql_close(&mysql[connection_number]);
   }
   mysql_init(&mysql[connection_number]);
-
+#ifdef MYSQL_DEFAULT_AUTH
+  if (ocelot_default_auth_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_DEFAULT_AUTH, ocelot_default_auth_as_utf8);
+#endif
+#ifdef MYSQL_ENABLE_CLEARTEXT_PLUGIN
+  if (ocelot_enable_cleartext_plugin != 0) mysql_options(&mysql[connection_number], MYSQL_ENABLE_CLEARTEXT_PLUGIN, ocelot_enable_cleartext_plugin);
+#endif
   if (ocelot_init_command_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, ocelot_init_command_as_utf8);
-
-  if (ocelot_default_character_set_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_NAME, ocelot_default_character_set_as_utf8);
-
-  if (ocelot_compress != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
-
-  if (ocelot_connect_timeout != 0)
+#ifdef MYSQL_OPT_BIND
+  if (ocelot_opt_bind_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_BIND, ocelot_opt_bind_as_utf8);
+#endif
+#ifdef MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS
+  if (ocelot_can_handle_expired_passwords != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS, ocelot_can_handle_expired_passwords);
+#endif
+  if (ocelot_opt_compress != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
+#ifdef MYSQL_OPT_CONNECT_ATTR_DELETE
+  if (ocelot_opt_connect_attr_delete_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_DELETE, ocelot_opt_connect_attr_delete_as_utf8);
+#endif
+#ifdef MYSQL_OPT_CONNECT_ATTR_RESET
+  if (ocelot_opt_connect_attr_reset != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_RESET, (char*) &ocelot_opt_connect_attr_reset);
+#endif
+  if (ocelot_opt_connect_timeout != 0)
   {
-    unsigned int timeout= ocelot_connect_timeout;
+    unsigned int timeout= ocelot_opt_connect_timeout;
     mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_TIMEOUT, (char*) &timeout);
   }
-
-  if (ocelot_secure_auth > 0) mysql_options(&mysql[connection_number], MYSQL_SECURE_AUTH, (char *) &ocelot_secure_auth);
-  if (ocelot_local_infile > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_LOCAL_INFILE, (char*) &ocelot_local_infile);
-
+  if (ocelot_opt_local_infile > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_LOCAL_INFILE, (char*) &ocelot_opt_local_infile);
+#ifdef MYSQL_OPT_NAMED_PIPE
+  if (ocelot_opt_named_pipe > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_NAMED_PIPE, (char*) &ocelot_opt_named_pipe);
+#endif
   if (ocelot_protocol_as_int > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_PROTOCOL, (char*)&ocelot_protocol_as_int);
+#ifdef MYSQL_OPT_READ_TIMEOUT
+  if (ocelot_opt_read_timeout > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_READ_TIMEOUT, (char*)&ocelot_opt_read_timeout);
+#endif
+#ifdef MYSQL_OPT_RECONNECT
+  if (ocelot_opt_reconnect > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_RECONNECT, (char*)&ocelot_opt_reconnect);
+#endif
+#ifdef MYSQL_OPT_SSL_CA
+  if (ocelot_opt_ssl_ca_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CA, ocelot_ocelot_opt_ssl_ca_as_utf8);
+#endif
+#ifdef MYSQL_OPT_SSL_CAPATH
+  if (ocelot_opt_ssl_capath_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CAPATH, ocelot_ocelot_opt_ssl_capath_as_utf8);
+#endif
+#ifdef MYSQL_OPT_SSL_CERT
+  if (ocelot_opt_ssl_cert_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CERT, ocelot_ocelot_opt_ssl_cert_as_utf8);
+#endif
+#ifdef MYSQL_OPT_SSL_CIPHER
+  if (ocelot_opt_ssl_cipher_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CIPHER, ocelot_ocelot_opt_ssl_cipher_as_utf8);
+#endif
+#ifdef MYSQL_OPT_SSL_CRL
+  if (ocelot_opt_ssl_crl_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRL, ocelot_ocelot_opt_ssl_crl_as_utf8);
+#endif
+#ifdef MYSQL_OPT_SSL_CRLPATH
+  if (ocelot_opt_ssl_crlpath_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRLPATH, ocelot_ocelot_opt_ssl_crlpath_as_utf8);
+#endif
+#ifdef MYSQL_OPT_SSL_KEY
+  if (ocelot_opt_ssl_key_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_key, ocelot_ocelot_opt_ssl_key_as_utf8);
+#endif
+#ifdef MYSQL_OPT_SSL_VERIFY_SERVER_CERT
+  if (ocelot_opt_ssl_verify_server_cert > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*) &ocelot_ocelot_opt_ssl_verify_server_cert);
+#endif
+#ifdef MYSQL_OPT_WRITE_TIMEOUT
+  if (ocelot_opt_write_timeout > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_WRITE_TIMEOUT, (char*)&ocelot_opt_write_timeout);
+#endif
+#ifdef MYSQL_PLUGIN_DIR
+  if (ocelot_plugin_dir_as_utf8[0] != '\0') mysql_options(&mysql[], MYSQL_PLUGIN_DIR, ocelot_plugin_dir_as_utf8);
+#endif
+#ifdef MYSQL_READ_DEFAULT_FILE
+  if (ocelot_read_default_file_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_FILE, ocelot_read_default_file_as_utf8);
+#endif
+#ifdef MYSQL_READ_DEFAULT_GROUP
+  if (ocelot_read_default_group_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_GROUP, ocelot_read_default_group_as_utf8);
+#endif
+#ifdef MYSQL_REPORT_DATA_TRUNCATION
+  if (ocelot_report_data_truncation > 0) mysql_options(&mysql[connection_number], MYSQL_REPORT_DATA_TRUNCATION, (char*) ocelot_report_data_truncation);
+#endif
+  if (ocelot_secure_auth > 0) mysql_options(&mysql[connection_number], MYSQL_SECURE_AUTH, (char *) &ocelot_secure_auth);
+#ifdef MYSQL_SERVER_PUBLIC_KEY
+  if (ocelot_server_public_key_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SERVER_PUBLIC_KEY, (char *) ocelot_server_public_key_as_utf8);
+#endif
+#ifdef MYSQL_SET_CHARSET_DIR
+  if (ocelot_set_charset_dir_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_DIR, ocelot_set_charset_dir_as_utf8);
+#endif
+#ifdef MYSQL_SET_CHARSET_NAME
+  if (ocelot_set_charset_name_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_NAME, ocelot_set_charset_name_as_utf8);
+#endif
+#ifdef MYSQL_SHARED_MEMORY_BASE_NAME
+  if (ocelot_shared_memory_base_name_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SHARED_MEMORY_BASE_NAME, ocelot_shared_memory_base_name_as_utf8);
+#endif
 
   if (ocelot_safe_updates != 0)
   {
@@ -8089,17 +8568,6 @@ int options_and_connect(
         ocelot_select_limit, ocelot_max_join_size);
     mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, init_command);
   }
-
-  /*
-    MYSQL_PLUGIN_DIR and MYSQL_DEFAULT_AUTH are options we should support.
-    But there can be problems building on some distros, because they're
-    relatively recent additions in mysql.h. Todo: support them real soon.
-  */
-  //  mysql_options(&mysql[], MYSQL_SET_CHARSET_NAME, default_charset);
-
-  //  if (*plugin_dir != '\0') mysql_options(&mysql[], MYSQL_PLUGIN_DIR, plugin_dir);
-
-  //  if (*default_auth != '\0') mysql_options(&mysql[], MYSQL_DEFAULT_AUTH, default_auth);
 
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
   if (mysql_real_connect(&mysql[connection_number], ocelot_host_as_utf8, ocelot_user_as_utf8, ocelot_password_as_utf8,
@@ -8128,38 +8596,58 @@ int options_and_connect(
   return 0;
 }
 
-
+/* Todo: check every one of the utf8 conversions for overflow, or do dynamic sizing. */
 void MainWindow::copy_connect_strings_to_utf8()
 {
   /* See comment "UTF8 Conversion" */
   int tmp_host_len= ocelot_host.toUtf8().size();
-  //  char *tmp_host= new char[tmp_host_len + 1];
-  //  memcpy(tmp_host, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
   memcpy(ocelot_host_as_utf8, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
   int tmp_database_len= ocelot_database.toUtf8().size();
-  //char *tmp_database= new char[tmp_database_len + 1];
   memcpy(ocelot_database_as_utf8, ocelot_database.toUtf8().constData(), tmp_database_len + 1);
   int tmp_user_len= ocelot_user.toUtf8().size();
-  //char *ocelot_user_as_utf8= new char[tmp_user_len + 1];
   memcpy(ocelot_user_as_utf8, ocelot_user.toUtf8().constData(), tmp_user_len + 1);
   int tmp_password_len= ocelot_password.toUtf8().size();
-  //char *tmp_password= new char[tmp_password_len + 1];
   memcpy(ocelot_password_as_utf8, ocelot_password.toUtf8().constData(), tmp_password_len + 1);
-  int tmp_init_command_len= ocelot_init_command.toUtf8().size();
-  //char *tmp_init_command= new char[tmp_init_command_len + 1];
-  memcpy(ocelot_init_command_as_utf8, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
-  int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
-  //char *tmp_plugin_dir= new char[tmp_plugin_dir_len + 1];
-  memcpy(ocelot_plugin_dir_as_utf8, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
   int tmp_default_auth_len= ocelot_default_auth.toUtf8().size();
-  //char *tmp_default_auth= new char[tmp_default_auth_len + 1];
   memcpy(ocelot_default_auth_as_utf8, ocelot_default_auth.toUtf8().constData(), tmp_default_auth_len + 1);
+  int tmp_init_command_len= ocelot_init_command.toUtf8().size();
+  memcpy(ocelot_init_command_as_utf8, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
+  int tmp_opt_bind_len= ocelot_opt_bind.toUtf8().size();
+  memcpy(ocelot_opt_bind_as_utf8, ocelot_opt_bind.toUtf8().constData(), tmp_opt_bind_len + 1);
+  int tmp_opt_connect_attr_delete_len= ocelot_opt_connect_attr_delete.toUtf8().size();
+  memcpy(ocelot_opt_connect_attr_delete_as_utf8, ocelot_opt_connect_attr_delete.toUtf8().constData(), tmp_opt_connect_attr_delete_len + 1);
+  int tmp_opt_ssl_len= ocelot_opt_ssl.toUtf8().size();
+  memcpy(ocelot_opt_ssl_as_utf8, ocelot_opt_ssl.toUtf8().constData(), tmp_opt_ssl_len + 1);
+  int tmp_opt_ssl_ca_len= ocelot_opt_ssl_ca.toUtf8().size();
+  memcpy(ocelot_opt_ssl_ca_as_utf8, ocelot_opt_ssl_ca.toUtf8().constData(), tmp_opt_ssl_ca_len + 1);
+  int tmp_opt_ssl_capath_len= ocelot_opt_ssl_capath.toUtf8().size();
+  memcpy(ocelot_opt_ssl_capath_as_utf8, ocelot_opt_ssl_capath.toUtf8().constData(), tmp_opt_ssl_capath_len + 1);
+  int tmp_opt_ssl_cert_len= ocelot_opt_ssl_cert.toUtf8().size();
+  memcpy(ocelot_opt_ssl_cert_as_utf8, ocelot_opt_ssl_cert.toUtf8().constData(), tmp_opt_ssl_cert_len + 1);
+  int tmp_opt_ssl_cipher_len= ocelot_opt_ssl_cipher.toUtf8().size();
+  memcpy(ocelot_opt_ssl_cipher_as_utf8, ocelot_opt_ssl_cipher.toUtf8().constData(), tmp_opt_ssl_cipher_len + 1);
+  int tmp_opt_ssl_crl_len= ocelot_opt_ssl_crl.toUtf8().size();
+  memcpy(ocelot_opt_ssl_crl_as_utf8, ocelot_opt_ssl_crl.toUtf8().constData(), tmp_opt_ssl_crl_len + 1);
+  int tmp_opt_ssl_crlpath_len= ocelot_opt_ssl_crlpath.toUtf8().size();
+  memcpy(ocelot_opt_ssl_crlpath_as_utf8, ocelot_opt_ssl_crlpath.toUtf8().constData(), tmp_opt_ssl_crlpath_len + 1);
+  int tmp_opt_ssl_key_len= ocelot_opt_ssl_key.toUtf8().size();
+  memcpy(ocelot_opt_ssl_key_as_utf8, ocelot_opt_ssl_key.toUtf8().constData(), tmp_opt_ssl_key_len + 1);
+  int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
+  memcpy(ocelot_plugin_dir_as_utf8, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
+  int tmp_read_default_file_len= ocelot_read_default_file.toUtf8().size();
+  memcpy(ocelot_read_default_file_as_utf8, ocelot_read_default_file.toUtf8().constData(), tmp_read_default_file_len + 1);
+  int tmp_read_default_group_len= ocelot_read_default_group.toUtf8().size();
+  memcpy(ocelot_read_default_group_as_utf8, ocelot_read_default_group.toUtf8().constData(), tmp_read_default_group_len + 1);
+  int tmp_server_public_key_len= ocelot_server_public_key.toUtf8().size();
+  memcpy(ocelot_server_public_key_as_utf8, ocelot_server_public_key.toUtf8().constData(), tmp_server_public_key_len + 1);
   int tmp_unix_socket_len= ocelot_unix_socket.toUtf8().size();
-  //char *tmp_unix_socket= new char[tmp_unix_socket_len + 1];
   memcpy(ocelot_unix_socket_as_utf8, ocelot_unix_socket.toUtf8().constData(), tmp_unix_socket_len + 1);
-  int tmp_default_character_set_len= ocelot_default_character_set.toUtf8().size();
-  //char *tmp_default_character_set= new char[tmp_default_character_set_len + 1];
-  memcpy(ocelot_default_character_set_as_utf8, ocelot_default_character_set.toUtf8().constData(), tmp_default_character_set_len + 1);
+  int tmp_set_charset_dir_len= ocelot_set_charset_dir.toUtf8().size();
+  memcpy(ocelot_set_charset_dir_as_utf8, ocelot_set_charset_dir.toUtf8().constData(), tmp_set_charset_dir_len + 1);
+  int tmp_set_charset_name_len= ocelot_set_charset_name.toUtf8().size();
+  memcpy(ocelot_set_charset_name_as_utf8, ocelot_set_charset_name.toUtf8().constData(), tmp_set_charset_name_len + 1);
+  int tmp_shared_memory_base_name_len= ocelot_shared_memory_base_name.toUtf8().size();
+  memcpy(ocelot_shared_memory_base_name_as_utf8, ocelot_shared_memory_base_name.toUtf8().constData(), tmp_shared_memory_base_name_len + 1);
 }
 
 
@@ -8170,16 +8658,7 @@ int MainWindow::the_connect(unsigned int connection_number)
   /* options_and_connect() cannot use QStrings because it is not in MainWindow */
   copy_connect_strings_to_utf8();
 
-  x= options_and_connect(
-                      connection_number);
+  x= options_and_connect(connection_number);
 
-//  delete []tmp_unix_socket;
-//  delete []tmp_default_auth;
-//  delete []tmp_plugin_dir;
-//  delete []tmp_init_command;
-//  delete []tmp_password;
-//  delete []tmp_user;
-//  delete []tmp_database;
-//  delete []tmp_host;
   return x;
 }
