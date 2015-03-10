@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.3.0 Alpha
-   Last modified: March 1 2015
+   Last modified: March 10 2015
 */
 
 /*
@@ -534,8 +534,24 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
     break;
   }
 
-  if (s != ocelot_delimiter_str) return false;
   if (statement_edit_widget->textCursor().position() <= main_token_offsets[i]) return false;
+  /* if create-routine && count-of-ENDs == count-of-BEGINS then END is the end else ; is not the end */
+  int returned_begin_count;
+  if (ocelot_delimiter_str != ";") returned_begin_count= 0;
+  else
+  {
+    get_next_statement_in_string(0, &returned_begin_count);
+    if ((returned_begin_count == 0) && (QString::compare(s, "end", Qt::CaseInsensitive) == 0))
+    {
+      emit action_execute();
+      return true;
+    }
+  }
+
+  if (s != ocelot_delimiter_str) return false;
+
+  if (returned_begin_count > 0) return false;
+
   /* All conditions have been met. Execute, and eat the return key. */
   emit action_execute();
   return true;
@@ -1873,8 +1889,9 @@ void MainWindow::make_style_strings()
   Beware: create procedure p () begin end// select 5//
   Beware: input might be a file dump, and statements might be long.
   Todo: think about delimiter. Maybe delimiters don't count if you're in a delimiter statement?
+  Todo: this doesn't allow for the possibility of "END comment WHILE|LOOP|REPEAT;"
 */
-int MainWindow::get_next_statement_in_string()
+int MainWindow::get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count)
 {
   int i;
   int begin_count;
@@ -1884,7 +1901,7 @@ int MainWindow::get_next_statement_in_string()
   text= statement_edit_widget->toPlainText(); /* Todo: decide whether I'm doing this too often */
   bool is_maybe_in_compound_statement= 0;
   begin_count= 0;
-  for (i= main_token_number; main_token_lengths[i] != 0; ++i)
+  for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
   {
     last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
     if (QString::compare(ocelot_delimiter_str, ";", Qt::CaseInsensitive) != 0)
@@ -1900,15 +1917,18 @@ int MainWindow::get_next_statement_in_string()
     }
     if ((main_token_types[i] == TOKEN_KEYWORD_PROCEDURE)
     ||  (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
-    ||  (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)) is_maybe_in_compound_statement= 1;
+    ||  (main_token_types[i] == TOKEN_KEYWORD_TRIGGER))
+    {
+      is_maybe_in_compound_statement= 1;
+    }
     if (is_maybe_in_compound_statement == 1)
     {
       if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
       ||  (main_token_types[i] == TOKEN_KEYWORD_ELSEIF)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_LOOP)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_WHILE))
+      ||  ((main_token_types[i] == TOKEN_KEYWORD_IF) && (main_token_types[i - 1] != TOKEN_KEYWORD_END))
+      ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP) && (main_token_types[i - 1] != TOKEN_KEYWORD_END))
+      ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && (main_token_types[i - 1] != TOKEN_KEYWORD_END))
+      ||  ((main_token_types[i] == TOKEN_KEYWORD_WHILE) && (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
       {
         ++begin_count;
       }
@@ -1918,7 +1938,8 @@ int MainWindow::get_next_statement_in_string()
       }
     }
   }
-  return i - main_token_number;
+  *returned_begin_count= begin_count;
+  return i - passed_main_token_number;
 }
 
 
@@ -4398,7 +4419,6 @@ void* kill_thread(void* unused)
     break;
   }
   if (is_connected == 1) mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
-  printf("call_statement=%s, kill_state=%d.\n", call_statement, kill_state);
   return ((void*) NULL);
 }
 
@@ -4462,6 +4482,7 @@ void* dbms_long_next_result_thread(void* unused)
 void MainWindow::action_execute()
 {
   QString text;
+  int returned_begin_count;
 
   main_token_number= 0;
   text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
@@ -4478,7 +4499,7 @@ void MainWindow::action_execute()
   is_kill_requested= false;
   for (;;)
   {
-    main_token_count_in_statement= get_next_statement_in_string();
+    main_token_count_in_statement= get_next_statement_in_string(main_token_number, &returned_begin_count);
     if (main_token_count_in_statement == 0) break;
     action_execute_one_statement(text);
 

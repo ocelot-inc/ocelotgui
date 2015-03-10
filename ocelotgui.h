@@ -312,7 +312,7 @@ private:
   void set_current_colors_and_font();
   void make_style_strings();
   void create_the_manual_widget();
-  int get_next_statement_in_string();
+  int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count);
   void action_execute_one_statement(QString text);
 
   void history_markup_make_strings();
