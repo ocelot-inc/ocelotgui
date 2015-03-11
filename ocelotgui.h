@@ -246,10 +246,9 @@ public slots:
   void action_debug_mousebuttonpress(QEvent *event, int which_debug_widget_index);
   void action_debug_continue();
 //  void action_debug_leave();
-  void debug_leave_go();
   void debug_skip_go();
   void debug_source_go();
-  void debug_set_go();
+  void debug_set_go(QString text);
   void debug_other_go(QString text);
   void action_debug_next();
 //  void action_debug_skip();
@@ -257,7 +256,7 @@ public slots:
   void action_debug_clear();
 //  void action_debug_delete();
   void debug_delete_go();
-  void debug_execute_go();
+  void debug_execute_go(QString text);
   void action_debug_exit();
   void debug_exit_go(int flagger);
   void debug_delete_tab_widgets();
@@ -2734,11 +2733,10 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
     connect(combo_box_for_size[2], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_2(int)));
+    /* I could not get result grid border size to work so it is hidden until someday it is figured out -- maybe never */
+    label_for_size[0]->hide();
+    combo_box_for_size[0]->hide();
   }
-
-  /* I could not get result grid border size to work so it is hidden until someday it is figured out -- maybe never */
-  label_for_size[0]->hide();
-  combo_box_for_size[0]->hide();
 
   /* The Cancel and OK buttons */
   widget_3= new QWidget(this);

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.3.0 Alpha
-   Last modified: March 10 2015
+   Last modified: March 11 2015
 */
 
 /*
@@ -3709,29 +3709,41 @@ void MainWindow::action_debug_step()
 //    action_execute();
 //}
 
-void MainWindow::debug_leave_go()
-{
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
-  put_diagnostics_in_result();
-}
 
-
+/* $SKIP seems to act like $CONT which isn't terribly useful */
 void MainWindow::debug_skip_go()
 {
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SKIP statement is not supported at this time'");
   put_diagnostics_in_result();
 }
 
 
 void MainWindow::debug_source_go()
 {
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SOURCE statement is not supported at this time'");
   put_diagnostics_in_result();
 }
 
-void MainWindow::debug_set_go()
+
+/*
+  $SET declared_variable_name = value;
+  Todo: As an additional error check: look up declared_variable_name in xxxmdbug.variables.
+*/
+void MainWindow::debug_set_go(QString text)
 {
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  char command_string[5120];
+  int index_of_number_1, index_of_number_2;
+
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_error((char*)"No debug session in progress") != 0) return;
+  }
+  if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
+  {
+    if (debug_error((char*)"Overflow") != 0) return;
+    return;
+  }
+  debug_call_xxxmdbug_command(command_string);
   put_diagnostics_in_result();
 }
 
@@ -3741,11 +3753,13 @@ void MainWindow::debug_set_go()
   todo: this will fail if first token is a comment
   todo: get rid of this, it fails
 */
-void MainWindow::debug_execute_go()
+void MainWindow::debug_execute_go(QString text)
 {
+  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $EXECUTE statement is not supported at this time'");
+  put_diagnostics_in_result();
+
 //  QString s;
 //  char command_string[5120];
-//
 //  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
 //  {
 //    if (debug_error((char*)"No debug session in progress") != 0) return;
@@ -3761,8 +3775,8 @@ void MainWindow::debug_execute_go()
 //  printf("command_string=%s.\n", command_string);
 //  debug_call_xxxmdbug_command(s.toUtf8());
 //  put_diagnostics_in_result();
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
-  put_diagnostics_in_result();
+////  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+////  put_diagnostics_in_result();
 }
 
 
@@ -5084,12 +5098,7 @@ int MainWindow::execute_client_statement(QString text)
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_EXECUTE)
   {
-    debug_execute_go();
-    return 1;
-  }
-  if (statement_type == TOKEN_KEYWORD_DEBUG_LEAVE)
-  {
-    debug_leave_go();
+    debug_execute_go(text);
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SKIP)
@@ -5099,7 +5108,7 @@ int MainWindow::execute_client_statement(QString text)
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SET)
   {
-    debug_set_go();
+    debug_set_go(text);
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SOURCE)
@@ -5110,6 +5119,7 @@ int MainWindow::execute_client_statement(QString text)
   if ((statement_type == TOKEN_KEYWORD_DEBUG_CONTINUE)
    || (statement_type == TOKEN_KEYWORD_DEBUG_EXECUTE)
    || (statement_type == TOKEN_KEYWORD_DEBUG_INFORMATION)
+   || (statement_type == TOKEN_KEYWORD_DEBUG_LEAVE)
    || (statement_type == TOKEN_KEYWORD_DEBUG_NEXT)
    || (statement_type == TOKEN_KEYWORD_DEBUG_REFRESH)
    || (statement_type == TOKEN_KEYWORD_DEBUG_STEP))
@@ -5124,6 +5134,7 @@ int MainWindow::execute_client_statement(QString text)
   {
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
+      /* Todo: figure out why sometimes we say connect_stripper() and sometimes we don't */
       /* Todo: make @ocelot_grid_detached a keyword so you can compare sub_token_types[i] instead. */
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@OCELOT_GRID_DETACHED", Qt::CaseInsensitive) == 0)
       {
@@ -5158,7 +5169,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "@ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_font_size= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        ocelot_statement_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
         return 2;
