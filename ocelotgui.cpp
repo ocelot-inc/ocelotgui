@@ -2024,6 +2024,22 @@ QString MainWindow::select_1_row(const char *select_statement)
   return s;
 }
 
+/* Variables used by kill thread, but which might be checked by debugger */
+#define KILL_STATE_CONNECT_THREAD_STARTED 0
+#define KILL_STATE_CONNECT_FAILED 1
+#define KILL_STATE_IS_CONNECTED 2
+#define KILL_STATE_MYSQL_REAL_QUERY_ERROR 3
+#define KILL_STATE_ENDED 4
+int volatile kill_state;
+int volatile kill_connection_id;
+
+#define LONG_QUERY_STATE_STARTED 0
+#define LONG_QUERY_STATE_ENDED 1
+char *dbms_query;
+int dbms_query_len;
+volatile int dbms_long_query_result;
+volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+
 
 #ifdef DEBUGGER
 
@@ -4187,6 +4203,16 @@ void MainWindow::action_debug_timer_status()
   char unexpected_error[512];
   int unexpected_new_error= 0;
 
+  /*
+    DANGER
+    When the main line is running SQL statements, it calls
+    QApplication::processEvents(), so there can be horrible
+    conflicts -- action_debug_timer_status() runs SQL too.
+    Either we must disable the Run|Kill feature, or disable
+    the timer. Here, we've chosen to disable the timer.
+  */
+  if (dbms_long_query_state == LONG_QUERY_STATE_STARTED) return;
+
   unexpected_error[0]= '\0';
   strcpy(call_statement, "call xxxmdbug.command('");
   strcat(call_statement, debuggee_channel_name);
@@ -4385,20 +4411,6 @@ void MainWindow::action_debug_timer_status()
 }
 #endif
 
-#define KILL_STATE_CONNECT_THREAD_STARTED 0
-#define KILL_STATE_CONNECT_FAILED 1
-#define KILL_STATE_IS_CONNECTED 2
-#define KILL_STATE_MYSQL_REAL_QUERY_ERROR 3
-#define KILL_STATE_ENDED 4
-int volatile kill_state;
-int volatile kill_connection_id;
-
-#define LONG_QUERY_STATE_STARTED 0
-#define LONG_QUERY_STATE_ENDED 1
-char *dbms_query;
-int dbms_query_len;
-volatile int dbms_long_query_result;
-volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
 /*
   For menu item "Execute|Kill" we must start another thread,
@@ -4623,6 +4635,10 @@ void MainWindow::action_execute_one_statement(QString text)
         QApplication::processEvents();
       }
       pthread_join(thread_id, NULL);
+
+ //     dbms_long_query_result= mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
+ //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+
 
       if (dbms_long_query_result)
       {
