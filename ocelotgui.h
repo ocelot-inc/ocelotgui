@@ -256,7 +256,7 @@ public slots:
   void action_debug_clear();
 //  void action_debug_delete();
   void debug_delete_go();
-  void debug_execute_go(QString text);
+  void debug_execute_go();
   void action_debug_exit();
   void debug_exit_go(int flagger);
   void debug_delete_tab_widgets();

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.3.0 Alpha
-   Last modified: March 11 2015
+   Last modified: March 16 2015
 */
 
 /*
@@ -201,19 +201,19 @@
 #define STRING_LENGTH_512 512
 
 /* Connect arguments and options */
-  char ocelot_host_as_utf8[512];                  /* argument */
-  char ocelot_database_as_utf8[512];              /* argument */
-  char ocelot_user_as_utf8[512];                  /* argument */
-  char ocelot_password_as_utf8[512];              /* argument */
+  char* ocelot_host_as_utf8= 0;                  /* argument */
+  char* ocelot_database_as_utf8= 0;              /* argument */
+  char* ocelot_user_as_utf8= 0;                  /* argument */
+  char* ocelot_password_as_utf8= 0;              /* argument */
   unsigned short ocelot_port;                     /* argument */
-  char ocelot_unix_socket_as_utf8[512];           /* argument */
-  char ocelot_default_auth_as_utf8[512];          /* for MYSQL_DEFAULT_AUTH */
+  char* ocelot_unix_socket_as_utf8= 0;           /* argument */
+  char* ocelot_default_auth_as_utf8= 0;          /* for MYSQL_DEFAULT_AUTH */
   unsigned short ocelot_enable_cleartext_plugin;  /* for MYSQL_ENABLE_CLEARTEXT_PLUGIN */
-  char ocelot_init_command_as_utf8[512];          /* for MYSQL_INIT_COMMAND */
-  char ocelot_opt_bind_as_utf8[STRING_LENGTH_512];/* for MYSQL_OPT_BIND */
+  char* ocelot_init_command_as_utf8= 0;          /* for MYSQL_INIT_COMMAND */
+  char* ocelot_opt_bind_as_utf8= 0;              /* for MYSQL_OPT_BIND */
   unsigned short ocelot_opt_can_handle_expired_passwords;/* for MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS */
   unsigned short ocelot_opt_compress;            /* for MYSQL_OPT_COMPRESS */
-  char ocelot_opt_connect_attr_delete_as_utf8[STRING_LENGTH_512];/* for MYSQL_OPT_CONNECT_ATTR_DELETE */
+  char* ocelot_opt_connect_attr_delete_as_utf8= 0;  /* for MYSQL_OPT_CONNECT_ATTR_DELETE */
   unsigned short int ocelot_opt_connect_attr_reset; /* for MYSQL_OPT_CONNECT_ATTR_RESET */
   unsigned long int ocelot_opt_connect_timeout;  /* for MYSQL_OPT_CONNECT_TIMEOUT */
   unsigned short ocelot_opt_local_infile;        /* for MYSQL_OPT_LOCAL_INFILE */
@@ -221,26 +221,26 @@
   unsigned int ocelot_protocol_as_int;       /* for MYSQL_OPT_PROTOCOL */
   unsigned int ocelot_opt_read_timeout;          /* for MYSQL_OPT_READ_TIMEOUT */
   unsigned int ocelot_opt_reconnect;             /* for MYSQL_OPT_RECONNECT */
-  char ocelot_opt_ssl_as_utf8[STRING_LENGTH_512];              /* for CONNECT. --ssl */
-  char ocelot_opt_ssl_ca_as_utf8[STRING_LENGTH_512];           /* for MYSQL_OPT_SSL_CA --ssl-ca */
-  char ocelot_opt_ssl_capath_as_utf8[STRING_LENGTH_512];       /* for MYSQL_OPT_SSL_CAPATH. --ssl-capath */
-  char ocelot_opt_ssl_cert_as_utf8[STRING_LENGTH_512];         /* for MYSQL_OPT_SSL_CERT. --ssl-cert */
-  char ocelot_opt_ssl_cipher_as_utf8[STRING_LENGTH_512];       /* for MYSQL_OPT_SSL_CIPHER. --ssl-cipher */
-  char ocelot_opt_ssl_crl_as_utf8[STRING_LENGTH_512];          /* for MYSQL_OPT_SSL_CRL. --ssl-crl */
-  char ocelot_opt_ssl_crlpath_as_utf8[STRING_LENGTH_512];      /* for MYSQL_OPT_SSL_CRLPATH. --ssl-crlpath */
-  char ocelot_opt_ssl_key_as_utf8[STRING_LENGTH_512];          /* for MYSQL_OPT_SSL_KEY. --ssl-key */
+  char* ocelot_opt_ssl_as_utf8= 0;              /* for CONNECT. --ssl */
+  char* ocelot_opt_ssl_ca_as_utf8= 0;           /* for MYSQL_OPT_SSL_CA --ssl-ca */
+  char* ocelot_opt_ssl_capath_as_utf8= 0;       /* for MYSQL_OPT_SSL_CAPATH. --ssl-capath */
+  char* ocelot_opt_ssl_cert_as_utf8= 0;         /* for MYSQL_OPT_SSL_CERT. --ssl-cert */
+  char* ocelot_opt_ssl_cipher_as_utf8= 0;       /* for MYSQL_OPT_SSL_CIPHER. --ssl-cipher */
+  char* ocelot_opt_ssl_crl_as_utf8= 0;          /* for MYSQL_OPT_SSL_CRL. --ssl-crl */
+  char* ocelot_opt_ssl_crlpath_as_utf8= 0;      /* for MYSQL_OPT_SSL_CRLPATH. --ssl-crlpath */
+  char* ocelot_opt_ssl_key_as_utf8= 0;          /* for MYSQL_OPT_SSL_KEY. --ssl-key */
   unsigned short int ocelot_opt_ssl_verify_server_cert;  /* for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert */
   unsigned short int ocelot_opt_use_result; /* for MYSQL_OPT_USE_RESULT */
   unsigned int ocelot_opt_write_timeout; /* for MYSQL_OPT_WRITE_TIMEOUT */
-  char ocelot_plugin_dir_as_utf8[512];       /* for MYSQL_PLUGIN_DIR */
-  char ocelot_read_default_file_as_utf8[512]; /* for MYSQL_READ_DEFAULT_FILE */
-  char ocelot_read_default_group_as_utf8[512];/* for MYSQL_READ_DEFAULT_GROUP */
+  char* ocelot_plugin_dir_as_utf8= 0;       /* for MYSQL_PLUGIN_DIR */
+  char* ocelot_read_default_file_as_utf8= 0; /* for MYSQL_READ_DEFAULT_FILE */
+  char* ocelot_read_default_group_as_utf8= 0;/* for MYSQL_READ_DEFAULT_GROUP */
   unsigned short int ocelot_report_data_truncation; /* for MYSQL_REPORT_DATA_TRUNCATION */
-  unsigned short ocelot_secure_auth;         /* for MYSQL_SECURE_AUTH */
-  char ocelot_server_public_key_as_utf8[512];/* for MYSQL_SERVER_PUBLIC_KEY */
-  char ocelot_set_charset_dir_as_utf8[512];  /* for MYSQL_SET_CHARSET_DIR */
-  char ocelot_set_charset_name_as_utf8[512]; /* for MYSQL_SET_CHARSET_NAME */
-  char ocelot_shared_memory_base_name_as_utf8[512]; /* for MYSQL_SHARED_MEMORY_BASE_NAME */
+  unsigned short ocelot_secure_auth;            /* for MYSQL_SECURE_AUTH */
+  char* ocelot_server_public_key_as_utf8= 0;       /* for MYSQL_SERVER_PUBLIC_KEY */
+  char* ocelot_set_charset_dir_as_utf8= 0;         /* for MYSQL_SET_CHARSET_DIR */
+  char* ocelot_set_charset_name_as_utf8= 0;        /* for MYSQL_SET_CHARSET_NAME */
+  char* ocelot_shared_memory_base_name_as_utf8= 0; /* for MYSQL_SHARED_MEMORY_BASE_NAME */
 
   unsigned short ocelot_safe_updates;        /* for CONNECT */
   unsigned long int ocelot_select_limit;     /* for CONNECT */
@@ -735,6 +735,7 @@ void MainWindow::history_markup_append()
 }
 
 /* When copying to history, change < and > and & and " to entities. */
+/* Change on 2015-03-16: change newline to <br>. */
 QString MainWindow::history_markup_copy_for_history(QString inputs)
 {
   QString outputs;
@@ -749,6 +750,7 @@ QString MainWindow::history_markup_copy_for_history(QString inputs)
     if (c == ">") c= "&gt;";
     if (c == "&") c= "&amp;";
     if (c == "\"") c= "&quot;";
+    if (c == "\n") c= "<br>";
     outputs.append(c);
   }
   return outputs;
@@ -3370,7 +3372,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
 
   /*
     We want a channel name that will differ from what others might choose.
-    Arbitrary decitision = debug_channel_name will be "ch#" || connection-number-of-main-connection.
+    Arbitrary decision = debug_channel_name will be "ch#" || connection-number-of-main-connection.
     It could be uniquified beyond that if necessary, e.g. add user name.
     Todo: this could be moved so it doesn't happen every time $debug happens. */
 
@@ -3769,7 +3771,7 @@ void MainWindow::debug_set_go(QString text)
   todo: this will fail if first token is a comment
   todo: get rid of this, it fails
 */
-void MainWindow::debug_execute_go(QString text)
+void MainWindow::debug_execute_go()
 {
   mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $EXECUTE statement is not supported at this time'");
   put_diagnostics_in_result();
@@ -5065,12 +5067,52 @@ int MainWindow::execute_client_statement(QString text)
   }
   if (statement_type == TOKEN_KEYWORD_STATUS)
   {
-    statement_edit_widget->result= tr("STATUS is not implemented.");
+    if (is_mysql_connected != 1) statement_edit_widget->result= tr("not connected.");
+    else
+    {
+      QString s;
+      statement_edit_widget->result= "";
+      s= "DBMS version = " + statement_edit_widget->dbms_version;
+      statement_edit_widget->result.append(s);
+      s= " Host = " + statement_edit_widget->dbms_host;
+      statement_edit_widget->result.append(s);
+      s= " Port = " + statement_edit_widget->dbms_port.toUtf8();
+      statement_edit_widget->result.append(s);
+    }
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_SYSTEM)
   {
-    statement_edit_widget->result= tr("SYSTEM is not implemented.");
+    /*
+      With mysql client "system ls" would do an ls with system. We use popen not system.
+      I don't know whether there is a Windows equivalent; mysql client doesn't support one.
+      So the easiest thing for a Windows port is:
+      statement_edit_widget->result= tr("SYSTEM is not implemented.");
+      Todo: allow "kill" -- some research required about how to stop a shell command.
+      Todo: reconsider: maybe output should go to result grid rather than history.
+    */
+    QString s;
+    unsigned statement_length= true_text_size /* text.size() */;
+    s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
+    char *command_string= new char[s.size() + 1];
+    memcpy(command_string, s.toUtf8().constData(), s.size() + 1);
+    statement_edit_widget->result= ""; /* unnecessary? */
+    FILE *fp;
+    int status;
+    char result_line[STRING_LENGTH_512]; /* arbitrary maximum expected line length */
+    fp= popen(command_string, "r");
+    if (fp == NULL) statement_edit_widget->result.append(tr("popen() failed"));
+    else
+    {
+      while (fgets(result_line, STRING_LENGTH_512, fp) != NULL)
+      {
+        statement_edit_widget->result.append(result_line);
+      }
+      status= pclose(fp);
+      if (status == -1) statement_edit_widget->result.append(tr("pclose() failed"));
+      /* We do not bother to check whether the command failed, display will be blank. */
+    }
+    delete [] command_string;
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_TEE)
@@ -5114,7 +5156,7 @@ int MainWindow::execute_client_statement(QString text)
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_EXECUTE)
   {
-    debug_execute_go(text);
+    debug_execute_go();
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SKIP)
@@ -7071,6 +7113,7 @@ QString CodeEditor::prompt_translate(int line_number_x)
         s_char= formatted_time;
       }
       if (s_char == "n")        /* \n is for newline. It goes in the stream but there's no apparent effect. */
+                                /* todo: try harder. use markup instead of \n? crlf? */
       {
         s_char= "\n";
       }
@@ -8644,57 +8687,128 @@ int options_and_connect(
   return 0;
 }
 
-/* Todo: check every one of the utf8 conversions for overflow, or do dynamic sizing. */
+/* Todo: check every one of the "new ..." results for failure. */
 void MainWindow::copy_connect_strings_to_utf8()
 {
   /* See comment "UTF8 Conversion" */
+  if (ocelot_host_as_utf8 != 0) { delete [] ocelot_host_as_utf8; ocelot_host_as_utf8= 0; }
   int tmp_host_len= ocelot_host.toUtf8().size();
+  ocelot_host_as_utf8= new char[tmp_host_len + 1];
   memcpy(ocelot_host_as_utf8, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
+
+  if (ocelot_database_as_utf8 != 0) { delete [] ocelot_database_as_utf8; ocelot_database_as_utf8= 0; }
   int tmp_database_len= ocelot_database.toUtf8().size();
+  ocelot_database_as_utf8= new char[tmp_database_len + 1];
   memcpy(ocelot_database_as_utf8, ocelot_database.toUtf8().constData(), tmp_database_len + 1);
+
+  if (ocelot_user_as_utf8 != 0) { delete [] ocelot_user_as_utf8; ocelot_user_as_utf8= 0; }
   int tmp_user_len= ocelot_user.toUtf8().size();
+  ocelot_user_as_utf8= new char[tmp_user_len + 1];
   memcpy(ocelot_user_as_utf8, ocelot_user.toUtf8().constData(), tmp_user_len + 1);
+
+  if (ocelot_password_as_utf8 != 0) { delete [] ocelot_password_as_utf8; ocelot_password_as_utf8= 0; }
   int tmp_password_len= ocelot_password.toUtf8().size();
+  ocelot_password_as_utf8= new char[tmp_password_len + 1];
   memcpy(ocelot_password_as_utf8, ocelot_password.toUtf8().constData(), tmp_password_len + 1);
+
+  if (ocelot_default_auth_as_utf8 != 0) { delete [] ocelot_default_auth_as_utf8; ocelot_default_auth_as_utf8= 0; }
   int tmp_default_auth_len= ocelot_default_auth.toUtf8().size();
+  ocelot_default_auth_as_utf8= new char[tmp_default_auth_len + 1];
   memcpy(ocelot_default_auth_as_utf8, ocelot_default_auth.toUtf8().constData(), tmp_default_auth_len + 1);
+
+  if (ocelot_init_command_as_utf8 != 0) { delete [] ocelot_init_command_as_utf8; ocelot_init_command_as_utf8= 0; }
   int tmp_init_command_len= ocelot_init_command.toUtf8().size();
+  ocelot_init_command_as_utf8= new char[tmp_init_command_len + 1];
   memcpy(ocelot_init_command_as_utf8, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
+
+  if (ocelot_opt_bind_as_utf8 != 0) { delete [] ocelot_opt_bind_as_utf8; ocelot_opt_bind_as_utf8= 0; }
   int tmp_opt_bind_len= ocelot_opt_bind.toUtf8().size();
+  ocelot_opt_bind_as_utf8= new char[tmp_opt_bind_len + 1];
   memcpy(ocelot_opt_bind_as_utf8, ocelot_opt_bind.toUtf8().constData(), tmp_opt_bind_len + 1);
+
+  if (ocelot_opt_connect_attr_delete_as_utf8 != 0) { delete [] ocelot_opt_connect_attr_delete_as_utf8; ocelot_opt_connect_attr_delete_as_utf8= 0; }
   int tmp_opt_connect_attr_delete_len= ocelot_opt_connect_attr_delete.toUtf8().size();
+  ocelot_opt_connect_attr_delete_as_utf8= new char[tmp_opt_connect_attr_delete_len + 1];
   memcpy(ocelot_opt_connect_attr_delete_as_utf8, ocelot_opt_connect_attr_delete.toUtf8().constData(), tmp_opt_connect_attr_delete_len + 1);
+
+  if (ocelot_opt_ssl_as_utf8 != 0) { delete [] ocelot_opt_ssl_as_utf8; ocelot_opt_ssl_as_utf8= 0; }
   int tmp_opt_ssl_len= ocelot_opt_ssl.toUtf8().size();
+  ocelot_opt_ssl_as_utf8= new char[tmp_opt_ssl_len + 1];
   memcpy(ocelot_opt_ssl_as_utf8, ocelot_opt_ssl.toUtf8().constData(), tmp_opt_ssl_len + 1);
+
+  if (ocelot_opt_ssl_ca_as_utf8 != 0) { delete [] ocelot_opt_ssl_ca_as_utf8; ocelot_opt_ssl_ca_as_utf8= 0; }
   int tmp_opt_ssl_ca_len= ocelot_opt_ssl_ca.toUtf8().size();
+  ocelot_opt_ssl_ca_as_utf8= new char[tmp_opt_ssl_ca_len + 1];
   memcpy(ocelot_opt_ssl_ca_as_utf8, ocelot_opt_ssl_ca.toUtf8().constData(), tmp_opt_ssl_ca_len + 1);
+
+  if (ocelot_opt_ssl_capath_as_utf8 != 0) { delete [] ocelot_opt_ssl_capath_as_utf8; ocelot_opt_ssl_capath_as_utf8= 0; }
   int tmp_opt_ssl_capath_len= ocelot_opt_ssl_capath.toUtf8().size();
+  ocelot_opt_ssl_capath_as_utf8= new char[tmp_opt_ssl_capath_len + 1];
   memcpy(ocelot_opt_ssl_capath_as_utf8, ocelot_opt_ssl_capath.toUtf8().constData(), tmp_opt_ssl_capath_len + 1);
+
+  if (ocelot_opt_ssl_cert_as_utf8 != 0) { delete [] ocelot_opt_ssl_cert_as_utf8; ocelot_opt_ssl_cert_as_utf8= 0; }
   int tmp_opt_ssl_cert_len= ocelot_opt_ssl_cert.toUtf8().size();
+  ocelot_opt_ssl_cert_as_utf8= new char[tmp_opt_ssl_cert_len + 1];
   memcpy(ocelot_opt_ssl_cert_as_utf8, ocelot_opt_ssl_cert.toUtf8().constData(), tmp_opt_ssl_cert_len + 1);
+
+  if (ocelot_opt_ssl_cipher_as_utf8 != 0) { delete [] ocelot_opt_ssl_cipher_as_utf8; ocelot_opt_ssl_cipher_as_utf8= 0; }
   int tmp_opt_ssl_cipher_len= ocelot_opt_ssl_cipher.toUtf8().size();
+  ocelot_opt_ssl_cipher_as_utf8= new char[tmp_opt_ssl_cipher_len + 1];
   memcpy(ocelot_opt_ssl_cipher_as_utf8, ocelot_opt_ssl_cipher.toUtf8().constData(), tmp_opt_ssl_cipher_len + 1);
+
+  if (ocelot_opt_ssl_crl_as_utf8 != 0) { delete [] ocelot_opt_ssl_crl_as_utf8; ocelot_opt_ssl_crl_as_utf8= 0; }
   int tmp_opt_ssl_crl_len= ocelot_opt_ssl_crl.toUtf8().size();
+  ocelot_opt_ssl_crl_as_utf8= new char[tmp_opt_ssl_crl_len + 1];
   memcpy(ocelot_opt_ssl_crl_as_utf8, ocelot_opt_ssl_crl.toUtf8().constData(), tmp_opt_ssl_crl_len + 1);
+
+  if (ocelot_opt_ssl_crlpath_as_utf8 != 0) { delete [] ocelot_opt_ssl_crlpath_as_utf8; ocelot_opt_ssl_crlpath_as_utf8= 0; }
   int tmp_opt_ssl_crlpath_len= ocelot_opt_ssl_crlpath.toUtf8().size();
+  ocelot_opt_ssl_crlpath_as_utf8= new char[tmp_opt_ssl_crlpath_len + 1];
   memcpy(ocelot_opt_ssl_crlpath_as_utf8, ocelot_opt_ssl_crlpath.toUtf8().constData(), tmp_opt_ssl_crlpath_len + 1);
+
+  if (ocelot_opt_ssl_key_as_utf8 != 0) { delete [] ocelot_opt_ssl_key_as_utf8; ocelot_opt_ssl_key_as_utf8= 0; }
   int tmp_opt_ssl_key_len= ocelot_opt_ssl_key.toUtf8().size();
+  ocelot_opt_ssl_key_as_utf8= new char[tmp_opt_ssl_key_len + 1];
   memcpy(ocelot_opt_ssl_key_as_utf8, ocelot_opt_ssl_key.toUtf8().constData(), tmp_opt_ssl_key_len + 1);
+
+  if (ocelot_plugin_dir_as_utf8 != 0) { delete [] ocelot_plugin_dir_as_utf8; ocelot_plugin_dir_as_utf8= 0; }
   int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
+  ocelot_plugin_dir_as_utf8= new char[tmp_plugin_dir_len + 1];
   memcpy(ocelot_plugin_dir_as_utf8, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
+
+  if (ocelot_read_default_file_as_utf8 != 0) { delete [] ocelot_read_default_file_as_utf8; ocelot_read_default_file_as_utf8= 0; }
   int tmp_read_default_file_len= ocelot_read_default_file.toUtf8().size();
+  ocelot_read_default_file_as_utf8= new char[tmp_read_default_file_len + 1];
   memcpy(ocelot_read_default_file_as_utf8, ocelot_read_default_file.toUtf8().constData(), tmp_read_default_file_len + 1);
+
+  if (ocelot_read_default_group_as_utf8 != 0) { delete [] ocelot_read_default_group_as_utf8; ocelot_read_default_group_as_utf8= 0; }
   int tmp_read_default_group_len= ocelot_read_default_group.toUtf8().size();
+  ocelot_read_default_group_as_utf8= new char[tmp_read_default_group_len + 1];
   memcpy(ocelot_read_default_group_as_utf8, ocelot_read_default_group.toUtf8().constData(), tmp_read_default_group_len + 1);
+
+  if (ocelot_server_public_key_as_utf8 != 0) { delete [] ocelot_server_public_key_as_utf8; ocelot_server_public_key_as_utf8= 0; }
   int tmp_server_public_key_len= ocelot_server_public_key.toUtf8().size();
+  ocelot_server_public_key_as_utf8= new char[tmp_server_public_key_len + 1];
   memcpy(ocelot_server_public_key_as_utf8, ocelot_server_public_key.toUtf8().constData(), tmp_server_public_key_len + 1);
+
+  if (ocelot_unix_socket_as_utf8 != 0) { delete [] ocelot_unix_socket_as_utf8; ocelot_unix_socket_as_utf8= 0; }
   int tmp_unix_socket_len= ocelot_unix_socket.toUtf8().size();
+  ocelot_unix_socket_as_utf8= new char[tmp_unix_socket_len + 1];
   memcpy(ocelot_unix_socket_as_utf8, ocelot_unix_socket.toUtf8().constData(), tmp_unix_socket_len + 1);
+
+  if (ocelot_set_charset_dir_as_utf8 != 0) { delete [] ocelot_set_charset_dir_as_utf8; ocelot_set_charset_dir_as_utf8= 0; }
   int tmp_set_charset_dir_len= ocelot_set_charset_dir.toUtf8().size();
+  ocelot_set_charset_dir_as_utf8= new char[tmp_set_charset_dir_len + 1];
   memcpy(ocelot_set_charset_dir_as_utf8, ocelot_set_charset_dir.toUtf8().constData(), tmp_set_charset_dir_len + 1);
+
+  if (ocelot_set_charset_name_as_utf8 != 0) { delete [] ocelot_set_charset_name_as_utf8; ocelot_set_charset_name_as_utf8= 0; }
   int tmp_set_charset_name_len= ocelot_set_charset_name.toUtf8().size();
+  ocelot_set_charset_name_as_utf8= new char[tmp_set_charset_name_len + 1];
   memcpy(ocelot_set_charset_name_as_utf8, ocelot_set_charset_name.toUtf8().constData(), tmp_set_charset_name_len + 1);
+
+  if (ocelot_shared_memory_base_name_as_utf8 != 0) { delete [] ocelot_shared_memory_base_name_as_utf8; ocelot_shared_memory_base_name_as_utf8= 0; }
   int tmp_shared_memory_base_name_len= ocelot_shared_memory_base_name.toUtf8().size();
+  ocelot_shared_memory_base_name_as_utf8= new char[tmp_shared_memory_base_name_len + 1];
   memcpy(ocelot_shared_memory_base_name_as_utf8, ocelot_shared_memory_base_name.toUtf8().constData(), tmp_shared_memory_base_name_len + 1);
 }
 
