@@ -74,6 +74,7 @@ class ResultGrid;
 class Settings;
 class TextEditFrame;
 class QThread48;
+class QTabWidget48;
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -200,7 +201,6 @@ public:
   int ocelot_grid_detached;
   unsigned int ocelot_grid_max_row_lines;          /* ?? should be unsigned long? */
   /* unsigned int ocelot_grid_max_desired_width_in_chars; */
-  int ocelot_history_includes_warnings;   /* affects history */
 
   QString history_markup_statement_start;    /* for markup */
   QString history_markup_statement_end;      /* for markup */
@@ -208,6 +208,9 @@ public:
   QString history_markup_prompt_end;         /* for markup */
   QString history_markup_result;             /* for markup */
   QString history_markup_entity;             /* for markup */
+
+  QString ocelot_history_tee_file_name;      /* for tee */
+  FILE *ocelot_history_tee_file;             /* for tee */
 
 public slots:
   void action_connect();
@@ -317,6 +320,9 @@ private:
   void history_markup_make_strings();
   void history_markup_append();
   QString history_markup_copy_for_history(QString);
+  int history_tee_start(QString);             /* for tee */
+  void history_tee_stop();                    /* for tee */
+  void history_tee_write(QString);            /* for tee */
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
 
@@ -720,7 +726,7 @@ private:
     QPushButton *the_manual_pushbutton;
 
   /* QTableWidget *grid_table_widget; */
-  QTabWidget *result_grid_tab_widget;
+  QTabWidget48 *result_grid_tab_widget;
 /* It's easy to increase this so more multi results are seen but then start time is longer. */
 #define RESULT_GRID_TAB_WIDGET_MAX 2
   ResultGrid *result_grid_table_widget[RESULT_GRID_TAB_WIDGET_MAX];
@@ -3408,5 +3414,18 @@ public:
   static void msleep(int ms)
   {
     QThread::msleep(ms);
+  }
+};
+
+/* QTabWidget:tabBar is protected in qt 4.8. so you have to say QTabWidget48::tabBar */
+class QTabWidget48 : public QTabWidget
+{
+public:
+  QTabWidget48(QWidget *w = 0) : QTabWidget(w){}
+
+public:
+  QTabBar *tabBar() const
+  {
+    return QTabWidget::tabBar();
   }
 };

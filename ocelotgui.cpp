@@ -249,6 +249,9 @@
   unsigned short int ocelot_no_beep;         /* for CONNECT */
   unsigned short int ocelot_wait;            /* for CONNECT */
 
+  bool ocelot_history_tee= false;            /* for tee */
+  int ocelot_history_includes_warnings= 0;   /* include warning(s) returned from statement? default = no. */
+
   int options_and_connect(unsigned int connection_number);
 
 /* Global mysql definitions */
@@ -308,7 +311,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 //  saved_font=&tmp_font;
 //  result_grid_table_widget= new ResultGrid(0, saved_font, this);
 
-  result_grid_tab_widget= new QTabWidget(this);
+  /* Todo: I used to say "(this)" i.e. have mainwindow parent. Maybe setParent later? */
+  result_grid_tab_widget= new QTabWidget48();
   result_grid_tab_widget->hide();
   for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
@@ -669,7 +673,6 @@ void MainWindow::create_widget_history()
   history_edit_widget= new QTextEdit();
   history_edit_widget->setReadOnly(false);       /* if history shouldn't be editable, set to "true" here */
   history_edit_widget->hide();                   /* hidden until a statement is executed */
-  ocelot_history_includes_warnings= 0;           /* include warning(s) returned from statement? default = no. */
   history_markup_make_strings();
   return;
 }
@@ -732,7 +735,11 @@ void MainWindow::history_markup_append()
   history_edit_widget->append(history_statement);
 
   history_markup_counter= 0;
+
+  history_tee_write(query_utf16); /* not related to markup, just a convenient place to call */
+  history_tee_write(statement_edit_widget->result);
 }
+
 
 /* When copying to history, change < and > and & and " to entities. */
 /* Change on 2015-03-16: change newline to <br>. */
@@ -755,6 +762,7 @@ QString MainWindow::history_markup_copy_for_history(QString inputs)
   }
   return outputs;
 }
+
 
 /* In response to edit menu "Previous statement" or "Next statement",
    make statement widget contents = a previous statement from history,
@@ -871,6 +879,60 @@ int MainWindow::history_markup_previous_or_next()
 
   statement_edit_widget->setPlainText(final_outputs);
   return 0;
+}
+
+
+/*
+  for tee
+  -------
+  * Code related to tee should have the comment somewhere = "for tee"
+  * bool ocelot_history_tee initially is false
+  * the options --tee=filename and --no-tee exist but aren't checked yet
+  * the client statements tee filename and notee will be seen
+  * there are no menu options (todo: this is a flaw)
+  * apparently the mysql client would flush, but we don't (todo: maybe change this)
+  * the mysql client would include results from queries, but we don't (todo: this is a flaw)
+  * there might be html in the output (todo: decide whether this is a flaw)
+*/
+void MainWindow::history_tee_write(QString text_line)  /* for tee */
+{
+  if (ocelot_history_tee)                              /* for tee */
+  {
+    QString s= text_line;
+    int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
+    char *query= new char[query_len + 1];
+    memcpy(query, s.toUtf8().constData(), query_len + 1);
+    query[query_len]= '\0';                            /* todo: think: is this necessary? */
+    fputs(query, ocelot_history_tee_file);
+    fputs("\n", ocelot_history_tee_file);
+    fflush(ocelot_history_tee_file);
+    delete []query;
+  }
+}
+
+
+int MainWindow::history_tee_start(QString file_name) /* for tee */
+{
+  int query_len= file_name.toUtf8().size();                  /* See comment "UTF8 Conversion" */
+  char *query= new char[query_len + 1];
+  memcpy(query, file_name.toUtf8().constData(), query_len + 1);
+  query[query_len]= '\0';                            /* todo: think: is this necessary? */
+  ocelot_history_tee_file= fopen(query, "a");        /* Open specified file, read only */
+  delete []query;
+  if (ocelot_history_tee_file != NULL)
+  {
+    ocelot_history_tee= true;
+    ocelot_history_tee_file_name= file_name;
+    return 1;
+  }
+  return 0;
+}
+
+
+void MainWindow::history_tee_stop()                 /* for tee */
+{
+  fclose(ocelot_history_tee_file);
+  ocelot_history_tee= false;
 }
 
 
@@ -1267,7 +1329,7 @@ void MainWindow::action_exit()
 #ifdef DEBUGGER
   /* Get rid of debuggee if it's still around. */
   /* Todo: this might not be enough. Maybe you should be intercepting the "close window" event. */
-  action_debug_exit();
+  if (menu_debug_action_exit->isEnabled() == true) action_debug_exit();
 #endif
   close();
 }
@@ -4874,6 +4936,7 @@ int MainWindow::execute_client_statement(QString text)
   ||  (statement_type == TOKEN_KEYWORD_EXIT))
   {
     action_exit();
+    return 1;
   }
 
   /*
@@ -4937,12 +5000,13 @@ int MainWindow::execute_client_statement(QString text)
     int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
     char *query= new char[query_len + 1];
     memcpy(query, s.toUtf8().constData(), query_len + 1);
-    query[query_len]= '\0';
+    query[query_len]= '\0';                            /* todo: think: is this necessary? */
     FILE *file= fopen(query, "r");                     /* Open specified file, read only */
     delete []query;
     if (file == NULL)
     {
-      statement_edit_widget->result= tr("Error, fopen failed");; return 1;
+      statement_edit_widget->result= tr("Error, fopen failed");
+      return 1;
     }
     char line[2048];
     while(fgets(line, sizeof line, file) != NULL)
@@ -5045,9 +5109,10 @@ int MainWindow::execute_client_statement(QString text)
     statement_edit_widget->result= tr("NOPAGER is not implemented.");
     return 1;
   }
-  if (statement_type == TOKEN_KEYWORD_NOTEE)
+  if (statement_type == TOKEN_KEYWORD_NOTEE) /* for tee */
   {
-    statement_edit_widget->result= tr("NOTEE is not implemented.");
+    history_tee_stop();
+    statement_edit_widget->result= tr("OK");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_PAGER)
@@ -5115,9 +5180,24 @@ int MainWindow::execute_client_statement(QString text)
     delete [] command_string;
     return 1;
   }
-  if (statement_type == TOKEN_KEYWORD_TEE)
+  if (statement_type == TOKEN_KEYWORD_TEE) /* for tee */
   {
-    statement_edit_widget->result= tr("TEE is not implemented.");
+    if (ocelot_history_tee == true)
+    {
+      statement_edit_widget->result= tr("TEE is already done.");
+      return 1;
+    }
+    /* Everything as far as statement end is tee file name. Compare how we do SOURCE file name. */
+    QString s;
+    unsigned statement_length= /* text.size() */ true_text_size;
+    if (i2 >= 2) s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
+    else
+    {
+      statement_edit_widget->result= tr("Error, TEE statement has no argument");
+      return 1;
+    }
+    if (history_tee_start(s) == 0) statement_edit_widget->result= tr("Error, fopen failed");
+    statement_edit_widget->result= tr("OK");
     return 1;
   }
 #ifdef DEBUGGER
@@ -8482,6 +8562,19 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if ((token0_length >= sizeof("sh")) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
   {
     ocelot_history_includes_warnings= 1;
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "tee") == 0)                 /* for tee */
+  {
+    history_tee_start(token2);
+    /* todo: check whether history_tee_start returned NULL which is an error */
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "no_tee") == 0)              /* for tee */
+  {
+    history_tee_stop();
     return;
   }
 
