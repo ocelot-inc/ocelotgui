@@ -230,6 +230,9 @@ public slots:
   void action_main();
   void history_markup_previous();
   void history_markup_next();
+  void action_option_vertical(bool checked);
+  void action_option_column_names(bool checked);
+  void action_option_no_beep(bool checked);
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -696,6 +699,10 @@ private:
     QAction *menu_settings_action_grid;
     QAction *menu_settings_action_history;
     QAction *menu_settings_action_main;
+  QMenu *menu_options;
+    QAction *menu_options_action_option_vertical;
+    QAction *menu_options_action_option_column_names;
+    QAction *menu_options_action_option_no_beep;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -1169,7 +1176,7 @@ public:
   QWidget *client;
 
   unsigned int result_column_count;
-  long unsigned int result_row_count;
+  long unsigned int result_row_count, grid_result_row_count;
   unsigned long *lengths;
   unsigned long *grid_column_widths;                         /* dynamic-sized list of widths */
   unsigned long *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
@@ -1191,6 +1198,8 @@ public:
 
   MYSQL_RES *grid_mysql_res;
   bool mysql_more_results_flag;
+  bool ocelot_result_grid_vertical_copy;
+  bool ocelot_result_grid_column_names_copy;
   char *mysql_res_copy;                                          /* gets a copy of mysql_res contents, if necessary */
   char **mysql_res_copy_rows;                                      /* dynamic-sized list of mysql_res_copy row offsets, if necessary */
   unsigned int ocelot_grid_max_grid_height_in_lines;             /* Todo: should be user-settable and passed */
@@ -1260,6 +1269,7 @@ ResultGrid(
 
   result_row_count= 0;
   result_column_count= 0;
+  grid_result_row_count= 0;
 
   /* With RESULT_GRID_WIDGET_MAX_HEIGHT=20 and 20 pixels per row this might be safe though it's sure arbitrary. */
   setMaximumHeight(RESULT_GRID_WIDGET_MAX_HEIGHT * 20);
@@ -1394,6 +1404,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
     }
   }
 
+
   if (old_cell_pool_size < new_cell_pool_size)
   {
     if (old_cell_pool_size != 0)
@@ -1441,13 +1452,23 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
-void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool mysql_more_results_parameter)
+void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool mysql_more_results_parameter,
+            bool ocelot_result_grid_vertical, bool ocelot_result_grid_column_names)
 {
   long unsigned int xrow;
   unsigned int col;
 
   /* mysql_more_results_flag affects whether we use mysql_res directly, or make a copy */
   mysql_more_results_flag= mysql_more_results_parameter;
+
+  /*
+    This is a kludge. We're not ready to handle mysql_more_results with vertical mode.
+    Todo: Remove this kludge and handle results correctly with vertical mode.
+  */
+  if (ocelot_result_grid_vertical) mysql_more_results_flag= false;
+
+  ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
+  ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
 
   /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
   hide();
@@ -1469,11 +1490,21 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   /* ocelot_grid_cell_right_drag_line_color= parent->ocelot_grid_cell_right_drag_line_color; */
   dbms_set_result_column_count();                                  /* this will be the width of the grid */
   result_row_count= mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
+  if (ocelot_result_grid_vertical == false) grid_result_row_count= result_row_count + 1;
+  else grid_result_row_count= result_row_count * result_column_count;
 
-  pools_resize(row_pool_size, RESULT_GRID_WIDGET_MAX_HEIGHT, cell_pool_size, RESULT_GRID_WIDGET_MAX_HEIGHT * result_column_count);
-
-  if (row_pool_size < RESULT_GRID_WIDGET_MAX_HEIGHT) row_pool_size= RESULT_GRID_WIDGET_MAX_HEIGHT;
-  if (cell_pool_size < RESULT_GRID_WIDGET_MAX_HEIGHT * result_column_count) cell_pool_size= RESULT_GRID_WIDGET_MAX_HEIGHT * result_column_count;
+  {
+    unsigned int minimum_number_of_cells;
+    if (ocelot_result_grid_vertical == false) minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT * result_column_count;
+    else
+    {
+      if (ocelot_result_grid_column_names == false) minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT;
+      else minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT * 2;
+    }
+    pools_resize(row_pool_size, RESULT_GRID_WIDGET_MAX_HEIGHT, cell_pool_size, minimum_number_of_cells);
+    if (row_pool_size < RESULT_GRID_WIDGET_MAX_HEIGHT) row_pool_size= RESULT_GRID_WIDGET_MAX_HEIGHT;
+    if (cell_pool_size < minimum_number_of_cells) cell_pool_size= minimum_number_of_cells;
+  }
 
   /*
     Dynamic-sized arrays for rows and columns.
@@ -1531,7 +1562,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   */
   QFontMetrics fm= QFontMetrics(*saved_font);
 
-  for (xrow= 0; (xrow < result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
+  for (xrow= 0; (xrow < grid_result_row_count) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
   {
     for (unsigned int column_number= 0; column_number < result_column_count; ++column_number)
     {
@@ -1583,6 +1614,35 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
     text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_row_number= -1;          /* means header row */
   }
 
+  if (ocelot_result_grid_vertical == true)
+  grid_column_size_calc(saved_font, ocelot_grid_cell_border_size_as_int,
+                        ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
+
+  if (ocelot_result_grid_vertical == true)
+  {
+    /* TODO: Make sure considerations for horizontal are all considered for vertical. */
+    /* We'll have to figure out the alignment etc. each time we get ready to display */
+    unsigned int grid_row_number, text_edit_frame_index;
+    for (grid_row_number= 0, text_edit_frame_index= 0;
+         grid_row_number < RESULT_GRID_WIDGET_MAX_HEIGHT;
+         ++grid_row_number)
+    {
+      if (grid_row_number >= (result_row_count * result_column_count)) break;
+      if (ocelot_result_grid_column_names == true)
+      {
+        text_edit_frames[text_edit_frame_index]->show();
+        grid_row_layouts[grid_row_number]->addWidget(text_edit_frames[text_edit_frame_index], 0, Qt::AlignTop | Qt::AlignLeft);
+        ++text_edit_frame_index;
+      }
+      text_edit_frames[text_edit_frame_index]->show();
+      grid_row_layouts[grid_row_number]->addWidget(text_edit_frames[text_edit_frame_index], 0, Qt::AlignTop | Qt::AlignLeft);
+      ++text_edit_frame_index;
+    }
+    /* How many text_edit_frame widgets are we actually using? This assumes number-of-columns-per-row is fixed. */
+    max_text_edit_frames_count= text_edit_frame_index;
+  }
+  else max_text_edit_frames_count= (grid_result_row_count) * result_column_count;
+
   /*
     grid detail rows
     While we're passing through, we also get max column lengths (in characters).
@@ -1591,7 +1651,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   fill_detail_widgets(0);                                             /* details */
 
   /* We'll use the automatic scroll bar for small result sets, we'll use our own scroll bar for large ones. */
-  if (result_row_count + 1 <= RESULT_GRID_WIDGET_MAX_HEIGHT)
+  if (grid_result_row_count <= RESULT_GRID_WIDGET_MAX_HEIGHT)
   {
     grid_scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     grid_vertical_scroll_bar->setVisible(false);
@@ -1604,9 +1664,9 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
 
   is_paintable= 1;
 
+  if (ocelot_result_grid_vertical == false)
   grid_column_size_calc(saved_font, ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
-
 
   /*
     grid_actual_grid_height_in_rows = # of rows that are actually showable at a time,
@@ -1615,11 +1675,11 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   //grid_actual_grid_height_in_rows= result_row_count;
   //if (grid_actual_grid_height_in_rows > result_row_count + 1) grid_actual_grid_height_in_rows= result_row_count + 1;
 
-//  unsigned int i;
-
-  /* Put the QTextEdit widgets in a layout. Remember grid row 0 is for the header. */
-  /*
-    Re making the row. Each row is [column_count] cells within one QHBoxLayout within one widget.
+  /* Put the QTextEdit widgets in a layout. Remember grid row 0 is for the header.
+    Horizontal (default):
+      Each row is [column_count] cells within one QHBoxLayout (grid_row_layout) within one widget.
+    Vertical (if --vertical or \G):
+      Each row is 2 cells within one QHBoxLayout (grid_row_layout) within one widget.
     grid_row_layout->setSizeConstraint(QLayout::SetMaximumSize) prevents gaps from forming during shrink.
     There's a "border", actually the visible part of TextEditFrame, on the cell's right.
     Drag it left to shrink the cell, drag it right to expand the cell.
@@ -1627,38 +1687,35 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
     possibly going beyond the original desired maximum width, possibly causing a horizontal scroll bar to appear.
     grid_row_layout->setSpacing(0) means the only thing separating cells is the "border".
   */
-  for (long unsigned int xrow= 0; (xrow < result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
+
+  if (ocelot_result_grid_vertical == false)
   {
-//    grid_main_layout->addWidget(grid_row_widgets[xrow]);
-    for (col= 0; col < result_column_count; ++col)
+    for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
     {
-      QTextEdit *l= text_edit_widgets[xrow * result_column_count + col];
-//    TextEditFrame *f= text_edit_frames[xrow * result_column_count + col];
-      /*
-        I'll right-align if type is number and this isn't the header.
-        But I read somewhere that might not be compatible with wrapping,
-        so I'll wrap only for non-number.
-        Do not assume it's left-aligned otherwise; there's a pool.
-      */
-      /* Todo: some other types e.g. BLOBs might also need special handling. */
-      if ((xrow > 0) && (dbms_get_field_flag(col) & NUM_FLAG))
+      for (col= 0; col < result_column_count; ++col)
       {
-        l->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
-        l->setAlignment(Qt::AlignRight);
-      }
-      else
-      {
-        l->document()->setDefaultTextOption(QTextOption(Qt::AlignLeft));
-        l->setAlignment(Qt::AlignLeft);
-        l->setWordWrapMode(QTextOption::WrapAnywhere);
-      }
-      /* l->setMaximumWidth(grid_column_widths[col]); */
-      /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
-      if (xrow == 0)
-      {
-//        f->setFixedSize(grid_column_widths[col], max_height_of_a_char + (border_size * 2) + 9);
-//        f->setMaximumHeight(max_height_of_a_char+(border_size * 2) + 10);
-//        f->setMinimumHeight(max_height_of_a_char+(border_size * 2) + 10);
+        QTextEdit *cell_text_edit_widget= text_edit_widgets[xrow * result_column_count + col];
+        /*
+          I'll right-align if type is number and this isn't the header.
+          But I read somewhere that might not be compatible with wrapping,
+          so I'll wrap only for non-number.
+          Do not assume it's left-aligned otherwise; there's a pool.
+        */
+        /* Todo: some other types e.g. BLOBs might also need special handling. */
+        if ((xrow > 0) && (dbms_get_field_flag(col) & NUM_FLAG))
+        {
+          cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
+          cell_text_edit_widget->setAlignment(Qt::AlignRight);
+        }
+        else
+        {
+          cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignLeft));
+          cell_text_edit_widget->setAlignment(Qt::AlignLeft);
+          cell_text_edit_widget->setWordWrapMode(QTextOption::WrapAnywhere);
+        }
+        /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
+        if (xrow == 0)
+        {
           int header_height= max_height_of_a_char
                            + ocelot_grid_cell_border_size_as_int * 2
                            + ocelot_grid_cell_right_drag_line_size_as_int;
@@ -1666,50 +1723,32 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
           text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
           text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
           text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
-      }
-      else
-      {
-        /* l->setMinimumHeight(max_height_of_a_char+(border_size*2) + 10); */
-        text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], grid_column_heights[col]);
-        text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(grid_column_heights[col]);
-        text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(grid_column_heights[col]);
-//          f->setFixedSize(grid_column_widths[col], grid_height_of_highest_column_in_pixels);
-//          f->setMaximumHeight(grid_height_of_highest_column_in_pixels);
-//          f->setMinimumHeight(grid_height_of_highest_column_in_pixels);
-      }
-//      text_edit_frames[xrow * result_column_count + col]->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);   /* This doesn't seem to do anything */
-
-      text_edit_frames[xrow * result_column_count + col]->show();
-      /* l->setMinimumWidth(1); */
-      /*
-        Todo: setStyleSheet() had to be removed because if it's here, setting of header palette won't work.
-        I think the solution is: use setStyleSheet always, although then setFont won't work.
-        And is there a way to find out what stylesheet settings are in use by QTableWidget?
-      */
-      /* l->setStyleSheet("border: 1px solid yellow"); */ /* just so I know the size of the border. Todo: user-settable? */
-      grid_row_layouts[xrow]->addWidget(text_edit_frames[xrow * result_column_count + col], 0, Qt::AlignTop | Qt::AlignLeft);
-
- //     l->updateGeometry();    /* removed 2015-03-04. doesn't seem to matter any more */
+        }
+        else
+        {
+          text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], grid_column_heights[col]);
+          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(grid_column_heights[col]);
+          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(grid_column_heights[col]);
+        }
+        text_edit_frames[xrow * result_column_count + col]->show();
+        grid_row_layouts[xrow]->addWidget(text_edit_frames[xrow * result_column_count + col], 0, Qt::AlignTop | Qt::AlignLeft);
       }
     }
-
-  /* How many text_edit_frame widgets are we actually using? This assumes number-of-columns-per-row is fixed. */
-  max_text_edit_frames_count= (result_row_count + 1) * result_column_count;
+  }
 
 //  grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
 
-  /* TEST: ONLY 1! */
-  for (long unsigned int xrow= 0; (xrow < result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
+  for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
   {
 //    grid_row_widgets[xrow]->setLayout(grid_row_layouts[xrow]);
     grid_main_layout->addWidget(grid_row_widgets[xrow], 0, Qt::AlignTop | Qt::AlignLeft);
   }
 
+
 //  client->setLayout(grid_main_layout);
 
   /* This doesn't work. Done too early? */
   /* client->setStyleSheet(copy_of_parent->ocelot_grid_style_string); */
-
   /*
     Before client->show(), client->height()=30 and height()=30.
     After client->show(), client->height()=something big e.g. 1098 and height()=30.
@@ -1966,12 +2005,13 @@ void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_a
       grid_height_of_highest_column_in_pixels= grid_column_heights[i];
     }
   }
+
 }
 
 
 /*
   If (!mysql_more_results_flag) all we want to know is: max actual length
-  If (mysql_more_results_flag) we want to max actual length but also want to make a copy of mysql_res.
+  If (mysql_more_results_flag) we want max actual length but also want to make a copy of mysql_res.
 */
 void scan_rows()
 {
@@ -2061,6 +2101,58 @@ void scan_rows()
   }
 }
 
+/*
+   Set alignment and height of a cell.
+   Todo: There's a terrible amount of duplication:
+   If vertical == false, this happens once before we do any displaying (but we don't call this).
+   If vertical == true, this happens at start and every time we scroll.
+*/
+void set_alignment_and_height(int ki, int col, int grid_col)
+{
+  QTextEdit *cell_text_edit_widget= text_edit_widgets[ki];
+  /*
+    I'll right-align if type is number and this isn't the header.
+    But I read somewhere that might not be compatible with wrapping,
+    so I'll wrap only for non-number.
+    Do not assume it's left-aligned otherwise; there's a pool.
+  */
+  /* Todo: some other types e.g. BLOBs might also need special handling. */
+  if ( (grid_col == 1) && (dbms_get_field_flag(col) & NUM_FLAG))
+  {
+    cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
+    cell_text_edit_widget->setAlignment(Qt::AlignRight);
+  }
+  else
+  {
+    cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignLeft));
+    cell_text_edit_widget->setAlignment(Qt::AlignLeft);
+    cell_text_edit_widget->setWordWrapMode(QTextOption::WrapAnywhere);
+  }
+  /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
+//  if (xrow == 0)
+//  {
+//    int header_height= max_height_of_a_char
+//                     + ocelot_grid_cell_border_size_as_int * 2
+//                     + ocelot_grid_cell_right_drag_line_size_as_int;
+//    if (ocelot_grid_cell_right_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
+//    text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
+//    text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
+//    text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
+//  }
+//  else
+  {
+    int this_width;
+    if (grid_col == 0)
+    {
+      /* Todo: this should be based on QFontMetrics, 20 is so arbitrary */
+      this_width= (20) * (text_edit_frames[ki]->length + 1);
+    }
+    else this_width= grid_column_widths[col];
+    text_edit_frames[ki]->setFixedSize(this_width, grid_column_heights[col]);
+    text_edit_frames[ki]->setMaximumHeight(grid_column_heights[col]);
+    text_edit_frames[ki]->setMinimumHeight(grid_column_heights[col]);
+  }
+}
 
 /*
   Put lengths and pointers in text_edit_frames.
@@ -2070,11 +2162,94 @@ void scan_rows()
 */
 /* The big problem is that setVerticalSpacing(0) goes awry if I use hide(). */
 
-void fill_detail_widgets(int first_row)
+void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
 {
   unsigned int i;
   unsigned int ki;
   unsigned int grid_row;
+  int first_row;
+
+  first_row= new_grid_vertical_scroll_bar_value;
+
+  if (ocelot_result_grid_vertical_copy == true)
+  {
+    int columns_per_row;
+    if (ocelot_result_grid_column_names_copy == true) columns_per_row= 2;
+    else columns_per_row= 1;
+    first_row= new_grid_vertical_scroll_bar_value / result_column_count;
+    i= new_grid_vertical_scroll_bar_value % result_column_count;
+    mysql_data_seek(grid_mysql_res, first_row);
+    r= first_row;
+    grid_row= 0;
+    row= mysql_fetch_row(grid_mysql_res);
+    if (row == NULL)
+    {
+      printf("mysql_fetch_row error A\n");
+      printf("r=%ld\n", r);
+      printf("first_row=%d\n", first_row);
+      printf("new_grid_vertical_scroll_bar_value=%d\n", new_grid_vertical_scroll_bar_value);
+      printf("grid_row=%d\n", grid_row);
+      printf("i=%d\n", i);
+      exit(0);
+    }
+    lengths= mysql_fetch_lengths(grid_mysql_res);
+    if (lengths == NULL)
+    {
+      printf("mysql_fetch_lengths error\n");
+      exit(0);
+    }
+    for (;;)
+    {
+      ki= grid_row * columns_per_row;
+      if (columns_per_row == 2)
+      {
+        text_edit_frames[ki]->length= fields[i].name_length;
+        text_edit_frames[ki]->pointer_to_content= fields[i].name;
+        text_edit_frames[ki]->is_retrieved_flag= false;
+        text_edit_frames[ki]->ancestor_grid_column_number= i;
+        text_edit_frames[ki]->ancestor_grid_row_number= r;
+        set_alignment_and_height(ki, i, 0);
+        text_edit_frames[ki]->show();
+        ++ki;
+      }
+      text_edit_frames[ki]->length= lengths[i];
+      text_edit_frames[ki]->pointer_to_content= row[i];
+      text_edit_frames[ki]->is_retrieved_flag= false;
+      text_edit_frames[ki]->ancestor_grid_column_number= i;
+      text_edit_frames[ki]->ancestor_grid_row_number= r;
+
+      set_alignment_and_height(ki, i, 1);
+      text_edit_frames[ki]->show();
+      ++i;
+      if (i == result_column_count)
+      {
+        ++r;
+        if (r >= result_row_count) break;
+        row= mysql_fetch_row(grid_mysql_res);
+        if (row == NULL)
+        {
+          printf("mysql_fetch_row error B\n");
+          printf("r=%ld\n", r);
+          printf("first_row=%d\n", first_row);
+          printf("new_grid_vertical_scroll_bar_value=%d\n", new_grid_vertical_scroll_bar_value);
+          printf("grid_row=%d\n", grid_row);
+          exit(0);
+        }
+        lengths= mysql_fetch_lengths(grid_mysql_res);
+        if (lengths == NULL)
+        {
+          printf("mysql_fetch_lengths error\n");
+          exit(0);
+        }
+        i= 0;
+      }
+      ++grid_row;
+      if (grid_row >= RESULT_GRID_WIDGET_MAX_HEIGHT) break;
+    }
+
+    for (ki= ki + 1; ki < max_text_edit_frames_count; ++ki) text_edit_frames[ki]->hide();
+    return;
+  }
 
   if (!mysql_more_results_flag)
   {
@@ -2191,7 +2366,8 @@ bool vertical_scroll_bar_event()
   }
 
   /* It's ridiculous to do these settings every time. But when is the best time to to them? Which event matters? */
-  grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+  if (ocelot_result_grid_vertical_copy == false) grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+  else grid_vertical_scroll_bar->setMaximum(grid_result_row_count - 1);
   grid_vertical_scroll_bar->setSingleStep(1);
   grid_vertical_scroll_bar->setPageStep(1);
   grid_vertical_scroll_bar->setMinimum(0);
@@ -2223,20 +2399,23 @@ bool vertical_scroll_bar_event()
 */
 void remove_layouts()
 {
-  long unsigned int xrow;
-  unsigned int col;
+  long unsigned int xrow; 
+  QLayoutItem *text_edit_frame_item;
+  QWidget *text_edit_frame_widget;
 
   client->hide(); /* client->show() will happen again soon */
-
   if (grid_main_layout != 0)
   {
-    for (xrow= 0; (xrow < result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
+    for (xrow= 0; (xrow < grid_result_row_count) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
     {
-      for (col= 0; col < result_column_count; ++col)
+      for (;;)
       {
-        int ki= xrow * result_column_count + col;
-        grid_row_layouts[xrow]->removeWidget(text_edit_frames[ki]);
-        text_edit_frames[ki]->hide();
+        text_edit_frame_item= grid_row_layouts[xrow]->itemAt(0);
+        if (text_edit_frame_item == NULL) break;
+        text_edit_frame_widget= text_edit_frame_item->widget();
+        if (text_edit_frame_widget == NULL) break;       /* I think this is impossible */
+        grid_row_layouts[xrow]->removeWidget(text_edit_frame_widget);
+        text_edit_frame_widget->hide(); /* i.e. text_edit_frames[..]->hide() */
       }
       grid_main_layout->removeWidget(grid_row_widgets[xrow]);
     }

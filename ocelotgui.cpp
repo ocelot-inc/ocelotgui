@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.3.0 Alpha
-   Last modified: March 16 2015
+   Last modified: March 25 2015
 */
 
 /*
@@ -246,11 +246,14 @@
   unsigned long int ocelot_select_limit;     /* for CONNECT */
   unsigned long int ocelot_max_join_size;    /* for CONNECT */
   unsigned short int ocelot_silent;          /* for CONNECT */
-  unsigned short int ocelot_no_beep;         /* for CONNECT */
   unsigned short int ocelot_wait;            /* for CONNECT */
 
+  bool ocelot_no_beep= false;                /* for CONNECT */
   bool ocelot_history_tee= false;            /* for tee */
   int ocelot_history_includes_warnings= 0;   /* include warning(s) returned from statement? default = no. */
+
+  bool ocelot_result_grid_vertical= false;   /* for vertical */
+  bool ocelot_result_grid_column_names= true;
 
   int options_and_connect(unsigned int connection_number);
 
@@ -1033,6 +1036,23 @@ void MainWindow::create_menu()
   connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
   connect(menu_settings_action_main, SIGNAL(triggered()), this, SLOT(action_main()));
 
+  menu_options= ui->menuBar->addMenu(tr("Options"));
+  menu_options_action_option_vertical= menu_options->addAction(tr("--vertical"));
+  menu_options_action_option_vertical->setCheckable(true);
+  menu_options_action_option_vertical->setChecked(ocelot_result_grid_vertical);
+  connect(menu_options_action_option_vertical, SIGNAL(triggered(bool)), this, SLOT(action_option_vertical(bool)));
+
+  menu_options_action_option_column_names= menu_options->addAction(tr("--column-names"));
+  menu_options_action_option_column_names->setCheckable(true);
+  menu_options_action_option_column_names->setChecked(ocelot_result_grid_column_names);
+  connect(menu_options_action_option_column_names, SIGNAL(triggered(bool)), this, SLOT(action_option_column_names(bool)));
+
+  menu_options_action_option_no_beep= menu_options->addAction(tr("--no-beep"));
+  menu_options_action_option_no_beep->setCheckable(true);
+  menu_options_action_option_no_beep->setChecked(ocelot_no_beep);
+  connect(menu_options_action_option_no_beep, SIGNAL(triggered(bool)), this, SLOT(action_option_no_beep(bool)));
+
+
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(tr("Debug"));
 
@@ -1333,6 +1353,25 @@ void MainWindow::action_exit()
 #endif
   close();
 }
+
+/* for vertical menu item = Options|--vertical */
+void MainWindow::action_option_vertical(bool checked)
+{
+  ocelot_result_grid_vertical= checked;
+}
+
+/* menu item = Options|--column-names */
+void MainWindow::action_option_column_names(bool checked)
+{
+  ocelot_result_grid_column_names= checked;
+}
+
+/* menu item = Options|--no-beep */
+void MainWindow::action_option_no_beep(bool checked)
+{
+  ocelot_no_beep= checked;
+}
+
 
 
 /* Todo: consider adding   //printf(qVersion()); */
@@ -4706,6 +4745,8 @@ void MainWindow::action_execute_one_statement(QString text)
 
       if (dbms_long_query_result)
       {
+        /* beep() hasn't been tested because getting sound to work on my computer is so hard */
+        if (ocelot_no_beep == false) QApplication::beep();
         delete []dbms_query;
       }
       else {
@@ -4759,7 +4800,8 @@ void MainWindow::action_execute_one_statement(QString text)
           tmp_font= result_grid_table_widget[0]->font();
           saved_font= &tmp_font;
 
-          result_grid_table_widget[0]->fillup(mysql_res, saved_font, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]));
+          result_grid_table_widget[0]->fillup(mysql_res, saved_font, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]),
+                                              ocelot_result_grid_vertical, ocelot_result_grid_column_names);
 
           result_grid_tab_widget->setCurrentWidget(result_grid_table_widget[0]);
           result_grid_tab_widget->tabBar()->hide();
@@ -4808,7 +4850,8 @@ void MainWindow::action_execute_one_statement(QString text)
               {
                 result_grid_tab_widget->tabBar()->show(); /* is this in the wrong place? */
                 result_row_count= mysql_num_rows(mysql_res);                /* this will be the height of the grid */
-                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, saved_font, this, true);
+                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, saved_font, this, true,
+                                                                                 ocelot_result_grid_vertical, ocelot_result_grid_column_names);
                 result_grid_table_widget[result_grid_table_widget_index]->show();
                 ++result_grid_table_widget_index;
               }
@@ -7579,33 +7622,14 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
   {
     if (event->x() > minimum_width)
     {
-      /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
-      ancestor_result_grid_widget->grid_column_widths[ancestor_grid_column_number]= event->x();
-      int xheight;
-      for (long unsigned int xrow= 0;
-           (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
-           ++xrow)
+      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy == true)
       {
-        TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_grid_column_number];
-        if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
-        if (xrow == 0) xheight= f->height();
-        f->setFixedSize(event->x(), xheight);
+        setFixedSize(event->x(), height());
       }
-    }
-  }
-  if (widget_side == BOTTOM)
-  {
-    if (event->y() > minimum_height)
-    {
-      /*
-        The following extra 'if' exists because Qt was displaying warnings like
-        "QWidget::setMinimumSize: (/TextEditFrame) Negative sizes (-4,45) are not possible"
-        when someone grabs the bottom and drags to the left
-      */
-      if (event->x() >= minimum_width)
+      else
       {
         /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
-        ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number]= event->y();
+        ancestor_result_grid_widget->grid_column_widths[ancestor_grid_column_number]= event->x();
         int xheight;
         for (long unsigned int xrow= 0;
              (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
@@ -7615,6 +7639,43 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
           if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
           if (xrow == 0) xheight= f->height();
           f->setFixedSize(event->x(), xheight);
+        }
+      }
+    }
+  }
+  if (widget_side == BOTTOM)
+  {
+    if (event->y() > minimum_height)
+    {
+      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy == true)
+      {
+        setFixedSize(width(), event->y());
+      }
+      else
+
+      /*
+        The following extra 'if' exists because Qt was displaying warnings like
+        "QWidget::setMinimumSize: (/TextEditFrame) Negative sizes (-4,45) are not possible"
+        when someone grabs the bottom and drags to the left.
+        todo: find out why it doesn't seem to happen for ocelot_result_grid_vertical, see above.
+      */
+      if (event->x() >= minimum_width)
+      {
+
+        {
+          /* todo: try to remember why you're looking at event->x() when change is to event->y()) */
+          /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
+          ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number]= event->y();
+          int xheight;
+          for (long unsigned int xrow= 0;
+               (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
+               ++xrow)
+          {
+            TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_grid_column_number];
+            if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
+            if (xrow == 0) xheight= f->height();
+            f->setFixedSize(event->x(), xheight);
+          }
         }
       }
     }
@@ -7645,9 +7706,11 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
       Todo: find out if there's a known Qt bug that might explain this.
       It's possible that it no longer happens now that I'm saying "hide()" more often.
     */
-    if (text_edit_frames_index > ancestor_result_grid_widget->max_text_edit_frames_count)
+    if (text_edit_frames_index >= ancestor_result_grid_widget->max_text_edit_frames_count)
     {
       printf("Trying to paint a texteditframe that isn't in the layout\n");
+      printf("  text_edit_frames_index=%d\n", text_edit_frames_index);
+      printf("  max_text_edit_frames_count=%d\n", ancestor_result_grid_widget->max_text_edit_frames_count);
     }
     else
     {
@@ -7874,7 +7937,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_select_limit= 0;
   ocelot_max_join_size= 0;
   ocelot_silent= 0;
-  ocelot_no_beep= 0;
+  /* ocelot_no_beep= 0; */ /* ocelot_no_beep is initialized to true */
   ocelot_wait= 0;
 
   {
@@ -7975,6 +8038,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
       if (token0 == "-C") token0= "compress";
       if (token0 == "-c") token0= "comments";
       if (token0 == "-D") token0= "database";
+      if (token0 == "-E") token0= "vertical";
       if (token0 == "-h") token0= "host";
       if (token0 == "-P") token0= "port";
       if (token0 == "-p") token0= "password";
@@ -8536,7 +8600,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if ((token0_length >= sizeof("no_b")) && (strncmp(token0_as_utf8, "no_beep", token0_length) == 0))
   {
-    ocelot_no_beep= 1;
+    ocelot_no_beep= true;
     return;
   }
   if ((token0_length >= sizeof("w")) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
@@ -8577,6 +8641,28 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     history_tee_stop();
     return;
   }
+
+  /* todo: check that this finds both --vertical and -E */
+  if (strcmp(token0_as_utf8, "vertical") == 0)              /* for vertical */
+  {
+    ocelot_result_grid_vertical= true;
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "column_names") == 0)
+  {
+    ocelot_result_grid_column_names= true;
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "skip_column_names") == 0)
+  {
+    ocelot_result_grid_column_names= false;
+    return;
+  }
+
+
+
 
 }
 
