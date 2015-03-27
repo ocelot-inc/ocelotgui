@@ -15,6 +15,7 @@
   In debuggee_wait_loop "PREPARE xxxmdbug_stmt FROM @xxxmdbug_what_to_call;" was replaced with "LEAVE x;".
 */
 
+/* todo: ensure this doesn't waste space by including things in ocelotgui.h that are unnecessary */
 #include "ocelotgui.h"
 //#include "ui_ocelotgui.h"
 

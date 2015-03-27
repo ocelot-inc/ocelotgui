@@ -52,6 +52,12 @@
 /* The include path for mysql.h is hard coded in ocelotgui.pro. */
 #include <mysql.h>
 
+/*
+  This might be appropriate place for all "blobal" variables that
+  are affected by option settings.
+  But, weirdly, ocelotgui.h is included in two places, so say 'static'
+*/
+  static bool ocelot_display_blob_as_image= false;
 
 namespace Ui
 {
@@ -73,6 +79,7 @@ class CodeEditor;
 class ResultGrid;
 class Settings;
 class TextEditFrame;
+class TextEditWidget;
 class QThread48;
 class QTabWidget48;
 QT_END_NAMESPACE
@@ -233,6 +240,7 @@ public slots:
   void action_option_vertical(bool checked);
   void action_option_column_names(bool checked);
   void action_option_no_beep(bool checked);
+  void action_option_display_blob_as_image(bool checked);
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -703,6 +711,7 @@ private:
     QAction *menu_options_action_option_vertical;
     QAction *menu_options_action_option_column_names;
     QAction *menu_options_action_option_no_beep;
+    QAction *menu_options_action_option_display_blob_as_image;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -788,6 +797,7 @@ public:
   char *pointer_to_content;
   bool is_retrieved_flag;
   bool is_style_sheet_set_flag;
+  bool is_image_flag;                    /* true if data type = blob and appropriate flag is on */
 
 protected:
   void mousePressEvent(QMouseEvent *event);
@@ -801,6 +811,25 @@ private:
   enum {LEFT= 1, RIGHT= 2, TOP= 3, BOTTOM= 4};
 
 };
+
+/*********************************************************************************************************/
+/* THE TEXTEDITWIDGET WIDGET */
+/* subclassed QTextEdit so paintEvent can be caught, for use in result_grid */
+class TextEditWidget : public QTextEdit
+{
+  Q_OBJECT
+
+public:
+  explicit TextEditWidget(QWidget *parent);
+  ~TextEditWidget();
+
+  TextEditFrame *text_edit_frame_of_cell;
+
+protected:
+  void paintEvent(QPaintEvent *event);
+
+};
+
 
 /*********************************************************************************************************/
 /* THE ROW_FORM_BOX WIDGET */
@@ -1192,7 +1221,7 @@ public:
   QScrollArea *grid_scroll_area;
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
-  QTextEdit **text_edit_widgets; /* Todo: consider using plaintext */ /* dynamic-sized list of pointers to QPlainTextEdit widgets */
+  TextEditWidget **text_edit_widgets; /* Todo: consider using plaintext */ /* dynamic-sized list of pointers to QPlainTextEdit widgets */
   QHBoxLayout **text_edit_layouts;
   TextEditFrame **text_edit_frames;
 
@@ -1270,6 +1299,7 @@ ResultGrid(
   result_row_count= 0;
   result_column_count= 0;
   grid_result_row_count= 0;
+  max_text_edit_frames_count= 0;
 
   /* With RESULT_GRID_WIDGET_MAX_HEIGHT=20 and 20 pixels per row this might be safe though it's sure arbitrary. */
   setMaximumHeight(RESULT_GRID_WIDGET_MAX_HEIGHT * 20);
@@ -1278,7 +1308,8 @@ ResultGrid(
 
   /* Create the cell pool. */
   /*
-    Make the cells. Each cell is one QTextEdit within one QHBoxLayout within one TextEditFrame.
+    Make the cells. Each cell is one QTextEdit (subclassed as TextEditWidget)
+    within one QHBoxLayout within one TextEditFrame.
     Each TexteditFrame i.e. text_edit_frames[n] will be added to the scroll area.
   */
   /* Todo: say "(this)" a lot so automatic garbage collect will work. */
@@ -1363,7 +1394,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 {
   QHBoxLayout **tmp_grid_row_layouts;
   QWidget **tmp_grid_row_widgets;
-  QTextEdit **tmp_text_edit_widgets;
+  TextEditWidget **tmp_text_edit_widgets;
   QHBoxLayout **tmp_text_edit_layouts;
   TextEditFrame **tmp_text_edit_frames;
   unsigned int i_rp, i_cp;
@@ -1409,10 +1440,10 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
   {
     if (old_cell_pool_size != 0)
     {
-      tmp_text_edit_widgets= new QTextEdit*[old_cell_pool_size];
+      tmp_text_edit_widgets= new TextEditWidget*[old_cell_pool_size];
       for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) tmp_text_edit_widgets[i_cp]= text_edit_widgets[i_cp];
       delete [] text_edit_widgets;
-      text_edit_widgets= new QTextEdit*[new_cell_pool_size];
+      text_edit_widgets= new TextEditWidget*[new_cell_pool_size];
       for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) text_edit_widgets[i_cp]= tmp_text_edit_widgets[i_cp];
       delete [] tmp_text_edit_widgets;
       tmp_text_edit_layouts= new QHBoxLayout*[old_cell_pool_size];
@@ -1430,7 +1461,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
     }
     else
     {
-      text_edit_widgets= new QTextEdit*[new_cell_pool_size];
+      text_edit_widgets= new TextEditWidget*[new_cell_pool_size];
       text_edit_layouts= new QHBoxLayout*[new_cell_pool_size];
       text_edit_frames= new TextEditFrame*[new_cell_pool_size];
     }
@@ -1440,12 +1471,13 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
   {
     for (i_cp= old_cell_pool_size; i_cp < new_cell_pool_size; ++i_cp)
     {
-      text_edit_widgets[i_cp]= new QTextEdit();
+      text_edit_widgets[i_cp]= new TextEditWidget(this);
       text_edit_widgets[i_cp]->setCursor(Qt::ArrowCursor); /* See Note#1 above */
       text_edit_layouts[i_cp]= new QHBoxLayout();
       text_edit_layouts[i_cp]->addWidget(text_edit_widgets[i_cp]);
       text_edit_frames[i_cp]= new TextEditFrame(this, this, i_cp);
       text_edit_frames[i_cp]->setLayout(text_edit_layouts[i_cp]);
+      text_edit_widgets[i_cp]->text_edit_frame_of_cell= text_edit_frames[i_cp];
     }
   }
 }
@@ -1612,6 +1644,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
     text_edit_frames[0 * result_column_count + i_h]->is_retrieved_flag= true;
     text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_column_number= i_h;
     text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_row_number= -1;          /* means header row */
+    text_edit_frames[0 * result_column_count + i_h]->is_image_flag= false;
   }
 
   if (ocelot_result_grid_vertical == true)
@@ -1694,7 +1727,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
     {
       for (col= 0; col < result_column_count; ++col)
       {
-        QTextEdit *cell_text_edit_widget= text_edit_widgets[xrow * result_column_count + col];
+        TextEditWidget *cell_text_edit_widget= text_edit_widgets[xrow * result_column_count + col];
         /*
           I'll right-align if type is number and this isn't the header.
           But I read somewhere that might not be compatible with wrapping,
@@ -1861,7 +1894,6 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   So let's give each column exactly what it needs, and perform a
   "squeeze" (reducing big columns) until the rows will fit, or until
   there's nothing more that can be squeezed.
-  Re null: nothing done yet. Todo: do something.
   Re <cr>: I'm not very worried because it merely causes elider
       This assumes that every header or cell in the table has the same font.
       I sometimes wish we could assume fixed-width font.
@@ -1940,6 +1972,7 @@ void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_a
     This is a strong attempt to reduce to the user-settable maximum, but if we have to override it, we do.
     Cannot squeeze to less than header length
     Todo: there should be a minimum for the sake of elide, and null, and border
+          (actually I think now we're taking null into account well enough)
     Todo: maybe there should be a user-settable minimum column width, not just the header-related minimum
   */
 
@@ -2012,6 +2045,7 @@ void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_a
 /*
   If (!mysql_more_results_flag) all we want to know is: max actual length
   If (mysql_more_results_flag) we want max actual length but also want to make a copy of mysql_res.
+  Todo: reconsider: maybe grid_max_column_widths should have come from max_length in MYSQL_FIELD.
 */
 void scan_rows()
 {
@@ -2109,7 +2143,7 @@ void scan_rows()
 */
 void set_alignment_and_height(int ki, int col, int grid_col)
 {
-  QTextEdit *cell_text_edit_widget= text_edit_widgets[ki];
+  TextEditWidget *cell_text_edit_widget= text_edit_widgets[ki];
   /*
     I'll right-align if type is number and this isn't the header.
     But I read somewhere that might not be compatible with wrapping,
@@ -2208,6 +2242,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
         text_edit_frames[ki]->is_retrieved_flag= false;
         text_edit_frames[ki]->ancestor_grid_column_number= i;
         text_edit_frames[ki]->ancestor_grid_row_number= r;
+        text_edit_frames[ki]->is_image_flag= false;
         set_alignment_and_height(ki, i, 0);
         text_edit_frames[ki]->show();
         ++ki;
@@ -2217,7 +2252,11 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       text_edit_frames[ki]->is_retrieved_flag= false;
       text_edit_frames[ki]->ancestor_grid_column_number= i;
       text_edit_frames[ki]->ancestor_grid_row_number= r;
-
+      if ((fields[i].type == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
+      {
+        text_edit_frames[ki]->is_image_flag= true;
+      }
+      else text_edit_frames[ki]->is_image_flag= false;
       set_alignment_and_height(ki, i, 1);
       text_edit_frames[ki]->show();
       ++i;
@@ -2265,6 +2304,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
         {
           text_edit_frames[ki]->length= sizeof(NULL_STRING) - 1;
           text_edit_frames[ki]->pointer_to_content= 0;
+          text_edit_frames[ki]->is_image_flag= false;
 //          if (sizeof(NULL_STRING) - 1 > grid_max_column_widths[i]) grid_max_column_widths[i]= sizeof(NULL_STRING) - 1;
         }
         else
@@ -2272,6 +2312,11 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
           text_edit_frames[ki]->length= lengths[i];
           text_edit_frames[ki]->pointer_to_content= row[i];
 //          if (lengths[i] > grid_max_column_widths[i]) grid_max_column_widths[i]= lengths[i];
+          if ((fields[i].type == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
+          {
+            text_edit_frames[ki]->is_image_flag= true;
+          }
+          else text_edit_frames[ki]->is_image_flag= false;
         }
         text_edit_frames[ki]->is_retrieved_flag= false;
         text_edit_frames[ki]->ancestor_grid_column_number= i;
@@ -2306,6 +2351,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       text_edit_frames[ki]->is_retrieved_flag= false;
       text_edit_frames[ki]->ancestor_grid_column_number= i;
       text_edit_frames[ki]->ancestor_grid_row_number= r;
+
       text_edit_frames[ki]->show();
     }
   }
@@ -2427,6 +2473,13 @@ void remove_layouts()
   We'll do our own garbage collecting for non-Qt items.
   Todo: make sure Qt items have parents where possible so that "delete result_grid_table_widget"
         takes care of them.
+  Why we clear() text_edit_widgets:
+    If the text is big blobs, and you start with default i.e. ocelot_display_blob_as_image = false,
+    then you switch to ocelot_display_blob_as_image = true,
+    it is much slower then if you start with ocelot_display_blob_as_image = true.
+    Clearing alleviates the problem.
+    It would be faster to use max_table_edit_widgets_count not cell_pool_size but that crashes.
+    Perhaps it would be better to clear only if current size > (some minimum)?
 */
 void garbage_collect()
 {
@@ -2438,6 +2491,7 @@ void garbage_collect()
   if (grid_column_dbms_field_numbers != 0) { delete [] grid_column_dbms_field_numbers; grid_column_dbms_field_numbers= 0; }
   if (mysql_res_copy != 0) { delete [] mysql_res_copy; mysql_res_copy= 0; }
   if (mysql_res_copy_rows != 0) { delete [] mysql_res_copy_rows; mysql_res_copy_rows= 0; }
+  for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear();
 }
 
 
@@ -3608,3 +3662,4 @@ public:
     return QTabWidget::tabBar();
   }
 };
+

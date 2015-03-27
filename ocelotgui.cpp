@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.3.0 Alpha
-   Last modified: March 25 2015
+   Last modified: March 27 2015
 */
 
 /*
@@ -193,6 +193,8 @@
 */
 
 
+
+
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
 
@@ -252,10 +254,12 @@
   bool ocelot_history_tee= false;            /* for tee */
   int ocelot_history_includes_warnings= 0;   /* include warning(s) returned from statement? default = no. */
 
+
   bool ocelot_result_grid_vertical= false;   /* for vertical */
   bool ocelot_result_grid_column_names= true;
 
   int options_and_connect(unsigned int connection_number);
+
 
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
@@ -1052,6 +1056,11 @@ void MainWindow::create_menu()
   menu_options_action_option_no_beep->setChecked(ocelot_no_beep);
   connect(menu_options_action_option_no_beep, SIGNAL(triggered(bool)), this, SLOT(action_option_no_beep(bool)));
 
+  menu_options_action_option_display_blob_as_image= menu_options->addAction(tr("display BLOB as image"));
+  menu_options_action_option_display_blob_as_image->setCheckable(true);
+  menu_options_action_option_display_blob_as_image->setChecked(ocelot_display_blob_as_image);
+  connect(menu_options_action_option_display_blob_as_image, SIGNAL(triggered(bool)), this, SLOT(action_option_display_blob_as_image(bool)));
+
 
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(tr("Debug"));
@@ -1372,6 +1381,11 @@ void MainWindow::action_option_no_beep(bool checked)
   ocelot_no_beep= checked;
 }
 
+/* menu item = Options|display BLOB as image */
+void MainWindow::action_option_display_blob_as_image(bool checked)
+{
+  ocelot_display_blob_as_image= checked;
+}
 
 
 /* Todo: consider adding   //printf(qVersion()); */
@@ -4724,6 +4738,7 @@ void MainWindow::action_execute_one_statement(QString text)
     }
     else
     {
+
       dbms_query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
       dbms_query= new char[dbms_query_len + 1];
       memcpy(dbms_query, query_utf16_copy.toUtf8().constData(),dbms_query_len);
@@ -4779,6 +4794,8 @@ void MainWindow::action_execute_one_statement(QString text)
           {
             mysql_free_result(mysql_res); /* This is the place we free if myql_more_results wasn't true, see below. */
           }
+
+
           mysql_res= mysql_res_for_new_result_set;
 
           /* We need to think better what to do if we exceed MAX_COLUMNS */
@@ -4799,10 +4816,8 @@ void MainWindow::action_execute_one_statement(QString text)
           QFont *saved_font;
           tmp_font= result_grid_table_widget[0]->font();
           saved_font= &tmp_font;
-
           result_grid_table_widget[0]->fillup(mysql_res, saved_font, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]),
                                               ocelot_result_grid_vertical, ocelot_result_grid_column_names);
-
           result_grid_tab_widget->setCurrentWidget(result_grid_table_widget[0]);
           result_grid_tab_widget->tabBar()->hide();
           result_grid_table_widget[0]->show();
@@ -4860,7 +4875,6 @@ void MainWindow::action_execute_one_statement(QString text)
 
             }
             mysql_res= 0;
-
           }
 
           return;
@@ -7714,7 +7728,7 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
     }
     else
     {
-      QTextEdit *text_edit= findChild<QTextEdit *>();
+      TextEditWidget *text_edit= findChild<TextEditWidget *>();
       if (text_edit != 0)
       {
         if (is_style_sheet_set_flag == false)
@@ -7726,8 +7740,11 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
         }
         if (is_retrieved_flag == false)
         {
-          if (pointer_to_content == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
-          else text_edit->setText(QString::fromUtf8(pointer_to_content, length));
+          if (is_image_flag == false)
+          {
+            if (pointer_to_content == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+            else text_edit->setText(QString::fromUtf8(pointer_to_content, length));
+          }
           is_retrieved_flag= true;
         }
       }
@@ -7735,6 +7752,56 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
   }
 }
 
+/*
+  TextEditWidget
+  This is one of the components of result_grid
+*/
+TextEditWidget::TextEditWidget(QWidget *parent) :
+    QTextEdit(parent)
+{
+}
+
+
+TextEditWidget::~TextEditWidget()
+{
+}
+
+/*
+ Finally we're ready to paint a cell inside a frame inside a grid row inside result widget.
+ The final decision is: paint as text (default) or paint as image (if blob and if flag).
+ If it's a non-blob or if ocelot_blob_flag (?? check this name) is off: default paint.
+ If it's a blob and ocelot_blob_flag is on:
+   make a pixmap from the contents
+   draw the pixmap
+   todo: we're allowing resizing (miraculously) but there's no option for scrolling
+   todo: consider: is there some better way to decide whether or not to display as image?
+*/
+
+void TextEditWidget::paintEvent(QPaintEvent *event)
+{
+  if (text_edit_frame_of_cell->is_image_flag == false)
+  {
+    QTextEdit::paintEvent(event);
+    return;
+  }
+  QPixmap p= QPixmap(QSize(event->rect().width(), event->rect().height()));
+  if (p.loadFromData((const uchar*) text_edit_frame_of_cell->pointer_to_content,
+                     text_edit_frame_of_cell->length,
+                     0,
+                     Qt::AutoColor) == false)
+  {
+    if (text_edit_frame_of_cell->pointer_to_content != 0)
+    {
+      setText(QString::fromUtf8(text_edit_frame_of_cell->pointer_to_content,
+                                text_edit_frame_of_cell->length));
+    }
+    QTextEdit::paintEvent(event);
+    return;
+  }
+  QPainter painter(this->viewport());
+  painter.drawPixmap(event->rect(), p);
+  return;
+}
 
 /*
   CONNECT
