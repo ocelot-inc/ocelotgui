@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.3.0 Alpha
-   Last modified: March 27 2015
+   Version: 0.4.0 Alpha
+   Last modified: April 2 2015
 */
 
 /*
@@ -257,6 +257,7 @@
 
   bool ocelot_result_grid_vertical= false;   /* for vertical */
   bool ocelot_result_grid_column_names= true;
+  bool ocelot_named_commands= false;
 
   int options_and_connect(unsigned int connection_number);
 
@@ -546,6 +547,25 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   }
 
   if (statement_edit_widget->textCursor().position() <= main_token_offsets[i]) return false;
+
+  /* "go" or "ego", alone on the line, if --named-commands, is statement end */
+  if ((ocelot_named_commands == true)
+  && ((main_token_types[i] == TOKEN_KEYWORD_GO) || (main_token_types[i] == TOKEN_KEYWORD_EGO)))
+  {
+    QString q;
+    for (int i_off= main_token_offsets[i] - 1;; --i_off)
+    {
+      if (i_off < 0) q= "\n";
+      else q= text.mid(i_off, 1);
+      if ((q == "\n") || (q == "\r"))
+      {
+        emit action_execute();
+        return true;
+      }
+      if (q != " ") break;
+    }
+  }
+
   /* if create-routine && count-of-ENDs == count-of-BEGINS then END is the end else ; is not the end */
   int returned_begin_count;
   if (ocelot_delimiter_str != ";") returned_begin_count= 0;
@@ -558,6 +578,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
       return true;
     }
   }
+
 
   if (s != ocelot_delimiter_str) return false;
 
@@ -1061,6 +1082,11 @@ void MainWindow::create_menu()
   menu_options_action_option_display_blob_as_image->setChecked(ocelot_display_blob_as_image);
   connect(menu_options_action_option_display_blob_as_image, SIGNAL(triggered(bool)), this, SLOT(action_option_display_blob_as_image(bool)));
 
+  menu_options_action_option_named_commands= menu_options->addAction(tr("--named-commands"));
+  menu_options_action_option_named_commands->setCheckable(true);
+  menu_options_action_option_named_commands->setChecked(ocelot_named_commands);
+  connect(menu_options_action_option_named_commands, SIGNAL(triggered(bool)), this, SLOT(action_option_named_commands(bool)));
+
 
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(tr("Debug"));
@@ -1387,6 +1413,13 @@ void MainWindow::action_option_display_blob_as_image(bool checked)
   ocelot_display_blob_as_image= checked;
 }
 
+/* menu item = Options|--named-columns */
+void MainWindow::action_option_named_commands(bool checked)
+{
+  ocelot_named_commands= checked;
+}
+
+
 
 /* Todo: consider adding   //printf(qVersion()); */
 void MainWindow::action_about()
@@ -1434,7 +1467,7 @@ void MainWindow::create_the_manual_widget()
   the_manual_text_edit->setText("\
 <BR><h1>The ocelotgui user manual</h1>  \
 <BR>  \
-<BR>Version 0.3.0, March 1 2015  \
+<BR>Version 0.4.0, April 2 2015  \
 <BR>  \
 <BR>  \
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -1747,13 +1780,12 @@ void MainWindow::action_undo()
    Luckily setStyleSheet will accept it, e.g. statement_edit_widget->setStyleSheet("background:rgb(200,100,150);");
    See also http://www.w3.org/TR/SVG/types.html#ColorKeywords "recognized color keyword names".
 */
-/* Note: the result of se->exec() will be QDialog::Rejected regardless which button was pushed, but that's OK. */
 
 void MainWindow::action_statement()
 {
   Settings *se= new Settings(STATEMENT_WIDGET, this);
   int result= se->exec();
-  if (result == QDialog::Rejected || result >= 0)
+  if (result == QDialog::Accepted)
   {
     //make_style_strings();
     //statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
@@ -1793,7 +1825,7 @@ void MainWindow::action_grid()
 {
   Settings *se= new Settings(GRID_WIDGET, this);
   int result= se->exec();
-  if (result == QDialog::Rejected || result >= 0)
+  if (result == QDialog::Accepted)
   {
     //make_style_strings();                                                      /* I think this should be commented out */
     //result_grid_table_widget[0]->set_all_style_sheets();
@@ -1819,7 +1851,7 @@ void MainWindow::action_history()
 {
   Settings *se= new Settings(HISTORY_WIDGET, this);
   int result= se->exec();
-  if (result == QDialog::Rejected || result >= 0)
+  if (result == QDialog::Accepted)
   {
     //make_style_strings();
     //history_edit_widget->setStyleSheet(ocelot_history_style_string);
@@ -1839,7 +1871,7 @@ void MainWindow::action_main()
 {
   Settings *se= new Settings(MAIN_WIDGET, this);
   int result= se->exec();
-  if (result == QDialog::Rejected || result >= 0)
+  if (result == QDialog::Accepted)
   {
     //make_style_strings();
     //main_window->setStyleSheet(ocelot_main_style_string);
@@ -4680,6 +4712,7 @@ void MainWindow::action_execute_one_statement(QString text)
 {
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set;
+  bool is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
 
   ++statement_edit_widget->statement_count;
 
@@ -4712,22 +4745,40 @@ void MainWindow::action_execute_one_statement(QString text)
 
   query_utf16= text.mid(main_token_offsets[main_token_number], query_utf16_len);
 
+  QString last_token;
+  bool strip_last_token= false;
   int length_of_last_token_in_statement= main_token_lengths[main_token_number+main_token_count_in_statement - 1];
+  int type_of_last_token_in_statement= main_token_types[main_token_number+main_token_count_in_statement - 1];
+  last_token= text.mid(main_token_offsets[main_token_number+main_token_count_in_statement - 1],
+                       length_of_last_token_in_statement);
+  if ((length_of_last_token_in_statement == 1) && ((type_of_last_token_in_statement == TOKEN_KEYWORD_EGO) || (type_of_last_token_in_statement == TOKEN_KEYWORD_GO)))
+  {
+    length_of_last_token_in_statement= 2;
+    strip_last_token= true;
+    if (type_of_last_token_in_statement == TOKEN_KEYWORD_EGO) is_vertical= true;
+  }
 
-  QString last_token= text.mid(main_token_offsets[main_token_number+main_token_count_in_statement - 1],
-                                 length_of_last_token_in_statement);
-
-
-  if (last_token == ocelot_delimiter_str)
+  /* Strip last word if it's delimiter or (when --named-commands, not only token) go|ego. */
+  if (last_token == ocelot_delimiter_str) strip_last_token= true;
+  else if ((ocelot_named_commands == true) && (main_token_count_in_statement > 1))
+  {
+    if (type_of_last_token_in_statement == TOKEN_KEYWORD_GO) strip_last_token= true;
+    if (type_of_last_token_in_statement == TOKEN_KEYWORD_EGO)
+    {
+      strip_last_token= true;
+      is_vertical= true;
+    }
+  }
+  if (strip_last_token == true)
   {
     query_utf16_copy= text.mid(main_token_offsets[main_token_number], query_utf16_len-length_of_last_token_in_statement);
   }
   else query_utf16_copy= query_utf16;
+
   statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch(); /* will be used for elapsed-time display */
   int ecs= execute_client_statement(text);
   if (ecs != 1)
   {
-
     /* The statement was not handled entirely by the client, it must be passed to the DBMS. */
 
     /* If DBMS is not (yet) connected, except for certain SET @ocelot_... statements, this is an error. */
@@ -4812,12 +4863,10 @@ void MainWindow::action_execute_one_statement(QString text)
           {
             result_grid_table_widget[i_r]->garbage_collect();
           }
-          QFont tmp_font;
-          QFont *saved_font;
-          tmp_font= result_grid_table_widget[0]->font();
-          saved_font= &tmp_font;
-          result_grid_table_widget[0]->fillup(mysql_res, saved_font, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]),
-                                              ocelot_result_grid_vertical, ocelot_result_grid_column_names);
+          //QFont tmp_font;
+          //tmp_font= result_grid_table_widget[0]->font();
+          result_grid_table_widget[0]->fillup(mysql_res, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]),
+                                              is_vertical, ocelot_result_grid_column_names);
           result_grid_tab_widget->setCurrentWidget(result_grid_table_widget[0]);
           result_grid_tab_widget->tabBar()->hide();
           result_grid_table_widget[0]->show();
@@ -4865,8 +4914,8 @@ void MainWindow::action_execute_one_statement(QString text)
               {
                 result_grid_tab_widget->tabBar()->show(); /* is this in the wrong place? */
                 result_row_count= mysql_num_rows(mysql_res);                /* this will be the height of the grid */
-                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, saved_font, this, true,
-                                                                                 ocelot_result_grid_vertical, ocelot_result_grid_column_names);
+                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, this, true,
+                                                                                 is_vertical, ocelot_result_grid_column_names);
                 result_grid_table_widget[result_grid_table_widget_index]->show();
                 ++result_grid_table_widget_index;
               }
@@ -5148,12 +5197,12 @@ int MainWindow::execute_client_statement(QString text)
   }
   if (statement_type == TOKEN_KEYWORD_EGO)
   {
-    statement_edit_widget->result= tr("EGO is not implemented.");
+    statement_edit_widget->result= tr("EGO does nothing unless it's on its own line after an executable statement, and --named-commands is true.");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_GO)
   {
-    statement_edit_widget->result= tr("GO is not implemented.");
+    statement_edit_widget->result= tr("GO does nothing unless it's on its own line after an executable statement, and --named-commands is true.");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_HELP)
@@ -5485,7 +5534,7 @@ int MainWindow::execute_client_statement(QString text)
         make_style_strings();
         for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
         {
-          result_grid_table_widget[i_r]->set_all_style_sheets();
+          result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string);
         }
         return 2;
       }
@@ -7784,7 +7833,8 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     QTextEdit::paintEvent(event);
     return;
   }
-  QPixmap p= QPixmap(QSize(event->rect().width(), event->rect().height()));
+  //QPixmap p= QPixmap(QSize(event->rect().width(), event->rect().height()));
+  QPixmap p= QPixmap();
   if (p.loadFromData((const uchar*) text_edit_frame_of_cell->pointer_to_content,
                      text_edit_frame_of_cell->length,
                      0,
@@ -7799,6 +7849,7 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     return;
   }
   QPainter painter(this->viewport());
+  /* Todo: this will scale to the size of the cell. Better would be: fragment + scrollbar. */
   painter.drawPixmap(event->rect(), p);
   return;
 }
@@ -8728,8 +8779,19 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
 
+  if (strcmp(token0_as_utf8, "named_commands") == 0)
+  {
+    ocelot_named_commands= true;
+    return;
+  }
 
-
+  if ((strcmp(token0_as_utf8, "no_named_commands") == 0)
+   || (strcmp(token0_as_utf8, "skip_named_commands") == 0)
+   || (strcmp(token0_as_utf8, "disable_named_commands") == 0))
+  {
+    ocelot_named_commands= false;
+    return;
+  }
 
 }
 

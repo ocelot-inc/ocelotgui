@@ -241,6 +241,7 @@ public slots:
   void action_option_column_names(bool checked);
   void action_option_no_beep(bool checked);
   void action_option_display_blob_as_image(bool checked);
+  void action_option_named_commands(bool checked);
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -712,6 +713,7 @@ private:
     QAction *menu_options_action_option_column_names;
     QAction *menu_options_action_option_no_beep;
     QAction *menu_options_action_option_display_blob_as_image;
+    QAction *menu_options_action_option_named_commands;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -1259,6 +1261,7 @@ public:
   unsigned int row_pool_size;
   unsigned int cell_pool_size;
   QString frame_color_setting;                                 /* based on drag line color */
+  QFont text_edit_widget_font;
 
 /* How many rows can fit on the screen? Take a guess. */
 #define RESULT_GRID_WIDGET_MAX_HEIGHT 20
@@ -1268,7 +1271,6 @@ public:
 
 ResultGrid(
 //        MYSQL_RES *mysql_res,
-//        QFont *saved_font,
         MainWindow *parent): QWidget(parent)
 {
   is_paintable= 0;
@@ -1380,6 +1382,7 @@ ResultGrid(
 
   mysql_res_copy= 0;
   mysql_res_copy_rows= 0;
+  text_edit_widget_font= this->font();
   set_frame_color_setting();
 }
 
@@ -1484,7 +1487,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
-void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool mysql_more_results_parameter,
+void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_parameter,
             bool ocelot_result_grid_vertical, bool ocelot_result_grid_column_names)
 {
   long unsigned int xrow;
@@ -1574,7 +1577,9 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
 
   /* Todo: since grid_column_size_calc() recalculates max_height_of_a_char, don't bother with this. */
 
-  QFontMetrics mm= QFontMetrics(*saved_font);
+  QFont *pointer_to_font;
+  pointer_to_font= &text_edit_widget_font;
+  QFontMetrics mm= QFontMetrics(*pointer_to_font);
 
   /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
   ocelot_grid_max_desired_width_in_pixels=(parent->width() - (mm.width("W") * 3));
@@ -1592,7 +1597,9 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
           That's actually a bug, because the drag line color doesn't change immediately.
     todo: why the whole pool rather than just result-row_count + 1?
   */
-  QFontMetrics fm= QFontMetrics(*saved_font);
+  QFont *pointer_to_font_2;
+  pointer_to_font_2= &text_edit_widget_font;
+  QFontMetrics fm= QFontMetrics(*pointer_to_font_2);
 
   for (xrow= 0; (xrow < grid_result_row_count) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
   {
@@ -1648,7 +1655,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   }
 
   if (ocelot_result_grid_vertical == true)
-  grid_column_size_calc(saved_font, ocelot_grid_cell_border_size_as_int,
+  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
 
   if (ocelot_result_grid_vertical == true)
@@ -1698,7 +1705,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
   is_paintable= 1;
 
   if (ocelot_result_grid_vertical == false)
-  grid_column_size_calc(saved_font, ocelot_grid_cell_border_size_as_int,
+  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
 
   /*
@@ -1922,7 +1929,7 @@ void fillup(MYSQL_RES *mysql_res, QFont *saved_font, MainWindow *parent, bool my
    I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
    but removing it doesn't solve the problem.
 */
-void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_right_drag_line_size_as_int)
+void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_right_drag_line_size_as_int)
 {
   unsigned int i;
   /* long unsigned int tmp_column_lengths[MAX_COLUMNS]; */
@@ -1931,9 +1938,12 @@ void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_a
   long unsigned int necessary_reduction;
   long unsigned int amount_being_reduced;
   long unsigned int max_reduction;
+  QFont *pointer_to_font;
+
+  pointer_to_font= &text_edit_widget_font;
 
   /* Translate from char width+height to pixel width+height */
-  QFontMetrics mm= QFontMetrics(*saved_font);
+  QFontMetrics mm= QFontMetrics(*pointer_to_font);
   /* This was a bug: "this" might not have been updated by setStyleSheet() yet ... QFontMetrics mm(this->fontMetrics()); */
   unsigned int max_width_of_a_char= mm.width("W");    /* not really a maximum unless fixed-width font */
   max_height_of_a_char= mm.lineSpacing();             /* Actually this is mm.height() + mm.leading(). */
@@ -2001,7 +2011,7 @@ void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_a
         necessary_reduction-= amount_being_reduced;
         sum_tmp_column_lengths-= amount_being_reduced;
       }
-      if (necessary_reduction == 0) break;
+      if (necessary_reduction == 0) break; /* todo: consider making this "< 10" */
     }
   }
 
@@ -2012,6 +2022,7 @@ void grid_column_size_calc(QFont *saved_font, int ocelot_grid_cell_border_size_a
     If that's greater than the user-defined maximum, reduce to user-defined maximum
     (the QTextEdit will get a vertical scroll bar if there's an overflow).
   */
+
   for (i= 0; i < result_column_count; ++i)
   {
     grid_column_heights[i]= (dbms_get_field_length(i) * max_width_of_a_char) / grid_column_widths[i]; /* fields[i].length */
@@ -2369,8 +2380,6 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
 /*
   Called from eventfilter
   "    if (event->type() == QEvent::FontChange) return (result_grid_table_widget->fontchange_event());"
-  Todo: bug: when I switched to Kacst Poster 28pt bold italic, I got scroll bars -- calculations 1 pixel off?
-        (not repeated recently, maybe it's fixed now)
 */
 int fontchange_event()
 {
@@ -2510,14 +2519,21 @@ void set_frame_color_setting()
   Setting the parent should affect the children.
   But we don't want all text_edit_frames and text_edit_widgets to change because that is slow.
   Let us set a flag which causes change at paint time. with setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
+  This gets called just after we chane colors + fonts with the dialog box, so we know
+  the new style string, and to get its font we will create a temporary QTextEdit.
+  Todo: I don't really want to "show" tmp_text_edit_widget, there's a cleverer way to get font which I've forgotten.
 */
-void set_all_style_sheets()
+void set_all_style_sheets(QString new_ocelot_grid_style_string)
 {
-
+  TextEditWidget *tmp_text_edit_widget= new TextEditWidget(this);
+  tmp_text_edit_widget->setStyleSheet(new_ocelot_grid_style_string);
+  tmp_text_edit_widget->show();
+  text_edit_widget_font= tmp_text_edit_widget->font();
+  tmp_text_edit_widget->hide();
+  delete tmp_text_edit_widget;
 //  this->setStyleSheet(ocelot_grid_style_string);
   unsigned int i_h;
 
-  //QFontMetrics fm= QFontMetrics(*saved_font);
   set_frame_color_setting();
   for (i_h= 0; i_h < cell_pool_size; ++i_h)
   {
@@ -3206,14 +3222,14 @@ private slots:
 /* If user clicks OK, end. The caller will move changed "new" settings to non-new. */
 void handle_button_for_ok()
 {
-  close();
+  done(QDialog::Accepted); /* i.e. close() but return Accepted */
 }
 
 
 /* If user clicks Cancel, don't do anything, and end. */
 void handle_button_for_cancel()
 {
-  close();
+  done(QDialog::Rejected); /* i.e. close() but return Rejected */
 }
 
 
