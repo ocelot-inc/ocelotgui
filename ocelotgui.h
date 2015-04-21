@@ -1,5 +1,4 @@
-/*
-  Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -53,9 +52,9 @@
 #include <mysql.h>
 
 /*
-  This might be appropriate place for all "blobal" variables that
-  are affected by option settings.
-  But, weirdly, ocelotgui.h is included in two places, so say 'static'
+  This might be appropriate place for all "global" variables that
+  are affected by option settings. They're mostly in ocelotgui.cpp though.
+  Weirdly, ocelotgui.h is included in two places, so say 'static'
 */
   static bool ocelot_display_blob_as_image= false;
 
@@ -170,7 +169,7 @@ public:
   QString ocelot_main_font_weight, new_ocelot_main_font_weight;
   QString ocelot_main_style_string;
 
-  /* Strings for CONNECT. These will be converted e.g. ocelot_host to ocelot_host_as_utf8 */
+  /* Strings for CONNECT. Some of these will be converted e.g. ocelot_host to ocelot_host_as_utf8 */
   QString ocelot_host;
   QString ocelot_database;
   QString ocelot_user;
@@ -179,7 +178,12 @@ public:
   QString ocelot_default_auth;
   QString ocelot_init_command;
   QString ocelot_opt_bind;
+  QString ocelot_bind_address; /* Todo: check: is this the same as ocelot_opt_bind? */
   QString ocelot_opt_connect_attr_delete;
+  QString ocelot_debug;
+  QString ocelot_execute;
+  QString ocelot_login_path;
+  QString ocelot_pager;
   QString ocelot_opt_ssl;
   QString ocelot_opt_ssl_ca;
   QString ocelot_opt_ssl_capath;
@@ -196,11 +200,11 @@ public:
   QString ocelot_set_charset_name;           /* was: ocelot_default_character_set */
   QString ocelot_shared_memory_base_name;
   QString ocelot_protocol;
-  unsigned short ocelot_comments;            /* for CONNECT. not used. */
-  unsigned short ocelot_no_defaults;         /* for CONNECT */
+  //unsigned short ocelot_no_defaults;         /* for CONNECT */
   QString ocelot_defaults_file;              /* for CONNECT */
   QString ocelot_defaults_extra_file;        /* for CONNECT */
-
+  QString ocelot_prompt;
+  QString ocelot_opt_ssl_verify;
 
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
 
@@ -237,11 +241,7 @@ public slots:
   void action_main();
   void history_markup_previous();
   void history_markup_next();
-  void action_option_vertical(bool checked);
-  void action_option_column_names(bool checked);
-  void action_option_no_beep(bool checked);
   void action_option_display_blob_as_image(bool checked);
-  void action_option_named_commands(bool checked);
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -303,6 +303,8 @@ private:
 #endif
 
   void create_menu();
+  int rehash_scan();
+  void rehash_search(char *search_string);
   void widget_sizer();
   int execute_client_statement(QString text);
   void put_diagnostics_in_result();
@@ -327,6 +329,7 @@ private:
   void make_style_strings();
   void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count);
+  int make_statement_ready_to_send(QString, QString, char *, int, bool);
   void action_execute_one_statement(QString text);
 
   void history_markup_make_strings();
@@ -709,11 +712,7 @@ private:
     QAction *menu_settings_action_history;
     QAction *menu_settings_action_main;
   QMenu *menu_options;
-    QAction *menu_options_action_option_vertical;
-    QAction *menu_options_action_option_column_names;
-    QAction *menu_options_action_option_no_beep;
     QAction *menu_options_action_option_display_blob_as_image;
-    QAction *menu_options_action_option_named_commands;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -883,24 +882,27 @@ private:
   QScrollArea *scroll_area;
   QWidget *widget_with_main_layout;
   QVBoxLayout *upper_layout;
+  QWidget *widget_for_size_hint;
+  QLabel *label_for_component_size_calc;
 
   int column_count_copy;
   int *row_form_is_password_copy;
   QString *row_form_data_copy;
   Row_form_box *this_row_form_box;
+  int width_for_size_hint, height_for_size_hint;
 
 public:
-Row_form_box(QFont *font, int column_count, QString *row_form_label,
+Row_form_box(int column_count, QString *row_form_label,
 //             int *row_form_type,
              int *row_form_is_password, QString *row_form_data,
 //             QString *row_form_width,
-             QString row_form_title, QString row_form_message, MainWindow *parent): QDialog(parent)
+             QString row_form_title, QString row_form_message,
+             MainWindow *parent): QDialog(parent)
 {
   int i;
 
   this_row_form_box= this;
   copy_of_parent= parent;
-
   column_count_copy= column_count;
   row_form_is_password_copy= row_form_is_password;
   row_form_data_copy= row_form_data;
@@ -918,6 +920,8 @@ Row_form_box(QFont *font, int column_count, QString *row_form_label,
   scroll_area= 0;
   widget_with_main_layout= 0;
   upper_layout= 0;
+  widget_for_size_hint= 0;
+  label_for_component_size_calc= 0;
 
   label= new QLabel*[column_count];
   line_edit= new QLineEdit*[column_count];
@@ -933,33 +937,38 @@ Row_form_box(QFont *font, int column_count, QString *row_form_label,
     hbox_layout[i]= 0;
     widget[i]= 0;
   }
-//  copy_of_parent= parent; I already did this
   is_ok= 0;
-  QFontMetrics mm= QFontMetrics(*font);
-  //unsigned int max_width_of_a_char= mm.width("W");                 /* not really a maximum unless fixed-width font */
-  unsigned int max_height_of_a_char= mm.lineSpacing();             /* Actually this is mm.height() + mm.leading(). */
+
+  /* Component height = enough for two lines. I tried using QFontMetrics, it didn't work. */
+  label_for_component_size_calc= new QLabel(this);
+  label_for_component_size_calc->setStyleSheet(parent->ocelot_grid_style_string);
+  label_for_component_size_calc->show();
+  int component_height= label_for_component_size_calc->height();
+  label_for_component_size_calc->close();
+
   main_layout= new QVBoxLayout();
   main_layout->setSpacing(0); /* Todo: check why this doesn't seem to have any effect */
   main_layout->setContentsMargins(0, 0, 0, 0); /* Todo: check why this doesn't seem to have any effect */
-  main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* no effect */
+  main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* necessary, but I don't know why */
   label_for_message= new QLabel(row_form_message);
   main_layout->addWidget(label_for_message);
-  /* Todo: watch row_form_type maybe it's NUM_FLAG */
   for (i= 0; i < column_count; ++i)
   {
     hbox_layout[i]= new QHBoxLayout();
     label[i]= new QLabel();
     label[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
+    label[i]->setMinimumHeight(component_height * 2);
     label[i]->setText(row_form_label[i]);
     hbox_layout[i]->addWidget(label[i]);
+
     if (row_form_is_password[i] == 1)
     {
       line_edit[i]= new QLineEdit();
       line_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
       line_edit[i]->insert(row_form_data[i]);
       line_edit[i]->setEchoMode(QLineEdit::Password); /* maybe PasswordEchoOnEdit would be better */
-      line_edit[i]->setMinimumHeight(2 * max_height_of_a_char + 3); /* no effect */
-      line_edit[i]->setMaximumHeight(2 * max_height_of_a_char + 3); /* no effect */
+      line_edit[i]->setMaximumHeight(component_height * 2);
+      line_edit[i]->setMinimumHeight(component_height * 2);
       hbox_layout[i]->addWidget(line_edit[i]);
     }
     else
@@ -967,10 +976,11 @@ Row_form_box(QFont *font, int column_count, QString *row_form_label,
       text_edit[i]= new QTextEdit();
       text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
       text_edit[i]->setText(row_form_data[i]);
-      //text_edit[i]->setMinimumHeight(max_height_of_a_char + 3); /* no effect */
-      text_edit[i]->setMaximumHeight(2 * max_height_of_a_char + 3); /* bizarre effect */
-      //text_edit[i]->updateGeometry(); /* no effect */
+      text_edit[i]->setMaximumHeight(component_height * 2);
+      text_edit[i]->setMinimumHeight(component_height * 2);
       text_edit[i]->setTabChangesFocus(true);
+      /* The following line will work, but I'm undecided whether it's desirable. */
+      //if (row_form_type[i] == NUM_FLAG) text_edit[i]->setAlignment(Qt::AlignRight);
       hbox_layout[i]->addWidget(text_edit[i]);
     }
     widget[i]= new QWidget();
@@ -986,51 +996,49 @@ Row_form_box(QFont *font, int column_count, QString *row_form_label,
   widget_for_ok_and_cancel->setLayout(hbox_layout_for_ok_and_cancel);
   connect(button_for_ok, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
   connect(button_for_cancel, SIGNAL(clicked()), this, SLOT(handle_button_for_cancel()));
-  main_layout->addWidget(widget_for_ok_and_cancel);
-
-//  this->setMinimumWidth(800);                                     /* !! BE SMARTER !! */
-//  this->setMinimumHeight(800);                                    /* !! BE SMARTER !! */
 
   widget_with_main_layout= new QWidget();
   widget_with_main_layout->setLayout(main_layout);
+  widget_with_main_layout->setMaximumHeight(200);
+  scroll_area= new QScrollArea();
+  scroll_area->setWidget(widget_with_main_layout);
+  scroll_area->setWidgetResizable(true);
 
-  /* I had trouble making the scroll area size correctly so I've commented out scroll area creation. */
-  //scroll_area= new QScrollArea();
-  //scroll_area->setWidget(widget_with_main_layout);
   upper_layout= new QVBoxLayout;
-  //upper_layout->addWidget(scroll_area);
-  upper_layout->addWidget(widget_with_main_layout);
+  upper_layout->addWidget(scroll_area);
+
+  upper_layout->addWidget(widget_for_ok_and_cancel);
+
+  widget_for_size_hint= new QDialog(this);
+  widget_for_size_hint->setLayout(upper_layout);
+  widget_for_size_hint->setWindowOpacity(0);                      /* perhaps unnecessary */
+  widget_for_size_hint->show();
+  width_for_size_hint= widget_for_size_hint->width()
+                     + scroll_area->verticalScrollBar()->width()
+                     + 5;
+  height_for_size_hint= widget_for_size_hint->height();
+  widget_for_size_hint->close();
+
   this->setLayout(upper_layout);
   this->setWindowTitle(row_form_title);
-
-//  set_preferred_size();
 }
 
 /*
-  Set preferred width and height for sizeHint().
-  Initially, I tried creating a dummy widget with a layout for one row, saying setWindowOpacity(0),
-  showing, and immediately hiding -- and the result was always garbage, I couldn't figure out a fix.
-  So once again I try here to guess what Qt would do.
-  width of (the longest label + contents) + (border width * 2)
-  height of (the highest label + contents) * # of columns + (border width * 2)
-  See also: grid_column_size_calc()
+  Row_form_box will have the wrong width if everything is default:
+  about 20 pixels too short, as if it didn't expect a vertical scroll bar.
+    I could make Qt do a better calculation by saying
+    scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    but someday I'll want to use Row_form_box for purposes besides connect.
+  Our solution is to make a not-to-be-really-used widget,
+  widget_for_size_hint, with the same layout, and use its width,
+  plus the width of the vertical scroll bar, plus 5 (5 is arbitrary).
+  We delete widget_for_size_hint during garbage_collect, but hope deletion is automatic.
+  Todo: setWindowOpacity(0) for widget_for_size_hint?
 */
-//void set_preferred_size()
-//{
-//  int width_of_one_row;
-//  int height_of_all_rows;
-//
-////  height_of_all_rows= 2 * max_height_of_a_char + 3;
-//  height_of_all_rows*= column_count_copy;
-//  printf("height=%d\n", height_of_all_rows);
-//}
-
-
-//QSize sizeHint() const
-//{
-//  return QSize(200, 200);
-//}
-
+QSize sizeHint() const
+{
+  return QSize(width_for_size_hint, height_for_size_hint);
+}
 
 private slots:
 
@@ -1096,6 +1104,8 @@ void garbage_collect ()
   if (widget_with_main_layout != 0) delete widget_with_main_layout;
   if (upper_layout != 0) delete upper_layout;
   if (scroll_area != 0) delete scroll_area;
+  if (widget_for_size_hint != 0) delete widget_for_size_hint;
+  if (label_for_component_size_calc != 0) delete label_for_component_size_calc;
 }
 
 };
@@ -1229,8 +1239,8 @@ public:
 
   MYSQL_RES *grid_mysql_res;
   bool mysql_more_results_flag;
-  bool ocelot_result_grid_vertical_copy;
-  bool ocelot_result_grid_column_names_copy;
+  unsigned short ocelot_result_grid_vertical_copy;
+  unsigned short ocelot_result_grid_column_names_copy;
   char *mysql_res_copy;                                          /* gets a copy of mysql_res contents, if necessary */
   char **mysql_res_copy_rows;                                      /* dynamic-sized list of mysql_res_copy row offsets, if necessary */
   unsigned int ocelot_grid_max_grid_height_in_lines;             /* Todo: should be user-settable and passed */
@@ -1488,7 +1498,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
 void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_parameter,
-            bool ocelot_result_grid_vertical, bool ocelot_result_grid_column_names)
+            unsigned short ocelot_result_grid_vertical, unsigned short ocelot_result_grid_column_names)
 {
   long unsigned int xrow;
   unsigned int col;
@@ -1500,7 +1510,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
     This is a kludge. We're not ready to handle mysql_more_results with vertical mode.
     Todo: Remove this kludge and handle results correctly with vertical mode.
   */
-  if (ocelot_result_grid_vertical) mysql_more_results_flag= false;
+  if (ocelot_result_grid_vertical > 0) mysql_more_results_flag= false;
 
   ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
   ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
@@ -1525,15 +1535,15 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   /* ocelot_grid_cell_right_drag_line_color= parent->ocelot_grid_cell_right_drag_line_color; */
   dbms_set_result_column_count();                                  /* this will be the width of the grid */
   result_row_count= mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
-  if (ocelot_result_grid_vertical == false) grid_result_row_count= result_row_count + 1;
+  if (ocelot_result_grid_vertical == 0) grid_result_row_count= result_row_count + 1;
   else grid_result_row_count= result_row_count * result_column_count;
 
   {
     unsigned int minimum_number_of_cells;
-    if (ocelot_result_grid_vertical == false) minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT * result_column_count;
+    if (ocelot_result_grid_vertical == 0) minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT * result_column_count;
     else
     {
-      if (ocelot_result_grid_column_names == false) minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT;
+      if (ocelot_result_grid_column_names == 0) minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT;
       else minimum_number_of_cells= RESULT_GRID_WIDGET_MAX_HEIGHT * 2;
     }
     pools_resize(row_pool_size, RESULT_GRID_WIDGET_MAX_HEIGHT, cell_pool_size, minimum_number_of_cells);
@@ -1564,7 +1574,10 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 //  grid_scroll_area->verticalScrollBar()->setPageStep(result_row_count / 10);    /* Todo; check if this could become 0 */
   grid_vertical_scroll_bar_value= -1;
 
-  scan_rows();
+  scan_rows(mysql_more_results_flag, result_column_count, result_row_count,
+            grid_mysql_res, &mysql_res_copy, &mysql_res_copy_rows,
+            &grid_max_column_widths);
+
 
   /*
     Calculate desired width and height based on parent width and height.
@@ -1654,11 +1667,11 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
     text_edit_frames[0 * result_column_count + i_h]->is_image_flag= false;
   }
 
-  if (ocelot_result_grid_vertical == true)
+  if (ocelot_result_grid_vertical > 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
 
-  if (ocelot_result_grid_vertical == true)
+  if (ocelot_result_grid_vertical > 0)
   {
     /* TODO: Make sure considerations for horizontal are all considered for vertical. */
     /* We'll have to figure out the alignment etc. each time we get ready to display */
@@ -1668,7 +1681,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
          ++grid_row_number)
     {
       if (grid_row_number >= (result_row_count * result_column_count)) break;
-      if (ocelot_result_grid_column_names == true)
+      if (ocelot_result_grid_column_names > 0)
       {
         text_edit_frames[text_edit_frame_index]->show();
         grid_row_layouts[grid_row_number]->addWidget(text_edit_frames[text_edit_frame_index], 0, Qt::AlignTop | Qt::AlignLeft);
@@ -1704,7 +1717,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
   is_paintable= 1;
 
-  if (ocelot_result_grid_vertical == false)
+  if (ocelot_result_grid_vertical == 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
 
@@ -1728,7 +1741,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
     grid_row_layout->setSpacing(0) means the only thing separating cells is the "border".
   */
 
-  if (ocelot_result_grid_vertical == false)
+  if (ocelot_result_grid_vertical == 0)
   {
     for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT); ++xrow)
     {
@@ -2058,29 +2071,38 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
   If (mysql_more_results_flag) we want max actual length but also want to make a copy of mysql_res.
   Todo: reconsider: maybe grid_max_column_widths should have come from max_length in MYSQL_FIELD.
 */
-void scan_rows()
+void scan_rows(bool p_mysql_more_results_flag,
+               unsigned int p_result_column_count,
+               unsigned int p_result_row_count,
+               MYSQL_RES *p_mysql_res,
+               char **p_mysql_res_copy,
+               char ***p_mysql_res_copy_rows,
+               unsigned long **p_grid_max_column_widths)
 {
+  unsigned long int v_r;
   unsigned int i;
+  MYSQL_ROW v_row;
+  unsigned long *v_lengths;
 //  unsigned int ki;
 
-  for (i= 0; i < result_column_count; ++i) grid_max_column_widths[i]= 0;
+  for (i= 0; i < p_result_column_count; ++i) (*p_grid_max_column_widths)[i]= 0;
 
-  if (!mysql_more_results_flag)
+  if (!p_mysql_more_results_flag)
   {
-    mysql_data_seek(grid_mysql_res, 0);
-    for (r= 0; r < result_row_count; ++r)
+    mysql_data_seek(p_mysql_res, 0);
+    for (v_r= 0; v_r < p_result_row_count; ++v_r)
     {
-      row= mysql_fetch_row(grid_mysql_res);
-      lengths= mysql_fetch_lengths(grid_mysql_res);
-      for (i= 0; i < result_column_count; ++i)
+      v_row= mysql_fetch_row(p_mysql_res);
+      v_lengths= mysql_fetch_lengths(p_mysql_res);
+      for (i= 0; i < p_result_column_count; ++i)
       {
-        if ((row == 0) || (row[i] == 0))
+        if ((v_row == 0) || (v_row[i] == 0))
         {
-          if (sizeof(NULL_STRING) - 1 > grid_max_column_widths[i]) grid_max_column_widths[i]= sizeof(NULL_STRING) - 1;
+          if (sizeof(NULL_STRING) - 1 > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
         }
         else
         {
-          if (lengths[i] > grid_max_column_widths[i]) grid_max_column_widths[i]= lengths[i];
+          if (v_lengths[i] > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= v_lengths[i];
         }
       }
     }
@@ -2093,54 +2115,54 @@ void scan_rows()
   */
   unsigned int total_size= 0;
   char *mysql_res_copy_pointer;
-  mysql_data_seek(grid_mysql_res, 0);
-  for (r= 0; r < result_row_count; ++r)                                /* first loop */
+  mysql_data_seek(p_mysql_res, 0);
+  for (v_r= 0; v_r < p_result_row_count; ++v_r)                                /* first loop */
   {
-    row= mysql_fetch_row(grid_mysql_res);
-    lengths= mysql_fetch_lengths(grid_mysql_res);
-    for (i= 0; i < result_column_count; ++i)
+    v_row= mysql_fetch_row(p_mysql_res);
+    v_lengths= mysql_fetch_lengths(p_mysql_res);
+    for (i= 0; i < p_result_column_count; ++i)
     {
-//      ki= (r + 1) * result_column_count + i;
-      if ((row == 0) || (row[i] == 0))
+//      ki= (v_r + 1) * result_column_count + i;
+      if ((v_row == 0) || (v_row[i] == 0))
       {
-        total_size+= sizeof(lengths[i]);
+        total_size+= sizeof(v_lengths[i]);
         total_size+= sizeof(NULL_STRING) - 1;
       }
       else
       {
-        total_size+= sizeof(lengths[i]);
-        total_size+= lengths[i];
+        total_size+= sizeof(v_lengths[i]);
+        total_size+= v_lengths[i];
       }
     }
   }
-  mysql_res_copy= new char[total_size];                                              /* allocate */
-  mysql_res_copy_rows= new char*[result_row_count];
-  mysql_res_copy_pointer= mysql_res_copy;
-  mysql_data_seek(grid_mysql_res, 0);
+  *p_mysql_res_copy= new char[total_size];                                              /* allocate */
+  *p_mysql_res_copy_rows= new char*[p_result_row_count];
+  mysql_res_copy_pointer= *p_mysql_res_copy;
+  mysql_data_seek(p_mysql_res, 0);
   int null_length= sizeof(NULL_STRING) - 1;
-  for (r= 0; r < result_row_count; ++r)                                 /* second loop */
+  for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
   {
-    mysql_res_copy_rows[r]= mysql_res_copy_pointer;
-    row= mysql_fetch_row(grid_mysql_res);
-    lengths= mysql_fetch_lengths(grid_mysql_res);
-    for (i= 0; i < result_column_count; ++i)
+    (*p_mysql_res_copy_rows)[v_r]= mysql_res_copy_pointer;
+    v_row= mysql_fetch_row(p_mysql_res);
+    v_lengths= mysql_fetch_lengths(p_mysql_res);
+    for (i= 0; i < p_result_column_count; ++i)
     {
-//      ki= (r + 1) * result_column_count + i;
-      if ((row == 0) || (row[i] == 0))
+//      ki= (r + 1) * p_result_column_count + i;
+      if ((v_row == 0) || (v_row[i] == 0))
       {
-        if (sizeof(NULL_STRING) - 1 > grid_max_column_widths[i]) grid_max_column_widths[i]= sizeof(NULL_STRING) - 1;
+        if (sizeof(NULL_STRING) - 1 > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
         memcpy(mysql_res_copy_pointer, &null_length, sizeof(null_length));
-        mysql_res_copy_pointer+= sizeof(lengths[i]);
+        mysql_res_copy_pointer+= sizeof(v_lengths[i]);
         memcpy(mysql_res_copy_pointer,NULL_STRING, sizeof(NULL_STRING) - 1);
         mysql_res_copy_pointer+= sizeof(NULL_STRING) - 1;
       }
       else
       {
-        if (lengths[i] > grid_max_column_widths[i]) grid_max_column_widths[i]= lengths[i];
-        memcpy(mysql_res_copy_pointer, &lengths[i], sizeof(lengths[i]));
-        mysql_res_copy_pointer+= sizeof(lengths[i]);
-        memcpy(mysql_res_copy_pointer, row[i], lengths[i]);
-        mysql_res_copy_pointer+= lengths[i];
+        if (v_lengths[i] > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= v_lengths[i];
+        memcpy(mysql_res_copy_pointer, &v_lengths[i], sizeof(v_lengths[i]));
+        mysql_res_copy_pointer+= sizeof(v_lengths[i]);
+        memcpy(mysql_res_copy_pointer, v_row[i], v_lengths[i]);
+        mysql_res_copy_pointer+= v_lengths[i];
       }
     }
   }
@@ -2216,10 +2238,10 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
 
   first_row= new_grid_vertical_scroll_bar_value;
 
-  if (ocelot_result_grid_vertical_copy == true)
+  if (ocelot_result_grid_vertical_copy > 0)
   {
     int columns_per_row;
-    if (ocelot_result_grid_column_names_copy == true) columns_per_row= 2;
+    if (ocelot_result_grid_column_names_copy > 0) columns_per_row= 2;
     else columns_per_row= 1;
     first_row= new_grid_vertical_scroll_bar_value / result_column_count;
     i= new_grid_vertical_scroll_bar_value % result_column_count;
@@ -2421,7 +2443,7 @@ bool vertical_scroll_bar_event()
   }
 
   /* It's ridiculous to do these settings every time. But when is the best time to to them? Which event matters? */
-  if (ocelot_result_grid_vertical_copy == false) grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+  if (ocelot_result_grid_vertical_copy == 0) grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
   else grid_vertical_scroll_bar->setMaximum(grid_result_row_count - 1);
   grid_vertical_scroll_bar->setSingleStep(1);
   grid_vertical_scroll_bar->setPageStep(1);
@@ -2767,7 +2789,7 @@ public:
         QColor statement_edit_widget_left_treatment1_textcolor;       /* suggestion = Qt::black */
         QString statement_edit_widget_left_treatment1_prompt_text;    /* suggestions = "     >" or "" */
 
-        QString prompt_default;                     /* = "mysql" -- or is it "\N [\d]>"? */
+        QString prompt_default;                     /* = "mysql>" -- or is it "\N [\d]>"? */
         QString prompt_as_input_by_user;            /* = What the user input with latest PROMPT statement, or prompt_default */
         /* QString prompt_translated;     */             /* = prompt_as_input_by_user, but with some \s converted for ease of parse */
         QString prompt_current;                     /* = latest result of prompt_reform() */

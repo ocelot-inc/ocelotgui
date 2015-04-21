@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: April 2 2015
+   Last modified: April 21 2015
 */
 
 /*
@@ -203,64 +203,115 @@
 #define STRING_LENGTH_512 512
 
 /* Connect arguments and options */
-  char* ocelot_host_as_utf8= 0;                  /* argument */
-  char* ocelot_database_as_utf8= 0;              /* argument */
-  char* ocelot_user_as_utf8= 0;                  /* argument */
-  char* ocelot_password_as_utf8= 0;              /* argument */
-  unsigned short ocelot_port;                     /* argument */
-  char* ocelot_unix_socket_as_utf8= 0;           /* argument */
-  char* ocelot_default_auth_as_utf8= 0;          /* for MYSQL_DEFAULT_AUTH */
-  unsigned short ocelot_enable_cleartext_plugin;  /* for MYSQL_ENABLE_CLEARTEXT_PLUGIN */
-  char* ocelot_init_command_as_utf8= 0;          /* for MYSQL_INIT_COMMAND */
-  char* ocelot_opt_bind_as_utf8= 0;              /* for MYSQL_OPT_BIND */
-  unsigned short ocelot_opt_can_handle_expired_passwords;/* for MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS */
-  unsigned short ocelot_opt_compress;            /* for MYSQL_OPT_COMPRESS */
-  char* ocelot_opt_connect_attr_delete_as_utf8= 0;  /* for MYSQL_OPT_CONNECT_ATTR_DELETE */
-  unsigned short int ocelot_opt_connect_attr_reset; /* for MYSQL_OPT_CONNECT_ATTR_RESET */
-  unsigned long int ocelot_opt_connect_timeout;  /* for MYSQL_OPT_CONNECT_TIMEOUT */
-  unsigned short ocelot_opt_local_infile;        /* for MYSQL_OPT_LOCAL_INFILE */
-  unsigned short ocelot_opt_named_pipe;          /* for MYSQL_OPT_NAMED_PIPE */
-  unsigned int ocelot_protocol_as_int;       /* for MYSQL_OPT_PROTOCOL */
-  unsigned int ocelot_opt_read_timeout;          /* for MYSQL_OPT_READ_TIMEOUT */
-  unsigned int ocelot_opt_reconnect;             /* for MYSQL_OPT_RECONNECT */
-  char* ocelot_opt_ssl_as_utf8= 0;              /* for CONNECT. --ssl */
-  char* ocelot_opt_ssl_ca_as_utf8= 0;           /* for MYSQL_OPT_SSL_CA --ssl-ca */
-  char* ocelot_opt_ssl_capath_as_utf8= 0;       /* for MYSQL_OPT_SSL_CAPATH. --ssl-capath */
-  char* ocelot_opt_ssl_cert_as_utf8= 0;         /* for MYSQL_OPT_SSL_CERT. --ssl-cert */
-  char* ocelot_opt_ssl_cipher_as_utf8= 0;       /* for MYSQL_OPT_SSL_CIPHER. --ssl-cipher */
-  char* ocelot_opt_ssl_crl_as_utf8= 0;          /* for MYSQL_OPT_SSL_CRL. --ssl-crl */
-  char* ocelot_opt_ssl_crlpath_as_utf8= 0;      /* for MYSQL_OPT_SSL_CRLPATH. --ssl-crlpath */
-  char* ocelot_opt_ssl_key_as_utf8= 0;          /* for MYSQL_OPT_SSL_KEY. --ssl-key */
-  unsigned short int ocelot_opt_ssl_verify_server_cert;  /* for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert */
-  unsigned short int ocelot_opt_use_result; /* for MYSQL_OPT_USE_RESULT */
-  unsigned int ocelot_opt_write_timeout; /* for MYSQL_OPT_WRITE_TIMEOUT */
-  char* ocelot_plugin_dir_as_utf8= 0;       /* for MYSQL_PLUGIN_DIR */
-  char* ocelot_read_default_file_as_utf8= 0; /* for MYSQL_READ_DEFAULT_FILE */
-  char* ocelot_read_default_group_as_utf8= 0;/* for MYSQL_READ_DEFAULT_GROUP */
-  unsigned short int ocelot_report_data_truncation; /* for MYSQL_REPORT_DATA_TRUNCATION */
-  unsigned short ocelot_secure_auth;            /* for MYSQL_SECURE_AUTH */
-  char* ocelot_server_public_key_as_utf8= 0;       /* for MYSQL_SERVER_PUBLIC_KEY */
-  char* ocelot_set_charset_dir_as_utf8= 0;         /* for MYSQL_SET_CHARSET_DIR */
-  char* ocelot_set_charset_name_as_utf8= 0;        /* for MYSQL_SET_CHARSET_NAME */
-  char* ocelot_shared_memory_base_name_as_utf8= 0; /* for MYSQL_SHARED_MEMORY_BASE_NAME */
+  /* todo: I doubt we're handling the "loose" or "enabled" possibilities */
+  static char* ocelot_host_as_utf8= 0;                  /* --host=s */
+  static char* ocelot_database_as_utf8= 0;              /* --database=s */
+  static char* ocelot_user_as_utf8= 0;                  /* --user=s */
+  static char* ocelot_password_as_utf8= 0;              /* --password[=s] */
+  static unsigned short ocelot_port= MYSQL_PORT;        /* --port=n */
+  static char* ocelot_unix_socket_as_utf8= 0;           /* --socket=s */
+  static unsigned int ocelot_protocol_as_int= 0;        /* --protocol=s for MYSQL_OPT_PROTOCOL */
+  static char* ocelot_init_command_as_utf8= 0;          /* --init_command=s for MYSQL_INIT_COMMAND */
+  /* Connect arguments below this point are minor and many are unsupported. */
+  static unsigned short ocelot_auto_rehash= 1;             /* --auto_rehash */
+  static unsigned short ocelot_auto_vertical_output= 0;    /* --auto_vertical_output */
+  static unsigned short ocelot_batch= 0;                   /* --batch */
+  static unsigned short ocelot_binary_mode= 0;             /* --binary_mode */
+  /* QString ocelot_bind_address */                        /* --bind_address=s */
+  static char* ocelot_set_charset_dir_as_utf8= 0;         /* --character_sets_dir=s for MYSQL_SET_CHARSET_DIR */
+  static unsigned short ocelot_result_grid_column_names= 1;/* --column_names */
+  static unsigned short ocelot_column_type_info= 0;        /* --column_type_info */
+  static unsigned short ocelot_comments= 0;               /* --comments */
+  static unsigned short ocelot_opt_compress= 0;           /* --compress for MYSQL_OPT_COMPRESS */
+  static unsigned short ocelot_connect_expired_password= 0;/* --connect_expired_password */
+  static unsigned long int ocelot_opt_connect_timeout= 0;  /* --connect_timeout = n for MYSQL_OPT_CONNECT_TIMEOUT */
+  /* QString ocelot_debug */                               /* --debug[=s] */
+  static unsigned short ocelot_debug_check= 0;             /* --debug_check */
+  static unsigned short ocelot_debug_info= 0;              /* --debug_info */
+  static char* ocelot_default_auth_as_utf8= 0;      /* --default_auth=s for MYSQL_DEFAULT_AUTH */
+  static char* ocelot_set_charset_name_as_utf8= 0;  /* --default_character_set=s for MYSQL_SET_CHARSET_NAME */
+  /* exists as QString */                    /* --defaults_extra_file=s */
+  /* exists as QString */                    /* --defaults_file=s */
+  /* QString ocelot_defaults_group_suffix */ /* --defaults_group_suffix=s */
+  /* exists as QString */                    /* --delimiter=s */
+  static unsigned short ocelot_enable_cleartext_plugin= 0;  /* --enable_cleartext_plugin for MYSQL_ENABLE_CLEARTEXT_PLUGIN */
+  /* QString ocelot_execute */               /* --execute=s */
+  static unsigned short ocelot_force= 0;     /* --force */
+  static unsigned short ocelot_help= 0;      /* --help */
+  static unsigned short ocelot_histignore= 0;/* --histignore=s */
+  static unsigned short ocelot_html= 0;      /* --html */
+  static unsigned short ocelot_ignore_spaces= 0;  /* --ignore_spaces */
+  static unsigned short ocelot_line_numbers= 0;   /* --line_numbers */
+  static unsigned short ocelot_opt_local_infile= 0;    /* --local_infile[=n]  for MYSQL_OPT_LOCAL_INFILE */
+  /* QString ocelot_login_path */            /* --login_path=s */
+  static unsigned long int ocelot_max_allowed_packet= 16777216; /* --max_allowed_packet=n */
+  static unsigned long int ocelot_max_join_size= 1000000; /* --max_join_size = n */
+  static unsigned short ocelot_named_commands= 0;         /* --named_commands */
+  static unsigned long int ocelot_net_buffer_length= 16384; /* --net_buffer_length=n */
+  static unsigned short ocelot_no_beep= 0;                /* --no_beep */
+  static unsigned short ocelot_no_defaults= 0;            /* --no_defaults */
+  static unsigned short ocelot_one_database= 0;           /* --one-database */
+  /* QString ocelot_pager */                              /* --pager[=s] */
+  static unsigned short ocelot_pipe= 0;                   /* --pipe */
+  static char* ocelot_plugin_dir_as_utf8= 0;        /* --plugin_dir=s for MYSQL_PLUGIN_DIR */
+  static unsigned short ocelot_print_defaults= 0;   /* --print_defaults */
+  /* QString ocelot_prompt */                       /* --prompt=s */
+  static unsigned short ocelot_quick= 0;            /* --quick */
+  static unsigned short ocelot_raw= 0;              /* --raw */
+  static unsigned int ocelot_opt_reconnect= 0;      /* --reconnect for MYSQL_OPT_RECONNECT */                                           /* --reconnect */
+  static unsigned short ocelot_safe_updates= 0;           /* --safe-updates or --i-am-a-dummy */
+  static unsigned short ocelot_secure_auth= 1;             /* --secure_auth for MYSQL_SECURE_AUTH (default=true if version >= 5.6.5) */
+  static unsigned long int ocelot_select_limit= 0;  /* --select_limit = n */
+  static char* ocelot_server_public_key_as_utf8= 0; /* --server_public_key=s for MYSQL_SERVER_PUBLIC_KEY */
+  static char* ocelot_shared_memory_base_name_as_utf8= 0; /* --shared_memory_base_name=s for MYSQL_SHARED_MEMORY_BASE_NAME */
+  static unsigned short ocelot_history_includes_warnings= 0; /* --show_warnings include warning(s) returned from statement? default = no. */
+  static unsigned short ocelot_sigint_ignore= 0;          /* --sigint_ignore */
+  static unsigned short ocelot_silent= 0;                 /* --silent */
+  static char* ocelot_opt_ssl_as_utf8= 0;           /* --ssl for CONNECT */
+  static char* ocelot_opt_ssl_ca_as_utf8= 0;        /* --ssl-ca for MYSQL_OPT_SSL_CA */
+  static char* ocelot_opt_ssl_capath_as_utf8= 0;    /* --ssl-capath for MYSQL_OPT_SSL_CAPATH. */
+  static char* ocelot_opt_ssl_cert_as_utf8= 0;      /* --ssl-cert for MYSQL_OPT_SSL_CERT */
+  static char* ocelot_opt_ssl_cipher_as_utf8= 0;    /* --ssl-cipher for MYSQL_OPT_SSL_CIPHER */
+  static char* ocelot_opt_ssl_crl_as_utf8= 0;       /*  --ssl-crl for MYSQL_OPT_SSL_CRL */
+  static char* ocelot_opt_ssl_crlpath_as_utf8= 0;   /* --ssl-crlpath for MYSQL_OPT_SSL_CRLPATH */
+  static char* ocelot_opt_ssl_key_as_utf8= 0;       /* --ssl-key for MYSQL_OPT_SSL_KEY */
+  static unsigned short int ocelot_opt_ssl_verify_server_cert= 0;  /* --ssl-verify-server-cert for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert (5.7) */
+  static unsigned short ocelot_syslog= 0;           /* --syslog (5.7) */
+  static unsigned short ocelot_table= 0;            /* --table */
+  /* todo: ocelot_history_tee_file_name exists as QString. Fix that. */
+  static bool ocelot_history_tee= false;            /* --tee for tee */
+  static unsigned short ocelot_unbuffered= 0;       /* --unbuffered */
+  static unsigned short ocelot_verbose= 0;          /* --verbose */
+  static unsigned short ocelot_version= 0;          /* --version */
+  static unsigned short ocelot_result_grid_vertical= 0;   /* --vertical for vertical */
+  static unsigned short ocelot_wait= 0;                   /* --wait ... actually this does nothing */
+  static unsigned short ocelot_xml= 0;                    /* --xml */
 
-  unsigned short ocelot_safe_updates;        /* for CONNECT */
-  unsigned long int ocelot_select_limit;     /* for CONNECT */
-  unsigned long int ocelot_max_join_size;    /* for CONNECT */
-  unsigned short int ocelot_silent;          /* for CONNECT */
-  unsigned short int ocelot_wait;            /* for CONNECT */
+  /* Some items we allow, which are not available in mysql client */
+  static char* ocelot_opt_bind_as_utf8= 0;              /* for MYSQL_OPT_BIND */
+  static unsigned short ocelot_opt_can_handle_expired_passwords= 0;/* for MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS */
+  static char* ocelot_opt_connect_attr_delete_as_utf8= 0;  /* for MYSQL_OPT_CONNECT_ATTR_DELETE */
+  static unsigned short int ocelot_opt_connect_attr_reset= 0; /* for MYSQL_OPT_CONNECT_ATTR_RESET */
+  static char* ocelot_read_default_file_as_utf8= 0; /* for MYSQL_READ_DEFAULT_FILE */
+  static char* ocelot_read_default_group_as_utf8= 0;/* for MYSQL_READ_DEFAULT_GROUP */
+  static unsigned int ocelot_opt_read_timeout= 0;          /* for MYSQL_OPT_READ_TIMEOUT */
+  static unsigned short int ocelot_report_data_truncation= 0; /* for MYSQL_REPORT_DATA_TRUNCATION */
+  static unsigned short int ocelot_opt_use_result= 0; /* for MYSQL_OPT_USE_RESULT */
 
-  bool ocelot_no_beep= false;                /* for CONNECT */
-  bool ocelot_history_tee= false;            /* for tee */
-  int ocelot_history_includes_warnings= 0;   /* include warning(s) returned from statement? default = no. */
+  /* Some items we allow, but the reasons we allow them are lost in the mists of time */
+  /* I gather that one is supposed to read the charset file. I don't think we do. */
+  static unsigned short ocelot_opt_named_pipe;          /* for MYSQL_OPT_NAMED_PIPE */
+  static unsigned int ocelot_opt_write_timeout= 0; /* for MYSQL_OPT_WRITE_TIMEOUT */
 
 
-  bool ocelot_result_grid_vertical= false;   /* for vertical */
-  bool ocelot_result_grid_column_names= true;
-  bool ocelot_named_commands= false;
+
+/* copy of an information_schema.columns select, used for rehash */
+  static  unsigned int rehash_result_column_count= 0;
+  static unsigned int rehash_result_row_count= 0;
+  static char *rehash_mysql_res_copy= 0;       /* gets a copy of mysql_res contents, if necessary */
+  static char **rehash_mysql_res_copy_rows= 0; /* dynamic-sized list of mysql_res_copy row offsets, if necessary */
 
   int options_and_connect(unsigned int connection_number);
-
 
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
@@ -421,7 +472,7 @@ void MainWindow::create_widget_statement()
   statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
   statement_edit_widget->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_color);
 
-  statement_edit_widget->prompt_default= (QString)"mysql>";     /* Todo: change to "\N [\d]>"? */
+  statement_edit_widget->prompt_default= ocelot_prompt;     /* Todo: change to "\N [\d]>"? */
   statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
 
   statement_edit_widget->statement_count= 0;
@@ -519,6 +570,33 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   if (event->type() != QEvent::KeyPress) return false;
   QKeyEvent *key= static_cast<QKeyEvent *>(event);
 
+  if ((key->key() == Qt::Key_Tab) && (ocelot_auto_rehash > 0))
+  {
+    int i= 0;
+    QString s;
+    char search_string[512];
+    int search_string_len;
+    while (main_token_lengths[i] != 0) ++i;
+    if (i > 1)
+    {
+      i-= 1;
+      if ((main_token_lengths[i] < 64) && (main_token_types[i] >= TOKEN_TYPE_OTHER))
+      {
+        text= statement_edit_widget->toPlainText();
+        s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        search_string_len= s.toUtf8().size();
+        memcpy(search_string, s.toUtf8().constData(), search_string_len);
+        search_string[search_string_len]= '\0';
+        rehash_search(search_string);
+        if (strcmp(search_string, "") > 0)
+        {
+          strcpy(search_string, search_string + search_string_len);
+          statement_edit_widget->insertPlainText(search_string);
+        }
+      }
+    }
+  }
+
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
@@ -549,7 +627,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   if (statement_edit_widget->textCursor().position() <= main_token_offsets[i]) return false;
 
   /* "go" or "ego", alone on the line, if --named-commands, is statement end */
-  if ((ocelot_named_commands == true)
+  if ((ocelot_named_commands > 0)
   && ((main_token_types[i] == TOKEN_KEYWORD_GO) || (main_token_types[i] == TOKEN_KEYWORD_EGO)))
   {
     QString q;
@@ -915,9 +993,9 @@ int MainWindow::history_markup_previous_or_next()
   -------
   * Code related to tee should have the comment somewhere = "for tee"
   * bool ocelot_history_tee initially is false
-  * the options --tee=filename and --no-tee exist but aren't checked yet
+  * the options --tee=filename and --no-tee exist and are checked (I think)
   * the client statements tee filename and notee will be seen
-  * there are no menu options (todo: this is a flaw)
+  * there are no menu options (todo: decide whether this is a flaw)
   * apparently the mysql client would flush, but we don't (todo: maybe change this)
   * the mysql client would include results from queries, but we don't (todo: this is a flaw)
   * there might be html in the output (todo: decide whether this is a flaw)
@@ -1062,31 +1140,12 @@ void MainWindow::create_menu()
   connect(menu_settings_action_main, SIGNAL(triggered()), this, SLOT(action_main()));
 
   menu_options= ui->menuBar->addMenu(tr("Options"));
-  menu_options_action_option_vertical= menu_options->addAction(tr("--vertical"));
-  menu_options_action_option_vertical->setCheckable(true);
-  menu_options_action_option_vertical->setChecked(ocelot_result_grid_vertical);
-  connect(menu_options_action_option_vertical, SIGNAL(triggered(bool)), this, SLOT(action_option_vertical(bool)));
 
-  menu_options_action_option_column_names= menu_options->addAction(tr("--column-names"));
-  menu_options_action_option_column_names->setCheckable(true);
-  menu_options_action_option_column_names->setChecked(ocelot_result_grid_column_names);
-  connect(menu_options_action_option_column_names, SIGNAL(triggered(bool)), this, SLOT(action_option_column_names(bool)));
-
-  menu_options_action_option_no_beep= menu_options->addAction(tr("--no-beep"));
-  menu_options_action_option_no_beep->setCheckable(true);
-  menu_options_action_option_no_beep->setChecked(ocelot_no_beep);
-  connect(menu_options_action_option_no_beep, SIGNAL(triggered(bool)), this, SLOT(action_option_no_beep(bool)));
 
   menu_options_action_option_display_blob_as_image= menu_options->addAction(tr("display BLOB as image"));
   menu_options_action_option_display_blob_as_image->setCheckable(true);
   menu_options_action_option_display_blob_as_image->setChecked(ocelot_display_blob_as_image);
   connect(menu_options_action_option_display_blob_as_image, SIGNAL(triggered(bool)), this, SLOT(action_option_display_blob_as_image(bool)));
-
-  menu_options_action_option_named_commands= menu_options->addAction(tr("--named-commands"));
-  menu_options_action_option_named_commands->setCheckable(true);
-  menu_options_action_option_named_commands->setChecked(ocelot_named_commands);
-  connect(menu_options_action_option_named_commands, SIGNAL(triggered(bool)), this, SLOT(action_option_named_commands(bool)));
-
 
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(tr("Debug"));
@@ -1306,37 +1365,107 @@ void MainWindow::action_connect_once(QString message)
   QString *row_form_width;
   QString row_form_title;
   QString row_form_message;
+  int i;
+  Row_form_box *co;
 
   row_form_label= 0;
   row_form_type= 0;
   row_form_is_password= 0;
   row_form_data= 0;
   row_form_width= 0;
-  column_count= 8;
+  column_count= 80; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
   row_form_is_password= new int[column_count];
   row_form_data= new QString[column_count];
   row_form_width= new QString[column_count];
 
-  row_form_label[0]= "host"; row_form_type[0]= 0; row_form_is_password[0]= 0; row_form_data[0]= ocelot_host; row_form_width[0]= 80;
-  row_form_label[1]= "port"; row_form_type[1]= NUM_FLAG; row_form_is_password[1]= 0; row_form_data[1]= QString::number(ocelot_port); row_form_width[1]= 4;
-  row_form_label[2]= "user"; row_form_type[2]= 0; row_form_is_password[2]= 0; row_form_data[2]= ocelot_user; row_form_width[2]= 80;
-  row_form_label[3]= "database"; row_form_type[3]= 0; row_form_is_password[3]= 0; row_form_data[3]= ocelot_database; row_form_width[3]= 80;
-  row_form_label[4]= "socket"; row_form_type[4]= 0; row_form_is_password[4]= 0; row_form_data[4]= ocelot_unix_socket; row_form_width[4]= 80;
-  row_form_label[5]= "password"; row_form_type[5]= 0; row_form_is_password[5]= 1; row_form_data[5]= ocelot_password; row_form_width[5]= 80;
-  row_form_label[6]= "protocol"; row_form_type[6]= NUM_FLAG; row_form_is_password[6]= 0; row_form_data[6]= ocelot_protocol; row_form_width[6]= 80;
-  row_form_label[7]= "init_command"; row_form_type[7]= 0; row_form_is_password[7]= 0; row_form_data[7]= ocelot_init_command; row_form_width[7]= 80;
-  //row_form_label[8]= "default_auth"; row_form_type[8]= 0; row_form_is_password[8]= 0; row_form_data[8]= ocelot_default_auth; row_form_width[8]= 80;
+  row_form_label[i=0]= "host"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_host; row_form_width[i]= 80;
+  row_form_label[++i]= "port"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_port); row_form_width[i]= 4;
+  row_form_label[++i]= "user"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_user; row_form_width[i]= 80;
+  row_form_label[++i]= "database"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_database; row_form_width[i]= 80;
+  row_form_label[++i]= "socket"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_unix_socket; row_form_width[i]= 80;
+  row_form_label[++i]= "password"; row_form_type[i]= 0; row_form_is_password[i]= 1; row_form_data[i]= ocelot_password; row_form_width[i]= 80;
+  row_form_label[++i]= "protocol"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_protocol; row_form_width[i]= 80;
+  row_form_label[++i]= "init_command"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_init_command; row_form_width[i]= 80;
+  row_form_label[++i]= "auto_rehash"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_rehash); row_form_width[i]= 5;
+  row_form_label[++i]= "auto_vertical_output"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_vertical_output); row_form_width[i]= 5;
+  row_form_label[++i]= "batch"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_batch); row_form_width[i]= 5;
+  row_form_label[++i]= "binary_mode"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_binary_mode); row_form_width[i]= 5;
+  row_form_label[++i]= "bind_address"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_bind_address; row_form_width[i]= 5;
+  row_form_label[++i]= "character_sets_dir"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_set_charset_dir; row_form_width[i]= 5;
+  row_form_label[++i]= "column_names"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_column_names); row_form_width[i]= 5;
+  row_form_label[++i]= "column_type_info"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_column_type_info); row_form_width[i]= 5;
+  row_form_label[++i]= "comments"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_comments); row_form_width[i]= 5;
+  row_form_label[++i]= "compress"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_compress); row_form_width[i]= 5;
+  row_form_label[++i]= "connect_expired_password"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_connect_expired_password); row_form_width[i]= 5;
+  row_form_label[++i]= "connect_tmeout"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_connect_timeout); row_form_width[i]= 5;
+  row_form_label[++i]= "debug"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_debug; row_form_width[i]= 5;
+  row_form_label[++i]= "debug_check"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_check); row_form_width[i]= 5;
+  row_form_label[++i]= "debug_info"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_info); row_form_width[i]= 5;
+  row_form_label[++i]= "default_auth"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_default_auth; row_form_width[i]= 5;
+  row_form_label[++i]= "default_character_set"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_set_charset_name; row_form_width[i]= 5;
+  row_form_label[++i]= "defaults_extra_file"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_extra_file; row_form_width[i]= 5;
+  row_form_label[++i]= "defaults_file"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_file; row_form_width[i]= 5;
+  row_form_label[++i]= "defaults_group_suffix"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_read_default_group; row_form_width[i]= 5;
+  row_form_label[++i]= "delimiter"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_delimiter_str; row_form_width[i]= 5;
+  row_form_label[++i]= "enable_cleartext_plugin"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_enable_cleartext_plugin); row_form_width[i]= 5;
+  row_form_label[++i]= "execute"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_execute; row_form_width[i]= 5;
+  row_form_label[++i]= "force"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_force); row_form_width[i]= 5;
+  row_form_label[++i]= "help"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0;  row_form_data[i]= QString::number(ocelot_help); row_form_width[i]= 5;
+  row_form_label[++i]= "histignore"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_histignore); row_form_width[i]= 5;
+  row_form_label[++i]= "html"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_html); row_form_width[i]= 5;
+  row_form_label[++i]= "ignore_spaces"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ignore_spaces); row_form_width[i]= 5;
+  row_form_label[++i]= "line_numbers"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_line_numbers); row_form_width[i]= 5;
+  row_form_label[++i]= "local_infile"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_local_infile); row_form_width[i]= 5;
+  row_form_label[++i]= "login_path"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_login_path; row_form_width[i]= 5;
+  row_form_label[++i]= "max_allowed_packet"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(max_allowed_packet); row_form_width[i]= 5;
+  row_form_label[++i]= "max_join_size"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_max_join_size); row_form_width[i]= 5;
+  row_form_label[++i]= "named_commands"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_named_commands); row_form_width[i]= 5;
+  row_form_label[++i]= "net_buffer_length"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_net_buffer_length); row_form_width[i]= 5;
+  row_form_label[++i]= "no_beep"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_beep); row_form_width[i]= 5;
+  row_form_label[++i]= "no_defaults"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_defaults); row_form_width[i]= 5;
+  row_form_label[++i]= "one_database"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_one_database); row_form_width[i]= 5;
+  row_form_label[++i]= "pager"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_pager; row_form_width[i]= 5;
+  row_form_label[++i]= "pipe"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_pipe); row_form_width[i]= 5;
+  row_form_label[++i]= "plugin_dir"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_plugin_dir; row_form_width[i]= 5;
+  row_form_label[++i]= "print_defaults"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_print_defaults); row_form_width[i]= 5;
+  row_form_label[++i]= "prompt"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_prompt; row_form_width[i]= 5;
+  row_form_label[++i]= "quick"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_quick); row_form_width[i]= 5;
+  row_form_label[++i]= "raw"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_raw); row_form_width[i]= 5;
+  row_form_label[++i]= "reconnect"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_reconnect); row_form_width[i]= 5;
+  row_form_label[++i]= "safe_updates"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_safe_updates); row_form_width[i]= 5;
+  row_form_label[++i]= "secure_auth"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_secure_auth); row_form_width[i]= 5;
+  row_form_label[++i]= "select_limit"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_select_limit); row_form_width[i]= 5;
+  row_form_label[++i]= "server_public_key"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_server_public_key; row_form_width[i]= 5;
+  row_form_label[++i]= "shared_memory_base_name"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_shared_memory_base_name; row_form_width[i]= 5;
+  /* It used to crash if I said number(ocelot_history_includes_warnings). Problem has disappeared. */
+  row_form_label[++i]= "show_warnings"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_history_includes_warnings); row_form_width[i]= 5;
+  row_form_label[++i]= "sigint_ignore"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_sigint_ignore); row_form_width[i]= 5;
+  row_form_label[++i]= "silent"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_silent); row_form_width[i]= 5;
+  row_form_label[++i]= "ssl"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_ca"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_ca; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_capath"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_capath; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_cert"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_cert; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_cipher"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_cipher; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_crl"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crl; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_crlpath"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crlpath; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_key"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_key; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_verify_server_cert"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_ssl_verify_server_cert); row_form_width[i]= 5;
+  row_form_label[++i]= "syslog"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_syslog); row_form_width[i]= 5;
+  row_form_label[++i]= "table"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_table); row_form_width[i]= 5;
+  row_form_label[++i]= "tee"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_history_tee_file_name; row_form_width[i]= 5;
+  row_form_label[++i]= "unbuffered"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_unbuffered); row_form_width[i]= 5;
+  row_form_label[++i]= "verbose"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_verbose); row_form_width[i]= 5;
+  row_form_label[++i]= "version"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_version); row_form_width[i]= 5;
+  row_form_label[++i]= "vertical"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_vertical); row_form_width[i]= 5;
+  row_form_label[++i]= "wait"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_wait); row_form_width[i]= 5;
+  row_form_label[++i]= "xml"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_xml); row_form_width[i]= 5;
+
   row_form_title= tr("Connection Dialog Box");
   row_form_message= message;
 
-  QFont tmp_font;
-  QFont *saved_font;
-  tmp_font= result_grid_table_widget[0]->font(); /* assumes each occurrence has same font */
-  saved_font=&tmp_font;
-
-  Row_form_box *co= new Row_form_box(saved_font, column_count, row_form_label,
+  co= new Row_form_box(column_count, row_form_label,
 //                                     row_form_type,
                                      row_form_is_password, row_form_data,
 //                                     row_form_width,
@@ -1353,7 +1482,81 @@ void MainWindow::action_connect_once(QString message)
     ocelot_password= row_form_data[5].trimmed();
     ocelot_protocol= row_form_data[6].trimmed(); ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
     ocelot_init_command= row_form_data[7].trimmed();
-    //ocelot_default_auth= row_form_data[8];           /* Todo: this is disabled but should work with MySQL 5.6+ */
+    ocelot_auto_rehash= row_form_data[8].trimmed().toInt();
+
+    i= 9;
+    ocelot_auto_vertical_output= row_form_data[i++].trimmed().toInt();
+    ocelot_batch= row_form_data[i++].trimmed().toInt();
+    ocelot_binary_mode= row_form_data[i++].trimmed().toInt();
+    ocelot_bind_address= row_form_data[i++].trimmed();
+    ocelot_set_charset_dir= row_form_data[i++].trimmed(); /* "character_sets_dir" */
+    ocelot_result_grid_column_names= row_form_data[i++].trimmed().toInt();
+    ocelot_column_type_info= row_form_data[i++].trimmed().toInt();
+    ocelot_comments= row_form_data[i++].trimmed().toInt();
+    ocelot_opt_compress= row_form_data[i++].trimmed().toInt();
+    ocelot_connect_expired_password= row_form_data[i++].trimmed().toInt();
+    ocelot_opt_connect_timeout= row_form_data[i++].trimmed().toInt();
+    ocelot_debug= row_form_data[i++].trimmed();
+    ocelot_debug_check= row_form_data[i++].trimmed().toInt();
+    ocelot_debug_info= row_form_data[i++].trimmed().toInt();
+    ocelot_default_auth= row_form_data[i++].trimmed();
+    ocelot_set_charset_name= row_form_data[i++].trimmed(); /* "default_character_set" */
+    ocelot_defaults_extra_file= row_form_data[i++].trimmed();
+    ocelot_defaults_file= row_form_data[i++].trimmed();
+    ocelot_read_default_group= row_form_data[i++].trimmed();
+    ocelot_delimiter_str= row_form_data[i++].trimmed();
+    ocelot_enable_cleartext_plugin= row_form_data[i++].trimmed().toInt();
+    ocelot_execute= row_form_data[i++].trimmed();
+    ocelot_force= row_form_data[i++].trimmed().toInt();
+    ocelot_help= row_form_data[i++].trimmed().toInt();
+    ocelot_histignore= row_form_data[i++].trimmed().toInt();
+    ocelot_html= row_form_data[i++].trimmed().toInt();
+    ocelot_ignore_spaces= row_form_data[i++].trimmed().toInt();
+    ocelot_line_numbers= row_form_data[i++].trimmed().toInt();
+    ocelot_opt_local_infile= row_form_data[i++].trimmed().toInt();
+    ocelot_login_path= row_form_data[i++].trimmed();
+    max_allowed_packet= row_form_data[i++].trimmed().toInt();
+    ocelot_max_join_size= row_form_data[i++].trimmed().toInt();
+    ocelot_named_commands= row_form_data[i++].trimmed().toInt();
+    ocelot_net_buffer_length= row_form_data[i++].trimmed().toInt();
+    ocelot_no_beep= row_form_data[i++].trimmed().toInt();
+    ocelot_no_defaults= row_form_data[i++].trimmed().toInt();
+    ocelot_one_database= row_form_data[i++].trimmed().toInt();
+    ocelot_pager= row_form_data[i++].trimmed();
+    ocelot_pipe= row_form_data[i++].trimmed().toInt();
+    ocelot_plugin_dir= row_form_data[i++].trimmed();
+    ocelot_print_defaults= row_form_data[i++].trimmed().toInt();
+    ocelot_prompt= row_form_data[i++].trimmed();
+    ocelot_quick= row_form_data[i++].trimmed().toInt();
+    ocelot_raw= row_form_data[i++].trimmed().toInt();
+    ocelot_opt_reconnect= row_form_data[i++].trimmed().toInt();
+    ocelot_safe_updates= row_form_data[i++].trimmed().toInt();
+    ocelot_secure_auth= row_form_data[i++].trimmed().toInt();
+    ocelot_select_limit= row_form_data[i++].trimmed().toInt();
+    ocelot_server_public_key= row_form_data[i++].trimmed();
+    ocelot_shared_memory_base_name= row_form_data[i++].trimmed();
+    ocelot_history_includes_warnings= row_form_data[i++].trimmed().toInt();
+    ocelot_sigint_ignore= row_form_data[i++].trimmed().toInt();
+    ocelot_silent= row_form_data[i++].trimmed().toInt();
+    ocelot_opt_ssl= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_ca= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_capath= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_cert= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_cipher= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_crl= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_crlpath= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_key= row_form_data[i++].trimmed();
+    ocelot_opt_ssl_verify_server_cert= row_form_data[i++].trimmed().toInt();
+    ocelot_syslog= row_form_data[i++].trimmed().toInt();
+    ocelot_table= row_form_data[i++].trimmed().toInt();
+    ocelot_history_tee_file_name= row_form_data[i++].trimmed();
+    ocelot_unbuffered= row_form_data[i++].trimmed().toInt();
+    ocelot_verbose= row_form_data[i++].trimmed().toInt();
+    ocelot_version= row_form_data[i++].trimmed().toInt();
+    ocelot_result_grid_vertical= row_form_data[i++].trimmed().toInt();
+    ocelot_wait= row_form_data[i++].trimmed().toInt();
+    ocelot_xml= row_form_data[i++].trimmed().toInt();
+
     /* This should ensure that a record goes to the history widget */
     /* Todo: clear statement_edit_widget first */
     statement_edit_widget->insertPlainText("CONNECT");
@@ -1367,7 +1570,7 @@ void MainWindow::action_connect_once(QString message)
   delete(co);
 
   if (row_form_width != 0) delete [] row_form_width;
-  if (row_form_type != 0) delete [] row_form_data;
+  if (row_form_data != 0) delete [] row_form_data;
   if (row_form_is_password != 0)  delete [] row_form_is_password;
   if (row_form_type != 0) delete [] row_form_type;
   if (row_form_label != 0) delete [] row_form_label;
@@ -1389,36 +1592,15 @@ void MainWindow::action_exit()
   close();
 }
 
-/* for vertical menu item = Options|--vertical */
-void MainWindow::action_option_vertical(bool checked)
-{
-  ocelot_result_grid_vertical= checked;
-}
 
-/* menu item = Options|--column-names */
-void MainWindow::action_option_column_names(bool checked)
-{
-  ocelot_result_grid_column_names= checked;
-}
 
-/* menu item = Options|--no-beep */
-void MainWindow::action_option_no_beep(bool checked)
-{
-  ocelot_no_beep= checked;
-}
+
 
 /* menu item = Options|display BLOB as image */
 void MainWindow::action_option_display_blob_as_image(bool checked)
 {
   ocelot_display_blob_as_image= checked;
 }
-
-/* menu item = Options|--named-columns */
-void MainWindow::action_option_named_commands(bool checked)
-{
-  ocelot_named_commands= checked;
-}
-
 
 
 /* Todo: consider adding   //printf(qVersion()); */
@@ -2108,10 +2290,55 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number, int *
     routine will use both (original string,offset,length) and (returned string).
     Comments should be replaced with a single space.
 */
-//void make_statement_ready_to_send(char *query)
-//{
-//  ;
-//}
+int MainWindow::make_statement_ready_to_send(QString text, QString query_utf16_copy,
+                                             char *dbms_query, int dbms_query_len,
+                                             bool strip_last_token)
+{
+  if (ocelot_comments > 0)
+  {
+    memcpy(dbms_query, query_utf16_copy.toUtf8().constData(),dbms_query_len);
+    dbms_query[dbms_query_len]= 0;
+    return dbms_query_len;
+  }
+  int token_type;
+  unsigned int i;
+  QString q;
+  char *tmp;
+  int tmp_len;
+  unsigned int token_count;
+  dbms_query[0]= '\0';
+  /* Ignore last token(s) if delimiter, \G, \g, or (sometimes) go, ego */
+  if (strip_last_token == true)
+  {
+    int last_i= main_token_number + main_token_count_in_statement - 1;
+    QString last_token= text.mid(main_token_offsets[last_i], main_token_lengths[last_i]);
+    if ((last_token == "G") || (last_token == "g"))
+    {
+      token_count= main_token_count_in_statement - 2;
+    }
+    else token_count= main_token_count_in_statement - 1;
+  }
+  else token_count= main_token_count_in_statement;
+  for (i= main_token_number; i < main_token_number + token_count; ++i)
+  {
+    token_type= main_token_types[i];
+    if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (token_type == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (token_type == TOKEN_TYPE_COMMENT_WITH_MINUS))
+     {
+       strcat(dbms_query," ");
+       continue;
+     }
+    q= text.mid(main_token_offsets[i], main_token_offsets[i + 1] - main_token_offsets[i]);
+    tmp_len= q.toUtf8().size();           /* See comment "UTF8 Conversion" */
+    tmp= new char[tmp_len + 1];
+    memcpy(tmp, q.toUtf8().constData(), tmp_len);
+    tmp[tmp_len]= 0;
+    strcat(dbms_query, tmp);
+    delete [] tmp;
+  }
+  return (strlen(dbms_query));
+}
 
 /*
   select_1_row() is a convenience routine, made because frequently there are single-row selects.
@@ -4666,7 +4893,7 @@ void MainWindow::action_execute()
   menu_file->setEnabled(false);
   menu_edit->setEnabled(false);
   menu_run_action_execute->setEnabled(false);
-  menu_run_action_kill->setEnabled(true);
+  if (ocelot_sigint_ignore == 0) menu_run_action_kill->setEnabled(true);
   menu_settings->setEnabled(false);
   menu_debug->setEnabled(false);
   menu_help->setEnabled(false);
@@ -4712,7 +4939,7 @@ void MainWindow::action_execute_one_statement(QString text)
 {
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set;
-  bool is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
+  unsigned short int is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
 
   ++statement_edit_widget->statement_count;
 
@@ -4755,18 +4982,18 @@ void MainWindow::action_execute_one_statement(QString text)
   {
     length_of_last_token_in_statement= 2;
     strip_last_token= true;
-    if (type_of_last_token_in_statement == TOKEN_KEYWORD_EGO) is_vertical= true;
+    if (type_of_last_token_in_statement == TOKEN_KEYWORD_EGO) is_vertical= 1;
   }
 
   /* Strip last word if it's delimiter or (when --named-commands, not only token) go|ego. */
   if (last_token == ocelot_delimiter_str) strip_last_token= true;
-  else if ((ocelot_named_commands == true) && (main_token_count_in_statement > 1))
+  else if ((ocelot_named_commands > 0) && (main_token_count_in_statement > 1))
   {
     if (type_of_last_token_in_statement == TOKEN_KEYWORD_GO) strip_last_token= true;
     if (type_of_last_token_in_statement == TOKEN_KEYWORD_EGO)
     {
       strip_last_token= true;
-      is_vertical= true;
+      is_vertical= 1;
     }
   }
   if (strip_last_token == true)
@@ -4781,19 +5008,29 @@ void MainWindow::action_execute_one_statement(QString text)
   {
     /* The statement was not handled entirely by the client, it must be passed to the DBMS. */
 
+    bool do_something= true;
+
     /* If DBMS is not (yet) connected, except for certain SET @ocelot_... statements, this is an error. */
     if (is_mysql_connected == 0)
     {
       if (ecs == 2) statement_edit_widget->result= tr("OK");
       else statement_edit_widget->result= tr("ERROR not connected");
+      do_something= false;
     }
-    else
+    /* If --one-database, and USE caused default database to change, error */
+    if ((ocelot_one_database > 0) && (ocelot_database != statement_edit_widget->dbms_database))
+    {
+      statement_edit_widget->result= tr("ERROR due to --one-database");
+      do_something= false;
+    }
+    if (do_something == true)
     {
 
       dbms_query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
       dbms_query= new char[dbms_query_len + 1];
-      memcpy(dbms_query, query_utf16_copy.toUtf8().constData(),dbms_query_len);
-      dbms_query[dbms_query_len]= 0;
+      dbms_query_len= make_statement_ready_to_send(text, query_utf16_copy,
+                                                   dbms_query, dbms_query_len,
+                                                   strip_last_token);
       pthread_t thread_id;
       dbms_long_query_state= LONG_QUERY_STATE_STARTED;
       pthread_create(&thread_id, NULL, &dbms_long_query_thread, NULL);
@@ -4812,7 +5049,7 @@ void MainWindow::action_execute_one_statement(QString text)
       if (dbms_long_query_result)
       {
         /* beep() hasn't been tested because getting sound to work on my computer is so hard */
-        if (ocelot_no_beep == false) QApplication::beep();
+        if (ocelot_no_beep == 0) QApplication::beep();
         delete []dbms_query;
       }
       else {
@@ -5125,6 +5362,7 @@ int MainWindow::execute_client_statement(QString text)
     }
 
   /* PROMPT or \R: mysql equivalent. */
+  /* This overrides the default setting which is made from ocelot_prompt during connect. */
   if (statement_type == TOKEN_KEYWORD_PROMPT)
   {
     QString s;
@@ -5143,7 +5381,7 @@ int MainWindow::execute_client_statement(QString text)
     return 1;
   }
 
-  /* WARNINGS or \W: mysql equivalent. */
+  /* WARNINGS or \W: mysql equivalent. This overrides a command-line option. */
   if (statement_type == TOKEN_KEYWORD_WARNINGS)
   {
     ocelot_history_includes_warnings= 1;
@@ -5151,7 +5389,7 @@ int MainWindow::execute_client_statement(QString text)
     return 1;
   }
 
-  /* NOWARNING or \w: mysql equivalent. */
+  /* NOWARNING or \w: mysql equivalent. This overrides a command-line option. */
   if (statement_type == TOKEN_KEYWORD_NOWARNING)
   {
     ocelot_history_includes_warnings= 0;
@@ -5231,9 +5469,12 @@ int MainWindow::execute_client_statement(QString text)
     statement_edit_widget->result= tr("PRINT is not implemented.");
     return 1;
   }
-  if (statement_type == TOKEN_KEYWORD_REHASH)
+  if (statement_type == TOKEN_KEYWORD_REHASH)   /* This overrides a command-line option */
   {
-    statement_edit_widget->result= tr("REHASH is not implemented.");
+    char result[32];
+    sprintf(result, "OK, result set size = %d", rehash_scan());
+    ocelot_auto_rehash= 1;
+    statement_edit_widget->result= result;
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_STATUS)
@@ -5677,6 +5918,111 @@ int MainWindow::execute_client_statement(QString text)
 
 
 /*
+** --auto-rehash or --no-auto-rehash or --skip-auto-rehash. default = TRUE
+** unsigned short ocelot_auto_rehash
+** Add it to Options menu
+** For TOKEN_KEYWORD_REHASH, change ocelot_auto_rehash
+** Use scan_rows to make a copy of database/table/column names for current:
+   if connect, if reconnect, if "rehash", if "use"
+** When user hits \t i.e. tab, if there's an unambiguous name, fill it in
+   (don't worry about what happens if user hits tab twice)
+** There's also the little matter of whether names are case-sensitive.
+They use a hash, we don't.
+They are for current database, we're for all (if qualifier). (No, that's doomed due to correlations / aliases.)
+In fact we'd like to keep lots of information about columns, for hovering.
+*/
+
+int MainWindow::rehash_scan()
+{
+  MYSQL_RES *res= NULL;
+//  QString s;
+  unsigned long *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
+
+  grid_max_column_widths= 0;
+
+  /* garbage_collect from the last rehash, if any */
+  if (rehash_mysql_res_copy != 0) { delete [] rehash_mysql_res_copy; rehash_mysql_res_copy= 0; }
+  if (rehash_mysql_res_copy_rows != 0) { delete [] rehash_mysql_res_copy_rows; rehash_mysql_res_copy_rows= 0; }
+  rehash_result_column_count= 0;
+  rehash_result_row_count= 0;
+
+  if (is_mysql_connected != 1) return 0; /* unexpected_error= "not connected"; */
+
+  if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION],
+                  "select table_name, column_name from information_schema.columns where table_schema = database()"))
+    {
+      return 0; /* unexpected_error= "select failed"; */
+    }
+
+  res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  if (res == NULL) return 0; /* unexpected_error= "mysql_store_result failed"; */
+
+  rehash_result_column_count= mysql_num_fields(res);
+  rehash_result_row_count= mysql_num_rows(res);
+  grid_max_column_widths= new long unsigned int[rehash_result_column_count];
+  result_grid_table_widget[0]->scan_rows(
+          true, /* mysql_more_results_flag, */
+          rehash_result_column_count, /* result_column_count, */
+          rehash_result_row_count, /* result_row_count, */
+          res, /* grid_mysql_res, */
+          &rehash_mysql_res_copy,
+          &rehash_mysql_res_copy_rows,
+          &grid_max_column_widths);
+
+  mysql_free_result(res);
+
+  delete [] grid_max_column_widths;
+
+  return rehash_result_row_count;
+}
+
+/*
+  Pass: search string. Return: column name matching searching string.
+  Todo: We only look at column[1] column_name. We should look at column[0] table_name.
+*/
+void MainWindow::rehash_search(char *search_string)
+{
+  long unsigned int r;
+  char *row_pointer;
+  unsigned long column_length;
+  unsigned int i;
+  char column_value[512];
+  unsigned int search_string_length;
+
+  search_string_length= strlen(search_string);
+  column_value[0]= '\0';
+
+  for (r= 0; r < rehash_result_row_count; ++r)
+  {
+    row_pointer= rehash_mysql_res_copy_rows[r];
+    for (i= 0; i < rehash_result_column_count; ++i)
+    {
+      memcpy(&column_length, row_pointer, sizeof(column_length));
+      row_pointer+= sizeof(column_length);
+      /* Now row_pointer points to contents, length has # of bytes */
+      if (i == 1)
+      {
+        if (search_string_length < column_length)
+        {
+          if (strncmp(row_pointer, search_string, search_string_length) == 0)
+          {
+            if (column_value[0] != '\0')
+            {
+              strcpy(search_string, "");
+              return; /* too many matches */
+            }
+            strncpy(column_value, row_pointer, column_length);
+            column_value[column_length]= '\0';
+          }
+        }
+      }
+    row_pointer+= column_length;
+    }
+  }
+  strcpy(search_string, column_value);
+}
+
+/*
   Call widget_sizer() from action_execute() to resize the three
   main_layout widgets if necessary.
   Todo: so far widget_sizer() is just ideas, mostly unimplemented.
@@ -5754,7 +6100,7 @@ void MainWindow::put_diagnostics_in_result()
     s1.append(mysql_error_and_state);
     if (mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]) > 0)
     {
-      if (ocelot_history_includes_warnings == 1)
+      if (ocelot_history_includes_warnings > 0)
       {
         mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "show warnings");
         MYSQL_RES *mysql_res_for_warnings;
@@ -5765,7 +6111,7 @@ void MainWindow::put_diagnostics_in_result()
         for (unsigned int wi= 0; wi <= mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]); ++wi)
         {
           warnings_row= mysql_fetch_row(mysql_res_for_warnings);
-          if (warnings_row!=NULL)
+          if (warnings_row != NULL)
           {
             /* lengths= mysql_fetch_lengths(connect_res); */
             sprintf(mysql_error_and_state, "\n%s (%s) %s.", warnings_row[0], warnings_row[1], warnings_row[2]);
@@ -7138,6 +7484,14 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   statement_edit_widget->result= tr("OK");
 
   /*
+    Todo: This overrides any earlier PROMPT statements by user.
+    Probably what we want is a flag: "if user did PROMPT, don't override it."
+    Or we want PROMPT statement to change ocelot_prompt.
+  */
+  statement_edit_widget->prompt_default= ocelot_prompt;
+  statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
+
+  /*
     Collect some variables in case they're needed for "prompt".
     Todo: check for errors after these mysql_ calls.
     Not using the mysql_res global, since this is not for user to see.
@@ -7685,7 +8039,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
   {
     if (event->x() > minimum_width)
     {
-      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy == true)
+      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy > 0)
       {
         setFixedSize(event->x(), height());
       }
@@ -7710,7 +8064,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
   {
     if (event->y() > minimum_height)
     {
-      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy == true)
+      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy > 0)
       {
         setFixedSize(width(), event->y());
       }
@@ -7875,16 +8229,12 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
    Most options are ignored but the ones which might be essential for connecting are not ignored.
    Example: if ~/.my.cnf has "port=3306" in [clients] group, and start happens with --host=127.0.0.1,
             then port=3306 and current_host=127.0.0.1 and that will get passed to the connect routine.
-   Read: http://dev.mysql.com/doc/refman/5.1/en/connecting.html
+   Read: http://dev.mysql.com/doc/refman/5.6/en/connecting.html
+         See also http://dev.mysql.com/doc/refman/5.6/en/mysql-command-options.html
 
    At one time there was an include of getopt.h and calls to my_long_options etc.
    That introduced some unwanted dependencies and so now we do all the option retrievals directly.
  */
-
-/* See also http://dev.mysql.com/doc/refman/5.6/en/mysql-command-options.html */
-
-//static int connected= 0;
-//extern  MYSQL mysql;
 
 /*
   Connect -- get options
@@ -7983,12 +8333,7 @@ QString connect_stripper(QString value_to_strip);
 
 void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 {
-  //char *ld_run_path;
-  //char *group_suffix;
-  //char *mysql_host;
-  //char *mysql_ps1;
   char *mysql_pwd;
-  //char *tz_user;
   char *home;
   char tmp_my_cnf[1024];                         /* file name = $HOME/.my.cnf or $HOME/.mylogin.cnf or defaults_extra_file */
 
@@ -8009,22 +8354,21 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_database= "";
   ocelot_user= "";
   ocelot_password_was_specified= 0;
-  ocelot_port= MYSQL_PORT;
-  ocelot_unix_socket= "";
+  /* ocelot_port= MYSQL_PORT; */ /* already initialized */
   ocelot_unix_socket= "";
   ocelot_default_auth= "";
-  ocelot_enable_cleartext_plugin= 0;
+  /* ocelot_enable_cleartext_plugin= 0; */ /* already initialized */
   ocelot_init_command= "";
   ocelot_opt_bind= "";
-  ocelot_opt_can_handle_expired_passwords= 0;
-  ocelot_opt_compress= 0;
+  /* ocelot_opt_can_handle_expired_passwords= 0; */ /* already initialized */
+  /* ocelot_opt_compress= 0; */ /* already initialized */
   ocelot_opt_connect_attr_delete= "";
-  ocelot_opt_connect_attr_reset= 0;
-  ocelot_opt_connect_timeout= 0;
-  ocelot_opt_local_infile= 0;
-  ocelot_opt_named_pipe= 0;
-  ocelot_opt_read_timeout= 0;
-  ocelot_opt_reconnect= 0;
+  /* ocelot_opt_connect_attr_reset= 0; */ /* already initialized */
+  /* ocelot_opt_connect_timeout= 0; */ /* ocelot_opt_connect_timeout is initialized to 0 */
+  /* ocelot_opt_local_infile= 0; */ /* ocelot_opt_local_infile is initialized to 0 */
+  /* ocelot_opt_named_pipe= 0; */ /* already initialized */
+  /* ocelot_opt_read_timeout= 0; */ /* already initialized */
+  /* ocelot_opt_reconnect= 0; */ /* ocelot_opt_reconnect is initialized to 0 */
   ocelot_opt_ssl= "";
   ocelot_opt_ssl_ca= "";
   ocelot_opt_ssl_capath= "";
@@ -8033,14 +8377,14 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_opt_ssl_crl= "";
   ocelot_opt_ssl_crlpath= "";
   ocelot_opt_ssl_key= "";
-  ocelot_opt_ssl_verify_server_cert= 0;
-  ocelot_opt_use_result= 0;
-  ocelot_opt_write_timeout= 0;
+  /* ocelot_opt_ssl_verify_server_cert= 0; */ /* already initialized */
+  /* ocelot_opt_use_result= 0; */ /* already initialized */
+  /* ocelot_opt_write_timeout= 0; */ /* already initialized */
   ocelot_plugin_dir= "";
   ocelot_read_default_file= "";
   ocelot_read_default_group= "";
-  ocelot_report_data_truncation= 0;
-  ocelot_secure_auth= 0;
+  /* ocelot_report_data_truncation= 0; */ /* already initialized */
+  /* ocelot_secure_auth= 1; secure_auth is 1 by default anyway */ /* =1 if mysql 5.6.7 */
   ocelot_server_public_key= "";
   ocelot_set_charset_dir= "";
   ocelot_set_charset_name= ""; /* ocelot_default_character_set= "";  */
@@ -8048,15 +8392,22 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 
   ocelot_protocol= ""; ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
 
-  ocelot_comments= 0;
   ocelot_delimiter_str= ";";
-  ocelot_history_includes_warnings= 0;
-  ocelot_safe_updates= 0;
-  ocelot_select_limit= 0;
-  ocelot_max_join_size= 0;
-  ocelot_silent= 0;
-  /* ocelot_no_beep= 0; */ /* ocelot_no_beep is initialized to true */
-  ocelot_wait= 0;
+  /* ocelot_history_includes_warnings= 0; is default anyway */
+  /* ocelot_sigint_ignore= 0; is default anyway */
+  /* ocelot_safe_updates= 0; */ /* ocelot_safe_updates is initialized to 0 */
+  /* ocelot_select_limit= 0; */ /* ocelot_select_limit is initialized to 0 */
+  /* ocelot_max_join_size= 0; */ /* ocelot_max_join_size is initialized to 0 */
+  /* ocelot_silent= 0; */ /* ocelot_silent is initialized to 0 */
+  /* ocelot_no_beep= 0; */ /* ocelot_no_beep is initialized to 0 */
+  /* ocelot_wait= 0; *//* ocelot_wait is initialized to 0 */
+
+  ocelot_bind_address= "";
+  ocelot_debug= "";
+  ocelot_execute= "";
+  ocelot_login_path= "";
+  ocelot_pager= "";
+  ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
 
   {
     struct passwd *pw;
@@ -8422,63 +8773,35 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   {
     if (token0_as_utf8[i] == '-') token0_as_utf8[i]= '_';
   }
-  if ((token0_length >= sizeof("ho")) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
-  {
-    ocelot_host= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "database") == 0)
-  {
-    ocelot_database= token2;
-    return;
-  }
-  if ((token0_length >= sizeof("us")) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
-  {
-    ocelot_user= token2;
-    return;
-  }
-  if ((token0_length >= sizeof("pas")) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
-  {
-    ocelot_password= token2;
-    ocelot_password_was_specified= 1;
-    return;
-  }
-  if ((token0_length >= sizeof("po")) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
-  {
-    ocelot_port= token2.toInt();
-    return;
-  }
-  if ((token0_length >= sizeof("so")) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
-  {
-    ocelot_unix_socket= token2;
-    return;
-  }
-  if ((token0_length >= sizeof("default_a")) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
-  {
-    ocelot_default_auth= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "enable_cleartext_plugin") == 0)
-  {
-    ocelot_enable_cleartext_plugin= token2.toInt();
-    return;
-  }
-  if (strcmp(token0_as_utf8, "init_command") == 0)
-  {
-    ocelot_init_command= token2;
-    return;
-  }
+
+  if (strcmp(token0_as_utf8, "auto_rehash") == 0) { ocelot_auto_rehash= 1; return; }
+  if (strcmp(token0_as_utf8, "auto_vertical_output") == 0) { ocelot_auto_vertical_output= 1; return; }
+  if (strcmp(token0_as_utf8, "batch") == 0) { ocelot_batch= 1; return; }
+  if (strcmp(token0_as_utf8, "binary_mode") == 0) { ocelot_binary_mode= 1; return; }
   if (strcmp(token0_as_utf8, "bind") == 0) /* not available in mysql client */
   {
     ocelot_opt_bind= token2;
     return;
   }
+  if (strcmp(token0_as_utf8, "bind_address") == 0) { ocelot_bind_address= 1; return; }
   if (strcmp(token0_as_utf8, "can_handle_expired_passwords") == 0) /* not available in mysql client */
   {
     ocelot_opt_can_handle_expired_passwords= 1;
     return;
   }
 
+  if (strcmp(token0_as_utf8, "character_sets_dir") == 0)
+  {
+    ocelot_set_charset_dir= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "column_names") == 0) { ocelot_result_grid_column_names= 1; return; }
+  if (strcmp(token0_as_utf8, "column_type_info") == 0) { ocelot_column_type_info= 1; return; }
+  if ((token0_length >= sizeof("comm")) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
+  {
+    ocelot_comments= 1;
+    return;
+  }
   if ((token0_length >= sizeof("comp")) && (strncmp(token0_as_utf8, "compress", token0_length) == 0))
   {
     ocelot_opt_compress= 1;
@@ -8494,189 +8817,26 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_connect_attr_reset= 1;
     return;
   }
-
   if ((token0_length >= sizeof("con")) && (strncmp(token0_as_utf8, "connect_timeout", token0_length) == 0))
   {
     ocelot_opt_connect_timeout= token2.toLong();
     return;
   }
-  if ((token0_length >= sizeof("lo")) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "database") == 0)
   {
-    ocelot_opt_local_infile= 1;
+    ocelot_database= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "pipe") == 0) /* Not sure about this. Windows. Same as protocol? */
+  if (strcmp(token0_as_utf8, "debug") == 0) { ocelot_debug= token2; return; }
+  if (strcmp(token0_as_utf8, "debug_info") == 0) { ocelot_debug_info= 1; return; }
+  if ((token0_length >= sizeof("default_a")) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
   {
-    ocelot_opt_named_pipe= 1;
+    ocelot_default_auth= token2;
     return;
   }
-
-  if ((token0_length >= sizeof("prot")) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
-  {
-    ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
-    ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
-    return;
-  }
-  if (strcmp(token0_as_utf8, "read_timeout") == 0) /* not available in mysql client */
-  {
-    ocelot_opt_read_timeout= token2.toInt();
-    return;
-  }
-
-  if (strcmp(token0_as_utf8, "reconnect") == 0)
-  {
-    ocelot_opt_reconnect= 1;
-    return;
-  }
-
-  if (strcmp(token0_as_utf8, "ssl") == 0)
-  {
-    ocelot_opt_ssl= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
-  {
-    ocelot_opt_ssl_ca= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
-  {
-    ocelot_opt_ssl_capath= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
-  {
-    ocelot_opt_ssl_cert= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
-  {
-    ocelot_opt_ssl_cipher= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
-  {
-    ocelot_opt_ssl_crl= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
-  {
-    ocelot_opt_ssl_crlpath= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_key") == 0)
-  {
-    ocelot_opt_ssl_key= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_verify_server_cert") == 0)
-  {
-    ocelot_opt_ssl_verify_server_cert= token2.toInt();
-    return;
-  }
-  if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
-  {
-    ocelot_opt_use_result= token2.toInt();
-    return;
-  }
-
-  if (strcmp(token0_as_utf8, "ssl") == 0)
-  {
-    ocelot_opt_ssl= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
-  {
-    ocelot_opt_ssl_ca= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
-  {
-    ocelot_opt_ssl_capath= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
-  {
-    ocelot_opt_ssl_cert= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
-  {
-    ocelot_opt_ssl_cipher= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
-  {
-    ocelot_opt_ssl_crl= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
-  {
-    ocelot_opt_ssl_crlpath= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_key") == 0)
-  {
-    ocelot_opt_ssl_key= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "write_timeout") == 0)
-  {
-    ocelot_opt_write_timeout= token2.toInt();
-    return;
-  }
-  if ((token0_length >= sizeof("pl")) && (strncmp(token0_as_utf8, "plugin_dir", token0_length) == 0))
-  {
-    ocelot_plugin_dir= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "read_default_file") == 0) /* not available in mysql client */
-  {
-    ocelot_read_default_file= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "read_default_group") == 0) /* not available in mysql client */
-  {
-    ocelot_read_default_group= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "report_data_truncation") == 0) /* not available in mysql client */
-  {
-    ocelot_report_data_truncation= 1;
-    return;
-  }
-
-  if ((token0_length >= sizeof("sec")) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
-  {
-    ocelot_secure_auth= 1;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "server_public_key") == 0) /* not available in mysql client */
-  {
-    ocelot_server_public_key= token2;
-    return;
-  }
-
-  if (strcmp(token0_as_utf8, "character_sets_dir") == 0)
-  {
-    ocelot_set_charset_dir= token2;
-    return;
-  }
-
   if (strcmp(token0_as_utf8, "default_character_set") == 0)
   {
     ocelot_set_charset_name= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
-  {
-    ocelot_shared_memory_base_name= token2;
-    return;
-  }
-
-  if (strcmp(token0_as_utf8, "no_defaults") == 0)
-  {
-    ocelot_no_defaults= 1;
     return;
   }
   if (strcmp(token0_as_utf8, "defaults_extra_file") == 0)
@@ -8689,41 +8849,118 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_defaults_file= token2;
     return;
   }
-
-
-  if ((token0_length >= sizeof("comm")) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
+  if ((token0_length >= sizeof("del")) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
   {
-    ocelot_comments= 1;
+    ocelot_delimiter_str= token2;
     return;
   }
-  if ((token0_length >= sizeof("sel")) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "disable_named_commands") == 0) { ocelot_named_commands= 0; return; }
+  if (strcmp(token0_as_utf8, "enable_cleartext_plugin") == 0)
   {
-    ocelot_select_limit= token2.toLong();
+    ocelot_enable_cleartext_plugin= 1;
     return;
   }
-  if ((token0_length >= sizeof("sel")) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "execute") == 0) { ocelot_execute= token2; return; }
+  if (strcmp(token0_as_utf8, "force") == 0) { ocelot_force= 1; return; }
+  if (strcmp(token0_as_utf8, "help") == 0) { ocelot_help= 1; return; }
+  if (strcmp(token0_as_utf8, "histignore") == 0) { ocelot_histignore= 1; return; }
+  if ((token0_length >= sizeof("ho")) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
   {
-    ocelot_select_limit= token2.toLong();
+    ocelot_host= token2;
     return;
   }
+  if (strcmp(token0_as_utf8, "html") == 0) { ocelot_html= 1; return; }
+  if ((token0_length >= sizeof("i_")) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
+  {
+    ocelot_safe_updates= 1;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ignore_spaces") == 0) { ocelot_ignore_spaces= 1; return; }
+  if (strcmp(token0_as_utf8, "init_command") == 0)
+  {
+    ocelot_init_command= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "line_numbers") == 0) { ocelot_line_numbers= 1; return; }
+  if ((token0_length >= sizeof("lo")) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
+  {
+    ocelot_opt_local_infile= 1;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "login_path") == 0) { ocelot_login_path= token2; return; }
+  if (strcmp(token0_as_utf8, "max_allowed_packet") == 0) { ocelot_max_allowed_packet= token2.toLong(); return; }
   if ((token0_length >= sizeof("max_j")) && (strncmp(token0_as_utf8, "max_join_size", token0_length) == 0))
   {
     ocelot_max_join_size= token2.toLong();
     return;
   }
-  if ((token0_length >= sizeof("sil")) && (strncmp(token0_as_utf8, "sil", token0_length) == 0))
-  {
-    ocelot_silent= 1;
-    return;
-  }
+  if (strcmp(token0_as_utf8, "named_commands") == 0) { ocelot_named_commands= 1; return; }
+  if (strcmp(token0_as_utf8, "net_buffer_length") == 0) { ocelot_net_buffer_length= token2.toLong(); return; }
+  if (strcmp(token0_as_utf8, "no_auto_rehash") == 0) { ocelot_auto_rehash= 0; return; }
   if ((token0_length >= sizeof("no_b")) && (strncmp(token0_as_utf8, "no_beep", token0_length) == 0))
   {
-    ocelot_no_beep= true;
+    ocelot_no_beep= 1;
     return;
   }
-  if ((token0_length >= sizeof("w")) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "no_defaults") == 0) { ocelot_no_defaults= 1; return; }
+  if (strcmp(token0_as_utf8, "no_named_commands") == 0) { ocelot_named_commands= 0; return; }
+  if (strcmp(token0_as_utf8, "no_tee") == 0) { history_tee_stop(); return; }/* for tee */
+  if (strcmp(token0_as_utf8, "one_database") == 0) { ocelot_one_database= 1; return; }
+  if (strcmp(token0_as_utf8, "pager") == 0) { ocelot_pager= 1; return; }
+  if ((token0_length >= sizeof("pas")) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
   {
-    ocelot_wait= 1;
+    ocelot_password= token2;
+    ocelot_password_was_specified= 1;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "pipe") == 0) /* Not sure about this. Windows. Same as protocol? */
+  {
+    ocelot_opt_named_pipe= 1;
+    return;
+  }
+  if ((token0_length >= sizeof("pl")) && (strncmp(token0_as_utf8, "plugin_dir", token0_length) == 0))
+  {
+    ocelot_plugin_dir= token2;
+    return;
+  }
+  if ((token0_length >= sizeof("po")) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
+  {
+    ocelot_port= token2.toInt();
+    return;
+  }
+  if (strcmp(token0_as_utf8, "print_defaults") == 0) { ocelot_print_defaults= 1; return; }
+  if (strcmp(token0_as_utf8, "prompt") == 0) { ocelot_prompt= token2; return; }
+  if ((token0_length >= sizeof("prot")) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
+  {
+    ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
+    ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
+    return;
+  }
+  if (strcmp(token0_as_utf8, "quick") == 0) { ocelot_quick= 1; return; }
+  if (strcmp(token0_as_utf8, "raw") == 0) { ocelot_raw= 1; return; }
+  if (strcmp(token0_as_utf8, "read_default_file") == 0) /* not available in mysql client */
+  {
+    ocelot_read_default_file= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "read_default_group") == 0) /* not available in mysql client */
+  {
+    ocelot_read_default_group= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "read_timeout") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_read_timeout= token2.toInt();
+    return;
+  }
+  if (strcmp(token0_as_utf8, "reconnect") == 0)
+  {
+    ocelot_opt_reconnect= 1;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "report_data_truncation") == 0) /* not available in mysql client */
+  {
+    ocelot_report_data_truncation= 1;
     return;
   }
   if ((token0_length >= sizeof("sa")) && (strncmp(token0_as_utf8, "safe_updates", token0_length) == 0))
@@ -8731,68 +8968,126 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_safe_updates= 1;
     return;
   }
-  if ((token0_length >= sizeof("i_")) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
+  if ((token0_length >= sizeof("sec")) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
   {
-    ocelot_safe_updates= 1;
+    ocelot_secure_auth= 1;
     return;
   }
-  if ((token0_length >= sizeof("del")) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "server_public_key") == 0) /* not available in mysql client */
   {
-    ocelot_delimiter_str= token2;
+    ocelot_server_public_key= token2;
     return;
   }
+   if ((token0_length >= sizeof("sel")) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
+  {
+    ocelot_select_limit= token2.toLong();
+    return;
+  }
+
+  if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
+  {
+    ocelot_shared_memory_base_name= token2;
+    return;
+    }
   if ((token0_length >= sizeof("sh")) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
   {
     ocelot_history_includes_warnings= 1;
     return;
-  }
-
-  if (strcmp(token0_as_utf8, "tee") == 0)                 /* for tee */
+    }
+  if (strcmp(token0_as_utf8, "sigint_ignore") == 0) { ocelot_sigint_ignore= 1; return; }
+  if ((token0_length >= sizeof("sil")) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
   {
-    history_tee_start(token2);
-    /* todo: check whether history_tee_start returned NULL which is an error */
+    ocelot_silent= 1;
     return;
   }
-
-  if (strcmp(token0_as_utf8, "no_tee") == 0)              /* for tee */
+  if (strcmp(token0_as_utf8, "skip_auto_rehash") == 0) { ocelot_auto_rehash= 0; return; }
+  if (strcmp(token0_as_utf8, "skip_column_names") == 0) { ocelot_result_grid_column_names= 0; return; }
+  if (strcmp(token0_as_utf8, "skip_comments") == 0) { ocelot_comments= 0; return; }
+  if (strcmp(token0_as_utf8, "skip_named_commands") == 0) { ocelot_named_commands= 0; return; }
+  if (strcmp(token0_as_utf8, "skip_secure_auth") == 0)
   {
-    history_tee_stop();
+    ocelot_secure_auth= 0;
     return;
   }
-
-  /* todo: check that this finds both --vertical and -E */
-  if (strcmp(token0_as_utf8, "vertical") == 0)              /* for vertical */
+  if ((token0_length >= sizeof("so")) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
   {
-    ocelot_result_grid_vertical= true;
+    ocelot_unix_socket= token2;
     return;
   }
-
-  if (strcmp(token0_as_utf8, "column_names") == 0)
+  if (strcmp(token0_as_utf8, "ssl") == 0)
   {
-    ocelot_result_grid_column_names= true;
+    ocelot_opt_ssl= token2;
     return;
   }
-
-  if (strcmp(token0_as_utf8, "skip_column_names") == 0)
+  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
   {
-    ocelot_result_grid_column_names= false;
+    ocelot_opt_ssl_ca= token2;
     return;
   }
-
-  if (strcmp(token0_as_utf8, "named_commands") == 0)
+  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
   {
-    ocelot_named_commands= true;
+    ocelot_opt_ssl_capath= token2;
     return;
   }
-
-  if ((strcmp(token0_as_utf8, "no_named_commands") == 0)
-   || (strcmp(token0_as_utf8, "skip_named_commands") == 0)
-   || (strcmp(token0_as_utf8, "disable_named_commands") == 0))
+  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
   {
-    ocelot_named_commands= false;
+    ocelot_opt_ssl_cert= token2;
     return;
   }
-
+  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
+  {
+    ocelot_opt_ssl_cipher= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
+  {
+    ocelot_opt_ssl_crl= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
+  {
+    ocelot_opt_ssl_crlpath= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_key") == 0)
+  {
+    ocelot_opt_ssl_key= token2;
+    return;
+  }
+  if ((token0_length >= sizeof("ssl_verify")) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
+  {
+    ocelot_opt_ssl_verify_server_cert= token2.toInt();
+    return;
+  }
+  if (strcmp(token0_as_utf8, "syslog") == 0) { ocelot_syslog= 1; return; }
+  if (strcmp(token0_as_utf8, "table") == 0) { ocelot_table= 1; return; }
+  if (strcmp(token0_as_utf8, "tee") == 0) { history_tee_start(token2); /* todo: check whether history_tee_start returned NULL which is an error */ return; }/* for tee */
+  if (strcmp(token0_as_utf8, "unbuffered") == 0) { ocelot_unbuffered= 1; return; }
+  if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_use_result= token2.toInt();
+    return;
+  }
+  if ((token0_length >= sizeof("us")) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
+  {
+    ocelot_user= token2;
+    return;
+  }
+  /* todo: check that this finds both --vertical and -E */ /* for vertical */
+  if (strcmp(token0_as_utf8, "verbose") == 0) { ocelot_verbose= 1; return; }
+  if (strcmp(token0_as_utf8, "version") == 0) { ocelot_version= 1; return; }
+  if (strcmp(token0_as_utf8, "vertical") == 0) { ocelot_result_grid_vertical= 1; return; }
+  if ((token0_length >= sizeof("w")) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
+  {
+    ocelot_wait= 1;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "write_timeout") == 0)
+  {
+    ocelot_opt_write_timeout= token2.toInt();
+    return;
+  }
+  if (strcmp(token0_as_utf8, "xml") == 0) { ocelot_xml= 1; return; }
 }
 
 
@@ -8874,7 +9169,7 @@ int options_and_connect(
   if (ocelot_default_auth_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_DEFAULT_AUTH, ocelot_default_auth_as_utf8);
 #endif
 #ifdef MYSQL_ENABLE_CLEARTEXT_PLUGIN
-  if (ocelot_enable_cleartext_plugin != 0) mysql_options(&mysql[connection_number], MYSQL_ENABLE_CLEARTEXT_PLUGIN, ocelot_enable_cleartext_plugin);
+  if (ocelot_enable_cleartext_plugin == true) mysql_options(&mysql[connection_number], MYSQL_ENABLE_CLEARTEXT_PLUGIN, ocelot_enable_cleartext_plugin);
 #endif
   if (ocelot_init_command_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, ocelot_init_command_as_utf8);
 #ifdef MYSQL_OPT_BIND
@@ -8883,7 +9178,7 @@ int options_and_connect(
 #ifdef MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS
   if (ocelot_can_handle_expired_passwords != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS, ocelot_can_handle_expired_passwords);
 #endif
-  if (ocelot_opt_compress != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
+  if (ocelot_opt_compress > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
 #ifdef MYSQL_OPT_CONNECT_ATTR_DELETE
   if (ocelot_opt_connect_attr_delete_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_DELETE, ocelot_opt_connect_attr_delete_as_utf8);
 #endif
@@ -8959,7 +9254,7 @@ int options_and_connect(
   if (ocelot_shared_memory_base_name_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SHARED_MEMORY_BASE_NAME, ocelot_shared_memory_base_name_as_utf8);
 #endif
 
-  if (ocelot_safe_updates != 0)
+  if (ocelot_safe_updates > 0)
   {
     char init_command[100]; /* todo: the size could be more dynamic here */
     sprintf(init_command,
