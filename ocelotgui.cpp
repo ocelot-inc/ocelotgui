@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: April 21 2015
+   Last modified: April 22 2015
 */
 
 /*
@@ -2477,6 +2477,7 @@ QString debug_routine_name[DEBUG_TAB_WIDGET_MAX + 1];
 
 QString debug_q_schema_name_in_statement;
 QString debug_q_routine_name_in_statement;
+QString debug_statement;
 
 QTimer *debug_timer;                                    /* For calling action_debug_timer_status() every 1/10 seconds */
 int debug_timer_old_line_number;
@@ -2487,6 +2488,7 @@ int debug_timer_old_commands_count;
 int debug_timer_old_number_of_status_message;
 int debug_timer_old_icc_count;
 int debug_timer_old_debug_widget_index;
+
 
 
 /*
@@ -3553,7 +3555,6 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   QString qstring_error_message;
   int current_widget_index;
   QString q_routine_schema, q_routine_name;
-
   char command_string[2048];
   int index_of_number_1, index_of_number_2;
 
@@ -3724,7 +3725,9 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     debug_widget[debug_widget_index]->setReadOnly(false);                 /* if debug shouldn't be editable, set to "true" here */
     debug_widget[debug_widget_index]->installEventFilter(this);           /* is this necessary? */
     debug_tab_widget->addTab(debug_widget[debug_widget_index], debug_routine_name[debug_widget_index]);
-    if ((debug_routine_name[debug_widget_index] == q_routine_name) && (debug_routine_schema_name[debug_widget_index] == q_routine_schema))
+
+    if ((QString::compare(debug_routine_name[debug_widget_index], q_routine_name, Qt::CaseInsensitive) == 0)
+    &&  (QString::compare(debug_routine_schema_name[debug_widget_index], q_routine_schema, Qt::CaseInsensitive) == 0))
     {
       current_widget_index= debug_widget_index;
     }
@@ -3777,7 +3780,6 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     sprintf(error_message, "Debuggee not responding. Code = %d. Thread has not been stopped.\n", debuggee_state);
     if (debug_error(error_message) != 0) return;
   }
-
   /*
     Attach to the debuggee.
     Todo: Check: is it possible for this to fail because thread has not connected yet? If so, sleep + repeat?
@@ -3814,6 +3816,28 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   //  strcat(call_statement, ".");
   //}
   //strcat(call_statement, routine_name);
+
+  /*
+    To work around a flaw in MDBug, convert all ' to ''.
+    Todo: This does not solve for $debug var_proc(''a''bc'');
+    so the manual should recommend: use an escape for '.
+    Todo: Check if other debug commands containing ', e.g. conditional breakpoints, work.
+  */
+  if (strchr(command_string, 0x27) != NULL)
+  {
+    char command_string_2[2048];
+    char *iptr, *optr;
+    for (iptr= command_string, optr= command_string_2;;)
+      {
+      if (*iptr == 0x27) { *optr= 0x27; ++optr; }
+      *optr= *iptr;
+      if (*iptr == '\0') break;
+      ++iptr;
+      ++optr;
+    }
+    strcpy(command_string, command_string_2);
+  }
+
   if (debug_call_xxxmdbug_command(command_string) != 0)
   {
     /* Debug failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
@@ -4266,8 +4290,6 @@ void MainWindow::debug_highlight_line()
 
   --new_line_number;
 
-  if (new_line_number < 0) new_line_number= 0; /* Probably this is unnecessary */
-
   /*
     Something like QTextCursor::HighlightCurrentLine. Make the background light red.
     This cancels the "current line" background (which is light yellow), and can be cancelled by it -- I think that's okay.
@@ -4294,7 +4316,11 @@ void MainWindow::debug_highlight_line()
   QColor lineColor= QColor(Qt::red).lighter(160);
 
   QTextDocument* doc= debug_widget[debug_widget_index]->document();
-  QTextBlock block= doc->findBlockByNumber(new_line_number);
+  QTextBlock block;
+  /* new_line_number will be -2 if "debuggee_wait_loop ended". probably -1 is impossible */
+  if (new_line_number == -2) block= doc->findBlockByNumber(doc->blockCount() - 1);
+  else if (new_line_number < 0) block= doc->findBlockByNumber(0);
+  else block= doc->findBlockByNumber(new_line_number);
   int pos= block.position();
 
   selection.format.setBackground(lineColor);
@@ -4394,6 +4420,9 @@ void MainWindow::debug_exit_go(int flagger)
     if (select_1_row_result_1 == "") break;
   }
 
+  /* $install was saying "Suggested next step is: $EXIT" even though $EXIT was already done. */
+  debuggee_state= DEBUGGEE_STATE_0;
+
   if (flagger == 0)
   {
     put_diagnostics_in_result(); /* This should show the result of the final call or select, so it should be "ok" */
@@ -4472,7 +4501,9 @@ void MainWindow::action_debug_refresh_call_stack()
 
 
 /*
-  Called from: action_debug_exit(), action_debug_debug(), action_debug_information()
+  Called from: action_debug_exit(), action_debug_debug(), action_debug_information(),
+  and anything else which requires xxxmdbug.command -- except 'attach', except
+  'information status' from from action_debug_timer_status().
   Make the SQL statement that is actually executed, but don't trouble the user with
   the details by showing it. For example, if the user said "$DEBUG test.p8", we
   execute "call xxxmdbug.command('channel#...','debug test.p8')" and return the
@@ -4485,7 +4516,7 @@ int MainWindow::debug_call_xxxmdbug_command(const char *command)
   strcpy(call_statement, "call xxxmdbug.command('");
   strcat(call_statement, debuggee_channel_name);
   strcat(call_statement, "', '");
-  strcat(call_statement,command);
+  strcat(call_statement, command);
   strcat(call_statement, "');\n");
 
   if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
@@ -4494,6 +4525,8 @@ int MainWindow::debug_call_xxxmdbug_command(const char *command)
     put_diagnostics_in_result();
     return 1;
   }
+  debug_statement= command;
+
   //put_diagnostics_in_result()???
 
   /* We no longer try to get the debuggee response with debug_information_status(). */
@@ -4720,6 +4753,20 @@ void MainWindow::action_debug_timer_status()
 
     if (strstr(debuggee_information_status_last_command_result, "Failed, the expected command is debug") != NULL)
       strcpy(debuggee_information_status_last_command_result, "Routine has stopped and continuing past the end is not possible.  Suggested next step is: $EXIT");
+
+  /*
+    When execution ends, we still have line number = 0 and "stopped at breakpoint".
+    That's misleading, but rather than change MDBug, let's override what it returns.
+    Also: last command isn't always updated if execution has ended.
+  */
+  if (strcmp(debuggee_information_status_last_command_result, "debuggee_wait_loop ended") == 0)
+  {
+    strcpy(debuggee_information_status_line_number, "-1");
+    strcpy(debuggee_information_status_is_at_breakpoint, "no");
+    strcpy(debuggee_information_status_is_at_routine_exit, "yes");
+    strcpy(debuggee_information_status_last_command, debug_statement.toUtf8());
+    /* todo: what about debuggee_information_status_last_command_result? */
+  }
 
   /*
     Change line_edit i.e. status widget, and maybe change highlight, if there's a new message.
