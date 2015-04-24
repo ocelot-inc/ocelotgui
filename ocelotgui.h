@@ -318,6 +318,7 @@ private:
   QString connect_stripper(QString value_to_strip);
   void connect_set_variable(QString token0, QString token2);
   void connect_make_statement();
+  long to_long(QString token);
 
   void copy_options_to_main_window();
   void copy_connect_strings_to_utf8(); /* in effect, copy options from main_window */

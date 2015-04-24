@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: April 23 2015
+   Last modified: April 24 2015
 */
 
 /*
@@ -1475,69 +1475,69 @@ void MainWindow::action_connect_once(QString message)
   if (co->is_ok == 1)
   {
     ocelot_host= row_form_data[0].trimmed();
-    ocelot_port= row_form_data[1].trimmed().toInt();
+    ocelot_port= to_long(row_form_data[1].trimmed());
     ocelot_user= row_form_data[2].trimmed();
     ocelot_database= row_form_data[3].trimmed();
     ocelot_unix_socket= row_form_data[4].trimmed();
     ocelot_password= row_form_data[5].trimmed();
     ocelot_protocol= row_form_data[6].trimmed(); ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
     ocelot_init_command= row_form_data[7].trimmed();
-    ocelot_auto_rehash= row_form_data[8].trimmed().toInt();
+    ocelot_auto_rehash= to_long(row_form_data[8].trimmed());
 
     i= 9;
-    ocelot_auto_vertical_output= row_form_data[i++].trimmed().toInt();
-    ocelot_batch= row_form_data[i++].trimmed().toInt();
-    ocelot_binary_mode= row_form_data[i++].trimmed().toInt();
+    ocelot_auto_vertical_output= to_long(row_form_data[i++].trimmed());
+    ocelot_batch= to_long(row_form_data[i++].trimmed());
+    ocelot_binary_mode= to_long(row_form_data[i++].trimmed());
     ocelot_bind_address= row_form_data[i++].trimmed();
     ocelot_set_charset_dir= row_form_data[i++].trimmed(); /* "character_sets_dir" */
-    ocelot_result_grid_column_names= row_form_data[i++].trimmed().toInt();
-    ocelot_column_type_info= row_form_data[i++].trimmed().toInt();
-    ocelot_comments= row_form_data[i++].trimmed().toInt();
-    ocelot_opt_compress= row_form_data[i++].trimmed().toInt();
-    ocelot_connect_expired_password= row_form_data[i++].trimmed().toInt();
-    ocelot_opt_connect_timeout= row_form_data[i++].trimmed().toInt();
+    ocelot_result_grid_column_names= to_long(row_form_data[i++].trimmed());
+    ocelot_column_type_info= to_long(row_form_data[i++].trimmed());
+    ocelot_comments= to_long(row_form_data[i++].trimmed());
+    ocelot_opt_compress= to_long(row_form_data[i++].trimmed());
+    ocelot_connect_expired_password= to_long(row_form_data[i++].trimmed());
+    ocelot_opt_connect_timeout= to_long(row_form_data[i++].trimmed());
     ocelot_debug= row_form_data[i++].trimmed();
-    ocelot_debug_check= row_form_data[i++].trimmed().toInt();
-    ocelot_debug_info= row_form_data[i++].trimmed().toInt();
+    ocelot_debug_check= to_long(row_form_data[i++].trimmed());
+    ocelot_debug_info= to_long(row_form_data[i++].trimmed());
     ocelot_default_auth= row_form_data[i++].trimmed();
     ocelot_set_charset_name= row_form_data[i++].trimmed(); /* "default_character_set" */
     ocelot_defaults_extra_file= row_form_data[i++].trimmed();
     ocelot_defaults_file= row_form_data[i++].trimmed();
     ocelot_read_default_group= row_form_data[i++].trimmed();
     ocelot_delimiter_str= row_form_data[i++].trimmed();
-    ocelot_enable_cleartext_plugin= row_form_data[i++].trimmed().toInt();
+    ocelot_enable_cleartext_plugin= to_long(row_form_data[i++].trimmed());
     ocelot_execute= row_form_data[i++].trimmed();
-    ocelot_force= row_form_data[i++].trimmed().toInt();
-    ocelot_help= row_form_data[i++].trimmed().toInt();
-    ocelot_histignore= row_form_data[i++].trimmed().toInt();
-    ocelot_html= row_form_data[i++].trimmed().toInt();
-    ocelot_ignore_spaces= row_form_data[i++].trimmed().toInt();
-    ocelot_line_numbers= row_form_data[i++].trimmed().toInt();
-    ocelot_opt_local_infile= row_form_data[i++].trimmed().toInt();
+    ocelot_force= to_long(row_form_data[i++].trimmed());
+    ocelot_help= to_long(row_form_data[i++].trimmed());
+    ocelot_histignore= to_long(row_form_data[i++].trimmed());
+    ocelot_html= to_long(row_form_data[i++].trimmed());
+    ocelot_ignore_spaces= to_long(row_form_data[i++].trimmed());
+    ocelot_line_numbers= to_long(row_form_data[i++].trimmed());
+    ocelot_opt_local_infile= to_long(row_form_data[i++].trimmed());
     ocelot_login_path= row_form_data[i++].trimmed();
-    max_allowed_packet= row_form_data[i++].trimmed().toInt();
-    ocelot_max_join_size= row_form_data[i++].trimmed().toInt();
-    ocelot_named_commands= row_form_data[i++].trimmed().toInt();
-    ocelot_net_buffer_length= row_form_data[i++].trimmed().toInt();
-    ocelot_no_beep= row_form_data[i++].trimmed().toInt();
-    ocelot_no_defaults= row_form_data[i++].trimmed().toInt();
-    ocelot_one_database= row_form_data[i++].trimmed().toInt();
+    max_allowed_packet= to_long(row_form_data[i++].trimmed());
+    ocelot_max_join_size= to_long(row_form_data[i++].trimmed());
+    ocelot_named_commands= to_long(row_form_data[i++].trimmed());
+    ocelot_net_buffer_length= to_long(row_form_data[i++].trimmed());
+    ocelot_no_beep= to_long(row_form_data[i++].trimmed());
+    ocelot_no_defaults= to_long(row_form_data[i++].trimmed());
+    ocelot_one_database= to_long(row_form_data[i++].trimmed());
     ocelot_pager= row_form_data[i++].trimmed();
-    ocelot_pipe= row_form_data[i++].trimmed().toInt();
+    ocelot_pipe= to_long(row_form_data[i++].trimmed());
     ocelot_plugin_dir= row_form_data[i++].trimmed();
-    ocelot_print_defaults= row_form_data[i++].trimmed().toInt();
+    ocelot_print_defaults= to_long(row_form_data[i++].trimmed());
     ocelot_prompt= row_form_data[i++].trimmed();
-    ocelot_quick= row_form_data[i++].trimmed().toInt();
-    ocelot_raw= row_form_data[i++].trimmed().toInt();
-    ocelot_opt_reconnect= row_form_data[i++].trimmed().toInt();
-    ocelot_safe_updates= row_form_data[i++].trimmed().toInt();
-    ocelot_secure_auth= row_form_data[i++].trimmed().toInt();
-    ocelot_select_limit= row_form_data[i++].trimmed().toInt();
+    ocelot_quick= to_long(row_form_data[i++].trimmed());
+    ocelot_raw= to_long(row_form_data[i++].trimmed());
+    ocelot_opt_reconnect= to_long(row_form_data[i++].trimmed());
+    ocelot_safe_updates= to_long(row_form_data[i++].trimmed());
+    ocelot_secure_auth= to_long(row_form_data[i++].trimmed());
+    ocelot_select_limit= to_long(row_form_data[i++].trimmed());
     ocelot_server_public_key= row_form_data[i++].trimmed();
     ocelot_shared_memory_base_name= row_form_data[i++].trimmed();
-    ocelot_history_includes_warnings= row_form_data[i++].trimmed().toInt();
-    ocelot_sigint_ignore= row_form_data[i++].trimmed().toInt();
-    ocelot_silent= row_form_data[i++].trimmed().toInt();
+    ocelot_history_includes_warnings= to_long(row_form_data[i++].trimmed());
+    ocelot_sigint_ignore= to_long(row_form_data[i++].trimmed());
+    ocelot_silent= to_long(row_form_data[i++].trimmed());
     ocelot_opt_ssl= row_form_data[i++].trimmed();
     ocelot_opt_ssl_ca= row_form_data[i++].trimmed();
     ocelot_opt_ssl_capath= row_form_data[i++].trimmed();
@@ -1546,16 +1546,16 @@ void MainWindow::action_connect_once(QString message)
     ocelot_opt_ssl_crl= row_form_data[i++].trimmed();
     ocelot_opt_ssl_crlpath= row_form_data[i++].trimmed();
     ocelot_opt_ssl_key= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_verify_server_cert= row_form_data[i++].trimmed().toInt();
-    ocelot_syslog= row_form_data[i++].trimmed().toInt();
-    ocelot_table= row_form_data[i++].trimmed().toInt();
+    ocelot_opt_ssl_verify_server_cert= to_long(row_form_data[i++].trimmed());
+    ocelot_syslog= to_long(row_form_data[i++].trimmed());
+    ocelot_table= to_long(row_form_data[i++].trimmed());
     ocelot_history_tee_file_name= row_form_data[i++].trimmed();
-    ocelot_unbuffered= row_form_data[i++].trimmed().toInt();
-    ocelot_verbose= row_form_data[i++].trimmed().toInt();
+    ocelot_unbuffered= to_long(row_form_data[i++].trimmed());
+    ocelot_verbose= to_long(row_form_data[i++].trimmed());
     ocelot_version= row_form_data[i++].trimmed().toInt();
-    ocelot_result_grid_vertical= row_form_data[i++].trimmed().toInt();
-    ocelot_wait= row_form_data[i++].trimmed().toInt();
-    ocelot_xml= row_form_data[i++].trimmed().toInt();
+    ocelot_result_grid_vertical= to_long(row_form_data[i++].trimmed());
+    ocelot_wait= to_long(row_form_data[i++].trimmed());
+    ocelot_xml= to_long(row_form_data[i++].trimmed());
 
     /* This should ensure that a record goes to the history widget */
     /* Todo: clear statement_edit_widget first */
@@ -8562,24 +8562,54 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
     {
       token0= "database"; token1= "="; token2= s_argv;
     }
-    /* If there is one '-' then token1=argv[i], token2='=', token3=argv[i+1 */
+    /* If there is one '-' then token0=argv[i], maybe token1='=', maybe token2=argv[i+1 */
+    /* Some items don't need spaces before argument, e.g. -D db_name is same as -Ddb_name */
     else if ((strlen(argv[i]) > 1) && (s_argv.mid(1, 1) != "-"))
     {
+      bool is_token2_needed= false;
       token0= argv[i]; token1= ""; token2= "";
+      if (token0.size() > 2)
+      {
+        token1= "=";
+        token2= token0.right(token0.size() - 2);
+        token0= token0.left(2);
+      }
+      if (token0 == "-?") token0= "help";
+      if (token0 == "-#") token0= "debug";
+      if (token0 == "-A") token0= "no_auto_rehash";
+      if (token0 == "-B") token0= "batch";
       if (token0 == "-b") token0= "no_beep";
       if (token0 == "-C") token0= "compress";
       if (token0 == "-c") token0= "comments";
-      if (token0 == "-D") token0= "database";
+      if (token0 == "-D") { token0= "database"; is_token2_needed= true; }
       if (token0 == "-E") token0= "vertical";
-      if (token0 == "-h") token0= "host";
-      if (token0 == "-P") token0= "port";
+      if (token0 == "-e") { token0= "execute"; is_token2_needed= true; }
+      if (token0 == "-f") token0= "force";
+      if (token0 == "-G") token0= "named_commands";
+      if (token0 == "-H") token0= "html";
+      if (token0 == "-h") { token0= "host"; is_token2_needed= true; }
+      if (token0 == "-i") token0= "ignore_spaces";
+      if (token0 == "-j") token0= "syslog";
+      if (token0 == "-L") token0= "skip_line_numbers";
+      if (token0 == "-N") token0= "skip_column_names";
+      if (token0 == "-n") token0= "unbuffered";
+      if (token0 == "-o") token0= "one_database";
+      if (token0 == "-P") { token0= "port"; is_token2_needed= true; }
       if (token0 == "-p") token0= "password";
-      if (token0 == "-S") token0= "socket";
+      if (token0 == "-q") token0= "quick";
+      if (token0 == "-r") token0= "raw";
+      if (token0 == "-S") { token0= "socket"; is_token2_needed= true; }
       if (token0 == "-s") token0= "silent";
+      if (token0 == "-T") token0= "debug_info";
+      if (token0 == "-t") token0= "table";
       if (token0 == "-U") token0= "safe_updates";
-      if (token0 == "-u") token0= "user";
+      if (token0 == "-u") { token0= "user"; is_token2_needed= true; }
+      if (token0 == "-V") token0= "version";
+      if (token0 == "-v") token0= "verbose";
+      if (token0 == "-W") token0= "pipe";
       if (token0 == "-w") token0= "wait";
-      if (i < argc - 1)
+      if (token0 == "-X") token0= "xml";
+      if ((i < argc - 1) && (is_token2_needed == true) && (token2 == ""))
       {
         token1= "="; token2= argv[i + 1];
         ++i;
@@ -8826,10 +8856,11 @@ QString MainWindow::connect_stripper(QString value_to_strip)
 void MainWindow::connect_set_variable(QString token0, QString token2)
 {
   unsigned int token0_length;
-  char token0_as_utf8[64 + 1];
+  char token0_as_utf8[80 + 1];
+  unsigned short int is_enable;
 
   token0_length= token0.count();
-  if (token0_length >= 64) return; /* no option name is ever longer than 64 bytes */
+  if (token0_length >= 64) return; /* no option name is ever longer than 80 bytes */
   strcpy(token0_as_utf8,token0.toUtf8());
   *(token0_as_utf8 + token0_length)= 0;
   for (int i= 0; token0_as_utf8[i] != '\0'; ++i)
@@ -8837,19 +8868,55 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     if (token0_as_utf8[i] == '-') token0_as_utf8[i]= '_';
   }
 
-  if (strcmp(token0_as_utf8, "auto_rehash") == 0) { ocelot_auto_rehash= 1; return; }
-  if (strcmp(token0_as_utf8, "auto_vertical_output") == 0) { ocelot_auto_vertical_output= 1; return; }
-  if (strcmp(token0_as_utf8, "batch") == 0) { ocelot_batch= 1; return; }
-  if (strcmp(token0_as_utf8, "binary_mode") == 0) { ocelot_binary_mode= 1; return; }
+  /* option modifiers: ignore loose, set enable=true if enable or false if disable|skip */
+  is_enable= 1;
+  for (;;)
+  {
+    if (strncmp(token0_as_utf8, "loose_", sizeof("loose_") - 1) == 0)
+    {
+      strcpy(token0_as_utf8, token0_as_utf8 + sizeof("loose_") - 1);
+      continue;
+    }
+    if (strncmp(token0_as_utf8, "enable_", sizeof("enable_") - 1) == 0)
+    {
+      is_enable= 1;
+      strcpy(token0_as_utf8, token0_as_utf8 + sizeof("enable_") - 1);
+      continue;
+    }
+    if (strncmp(token0_as_utf8, "disable_", sizeof("disable_") - 1) == 0)
+    {
+      is_enable= 0;
+      strcpy(token0_as_utf8, token0_as_utf8 + sizeof("disable_") - 1);
+      continue;
+    }
+    if (strncmp(token0_as_utf8, "skip_", sizeof("skip_") - 1) == 0)
+    {
+      is_enable= 0;
+      strcpy(token0_as_utf8, token0_as_utf8 + sizeof("skip_") - 1);
+      continue;
+    }
+    break;
+  }
+
+  if (strcmp(token0_as_utf8, "auto_rehash") == 0) { ocelot_auto_rehash= is_enable; return; }
+  if (strcmp(token0_as_utf8, "auto_vertical_output") == 0) { ocelot_auto_vertical_output= is_enable; return; }
+  if (strcmp(token0_as_utf8, "batch") == 0)
+  {
+    ocelot_batch= is_enable;
+    ocelot_silent= is_enable;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "binary_mode") == 0) { ocelot_binary_mode= is_enable; return; }
   if (strcmp(token0_as_utf8, "bind") == 0) /* not available in mysql client */
   {
     ocelot_opt_bind= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "bind_address") == 0) { ocelot_bind_address= 1; return; }
+  if (strcmp(token0_as_utf8, "bind_address") == 0) { ocelot_bind_address= is_enable; return; }
+
   if (strcmp(token0_as_utf8, "can_handle_expired_passwords") == 0) /* not available in mysql client */
   {
-    ocelot_opt_can_handle_expired_passwords= 1;
+    ocelot_opt_can_handle_expired_passwords= is_enable;
     return;
   }
 
@@ -8858,16 +8925,16 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_set_charset_dir= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "column_names") == 0) { ocelot_result_grid_column_names= 1; return; }
-  if (strcmp(token0_as_utf8, "column_type_info") == 0) { ocelot_column_type_info= 1; return; }
-  if ((token0_length >= sizeof("comm")) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "column_names") == 0) { ocelot_result_grid_column_names= is_enable; return; }
+  if (strcmp(token0_as_utf8, "column_type_info") == 0) { ocelot_column_type_info= is_enable; return; }
+  if ((token0_length >= sizeof("comm") - 1) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
   {
-    ocelot_comments= 1;
+    ocelot_comments= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("comp")) && (strncmp(token0_as_utf8, "compress", token0_length) == 0))
+  if ((token0_length >= sizeof("comp") - 1) && (strncmp(token0_as_utf8, "compress", token0_length) == 0))
   {
-    ocelot_opt_compress= 1;
+    ocelot_opt_compress= is_enable;
     return;
   }
   if (strcmp(token0_as_utf8, "connect_attr_delete") == 0) /* not available in mysql client */
@@ -8877,12 +8944,12 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (strcmp(token0_as_utf8, "connect_attr_reset") == 0) /* not available in mysql client */
   {
-    ocelot_opt_connect_attr_reset= 1;
+    ocelot_opt_connect_attr_reset= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("con")) && (strncmp(token0_as_utf8, "connect_timeout", token0_length) == 0))
+  if ((token0_length >= sizeof("con") - 1) && (strncmp(token0_as_utf8, "connect_timeout", token0_length) == 0))
   {
-    ocelot_opt_connect_timeout= token2.toLong();
+    ocelot_opt_connect_timeout= to_long(token2);
     return;
   }
   if (strcmp(token0_as_utf8, "database") == 0)
@@ -8891,8 +8958,8 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
   if (strcmp(token0_as_utf8, "debug") == 0) { ocelot_debug= token2; return; }
-  if (strcmp(token0_as_utf8, "debug_info") == 0) { ocelot_debug_info= 1; return; }
-  if ((token0_length >= sizeof("default_a")) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "debug_info") == 0) { ocelot_debug_info= is_enable; return; }
+  if ((token0_length >= sizeof("default_a") - 1) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
   {
     ocelot_default_auth= token2;
     return;
@@ -8912,95 +8979,95 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_defaults_file= token2;
     return;
   }
-  if ((token0_length >= sizeof("del")) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
+  if ((token0_length >= sizeof("del") - 1) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
   {
     ocelot_delimiter_str= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "disable_named_commands") == 0) { ocelot_named_commands= 0; return; }
-  if (strcmp(token0_as_utf8, "enable_cleartext_plugin") == 0)
+  if (strcmp(token0_as_utf8, "cleartext_plugin") == 0)
   {
-    ocelot_enable_cleartext_plugin= 1;
+    ocelot_enable_cleartext_plugin= is_enable;
     return;
   }
   if (strcmp(token0_as_utf8, "execute") == 0) { ocelot_execute= token2; return; }
-  if (strcmp(token0_as_utf8, "force") == 0) { ocelot_force= 1; return; }
-  if (strcmp(token0_as_utf8, "help") == 0) { ocelot_help= 1; return; }
-  if (strcmp(token0_as_utf8, "histignore") == 0) { ocelot_histignore= 1; return; }
-  if ((token0_length >= sizeof("ho")) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "force") == 0) { ocelot_force= is_enable; return; }
+  if (strcmp(token0_as_utf8, "help") == 0) { ocelot_help= is_enable; return; }
+  if (strcmp(token0_as_utf8, "histignore") == 0) { ocelot_histignore= is_enable; return; }
+  if ((token0_length >= sizeof("ho") - 1) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
   {
     ocelot_host= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "html") == 0) { ocelot_html= 1; return; }
-  if ((token0_length >= sizeof("i_")) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "html") == 0) { ocelot_html= is_enable; return; }
+  if ((token0_length >= sizeof("i_") - 1) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
   {
-    ocelot_safe_updates= 1;
+    ocelot_safe_updates= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "ignore_spaces") == 0) { ocelot_ignore_spaces= 1; return; }
+  if (strcmp(token0_as_utf8, "ignore_spaces") == 0) { ocelot_ignore_spaces= is_enable; return; }
   if (strcmp(token0_as_utf8, "init_command") == 0)
   {
     ocelot_init_command= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "line_numbers") == 0) { ocelot_line_numbers= 1; return; }
-  if ((token0_length >= sizeof("lo")) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "line_numbers") == 0) { ocelot_line_numbers= is_enable; return; }
+  if ((token0_length >= sizeof("loc") - 1) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
   {
-    ocelot_opt_local_infile= 1;
+    if (token2 > "") ocelot_opt_local_infile= to_long(token2);
+    else ocelot_opt_local_infile= is_enable;
     return;
   }
   if (strcmp(token0_as_utf8, "login_path") == 0) { ocelot_login_path= token2; return; }
-  if (strcmp(token0_as_utf8, "max_allowed_packet") == 0) { ocelot_max_allowed_packet= token2.toLong(); return; }
-  if ((token0_length >= sizeof("max_j")) && (strncmp(token0_as_utf8, "max_join_size", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "max_allowed_packet") == 0) { ocelot_max_allowed_packet= to_long(token2); return; }
+  if ((token0_length >= sizeof("max_j") - 1) && (strncmp(token0_as_utf8, "max_join_size", token0_length) == 0))
   {
-    ocelot_max_join_size= token2.toLong();
+    ocelot_max_join_size= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "named_commands") == 0) { ocelot_named_commands= 1; return; }
-  if (strcmp(token0_as_utf8, "net_buffer_length") == 0) { ocelot_net_buffer_length= token2.toLong(); return; }
+  if (strcmp(token0_as_utf8, "named_commands") == 0) { ocelot_named_commands= is_enable; return; }
+  if (strcmp(token0_as_utf8, "net_buffer_length") == 0) { ocelot_net_buffer_length= to_long(token2); return; }
   if (strcmp(token0_as_utf8, "no_auto_rehash") == 0) { ocelot_auto_rehash= 0; return; }
-  if ((token0_length >= sizeof("no_b")) && (strncmp(token0_as_utf8, "no_beep", token0_length) == 0))
+  if ((token0_length >= sizeof("no_b") - 1) && (strncmp(token0_as_utf8, "no_beep", token0_length) == 0))
   {
-    ocelot_no_beep= 1;
+    ocelot_no_beep= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "no_defaults") == 0) { ocelot_no_defaults= 1; return; }
+  if (strcmp(token0_as_utf8, "no_defaults") == 0) { ocelot_no_defaults= is_enable; return; }
   if (strcmp(token0_as_utf8, "no_named_commands") == 0) { ocelot_named_commands= 0; return; }
   if (strcmp(token0_as_utf8, "no_tee") == 0) { history_tee_stop(); return; }/* for tee */
-  if (strcmp(token0_as_utf8, "one_database") == 0) { ocelot_one_database= 1; return; }
-  if (strcmp(token0_as_utf8, "pager") == 0) { ocelot_pager= 1; return; }
-  if ((token0_length >= sizeof("pas")) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
+  if (strcmp(token0_as_utf8, "one_database") == 0) { ocelot_one_database= is_enable; return; }
+  if (strcmp(token0_as_utf8, "pager") == 0) { ocelot_pager= is_enable; return; }
+  if ((token0_length >= sizeof("pas") - 1) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
   {
     ocelot_password= token2;
-    ocelot_password_was_specified= 1;
+    ocelot_password_was_specified= is_enable;
     return;
   }
   if (strcmp(token0_as_utf8, "pipe") == 0) /* Not sure about this. Windows. Same as protocol? */
   {
-    ocelot_opt_named_pipe= 1;
+    ocelot_opt_named_pipe= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("pl")) && (strncmp(token0_as_utf8, "plugin_dir", token0_length) == 0))
+  if ((token0_length >= sizeof("pl") - 1) && (strncmp(token0_as_utf8, "plugin_dir", token0_length) == 0))
   {
     ocelot_plugin_dir= token2;
     return;
   }
-  if ((token0_length >= sizeof("po")) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
+  if ((token0_length >= sizeof("po") - 1) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
   {
-    ocelot_port= token2.toInt();
+    ocelot_port= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "print_defaults") == 0) { ocelot_print_defaults= 1; return; }
+  if (strcmp(token0_as_utf8, "print_defaults") == 0) { ocelot_print_defaults= is_enable; return; }
   if (strcmp(token0_as_utf8, "prompt") == 0) { ocelot_prompt= token2; return; }
-  if ((token0_length >= sizeof("prot")) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
+  if ((token0_length >= sizeof("prot") - 1) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
   {
     ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
     ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
     return;
   }
-  if (strcmp(token0_as_utf8, "quick") == 0) { ocelot_quick= 1; return; }
-  if (strcmp(token0_as_utf8, "raw") == 0) { ocelot_raw= 1; return; }
+  if (strcmp(token0_as_utf8, "quick") == 0) { ocelot_quick= is_enable; return; }
+  if (strcmp(token0_as_utf8, "raw") == 0) { ocelot_raw= is_enable; return; }
   if (strcmp(token0_as_utf8, "read_default_file") == 0) /* not available in mysql client */
   {
     ocelot_read_default_file= token2;
@@ -9013,27 +9080,27 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (strcmp(token0_as_utf8, "read_timeout") == 0) /* not available in mysql client */
   {
-    ocelot_opt_read_timeout= token2.toInt();
+    ocelot_opt_read_timeout= to_long(token2);
     return;
   }
   if (strcmp(token0_as_utf8, "reconnect") == 0)
   {
-    ocelot_opt_reconnect= 1;
+    ocelot_opt_reconnect= is_enable;
     return;
   }
   if (strcmp(token0_as_utf8, "report_data_truncation") == 0) /* not available in mysql client */
   {
-    ocelot_report_data_truncation= 1;
+    ocelot_report_data_truncation= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("sa")) && (strncmp(token0_as_utf8, "safe_updates", token0_length) == 0))
+  if ((token0_length >= sizeof("sa") - 1) && (strncmp(token0_as_utf8, "safe_updates", token0_length) == 0))
   {
-    ocelot_safe_updates= 1;
+    ocelot_safe_updates= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("sec")) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
+  if ((token0_length >= sizeof("sec") -1 ) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
   {
-    ocelot_secure_auth= 1;
+    ocelot_secure_auth= is_enable;
     return;
   }
   if (strcmp(token0_as_utf8, "server_public_key") == 0) /* not available in mysql client */
@@ -9041,116 +9108,107 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_server_public_key= token2;
     return;
   }
-   if ((token0_length >= sizeof("sel")) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
+   if ((token0_length >= sizeof("sel") - 1) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
   {
-    ocelot_select_limit= token2.toLong();
+    ocelot_select_limit= to_long(token2);
     return;
   }
 
-  if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
-  {
-    ocelot_shared_memory_base_name= token2;
-    return;
-    }
-  if ((token0_length >= sizeof("sh")) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
-  {
-    ocelot_history_includes_warnings= 1;
-    return;
-    }
-  if (strcmp(token0_as_utf8, "sigint_ignore") == 0) { ocelot_sigint_ignore= 1; return; }
-  if ((token0_length >= sizeof("sil")) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
-  {
-    ocelot_silent= 1;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "skip_auto_rehash") == 0) { ocelot_auto_rehash= 0; return; }
-  if (strcmp(token0_as_utf8, "skip_column_names") == 0) { ocelot_result_grid_column_names= 0; return; }
-  if (strcmp(token0_as_utf8, "skip_comments") == 0) { ocelot_comments= 0; return; }
-  if (strcmp(token0_as_utf8, "skip_named_commands") == 0) { ocelot_named_commands= 0; return; }
-  if (strcmp(token0_as_utf8, "skip_secure_auth") == 0)
-  {
-    ocelot_secure_auth= 0;
-    return;
-  }
-  if ((token0_length >= sizeof("so")) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
-  {
-    ocelot_unix_socket= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl") == 0)
-  {
-    ocelot_opt_ssl= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
-  {
-    ocelot_opt_ssl_ca= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
-  {
-    ocelot_opt_ssl_capath= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
-  {
-    ocelot_opt_ssl_cert= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
-  {
-    ocelot_opt_ssl_cipher= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
-  {
-    ocelot_opt_ssl_crl= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
-  {
-    ocelot_opt_ssl_crlpath= token2;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "ssl_key") == 0)
-  {
-    ocelot_opt_ssl_key= token2;
-    return;
-  }
-  if ((token0_length >= sizeof("ssl_verify")) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
-  {
-    ocelot_opt_ssl_verify_server_cert= token2.toInt();
-    return;
-  }
-  if (strcmp(token0_as_utf8, "syslog") == 0) { ocelot_syslog= 1; return; }
-  if (strcmp(token0_as_utf8, "table") == 0) { ocelot_table= 1; return; }
-  if (strcmp(token0_as_utf8, "tee") == 0) { history_tee_start(token2); /* todo: check whether history_tee_start returned NULL which is an error */ return; }/* for tee */
-  if (strcmp(token0_as_utf8, "unbuffered") == 0) { ocelot_unbuffered= 1; return; }
-  if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
-  {
-    ocelot_opt_use_result= token2.toInt();
-    return;
-  }
-  if ((token0_length >= sizeof("us")) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
-  {
-    ocelot_user= token2;
-    return;
-  }
-  /* todo: check that this finds both --vertical and -E */ /* for vertical */
-  if (strcmp(token0_as_utf8, "verbose") == 0) { ocelot_verbose= 1; return; }
-  if (strcmp(token0_as_utf8, "version") == 0) { ocelot_version= 1; return; }
-  if (strcmp(token0_as_utf8, "vertical") == 0) { ocelot_result_grid_vertical= 1; return; }
-  if ((token0_length >= sizeof("w")) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
-  {
-    ocelot_wait= 1;
-    return;
-  }
-  if (strcmp(token0_as_utf8, "write_timeout") == 0)
-  {
-    ocelot_opt_write_timeout= token2.toInt();
-    return;
-  }
-  if (strcmp(token0_as_utf8, "xml") == 0) { ocelot_xml= 1; return; }
+   if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
+   {
+     ocelot_shared_memory_base_name= token2;
+     return;
+     }
+   if ((token0_length >= sizeof("sh") - 1) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
+   {
+     ocelot_history_includes_warnings= is_enable;
+     return;
+     }
+   if (strcmp(token0_as_utf8, "sigint_ignore") == 0) { ocelot_sigint_ignore= is_enable; return; }
+   if ((token0_length >= sizeof("sil") - 1) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
+   {
+     ocelot_silent= is_enable;
+     return;
+   }
+   if ((token0_length >= sizeof("so") - 1) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
+   {
+     ocelot_unix_socket= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl") == 0)
+   {
+     ocelot_opt_ssl= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl_ca") == 0)
+   {
+     ocelot_opt_ssl_ca= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl_capath") == 0)
+   {
+     ocelot_opt_ssl_capath= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl_cert") == 0)
+   {
+     ocelot_opt_ssl_cert= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
+   {
+     ocelot_opt_ssl_cipher= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl_crl") == 0)
+   {
+     ocelot_opt_ssl_crl= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
+   {
+     ocelot_opt_ssl_crlpath= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "ssl_key") == 0)
+   {
+     ocelot_opt_ssl_key= token2;
+     return;
+   }
+   if ((token0_length >= sizeof("ssl_verify") - 1) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
+   {
+     ocelot_opt_ssl_verify_server_cert= to_long(token2);
+     return;
+   }
+   if (strcmp(token0_as_utf8, "syslog") == 0) { ocelot_syslog= is_enable; return; }
+   if (strcmp(token0_as_utf8, "table") == 0) { ocelot_table= is_enable; return; }
+   if (strcmp(token0_as_utf8, "tee") == 0) { history_tee_start(token2); /* todo: check whether history_tee_start returned NULL which is an error */ return; }/* for tee */
+   if (strcmp(token0_as_utf8, "unbuffered") == 0) { ocelot_unbuffered= is_enable; return; }
+   if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
+   {
+     ocelot_opt_use_result= to_long(token2);
+     return;
+   }
+   if ((token0_length >= sizeof("us") - 1) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
+   {
+     ocelot_user= token2;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "verbose") == 0) { ocelot_verbose= is_enable; return; }
+   if (strcmp(token0_as_utf8, "version") == 0) { ocelot_version= is_enable; return; }
+   /* todo: check that this finds both --vertical and -E */ /* for vertical */
+   if (strcmp(token0_as_utf8, "vertical") == 0) { ocelot_result_grid_vertical= is_enable; return; }
+   if ((token0_length >= sizeof("wa") - 1) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
+   {
+     ocelot_wait= is_enable;
+     return;
+   }
+   if (strcmp(token0_as_utf8, "write_timeout") == 0)
+   {
+     ocelot_opt_write_timeout= to_long(token2);
+     return;
+   }
+   if (strcmp(token0_as_utf8, "xml") == 0) { ocelot_xml= is_enable; return; }
 }
 
 
@@ -9352,6 +9410,32 @@ int options_and_connect(
   connected[connection_number]= 1;
   return 0;
 }
+
+/*
+  Convert string to long.
+  For numeric connect-related tokens, K means 1024, M means 1024**2, G means 1024**3.
+  Actually the token might be unsigned int or unsigned long, but this will do.
+*/
+long MainWindow::to_long(QString token)
+{
+  QString kmg;
+  QString token_without_kmg;
+  long return_value;
+
+  kmg= token.right(1).toUpper();
+  if ((kmg == "K") || (kmg == "M") || (kmg == "G"))
+  {
+    token_without_kmg= token.left(token.size() - 1);
+    return_value= token_without_kmg.toLong();
+    if (kmg == "K") return_value *= 1024;
+    if (kmg == "M") return_value *= 1024 * 1024;
+    if (kmg == "G") return_value *= 1024 * 1024 * 1024;
+  }
+  else return_value= token.toLong();
+  return return_value;
+
+}
+
 
 /* Todo: check every one of the "new ..." results for failure. */
 void MainWindow::copy_connect_strings_to_utf8()
