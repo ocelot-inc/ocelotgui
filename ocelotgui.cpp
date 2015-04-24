@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: April 22 2015
+   Last modified: April 23 2015
 */
 
 /*
@@ -4461,6 +4461,10 @@ void MainWindow::action_debug_information()
 */
 void MainWindow::action_debug_refresh_server_variables()
 {
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_error((char*)"No debug session in progress") != 0) return;
+  }
   if (debug_call_xxxmdbug_command("refresh server variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables");
   emit action_execute();
@@ -4472,6 +4476,10 @@ void MainWindow::action_debug_refresh_server_variables()
 */
 void MainWindow::action_debug_refresh_user_variables()
 {
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_error((char*)"No debug session in progress") != 0) return;
+  }
   if (debug_call_xxxmdbug_command("refresh user variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.user_variables");
   emit action_execute();
@@ -4483,6 +4491,10 @@ void MainWindow::action_debug_refresh_user_variables()
 */
 void MainWindow::action_debug_refresh_variables()
 {
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_error((char*)"No debug session in progress") != 0) return;
+  }
   if (debug_call_xxxmdbug_command("refresh variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.variables");
   emit action_execute();
@@ -4494,6 +4506,10 @@ void MainWindow::action_debug_refresh_variables()
 */
 void MainWindow::action_debug_refresh_call_stack()
 {
+  if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
+  {
+    if (debug_error((char*)"No debug session in progress") != 0) return;
+  }
   if (debug_call_xxxmdbug_command("refresh call_stack") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.call_stack");
   emit action_execute();

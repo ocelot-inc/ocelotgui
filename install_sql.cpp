@@ -13,6 +13,7 @@
   Three lines have been commented out because "REPAIR TABLE mysql.proc" is now not needed (I hope).
   Five lines are changed in xxxmdbug.dbms_pipe_receive so that there is one critical SET statement rather thn three (less race).
   In debuggee_wait_loop "PREPARE xxxmdbug_stmt FROM @xxxmdbug_what_to_call;" was replaced with "LEAVE x;".
+  In insert_into_statements two lines were changed because a statement within an ELSE wasn't generated.
 */
 
 /* todo: ensure this doesn't waste space by including things in ocelotgui.h that are unnecessary */
@@ -4346,8 +4347,8 @@ strcpy(x,
 "/* TODO: get rid of statement_number_within_routine, apparently it's always the same as statement_number. */" 
 "CREATE PROCEDURE xxxmdbug.create_statements_table ()" 
 "BEGIN" 
-"  DROP TEMPORARY TABLE IF EXISTS xxxmdbug.statements;" 
-"  CREATE TEMPORARY TABLE xxxmdbug.statements (" 
+"  DROP TEMPORARY TABLE IF EXISTS xxxmdbug.statements;"
+"  CREATE TEMPORARY TABLE xxxmdbug.statements ("
 "  statement_number INT," 
 "  schema_identifier VARCHAR(66) CHARACTER SET utf8," 
 "  routine_identifier VARCHAR(66) CHARACTER SET utf8," 
@@ -4640,7 +4641,8 @@ strcpy(x,
 "    OR v_value = ':' /* Treat 'label:' as a statement, though of course not executable */" 
 "    /* Some sequences get special treatment -- end of non-debuggable. */" 
 "    OR v_value in ('BEGIN', 'LOOP') /* standalone */" 
-"    OR v_value = 'ELSE' and v_value_of_first_token IN ('IF','ELSEIF','CASE','WHEN')" 
+//"    OR v_value = 'ELSE' and v_value_of_first_token IN ('IF','ELSEIF','CASE','WHEN')"
+"    OR v_value = 'ELSE'"
 "    OR v_value = 'REPEAT' AND v_value_of_next_token <> '(' /* standalone */" 
 "    OR v_value = 'DO' and v_value_of_first_token = 'WHILE'" 
 "    OR v_value_of_next_token = 'END' and v_value_of_first_token = 'UNTIL' and v_value_of_next_next_token = 'REPEAT'" 
@@ -4660,7 +4662,8 @@ strcpy(x,
 "        END IF;" 
 "      /* todo: think about 'LEAVE' and 'ITERATE'. maybe they should be flow_control rather than debuggable? */" 
 "      /* todo: check whether ELSE and ELSEIF could be caught here, probably we are calling them 'unknown' but maybe it is deliberate */" 
-"      IF v_value_of_first_token IN ('BEGIN','CASE','IF','LOOP','REPEAT','WHILE') THEN" 
+//"      IF v_value_of_first_token IN ('BEGIN','CASE','IF','LOOP','REPEAT','WHILE') THEN"
+"      IF v_value_of_first_token IN ('BEGIN','CASE','ELSE','IF','LOOP','REPEAT','WHILE') THEN"
 "        set v_statement_type = 'flow_control';" 
 "        END IF;" 
 "      /* TODO: check this list against all verbs in 5.6. */" 
