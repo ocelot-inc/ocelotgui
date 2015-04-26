@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: April 24 2015
+   Last modified: April 26 2015
 */
 
 /*
@@ -313,6 +313,9 @@
 
   int options_and_connect(unsigned int connection_number);
 
+  /* This should correspond to the version number in the comment at the start of this program. */
+  static char ocelotgui_version[]="0.4 Alpha"; /* For --version. Make sure it's in manual too. */
+
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
 #define MYSQL_DEBUGGER_CONNECTION 1
@@ -353,6 +356,18 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_grid_detached= 0;
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
   connect_mysql_options_2(argc, argv);               /* pick up my.cnf and command-line MySQL-related options, if any */
+
+  if (ocelot_version != 0)                           /* e.g. if user said "ocelotgui --version" */
+  {
+    print_version();
+    exit(0);
+  }
+
+  if (ocelot_help != 0)                              /* e.g. if user said "ocelotgui --help" */
+  {
+    print_help();
+    exit(0);
+  }
 
   ocelot_statement_prompt_background_color= "lightGray"; /* set early because create_widget_statement() depends on this */
 
@@ -431,7 +446,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     so put up the connection dialog box. Otherwise try immediately to connect.
     Todo: better messages so the user gets the hint: connection is necessary / password is necessary.
   */
-  if (ocelot_password_was_specified == 1)
+  if (ocelot_password_was_specified == 0)
   {
     statement_edit_widget->insertPlainText("CONNECT");
     action_execute();
@@ -1349,6 +1364,8 @@ void MainWindow::action_connect()
 
 
 /*
+  If we're connecting, action_calls action_connect_once with arg = "FIle|Connect".
+  If we're printing for --help, print_help calls action_connect_once with arg = "Print".
   Todo:
   If user types OK and there's an error, repeat the dialog box with a new message e.g. "Connect failed ...".
   This is called from program-start!
@@ -1462,112 +1479,126 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "wait"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_wait); row_form_width[i]= 5;
   row_form_label[++i]= "xml"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_xml); row_form_width[i]= 5;
 
-  row_form_title= tr("Connection Dialog Box");
-  row_form_message= message;
-
-  co= new Row_form_box(column_count, row_form_label,
-//                                     row_form_type,
-                                     row_form_is_password, row_form_data,
-//                                     row_form_width,
-                                     row_form_title, row_form_message, this);
-  co->exec();
-
-  if (co->is_ok == 1)
+  if (message == "Print")
   {
-    ocelot_host= row_form_data[0].trimmed();
-    ocelot_port= to_long(row_form_data[1].trimmed());
-    ocelot_user= row_form_data[2].trimmed();
-    ocelot_database= row_form_data[3].trimmed();
-    ocelot_unix_socket= row_form_data[4].trimmed();
-    ocelot_password= row_form_data[5].trimmed();
-    ocelot_protocol= row_form_data[6].trimmed(); ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
-    ocelot_init_command= row_form_data[7].trimmed();
-    ocelot_auto_rehash= to_long(row_form_data[8].trimmed());
-
-    i= 9;
-    ocelot_auto_vertical_output= to_long(row_form_data[i++].trimmed());
-    ocelot_batch= to_long(row_form_data[i++].trimmed());
-    ocelot_binary_mode= to_long(row_form_data[i++].trimmed());
-    ocelot_bind_address= row_form_data[i++].trimmed();
-    ocelot_set_charset_dir= row_form_data[i++].trimmed(); /* "character_sets_dir" */
-    ocelot_result_grid_column_names= to_long(row_form_data[i++].trimmed());
-    ocelot_column_type_info= to_long(row_form_data[i++].trimmed());
-    ocelot_comments= to_long(row_form_data[i++].trimmed());
-    ocelot_opt_compress= to_long(row_form_data[i++].trimmed());
-    ocelot_connect_expired_password= to_long(row_form_data[i++].trimmed());
-    ocelot_opt_connect_timeout= to_long(row_form_data[i++].trimmed());
-    ocelot_debug= row_form_data[i++].trimmed();
-    ocelot_debug_check= to_long(row_form_data[i++].trimmed());
-    ocelot_debug_info= to_long(row_form_data[i++].trimmed());
-    ocelot_default_auth= row_form_data[i++].trimmed();
-    ocelot_set_charset_name= row_form_data[i++].trimmed(); /* "default_character_set" */
-    ocelot_defaults_extra_file= row_form_data[i++].trimmed();
-    ocelot_defaults_file= row_form_data[i++].trimmed();
-    ocelot_read_default_group= row_form_data[i++].trimmed();
-    ocelot_delimiter_str= row_form_data[i++].trimmed();
-    ocelot_enable_cleartext_plugin= to_long(row_form_data[i++].trimmed());
-    ocelot_execute= row_form_data[i++].trimmed();
-    ocelot_force= to_long(row_form_data[i++].trimmed());
-    ocelot_help= to_long(row_form_data[i++].trimmed());
-    ocelot_histignore= to_long(row_form_data[i++].trimmed());
-    ocelot_html= to_long(row_form_data[i++].trimmed());
-    ocelot_ignore_spaces= to_long(row_form_data[i++].trimmed());
-    ocelot_line_numbers= to_long(row_form_data[i++].trimmed());
-    ocelot_opt_local_infile= to_long(row_form_data[i++].trimmed());
-    ocelot_login_path= row_form_data[i++].trimmed();
-    max_allowed_packet= to_long(row_form_data[i++].trimmed());
-    ocelot_max_join_size= to_long(row_form_data[i++].trimmed());
-    ocelot_named_commands= to_long(row_form_data[i++].trimmed());
-    ocelot_net_buffer_length= to_long(row_form_data[i++].trimmed());
-    ocelot_no_beep= to_long(row_form_data[i++].trimmed());
-    ocelot_no_defaults= to_long(row_form_data[i++].trimmed());
-    ocelot_one_database= to_long(row_form_data[i++].trimmed());
-    ocelot_pager= row_form_data[i++].trimmed();
-    ocelot_pipe= to_long(row_form_data[i++].trimmed());
-    ocelot_plugin_dir= row_form_data[i++].trimmed();
-    ocelot_print_defaults= to_long(row_form_data[i++].trimmed());
-    ocelot_prompt= row_form_data[i++].trimmed();
-    ocelot_quick= to_long(row_form_data[i++].trimmed());
-    ocelot_raw= to_long(row_form_data[i++].trimmed());
-    ocelot_opt_reconnect= to_long(row_form_data[i++].trimmed());
-    ocelot_safe_updates= to_long(row_form_data[i++].trimmed());
-    ocelot_secure_auth= to_long(row_form_data[i++].trimmed());
-    ocelot_select_limit= to_long(row_form_data[i++].trimmed());
-    ocelot_server_public_key= row_form_data[i++].trimmed();
-    ocelot_shared_memory_base_name= row_form_data[i++].trimmed();
-    ocelot_history_includes_warnings= to_long(row_form_data[i++].trimmed());
-    ocelot_sigint_ignore= to_long(row_form_data[i++].trimmed());
-    ocelot_silent= to_long(row_form_data[i++].trimmed());
-    ocelot_opt_ssl= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_ca= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_capath= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_cert= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_cipher= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_crl= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_crlpath= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_key= row_form_data[i++].trimmed();
-    ocelot_opt_ssl_verify_server_cert= to_long(row_form_data[i++].trimmed());
-    ocelot_syslog= to_long(row_form_data[i++].trimmed());
-    ocelot_table= to_long(row_form_data[i++].trimmed());
-    ocelot_history_tee_file_name= row_form_data[i++].trimmed();
-    ocelot_unbuffered= to_long(row_form_data[i++].trimmed());
-    ocelot_verbose= to_long(row_form_data[i++].trimmed());
-    ocelot_version= row_form_data[i++].trimmed().toInt();
-    ocelot_result_grid_vertical= to_long(row_form_data[i++].trimmed());
-    ocelot_wait= to_long(row_form_data[i++].trimmed());
-    ocelot_xml= to_long(row_form_data[i++].trimmed());
-
-    /* This should ensure that a record goes to the history widget */
-    /* Todo: clear statement_edit_widget first */
-    statement_edit_widget->insertPlainText("CONNECT");
-    action_execute();
-    if (ocelot_init_command > "")
+    char output_string[5120];
+    for (int j= 0; j < i; ++j)
     {
-      statement_edit_widget->insertPlainText(ocelot_init_command);
-      action_execute();
+      strcpy(output_string, row_form_label[j].toUtf8());
+      printf("%-34s", output_string);
+      strcpy(output_string, row_form_data[j].toUtf8());
+      printf("%s\n", output_string);
     }
   }
-  delete(co);
+  else /* if (message == "FIle|Connect") */
+  {
+    row_form_title= tr("Connection Dialog Box");
+    row_form_message= message;
+
+    co= new Row_form_box(column_count, row_form_label,
+  //                                     row_form_type,
+                                       row_form_is_password, row_form_data,
+  //                                     row_form_width,
+                                       row_form_title, row_form_message, this);
+    co->exec();
+
+    if (co->is_ok == 1)
+    {
+      ocelot_host= row_form_data[0].trimmed();
+      ocelot_port= to_long(row_form_data[1].trimmed());
+      ocelot_user= row_form_data[2].trimmed();
+      ocelot_database= row_form_data[3].trimmed();
+      ocelot_unix_socket= row_form_data[4].trimmed();
+      ocelot_password= row_form_data[5].trimmed();
+      ocelot_protocol= row_form_data[6].trimmed(); ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
+      ocelot_init_command= row_form_data[7].trimmed();
+      ocelot_auto_rehash= to_long(row_form_data[8].trimmed());
+
+      i= 9;
+      ocelot_auto_vertical_output= to_long(row_form_data[i++].trimmed());
+      ocelot_batch= to_long(row_form_data[i++].trimmed());
+      ocelot_binary_mode= to_long(row_form_data[i++].trimmed());
+      ocelot_bind_address= row_form_data[i++].trimmed();
+      ocelot_set_charset_dir= row_form_data[i++].trimmed(); /* "character_sets_dir" */
+      ocelot_result_grid_column_names= to_long(row_form_data[i++].trimmed());
+      ocelot_column_type_info= to_long(row_form_data[i++].trimmed());
+      ocelot_comments= to_long(row_form_data[i++].trimmed());
+      ocelot_opt_compress= to_long(row_form_data[i++].trimmed());
+      ocelot_connect_expired_password= to_long(row_form_data[i++].trimmed());
+      ocelot_opt_connect_timeout= to_long(row_form_data[i++].trimmed());
+      ocelot_debug= row_form_data[i++].trimmed();
+      ocelot_debug_check= to_long(row_form_data[i++].trimmed());
+      ocelot_debug_info= to_long(row_form_data[i++].trimmed());
+      ocelot_default_auth= row_form_data[i++].trimmed();
+      ocelot_set_charset_name= row_form_data[i++].trimmed(); /* "default_character_set" */
+      ocelot_defaults_extra_file= row_form_data[i++].trimmed();
+      ocelot_defaults_file= row_form_data[i++].trimmed();
+      ocelot_read_default_group= row_form_data[i++].trimmed();
+      ocelot_delimiter_str= row_form_data[i++].trimmed();
+      ocelot_enable_cleartext_plugin= to_long(row_form_data[i++].trimmed());
+      ocelot_execute= row_form_data[i++].trimmed();
+      ocelot_force= to_long(row_form_data[i++].trimmed());
+      ocelot_help= to_long(row_form_data[i++].trimmed());
+      ocelot_histignore= to_long(row_form_data[i++].trimmed());
+      ocelot_html= to_long(row_form_data[i++].trimmed());
+      ocelot_ignore_spaces= to_long(row_form_data[i++].trimmed());
+      ocelot_line_numbers= to_long(row_form_data[i++].trimmed());
+      ocelot_opt_local_infile= to_long(row_form_data[i++].trimmed());
+      ocelot_login_path= row_form_data[i++].trimmed();
+      max_allowed_packet= to_long(row_form_data[i++].trimmed());
+      ocelot_max_join_size= to_long(row_form_data[i++].trimmed());
+      ocelot_named_commands= to_long(row_form_data[i++].trimmed());
+      ocelot_net_buffer_length= to_long(row_form_data[i++].trimmed());
+      ocelot_no_beep= to_long(row_form_data[i++].trimmed());
+      ocelot_no_defaults= to_long(row_form_data[i++].trimmed());
+      ocelot_one_database= to_long(row_form_data[i++].trimmed());
+      ocelot_pager= row_form_data[i++].trimmed();
+      ocelot_pipe= to_long(row_form_data[i++].trimmed());
+      ocelot_plugin_dir= row_form_data[i++].trimmed();
+      ocelot_print_defaults= to_long(row_form_data[i++].trimmed());
+      ocelot_prompt= row_form_data[i++].trimmed();
+      ocelot_quick= to_long(row_form_data[i++].trimmed());
+      ocelot_raw= to_long(row_form_data[i++].trimmed());
+      ocelot_opt_reconnect= to_long(row_form_data[i++].trimmed());
+      ocelot_safe_updates= to_long(row_form_data[i++].trimmed());
+      ocelot_secure_auth= to_long(row_form_data[i++].trimmed());
+      ocelot_select_limit= to_long(row_form_data[i++].trimmed());
+      ocelot_server_public_key= row_form_data[i++].trimmed();
+      ocelot_shared_memory_base_name= row_form_data[i++].trimmed();
+      ocelot_history_includes_warnings= to_long(row_form_data[i++].trimmed());
+      ocelot_sigint_ignore= to_long(row_form_data[i++].trimmed());
+      ocelot_silent= to_long(row_form_data[i++].trimmed());
+      ocelot_opt_ssl= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_ca= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_capath= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_cert= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_cipher= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_crl= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_crlpath= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_key= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_verify_server_cert= to_long(row_form_data[i++].trimmed());
+      ocelot_syslog= to_long(row_form_data[i++].trimmed());
+      ocelot_table= to_long(row_form_data[i++].trimmed());
+      ocelot_history_tee_file_name= row_form_data[i++].trimmed();
+      ocelot_unbuffered= to_long(row_form_data[i++].trimmed());
+      ocelot_verbose= to_long(row_form_data[i++].trimmed());
+      ocelot_version= row_form_data[i++].trimmed().toInt();
+      ocelot_result_grid_vertical= to_long(row_form_data[i++].trimmed());
+      ocelot_wait= to_long(row_form_data[i++].trimmed());
+      ocelot_xml= to_long(row_form_data[i++].trimmed());
+
+      /* This should ensure that a record goes to the history widget */
+      /* Todo: clear statement_edit_widget first */
+      statement_edit_widget->insertPlainText("CONNECT");
+      action_execute();
+      if (ocelot_init_command > "")
+      {
+        statement_edit_widget->insertPlainText(ocelot_init_command);
+        action_execute();
+      }
+    }
+    delete(co);
+  }
 
   if (row_form_width != 0) delete [] row_form_width;
   if (row_form_data != 0) delete [] row_form_data;
@@ -8370,7 +8401,7 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
 
   The above comments apply to Unix, Windows is a bit different.
 
-  Todo: whenever you have a token1/token2/token3:
+  Todo: whenever you have a token0/token1/token2:
         find token1 in case it's one of the options we track
         set the value for that option
   Todo: if argv[i] is a password, you should wipe it out. Compare what mysql client does:
@@ -8471,6 +8502,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_login_path= "";
   ocelot_pager= "";
   ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
+
+  options_files_read= "";
 
   {
     struct passwd *pw;
@@ -8615,7 +8648,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
         ++i;
       }
     }
-    /* If there are two '-'s then token1=argv[i] left, token2='=', token3=argv[i] right */
+    /* If there are two '-'s then token0=argv[i] left, token1='=', token2=argv[i] right */
     else
     {
       QString equaller;
@@ -8663,6 +8696,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
   {
     return;
   }
+  options_files_read.append(file_name); options_files_read.append(" ");
   while(fgets(line, sizeof line, file) != NULL)
   {
     QString s= line;
@@ -8811,10 +8845,10 @@ QString MainWindow::connect_stripper(QString value_to_strip)
 
 
 /*
-  Given token1=option-name [token2=equal-sign token3=value],
+  Given token0=option-name [token1=equal-sign token2=value],
   see if option-name corresponds to one of your program-variables,
   and if so set program-variable = true or program-variable = value.
-  For example, if token1="user", token2="=", token3="peter",
+  For example, if token0="user", token1="=", token2="peter",
   then set ocelot_user = "peter".
   But that would be too simple, eh? So here are some complications:
   * unambiguous prefixes of option names are allowed until MySQL 5.7
@@ -8897,6 +8931,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     }
     break;
   }
+  if (token2 > "") is_enable= to_long(token2);  /* in case some fool says "--vertical = 5" etc. */
 
   if (strcmp(token0_as_utf8, "auto_rehash") == 0) { ocelot_auto_rehash= is_enable; return; }
   if (strcmp(token0_as_utf8, "auto_vertical_output") == 0) { ocelot_auto_vertical_output= is_enable; return; }
@@ -9573,4 +9608,36 @@ int MainWindow::the_connect(unsigned int connection_number)
   x= options_and_connect(connection_number);
 
   return x;
+}
+
+/* --version, or version in an option file, causes version display and exit */
+void MainWindow::print_version()
+{
+  printf("ocelotgui version %s", ocelotgui_version);
+  printf(", for Linux");
+  #if __x86_64__
+  printf(" (x86_64)");
+  #endif
+  printf(" using Qt version %s", qVersion()); /* i.e. Qt runtime, maybe != QT_VERSION_STR */
+  printf("\n");
+}
+
+/* --help, or help in an option file, causes help display and exit */
+void MainWindow::print_help()
+{
+  char output_string[5120];
+
+  print_version();
+  printf("Copyright (c) 2014 by Ocelot Computer Services Inc. and others\n");
+  printf("\n");
+  printf("Usage: ocelotgui [OPTIONS] [database]\n");
+  printf("Options files that were actually read:\n");
+  strcpy(output_string, options_files_read.toUtf8());
+  printf("%s\n", output_string);
+  printf("Options files groups that ocelotgui looks for: client mysql ocelot\n");
+  printf("Possible option values: same as possible option values for mysql client\n");
+  printf("Option values after reading options files and command-line arguments:\n");
+  printf("Option                            Value\n");
+  printf("--------------------------------- ----------------------------------------\n");
+  action_connect_once("Print");
 }

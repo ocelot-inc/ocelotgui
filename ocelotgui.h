@@ -205,6 +205,7 @@ public:
   QString ocelot_defaults_extra_file;        /* for CONNECT */
   QString ocelot_prompt;
   QString ocelot_opt_ssl_verify;
+  QString options_files_read;
 
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
 
@@ -319,6 +320,8 @@ private:
   void connect_set_variable(QString token0, QString token2);
   void connect_make_statement();
   long to_long(QString token);
+  void print_version();
+  void print_help();
 
   void copy_options_to_main_window();
   void copy_connect_strings_to_utf8(); /* in effect, copy options from main_window */
