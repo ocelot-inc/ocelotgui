@@ -3,7 +3,7 @@
   For copyright and license notice of install_sql function contents, see beginning of ocelotgui.cpp.
   This file was made by downloading MDBug's install.sql and editing. Most of the editing was done thus:
   (1) replace all \ with \\ (2) replace all " with \" (3) replace all \n with " \n" (4) replace all //" with
-  ";\n\nif (mysql_real_query(mysql, x, strlen(x))) return -1;\nstrcpy(x,
+  ";\n\nif (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;\nstrcpy(x,
   Pass &mysql[MYSQL_MAIN_CONNECTION].
 */
 
@@ -17,7 +17,7 @@
 */
 
 /* todo: ensure this doesn't waste space by including things in ocelotgui.h that are unnecessary */
-#include "ocelotgui.h"
+//TEST!! #include "ocelotgui.h"
 //#include "ui_ocelotgui.h"
 
 #ifdef DEBUGGER
@@ -55,7 +55,7 @@ strcpy(x,
 "carries forward this exception." 
 "'");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* THE MDBUG CORE DEBUGGER" 
@@ -71,16 +71,16 @@ strcpy(x,
 "" 
 "SET @xxxmdbug_saved_sql_mode=@@sql_mode");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "SET SESSION sql_mode=''");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 //strcpy(x,
 //""
 //"REPAIR TABLE mysql.proc");
 //
-//if (mysql_real_query(mysql, x, strlen(x))) return -1;
+//if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 //MYSQL_RES *debug_res= NULL;                          /* added because REPAIR returns a result set */
 //debug_res= mysql_store_result(mysql);
 //if (debug_res != NULL) mysql_free_result(debug_res);
@@ -89,525 +89,525 @@ strcpy(x,
 ""
 "CREATE DATABASE IF NOT EXISTS xxxmdbug");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP TABLE IF EXISTS xxxmdbug.copyright");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP TABLE IF EXISTS xxxmdbug.readme");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.add_delimiters");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.become_debuggee_connection");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.breakpoint_delete");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.check_surrogate_routine");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.checks_and_warnings");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.clear_warnings");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_i_status");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_r_breakpoints");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_r_call_stack");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_r_prepared_statements");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_r_server_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_r_statements_executed");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_r_user_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.command_r_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.compare");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_breakpoints_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_prepared_statements_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_routines_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_server_variables_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_setup_log_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_statements_executed_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_statements_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_tmp_user_variables_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_tokens_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_user_variables_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.create_variables_table");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.dbms_pipe_clean");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.dbms_pipe_receive");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.dbms_pipe_receive_with_timeout");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.dbms_pipe_send");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.debuggee_get_surrogate_name");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.debuggee_stop");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.debuggee_wait_loop");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.debugger_wait_and_receive");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.delete_from_linked_list");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.delete_from_prepared_statements");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.determine_what_variables_are_in_scope");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_breakpoints_clear");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_delete");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_insert");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_prepared_statements_clear");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_routines_clear");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_select");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_statements_executed_clear");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_update");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.fixed_variables_clear");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_ender");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_icc_core");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_icc_process_user_command_r_server_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_icc_process_user_command_set_server_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_label");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_routine_entry_parameter");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_starter");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_statement_text");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.generate_statement_text_as_is");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.get_current_schema_identifier_and_routine_identifier");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.get_from_linked_list");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.get_setup_group_name");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.get_token_identifier_type");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.get_token_type");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_breakpoint_check");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_change_statement_status");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_copy_table_row_to_variable");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_copy_variable_to_table_row");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_core");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_end");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_get_user_command");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_attach");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_break");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_execute");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_r_breakpoints");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_r_call_stack");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_r_prepared_statements");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_r_server_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_set_server_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_r_statements_executed");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_r_user_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_r_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_set");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_process_user_command_step_or_next");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_send_statement_status");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.icc_start");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.initialize_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_linked_list");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_prepared_statements");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_routines");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_statements");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_tokens");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_tokens_linked_list");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_variables_declared_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_variables_parameters");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.insert_into_variables_user_variables");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.install_check");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP FUNCTION IF EXISTS xxxmdbug.isnumeric");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP FUNCTION IF EXISTS xxxmdbug.is_debuggee_and_is_attached");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.multiple_name_parser");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.mysql_proc_insert");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.mysql_proc_insert_caller");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.overflow_check");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.preparer");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.prepare_while_ansi_quotes_yes");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.prepare_while_ansi_quotes_no");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.privilege_checks");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.reset");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.retype");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.routine_entry");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.routine_exit");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.setup");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.setup_internal");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.setup_switches");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.setxxxmdbug_channel");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.set_default_schema");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.statement_change");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.syntax_check_for_breakpoint");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.syntax_check_for_debug");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.syntax_check_for_set");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.update_linked_list");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.update_statements_executed");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.uvar");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.view_and_trigger_and_event_check");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "DROP PROCEDURE IF EXISTS xxxmdbug.walkthrough");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "SET @xxxmdbug_start_timestamp = CURRENT_TIMESTAMP");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE TABLE xxxmdbug.copyright (copyright TEXT CHARACTER SET utf8)");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "INSERT INTO xxxmdbug.copyright VALUES (@xxxmdbug_copyright)");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/*" 
@@ -635,7 +635,7 @@ strcpy(x,
 "  SET global init_connect = CONCAT(@@init_connect,'/*',prefix,string,'*/');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Receive." 
@@ -671,7 +671,7 @@ strcpy(x,
 "  SET p_message_start = v_message_start;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Eliminate any occurrences of '*' or '/' in string -- anything that might cause comment parts to be in init_connect is dangerous." 
@@ -683,7 +683,7 @@ strcpy(x,
 "  SET string = REPLACE(string,'/','/([xxxmdbug)');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Getting VARCHAR values to debugger from debuggee.." 
@@ -880,7 +880,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* We do not actually do anything for command(...,'breakpoint ...'), except pipe it to the debuggee." 
@@ -1029,7 +1029,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Some of the code here is the same as in syntax_check_for_breakpoint() */" 
@@ -1139,7 +1139,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* The expectation for 'set' is 'set identifier = literal | null */" 
@@ -1193,7 +1193,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Clear warnings. Call this when a handler catches a syntax error and" 
@@ -1206,7 +1206,7 @@ strcpy(x,
 "  SELECT 1 INTO v FROM information_schema.tables LIMIT 1;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* For checking command syntax, we need to know what kind of token a token is." 
@@ -1255,7 +1255,7 @@ strcpy(x,
 "  SET @xxxmdbug_token_type=0;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* get_token_type() should not be called from debuggee routine because that changes the warning list. */" 
@@ -1295,7 +1295,7 @@ strcpy(x,
 "  SET @xxxmdbug_token_type=9;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_i_status ()" 
@@ -1398,7 +1398,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* All the 'refresh' commands ('refresh breakpoints' etc.) will call debugger_wait_and_receive()." 
@@ -1430,7 +1430,7 @@ strcpy(x,
 "  /* Something has arrived from debuggee */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* dbms_pipe_receive_with_timeout() calls dbms_pipe_receive(no wait) repeatedly until" 
@@ -1472,7 +1472,7 @@ strcpy(x,
 "  /* Something has arrived */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_r_call_stack (p_message MEDIUMTEXT CHARACTER SET utf8)" 
@@ -1516,7 +1516,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_r_variables (p_message VARCHAR(8192) CHARACTER SET utf8)" 
@@ -1575,7 +1575,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_r_server_variables (p_message VARCHAR(8192) CHARACTER SET utf8)" 
@@ -1620,7 +1620,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_r_user_variables (p_message VARCHAR(8192) CHARACTER SET utf8)" 
@@ -1666,7 +1666,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_r_breakpoints (p_message VARCHAR(8192) CHARACTER SET utf8)" 
@@ -1740,7 +1740,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_r_prepared_statements (p_message VARCHAR(8192) CHARACTER SET utf8)" 
@@ -1772,7 +1772,7 @@ strcpy(x,
 "  CLOSE c_tokens_of_prepared_statements;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.command_r_statements_executed (p_message VARCHAR(8192) CHARACTER SET utf8)" 
@@ -1828,7 +1828,7 @@ strcpy(x,
 "  CLOSE cxxx;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* We can call this during setup, and from debugger, but debuggee procedures use fixed areas.*/" 
@@ -2019,7 +2019,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/*" 
@@ -2046,7 +2046,7 @@ strcpy(x,
 "  SET linked_list=CONCAT(linked_list,field_for_length,field_for_offset,field_for_line_number,token);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.update_linked_list (pos INT," 
@@ -2058,7 +2058,7 @@ strcpy(x,
 "  SET linked_list = INSERT(linked_list,pos+24,len,LEFT(token,len));" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Suppose you make a linked list with insert_into_tokens_linked_list." 
@@ -2090,7 +2090,7 @@ strcpy(x,
 "  SET p_token_value_offset=token_value_offset;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Suppose you make a linked list with insert_into_tokens_linked_list." 
@@ -2121,7 +2121,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* insert_into_tokens_linked_list" 
@@ -2302,7 +2302,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Current schema.routine = end of call stack. If that is empty, try result of 'debug routine'. */" 
@@ -2331,7 +2331,7 @@ strcpy(x,
 "  SET p_routine_type = 'ROUTINE';" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* When a command is considered \"done\", we call icc_change_statement_status() so that it will" 
@@ -2346,7 +2346,7 @@ strcpy(x,
 "  SET @xxxmdbug_commands_count = @xxxmdbug_commands_count + 1;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Whenever the debuggee reaches a debuggable statement, it sends a status message. For example" 
@@ -2416,7 +2416,7 @@ strcpy(x,
 "  if v_status_message is null then signal sqlstate '05678' set mysql_errno=@xxxmdbug_signal_errno,message_text='assert.icc_send_statement_status'; end if;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Return 1 if token is all digits or - or . else return 0." 
@@ -2433,7 +2433,7 @@ strcpy(x,
 "  RETURN 1;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* todo: syntax must allow type */" 
@@ -2593,7 +2593,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* icc_process_user_command_step_or_next() does what icc_process_user_command_break() does: adds a 'row' in breakpoints 'table'." 
@@ -2642,7 +2642,7 @@ strcpy(x,
 "  CALL xxxmdbug.fixed_insert(@xxxmdbug_breakpoints_command,20,@xxxmdbug_token_value_1);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.icc_process_user_command ()" 
@@ -2706,7 +2706,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Command 'r call_stack'" 
@@ -2744,7 +2744,7 @@ strcpy(x,
 "  CALL xxxmdbug.icc_change_statement_status('OK');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Command 'r breakpoints'" 
@@ -2842,7 +2842,7 @@ strcpy(x,
 "  CALL xxxmdbug.icc_change_statement_status('OK');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* command = 'r statements_executed'" 
@@ -2916,7 +2916,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* command = 'r prepared_statements'" 
@@ -2956,7 +2956,7 @@ strcpy(x,
 "  CALL xxxmdbug.icc_change_statement_status('OK');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* command = 'r variables'" 
@@ -3035,7 +3035,7 @@ strcpy(x,
 "  CALL xxxmdbug.icc_change_statement_status('OK');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 //strcpy(x,
 //""
 //"/* command = 'r server_variables'"
@@ -3056,7 +3056,7 @@ if (mysql_real_query(mysql, x, strlen(x))) return -1;
 //"  CALL xxxmdbug.icc_change_statement_status('OK');"
 //"  END");
 
-//if (mysql_real_query(mysql, x, strlen(x))) return -1;
+//if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 
 /* command = 'r user_variables'
@@ -3071,7 +3071,7 @@ strcpy(x,
 "  CALL xxxmdbug.icc_change_statement_status('OK');"
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* retype() is called from icc_process_user_command_set (when processing 'set'" 
@@ -3135,7 +3135,7 @@ strcpy(x,
 "  SET i_bigint=@xxxmdbug_token_value_4; SET @xxxmdbug_token_value_4a=i_bigint;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Processing 'set'" 
@@ -3217,7 +3217,7 @@ strcpy(x,
 "  CALL xxxmdbug.icc_change_statement_status(CONCAT('\"OK, row_count()=',v_row_count,'\"'));" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Processing 'execute'." 
@@ -3242,7 +3242,7 @@ strcpy(x,
 "  CALL xxxmdbug.icc_change_statement_status(v_result);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Update the variables table, setting is_in_scope=1 for parameters/variables that are" 
@@ -3328,7 +3328,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* In icc_start we said" 
@@ -3381,7 +3381,7 @@ strcpy(x,
 "    END LOOP;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* This routine is depending on the current and possibly-undocumented behaviour that," 
@@ -3437,7 +3437,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Find the breakpoint in the fixed list." 
@@ -3668,7 +3668,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* compare() is called from breakpoint_check()." 
@@ -3736,7 +3736,7 @@ strcpy(x,
 "  SET return_value = (i_bigint = i_bigint_2);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* if with_wait=0 i.e. \"with no wait\" then don't wait, but take from the queue." 
@@ -3802,7 +3802,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* There are two kinds of commands: the ones that cause forward motion (continue, leave, exit, skip)" 
@@ -3855,7 +3855,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* generate_icc_core will generate, for a user variable named @a:" 
@@ -3927,7 +3927,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* This generates a variant icc_core that can handle 'refresh user_variables'.." 
@@ -4118,7 +4118,7 @@ strcpy(x,
 "  VALUES (mysql_proc_db,mysql_proc_name,@xxxmdbug_surrogate_routine_identifier,@xxxmdbug_timestamp,'','',mysql_proc_type,v_g,v_g,v_offset_of_begin);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* icc_start is called before the variable-copying and" 
@@ -4180,7 +4180,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* We generate \"call icc_end()\" after \"call icc_core()\" and after checking for 'set' or 'execute'," 
@@ -4214,7 +4214,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* There is a generated 'call xxxmdbug.update_statements_executed()' call" 
@@ -4251,7 +4251,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* We generate 'call insert_into_prepared_statements()' when we see 'PREPARE'." 
@@ -4264,7 +4264,7 @@ strcpy(x,
 "  CALL xxxmdbug.fixed_insert(@xxxmdbug_prepared_statements_statement_text,80,statement_text);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.delete_from_prepared_statements (statement_name VARCHAR(66) CHARACTER SET utf8)" 
 "BEGIN" 
@@ -4284,7 +4284,7 @@ strcpy(x,
 "    END LOOP;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_setup_log_table ()" 
@@ -4306,7 +4306,7 @@ strcpy(x,
 "    comment_based_on_readme VARCHAR(66) CHARACTER SET utf8) engine=myisam;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_routines_table ()" 
@@ -4325,7 +4325,7 @@ strcpy(x,
 "  offset_of_begin INT) engine=myisam;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_tokens_table ()" 
@@ -4341,7 +4341,7 @@ strcpy(x,
 "                       value VARCHAR(16384) CHARACTER SET utf8) engine=myisam;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* TODO: get rid of statement_number_within_routine, apparently it's always the same as statement_number. */" 
@@ -4364,7 +4364,7 @@ strcpy(x,
 "  is_leave_possible INT) engine=memory;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_variables_table ()" 
@@ -4384,7 +4384,7 @@ strcpy(x,
 "  is_updated_by_set INT DEFAULT 0) engine=memory;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_tmp_user_variables_table ()" 
@@ -4394,7 +4394,7 @@ strcpy(x,
 "  variable_identifier VARCHAR(66) CHARACTER SET utf8 DEFAULT '') engine=memory;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_server_variables_table ()" 
@@ -4414,7 +4414,7 @@ strcpy(x,
 "  is_updated_by_set INT DEFAULT 0) engine=memory;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_user_variables_table ()" 
@@ -4434,7 +4434,7 @@ strcpy(x,
 "  is_updated_by_set INT DEFAULT 0) engine=memory;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_prepared_statements_table ()" 
@@ -4445,7 +4445,7 @@ strcpy(x,
 "  statement_text VARCHAR(66) CHARACTER SET utf8 DEFAULT '');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* xxxmdbug.breakpoints is a TEMPORARY table in xxxmdbug." 
@@ -4473,7 +4473,7 @@ strcpy(x,
 "  command VARCHAR(14) CHARACTER SET utf8 DEFAULT '') engine=memory;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.create_statements_executed_table ()" 
@@ -4492,7 +4492,7 @@ strcpy(x,
 "  row_count INT DEFAULT 0) engine=memory;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* routine_identifier_of_surrogate = xxxmdbug xxx type routine_identifier" 
@@ -4537,7 +4537,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.insert_into_routines (`p_db` VARCHAR(66) CHARACTER SET utf8," 
@@ -4561,7 +4561,7 @@ strcpy(x,
 "  VALUES (p_db,p_name,v_routine_identifier_of_surrogate,@xxxmdbug_timestamp,param_list,returns,type,body,NULL,NULL);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.insert_into_statements (mysql_proc_db VARCHAR(66) CHARACTER SET utf8, mysql_proc_name VARCHAR(66) CHARACTER SET utf8)" 
@@ -4713,7 +4713,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Most of insert_into_variables_parameters() is for parsing" 
@@ -4767,7 +4767,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Most of insert_into_variables_declared_variables() is for parsing" 
@@ -4832,7 +4832,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* We finished with declared variables." 
@@ -4864,7 +4864,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/*" 
@@ -4997,7 +4997,7 @@ strcpy(x,
 "  SET @xxxmdbug_call_stack=CONCAT(@xxxmdbug_call_stack,RPAD(mysql_proc_db,66,' '),RPAD(mysql_proc_name,66,' '),LEFT(mysql_proc_type,1),'000000');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* called from generate_starter()." 
@@ -5027,7 +5027,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Some notes about the call stack." 
@@ -5051,7 +5051,7 @@ strcpy(x,
 "  SET @xxxmdbug_call_stack=LEFT(@xxxmdbug_call_stack,LENGTH(@xxxmdbug_call_stack)-(66+66+1+6));" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* \"Generate: starter\". Called from generate() */" 
@@ -5093,7 +5093,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* \"Generate: label\": Called from generate()" 
@@ -5126,7 +5126,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 //strcpy(x,
 //""
 //"/* \"Generate: handlers\" */"
@@ -5159,7 +5159,7 @@ if (mysql_real_query(mysql, x, strlen(x))) return -1;
 //"*/"
 //);
 
-//if (mysql_real_query(mysql, x, strlen(x))) return -1;
+//if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* \"Generate: statement text\" */" 
@@ -5265,7 +5265,7 @@ strcpy(x,
 "  END");
 
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* \"Generate: statement text\" but without any changes or special handling." 
@@ -5289,7 +5289,7 @@ strcpy(x,
 "  if v_g is null then signal sqlstate '56780' set mysql_errno=@xxxmdbug_signal_errno, message_text='assert 47'; end if;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* \"Generate: ender\": Called from generate()." 
@@ -5304,7 +5304,7 @@ strcpy(x,
 "  SET v_g = CONCAT(v_g,'END');" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* 'attach'" 
@@ -5325,7 +5325,7 @@ strcpy(x,
 "  SET @xxxmdbug_is_attached=1;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* called by debuggee_wait_loop, and also generated for every debuggable statement */" 
@@ -5372,7 +5372,7 @@ strcpy(x,
 "  RETURN 1;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* This generates the debuggee procedure that will handle the 'refresh server_variables'" 
@@ -5487,7 +5487,7 @@ strcpy(x,
 "  VALUES (mysql_proc_db,mysql_proc_name,@xxxmdbug_surrogate_routine_identifier,@xxxmdbug_timestamp,'','',mysql_proc_type,v_g,v_g,v_offset_of_begin);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* This generates the debuggee procedure that will handle the 'set @@server_variable=...'" 
@@ -5571,7 +5571,7 @@ strcpy(x,
 "  VALUES (mysql_proc_db,mysql_proc_name,@xxxmdbug_surrogate_routine_identifier,@xxxmdbug_timestamp,'','',mysql_proc_type,v_g,v_g,v_offset_of_begin);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* todo: decide whether setup() should create with definer privileges or sql security invoker" 
@@ -5582,7 +5582,7 @@ strcpy(x,
 "  CALL xxxmdbug.reset(xxxmdbug_channel,0);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* become_debuggee_connection calls reset(0) which initializes everything including breakpoints" 
@@ -5637,7 +5637,7 @@ strcpy(x,
 "" 
 "  end");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* debuggee_stop() should cancel any effects of any calls to any debugger/debuggee" 
@@ -5814,7 +5814,7 @@ strcpy(x,
 "  SET @xxxmdbug_xoffset=NULL;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* todo: require fully qualified name for 'debug' */" 
@@ -6048,7 +6048,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Pass: original name e.g. 'test.p'." 
@@ -6155,7 +6155,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.check_surrogate_routine (p_schema_identifier VARCHAR(66) CHARACTER SET utf8," 
@@ -6241,7 +6241,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.generate (mysql_proc_db VARCHAR(66) CHARACTER SET utf8, mysql_proc_name VARCHAR(66) CHARACTER SET utf8," 
@@ -6531,7 +6531,7 @@ strcpy(x,
 "  WHERE routine_identifier_of_original = mysql_proc_name AND schema_identifier_of_original = mysql_proc_db;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* We occasionally pass a value to overflow_check() to see whether it is about to overflow." 
@@ -6552,16 +6552,16 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.view_and_trigger_and_event_check() BEGIN END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.checks_and_warnings(database_name CHAR(255) CHARACTER SET utf8) BEGIN END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Set @xxxmdbug_channel." 
@@ -6594,7 +6594,7 @@ strcpy(x,
 "  CALL xxxmdbug.dbms_pipe_clean(@xxxmdbug_channel); /* replace * or / with _ */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 //strcpy(x,
 //""
 //"/* We run into identifiers with setup(original_routine_identifier, with 'd routine_name', etc."
@@ -6626,7 +6626,7 @@ if (mysql_real_query(mysql, x, strlen(x))) return -1;
 //"  END"
 //"*/");
 
-//if (mysql_real_query(mysql, x, strlen(x))) return -1;
+//if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* When there's a comma-separated list with multiple names, name_parser() isn't good enough." 
@@ -6690,7 +6690,7 @@ strcpy(x,
 "  DROP TEMPORARY TABLE xxxmdbug.tokens;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.setup (" 
@@ -6699,7 +6699,7 @@ strcpy(x,
 "  CALL xxxmdbug.setup_internal(object_name_list,1);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* todo: decide whether to use body or body_utf8 from mysql.proc. */" 
@@ -6943,7 +6943,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* The 'track' switches exist so that one can reduce the amount of instrumenting," 
@@ -6991,7 +6991,7 @@ strcpy(x,
 "    END LOOP;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* setup() and command() call initialize_variables(), which contains the line" 
@@ -7003,7 +7003,7 @@ strcpy(x,
 "  SET @xxxmdbug_default_schema=default_schema;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Initialize some variables. Called from setup(), command(), and become_debuggee_connection()." 
@@ -7057,7 +7057,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* called from install_check, setup, become_debuggee_connection, and command." 
@@ -7110,7 +7110,7 @@ strcpy(x,
 "    END;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Fixed lists" 
@@ -7143,7 +7143,7 @@ strcpy(x,
 "  SET @xxxmdbug_variables_is_updated_by_set=''; /* is_updated_by_set INT */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.fixed_breakpoints_clear () /* \"delete\" from breakpoints */" 
 "BEGIN  " 
@@ -7166,7 +7166,7 @@ strcpy(x,
 "  SET @xxxmdbug_breakpoints_last_insert_id=0; /* value for breakpoint_identifier */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.fixed_routines_clear () /* \"delete\" from routines */" 
 "BEGIN  " 
@@ -7175,7 +7175,7 @@ strcpy(x,
 "  SET @xxxmdbug_routines_routine_type_of_original=''; /* routine_type_of_original VARCHAR(10) CHARACTER SET utf8 */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.fixed_statements_executed_clear () /* \"delete\" from routines */" 
 "BEGIN" 
@@ -7191,7 +7191,7 @@ strcpy(x,
 "  SET @xxxmdbug_statements_executed_row_count=''; /* row_count INT */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.fixed_prepared_statements_clear () /* \"delete\" from routines */" 
 "BEGIN  " 
@@ -7199,7 +7199,7 @@ strcpy(x,
 "  SET @xxxmdbug_prepared_statements_statement_text=''; /* statement_text VARCHAR(66) CHARACTER SET utf8 */" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.fixed_delete (" 
@@ -7209,7 +7209,7 @@ strcpy(x,
 "                    RIGHT(p_list,LENGTH(p_list)-p_entry_length*(p_n+1)));" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.fixed_update (" 
 "                 INOUT p_list TEXT,p_entry_length INT,p_n INT,new_value VARBINARY(998))" 
@@ -7227,7 +7227,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.fixed_insert (" 
 "                 INOUT p_list TEXT,p_entry_length INT,new_value VARBINARY(998))" 
@@ -7241,7 +7241,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.fixed_select (" 
 "                 p_list TEXT,p_entry_length INT,p_n INT,OUT new_value VARBINARY(998)," 
@@ -7263,7 +7263,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.breakpoint_delete (v_n INT)" 
@@ -7286,7 +7286,7 @@ strcpy(x,
 "  CALL xxxmdbug.fixed_delete(@xxxmdbug_breakpoints_command,20,v_n);" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE TABLE xxxmdbug.readme (" 
@@ -7299,11 +7299,11 @@ strcpy(x,
 "  link_to_documentation VARCHAR(66) CHARACTER SET utf8," 
 "  is_install_script_done INT)");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CALL xxxmdbug.initialize_variables()  /* So @@xxxmdbug_debugger_version and @xxxmdbug_debugger_name will be correct */");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* todo: this is obsolete. Now there is a copyright table. */" 
@@ -7318,7 +7318,7 @@ strcpy(x,
 "  'Documentation exists in file debuggercore_manual.txt.'," 
 "  1)");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "/* Strip ``s when:" 
@@ -7340,7 +7340,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 /* The following two routines -- mysql_proc_insert() and mysql_proc_insert_caller() -- are called for generate.
    They take each row in xxxmdbug.routines and INSERT an appropriate row in mysql.proc.
    That's bad! One should not fool with tables in the mysql database! And the trick will not work for triggers!
@@ -7489,7 +7489,7 @@ strcpy(x,
 "" 
 "  end");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 strcpy(x,
 "" 
 "CREATE PROCEDURE xxxmdbug.mysql_proc_insert_caller ()" 
@@ -7545,7 +7545,7 @@ strcpy(x,
 "  CLOSE c;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "" 
@@ -7553,23 +7553,23 @@ strcpy(x,
 "   So we have two PREPARE procedures, one for sql_mode=ansi_quotes, one for sql_mode<>ansi_quotes." 
 "   We perhaps should also care about ignore_space, no_backslash_escapes, and pipes_as_concat. */" 
 "SET @xxxmdbug_saved_sql_mode_before_prepare=@@sql_mode");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "SET sql_mode='ansi_quotes'");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.prepare_while_ansi_quotes_yes () PREPARE xxxmdbug_stmt FROM @xxxmdbug_test_setting;");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "SET sql_mode=''");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.prepare_while_ansi_quotes_no () PREPARE xxxmdbug_stmt FROM @xxxmdbug_test_setting;");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "CREATE PROCEDURE xxxmdbug.preparer (sql_mode VARCHAR(512) CHARACTER SET utf8)" 
@@ -7578,11 +7578,11 @@ strcpy(x,
 "  ELSE CALL xxxmdbug.prepare_while_ansi_quotes_no();" 
 "  END IF;" 
 "  END");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "SET sql_mode=@xxxmdbug_saved_sql_mode_before_prepare");
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 strcpy(x,
 "" 
@@ -7658,7 +7658,7 @@ strcpy(x,
 "    END IF;" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 /* The walkthrough() procedure is an example and a tool.
    It sends 'debug', then it goes into a loop
@@ -7760,7 +7760,7 @@ strcpy(x,
 "" 
 "  END");
 
-if (mysql_real_query(mysql, x, strlen(x))) return -1;
+if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 
 /* Todo: restore this, we'd like to have some sort of check, but for now SELECT within a procedure is a no-no. */
 
@@ -7768,7 +7768,7 @@ if (mysql_real_query(mysql, x, strlen(x))) return -1;
 //""
 //"SET SESSION sql_mode=@xxxmdbug_saved_sql_mode");
 //
-//if (mysql_real_query(mysql, x, strlen(x))) return -1;
+//if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 //strcpy(x,
 //""
 //"CREATE PROCEDURE xxxmdbug.install_check ()"
@@ -7780,11 +7780,11 @@ if (mysql_real_query(mysql, x, strlen(x))) return -1;
 //"  AND created BETWEEN @xxxmdbug_start_timestamp AND CURRENT_TIMESTAMP;"
 //"  END");
 
-//if (mysql_real_query(mysql, x, strlen(x))) return -1;
+//if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 //strcpy(x,
 //"CALL xxxmdbug.install_check()");
 
-//if (mysql_real_query(mysql, x, strlen(x))) return -1;
+//if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
   return 0;
 }
 /* End of debug_mdbug_install_sql(). End of effect of licence of install_sql function contents. */

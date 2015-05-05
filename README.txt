@@ -36,7 +36,9 @@ The assumption is that you have already installed MySQL or MariaDB somewhere.
 Therefore you may have a copy of libmysqlclient.so somewhere.
 If it is not already on the default path, then an error or warning
 will appear when you try to run ocelotgui. Find it, and say something like
-export LD_LIBRARY_PATH=[path to directory that contains libmysqlclient.so]
+export LD_RUN_PATH=[path to directory that contains libmysqlclient.so]
+Several other directories are searched; for details start ocelotgui and 
+choose Help | libmysqlclient.
 
 The installation examples that follow do not assume that libmysqlclient.so
 is already installed.

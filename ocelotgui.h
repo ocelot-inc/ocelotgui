@@ -46,10 +46,23 @@
 #include <QThread>
 #include <QTimer>
 #endif
+#ifndef __linux
+#include <QLibrary>
+#include <QApplication>
+#endif
+
 
 /* All mysql includes go here */
 /* The include path for mysql.h is hard coded in ocelotgui.pro. */
 #include <mysql.h>
+
+#ifdef __linux
+#include <dlfcn.h>
+#endif
+
+/* Flags used for row_form_box. NUM_FLAG is also defined in mysql include, with same value. */
+#define READONLY_FLAG 1
+#define NUM_FLAG 32768
 
 /*
   This might be appropriate place for all "global" variables that
@@ -182,6 +195,7 @@ public:
   QString ocelot_opt_connect_attr_delete;
   QString ocelot_debug;
   QString ocelot_execute;
+  QString ocelot_ld_run_path;
   QString ocelot_login_path;
   QString ocelot_pager;
   QString ocelot_opt_ssl;
@@ -233,6 +247,7 @@ public slots:
   void action_about();
   void action_the_manual();
   void action_the_manual_close();
+  void action_libmysqlclient();
   void action_statement_edit_widget_text_changed();
   void action_undo();
   void action_statement();
@@ -740,6 +755,7 @@ private:
   QMenu *menu_help;
     QAction *menu_help_action_about;
     QAction *menu_help_action_the_manual;
+    QAction *menu_help_action_libmysqlclient;
 
   QWidget *the_manual_widget;
     QVBoxLayout *the_manual_layout;
@@ -897,7 +913,7 @@ private:
 
 public:
 Row_form_box(int column_count, QString *row_form_label,
-//             int *row_form_type,
+             int *row_form_type,
              int *row_form_is_password, QString *row_form_data,
 //             QString *row_form_width,
              QString row_form_title, QString row_form_message,
@@ -978,13 +994,23 @@ Row_form_box(int column_count, QString *row_form_label,
     else
     {
       text_edit[i]= new QTextEdit();
-      text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
+
+      if ((row_form_type[i] & READONLY_FLAG) != 0)
+      {
+        text_edit[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
+        text_edit[i]->setReadOnly(true);
+      }
+      else
+      {
+        text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
+        text_edit[i]->setReadOnly(false);
+      }
       text_edit[i]->setText(row_form_data[i]);
       text_edit[i]->setMaximumHeight(component_height * 2);
       text_edit[i]->setMinimumHeight(component_height * 2);
       text_edit[i]->setTabChangesFocus(true);
       /* The following line will work, but I'm undecided whether it's desirable. */
-      //if (row_form_type[i] == NUM_FLAG) text_edit[i]->setAlignment(Qt::AlignRight);
+      //if ((row_form_type[i] & NUM_FLAG) != 0) text_edit[i]->setAlignment(Qt::AlignRight);
       hbox_layout[i]->addWidget(text_edit[i]);
     }
     widget[i]= new QWidget();
@@ -1119,6 +1145,395 @@ void garbage_collect ()
 #define GRID_WIDGET 1
 #define HISTORY_WIDGET 2
 #define MAIN_WIDGET 3
+
+/***********************************************************/
+/* The Low-Level DBMS calls */
+/***********************************************************/
+
+/*
+  The functions that start with "ldbms_" are supposed to be low level.
+  Eventually there might be "#if mysql ... #endif" code inside them.
+  Eventually there might be a separate class with all dbms-related calls.
+  But we're still a long way from having dbms-independent code here.
+  We have these new lists, which are created when we make the grid and deleted when we stop:
+    grid_column_dbms_sources[].       = DBMS_SOURCE_IS_MYSQL_FIELD or DBMS_SOURCE_IS_ROW_NUMBER
+    grid_column_dbms_field_numbers[]. = mysql field number, or irrelevant
+  The idea is that any column can be special, that is, can have a source other than
+  the DBMS field. So far the only special column is the row number, experimentally.
+*/
+
+/* Dynamic load
+* Why dynamic-loading at runtime:
+  To get rid of the warning "no version information available"
+  So that we don't necessarily depend on libmysqlclient -- someday we'll allow other connections.
+  The mysql documentation specifically says to use LD_RUN_PATH for mysqlclient; Qt ignores that.
+  On the other hand, this is a pretty convoluted wrapper -- probably there's a more standard way
+  to do it.
+  (I could have checked out Qt's DBMS wrappers, but preferred to learn something at the lower level.)
+  Todo: check library version (not sure how I do that, though).
+
+  Initiate with: ldbms *lmysql;
+                 lmysql= new ldbms();
+                 if (lmysql == NULL) printf("fail\n");
+                 (Failure is possible if library cannot be loaded.)
+  Call with:     lmysql->ldbms_function();
+*/
+
+class ldbms : public QWidget
+{
+public:
+
+  void *dlopen_handle;
+
+  /* For Qt typedef example see http://doc.qt.io/qt-4.8/qlibrary.html#fileName-prop */
+
+  typedef my_ulonglong    (*tmysql_affected_rows)(MYSQL *);
+  typedef void            (*tmysql_close)        (MYSQL *);
+  typedef void            (*tmysql_data_seek)    (MYSQL_RES *, my_ulonglong);
+  typedef unsigned int    (*tmysql_errno)        (MYSQL *);
+  typedef const char*     (*tmysql_error)        (MYSQL *);
+  typedef MYSQL_FIELD*    (*tmysql_fetch_fields) (MYSQL_RES *);
+  typedef unsigned long*  (*tmysql_fetch_lengths)(MYSQL_RES *);
+  typedef MYSQL_ROW       (*tmysql_fetch_row)    (MYSQL_RES *);
+  typedef void            (*tmysql_free_result)  (MYSQL_RES *);
+  typedef const char*     (*tmysql_get_host_info)(MYSQL *);
+  typedef const char*     (*tmysql_info)         (MYSQL *);
+  typedef MYSQL*          (*tmysql_init)         (MYSQL *);
+  typedef my_bool         (*tmysql_more_results) (MYSQL *);
+  typedef int             (*tmysql_next_result)  (MYSQL *);
+  typedef unsigned int    (*tmysql_num_fields)   (MYSQL_RES *);
+  typedef my_ulonglong    (*tmysql_num_rows)     (MYSQL_RES *);
+  typedef int             (*tmysql_options)      (MYSQL *, enum mysql_option, const char *);
+  typedef int             (*tmysql_query)        (MYSQL *, const char *);
+  typedef MYSQL*          (*tmysql_real_connect) (MYSQL *, const char *,
+                                                  const char *,
+                                                  const char *,
+                                                  const char *,
+                                                  unsigned int,
+                                                  const char *,
+                                                  unsigned long);
+  typedef int             (*tmysql_real_query)   (MYSQL *, const char *, unsigned long);
+  typedef int             (*tmysql_select_db)    (MYSQL *, const char *);
+  typedef char*           (*tmysql_sqlstate)     (MYSQL *);
+  typedef MYSQL_RES*      (*tmysql_store_result) (MYSQL *);
+  typedef unsigned int    (*tmysql_warning_count)(MYSQL *);
+
+  tmysql_affected_rows t__mysql_affected_rows;
+  tmysql_close t__mysql_close;
+  tmysql_data_seek t__mysql_data_seek;
+  tmysql_errno t__mysql_errno;
+  tmysql_error t__mysql_error;
+  tmysql_fetch_fields t__mysql_fetch_fields;
+  tmysql_fetch_lengths t__mysql_fetch_lengths;
+  tmysql_fetch_row t__mysql_fetch_row;
+  tmysql_free_result t__mysql_free_result;
+  tmysql_get_host_info t__mysql_get_host_info;
+  tmysql_info t__mysql_info;
+  tmysql_init t__mysql_init;
+  tmysql_more_results t__mysql_more_results;
+  tmysql_next_result t__mysql_next_result;
+  tmysql_num_fields t__mysql_num_fields;
+  tmysql_num_rows t__mysql_num_rows;
+  tmysql_options t__mysql_options;
+  tmysql_query t__mysql_query;
+  tmysql_real_connect t__mysql_real_connect;
+  tmysql_real_query t__mysql_real_query;
+  tmysql_select_db t__mysql_select_db;
+  tmysql_sqlstate t__mysql_sqlstate;
+  tmysql_store_result t__mysql_store_result;
+  tmysql_warning_count t__mysql_warning_count;
+
+  ldbms(QString ocelot_ld_run_path, int *is_libmysqlclient_loaded, QString *return_string) : QWidget()
+  {
+    char *query;
+    int query_len;
+    QString error_string;
+
+    /*
+      What's with all the #ifdef __linux stuff?
+      Originally I coded for QLibrary. For reasons I couldn't figure out,
+      t__mysql_real_connect crashed. So I switched to dlopen().
+      I suspect the ability to say RTLD_DEEPBIND | RTLD_NOW had something to do with it.
+      WIthout RTLD_DEEPBIND it crashed though that might be an obsolete observation.
+      But perhaps someday we'll want to revive QLibrary for other platforms.
+
+      There is a description re finding libmysqlclient if one types Help | libmysqlclient.
+    */
+    if (*is_libmysqlclient_loaded == 1)
+    {
+      /*
+        Since this is called when we're re-connecting,
+        I'd like to dclose() and dlopen() again in case library name has changed.
+        But apparently dclose() is not reliable. So don't change library name, eh?
+      */
+      return;
+    }
+    if (*is_libmysqlclient_loaded == -2)
+    {
+      /* The last error was that we got the wrong library. Unrecoverable. */
+      return;
+    }
+#ifndef __linux
+    QLibrary lib("libmysqlclient");
+#endif
+    /*
+      Finding libmysqlclient
+      I tried "qApp->addLibraryPath(ld_run_path);" but it failed.
+      So first I'll try hard-coding lib() with strings from ld_run_path.
+    */
+    if (ocelot_ld_run_path != "")
+    {
+      QString ld_run_path_part;
+      char *ld_run_path;
+      int ld_run_path_len;
+      int i= 0;
+      int prev_i= 0;
+
+      ld_run_path_len= ocelot_ld_run_path.toUtf8().size();         /* See comment "UTF8 Conversion" */
+      ld_run_path= new char[ld_run_path_len + 1];
+      memcpy(ld_run_path, ocelot_ld_run_path.toUtf8().constData(), ld_run_path_len + 1);
+      ld_run_path[ld_run_path_len]= '\0';
+
+      for (;;)
+      {
+        for (i= prev_i;; ++i)
+        {
+          if ((*(ld_run_path + i) == ';') || (*(ld_run_path + i) == '\0')) break;
+        }
+        ld_run_path_part= ld_run_path + prev_i;
+        ld_run_path_part= ld_run_path_part.left(i - prev_i);
+        ld_run_path_part= ld_run_path_part.trimmed();
+        if (ld_run_path_part > "")
+        {
+#ifdef __linux
+          ld_run_path_part.append("/libmysqlclient.so");
+          query_len= ld_run_path_part.toUtf8().size();         /* See comment "UTF8 Conversion" */
+          query= new char[query_len + 1];
+          memcpy(query, ld_run_path_part.toUtf8().constData(), query_len + 1);
+          query[query_len]= '\0';
+          dlopen_handle= dlopen(query,  RTLD_DEEPBIND | RTLD_NOW);
+          delete []query;
+          if (dlopen_handle == 0) {*is_libmysqlclient_loaded= 0; error_string= dlerror(); }
+          else *is_libmysqlclient_loaded= 1;
+#else
+          ld_run_path_part.append("/libmysqlclient");
+          lib.setFileName(ld_run_path_part);
+          *is_libmysqlclient_loaded= lib.load();
+          error_string= lib.errorString();
+#endif
+          if (*is_libmysqlclient_loaded == 1) break;
+        }
+        if (*(ld_run_path + i) == '\0') break;
+        prev_i= i + 1;
+      }
+      delete []ld_run_path;
+    }
+    /* If it wasn't found via LD_RUN_PATH, use defaults e.g. LD_LIBRARY_PATH */
+    if (*is_libmysqlclient_loaded == 0)
+    {
+#ifdef __linux
+      dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
+      if (dlopen_handle == 0) {*is_libmysqlclient_loaded= 0; error_string= dlerror(); }
+      else *is_libmysqlclient_loaded= 1;
+#else
+      lib.setFileName("libmysqlclient");
+      *is_libmysqlclient_loaded= lib.load();
+      error_string= lib.errorString();
+#endif
+    }
+    if (*is_libmysqlclient_loaded == 0)
+    {
+      *return_string= error_string;
+      return;
+    }
+    if (*is_libmysqlclient_loaded == 1)
+    {
+      QString s= "";
+#ifdef __linux
+      t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows"); if (dlerror() != 0) s.append("mysql_affected_rows ");
+      t__mysql_close= (tmysql_close) dlsym(dlopen_handle, "mysql_close"); if (dlerror() != 0) s.append("mysql_close ");
+      t__mysql_data_seek= (tmysql_data_seek) dlsym(dlopen_handle, "mysql_data_seek"); if (dlerror() != 0) s.append("mysql_data_seek ");
+      t__mysql_errno= (tmysql_errno) dlsym(dlopen_handle, "mysql_errno"); if (dlerror() != 0) s.append("mysql_errno ");
+      t__mysql_error= (tmysql_error) dlsym(dlopen_handle, "mysql_error"); if (dlerror() != 0) s.append("mysql_errorinit ");
+      t__mysql_fetch_fields= (tmysql_fetch_fields) dlsym(dlopen_handle, "mysql_fetch_fields"); if (dlerror() != 0) s.append("mysql_fetch_fields ");
+      t__mysql_fetch_lengths= (tmysql_fetch_lengths) dlsym(dlopen_handle, "mysql_fetch_lengths"); if (dlerror() != 0) s.append("mysql_fetch_lengths ");
+      t__mysql_fetch_row= (tmysql_fetch_row) dlsym(dlopen_handle, "mysql_fetch_row"); if (dlerror() != 0) s.append("mysql_fetch_rows ");
+      t__mysql_free_result= (tmysql_free_result) dlsym(dlopen_handle, "mysql_free_result"); if (dlerror() != 0) s.append("mysql_free_result ");
+      t__mysql_get_host_info= (tmysql_get_host_info) dlsym(dlopen_handle, "mysql_get_host_info"); if (dlerror() != 0) s.append("mysql_get_host_info ");
+      t__mysql_info= (tmysql_info) dlsym(dlopen_handle, "mysql_info"); if (dlerror() != 0) s.append("mysql_info ");
+      t__mysql_init= (tmysql_init) dlsym(dlopen_handle, "mysql_init"); if (dlerror() != 0) s.append("mysql_init ");
+      t__mysql_more_results= (tmysql_more_results) dlsym(dlopen_handle, "mysql_more_results"); if (dlerror() != 0) s.append("mysql_more_results ");
+      t__mysql_next_result= (tmysql_next_result) dlsym(dlopen_handle, "mysql_next_result"); if (dlerror() != 0) s.append("mysql_next_result ");
+      t__mysql_num_fields= (tmysql_num_fields) dlsym(dlopen_handle, "mysql_num_fields"); if (dlerror() != 0) s.append("mysql_num_fields ");
+      t__mysql_num_rows= (tmysql_num_rows) dlsym(dlopen_handle, "mysql_num_rows"); if (dlerror() != 0) s.append("mysql_num_rows ");
+      t__mysql_options= (tmysql_options) dlsym(dlopen_handle, "mysql_options"); if (dlerror() != 0) s.append("mysql_options ");
+      t__mysql_query= (tmysql_query) dlsym(dlopen_handle, "mysql_query"); if (dlerror() != 0) s.append("mysql_query ");
+      t__mysql_real_connect= (tmysql_real_connect) dlsym(dlopen_handle, "mysql_real_connect"); if (dlerror() != 0) s.append("mysql_real_connect ");
+      t__mysql_real_query= (tmysql_real_query) dlsym(dlopen_handle, "mysql_real_query"); if (dlerror() != 0) s.append("mysql_real_query ");
+      t__mysql_select_db= (tmysql_select_db) dlsym(dlopen_handle, "mysql_select_db"); if (dlerror() != 0) s.append("mysql_select_db ");
+      t__mysql_sqlstate= (tmysql_sqlstate) dlsym(dlopen_handle, "mysql_sqlstate"); if (dlerror() != 0) s.append("mysql_sqlstate ");
+      t__mysql_store_result= (tmysql_store_result) dlsym(dlopen_handle, "mysql_store_result"); if (dlerror() != 0) s.append("mysql_store_result ");
+      t__mysql_warning_count= (tmysql_warning_count) dlsym(dlopen_handle, "mysql_warning_count"); if (dlerror() != 0) s.append("mysql_warning_count ");
+#else
+      if ((t__mysql_affected_rows= (tmysql_affected_rows) lib.resolve("mysql_affected_rows")) == 0) s.append("mysql_affected_rows ");
+      if ((t__mysql_close= (tmysql_close) lib.resolve("mysql_close")) == 0) s.append("mysql_close ");
+      if ((t__mysql_data_seek= (tmysql_data_seek) lib.resolve("mysql_data_seek")) == 0) s.append("mysql_data_seek ");
+      if ((t__mysql_errno= (tmysql_errno) lib.resolve("mysql_errno")) == 0) s.append("mysql_errno ");
+      if ((t__mysql_error= (tmysql_error) lib.resolve("mysql_error")) == 0) s.append("mysql_error ");
+      if ((t__mysql_fetch_fields= (tmysql_fetch_fields) lib.resolve("mysql_fetch_fields")) == 0) s.append("mysql_fetch_fields ");
+      if ((t__mysql_fetch_lengths= (tmysql_fetch_lengths) lib.resolve("mysql_fetch_lengths")) == 0) s.append("mysql_fetch_lengths ");
+      if ((t__mysql_fetch_row= (tmysql_fetch_row) lib.resolve("mysql_fetch_row")) == 0) s.append("mysql_fetch_row ");
+      if ((t__mysql_free_result= (tmysql_free_result) lib.resolve("mysql_free_result")) == 0) s.append("mysql_free_result ");
+      if ((t__mysql_get_host_info= (tmysql_get_host_info) lib.resolve("mysql_get_host_info")) == 0) s.append("mysql_get_host_info ");
+      if ((t__mysql_info= (tmysql_info) lib.resolve("mysql_info")) == 0) s.append("mysql_info ");
+      if ((t__mysql_init= (tmysql_init) lib.resolve("mysql_init")) == 0) s.append("mysql_init ");
+      if ((t__mysql_more_results= (tmysql_more_results) lib.resolve("mysql_more_results")) == 0) s.append("mysql_more_results ");
+      if ((t__mysql_next_result= (tmysql_next_result) lib.resolve("mysql_next_result")) == 0) s.append("mysql_next_result ");
+      if ((t__mysql_num_fields= (tmysql_num_fields) lib.resolve("mysql_num_fields")) == 0) s.append("mysql_num_fields ");
+      if ((t__mysql_num_rows= (tmysql_num_rows) lib.resolve("mysql_num_rows")) == 0) s.append("mysql_num_rows ");
+      if ((t__mysql_options= (tmysql_options) lib.resolve("mysql_options")) == 0) s.append("mysql_options ");
+      if ((t__mysql_query= (tmysql_query) lib.resolve("mysql_query")) == 0) s.append("mysql_query ");
+      if ((t__mysql_real_connect= (tmysql_real_connect) lib.resolve("mysql_real_connect")) == 0) s.append("mysql_real_connect ");
+      if ((t__mysql_real_query= (tmysql_real_query) lib.resolve("mysql_real_query")) == 0) s.append("mysql_real_query ");
+      if ((t__mysql_select_db= (tmysql_select_db) lib.resolve("mysql_select_db")) == 0) s.append("mysql_select_db ");
+      if ((t__mysql_sqlstate= (tmysql_sqlstate) lib.resolve("mysql_sqlstate")) == 0) s.append("mysql_sqlstate ");
+      if ((t__mysql_store_result= (tmysql_store_result) lib.resolve("mysql_store_result")) == 0) s.append("mysql_store_result ");
+      if ((t__mysql_warning_count= (tmysql_warning_count) lib.resolve("mysql_warning_count")) == 0) s.append("mysql_warning_count ");
+#endif
+      if (s > "")
+      {
+        {
+          /* Unrecoverable error -- one or more names not found. Return the names. */
+          *return_string= s;
+          *is_libmysqlclient_loaded= -2;
+          return;
+          }
+      }
+    }
+  }
+
+  my_ulonglong ldbms_mysql_affected_rows(MYSQL *mysql)
+  {
+    return t__mysql_affected_rows(mysql);
+  }
+
+  void ldbms_mysql_close(MYSQL *mysql)
+  {
+    t__mysql_close(mysql);
+  }
+
+  void ldbms_mysql_data_seek(MYSQL_RES *result, my_ulonglong offset)
+  {
+    t__mysql_data_seek(result, offset);
+  }
+
+  unsigned int ldbms_mysql_errno(MYSQL *mysql)
+  {
+    return t__mysql_errno(mysql);
+  }
+
+  const char *ldbms_mysql_error(MYSQL *mysql)
+  {
+    return t__mysql_error(mysql);
+  }
+
+  MYSQL_FIELD *ldbms_mysql_fetch_fields(MYSQL_RES *result)
+  {
+    return t__mysql_fetch_fields(result);
+  }
+
+  unsigned long *ldbms_mysql_fetch_lengths(MYSQL_RES *result)
+  {
+    return t__mysql_fetch_lengths(result);
+  }
+
+  MYSQL_ROW ldbms_mysql_fetch_row(MYSQL_RES *result)
+  {
+    return t__mysql_fetch_row(result);
+  }
+
+  void ldbms_mysql_free_result(MYSQL_RES *result)
+  {
+    t__mysql_free_result(result);
+  }
+
+  const char *ldbms_mysql_get_host_info(MYSQL *mysql)
+  {
+    return t__mysql_get_host_info(mysql);
+  }
+
+  const char *ldbms_mysql_info(MYSQL *mysql)
+  {
+    return t__mysql_info(mysql);
+  }
+
+  MYSQL *ldbms_mysql_init(MYSQL *mysql)
+  {
+    return t__mysql_init(mysql);
+  }
+
+  my_bool ldbms_mysql_more_results(MYSQL *mysql)
+  {
+    return t__mysql_more_results(mysql);
+  }
+
+  int ldbms_mysql_next_result(MYSQL *mysql)
+  {
+    return t__mysql_next_result(mysql);
+  }
+
+  unsigned int ldbms_mysql_num_fields(MYSQL_RES *result)
+  {
+    return t__mysql_num_fields(result);
+  }
+
+  my_ulonglong ldbms_mysql_num_rows(MYSQL_RES *result)
+  {
+    return t__mysql_num_rows(result);
+  }
+
+  int ldbms_mysql_options(MYSQL *mysql, enum mysql_option option, const char *arg)
+  {
+    return t__mysql_options(mysql, option, arg);
+  }
+
+  int ldbms_mysql_query(MYSQL *mysql, const char *stmt_str)
+  {
+    return t__mysql_query(mysql, stmt_str);
+  }
+
+  MYSQL *ldbms_mysql_real_connect(MYSQL *mysql, const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long client_flag)
+  {
+    return t__mysql_real_connect(mysql, host, user, passwd, db, port, unix_socket, client_flag);
+  }
+
+  /* This is not usually called from the main thread. Do not put a message box in this. */
+  int ldbms_mysql_real_query(MYSQL *mysql, const char *stmt_str, unsigned long length)
+  {
+    return t__mysql_real_query(mysql, stmt_str, length);
+  }
+
+  int ldbms_mysql_select_db(MYSQL *mysql, const char *db)
+  {
+    return t__mysql_select_db(mysql, db);
+  }
+
+  MYSQL_RES *ldbms_mysql_store_result(MYSQL *mysql)
+  {
+    return t__mysql_store_result(mysql);
+  }
+
+  const char *ldbms_mysql_sqlstate(MYSQL *mysql)
+  {
+    return t__mysql_sqlstate(mysql);
+  }
+
+  unsigned int ldbms_mysql_warning_count(MYSQL *mysql)
+  {
+    return t__mysql_warning_count(mysql);
+  }
+
+};
 
 
 /*********************************************************************************************************/
@@ -1276,6 +1691,7 @@ public:
   unsigned int cell_pool_size;
   QString frame_color_setting;                                 /* based on drag line color */
   QFont text_edit_widget_font;
+  ldbms *lmysql;
 
 /* How many rows can fit on the screen? Take a guess. */
 #define RESULT_GRID_WIDGET_MAX_HEIGHT 20
@@ -1285,12 +1701,15 @@ public:
 
 ResultGrid(
 //        MYSQL_RES *mysql_res,
+        ldbms *passed_lmysql,
         MainWindow *parent): QWidget(parent)
 {
   is_paintable= 0;
   ocelot_grid_max_grid_height_in_lines= 35;                 /* Todo: should be user-settable and passed */
 
   client= new QWidget(this);
+
+  lmysql= passed_lmysql;
 
   copy_of_parent= parent;
 
@@ -1502,10 +1921,14 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
 void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_parameter,
-            unsigned short ocelot_result_grid_vertical, unsigned short ocelot_result_grid_column_names)
+            unsigned short ocelot_result_grid_vertical,
+            unsigned short ocelot_result_grid_column_names,
+            ldbms *passed_lmysql)
 {
   long unsigned int xrow;
   unsigned int col;
+
+  lmysql= passed_lmysql;
 
   /* mysql_more_results_flag affects whether we use mysql_res directly, or make a copy */
   mysql_more_results_flag= mysql_more_results_parameter;
@@ -1538,7 +1961,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   /* ocelot_grid_cell_right_drag_line_size_as_int= parent->ocelot_grid_cell_right_drag_line_size.toInt(); */
   /* ocelot_grid_cell_right_drag_line_color= parent->ocelot_grid_cell_right_drag_line_color; */
   dbms_set_result_column_count();                                  /* this will be the width of the grid */
-  result_row_count= mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
+  result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
   if (ocelot_result_grid_vertical == 0) grid_result_row_count= result_row_count + 1;
   else grid_result_row_count= result_row_count * result_column_count;
 
@@ -2093,11 +2516,11 @@ void scan_rows(bool p_mysql_more_results_flag,
 
   if (!p_mysql_more_results_flag)
   {
-    mysql_data_seek(p_mysql_res, 0);
+    lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
     for (v_r= 0; v_r < p_result_row_count; ++v_r)
     {
-      v_row= mysql_fetch_row(p_mysql_res);
-      v_lengths= mysql_fetch_lengths(p_mysql_res);
+      v_row= lmysql->ldbms_mysql_fetch_row(p_mysql_res);
+      v_lengths= lmysql->ldbms_mysql_fetch_lengths(p_mysql_res);
       for (i= 0; i < p_result_column_count; ++i)
       {
         if ((v_row == 0) || (v_row[i] == 0))
@@ -2119,11 +2542,11 @@ void scan_rows(bool p_mysql_more_results_flag,
   */
   unsigned int total_size= 0;
   char *mysql_res_copy_pointer;
-  mysql_data_seek(p_mysql_res, 0);
+  lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                /* first loop */
   {
-    v_row= mysql_fetch_row(p_mysql_res);
-    v_lengths= mysql_fetch_lengths(p_mysql_res);
+    v_row= lmysql->ldbms_mysql_fetch_row(p_mysql_res);
+    v_lengths= lmysql->ldbms_mysql_fetch_lengths(p_mysql_res);
     for (i= 0; i < p_result_column_count; ++i)
     {
 //      ki= (v_r + 1) * result_column_count + i;
@@ -2142,13 +2565,13 @@ void scan_rows(bool p_mysql_more_results_flag,
   *p_mysql_res_copy= new char[total_size];                                              /* allocate */
   *p_mysql_res_copy_rows= new char*[p_result_row_count];
   mysql_res_copy_pointer= *p_mysql_res_copy;
-  mysql_data_seek(p_mysql_res, 0);
+  lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
   int null_length= sizeof(NULL_STRING) - 1;
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
   {
     (*p_mysql_res_copy_rows)[v_r]= mysql_res_copy_pointer;
-    v_row= mysql_fetch_row(p_mysql_res);
-    v_lengths= mysql_fetch_lengths(p_mysql_res);
+    v_row= lmysql->ldbms_mysql_fetch_row(p_mysql_res);
+    v_lengths= lmysql->ldbms_mysql_fetch_lengths(p_mysql_res);
     for (i= 0; i < p_result_column_count; ++i)
     {
 //      ki= (r + 1) * p_result_column_count + i;
@@ -2249,10 +2672,10 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
     else columns_per_row= 1;
     first_row= new_grid_vertical_scroll_bar_value / result_column_count;
     i= new_grid_vertical_scroll_bar_value % result_column_count;
-    mysql_data_seek(grid_mysql_res, first_row);
+    lmysql->ldbms_mysql_data_seek(grid_mysql_res, first_row);
     r= first_row;
     grid_row= 0;
-    row= mysql_fetch_row(grid_mysql_res);
+    row= lmysql->ldbms_mysql_fetch_row(grid_mysql_res);
     if (row == NULL)
     {
       printf("mysql_fetch_row error A\n");
@@ -2263,7 +2686,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       printf("i=%d\n", i);
       exit(0);
     }
-    lengths= mysql_fetch_lengths(grid_mysql_res);
+    lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
     if (lengths == NULL)
     {
       printf("mysql_fetch_lengths error\n");
@@ -2301,7 +2724,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       {
         ++r;
         if (r >= result_row_count) break;
-        row= mysql_fetch_row(grid_mysql_res);
+        row= lmysql->ldbms_mysql_fetch_row(grid_mysql_res);
         if (row == NULL)
         {
           printf("mysql_fetch_row error B\n");
@@ -2311,7 +2734,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
           printf("grid_row=%d\n", grid_row);
           exit(0);
         }
-        lengths= mysql_fetch_lengths(grid_mysql_res);
+        lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
         if (lengths == NULL)
         {
           printf("mysql_fetch_lengths error\n");
@@ -2329,11 +2752,11 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
 
   if (!mysql_more_results_flag)
   {
-    mysql_data_seek(grid_mysql_res, first_row);
+    lmysql->ldbms_mysql_data_seek(grid_mysql_res, first_row);
     for (r= first_row, grid_row= 1; (r < result_row_count) && (grid_row < RESULT_GRID_WIDGET_MAX_HEIGHT); ++r, ++grid_row)
     {
-      row= mysql_fetch_row(grid_mysql_res);
-      lengths= mysql_fetch_lengths(grid_mysql_res);
+      row= lmysql->ldbms_mysql_fetch_row(grid_mysql_res);
+      lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
       for (i= 0; i < result_column_count; ++i)
       {
         ki= grid_row * result_column_count + i;
@@ -2377,7 +2800,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
   for (r= first_row, grid_row= 1; (r < result_row_count) && (grid_row < RESULT_GRID_WIDGET_MAX_HEIGHT); ++r, ++grid_row)
   {
     row_pointer= mysql_res_copy_rows[r];
-//    lengths= mysql_fetch_lengths(grid_mysql_res);
+//    lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
     for (i= 0; i < result_column_count; ++i)
     {
       ki= grid_row * result_column_count + i;
@@ -2591,18 +3014,6 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string)
 //}
 
 /*
-  The functions that start with "dbms_" are supposed to be low level.
-  Eventually there might be "#if mysql ... #endif" code inside them.
-  Eventually there might be a separate class with all dbms-related calls.
-  But we're still a long way from having dbms-independent code here.
-  We have these new lists, which are created when we make the grid and deleted when we stop:
-    grid_column_dbms_sources[].       = DBMS_SOURCE_IS_MYSQL_FIELD or DBMS_SOURCE_IS_ROW_NUMBER
-    grid_column_dbms_field_numbers[]. = mysql field number, or irrelevant
-  The idea is that any column can be special, that is, can have a source other than
-  the DBMS field. So far the only special column is the row number, experimentally.
-*/
-
-/*
   Ordinarily DBMS_ROW_NUMBER_TEST is 0 = off.
   Turn it to 1 = on if testing to get row numbers as leftmost column.
   Todo: If it's 1, then the test will succeed, but is this really the way you want to do things?
@@ -2617,13 +3028,13 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string)
 
 /*
   dbms_set_result_column_count() gets the number of columns in the grid
-  It might be the same as the number of fields returned by mysql_num_fields().
+  It might be the same as the number of fields returned by lmysql->ldbms_mysql_num_fields().
   But if there is an additional field for row-number, ++.
   Todo: check if this will crash if somebody changes the setting for row numbers (if we allow that)?
 */
 void dbms_set_result_column_count()
 {
-  result_column_count= mysql_num_fields(grid_mysql_res);           /* this will be the width of the grid */
+  result_column_count= lmysql->ldbms_mysql_num_fields(grid_mysql_res);           /* this will be the width of the grid */
   if (DBMS_ROW_NUMBER_TEST == 1) ++result_column_count;
 }
 
@@ -2632,7 +3043,7 @@ void dbms_set_grid_column_sources()
   unsigned int column_number;
   unsigned int dbms_field_number;
 
-  fields= mysql_fetch_fields(grid_mysql_res);
+  fields= lmysql->ldbms_mysql_fetch_fields(grid_mysql_res);
   dbms_field_number= 0;
   for (column_number= 0; column_number < result_column_count; ++column_number)
   {
@@ -2730,7 +3141,6 @@ QString dbms_get_field_value(int row_number, unsigned int column_number)
 public slots:
 private:
 };
-
 
 /*********************************************************************************************************/
 

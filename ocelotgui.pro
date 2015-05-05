@@ -21,19 +21,32 @@ TARGET = ocelotgui
 TEMPLATE = app
 
 SOURCES +=\
-        ocelotgui.cpp \
-    install_sql.cpp
-
+        ocelotgui.cpp 
 HEADERS  += ocelotgui.h
 
 FORMS    += ocelotgui.ui
 
-# Todo: don't hard code these paths, find where mysql.h and libmysqlclient.so should be!
-# Todo: getenv("LD_RUN_PATH") is in the code, but unused.
+# INCLUDEPATH is where the compiler will search for mysql.h at build time.
+# Replace this with the actual location of the file as supplied by MySQL or MariaDB.
+# Todo: don't hard code a single path, find where mysql.h should be!
 INCLUDEPATH += /home/pgulutzan/mariadb-10.0.17/include/mysql
-LIBS += /home/pgulutzan/mariadb-10.0.17//lib/libmysqlclient.so
-# INCLUDEPATH += /home/pgulutzan/mysql-5.5/include
-# LIBS += /home/pgulutzan/mysql-5.5/lib/libmysqlclient.so
+
+# QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time,
+# but first it will try several other ways.
+# Start ocelotgui and say Help | libmysqlclient for details.
+QMAKE_RPATHDIR += /usr/local/lib
+QMAKE_RPATHDIR += /usr/mysql/lib
+QMAKE_RPATHDIR += /usr/local/mysql/lib
+QMAKE_RPATHDIR += /usr/lib
+QMAKE_RPATHDIR += /usr/local/lib/mysql
+QMAKE_RPATHDIR += /usr/lib/mysql
+QMAKE_RPATHDIR += /usr/local
+QMAKE_RPATHDIR += /usr/local/mysql
+QMAKE_RPATHDIR += /usr/local
+QMAKE_RPATHDIR += /usr
+
+
+
 
 
 

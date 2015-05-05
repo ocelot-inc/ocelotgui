@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: April 26 2015
+   Last modified: May 5 2015
 */
 
 /*
@@ -241,6 +241,7 @@
   static unsigned short ocelot_histignore= 0;/* --histignore=s */
   static unsigned short ocelot_html= 0;      /* --html */
   static unsigned short ocelot_ignore_spaces= 0;  /* --ignore_spaces */
+  /* QString ocelot_ld_run_path */                /* --ld_run_path=s */
   static unsigned short ocelot_line_numbers= 0;   /* --line_numbers */
   static unsigned short ocelot_opt_local_infile= 0;    /* --local_infile[=n]  for MYSQL_OPT_LOCAL_INFILE */
   /* QString ocelot_login_path */            /* --login_path=s */
@@ -303,7 +304,7 @@
   static unsigned short ocelot_opt_named_pipe;          /* for MYSQL_OPT_NAMED_PIPE */
   static unsigned int ocelot_opt_write_timeout= 0; /* for MYSQL_OPT_WRITE_TIMEOUT */
 
-
+  int is_libmysqlclient_loaded= 0;
 
 /* copy of an information_schema.columns select, used for rehash */
   static  unsigned int rehash_result_column_count= 0;
@@ -328,12 +329,14 @@
   static int connected[1]= {0};
 #endif
 
+  ldbms *lmysql= 0;
+
 int main(int argc, char *argv[])
 {
-    QApplication a(argc, argv);
+    QApplication main_application(argc, argv);
     MainWindow w (argc, argv);
     w.showMaximized();
-    return a.exec();
+    return main_application.exec();
 }
 
 
@@ -371,7 +374,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   ocelot_statement_prompt_background_color= "lightGray"; /* set early because create_widget_statement() depends on this */
 
-
   ocelot_grid_border_color= "black";
   ocelot_grid_header_background_color= "lightGray";
   ocelot_grid_cell_right_drag_line_color= "lightBlue";
@@ -390,7 +392,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   result_grid_tab_widget->hide();
   for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
-    result_grid_table_widget[i_r]= new ResultGrid(this);
+    result_grid_table_widget[i_r]= new ResultGrid(lmysql, this);
     result_grid_tab_widget->addTab(result_grid_table_widget[i_r], QString::number(i_r + 1));
     result_grid_table_widget[i_r]->hide(); /* Maybe this isn't necessary */
   }
@@ -1246,6 +1248,10 @@ void MainWindow::create_menu()
   /* Qt says I should also do "addSeparator" if Motif style. Harmless. */
   ui->menuBar->addSeparator();
   /* exitAction->setPriority(QAction::LowPriority); */
+
+  menu_help_action_libmysqlclient= menu_help->addAction(tr("libmysqlclient"));
+  connect(menu_help_action_libmysqlclient, SIGNAL(triggered()), this, SLOT(action_libmysqlclient()));
+
 }
 
 
@@ -1390,7 +1396,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_is_password= 0;
   row_form_data= 0;
   row_form_width= 0;
-  column_count= 80; /* If you add or remove items, you have to change this */
+  column_count= 81; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
   row_form_is_password= new int[column_count];
@@ -1432,11 +1438,13 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "help"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0;  row_form_data[i]= QString::number(ocelot_help); row_form_width[i]= 5;
   row_form_label[++i]= "histignore"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_histignore); row_form_width[i]= 5;
   row_form_label[++i]= "html"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_html); row_form_width[i]= 5;
-  row_form_label[++i]= "ignore_spaces"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ignore_spaces); row_form_width[i]= 5;
+  row_form_label[++i]= "ignore_spaces"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ignore_spaces); row_form_width[i]= 5;
+  row_form_label[++i]= "ld_run_path"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_ld_run_path; row_form_width[i]= 5;
+  if (is_libmysqlclient_loaded != 0) row_form_type[i]= (row_form_type[i] | READONLY_FLAG);
   row_form_label[++i]= "line_numbers"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_line_numbers); row_form_width[i]= 5;
   row_form_label[++i]= "local_infile"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_local_infile); row_form_width[i]= 5;
   row_form_label[++i]= "login_path"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_login_path; row_form_width[i]= 5;
-  row_form_label[++i]= "max_allowed_packet"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(max_allowed_packet); row_form_width[i]= 5;
+  row_form_label[++i]= "max_allowed_packet"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_max_allowed_packet); row_form_width[i]= 5;
   row_form_label[++i]= "max_join_size"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_max_join_size); row_form_width[i]= 5;
   row_form_label[++i]= "named_commands"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_named_commands); row_form_width[i]= 5;
   row_form_label[++i]= "net_buffer_length"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_net_buffer_length); row_form_width[i]= 5;
@@ -1492,11 +1500,12 @@ void MainWindow::action_connect_once(QString message)
   }
   else /* if (message == "FIle|Connect") */
   {
+
     row_form_title= tr("Connection Dialog Box");
     row_form_message= message;
 
     co= new Row_form_box(column_count, row_form_label,
-  //                                     row_form_type,
+                                       row_form_type,
                                        row_form_is_password, row_form_data,
   //                                     row_form_width,
                                        row_form_title, row_form_message, this);
@@ -1542,10 +1551,11 @@ void MainWindow::action_connect_once(QString message)
       ocelot_histignore= to_long(row_form_data[i++].trimmed());
       ocelot_html= to_long(row_form_data[i++].trimmed());
       ocelot_ignore_spaces= to_long(row_form_data[i++].trimmed());
+      ocelot_ld_run_path= row_form_data[i++].trimmed();
       ocelot_line_numbers= to_long(row_form_data[i++].trimmed());
       ocelot_opt_local_infile= to_long(row_form_data[i++].trimmed());
       ocelot_login_path= row_form_data[i++].trimmed();
-      max_allowed_packet= to_long(row_form_data[i++].trimmed());
+      ocelot_max_allowed_packet= to_long(row_form_data[i++].trimmed());
       ocelot_max_join_size= to_long(row_form_data[i++].trimmed());
       ocelot_named_commands= to_long(row_form_data[i++].trimmed());
       ocelot_net_buffer_length= to_long(row_form_data[i++].trimmed());
@@ -1620,6 +1630,7 @@ void MainWindow::action_exit()
   /* Todo: this might not be enough. Maybe you should be intercepting the "close window" event. */
   if (menu_debug_action_exit->isEnabled() == true) action_debug_exit();
 #endif
+  /* Todo: Check: is there any point doing a dlclose for the libmysqlclient if it's loaded? */
   close();
 }
 
@@ -1940,6 +1951,34 @@ void MainWindow::action_the_manual()
 void MainWindow::action_the_manual_close()
 {
   the_manual_widget->hide();
+}
+
+void MainWindow::action_libmysqlclient()
+{
+  QMessageBox msgBox;
+
+  msgBox.setWindowTitle(tr("Help | libmysqlclient"));
+  msgBox.setText("<b>libmysqlclient<br>\
+  Before ocelotgui can try to connect to a MySQL server, \
+  it needs a shared library named libmysqlclient \
+  (file name on Linux is 'libmysqlclient.so'). \
+  If a mysql client was installed, then this file exists \
+  ... somewhere. \
+  ocelotgui searches for libmysqlclient.so in these directories:<br> \
+  (1) as specified by environment variable LD_RUN_PATH<br> \
+  (2) as specified by environment variable LD_LIBRARY_PATH<br> \
+  (3) as specified during build in file ocelotgui.pro, \
+  which are by default hard-coded as: /usr/local/lib \
+  /usr/mysql/lib /usr/local/mysql/lib /usr/lib /usr/local/lib/mysql \
+  /usr/lib/mysql /usr/local /usr/local/mysql /usr/local /usr.<br> \
+  If a message appears saying libmysqlclient cannot be found, \
+  or if there is a suspicion that an obsolete copy of libmysqlclient \
+  was found, a possible solution is:<br> \
+  1. Find the right libmysqlclient.so with Linux 'find' or 'locate'. \
+  Suppose it is /home/jeanmartin/libmysqlclient.so.<br> \
+  2. Specify the library when starting ocelotgui, thus:<br> \
+  LD_RUN_PATH=/home/jeanmartin ocelotgui");
+    msgBox.exec();
 }
 
 
@@ -2387,14 +2426,14 @@ QString MainWindow::select_1_row(const char *select_statement)
   QString s;
   unsigned int num_fields;
 
-  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], select_statement, strlen(select_statement)))
+  if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], select_statement, strlen(select_statement)))
   {
     unexpected_error= "select failed";
   }
 
   if (unexpected_error == NULL)
   {
-    res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+    res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
     if (res == NULL)
     {
       unexpected_error= "mysql_store_result failed";
@@ -2403,12 +2442,12 @@ QString MainWindow::select_1_row(const char *select_statement)
 
   if (unexpected_error == NULL)
   {
-    num_fields= mysql_num_fields(res);
+    num_fields= lmysql->ldbms_mysql_num_fields(res);
   }
 
   if (unexpected_error == NULL)
   {
-    row= mysql_fetch_row(res);
+    row= lmysql->ldbms_mysql_fetch_row(res);
     if (row == NULL)
     {
       unexpected_error= "mysql_fetch row failed"; /* Beware! Look for a proc that compares routine with this string value! */
@@ -2423,7 +2462,7 @@ QString MainWindow::select_1_row(const char *select_statement)
     }
   }
 
-  if (res != NULL) mysql_free_result(res);
+  if (res != NULL) lmysql->ldbms_mysql_free_result(res);
 
   if (unexpected_error != NULL) s= unexpected_error;
   else s= "";
@@ -2614,14 +2653,14 @@ void* debuggee_thread(void* unused)
   {
     /*
       The debuggee connection.
-      I don't think I need to say mysql_init(&mysql[connection_number]);
+      I don't think I need to say lmysql->ldbms_mysql_init(&mysql[connection_number]);
       Todo: the_connect() could easily fail: parameters are changed, # of connections = max, password no longer works, etc.
             ... so you should try to pass back a better explanation if the_connect() fails here.
     */
     if (options_and_connect(MYSQL_DEBUGGER_CONNECTION))
     {
        debuggee_state= DEBUGGEE_STATE_CONNECT_FAILED;
-       strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+       strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
        break;
     }
 
@@ -2629,38 +2668,38 @@ void* debuggee_thread(void* unused)
 
     /* Get connection_id(). This is only in case regular "exit" fails and we have to issue a kill statement. */
     strcpy(call_statement, "select connection_id();");
-    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
     {
       debuggee_state= DEBUGGEE_STATE_MYSQL_REAL_QUERY_ERROR;
-      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
       break;
     }
-    debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+    debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
     if (debug_res == NULL)
     {
       debuggee_state= DEBUGGEE_STATE_MYSQL_STORE_RESULT_ERROR;
-      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
       break;
     }
-    debug_row= mysql_fetch_row(debug_res);
+    debug_row= lmysql->ldbms_mysql_fetch_row(debug_res);
     if (debug_row == NULL)
     {
       debuggee_state= DEBUGGEE_STATE_MYSQL_FETCH_ROW_ERROR;
-      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
-      mysql_free_result(debug_res);
+      strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      lmysql->ldbms_mysql_free_result(debug_res);
       break;
     }
     debuggee_connection_id= atoi(debug_row[0]);
-    mysql_free_result(debug_res);
+    lmysql->ldbms_mysql_free_result(debug_res);
 
     strcpy(call_statement, "call xxxmdbug.become_debuggee_connection('");
     strcat(call_statement, debuggee_channel_name);
     strcat(call_statement, "');");
     debuggee_state= DEBUGGEE_STATE_BECOME_DEBUGEE_CONNECTION;
-    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
     {
       debuggee_state= DEBUGGEE_STATE_BECOME_DEBUGGEE_CONNECTION_ERROR;
-      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
       break;
     }
 
@@ -2675,15 +2714,15 @@ void* debuggee_thread(void* unused)
 
     strcpy(call_statement, "call xxxmdbug.debuggee_wait_loop();");
     debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP;
-    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
     {
       debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
-      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
       break;
     }
     {
       char xxxmdbug_status_last_command_result[512];
-      if (mysql_query(&mysql[MYSQL_DEBUGGER_CONNECTION], "select @xxxmdbug_status_last_command_result"))
+      if (lmysql->ldbms_mysql_query(&mysql[MYSQL_DEBUGGER_CONNECTION], "select @xxxmdbug_status_last_command_result"))
       {
         /* This can happen, for example if debug command failed. */
         debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
@@ -2691,26 +2730,26 @@ void* debuggee_thread(void* unused)
         strcpy(debuggee_state_error, "no result from last command");
         break;
       }
-      debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+      debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
       if (debug_res == NULL)
       {
         unexpected_error= "mysql_store_result failed";
       }
-      if (mysql_num_fields(debug_res) != 1)
+      if (lmysql->ldbms_mysql_num_fields(debug_res) != 1)
       {
         unexpected_error= "wrong field count";
-        mysql_free_result(debug_res);
+        lmysql->ldbms_mysql_free_result(debug_res);
         break;
       }
-      debug_row= mysql_fetch_row(debug_res);
+      debug_row= lmysql->ldbms_mysql_fetch_row(debug_res);
       if (debug_row == NULL)
       {
         unexpected_error= "mysql_fetch_row failed";
-        mysql_free_result(debug_res);
+        lmysql->ldbms_mysql_free_result(debug_res);
        break;
       }
       strcpy(xxxmdbug_status_last_command_result, debug_row[0]);
-      mysql_free_result(debug_res);
+      lmysql->ldbms_mysql_free_result(debug_res);
       /* There are various errors that xxxmdbug.check_surrogate_routine could have returned. */
       if ((strstr(xxxmdbug_status_last_command_result,"Error reading setup log") != 0)
        || (strstr(xxxmdbug_status_last_command_result,"is incorrect format for a surrogate identifier") != 0)
@@ -2725,36 +2764,36 @@ void* debuggee_thread(void* unused)
         break;
       }
     }
-    if (mysql_query(&mysql[MYSQL_DEBUGGER_CONNECTION], "select @xxxmdbug_what_to_call"))
+    if (lmysql->ldbms_mysql_query(&mysql[MYSQL_DEBUGGER_CONNECTION], "select @xxxmdbug_what_to_call"))
     {
       unexpected_error=" select @xxxmdbug_what_to_call failed";
       break;
     }
-    debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+    debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
     if (debug_res == NULL)
     {
       unexpected_error= "mysql_store_result failed";
     }
-    if (mysql_num_fields(debug_res) != 1)
+    if (lmysql->ldbms_mysql_num_fields(debug_res) != 1)
     {
       unexpected_error= "wrong field count";
-      mysql_free_result(debug_res);
+      lmysql->ldbms_mysql_free_result(debug_res);
       break;
     }
-    debug_row= mysql_fetch_row(debug_res);
+    debug_row= lmysql->ldbms_mysql_fetch_row(debug_res);
     if (debug_row == NULL)
     {
       unexpected_error= "mysql_fetch_row failed";
-      mysql_free_result(debug_res);
+      lmysql->ldbms_mysql_free_result(debug_res);
       break;
     }
     strcpy(call_statement, debug_row[0]);
-    mysql_free_result(debug_res);
+    lmysql->ldbms_mysql_free_result(debug_res);
 
-    if (mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
     {
       debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
-      strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+      strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
     }
     else
     {
@@ -2766,19 +2805,19 @@ void* debuggee_thread(void* unused)
           Todo: we can put each result into the result grid widget as it comes;
           we'll have to decide whether the debugger should do it, or the main.
         */
-        if (mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
+        if (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
         {
-          debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+          debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
           if (debug_res != 0)
           {
-            mysql_free_result(debug_res);
+            lmysql->ldbms_mysql_free_result(debug_res);
 
-            if (mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
+            if (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
             {
-              while (mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0)
+              while (lmysql->ldbms_mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0)
               {
-                debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
-                if (debug_res != 0) mysql_free_result(debug_res);
+                debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+                if (debug_res != 0) lmysql->ldbms_mysql_free_result(debug_res);
               }
               debug_res= 0;
             }
@@ -2790,27 +2829,27 @@ void* debuggee_thread(void* unused)
     break;
   }
 
-  /* Todo: Even after failure, get rid of result sets. But, oddly, mysql_next_result() never returns anything. */
+  /* Todo: Even after failure, get rid of result sets. But, oddly, lmysql->ldbms_mysql_next_result() never returns anything. */
   /* This just would throw any results away, which is what happens also with MYSQL_MAIN_CONNECTION. */
   /* What I'd have liked to do is: have the main connection put the result set up on the main screen. */
-  //while (mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0) ;
-  //if (mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
+  //while (lmysql->ldbms_mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0) ;
+  //if (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_DEBUGGER_CONNECTION]))
   //{
-  //  while (mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0)
+  //  while (lmysql->ldbms_mysql_next_result(&mysql[MYSQL_DEBUGGER_CONNECTION]) == 0)
   //  {
-  //    debug_res= mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
-  //    if (debug_res != 0) mysql_free_result(debug_res);
+  //    debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+  //    if (debug_res != 0) lmysql->ldbms_mysql_free_result(debug_res);
   //  }
   //  debug_res= 0;
   //}
   if (unexpected_error != NULL)
   {
-    strncpy(debuggee_state_error, mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
+    strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
   }
 
   /* Cleanup */
   /* Shut the connection, which seems to cause disconnect automatically. */
-  if (is_connected == 1) mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+  if (is_connected == 1) lmysql->ldbms_mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
 
   /* Typically we'll reach this point with last_command_result = "debuggee_wait_loop() termination" */
 
@@ -2964,7 +3003,7 @@ void MainWindow::debug_setup_go(QString text)
   strcat(call_statement, strstr(command_string, " ") + 1);
   strcat(call_statement, "')");
 
-  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     put_diagnostics_in_result();
     return;
@@ -2994,22 +3033,22 @@ void MainWindow::debug_setup_mysql_proc_insert()
   QString definition_of_surrogate_routine;
   int it_is_ok_if_proc_is_already_there;
 
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from xxxmdbug.routines");
-  res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from xxxmdbug.routines");
+  res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
   if (res != NULL)
   {
-    num_rows= mysql_num_rows(res);
-    mysql_free_result(res);
+    num_rows= lmysql->ldbms_mysql_num_rows(res);
+    lmysql->ldbms_mysql_free_result(res);
     if (num_rows - 3 >= DEBUG_TAB_WIDGET_MAX)
     {
       sprintf(command, "SIGNAL SQLSTATE '05678' SET message_text='$setup generated %d surrogates but the current maximum is %d'", num_rows - 3, DEBUG_TAB_WIDGET_MAX - 1);
-      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
       put_diagnostics_in_result();
       return;
     }
   }
 
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SET @xxxmdbug_saved_sql_mode=@@sql_mode");
+  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SET @xxxmdbug_saved_sql_mode=@@sql_mode");
   /*
     Go through all the rows of mysql.proc twice.
     In the first iteration, we try to drop and create. If a create fails, we need a second iteration.
@@ -3035,18 +3074,18 @@ void MainWindow::debug_setup_mysql_proc_insert()
     "       offset_of_begin "
     "FROM xxxmdbug.routines");
 
-    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], command, strlen(command)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], command, strlen(command)))
     {
       unexpected_error= "select failed";
     }
     if (unexpected_error == NULL)
     {
-      res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+      res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
       if (res == NULL) unexpected_error= "mysql_store_result failed";
     }
     if (unexpected_error == NULL)
     {
-      num_fields= mysql_num_fields(res);
+      num_fields= lmysql->ldbms_mysql_num_fields(res);
       if (num_fields != 5) unexpected_error= "wrong field count";
     }
 
@@ -3054,7 +3093,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
     {
       for (;;)
       {
-        row= mysql_fetch_row(res);
+        row= lmysql->ldbms_mysql_fetch_row(res);
         if (row == NULL) break;
         it_is_ok_if_proc_is_already_there= 0;
         /* todo: make sure row[2] i.e. routine_identifier_of_surrogate is not null */
@@ -3080,22 +3119,22 @@ void MainWindow::debug_setup_mysql_proc_insert()
           strcat(tmp, "' and routine_name='");
           strcat(tmp, row[1]);
           strcat(tmp, "'");
-          if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp)) num_rows_2= 0;
+          if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp)) num_rows_2= 0;
           else
           {
-            res_2= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+            res_2= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
             if (res_2 != NULL)
             {
-              num_rows_2= mysql_num_rows(res_2);
+              num_rows_2= lmysql->ldbms_mysql_num_rows(res_2);
             }
           }
           if (num_rows_2 == 1)
           {
-            row_2= mysql_fetch_row(res_2);
+            row_2= lmysql->ldbms_mysql_fetch_row(res_2);
             if ((row_2 == NULL) || (row_2[0] == NULL) || (strcmp(row_2[0],"") == 0))
             {
               char command[512];
-              mysql_free_result(res_2);
+              lmysql->ldbms_mysql_free_result(res_2);
               strcpy(tmp, "Could not get a routine definition for ");
               strcat(tmp, row[0]);
               strcat(tmp, ".");
@@ -3103,14 +3142,14 @@ void MainWindow::debug_setup_mysql_proc_insert()
               strcat(tmp, ". Are you the routine creator and/or do you have SELECT privilege for mysql.proc?");
               /* Todo: merge this sort of stuff into debug_error() */
               sprintf(command, "SIGNAL sqlstate '05678' set message_text = '%s'", tmp);
-              mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+              lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
               unexpected_error= "create failed";
               put_diagnostics_in_result();
               second_iteration_is_necessary= 1;
               break;
             }
           }
-          if (res_2 != NULL) mysql_free_result(res_2);
+          if (res_2 != NULL) lmysql->ldbms_mysql_free_result(res_2);
         }
         definition_of_surrogate_routine= QString::fromUtf8(row[3]);
         index_of_semicolon= definition_of_surrogate_routine.indexOf(";");
@@ -3126,14 +3165,14 @@ void MainWindow::debug_setup_mysql_proc_insert()
           third_query= definition_of_surrogate_routine.mid(index_of_create, -1);
           if (it_is_ok_if_proc_is_already_there == 0)
           {
-            if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], first_query.toUtf8(), strlen(first_query.toUtf8())))
+            if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], first_query.toUtf8(), strlen(first_query.toUtf8())))
             {
               /* Actually, a failed drop will have to be considered to be okay. */
             }
           }
           if ((unexpected_error == NULL) && (index_of_set != -1))
           {
-            if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], second_query.toUtf8(), strlen(second_query.toUtf8())))
+            if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], second_query.toUtf8(), strlen(second_query.toUtf8())))
             {
               unexpected_error= "set failed";
               break;
@@ -3143,7 +3182,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
           {
             if (iteration == 0)
             {
-              if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], third_query.toUtf8(), strlen(third_query.toUtf8())))
+              if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], third_query.toUtf8(), strlen(third_query.toUtf8())))
               {
                 /* If there's an error, the diagnostics here should go all the way back up to the user. */
                 if (it_is_ok_if_proc_is_already_there == 0)
@@ -3159,16 +3198,16 @@ void MainWindow::debug_setup_mysql_proc_insert()
         }
       }
     }
-  if (res != NULL) mysql_free_result(res);
+  if (res != NULL) lmysql->ldbms_mysql_free_result(res);
   }
 
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "set session sql_mode=@xxxmdbug_saved_sql_mode");
+  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "set session sql_mode=@xxxmdbug_saved_sql_mode");
 
   if (unexpected_error != NULL)
   {
     if (strcmp(unexpected_error, "create failed") ==0) return; /* we already have the diagnostics */
     sprintf(command, "SIGNAL SQLSTATE '05678' SET message_text='%s'", unexpected_error);
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
   }
   put_diagnostics_in_result();
 }
@@ -3206,45 +3245,45 @@ QString MainWindow::debug_privilege_check(int statement_type)
   if (statement_type == TOKEN_KEYWORD_DEBUG_INSTALL)
   {
     /* Somebody has to have said: grant create, drop, create routine, alter routine, select, insert, update, delete, select on xxxmdbug.* ... */
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create database xxxmdbug");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need create privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop table if exists xxxmdbug.xxxmdbug");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create table xxxmdbug.xxxmdbug (s1 int)");
-    if ((s == "") && (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142)) s.append("Need create privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.xxxmdbug'");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'insert into xxxmdbug.xxxmdbug values (1)'");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need insert privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'delete from xxxmdbug.xxxmdbug'");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need delete privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'update xxxmdbug.xxxmdbug set s1 = 1'");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need update privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop table xxxmdbug.xxxmdbug");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need drop privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop procedure if exists xxxmdbug.xxxmdbug");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create procedure xxxmdbug.xxxmdbug () set @a = 1");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create routine privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop procedure xxxmdbug.xxxmdbug");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1370) s.append("Need alter routine privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create database xxxmdbug");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need create privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop table if exists xxxmdbug.xxxmdbug");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create table xxxmdbug.xxxmdbug (s1 int)");
+    if ((s == "") && (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142)) s.append("Need create privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.xxxmdbug'");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'insert into xxxmdbug.xxxmdbug values (1)'");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need insert privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'delete from xxxmdbug.xxxmdbug'");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need delete privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'update xxxmdbug.xxxmdbug set s1 = 1'");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need update privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop table xxxmdbug.xxxmdbug");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need drop privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop procedure if exists xxxmdbug.xxxmdbug");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "create procedure xxxmdbug.xxxmdbug () set @a = 1");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create routine privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "drop procedure xxxmdbug.xxxmdbug");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1370) s.append("Need alter routine privilege on xxxmdbug.*. ");
     return s;
   }
 
   /* First make sure xxxmdbug exists */
   num_rows= 0;
-  if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from information_schema.schemata where schema_name = 'xxxmdbug'"))
+  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from information_schema.schemata where schema_name = 'xxxmdbug'"))
   {
     s.append("Cannot select from information_schema");
     return s;
   }
-  res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
   if (res != NULL)
   {
-    num_rows= mysql_num_rows(res);
-    mysql_free_result(res);
+    num_rows= lmysql->ldbms_mysql_num_rows(res);
+    lmysql->ldbms_mysql_free_result(res);
   }
   if (num_rows != 1)
   {
@@ -3254,68 +3293,68 @@ QString MainWindow::debug_privilege_check(int statement_type)
 
   if ((statement_type == TOKEN_KEYWORD_DEBUG_DEBUG) || (statement_type == TOKEN_KEYWORD_DEBUG_SETUP))
   {
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.readme union all select * from xxxmdbug.copyright'");/* Returns 1142 if SELECT denied */
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'create temporary table xxxmdbug.xxxmdbug_tmp (s1 int)'");/* Returns 1044 if CREATE TEMPORARY denied */
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create temporary privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.readme union all select * from xxxmdbug.copyright'");/* Returns 1142 if SELECT denied */
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'create temporary table xxxmdbug.xxxmdbug_tmp (s1 int)'");/* Returns 1044 if CREATE TEMPORARY denied */
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create temporary privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
   }
 
   if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG)
   {
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'set global init_connect = @@init_connect'");/* Returns 1227 if you need SUPER */
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1227) s.append("Need super privilege. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'call xxxmdbug.command()'");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need execute privilege on xxxmdbug.command. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'set global init_connect = @@init_connect'");/* Returns 1227 if you need SUPER */
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1227) s.append("Need super privilege. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'call xxxmdbug.command()'");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need execute privilege on xxxmdbug.command. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
   }
 
   if (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)
   {
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare stmt1 from 'select * from mysql.proc'");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on mysql.proc. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare stmt1 from 'select * from mysql.proc'");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1142) s.append("Need select privilege on mysql.proc. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
 
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'create table xxxmdbug.xxxmdbug_nontmp (s1 int)'");/* Returns 1044 if CREATE TEMPORARY denied */
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create privilege on xxxmdbug.*. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'create table xxxmdbug.xxxmdbug_nontmp (s1 int)'");/* Returns 1044 if CREATE TEMPORARY denied */
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
 
     /* Can't prepare create-routine statements so test by actually creating and dropping a trivial for-test-only routine */
     sprintf(call_statement, "create procedure xxxmdbug.xxxmdbugp () set @=@a");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement);
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create routine privilege on xxxmdbug.*. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement);
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create routine privilege on xxxmdbug.*. ");
     else
     {
       sprintf(call_statement, "drop procedure xxxmdbug.xxxmdbugp");
-      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement);
-      if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need drop routine privilege on xxxmdbug.*. ");
+      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement);
+      if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need drop routine privilege on xxxmdbug.*. ");
     }
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'call xxxmdbug.setup()'");
-    if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need execute privilege on xxxmdbug.setup. ");
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'call xxxmdbug.setup()'");
+    if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need execute privilege on xxxmdbug.setup. ");
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
 
     result_string= select_1_row("select count(*) from information_schema.tables where table_schema = 'xxxmdbug' and table_name = 'setup_log'" );
     if (result_string != "") s.append(result_string);
     else if (select_1_row_result_1.toInt() != 0)
     {
-      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.setup_log'");
-      if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need select privilege on xxxmdbug.setup_log. ");
-      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
-      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'insert into setup_log select * from xxxmdbug.setup_log'");
-      if (mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need insert privilege on xxxmdbug.setup_log. ");
-      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'select * from xxxmdbug.setup_log'");
+      if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need select privilege on xxxmdbug.setup_log. ");
+      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
+      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "prepare xxxmdbug_stmt from 'insert into setup_log select * from xxxmdbug.setup_log'");
+      if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need insert privilege on xxxmdbug.setup_log. ");
+      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
       /* Todo: Find out why repair table is sometimes necessary. I know it can get corrupted but don't yet know why. */
-      if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "repair table xxxmdbug.setup_log"))
+      if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "repair table xxxmdbug.setup_log"))
       {
         s.append("Repair Table xxxmdbug.setup_log failed");
       }
       else
       {
-        res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
-        if (res != NULL) mysql_free_result(res);
+        res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+        if (res != NULL) lmysql->ldbms_mysql_free_result(res);
       }
     }
   }
@@ -3558,7 +3597,7 @@ int MainWindow::debug_error(char *text)
     {
       sprintf(tmp_string_2, "SIGNAL sqlstate '05678' set message_text = 'Routine has stopped. Suggested next step is: $EXIT'");
     }
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp_string_2);
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp_string_2);
     put_diagnostics_in_result();
     return 1;
   }
@@ -3567,7 +3606,7 @@ int MainWindow::debug_error(char *text)
   if (strcmp(text,"") != 0)
   {
     sprintf(command, "SIGNAL sqlstate '05678' set message_text = '%s'", text);
-    mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
     put_diagnostics_in_result();
     return 1;
   }
@@ -3636,7 +3675,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   strcat(call_statement, "','");
   strcat(call_statement, routine_schema);
   strcat(call_statement, "',@schema_identifier,@surrogate_routine_identifier,@routine_type,@remainder_of_original_name)");
-  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     if (debug_error((char*)"Surrogate not found. Probably $setup wasn't done for a group including this routine.") != 0) return;
   }
@@ -3821,7 +3860,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   strcat(call_statement, debuggee_channel_name);
   strcat(call_statement, "', 'attach');\n");
 
-  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Attach failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
     put_diagnostics_in_result();
@@ -4057,7 +4096,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 */
 void MainWindow::debug_delete_go()
 {
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
   put_diagnostics_in_result();
 }
 
@@ -4160,14 +4199,14 @@ void MainWindow::action_debug_step()
 /* $SKIP seems to act like $CONT which isn't terribly useful */
 void MainWindow::debug_skip_go()
 {
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SKIP statement is not supported at this time'");
+  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SKIP statement is not supported at this time'");
   put_diagnostics_in_result();
 }
 
 
 void MainWindow::debug_source_go()
 {
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SOURCE statement is not supported at this time'");
+  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SOURCE statement is not supported at this time'");
   put_diagnostics_in_result();
 }
 
@@ -4202,7 +4241,7 @@ void MainWindow::debug_set_go(QString text)
 */
 void MainWindow::debug_execute_go()
 {
-  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $EXECUTE statement is not supported at this time'");
+  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $EXECUTE statement is not supported at this time'");
   put_diagnostics_in_result();
 
 //  QString s;
@@ -4222,7 +4261,7 @@ void MainWindow::debug_execute_go()
 //  printf("command_string=%s.\n", command_string);
 //  debug_call_xxxmdbug_command(s.toUtf8());
 //  put_diagnostics_in_result();
-////  mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
+////  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
 ////  put_diagnostics_in_result();
 }
 
@@ -4406,7 +4445,7 @@ void MainWindow::debug_exit_go(int flagger)
     /* Todo: merge this with debug_error somehow, and make sure nothing's enabled/disabled unless debug/exit succeeded! */
     if (menu_debug_action_exit->isEnabled() == false)
     {
-      mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "signal sqlstate '05678' set message_text = '$DEBUG not done'");
+      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "signal sqlstate '05678' set message_text = '$DEBUG not done'");
       put_diagnostics_in_result();
       return;
     }
@@ -4431,10 +4470,10 @@ void MainWindow::debug_exit_go(int flagger)
     {
       sprintf(call_statement, "kill %d", debuggee_connection_id);
 
-      if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+      if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
       {
         sprintf(call_statement, "SIGNAL SQLSTATE '05678' SET message_text='exit failed and kill failed -- try executing manually: kill %d'", debuggee_connection_id);
-        mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement));
+        lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement));
       }
     }
   }
@@ -4445,7 +4484,7 @@ void MainWindow::debug_exit_go(int flagger)
           "', 1, @xxxmdbug_tmp_1, @xxxmdbug_tmp_2)");
   for (int i= 0; i < 50; ++i)                                              /* 50 is an arbitrary big number */
   {
-    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement))) break;
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement))) break;
     error_return= select_1_row("select @xxxmdbug_tmp_1");
     if (error_return != "") break;
     if (select_1_row_result_1 == "") break;
@@ -4566,7 +4605,7 @@ int MainWindow::debug_call_xxxmdbug_command(const char *command)
   strcat(call_statement, command);
   strcat(call_statement, "');\n");
 
-  if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+  if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Initially this can happen because we start the timer immediately after we call 'attach'. */
     put_diagnostics_in_result();
@@ -4690,7 +4729,7 @@ void MainWindow::action_debug_timer_status()
 
   if (unexpected_error[0] == '\0')
   {
-    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
     {
       /* Initially this can happen because we start the timer immediately after we call 'attach'. */
       strcpy(unexpected_error, "i status command failed");
@@ -4700,7 +4739,7 @@ void MainWindow::action_debug_timer_status()
   if (unexpected_error[0]== '\0')
   {
     const char *query= "select * from xxxmdbug.information_status";
-    if (mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], query, strlen(query)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], query, strlen(query)))
     {
       strcpy(unexpected_error, "i status command failed (this is not always a severe error)");
     }
@@ -4708,7 +4747,7 @@ void MainWindow::action_debug_timer_status()
 
   if (unexpected_error[0] == '\0')
   {
-    debug_res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+    debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
     if (debug_res == NULL)
     {
       strcpy(unexpected_error, "mysql_store_result failed");
@@ -4717,14 +4756,14 @@ void MainWindow::action_debug_timer_status()
 
   if (unexpected_error[0] == '\0')
   {
-    row= mysql_fetch_row(debug_res);
+    row= lmysql->ldbms_mysql_fetch_row(debug_res);
     if (row == NULL)
     {
       strcpy(unexpected_error, "mysql_fetch row failed");
     }
     else
     {
-      if (mysql_num_fields(debug_res) < 14)
+      if (lmysql->ldbms_mysql_num_fields(debug_res) < 14)
       {
         strcpy(unexpected_error, "mysql_num_fields < 14");
       }
@@ -4766,7 +4805,7 @@ void MainWindow::action_debug_timer_status()
     }
   }
 
-  if (debug_res != NULL) mysql_free_result(debug_res);
+  if (debug_res != NULL) lmysql->ldbms_mysql_free_result(debug_res);
 
   if (unexpected_error[0] != '\0')
   {
@@ -4906,7 +4945,7 @@ void* kill_thread(void* unused)
     is_connected= 1;
     kill_state= KILL_STATE_IS_CONNECTED;
     sprintf(call_statement, "kill query %d", kill_connection_id);
-    if (mysql_real_query(&mysql[MYSQL_KILL_CONNECTION], call_statement, strlen(call_statement)))
+    if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_KILL_CONNECTION], call_statement, strlen(call_statement)))
     {
       kill_state= KILL_STATE_MYSQL_REAL_QUERY_ERROR;
       break;
@@ -4914,7 +4953,7 @@ void* kill_thread(void* unused)
     kill_state= KILL_STATE_ENDED;
     break;
   }
-  if (is_connected == 1) mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+  if (is_connected == 1) lmysql->ldbms_mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
   return ((void*) NULL);
 }
 
@@ -4954,7 +4993,7 @@ void* dbms_long_query_thread(void* unused)
 {
  (void) unused; /* suppress "unused parameter" warning */
 
-  dbms_long_query_result= mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
+  dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
   dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   return ((void*) NULL);
 }
@@ -4963,7 +5002,7 @@ void* dbms_long_next_result_thread(void* unused)
 {
   (void) unused; /* suppress "unused parameter" warning */
 
-  dbms_long_query_result= mysql_next_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  dbms_long_query_result= lmysql->ldbms_mysql_next_result(&mysql[MYSQL_MAIN_CONNECTION]);
   dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   return ((void*) NULL);
 }
@@ -5136,7 +5175,7 @@ void MainWindow::action_execute_one_statement(QString text)
       }
       pthread_join(thread_id, NULL);
 
- //     dbms_long_query_result= mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
+ //     dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
  //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
 
@@ -5151,7 +5190,7 @@ void MainWindow::action_execute_one_statement(QString text)
 
         /*
           It was a successful SQL statement, and now look if it returned a result.
-          If it did, as determined by looking at the mysql_res that mysql_store_result() returns,
+          If it did, as determined by looking at the mysql_res that lmysql->ldbms_mysql_store_result() returns,
           then free the previous mysql_res and delete the previous result grid,
           before setting up new ones.
           This means that statements which don't return result sets don't cause clearing
@@ -5162,7 +5201,7 @@ void MainWindow::action_execute_one_statement(QString text)
           statement is SELECT SHOW etc.), that would be better.
           Todo: nothing is happening for multiple result sets, we throw away all but the first.
         */
-        mysql_res_for_new_result_set= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+        mysql_res_for_new_result_set= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
         if (mysql_res_for_new_result_set == 0) {
           /*
             Last statement did not cause a result set. We could hide the grid and shrink the
@@ -5174,7 +5213,7 @@ void MainWindow::action_execute_one_statement(QString text)
         {
           if (mysql_res != 0)
           {
-            mysql_free_result(mysql_res); /* This is the place we free if myql_more_results wasn't true, see below. */
+            lmysql->ldbms_mysql_free_result(mysql_res); /* This is the place we free if myql_more_results wasn't true, see below. */
           }
 
 
@@ -5184,11 +5223,11 @@ void MainWindow::action_execute_one_statement(QString text)
 
           /*
             Todo: consider whether it would be appropriate to set grid width with
-            result_grid_table_widget[0]->result_column_count= mysql_num_fields(mysql_res);
+            result_grid_table_widget[0]->result_column_count= lmysql->ldbms_mysql_num_fields(mysql_res);
             but it may be unnecessary, and may cause a crash in garbage_collect()
           */
 
-          result_row_count= mysql_num_rows(mysql_res);                /* this will be the height of the grid */
+          result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
 
           for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
           {
@@ -5196,28 +5235,29 @@ void MainWindow::action_execute_one_statement(QString text)
           }
           //QFont tmp_font;
           //tmp_font= result_grid_table_widget[0]->font();
-          result_grid_table_widget[0]->fillup(mysql_res, this, mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]),
-                                              is_vertical, ocelot_result_grid_column_names);
+          result_grid_table_widget[0]->fillup(mysql_res, this, lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]),
+                                              is_vertical, ocelot_result_grid_column_names,
+                                              lmysql);
           result_grid_tab_widget->setCurrentWidget(result_grid_table_widget[0]);
           result_grid_tab_widget->tabBar()->hide();
           result_grid_table_widget[0]->show();
           result_grid_tab_widget->show(); /* Maybe this only has to happen once */
 
-          /* Todo: small bug: elapsed_time calculation happens before mysql_next_result(). */
-          /* You must call mysql_next_result() + mysql_free_result() if there are multiple sets */
+          /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
+          /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(); /* Do this while we still have number of rows */
           history_markup_append();
 
-          if (mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]))
+          if (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]))
           {
-            mysql_free_result(mysql_res);
+            lmysql->ldbms_mysql_free_result(mysql_res);
             /*
               We started with CLIENT_MULTI_RESULT flag (not CLIENT_MULTI_STATEMENT).
               We expect that a CALL to a stored procedure might return multiple result sets
               plus a status result at the end. The following lines try to pick up and display
               the extra result sets, up to a fixed maximum, and just throw away everything
               after that, to avoid the dreaded out-of-sync error message.
-              If it's an ordinary select, mysql_free_result(mysql_res) happens later, see above.
+              If it's an ordinary select, lmysql->ldbms_mysql_free_result(mysql_res) happens later, see above.
             */
             int result_grid_table_widget_index= 1;
             for (;;)
@@ -5236,7 +5276,7 @@ void MainWindow::action_execute_one_statement(QString text)
 
               if (dbms_long_query_result != 0) break;
 
-              mysql_res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+              mysql_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
 
               /* I think the following will help us avoid the "status" return. */
               if (mysql_res == NULL) continue;
@@ -5244,14 +5284,16 @@ void MainWindow::action_execute_one_statement(QString text)
               if (result_grid_table_widget_index < RESULT_GRID_TAB_WIDGET_MAX)
               {
                 result_grid_tab_widget->tabBar()->show(); /* is this in the wrong place? */
-                result_row_count= mysql_num_rows(mysql_res);                /* this will be the height of the grid */
+                result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
                 result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, this, true,
-                                                                                 is_vertical, ocelot_result_grid_column_names);
+                                                                                 is_vertical,
+                                                                                 ocelot_result_grid_column_names,
+                                                                                 lmysql);
                 result_grid_table_widget[result_grid_table_widget_index]->show();
                 ++result_grid_table_widget_index;
               }
 
-              if (mysql_res != 0) mysql_free_result(mysql_res);
+              if (mysql_res != 0) lmysql->ldbms_mysql_free_result(mysql_res);
 
             }
             mysql_res= 0;
@@ -5404,7 +5446,7 @@ int MainWindow::execute_client_statement(QString text)
     char *query= new char[query_len + 1];
     memcpy(query, s.toUtf8().constData(), query_len + 1);
 
-    mysql_select_db_result= mysql_select_db(&mysql[MYSQL_MAIN_CONNECTION], query);
+    mysql_select_db_result= lmysql->ldbms_mysql_select_db(&mysql[MYSQL_MAIN_CONNECTION], query);
     delete []query;
     if (mysql_select_db_result != 0) put_diagnostics_in_result();
     else
@@ -6042,17 +6084,17 @@ int MainWindow::rehash_scan()
 
   if (is_mysql_connected != 1) return 0; /* unexpected_error= "not connected"; */
 
-  if (mysql_query(&mysql[MYSQL_MAIN_CONNECTION],
+  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION],
                   "select table_name, column_name from information_schema.columns where table_schema = database()"))
     {
       return 0; /* unexpected_error= "select failed"; */
     }
 
-  res= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
   if (res == NULL) return 0; /* unexpected_error= "mysql_store_result failed"; */
 
-  rehash_result_column_count= mysql_num_fields(res);
-  rehash_result_row_count= mysql_num_rows(res);
+  rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
+  rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
   grid_max_column_widths= new long unsigned int[rehash_result_column_count];
   result_grid_table_widget[0]->scan_rows(
           true, /* mysql_more_results_flag, */
@@ -6063,7 +6105,7 @@ int MainWindow::rehash_scan()
           &rehash_mysql_res_copy_rows,
           &grid_max_column_widths);
 
-  mysql_free_result(res);
+  lmysql->ldbms_mysql_free_result(res);
 
   delete [] grid_max_column_widths;
 
@@ -6168,23 +6210,23 @@ void MainWindow::put_diagnostics_in_result()
   char mysql_error_and_state[50]; /* actually we should need less than 50 */
   QString s1, s2;
 
-  mysql_errno_result= mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]);
+  mysql_errno_result= lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]);
   if (mysql_errno_result == 0)
   {
     s1= tr("OK");
 
     /* This should output, e.g. "Records: 3 Duplicates: 0 Warnings: 0" -- but actually nothing happens. */
-    if (mysql_info(&mysql[MYSQL_MAIN_CONNECTION])!=NULL)
+    if (lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])!=NULL)
     {
       /* This only works for certain insert, load, alter or update statements */
-      s1.append(tr(mysql_info(&mysql[MYSQL_MAIN_CONNECTION])));
+      s1.append(tr(lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])));
     }
     else
     {
-      sprintf(mysql_error_and_state, " %llu rows affected", mysql_affected_rows(&mysql[MYSQL_MAIN_CONNECTION]));
+      sprintf(mysql_error_and_state, " %llu rows affected", lmysql->ldbms_mysql_affected_rows(&mysql[MYSQL_MAIN_CONNECTION]));
       s1.append(mysql_error_and_state);
     }
-    //printf("info=%s.\n", mysql_info(&mysql));
+    //printf("info=%s.\n", lmysql->ldbms_mysql_info(&mysql));
     /* Add to display: how long the statement took, to nearest tenth of a second. Todo: fix calculation. */
     qint64 statement_end_time= QDateTime::currentMSecsSinceEpoch();
     qint64 elapsed_time= statement_end_time - statement_edit_widget->start_time;
@@ -6192,36 +6234,36 @@ void MainWindow::put_diagnostics_in_result()
     float elapsed_time_as_float= (float) elapsed_time_as_long_int / 1000;
     sprintf(mysql_error_and_state, "(%.1f seconds)", elapsed_time_as_float);
     s1.append(mysql_error_and_state);
-    if (mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]) > 0)
+    if (lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]) > 0)
     {
       if (ocelot_history_includes_warnings > 0)
       {
-        mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "show warnings");
+        lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "show warnings");
         MYSQL_RES *mysql_res_for_warnings;
         MYSQL_ROW warnings_row;
         QString s;
         // unsigned long connect_lengths[0];
-        mysql_res_for_warnings= mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
-        for (unsigned int wi= 0; wi <= mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]); ++wi)
+        mysql_res_for_warnings= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+        for (unsigned int wi= 0; wi <= lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]); ++wi)
         {
-          warnings_row= mysql_fetch_row(mysql_res_for_warnings);
+          warnings_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_warnings);
           if (warnings_row != NULL)
           {
-            /* lengths= mysql_fetch_lengths(connect_res); */
+            /* lengths= lmysql->ldbms_mysql_fetch_lengths(connect_res); */
             sprintf(mysql_error_and_state, "\n%s (%s) %s.", warnings_row[0], warnings_row[1], warnings_row[2]);
             s1.append(mysql_error_and_state);
           }
         }
-        mysql_free_result(mysql_res_for_warnings);
+        lmysql->ldbms_mysql_free_result(mysql_res_for_warnings);
       }
     }
   }
   if (mysql_errno_result > 0)
   {
     s1= tr("Error ");
-    sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, mysql_sqlstate(&mysql[MYSQL_MAIN_CONNECTION]));
+    sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, lmysql->ldbms_mysql_sqlstate(&mysql[MYSQL_MAIN_CONNECTION]));
     s1.append(mysql_error_and_state);
-    s2= mysql_error(&mysql[MYSQL_MAIN_CONNECTION]);
+    s2= lmysql->ldbms_mysql_error(&mysql[MYSQL_MAIN_CONNECTION]);
     s1.append(s2);
   }
   statement_edit_widget->result= s1;
@@ -7566,8 +7608,45 @@ int MainWindow::next_token(int i)
 */
 int MainWindow::connect_mysql(unsigned int connection_number)
 {
+  QString ldbms_return_string;
 
-  mysql_init(&mysql[connection_number]); /* Todo: avoid repetition, this is init'd elsewhere. */
+  ldbms_return_string= "";
+
+  /* First find libmysqlclient.so */
+  if (is_libmysqlclient_loaded != 1)
+  {
+    lmysql= new ldbms(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string);
+  }
+  /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
+
+  if (is_libmysqlclient_loaded == -2)
+  {
+    QMessageBox msgbox;
+    QString error_message;
+    error_message= "Severe error: libmysqlclient does not have these names: ";
+    error_message.append(ldbms_return_string);
+    error_message.append(". Close ocelotgui, restart with a better libmysqlclient. See Help|libmysqlclient for tips.");
+    error_message.append(". For tips about making sure ocelotgui finds the right libmysqlclient, click Help|libmysqlclient");
+    msgbox.setText(error_message);
+    msgbox.exec();
+    delete lmysql;
+    return 1;
+  }
+
+  if (is_libmysqlclient_loaded == 0)
+  {
+    QMessageBox msgbox;
+    QString error_message;
+    error_message= "Error, libmysqlclient was not found or a loading error occurred. Message was: ";
+    error_message.append(ldbms_return_string);
+    error_message.append(". For tips about making sure ocelotgui finds libmysqlclient, click Help|libmysqlclient");
+    msgbox.setText(error_message);
+    msgbox.exec();
+    delete lmysql;
+    return 1;
+  }
+
+  lmysql->ldbms_mysql_init(&mysql[connection_number]); /* Todo: avoid repetition, this is init'd elsewhere. */
 
   if (the_connect(connection_number))
   {
@@ -7590,17 +7669,17 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     Todo: check for errors after these mysql_ calls.
     Not using the mysql_res global, since this is not for user to see.
   */
-  mysql_query(&mysql[connection_number], "select version(), database(), @@port, current_user(), connection_id()");
+  lmysql->ldbms_mysql_query(&mysql[connection_number], "select version(), database(), @@port, current_user(), connection_id()");
   MYSQL_RES *mysql_res_for_connect;
   MYSQL_ROW connect_row;
   QString s;
   int i;
 
   // unsigned long connect_lengths[1];
-  mysql_res_for_connect= mysql_store_result(&mysql[connection_number]);
-  connect_row= mysql_fetch_row(mysql_res_for_connect);
+  mysql_res_for_connect= lmysql->ldbms_mysql_store_result(&mysql[connection_number]);
+  connect_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_connect);
 
-  /* lengths= mysql_fetch_lengths(mysql_res_for_connect); */
+  /* lengths= lmysql->ldbms_mysql_fetch_lengths(mysql_res_for_connect); */
   statement_edit_widget->dbms_version= connect_row[0];
   statement_edit_widget->dbms_database= connect_row[1];
   statement_edit_widget->dbms_port= connect_row[2];
@@ -7610,11 +7689,11 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_current_user_without_host= s;
   statement_edit_widget->dbms_connection_id=atoi(connect_row[4]);
-  s= mysql_get_host_info(&mysql[connection_number]);
+  s= lmysql->ldbms_mysql_get_host_info(&mysql[connection_number]);
   i= s.indexOf(QRegExp(" "), 0);
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_host= s;
-  mysql_free_result(mysql_res_for_connect);
+  lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
   is_mysql_connected= 1;
   return 0;
 }
@@ -7646,7 +7725,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     Bug: for "prompt \w", the \w will be taken as a "nowarnings" keyword, because it's the last thing on the line.
     Todo: There are several prompts that require asking the server. The probable way to handle them is:
           At connect time:
-          mysql_get_host_info() to get the host
+          lmysql->ldbms_mysql_get_host_info() to get the host
           select current_user(), version(), database(), @@port to get other server stuff
 */
 
@@ -8313,7 +8392,7 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
    on the command line with phrases such as --port=x.
    Todo: meld that with whatever a user might say in a CONNECT command line
          or maybe even a dialog box.
-   Assume mysql_init() has already happened. (Currently it's in this function, but it shouldn't be.)
+   Assume lmysql->ldbms_mysql_init() has already happened. (Currently it's in this function, but it shouldn't be.)
    Qt gets to see argc+argv first, and Qt will process options that it recognizes
    such as -style, -session, -graphicssystem. See
    http://qt-project.org/doc/qt-4.8/qapplication.html#details.
@@ -8430,6 +8509,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   char *mysql_pwd;
   char *home;
   char tmp_my_cnf[1024];                         /* file name = $HOME/.my.cnf or $HOME/.mylogin.cnf or defaults_extra_file */
+  char *ld_run_path;
 
   /*
     Todo: check: are there any default values to be set before looking at environment variables?
@@ -8499,6 +8579,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_bind_address= "";
   ocelot_debug= "";
   ocelot_execute= "";
+  ocelot_ld_run_path= "";
   ocelot_login_path= "";
   ocelot_pager= "";
   ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
@@ -8516,10 +8597,16 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   connect_read_command_line(argc, argv);               /* We're doing this twice, the first time won't count. */
 
   /* Environment variables */
-  //ld_run_path= getenv("LD_RUN_PATH");                /* We're not doing anything with this yet. Maybe we should. */
-  //group_suffix= getenv("GROUP_SUFFIX");              /* "" */
-  //mysql_host= getenv("MYSQL_HOST");                  /* "" */
-  //mysql_ps1= getenv("MYSQL_PS1");                    /* "" */
+
+  if (getenv("LD_RUN_PATH") != 0)
+  {
+    ld_run_path= getenv("LD_RUN_PATH");                  /* maybe used to find libmysqlclient */
+    ocelot_ld_run_path= ld_run_path;
+  }
+
+  //group_suffix= getenv("GROUP_SUFFIX");
+  //mysql_host= getenv("MYSQL_HOST");
+  //mysql_ps1= getenv("MYSQL_PS1");
   if (getenv("MYSQL_PWD") != 0)
   {
     mysql_pwd= getenv("MYSQL_PWD");
@@ -9040,6 +9127,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
   if (strcmp(token0_as_utf8, "ignore_spaces") == 0) { ocelot_ignore_spaces= is_enable; return; }
+  if (strcmp(token0_as_utf8, "ld_run_path") == 0) { ocelot_ld_run_path= token2; return; }
   if (strcmp(token0_as_utf8, "init_command") == 0)
   {
     ocelot_init_command= token2;
@@ -9318,96 +9406,96 @@ int options_and_connect(
   if (connected[connection_number] != 0)
   {
     connected[connection_number]= 0;
-    mysql_close(&mysql[connection_number]);
+    lmysql->ldbms_mysql_close(&mysql[connection_number]);
   }
-  mysql_init(&mysql[connection_number]);
+  lmysql->ldbms_mysql_init(&mysql[connection_number]);
 #ifdef MYSQL_DEFAULT_AUTH
-  if (ocelot_default_auth_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_DEFAULT_AUTH, ocelot_default_auth_as_utf8);
+  if (ocelot_default_auth_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_DEFAULT_AUTH, ocelot_default_auth_as_utf8);
 #endif
 #ifdef MYSQL_ENABLE_CLEARTEXT_PLUGIN
-  if (ocelot_enable_cleartext_plugin == true) mysql_options(&mysql[connection_number], MYSQL_ENABLE_CLEARTEXT_PLUGIN, ocelot_enable_cleartext_plugin);
+  if (ocelot_enable_cleartext_plugin == true) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_ENABLE_CLEARTEXT_PLUGIN, ocelot_enable_cleartext_plugin);
 #endif
-  if (ocelot_init_command_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, ocelot_init_command_as_utf8);
+  if (ocelot_init_command_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, ocelot_init_command_as_utf8);
 #ifdef MYSQL_OPT_BIND
-  if (ocelot_opt_bind_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_BIND, ocelot_opt_bind_as_utf8);
+  if (ocelot_opt_bind_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_BIND, ocelot_opt_bind_as_utf8);
 #endif
 #ifdef MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS
-  if (ocelot_can_handle_expired_passwords != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS, ocelot_can_handle_expired_passwords);
+  if (ocelot_can_handle_expired_passwords != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS, ocelot_can_handle_expired_passwords);
 #endif
-  if (ocelot_opt_compress > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
+  if (ocelot_opt_compress > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
 #ifdef MYSQL_OPT_CONNECT_ATTR_DELETE
-  if (ocelot_opt_connect_attr_delete_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_DELETE, ocelot_opt_connect_attr_delete_as_utf8);
+  if (ocelot_opt_connect_attr_delete_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_DELETE, ocelot_opt_connect_attr_delete_as_utf8);
 #endif
 #ifdef MYSQL_OPT_CONNECT_ATTR_RESET
-  if (ocelot_opt_connect_attr_reset != 0) mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_RESET, (char*) &ocelot_opt_connect_attr_reset);
+  if (ocelot_opt_connect_attr_reset != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_RESET, (char*) &ocelot_opt_connect_attr_reset);
 #endif
   if (ocelot_opt_connect_timeout != 0)
   {
     unsigned int timeout= ocelot_opt_connect_timeout;
-    mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_TIMEOUT, (char*) &timeout);
+    lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_TIMEOUT, (char*) &timeout);
   }
-  if (ocelot_opt_local_infile > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_LOCAL_INFILE, (char*) &ocelot_opt_local_infile);
+  if (ocelot_opt_local_infile > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_LOCAL_INFILE, (char*) &ocelot_opt_local_infile);
 #ifdef MYSQL_OPT_NAMED_PIPE
-  if (ocelot_opt_named_pipe > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_NAMED_PIPE, (char*) &ocelot_opt_named_pipe);
+  if (ocelot_opt_named_pipe > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_NAMED_PIPE, (char*) &ocelot_opt_named_pipe);
 #endif
-  if (ocelot_protocol_as_int > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_PROTOCOL, (char*)&ocelot_protocol_as_int);
+  if (ocelot_protocol_as_int > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_PROTOCOL, (char*)&ocelot_protocol_as_int);
 #ifdef MYSQL_OPT_READ_TIMEOUT
-  if (ocelot_opt_read_timeout > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_READ_TIMEOUT, (char*)&ocelot_opt_read_timeout);
+  if (ocelot_opt_read_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_READ_TIMEOUT, (char*)&ocelot_opt_read_timeout);
 #endif
 #ifdef MYSQL_OPT_RECONNECT
-  if (ocelot_opt_reconnect > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_RECONNECT, (char*)&ocelot_opt_reconnect);
+  if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_RECONNECT, (char*)&ocelot_opt_reconnect);
 #endif
 #ifdef MYSQL_OPT_SSL_CA
-  if (ocelot_opt_ssl_ca_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CA, ocelot_ocelot_opt_ssl_ca_as_utf8);
+  if (ocelot_opt_ssl_ca_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CA, ocelot_ocelot_opt_ssl_ca_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_CAPATH
-  if (ocelot_opt_ssl_capath_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CAPATH, ocelot_ocelot_opt_ssl_capath_as_utf8);
+  if (ocelot_opt_ssl_capath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CAPATH, ocelot_ocelot_opt_ssl_capath_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_CERT
-  if (ocelot_opt_ssl_cert_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CERT, ocelot_ocelot_opt_ssl_cert_as_utf8);
+  if (ocelot_opt_ssl_cert_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CERT, ocelot_ocelot_opt_ssl_cert_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_CIPHER
-  if (ocelot_opt_ssl_cipher_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CIPHER, ocelot_ocelot_opt_ssl_cipher_as_utf8);
+  if (ocelot_opt_ssl_cipher_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CIPHER, ocelot_ocelot_opt_ssl_cipher_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_CRL
-  if (ocelot_opt_ssl_crl_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRL, ocelot_ocelot_opt_ssl_crl_as_utf8);
+  if (ocelot_opt_ssl_crl_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRL, ocelot_ocelot_opt_ssl_crl_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_CRLPATH
-  if (ocelot_opt_ssl_crlpath_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRLPATH, ocelot_ocelot_opt_ssl_crlpath_as_utf8);
+  if (ocelot_opt_ssl_crlpath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRLPATH, ocelot_ocelot_opt_ssl_crlpath_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_KEY
-  if (ocelot_opt_ssl_key_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_key, ocelot_ocelot_opt_ssl_key_as_utf8);
+  if (ocelot_opt_ssl_key_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_key, ocelot_ocelot_opt_ssl_key_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_VERIFY_SERVER_CERT
-  if (ocelot_opt_ssl_verify_server_cert > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*) &ocelot_ocelot_opt_ssl_verify_server_cert);
+  if (ocelot_opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*) &ocelot_ocelot_opt_ssl_verify_server_cert);
 #endif
 #ifdef MYSQL_OPT_WRITE_TIMEOUT
-  if (ocelot_opt_write_timeout > 0) mysql_options(&mysql[connection_number], MYSQL_OPT_WRITE_TIMEOUT, (char*)&ocelot_opt_write_timeout);
+  if (ocelot_opt_write_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_WRITE_TIMEOUT, (char*)&ocelot_opt_write_timeout);
 #endif
 #ifdef MYSQL_PLUGIN_DIR
-  if (ocelot_plugin_dir_as_utf8[0] != '\0') mysql_options(&mysql[], MYSQL_PLUGIN_DIR, ocelot_plugin_dir_as_utf8);
+  if (ocelot_plugin_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[], MYSQL_PLUGIN_DIR, ocelot_plugin_dir_as_utf8);
 #endif
 #ifdef MYSQL_READ_DEFAULT_FILE
-  if (ocelot_read_default_file_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_FILE, ocelot_read_default_file_as_utf8);
+  if (ocelot_read_default_file_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_FILE, ocelot_read_default_file_as_utf8);
 #endif
 #ifdef MYSQL_READ_DEFAULT_GROUP
-  if (ocelot_read_default_group_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_GROUP, ocelot_read_default_group_as_utf8);
+  if (ocelot_read_default_group_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_GROUP, ocelot_read_default_group_as_utf8);
 #endif
 #ifdef MYSQL_REPORT_DATA_TRUNCATION
-  if (ocelot_report_data_truncation > 0) mysql_options(&mysql[connection_number], MYSQL_REPORT_DATA_TRUNCATION, (char*) ocelot_report_data_truncation);
+  if (ocelot_report_data_truncation > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_REPORT_DATA_TRUNCATION, (char*) ocelot_report_data_truncation);
 #endif
-  if (ocelot_secure_auth > 0) mysql_options(&mysql[connection_number], MYSQL_SECURE_AUTH, (char *) &ocelot_secure_auth);
+  if (ocelot_secure_auth > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SECURE_AUTH, (char *) &ocelot_secure_auth);
 #ifdef MYSQL_SERVER_PUBLIC_KEY
-  if (ocelot_server_public_key_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SERVER_PUBLIC_KEY, (char *) ocelot_server_public_key_as_utf8);
+  if (ocelot_server_public_key_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SERVER_PUBLIC_KEY, (char *) ocelot_server_public_key_as_utf8);
 #endif
 #ifdef MYSQL_SET_CHARSET_DIR
-  if (ocelot_set_charset_dir_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_DIR, ocelot_set_charset_dir_as_utf8);
+  if (ocelot_set_charset_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_DIR, ocelot_set_charset_dir_as_utf8);
 #endif
 #ifdef MYSQL_SET_CHARSET_NAME
-  if (ocelot_set_charset_name_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_NAME, ocelot_set_charset_name_as_utf8);
+  if (ocelot_set_charset_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_NAME, ocelot_set_charset_name_as_utf8);
 #endif
 #ifdef MYSQL_SHARED_MEMORY_BASE_NAME
-  if (ocelot_shared_memory_base_name_as_utf8[0] != '\0') mysql_options(&mysql[connection_number], MYSQL_SHARED_MEMORY_BASE_NAME, ocelot_shared_memory_base_name_as_utf8);
+  if (ocelot_shared_memory_base_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SHARED_MEMORY_BASE_NAME, ocelot_shared_memory_base_name_as_utf8);
 #endif
 
   if (ocelot_safe_updates > 0)
@@ -9416,11 +9504,11 @@ int options_and_connect(
     sprintf(init_command,
         "SET sql_select_limit = %lu, sql_safe_updates = 1, max_join_size = %lu",
         ocelot_select_limit, ocelot_max_join_size);
-    mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, init_command);
+    lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, init_command);
   }
 
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
-  if (mysql_real_connect(&mysql[connection_number], ocelot_host_as_utf8, ocelot_user_as_utf8, ocelot_password_as_utf8,
+  if (lmysql->ldbms_mysql_real_connect(&mysql[connection_number], ocelot_host_as_utf8, ocelot_user_as_utf8, ocelot_password_as_utf8,
                           ocelot_database_as_utf8, ocelot_port, ocelot_unix_socket_as_utf8,
                           CLIENT_MULTI_RESULTS) == 0)
   {
@@ -9439,8 +9527,8 @@ int options_and_connect(
     Todo: Worry that there might be some way to start Qt with different character-set assumptions.
     Todo: Worry that we haven't got a plan for _latin2 'string' etc. although we could get the server to translate for us
   */
-  if (mysql_query(&mysql[connection_number], "set character_set_client = utf8")) printf("SET character_set_client failed\n");
-  if (mysql_query(&mysql[connection_number], "set character_set_results = utf8")) printf("SET character_set_results failed\n");
+  if (lmysql->ldbms_mysql_query(&mysql[connection_number], "set character_set_client = utf8")) printf("SET character_set_client failed\n");
+  if (lmysql->ldbms_mysql_query(&mysql[connection_number], "set character_set_results = utf8")) printf("SET character_set_results failed\n");
 
   connected[connection_number]= 1;
   return 0;
@@ -9641,3 +9729,5 @@ void MainWindow::print_help()
   printf("--------------------------------- ----------------------------------------\n");
   action_connect_once("Print");
 }
+
+#include "install_sql.cpp"
