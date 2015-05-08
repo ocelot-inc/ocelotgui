@@ -110,14 +110,14 @@ public:
     Client variables have the prefix 'ocelot_'.
     Every client variable has an item on the Settings menu,
     and may be changed with the SET statement. For example,
-    ocelot_grid_cell_right_drag_line_color is on menu item Settings | Grid Widget,
-    SET @ocelot_grid_cell_right_drag_line_color = value; will change.
+    ocelot_grid_cell_drag_line_color is on menu item Settings | Grid Widget,
+    SET ocelot_grid_cell_drag_line_color = value; will change.
     The important thing is: if it's changed on the Settings menu, then
     a SET statement is generated, so that can be saved and replayed.
     Naming convention: ocelot_ + settings-menu-item + object + color|size|font.
     Todo: pass it on to the server, without interfering with ordinary SET statements.
     Todo: use keywords.
-    Todo: allow SET @ocelot_... = DEFAULT
+    Todo: allow SET ocelot_... = DEFAULT
     Todo: pass it on to the server iff there's a server in existence
     Todo: REFRESH-FROM-SERVER in case server value changed during a function
     Todo: need a more flexible parser, eventually.
@@ -136,7 +136,7 @@ public:
     See also: Client variables that can be changed with the Settings widget
     Todo: Shouldn't client variables be in statement widget?
   */
-  QString ocelot_statement_color, new_ocelot_statement_color;
+  QString ocelot_statement_text_color, new_ocelot_statement_text_color;
   QString ocelot_statement_background_color, new_ocelot_statement_background_color;
   QString ocelot_statement_border_color, new_ocelot_statement_border_color;
   QString ocelot_statement_font_family, new_ocelot_statement_font_family;
@@ -150,7 +150,7 @@ public:
   QString ocelot_statement_highlight_reserved_color, new_ocelot_statement_highlight_reserved_color;
   QString ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color;
   QString ocelot_statement_style_string;
-  QString ocelot_grid_color, new_ocelot_grid_color;
+  QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
   QString ocelot_grid_border_color, new_ocelot_grid_border_color;
   QString ocelot_grid_header_background_color, new_ocelot_grid_header_background_color;
@@ -159,13 +159,13 @@ public:
   QString ocelot_grid_font_style, new_ocelot_grid_font_style;
   QString ocelot_grid_font_weight, new_ocelot_grid_font_weight;
   QString ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color;
-  QString ocelot_grid_cell_right_drag_line_color, new_ocelot_grid_cell_right_drag_line_color;
+  QString ocelot_grid_cell_drag_line_color, new_ocelot_grid_cell_drag_line_color;
   QString ocelot_grid_border_size, new_ocelot_grid_border_size;
   QString ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size;
-  QString ocelot_grid_cell_right_drag_line_size, new_ocelot_grid_cell_right_drag_line_size;
+  QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size;
   QString ocelot_grid_style_string;
   QString ocelot_grid_header_style_string;
-  QString ocelot_history_color, new_ocelot_history_color;
+  QString ocelot_history_text_color, new_ocelot_history_text_color;
   QString ocelot_history_background_color, new_ocelot_history_background_color;
   QString ocelot_history_border_color, new_ocelot_history_border_color;
   QString ocelot_history_font_family, new_ocelot_history_font_family;
@@ -173,14 +173,14 @@ public:
   QString ocelot_history_font_style, new_ocelot_history_font_style;
   QString ocelot_history_font_weight, new_ocelot_history_font_weight;
   QString ocelot_history_style_string, new_ocelot_history_style_string;
-  QString ocelot_main_color, new_ocelot_main_color;
-  QString ocelot_main_background_color, new_ocelot_main_background_color;
-  QString ocelot_main_border_color, new_ocelot_main_border_color;
-  QString ocelot_main_font_family, new_ocelot_main_font_family;
-  QString ocelot_main_font_size, new_ocelot_main_font_size;
-  QString ocelot_main_font_style, new_ocelot_main_font_style;
-  QString ocelot_main_font_weight, new_ocelot_main_font_weight;
-  QString ocelot_main_style_string;
+  QString ocelot_menu_text_color, new_ocelot_menu_text_color;
+  QString ocelot_menu_background_color, new_ocelot_menu_background_color;
+  QString ocelot_menu_border_color, new_ocelot_menu_border_color;
+  QString ocelot_menu_font_family, new_ocelot_menu_font_family;
+  QString ocelot_menu_font_size, new_ocelot_menu_font_size;
+  QString ocelot_menu_font_style, new_ocelot_menu_font_style;
+  QString ocelot_menu_font_weight, new_ocelot_menu_font_weight;
+  QString ocelot_menu_style_string;
 
   /* Strings for CONNECT. Some of these will be converted e.g. ocelot_host to ocelot_host_as_utf8 */
   QString ocelot_host;
@@ -248,13 +248,14 @@ public slots:
   void action_the_manual();
   void action_the_manual_close();
   void action_libmysqlclient();
+  void action_settings();
   void action_statement_edit_widget_text_changed();
   void action_undo();
   void action_statement();
   void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
   void action_grid();
   void action_history();
-  void action_main();
+  void action_menu();
   void history_markup_previous();
   void history_markup_next();
   void action_option_display_blob_as_image(bool checked);
@@ -306,8 +307,8 @@ private:
   Ui::MainWindow *ui;
 
   int history_markup_previous_or_next();
-  void create_widget_history();
-  void create_widget_statement();
+  void initialize_widget_history();
+  void initialize_widget_statement();
 #ifdef DEBUGGER
   void debug_menu_enable_or_disable(int statement_type);
   void create_widget_debug();
@@ -729,7 +730,7 @@ private:
     QAction *menu_settings_action_statement;
     QAction *menu_settings_action_grid;
     QAction *menu_settings_action_history;
-    QAction *menu_settings_action_main;
+    QAction *menu_settings_action_menu;
   QMenu *menu_options;
     QAction *menu_options_action_option_display_blob_as_image;
 #ifdef DEBUGGER
@@ -756,6 +757,7 @@ private:
     QAction *menu_help_action_about;
     QAction *menu_help_action_the_manual;
     QAction *menu_help_action_libmysqlclient;
+    QAction *menu_help_action_settings;
 
   QWidget *the_manual_widget;
     QVBoxLayout *the_manual_layout;
@@ -1682,11 +1684,11 @@ public:
   unsigned int ocelot_grid_max_desired_width_in_pixels;        /* used when calculating cell height + width */
   unsigned int ocelot_grid_max_column_height_in_lines;         /* used when calculating cell height + width */
 
-  int ocelot_grid_cell_right_drag_line_size_as_int;
+  int ocelot_grid_cell_drag_line_size_as_int;
   int ocelot_grid_cell_border_size_as_int;
-  QString ocelot_grid_color;
+  QString ocelot_grid_text_color;
   QString ocelot_grid_background_color;
-  QString ocelot_grid_cell_right_drag_line_color;
+  QString ocelot_grid_cell_drag_line_color;
   unsigned int row_pool_size;
   unsigned int cell_pool_size;
   QString frame_color_setting;                                 /* based on drag line color */
@@ -1956,10 +1958,10 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
     text_edit_frames[0 * result_column_count + i_h]->is_style_sheet_set_flag= false;
   }
 
-  ocelot_grid_color= parent->ocelot_grid_color;
+  ocelot_grid_text_color= parent->ocelot_grid_text_color;
   ocelot_grid_background_color= parent->ocelot_grid_background_color;
-  /* ocelot_grid_cell_right_drag_line_size_as_int= parent->ocelot_grid_cell_right_drag_line_size.toInt(); */
-  /* ocelot_grid_cell_right_drag_line_color= parent->ocelot_grid_cell_right_drag_line_color; */
+  /* ocelot_grid_cell_drag_line_size_as_int= parent->ocelot_grid_cell_drag_line_size.toInt(); */
+  /* ocelot_grid_cell_drag_line_color= parent->ocelot_grid_cell_drag_line_color; */
   dbms_set_result_column_count();                                  /* this will be the width of the grid */
   result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
   if (ocelot_result_grid_vertical == 0) grid_result_row_count= result_row_count + 1;
@@ -2027,8 +2029,8 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   ocelot_grid_max_column_height_in_lines=ocelot_grid_max_column_height_in_lines / 3;
   if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
 
-  ocelot_grid_cell_right_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_right_drag_line_size.toInt();
-//  ocelot_grid_cell_right_drag_line_color= copy_of_parent->ocelot_grid_cell_right_drag_line_color;
+  ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+//  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
   ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
 
   /*
@@ -2048,7 +2050,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
       int ki= xrow * result_column_count + column_number;
       text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
       text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
-      text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_right_drag_line_size_as_int, ocelot_grid_cell_right_drag_line_size_as_int));
+      text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
       /*
         Change the color of the frame. Be specific that it's TextEditFrame, because you don't want the
         children e.g. the QTextEdit to inherit the color. TextEditFrame is a custom widget and therefore
@@ -2096,7 +2098,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
   if (ocelot_result_grid_vertical > 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
-                        ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
+                        ocelot_grid_cell_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
 
   if (ocelot_result_grid_vertical > 0)
   {
@@ -2146,7 +2148,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
   if (ocelot_result_grid_vertical == 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
-                        ocelot_grid_cell_right_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
+                        ocelot_grid_cell_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
 
   /*
     grid_actual_grid_height_in_rows = # of rows that are actually showable at a time,
@@ -2198,8 +2200,8 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
         {
           int header_height= max_height_of_a_char
                            + ocelot_grid_cell_border_size_as_int * 2
-                           + ocelot_grid_cell_right_drag_line_size_as_int;
-          if (ocelot_grid_cell_right_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
+                           + ocelot_grid_cell_drag_line_size_as_int;
+          if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
           text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
           text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
           text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
@@ -2369,7 +2371,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
    I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
    but removing it doesn't solve the problem.
 */
-void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_right_drag_line_size_as_int)
+void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_drag_line_size_as_int)
 {
   unsigned int i;
   /* long unsigned int tmp_column_lengths[MAX_COLUMNS]; */
@@ -2402,7 +2404,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
     if (grid_column_widths[i] < dbms_get_field_length(i)) grid_column_widths[i]= dbms_get_field_length(i); /* fields[i].length */
 
     /* For explanation of next line, see comment "Extra size". */
-    if ((grid_column_widths[i] < 2) && (ocelot_grid_cell_right_drag_line_size_as_int > 0)) grid_column_widths[i]= 2;
+    if ((grid_column_widths[i] < 2) && (ocelot_grid_cell_drag_line_size_as_int > 0)) grid_column_widths[i]= 2;
 
     ++grid_column_widths[i]; /* ?? something do do with border width, I suppose */
 
@@ -2411,7 +2413,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
 
     grid_column_widths[i]= (grid_column_widths[i] * max_width_of_a_char)
                             + ocelot_grid_cell_border_size_as_int * 2
-                            + ocelot_grid_cell_right_drag_line_size_as_int;
+                            + ocelot_grid_cell_drag_line_size_as_int;
 
     sum_tmp_column_lengths+= grid_column_widths[i];
   }
@@ -2436,7 +2438,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
     {
       unsigned int min_width= (dbms_get_field_name_length(i) + 1) * max_width_of_a_char /* fields[i].name_length */
               + ocelot_grid_cell_border_size_as_int * 2
-              + ocelot_grid_cell_right_drag_line_size_as_int;
+              + ocelot_grid_cell_drag_line_size_as_int;
 //              + border_size * 2;
       if (grid_column_widths[i] <= min_width) continue;
       max_reduction= grid_column_widths[i] - min_width;
@@ -2479,10 +2481,10 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
   {
 //    grid_column_heights[i]= (grid_column_heights[i] * (max_height_of_a_char+(border_size * 2))) + 9;
     /* For explanation of next line, see comment "Extra size". */
-    if ((grid_column_heights[i] < 2) && (ocelot_grid_cell_right_drag_line_size_as_int > 0)) grid_column_heights[i]= 2;
+    if ((grid_column_heights[i] < 2) && (ocelot_grid_cell_drag_line_size_as_int > 0)) grid_column_heights[i]= 2;
     grid_column_heights[i]= (grid_column_heights[i] * max_height_of_a_char)
                             + ocelot_grid_cell_border_size_as_int * 2
-                            + ocelot_grid_cell_right_drag_line_size_as_int;
+                            + ocelot_grid_cell_drag_line_size_as_int;
 
     if (grid_column_heights[i] > grid_height_of_highest_column_in_pixels)
     {
@@ -2627,8 +2629,8 @@ void set_alignment_and_height(int ki, int col, int grid_col)
 //  {
 //    int header_height= max_height_of_a_char
 //                     + ocelot_grid_cell_border_size_as_int * 2
-//                     + ocelot_grid_cell_right_drag_line_size_as_int;
-//    if (ocelot_grid_cell_right_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
+//                     + ocelot_grid_cell_drag_line_size_as_int;
+//    if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
 //    text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
 //    text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
 //    text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
@@ -2955,10 +2957,10 @@ void garbage_collect()
 
 void set_frame_color_setting()
 {
-  ocelot_grid_cell_right_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_right_drag_line_size.toInt();
-  ocelot_grid_cell_right_drag_line_color= copy_of_parent->ocelot_grid_cell_right_drag_line_color;
+  ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
   frame_color_setting= "TextEditFrame {background-color: ";
-  frame_color_setting.append(ocelot_grid_cell_right_drag_line_color);
+  frame_color_setting.append(ocelot_grid_cell_drag_line_color);
   //frame_color_setting.append(";border: 0px");              /* TEST !! */
   frame_color_setting.append("}");
 }
@@ -2968,7 +2970,7 @@ void set_frame_color_setting()
   Setting the parent should affect the children.
   But we don't want all text_edit_frames and text_edit_widgets to change because that is slow.
   Let us set a flag which causes change at paint time. with setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
-  This gets called just after we chane colors + fonts with the dialog box, so we know
+  This gets called just after we change colors + fonts with the dialog box, so we know
   the new style string, and to get its font we will create a temporary QTextEdit.
   Todo: I don't really want to "show" tmp_text_edit_widget, there's a cleverer way to get font which I've forgotten.
 */
@@ -2989,8 +2991,8 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string)
     text_edit_frames[i_h]->is_style_sheet_set_flag= false;
     //text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
     //text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
-    /* todo: skip following line if ocelot_grid_cell_right_drag_line_size_as_int did not change */
-    text_edit_layouts[i_h]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_right_drag_line_size_as_int, ocelot_grid_cell_right_drag_line_size_as_int));
+    /* todo: skip following line if ocelot_grid_cell_drag_line_size_as_int did not change */
+    text_edit_layouts[i_h]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
   }
 }
 
@@ -3306,7 +3308,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   current_widget= passed_widget_number;
 
   /* Copy the parent's settings. They'll be copied back to the parent, possibly changed, if the user presses OK. */
-  copy_of_parent->new_ocelot_statement_color= copy_of_parent->ocelot_statement_color;
+  copy_of_parent->new_ocelot_statement_text_color= copy_of_parent->ocelot_statement_text_color;
   copy_of_parent->new_ocelot_statement_background_color= copy_of_parent->ocelot_statement_background_color;
   copy_of_parent->new_ocelot_statement_border_color= copy_of_parent->ocelot_statement_border_color;
   copy_of_parent->new_ocelot_statement_font_family= copy_of_parent->ocelot_statement_font_family;
@@ -3320,7 +3322,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_highlight_reserved_color= copy_of_parent->ocelot_statement_highlight_reserved_color;
   copy_of_parent->new_ocelot_statement_prompt_background_color= copy_of_parent->ocelot_statement_prompt_background_color;
 
-  copy_of_parent->new_ocelot_grid_color= copy_of_parent->ocelot_grid_color;
+  copy_of_parent->new_ocelot_grid_text_color= copy_of_parent->ocelot_grid_text_color;
   copy_of_parent->new_ocelot_grid_background_color= copy_of_parent->ocelot_grid_background_color;
   copy_of_parent->new_ocelot_grid_border_color= copy_of_parent->ocelot_grid_border_color;
   copy_of_parent->new_ocelot_grid_header_background_color= copy_of_parent->ocelot_grid_header_background_color;
@@ -3329,11 +3331,11 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_grid_font_style= copy_of_parent->ocelot_grid_font_style;
   copy_of_parent->new_ocelot_grid_font_weight= copy_of_parent->ocelot_grid_font_weight;
   copy_of_parent->new_ocelot_grid_cell_border_color= copy_of_parent->ocelot_grid_cell_border_color;
-  copy_of_parent->new_ocelot_grid_cell_right_drag_line_color= copy_of_parent->ocelot_grid_cell_right_drag_line_color;
+  copy_of_parent->new_ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
   copy_of_parent->new_ocelot_grid_border_size= copy_of_parent->ocelot_grid_border_size;
   copy_of_parent->new_ocelot_grid_cell_border_size= copy_of_parent->ocelot_grid_cell_border_size;
-  copy_of_parent->new_ocelot_grid_cell_right_drag_line_size= copy_of_parent->ocelot_grid_cell_right_drag_line_size;
-  copy_of_parent->new_ocelot_history_color= copy_of_parent->ocelot_history_color;
+  copy_of_parent->new_ocelot_grid_cell_drag_line_size= copy_of_parent->ocelot_grid_cell_drag_line_size;
+  copy_of_parent->new_ocelot_history_text_color= copy_of_parent->ocelot_history_text_color;
   copy_of_parent->new_ocelot_history_background_color= copy_of_parent->ocelot_history_background_color;
   copy_of_parent->new_ocelot_history_border_color= copy_of_parent->ocelot_history_border_color;
   copy_of_parent->new_ocelot_history_font_family= copy_of_parent->ocelot_history_font_family;
@@ -3341,13 +3343,13 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_history_font_style= copy_of_parent->ocelot_history_font_style;
   copy_of_parent->new_ocelot_history_font_weight= copy_of_parent->ocelot_history_font_weight;
 
-  copy_of_parent->new_ocelot_main_color= copy_of_parent->ocelot_main_color;
-  copy_of_parent->new_ocelot_main_background_color= copy_of_parent->ocelot_main_background_color;
-  copy_of_parent->new_ocelot_main_border_color= copy_of_parent->ocelot_main_border_color;
-  copy_of_parent->new_ocelot_main_font_family= copy_of_parent->ocelot_main_font_family;
-  copy_of_parent->new_ocelot_main_font_size= copy_of_parent->ocelot_main_font_size;
-  copy_of_parent->new_ocelot_main_font_style= copy_of_parent->ocelot_main_font_style;
-  copy_of_parent->new_ocelot_main_font_weight= copy_of_parent->ocelot_main_font_weight;
+  copy_of_parent->new_ocelot_menu_text_color= copy_of_parent->ocelot_menu_text_color;
+  copy_of_parent->new_ocelot_menu_background_color= copy_of_parent->ocelot_menu_background_color;
+  copy_of_parent->new_ocelot_menu_border_color= copy_of_parent->ocelot_menu_border_color;
+  copy_of_parent->new_ocelot_menu_font_family= copy_of_parent->ocelot_menu_font_family;
+  copy_of_parent->new_ocelot_menu_font_size= copy_of_parent->ocelot_menu_font_size;
+  copy_of_parent->new_ocelot_menu_font_style= copy_of_parent->ocelot_menu_font_style;
+  copy_of_parent->new_ocelot_menu_font_weight= copy_of_parent->ocelot_menu_font_weight;
 
   setWindowTitle(tr("Settings -- Colors and Fonts"));                        /* affects "this"] */
 
@@ -3406,16 +3408,16 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     for (int ci= 0; ci < 3; ++ci)
     {
       widget_for_size[ci]= new QWidget(this);
-      if (ci == 0) label_for_size[ci]= new QLabel(tr("Border size"));
-      if (ci == 1) label_for_size[ci]= new QLabel(tr("Cell Border size"));
-      if (ci == 2) label_for_size[ci]= new QLabel(tr("Cell right drag line size"));
+      if (ci == 0) label_for_size[ci]= new QLabel(tr("Grid Border size"));
+      if (ci == 1) label_for_size[ci]= new QLabel(tr("Grid Cell Border Size"));
+      if (ci == 2) label_for_size[ci]= new QLabel(tr("Grid Cell Drag Line Size"));
       combo_box_for_size[ci]= new QComboBox();
       combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 3);
       for (int cj= 0; cj < 10; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
       label_for_size[ci]->setFixedWidth(label_for_color_width * 20);
       if (ci == 0) combo_box_for_size[0]->setCurrentIndex(copy_of_parent->new_ocelot_grid_border_size.toInt());
       if (ci == 1) combo_box_for_size[1]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_border_size.toInt());
-      if (ci == 2) combo_box_for_size[2]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_right_drag_line_size.toInt());
+      if (ci == 2) combo_box_for_size[2]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_drag_line_size.toInt());
       hbox_layout_for_size[ci]= new QHBoxLayout();
       hbox_layout_for_size[ci]->addWidget(label_for_size[ci]);
       hbox_layout_for_size[ci]->addWidget(combo_box_for_size[ci]);
@@ -3466,45 +3468,45 @@ void set_widget_values(int ci)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Foreground"); color_name= copy_of_parent->new_ocelot_statement_color; break; }
-    case 1: { color_type= tr("Background"); color_name= copy_of_parent->new_ocelot_statement_background_color; break; }
-    case 2: { color_type= tr("Highlight literal"); color_name= copy_of_parent->new_ocelot_statement_highlight_literal_color; break; }
-    case 3: { color_type= tr("Highlight identifier"); color_name= copy_of_parent->new_ocelot_statement_highlight_identifier_color; break; }
-    case 4: { color_type= tr("Highlight comment"); color_name= copy_of_parent->new_ocelot_statement_highlight_comment_color; break; }
-    case 5: { color_type= tr("Highlight operator"); color_name= copy_of_parent->new_ocelot_statement_highlight_operator_color; break; }
-    case 6: { color_type= tr("Highlight reserved"); color_name= copy_of_parent->new_ocelot_statement_highlight_reserved_color; break; }
-    case 7: { color_type= tr("Prompt background"); color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
-    case 8: { color_type= tr("Border"); color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
+    case 0: { color_type= tr("Statement Text Color"); color_name= copy_of_parent->new_ocelot_statement_text_color; break; }
+    case 1: { color_type= tr("Statement Background Color"); color_name= copy_of_parent->new_ocelot_statement_background_color; break; }
+    case 2: { color_type= tr("Statement Highlight Literal Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_literal_color; break; }
+    case 3: { color_type= tr("Statement Highlight Identifier Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_identifier_color; break; }
+    case 4: { color_type= tr("Statement Highlight Comment Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_comment_color; break; }
+    case 5: { color_type= tr("Statement Highlight Operator Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_operator_color; break; }
+    case 6: { color_type= tr("Statement Highlight Reserved Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_reserved_color; break; }
+    case 7: { color_type= tr("Statement Prompt Background Color"); color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
+    case 8: { color_type= tr("Statement Border Color"); color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
     }
   }
   if (current_widget == GRID_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Foreground"); color_name= copy_of_parent->new_ocelot_grid_color; break; }
-    case 1: { color_type= tr("Background"); color_name= copy_of_parent->new_ocelot_grid_background_color; break; }
-    case 2: { color_type= tr("Cell border"); color_name= copy_of_parent->new_ocelot_grid_cell_border_color; break; }
-    case 3: { color_type= tr("Cell right drag line"); color_name= copy_of_parent->new_ocelot_grid_cell_right_drag_line_color; break; }
-    case 7: { color_type= tr("Header background"); color_name= copy_of_parent->new_ocelot_grid_header_background_color; break; }
-    case 8: { color_type= tr("Border"); color_name= copy_of_parent->new_ocelot_grid_border_color; break; }
+    case 0: { color_type= tr("Grid Text Color"); color_name= copy_of_parent->new_ocelot_grid_text_color; break; }
+    case 1: { color_type= tr("Grid Background Color"); color_name= copy_of_parent->new_ocelot_grid_background_color; break; }
+    case 2: { color_type= tr("Grid Cell Border Color"); color_name= copy_of_parent->new_ocelot_grid_cell_border_color; break; }
+    case 3: { color_type= tr("Grid Cell Drag Line Color"); color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color; break; }
+    case 7: { color_type= tr("Grid Header Background Color"); color_name= copy_of_parent->new_ocelot_grid_header_background_color; break; }
+    case 8: { color_type= tr("Grid Border Color"); color_name= copy_of_parent->new_ocelot_grid_border_color; break; }
     }
   }
   if (current_widget == HISTORY_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Foreground"); color_name= copy_of_parent->new_ocelot_history_color; break; }
-    case 1: { color_type= tr("Background"); color_name= copy_of_parent->new_ocelot_history_background_color; break; }
-    case 8: { color_type= tr("Border"); color_name= copy_of_parent->new_ocelot_history_border_color; break; }
+    case 0: { color_type= tr("History Text Color"); color_name= copy_of_parent->new_ocelot_history_text_color; break; }
+    case 1: { color_type= tr("History Background Color"); color_name= copy_of_parent->new_ocelot_history_background_color; break; }
+    case 8: { color_type= tr("History Border Color"); color_name= copy_of_parent->new_ocelot_history_border_color; break; }
     }
   }
   if (current_widget == MAIN_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Foreground"); color_name= copy_of_parent->new_ocelot_main_color; break; }
-    case 1: { color_type= tr("Background"); color_name= copy_of_parent->new_ocelot_main_background_color; break; }
-    case 8: { color_type= tr("Border"); color_name= copy_of_parent->new_ocelot_main_border_color; break; }
+    case 0: { color_type= tr("Menu Text Color"); color_name= copy_of_parent->new_ocelot_menu_text_color; break; }
+    case 1: { color_type= tr("Menu Background Color"); color_name= copy_of_parent->new_ocelot_menu_background_color; break; }
+    case 8: { color_type= tr("Menu Border Color"); color_name= copy_of_parent->new_ocelot_menu_border_color; break; }
     }
   }
   label_for_color[ci]->setText(color_type);
@@ -3544,7 +3546,7 @@ void handle_combo_box_1(int i)
 
   if (i == 1)                                       /* grid? */
   {
-    color_type= "Header background";               /* ?? unnecessary now that set_widget_values() does it, eh? */
+    color_type= "Grid Header Background Color";     /* ?? unnecessary now that set_widget_values() does it, eh? */
     label_for_color[7]->setText(color_type);
     for (ci= 4; ci < 7; ++ci)
     {
@@ -3633,19 +3635,19 @@ void label_for_font_dialog_set_text()
 
   if (current_widget == MAIN_WIDGET)
   {
-    s_for_label_for_font_dialog= copy_of_parent->new_ocelot_main_font_family;
+    s_for_label_for_font_dialog= copy_of_parent->new_ocelot_menu_font_family;
     s_for_label_for_font_dialog.append(" ");
-    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_main_font_size);
+    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_menu_font_size);
     s_for_label_for_font_dialog.append("pt");
-    if (QString::compare(copy_of_parent->new_ocelot_main_font_weight, "normal") != 0)
+    if (QString::compare(copy_of_parent->new_ocelot_menu_font_weight, "normal") != 0)
     {
       s_for_label_for_font_dialog.append(" ");
-      s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_main_font_weight);
+      s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_menu_font_weight);
     }
-    if (QString::compare(copy_of_parent->new_ocelot_main_font_style, "normal") != 0)
+    if (QString::compare(copy_of_parent->new_ocelot_menu_font_style, "normal") != 0)
     {
       s_for_label_for_font_dialog.append(" ");
-      s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_main_font_style);
+      s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_menu_font_style);
     }
   }
 
@@ -3679,53 +3681,53 @@ void handle_button_for_color_pick_0()
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Foreground"), QColorDialog::ShowAlphaChannel);
+    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_text_color);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Text Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_color= curr_color.name();
-      label_for_color_rgb[0]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_text_color= color_name(curr_color);
+      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_statement_text_color);
       QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_color);
+      s.append(copy_of_parent->new_ocelot_statement_text_color);
       button_for_color_show[0]->setStyleSheet(s);
     }
   }
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Foreground"), QColorDialog::ShowAlphaChannel);
+    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_text_color);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Text Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_grid_color= curr_color.name();
-      label_for_color_rgb[0]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_grid_text_color= color_name(curr_color);
+      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_grid_text_color);
       QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_color);
+      s.append(copy_of_parent->new_ocelot_grid_text_color);
       button_for_color_show[0]->setStyleSheet(s);
     }
   }
   if (current_widget == HISTORY_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_history_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Foreground"), QColorDialog::ShowAlphaChannel);
+    QColor curr_color= QColor(copy_of_parent->new_ocelot_history_text_color);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("History Text Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_history_color= curr_color.name();
-      label_for_color_rgb[0]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_history_text_color= color_name(curr_color);
+      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_history_text_color);
       QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_history_color);
+      s.append(copy_of_parent->new_ocelot_history_text_color);
       button_for_color_show[0]->setStyleSheet(s);
     }
   }
   if (current_widget == MAIN_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_main_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Foreground"), QColorDialog::ShowAlphaChannel);
+    QColor curr_color= QColor(copy_of_parent->new_ocelot_menu_text_color);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Menu Text Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_main_color= curr_color.name();
-      label_for_color_rgb[0]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_menu_text_color= color_name(curr_color);
+      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_menu_text_color);
       QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_main_color);
+      s.append(copy_of_parent->new_ocelot_menu_text_color);
       button_for_color_show[0]->setStyleSheet(s);
     }
   }
@@ -3737,11 +3739,11 @@ void handle_button_for_color_pick_1()
   if (current_widget == STATEMENT_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Background"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Background Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_background_color= curr_color.name();
-      label_for_color_rgb[1]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_background_color= color_name(curr_color);
+      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_statement_background_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_statement_background_color);
       button_for_color_show[1]->setStyleSheet(s);
@@ -3750,11 +3752,11 @@ void handle_button_for_color_pick_1()
   if (current_widget == GRID_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Background"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Background Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_grid_background_color= curr_color.name();
-      label_for_color_rgb[1]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_grid_background_color= color_name(curr_color);
+      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_grid_background_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_grid_background_color);
       button_for_color_show[1]->setStyleSheet(s);
@@ -3763,11 +3765,11 @@ void handle_button_for_color_pick_1()
   if (current_widget == HISTORY_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Background"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("History Background Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_history_background_color= curr_color.name();
-      label_for_color_rgb[1]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_history_background_color= color_name(curr_color);
+      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_history_background_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_history_background_color);
       button_for_color_show[1]->setStyleSheet(s);
@@ -3775,14 +3777,14 @@ void handle_button_for_color_pick_1()
   }
   if (current_widget == MAIN_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Background"), QColorDialog::ShowAlphaChannel);
+    QColor curr_color= QColor(copy_of_parent->new_ocelot_menu_background_color);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Menu Background Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_main_background_color= curr_color.name();
-      label_for_color_rgb[1]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_menu_background_color= color_name(curr_color);
+      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_menu_background_color);
       QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_main_background_color);
+      s.append(copy_of_parent->new_ocelot_menu_background_color);
       button_for_color_show[1]->setStyleSheet(s);
     }
   }
@@ -3794,11 +3796,11 @@ void handle_button_for_color_pick_2()
   if (current_widget == STATEMENT_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_literal_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Highlight literal"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Literal Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_highlight_literal_color= curr_color.name();
-      label_for_color_rgb[2]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_highlight_literal_color= color_name(curr_color);
+      label_for_color_rgb[2]->setText(copy_of_parent->new_ocelot_statement_highlight_literal_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_statement_highlight_literal_color);
       button_for_color_show[2]->setStyleSheet(s);
@@ -3808,11 +3810,11 @@ void handle_button_for_color_pick_2()
   if (current_widget == GRID_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_cell_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Cell border"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Cell Border Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_grid_cell_border_color= curr_color.name();
-      label_for_color_rgb[2]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_grid_cell_border_color= color_name(curr_color);
+      label_for_color_rgb[2]->setText(copy_of_parent->new_ocelot_grid_cell_border_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_grid_cell_border_color);
       button_for_color_show[2]->setStyleSheet(s);
@@ -3826,11 +3828,11 @@ void handle_button_for_color_pick_3()
   if (current_widget == STATEMENT_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_identifier_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Highlight identifier"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight identifier Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_highlight_identifier_color= curr_color.name();
-      label_for_color_rgb[3]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_highlight_identifier_color= color_name(curr_color);
+      label_for_color_rgb[3]->setText(copy_of_parent->new_ocelot_statement_highlight_identifier_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_statement_highlight_identifier_color);
       button_for_color_show[3]->setStyleSheet(s);
@@ -3839,14 +3841,14 @@ void handle_button_for_color_pick_3()
 
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_cell_right_drag_line_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Cell drag line"), QColorDialog::ShowAlphaChannel);
+    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_cell_drag_line_color);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Cell Drag Line Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_grid_cell_right_drag_line_color= curr_color.name();
-      label_for_color_rgb[3]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_grid_cell_drag_line_color= color_name(curr_color);
+      label_for_color_rgb[3]->setText(copy_of_parent->new_ocelot_grid_cell_drag_line_color);
       QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_cell_right_drag_line_color);
+      s.append(copy_of_parent->new_ocelot_grid_cell_drag_line_color);
        button_for_color_show[3]->setStyleSheet(s);
     }
   }
@@ -3858,11 +3860,11 @@ void handle_button_for_color_pick_4()
   if (current_widget == STATEMENT_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_comment_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Highlight comment"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Comment Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_highlight_comment_color= curr_color.name();
-      label_for_color_rgb[4]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_highlight_comment_color= color_name(curr_color);
+      label_for_color_rgb[4]->setText(copy_of_parent->new_ocelot_statement_highlight_comment_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_statement_highlight_comment_color);
       button_for_color_show[4]->setStyleSheet(s);
@@ -3876,11 +3878,11 @@ void handle_button_for_color_pick_5()
   if (current_widget == STATEMENT_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_operator_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Highlight operator"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Operator Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_highlight_operator_color= curr_color.name();
-      label_for_color_rgb[5]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_highlight_operator_color= color_name(curr_color);
+      label_for_color_rgb[5]->setText(copy_of_parent->new_ocelot_statement_highlight_operator_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_statement_highlight_operator_color);
       button_for_color_show[5]->setStyleSheet(s);
@@ -3894,11 +3896,11 @@ void handle_button_for_color_pick_6()
   if (current_widget == STATEMENT_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_reserved_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Highlight reserved"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Reserved Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_highlight_reserved_color= curr_color.name();
-      label_for_color_rgb[6]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_highlight_reserved_color= color_name(curr_color);
+      label_for_color_rgb[6]->setText(copy_of_parent->new_ocelot_statement_highlight_reserved_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_statement_highlight_reserved_color);
       button_for_color_show[6]->setStyleSheet(s);
@@ -3912,11 +3914,11 @@ void handle_button_for_color_pick_7()
  if (current_widget == STATEMENT_WIDGET)
  {
    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_prompt_background_color);
-   curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Prompt background"), QColorDialog::ShowAlphaChannel);
+   curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Prompt Background Color"));
    if (curr_color.isValid())
    {
-     copy_of_parent->new_ocelot_statement_prompt_background_color= curr_color.name();
-     label_for_color_rgb[7]->setText(curr_color.name());
+     copy_of_parent->new_ocelot_statement_prompt_background_color= color_name(curr_color);
+     label_for_color_rgb[7]->setText(copy_of_parent->new_ocelot_statement_prompt_background_color);
      QString s= "background-color: ";
      s.append(copy_of_parent->new_ocelot_statement_prompt_background_color);
      button_for_color_show[7]->setStyleSheet(s);
@@ -3925,11 +3927,11 @@ void handle_button_for_color_pick_7()
   if (current_widget == GRID_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_header_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Header background"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Header Background Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_grid_header_background_color= curr_color.name();
-      label_for_color_rgb[7]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_grid_header_background_color= color_name(curr_color);
+      label_for_color_rgb[7]->setText(copy_of_parent->new_ocelot_grid_header_background_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_grid_header_background_color);
       button_for_color_show[7]->setStyleSheet(s);
@@ -3943,11 +3945,11 @@ void handle_button_for_color_pick_8()
   if (current_widget == STATEMENT_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Border"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Border Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_statement_border_color= curr_color.name();
-      label_for_color_rgb[8]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_statement_border_color= color_name(curr_color);
+      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_statement_border_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_statement_border_color);
       button_for_color_show[8]->setStyleSheet(s);
@@ -3956,11 +3958,11 @@ void handle_button_for_color_pick_8()
   if (current_widget == GRID_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Border"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Border Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_grid_border_color= curr_color.name();
-      label_for_color_rgb[8]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_grid_border_color= color_name(curr_color);
+      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_grid_border_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_grid_border_color);
       button_for_color_show[8]->setStyleSheet(s);
@@ -3969,11 +3971,11 @@ void handle_button_for_color_pick_8()
   if (current_widget == HISTORY_WIDGET)
   {
     QColor curr_color= QColor(copy_of_parent->new_ocelot_history_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Border"), QColorDialog::ShowAlphaChannel);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("History Border Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_history_border_color= curr_color.name();
-      label_for_color_rgb[8]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_history_border_color= color_name(curr_color);
+      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_history_border_color);
       QString s= "background-color: ";
       s.append(copy_of_parent->new_ocelot_history_border_color);
       button_for_color_show[8]->setStyleSheet(s);
@@ -3981,14 +3983,14 @@ void handle_button_for_color_pick_8()
   }
   if (current_widget == MAIN_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_main_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Pick Color of Border"), QColorDialog::ShowAlphaChannel);
+    QColor curr_color= QColor(copy_of_parent->new_ocelot_menu_border_color);
+    curr_color= QColorDialog::getColor(curr_color, this, tr("Menu Border Color"));
     if (curr_color.isValid())
     {
-      copy_of_parent->new_ocelot_main_border_color= curr_color.name();
-      label_for_color_rgb[8]->setText(curr_color.name());
+      copy_of_parent->new_ocelot_menu_border_color= color_name(curr_color);
+      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_menu_border_color);
       QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_main_border_color);
+      s.append(copy_of_parent->new_ocelot_menu_border_color);
       button_for_color_show[8]->setStyleSheet(s);
     }
   }
@@ -4009,7 +4011,7 @@ void handle_combo_box_for_size_1(int i)
 
 void handle_combo_box_for_size_2(int i)
 {
-  copy_of_parent->new_ocelot_grid_cell_right_drag_line_size= QString::number(i);
+  copy_of_parent->new_ocelot_grid_cell_drag_line_size= QString::number(i);
 }
 
 
@@ -4042,9 +4044,9 @@ void handle_button_for_font_dialog()
   }
   if (current_widget == MAIN_WIDGET)
   {
-    if (QString::compare(copy_of_parent->new_ocelot_main_font_weight, "bold") == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_main_font_style, "italic") == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(copy_of_parent->new_ocelot_main_font_family, copy_of_parent->new_ocelot_main_font_size.toInt(), boldness, italics), this);
+    if (QString::compare(copy_of_parent->new_ocelot_menu_font_weight, "bold") == 0) boldness= QFont::Bold;
+    if (QString::compare(copy_of_parent->new_ocelot_menu_font_style, "italic") == 0) italics= true;
+    font= QFontDialog::getFont(&ok, QFont(copy_of_parent->new_ocelot_menu_font_family, copy_of_parent->new_ocelot_menu_font_size.toInt(), boldness, italics), this);
   }
 
   if (ok)
@@ -4079,15 +4081,181 @@ void handle_button_for_font_dialog()
    }
    if (current_widget == MAIN_WIDGET)
    {
-     copy_of_parent->new_ocelot_main_font_family= font.family();
-     if (font.italic()) copy_of_parent->new_ocelot_main_font_style= "italic";
-     else copy_of_parent->new_ocelot_main_font_style= "normal";
-     copy_of_parent->new_ocelot_main_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-     if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_main_font_weight= "bold";
-     else copy_of_parent->new_ocelot_main_font_weight= "normal";
+     copy_of_parent->new_ocelot_menu_font_family= font.family();
+     if (font.italic()) copy_of_parent->new_ocelot_menu_font_style= "italic";
+     else copy_of_parent->new_ocelot_menu_font_style= "normal";
+     copy_of_parent->new_ocelot_menu_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
+     if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_menu_font_weight= "bold";
+     else copy_of_parent->new_ocelot_menu_font_weight= "normal";
     }
     label_for_font_dialog_set_text();
   }
+}
+
+QString color_name(QColor curr_color)
+{
+
+/*
+  Called from handle_button_for_color_pick_* after getting name(), which is in fact hex.
+  Includes list of X11 color names and hex values, commonly-available list, example =
+  https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart
+  (but excluding webGray, webGreen, webMaroon, webPurple)
+  Colors can be entered as either hex codes or names.
+  -- not exactly the same as Qt names, and not exactly the same as W3C for gray green maroon purple.
+  The dialog box accepts X11 color name but QColor::name() returns hex code.
+  This is for translating hex codes back to names.
+  Doubtless this has been done many times, but I couldn't find examples.
+*/
+static const char *color_list[292]=
+{"AliceBlue","#F0F8FF",
+"AntiqueWhite","#FAEBD7",
+"Aqua","#00FFFF",
+"Aquamarine","#7FFFD4",
+"Azure","#F0FFFF",
+"Beige","#F5F5DC",
+"Bisque","#FFE4C4",
+"Black","#000000",
+"BlanchedAlmond","#FFEBCD",
+"Blue","#0000FF",
+"BlueViolet","#8A2BE2",
+"Brown","#A52A2A",
+"Burlywood","#DEB887",
+"CadetBlue","#5F9EA0",
+"Chartreuse","#7FFF00",
+"Chocolate","#D2691E",
+"Coral","#FF7F50",
+"Cornflower","#6495ED",
+"Cornsilk","#FFF8DC",
+"Crimson","#DC143C",
+"Cyan","#00FFFF",
+"DarkBlue","#00008B",
+"DarkCyan","#008B8B",
+"DarkGoldenrod","#B8860B",
+"DarkGray","#A9A9A9",
+"DarkGreen","#006400",
+"DarkKhaki","#BDB76B",
+"DarkMagenta","#8B008B",
+"DarkOlive Green","#556B2F",
+"DarkOrange","#FF8C00",
+"DarkOrchid","#9932CC",
+"DarkRed","#8B0000",
+"DarkSalmon","#E9967A",
+"DarkSeaGreen","#8FBC8F",
+"DarkSlateBlue","#483D8B",
+"DarkSlateGray","#2F4F4F",
+"DarkTurquoise","#00CED1",
+"DarkViolet","#9400D3",
+"DeepPink","#FF1493",
+"DeepSkyBlue","#00BFFF",
+"DimGray","#696969",
+"DodgerBlue","#1E90FF",
+"Firebrick","#B22222",
+"FloralWhite","#FFFAF0",
+"ForestGreen","#228B22",
+"Fuchsia","#FF00FF",
+"Gainsboro","#DCDCDC",
+"GhostWhite","#F8F8FF",
+"Gold","#FFD700",
+"Goldenrod","#DAA520",
+"Gray","#BEBEBE",
+"Green","#00FF00",
+"GreenYellow","#ADFF2F",
+"Honeydew","#F0FFF0",
+"HotPink","#FF69B4",
+"IndianRed","#CD5C5C",
+"Indigo","#4B0082",
+"Ivory","#FFFFF0",
+"Khaki","#F0E68C",
+"Lavender","#E6E6FA",
+"Lavender Blush","#FFF0F5",
+"LawnGreen","#7CFC00",
+"LemonChiffon","#FFFACD",
+"LightBlue","#ADD8E6",
+"LightCoral","#F08080",
+"LightCyan","#E0FFFF",
+"LightGoldenrod","#FAFAD2",
+"LightGray","#D3D3D3",
+"LightGreen","#90EE90",
+"LightPink","#FFB6C1",
+"LightSalmon","#FFA07A",
+"LightSeaGreen","#20B2AA",
+"LightSkyBlue","#87CEFA",
+"LightSlateGray","#778899",
+"Light SteelBlue","#B0C4DE",
+"LightYellow","#FFFFE0",
+"Lime","#00FF00",
+"LimeGreen","#32CD32",
+"Linen","#FAF0E6",
+"Magenta","#FF00FF",
+"Maroon","#B03060",
+"MediumAquamarine","#66CDAA",
+"MediumBlue","#0000CD",
+"MediumOrchid","#BA55D3",
+"MediumPurple","#9370DB",
+"MediumSeaGreen","#3CB371",
+"MediumSlateBlue","#7B68EE",
+"MediumSpringGreen","#00FA9A",
+"MediumTurquoise","#48D1CC",
+"MediumVioletRed","#C71585",
+"MidnightBlue","#191970",
+"MintCream","#F5FFFA",
+"MistyRose","#FFE4E1",
+"Moccasin","#FFE4B5",
+"NavajoWhite","#FFDEAD",
+"NavyBlue","#000080",
+"OldLace","#FDF5E6",
+"Olive","#808000",
+"OliveDrab","#6B8E23",
+"Orange","#FFA500",
+"OrangeRed","#FF4500",
+"Orchid","#DA70D6",
+"PaleGoldenrod","#EEE8AA",
+"PaleGreen","#98FB98",
+"PaleTurquoise","#AFEEEE",
+"PaleVioletRed","#DB7093",
+"PapayaWhip","#FFEFD5",
+"PeachPuff","#FFDAB9",
+"Peru","#CD853F",
+"Pink","#FFC0CB",
+"Plum","#DDA0DD",
+"PowderBlue","#B0E0E6",
+"Purple","#A020F0",
+"RebeccaPurple","#663399",
+"Red","#FF0000",
+"RosyBrown","#BC8F8F",
+"RoyalBlue","#4169E1",
+"SaddleBrown","#8B4513",
+"Salmon","#FA8072",
+"SandyBrown","#F4A460",
+"SeaGreen","#2E8B57",
+"Seashell","#FFF5EE",
+"Sienna","#A0522D",
+"Silver","#C0C0C0",
+"SkyBlue","#87CEEB",
+"SlateBlue","#6A5ACD",
+"SlateGray","#708090",
+"Snow","#FFFAFA",
+"SpringGreen","#00FF7F",
+"SteelBlue","#4682B4",
+"Tan","#D2B48C",
+"Teal","#008080",
+"Thistle","#D8BFD8",
+"Tomato","#FF6347",
+"Turquoise","#40E0D0",
+"Violet","#EE82EE",
+"Wheat","#F5DEB3",
+"White","#FFFFFF",
+"WhiteSmoke","#F5F5F5",
+"Yellow","#FFFF00",
+"YellowGreen","#9ACD32",
+"",""};
+
+  QString color_name_string= curr_color.name().toUpper();
+  for (int i= 1; strcmp(color_list[i], "") > 0; i+= 2)
+  {
+    if (color_name_string == color_list[i]) return color_list[i - 1];
+  }
+  return color_name_string;
 }
 
 };
