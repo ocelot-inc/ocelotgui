@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: May 8 2015
+   Last modified: May 17 2015
 */
 
 /*
@@ -299,6 +299,11 @@
   static unsigned short int ocelot_report_data_truncation= 0; /* for MYSQL_REPORT_DATA_TRUNCATION */
   static unsigned short int ocelot_opt_use_result= 0; /* for MYSQL_OPT_USE_RESULT */
 
+  /* Items affecting history which cannot be changed except by modifying + rebuilding */
+  unsigned int ocelot_history_max_column_width= 10;
+  unsigned int ocelot_history_max_column_count= 5;
+  unsigned int ocelot_history_max_row_count= 5;
+
   /* Some items we allow, but the reasons we allow them are lost in the mists of time */
   /* I gather that one is supposed to read the charset file. I don't think we do. */
   static unsigned short ocelot_opt_named_pipe;          /* for MYSQL_OPT_NAMED_PIPE */
@@ -389,7 +394,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   main_layout= new QVBoxLayout();               /* todo: do I need to say "this"? */
 
   history_edit_widget= new QTextEdit();
-  statement_edit_widget= new CodeEditor();
+  statement_edit_widget= new CodeEditor(this);
+
 
 #ifdef DEBUGGER
   create_widget_debug();
@@ -410,6 +416,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_highlight_comment_color= "red";
   ocelot_statement_highlight_operator_color= "lightGreen";
   ocelot_statement_highlight_reserved_color= "magenta";
+  ocelot_statement_highlight_current_line_color= "yellow";
 
   ocelot_history_border_color= "black";
   ocelot_menu_border_color= "black";
@@ -429,6 +436,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     print_help();
     exit(0);
   }
+
+  if (color_list[0][0] == 0) { ;  }                 /* kludge to avoid "variable not used" warning */
+  for (int q_i= 0; strcmp(color_list[q_i]," ") > 0; ++q_i) q_color_list.append(color_list[q_i]);
+  assign_names_for_colors();
 
   make_style_strings();
   //main_window->setStyleSheet(ocelot_menu_style_string);
@@ -834,7 +845,7 @@ void MainWindow::history_markup_make_strings()
 /* The following will append the statement to history, line-at-a-time with prompts. */
 /* It seems to work except that the prompt is not right-justified. */
 /* Todo: right justify. Make it optional to show the prompt, unless prompt can be hidden. */
-void MainWindow::history_markup_append()
+void MainWindow::history_markup_append(QString result_set_for_history)
 {
   QString plainTextEditContents;
   QStringList statement_lines;
@@ -866,6 +877,12 @@ void MainWindow::history_markup_append()
 
   history_statement.append(history_markup_result);
   history_statement.append(history_markup_copy_for_history(statement_edit_widget->result)); /* the main "OK" or error message */
+  if (result_set_for_history > "")
+  {
+    history_statement.append("<pre>");
+    history_statement.append(result_set_for_history);
+    history_statement.append("<//pre>");
+  }
   history_statement.append(history_markup_statement_end);
 
   history_edit_widget->append(history_statement);
@@ -1318,17 +1335,17 @@ void MainWindow::action_statement_edit_widget_text_changed()
   /* cur.select (QTextCursor::Document); */ /* desperate attempt to fix so undo/redo is not destroyed ... does not work */
 
   QTextCharFormat format_of_literal;
-  format_of_literal.setForeground(QColor(ocelot_statement_highlight_literal_color));
+  format_of_literal.setForeground(QColor(qt_color(ocelot_statement_highlight_literal_color)));
   QTextCharFormat format_of_identifier;
-  format_of_identifier.setForeground(QColor(ocelot_statement_highlight_identifier_color));
+  format_of_identifier.setForeground(QColor(qt_color(ocelot_statement_highlight_identifier_color)));
   QTextCharFormat format_of_comment;
-  format_of_comment.setForeground(QColor(ocelot_statement_highlight_comment_color));
+  format_of_comment.setForeground(QColor(qt_color(ocelot_statement_highlight_comment_color)));
   QTextCharFormat format_of_operator;
-  format_of_operator.setForeground(QColor(ocelot_statement_highlight_operator_color));
+  format_of_operator.setForeground(QColor(qt_color(ocelot_statement_highlight_operator_color)));
   QTextCharFormat format_of_reserved_word;
-  format_of_reserved_word.setForeground(QColor(ocelot_statement_highlight_reserved_color));
+  format_of_reserved_word.setForeground(QColor(qt_color(ocelot_statement_highlight_reserved_color)));
   QTextCharFormat format_of_other;
-  format_of_other.setForeground(QColor(ocelot_statement_text_color));
+  format_of_other.setForeground(QColor(qt_color(ocelot_statement_text_color)));
 
   pos= 0;
   /* cur.setPosition(pos, QTextCursor::KeepAnchor); */
@@ -2010,9 +2027,8 @@ void MainWindow::action_settings()
   For example, to change the statement background color to dark blue:<br>\
   * Click the menu item Settings<br>\
     then click Statement Widget: Colors and Fonts<br>\
-    then click the Pick New Color button for Statement Background Color<br>\
-    then enter the word 'DarkBlue' in the box with the label = Color name:<br>\
-    then click OK<br>\
+    then click the box on the right of the Statement Background Color line<br>\
+    then click on the word 'DarkBlue' in the list of choices<br>\
     then click OK to confirm<br>\
   * Or, Start ocelotgui with a parameter:<br>\
     ocelotgui --ocelot_statement_background-color='DarkBlue'<br>\
@@ -2021,11 +2037,13 @@ void MainWindow::action_settings()
     ocelot_statement_background_color='DarkBlue'<br>\
   * Or, execute a statement<br>\
     SET ocelot_statement_background_color='DarkBlue';<br>\
-  Color names may be #hexadecimal-RGB for example '#0000FE', \
-  or as one of the many X11 names listed on this Wikipedia chart: \
-  https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart, \
-  but do not use WebGray, WebGreen, WebMaroon, or WebPurple.<br>\
-               <br>\
+  Color names may be any of the many names listed on this W3C chart: \
+  http://www.w3.org/wiki/CSS/Properties/color/keywords \
+  as well as additions from this unofficial X11 chart: \
+  https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart. \
+  Hexadecimal-RGB values for example '#0000FE' are allowed in parameters or statements. \
+  <br>\
+  <br>\
   CHANGING FONTS<br>\
   For example, to change the menu font to bold italic:<br>\
   * Click the menu item Settings<br>\
@@ -2122,6 +2140,7 @@ void MainWindow::action_statement()
     action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,"ocelot_statement_highlight_operator_color");
     action_change_one_setting(ocelot_statement_highlight_reserved_color, new_ocelot_statement_highlight_reserved_color,"ocelot_statement_highlight_reserved_color");
     action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,"ocelot_statement_prompt_background_color");
+    action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,"ocelot_statement_highlight_current_line_color");
 
     /* Todo: consider: maybe you hve to do a restore like this */
     //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
@@ -2236,6 +2255,60 @@ void MainWindow::action_change_one_setting(QString old_setting, QString new_sett
 
 
 /*
+  Pass QString with rgb name '#RRGGBB'.
+  Find that string in q_color_list.
+  If it's not there: add it.
+*/
+QString MainWindow::q_color_list_name(QString rgb_name)
+{
+  for (int i= 1; i < q_color_list.size(); i+= 2)
+  {
+    if (QString::compare(rgb_name, q_color_list[i], Qt::CaseInsensitive) == 0) return q_color_list[i - 1];
+  }
+  q_color_list.append(rgb_name);
+  q_color_list.append(rgb_name);
+  return rgb_name;
+}
+
+/*
+  It's possible to say SET [ocelot color name] = rgb_name e.g. "#FFFFFF"
+  or have rgb_name in an options file or get an RGB name with set_current_colors_and_fonts().
+  We'd prefer to show as W3C names where possible, X11 names as second choice.
+*/
+void MainWindow::assign_names_for_colors()
+{
+  if (ocelot_statement_text_color.left(1) == "#") ocelot_statement_text_color= q_color_list_name(ocelot_statement_text_color);
+  if (ocelot_statement_background_color.left(1) == "#") ocelot_statement_background_color= q_color_list_name(ocelot_statement_background_color);
+  if (ocelot_statement_border_color.left(1) == "#") ocelot_statement_border_color= q_color_list_name(ocelot_statement_border_color);
+  if (ocelot_statement_highlight_literal_color.left(1) == "#") ocelot_statement_highlight_literal_color= q_color_list_name(ocelot_statement_highlight_literal_color);
+  if (ocelot_statement_highlight_identifier_color.left(1) == "#") ocelot_statement_highlight_identifier_color= q_color_list_name(ocelot_statement_highlight_identifier_color);
+  if (ocelot_statement_highlight_comment_color.left(1) == "#") ocelot_statement_highlight_comment_color= q_color_list_name(ocelot_statement_highlight_comment_color);
+  if (ocelot_statement_highlight_operator_color.left(1) == "#") ocelot_statement_highlight_operator_color= q_color_list_name(ocelot_statement_highlight_operator_color);
+  if (ocelot_statement_highlight_reserved_color.left(1) == "#") ocelot_statement_highlight_reserved_color= q_color_list_name(ocelot_statement_highlight_reserved_color);
+  if (ocelot_statement_prompt_background_color.left(1) == "#") ocelot_statement_prompt_background_color= q_color_list_name(ocelot_statement_prompt_background_color);
+  if (ocelot_statement_highlight_current_line_color.left(1) == "#") ocelot_statement_highlight_current_line_color= q_color_list_name(ocelot_statement_highlight_current_line_color);
+  if (ocelot_grid_text_color.left(1) == "#") ocelot_grid_text_color= q_color_list_name(ocelot_grid_text_color);
+  if (ocelot_grid_border_color.left(1) == "#") ocelot_grid_border_color= q_color_list_name(ocelot_grid_border_color);
+  if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
+  if (ocelot_grid_header_background_color.left(1) == "#") ocelot_grid_header_background_color= q_color_list_name(ocelot_grid_header_background_color);
+  if (ocelot_grid_font_family.left(1) == "#") ocelot_grid_font_family= q_color_list_name(ocelot_grid_font_family);
+  if (ocelot_grid_font_size.left(1) == "#") ocelot_grid_font_size= q_color_list_name(ocelot_grid_font_size);
+  if (ocelot_grid_font_style.left(1) == "#") ocelot_grid_font_style= q_color_list_name(ocelot_grid_font_style);
+  if (ocelot_grid_font_weight.left(1) == "#") ocelot_grid_font_weight= q_color_list_name(ocelot_grid_font_weight);
+  if (ocelot_grid_cell_border_color.left(1) == "#") ocelot_grid_cell_border_color= q_color_list_name(ocelot_grid_cell_border_color);
+  if (ocelot_grid_cell_drag_line_color.left(1) == "#") ocelot_grid_cell_drag_line_color= q_color_list_name(ocelot_grid_cell_drag_line_color);
+  if (ocelot_grid_border_size.left(1) == "#") ocelot_grid_border_size= q_color_list_name(ocelot_grid_border_size);
+  if (ocelot_grid_cell_border_size.left(1) == "#") ocelot_grid_cell_border_size= q_color_list_name(ocelot_grid_cell_border_size);
+  if (ocelot_grid_cell_drag_line_size.left(1) == "#") ocelot_grid_cell_drag_line_size= q_color_list_name(ocelot_grid_cell_drag_line_size);
+  if (ocelot_history_text_color.left(1) == "#") ocelot_history_text_color= q_color_list_name(ocelot_history_text_color);
+  if (ocelot_history_background_color.left(1) == "#") ocelot_history_background_color= q_color_list_name(ocelot_history_background_color);
+  if (ocelot_history_border_color.left(1) == "#") ocelot_history_border_color= q_color_list_name(ocelot_history_border_color);
+  if (ocelot_menu_text_color.left(1) == "#") ocelot_menu_text_color= q_color_list_name(ocelot_menu_text_color);
+  if (ocelot_menu_background_color.left(1) == "#") ocelot_menu_background_color= q_color_list_name(ocelot_menu_background_color);
+  if (ocelot_menu_border_color.left(1) == "#") ocelot_menu_border_color= q_color_list_name(ocelot_menu_border_color);
+}
+
+/*
   Todo: something has to be figured out about border width and border colors.
   I think, uncertainly, that the default border width is 0 and the color is Palette:shadow i.e. black.
   Possibly I could get the original value from QWidget::styleSheet() is some startup parameter changed it?
@@ -2279,6 +2352,83 @@ void MainWindow::set_current_colors_and_font()
   if (font.weight() >= QFont::Bold) ocelot_menu_font_weight= "bold"; else ocelot_menu_font_weight= "normal";
 }
 
+/*
+  Pass: a string which is supposed to have a color name. Return: a canonical color name.
+  1. Check color_list (names). If match, return name. Might be a case change e.g. Gray not gray.
+  2. Accept some color name variants, return the name in the list. e.g. Gray not Grey.
+     They appear in http://www.w3.org/TR/SVG/types.html#ColorKeywords.
+  3. Put the color in a QColor. If result is invalid, return "" which means invalid.
+  4. Get the color back as #RRGGBB
+  3. Check color_list (RGBs). If match, return name. e.g. Gray not #BEBEBE.
+  4. Return the #RRGGBB color.
+  This does not mean that absolutely no synonyms are allowed -- two names may have the same #RRGGBB.
+*/
+QString MainWindow::canonical_color_name(QString color_name_string)
+{
+  QString s;
+  for (int i= 0; strcmp(color_list[i], "") > 0; i+= 2)
+  {
+    s= color_list[i];
+    if (QString::compare(color_name_string, s, Qt::CaseInsensitive) == 0)
+    {
+      return s;
+    }
+  }
+
+  if (QString::compare(color_name_string, "Cornflower", Qt::CaseInsensitive) == 0) return "CornflowerBlue";
+  if (QString::compare(color_name_string, "Darkgrey", Qt::CaseInsensitive) == 0) return "Darkgray";
+  if (QString::compare(color_name_string, "DarkSlateGrey", Qt::CaseInsensitive) == 0) return "DarkSlateGray";
+  if (QString::compare(color_name_string, "DimGrey", Qt::CaseInsensitive) == 0) return "DimGray";
+  if (QString::compare(color_name_string, "Grey", Qt::CaseInsensitive) == 0) return "Gray";
+  if (QString::compare(color_name_string, "LightGoldenrod", Qt::CaseInsensitive) == 0) return "LightGoldenrodYellow";
+  if (QString::compare(color_name_string, "LightGrey", Qt::CaseInsensitive) == 0) return "LightGray";
+  if (QString::compare(color_name_string, "LightSlateGrey", Qt::CaseInsensitive) == 0) return "LightSlateGray";
+  if (QString::compare(color_name_string, "NavyBlue", Qt::CaseInsensitive) == 0) return "Navy";
+  if (QString::compare(color_name_string, "SlateGrey", Qt::CaseInsensitive) == 0) return "SlateGray";
+  QColor qq_color;
+  qq_color.setNamedColor(color_name_string);
+  if (qq_color.isValid() == false) return "";                 /* bad color, maybe bad format */
+  QString qq_color_name= qq_color.name();                      /* returns name as "#RRGGBB" */
+  for (int i= 1; strcmp(color_list[i], "") > 0; i+= 2)
+  {
+    s= color_list[i];
+    if (QString::compare(qq_color_name, s, Qt::CaseInsensitive) == 0)
+    {
+      s= color_list[i - 1];
+      return s;
+    }
+  }
+  return qq_color_name;
+}
+
+
+//QPalette qp;
+//QColor c;
+//qp.setColor(QPalette::Window,"red");
+//QString tl= qp.color(QPalette::Window).name();
+
+
+/* Called from: make_style_strings(). We allow sixteen color names that Qt doesn't like. */
+QString MainWindow::qt_color(QString color_name)
+{
+  if (QString::compare(color_name, "Aqua", Qt::CaseInsensitive) == 0) return "#00FFFF"; /* = Cyan */
+  if (QString::compare(color_name, "Fuchsia", Qt::CaseInsensitive) == 0) return "#FF00FF"; /* = Magenta */
+  if (QString::compare(color_name, "GrayX11", Qt::CaseInsensitive) == 0) return "#BEBEBE";
+  if (QString::compare(color_name, "GreenX11", Qt::CaseInsensitive) == 0) return "#00FF00";
+  if (QString::compare(color_name, "Indigo", Qt::CaseInsensitive) == 0) return "#4B0082";
+  if (QString::compare(color_name, "Lime", Qt::CaseInsensitive) == 0) return "#00FF00"; /* = Green */
+  if (QString::compare(color_name, "MaroonX11", Qt::CaseInsensitive) == 0) return "#B03060";
+  if (QString::compare(color_name, "Olive", Qt::CaseInsensitive) == 0) return "#808000";
+  if (QString::compare(color_name, "PurpleX11", Qt::CaseInsensitive) == 0) return "#A020F0";
+  if (QString::compare(color_name, "RebeccaPurple", Qt::CaseInsensitive) == 0) return "#663399";
+  if (QString::compare(color_name, "Silver", Qt::CaseInsensitive) == 0) return "#C0C0C0";
+  if (QString::compare(color_name, "Teal", Qt::CaseInsensitive) == 0) return "#008080";
+  if (QString::compare(color_name, "WebGray", Qt::CaseInsensitive) == 0) return "#808080";
+  if (QString::compare(color_name, "WebGreen", Qt::CaseInsensitive) == 0) return "#008000";
+  if (QString::compare(color_name, "WebMaroon", Qt::CaseInsensitive) == 0) return "#7F0000";
+  if (QString::compare(color_name, "WebPurple", Qt::CaseInsensitive) == 0) return "#7F007F";
+  return color_name;
+}
 
 /* Called from: action_statement() etc. Make a string that setStyleSheet() can use. */
 /*
@@ -2287,47 +2437,47 @@ void MainWindow::set_current_colors_and_font()
 */
 void MainWindow::make_style_strings()
 {
-  ocelot_statement_style_string= "color:"; ocelot_statement_style_string.append(ocelot_statement_text_color);
-  ocelot_statement_style_string.append(";background-color:"); ocelot_statement_style_string.append(ocelot_statement_background_color);
-  ocelot_statement_style_string.append(";border:1px solid "); ocelot_statement_style_string.append(ocelot_statement_border_color);
+  ocelot_statement_style_string= "color:"; ocelot_statement_style_string.append(qt_color(ocelot_statement_text_color));
+  ocelot_statement_style_string.append(";background-color:"); ocelot_statement_style_string.append(qt_color(ocelot_statement_background_color));
+  ocelot_statement_style_string.append(";border:1px solid "); ocelot_statement_style_string.append(qt_color(ocelot_statement_border_color));
   ocelot_statement_style_string.append(";font-family:"); ocelot_statement_style_string.append(ocelot_statement_font_family);
   ocelot_statement_style_string.append(";font-size:"); ocelot_statement_style_string.append(ocelot_statement_font_size);
   ocelot_statement_style_string.append("pt;font-style:"); ocelot_statement_style_string.append(ocelot_statement_font_style);
   ocelot_statement_style_string.append(";font-weight:"); ocelot_statement_style_string.append(ocelot_statement_font_weight);
 
-  ocelot_grid_style_string= "color:"; ocelot_grid_style_string.append(ocelot_grid_text_color);
-  ocelot_grid_style_string.append(";background-color:"); ocelot_grid_style_string.append(ocelot_grid_background_color);
+  ocelot_grid_style_string= "color:"; ocelot_grid_style_string.append(qt_color(ocelot_grid_text_color));
+  ocelot_grid_style_string.append(";background-color:"); ocelot_grid_style_string.append(qt_color(ocelot_grid_background_color));
   ocelot_grid_style_string.append(";border:");
   ocelot_grid_style_string.append(ocelot_grid_cell_border_size);
   ocelot_grid_style_string.append("px solid ");
-  ocelot_grid_style_string.append(ocelot_grid_border_color);
+  ocelot_grid_style_string.append(qt_color(ocelot_grid_border_color));
   ocelot_grid_style_string.append(";font-family:"); ocelot_grid_style_string.append(ocelot_grid_font_family);
   ocelot_grid_style_string.append(";font-size:"); ocelot_grid_style_string.append(ocelot_grid_font_size);
   ocelot_grid_style_string.append("pt;font-style:"); ocelot_grid_style_string.append(ocelot_grid_font_style);
   ocelot_grid_style_string.append(";font-weight:"); ocelot_grid_style_string.append(ocelot_grid_font_weight);
 
-  ocelot_grid_header_style_string= "color:"; ocelot_grid_header_style_string.append(ocelot_grid_text_color);
-  ocelot_grid_header_style_string.append(";background-color:"); ocelot_grid_header_style_string.append(ocelot_grid_header_background_color);
+  ocelot_grid_header_style_string= "color:"; ocelot_grid_header_style_string.append(qt_color(ocelot_grid_text_color));
+  ocelot_grid_header_style_string.append(";background-color:"); ocelot_grid_header_style_string.append(qt_color(ocelot_grid_header_background_color));
   ocelot_grid_header_style_string.append(";border:");
   ocelot_grid_header_style_string.append(ocelot_grid_cell_border_size);
   ocelot_grid_header_style_string.append("px solid ");
-  ocelot_grid_header_style_string.append(ocelot_grid_border_color);
+  ocelot_grid_header_style_string.append(qt_color(ocelot_grid_border_color));
   ocelot_grid_header_style_string.append(";font-family:"); ocelot_grid_header_style_string.append(ocelot_grid_font_family);
   ocelot_grid_header_style_string.append(";font-size:"); ocelot_grid_header_style_string.append(ocelot_grid_font_size);
   ocelot_grid_header_style_string.append("pt;font-style:"); ocelot_grid_header_style_string.append(ocelot_grid_font_style);
   ocelot_grid_header_style_string.append(";font-weight:"); ocelot_grid_header_style_string.append(ocelot_grid_font_weight);
 
-  ocelot_history_style_string= "color:"; ocelot_history_style_string.append(ocelot_history_text_color);
-  ocelot_history_style_string.append(";background-color:"); ocelot_history_style_string.append(ocelot_history_background_color);
-  ocelot_history_style_string.append(";border:1px solid "); ocelot_history_style_string.append(ocelot_history_border_color);
+  ocelot_history_style_string= "color:"; ocelot_history_style_string.append(qt_color(ocelot_history_text_color));
+  ocelot_history_style_string.append(";background-color:"); ocelot_history_style_string.append(qt_color(ocelot_history_background_color));
+  ocelot_history_style_string.append(";border:1px solid "); ocelot_history_style_string.append(qt_color(ocelot_history_border_color));
   ocelot_history_style_string.append(";font-family:"); ocelot_history_style_string.append(ocelot_history_font_family);
   ocelot_history_style_string.append(";font-size:"); ocelot_history_style_string.append(ocelot_history_font_size);
   ocelot_history_style_string.append("pt;font-style:"); ocelot_history_style_string.append(ocelot_history_font_style);
   ocelot_history_style_string.append(";font-weight:"); ocelot_history_style_string.append(ocelot_history_font_weight);
 
-  ocelot_menu_style_string= "color:"; ocelot_menu_style_string.append(ocelot_menu_text_color);
-  ocelot_menu_style_string.append(";background-color:"); ocelot_menu_style_string.append(ocelot_menu_background_color);
-  ocelot_menu_style_string.append(";border:1px solid "); ocelot_menu_style_string.append(ocelot_menu_border_color);
+  ocelot_menu_style_string= "color:"; ocelot_menu_style_string.append(qt_color(ocelot_menu_text_color));
+  ocelot_menu_style_string.append(";background-color:"); ocelot_menu_style_string.append(qt_color(ocelot_menu_background_color));
+  ocelot_menu_style_string.append(";border:1px solid "); ocelot_menu_style_string.append(qt_color(ocelot_menu_border_color));
   ocelot_menu_style_string.append(";font-family:"); ocelot_menu_style_string.append(ocelot_menu_font_family);
   ocelot_menu_style_string.append(";font-size:"); ocelot_menu_style_string.append(ocelot_menu_font_size);
   ocelot_menu_style_string.append("pt;font-style:"); ocelot_menu_style_string.append(ocelot_menu_font_style);
@@ -3848,7 +3998,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
       if (debug_error(call_statement)) return;
     }
 
-    debug_widget[debug_widget_index]= new CodeEditor();
+    debug_widget[debug_widget_index]= new CodeEditor(this);
     debug_widget[debug_widget_index]->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
     debug_widget[debug_widget_index]->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_text_color);
 
@@ -5090,6 +5240,7 @@ void MainWindow::action_execute()
   text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
 
   /* While executing, we allow no more statements, but a few things are enabled. */
+  /* This makes the menu seem to blink. If that's not OK, turn off sub-items not main menu items. */
   menu_file->setEnabled(false);
   menu_edit->setEnabled(false);
   menu_run_action_execute->setEnabled(false);
@@ -5309,11 +5460,13 @@ void MainWindow::action_execute_one_statement(QString text)
           result_grid_tab_widget->tabBar()->hide();
           result_grid_table_widget[0]->show();
           result_grid_tab_widget->show(); /* Maybe this only has to happen once */
+          QString result_set_for_history;
+          result_set_for_history= result_grid_table_widget[0]->copy(ocelot_history_max_column_width, ocelot_history_max_column_count, ocelot_history_max_row_count);
 
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(); /* Do this while we still have number of rows */
-          history_markup_append();
+          history_markup_append(result_set_for_history);
 
           if (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]))
           {
@@ -5357,8 +5510,14 @@ void MainWindow::action_execute_one_statement(QString text)
                                                                                  ocelot_result_grid_column_names,
                                                                                  lmysql);
                 result_grid_table_widget[result_grid_table_widget_index]->show();
+
+                //Put in something based on this if you want extra results to go to history:
+                //... result_grid_table_widget[result_grid_table_widget_index]->copy(); etc.
+
                 ++result_grid_table_widget_index;
               }
+
+
 
               if (mysql_res != 0) lmysql->ldbms_mysql_free_result(mysql_res);
 
@@ -5376,7 +5535,7 @@ void MainWindow::action_execute_one_statement(QString text)
 
   /* statement is over */
 
-  history_markup_append(); /* add prompt+statement+result to history, with markup */
+  history_markup_append(""); /* add prompt+statement+result to history, with markup */
 
 }
 
@@ -5831,36 +5990,42 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_text_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_text_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        statement_edit_widget->result= tr("OK");return 1;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_text_color= ccn;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_background_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_background_color= ccn;
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_border_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_border_color= ccn;
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_family", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_style", Qt::CaseInsensitive) == 0)
       {
@@ -5878,55 +6043,83 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_literal_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_highlight_literal_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-            statement_edit_widget->result= tr("OK");return 1;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_highlight_literal_color= ccn;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_identifier_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_highlight_identifier_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-            statement_edit_widget->result= tr("OK");return 1;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_highlight_identifier_color= ccn;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_comment_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_highlight_comment_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-            statement_edit_widget->result= tr("OK");return 1;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_highlight_comment_color= ccn;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_operator_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_highlight_operator_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-            statement_edit_widget->result= tr("OK");return 1;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_highlight_operator_color= ccn;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_reserved_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_highlight_reserved_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-            statement_edit_widget->result= tr("OK");return 1;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_highlight_reserved_color= ccn;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_prompt_background_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_prompt_background_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_prompt_background_color= ccn;
         statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_current_line_color", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_statement_highlight_current_line_color= ccn;
+        statement_edit_widget->highlightCurrentLine();
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       bool is_result_grid_style_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_text_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_text_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        is_result_grid_style_changed= true;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_grid_text_color= ccn;
+        assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        is_result_grid_style_changed= true;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_grid_border_color= ccn;
+        assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_background_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        is_result_grid_style_changed= true;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_grid_background_color= ccn;
+        assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_header_background_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_header_background_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        is_result_grid_style_changed= true;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_grid_header_background_color= ccn;
+        assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_family", Qt::CaseInsensitive) == 0)
       {
@@ -5950,13 +6143,17 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_cell_border_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        is_result_grid_style_changed= true;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_grid_cell_border_color= ccn;
+        assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_cell_drag_line_color= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
-        is_result_grid_style_changed= true;
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_grid_cell_drag_line_color= ccn;
+        assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_size", Qt::CaseInsensitive) == 0)
       {
@@ -5980,28 +6177,34 @@ int MainWindow::execute_client_statement(QString text)
         {
           result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string);
         }
-            statement_edit_widget->result= tr("OK");return 1;
+        statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_text_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_text_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_history_text_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_background_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_background_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_history_background_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_border_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_border_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_history_border_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_family", Qt::CaseInsensitive) == 0)
       {
@@ -6033,27 +6236,30 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_text_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_text_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_menu_text_color= ccn;
         make_style_strings();
-        //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_background_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_background_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_menu_background_color= ccn;
         make_style_strings();
-        //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_border_color", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_border_color= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_menu_border_color= ccn;
         make_style_strings();
-        //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_font_family", Qt::CaseInsensitive) == 0)
       {
@@ -7803,9 +8009,10 @@ int k_line_number[K_SIZE];
 QColor k_color[K_SIZE];
 QString k_string[K_SIZE];
 
-CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent)
+CodeEditor::CodeEditor(MainWindow *parent) : QPlainTextEdit(parent)
 {
   prompt_widget= new prompt_class(this);
+  main_window= parent;
 
   connect(this, SIGNAL(blockCountChanged(int)), this, SLOT(update_prompt_width(int)));
   connect(this, SIGNAL(updateRequest(QRect,int)), this, SLOT(update_prompt(QRect,int)));
@@ -7816,6 +8023,7 @@ CodeEditor::CodeEditor(QWidget *parent) : QPlainTextEdit(parent)
   */
   /* I decided "update_prompt_width(0);" here would be unnecessary since I redo prompt width after making a default etc. */
   highlightCurrentLine();
+
 }
 
 
@@ -8139,7 +8347,8 @@ void CodeEditor::highlightCurrentLine()
   {
     QTextEdit::ExtraSelection selection;
 
-    QColor lineColor= QColor(Qt::yellow).lighter(160);
+    //QColor lineColor= QColor(Qt::yellow).lighter(160);
+    QColor lineColor= QColor(main_window->ocelot_statement_highlight_current_line_color).lighter(160);
 
     selection.format.setBackground(lineColor);
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -9227,48 +9436,72 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "no_named_commands") == 0) { ocelot_named_commands= 0; return; }
   if (strcmp(token0_as_utf8, "no_tee") == 0) { history_tee_stop(); return; }/* for tee */
 
+  QString ccn;
   /* Changes to ocelot_* settings. But we don't check that they're in the [ocelot] group. */
   /* Todo: validity checks */
-  if (strcmp(token0_as_utf8, "ocelot_grid_text_color") == 0) { ocelot_grid_text_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_background_color") == 0) { ocelot_grid_background_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_border_color") == 0) { ocelot_grid_border_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_header_background_color") == 0) { ocelot_grid_header_background_color= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_text_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_text_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_background_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_background_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_border_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_border_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_header_background_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_header_background_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_font_family") == 0) { ocelot_grid_font_family= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_font_size") == 0) { ocelot_grid_font_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_font_style") == 0) { ocelot_grid_font_style= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_font_weight") == 0) { ocelot_grid_font_weight= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_cell_border_color") == 0) { ocelot_grid_cell_border_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_color") == 0) { ocelot_grid_cell_drag_line_color= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_cell_border_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_cell_border_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_cell_drag_line_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_border_size") == 0) { ocelot_grid_border_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_cell_border_size") == 0) { ocelot_grid_cell_border_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_size") == 0) { ocelot_grid_cell_drag_line_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_text_color") == 0) { ocelot_history_text_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_background_color") == 0) { ocelot_history_background_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_border_color") == 0) { ocelot_history_border_color= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_text_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_text_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_background_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_background_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_border_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_border_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_font_family") == 0) { ocelot_history_font_family= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_font_size") == 0) { ocelot_history_font_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_font_style") == 0) { ocelot_history_font_style= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_font_weight") == 0) { ocelot_history_font_weight= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_text_color") == 0) { ocelot_menu_text_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_background_color") == 0) { ocelot_menu_background_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_border_color") == 0) { ocelot_menu_border_color= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_menu_text_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_text_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_menu_background_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_background_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_menu_border_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_border_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_font_family") == 0) { ocelot_menu_font_family= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_font_size") == 0) { ocelot_menu_font_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_font_style") == 0) { ocelot_menu_font_style= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_font_weight") == 0) { ocelot_menu_font_weight= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_text_color") == 0) { ocelot_statement_text_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_background_color") == 0) { ocelot_statement_background_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_border_color") == 0) { ocelot_statement_border_color= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_text_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_text_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_background_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_background_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_border_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_border_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_font_family") == 0) { ocelot_statement_font_family= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_font_size") == 0) { ocelot_statement_font_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_font_style") == 0) { ocelot_statement_font_style= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_font_weight") == 0) { ocelot_statement_font_weight= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_literal_color") == 0) { ocelot_statement_highlight_literal_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_identifier_color") == 0) { ocelot_statement_highlight_identifier_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_comment_color") == 0) { ocelot_statement_highlight_comment_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_operator_color") == 0) { ocelot_statement_highlight_operator_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_reserved_color") == 0) { ocelot_statement_highlight_reserved_color= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_prompt_background_color") == 0) { ocelot_statement_prompt_background_color= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_literal_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_literal_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_identifier_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_identifier_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_comment_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_comment_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_operator_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_operator_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_reserved_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_reserved_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_prompt_background_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_prompt_background_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_current_line_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_current_line_color= ccn; return; }
 
   if (strcmp(token0_as_utf8, "one_database") == 0) { ocelot_one_database= is_enable; return; }
   if (strcmp(token0_as_utf8, "pager") == 0) { ocelot_pager= is_enable; return; }

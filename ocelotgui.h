@@ -31,7 +31,7 @@
 #include <QPushButton>
 #include <QLineEdit>
 #include <QComboBox>
-#include <QColorDialog>
+//#include <QColorDialog>
 #include <QFontDialog>
 #include <QPlainTextEdit>
 #include <QWidget>
@@ -50,7 +50,7 @@
 #include <QLibrary>
 #include <QApplication>
 #endif
-
+#include <QAbstractItemView>
 
 /* All mysql includes go here */
 /* The include path for mysql.h is hard coded in ocelotgui.pro. */
@@ -95,6 +95,172 @@ class TextEditWidget;
 class QThread48;
 class QTabWidget48;
 QT_END_NAMESPACE
+
+/*
+  We use color_list only twice, when checking command-line parameters
+  and then to copy its data to q_color_list,
+  which will be what we actually use for handle_combo_box_for_color_pick_*
+  in the Settings class. This list of color names prefers W3C names
+  http://www.w3.org/wiki/CSS/Properties/color/keywords
+  but also includes all X11 color names and hex values, a commonly-available list,
+  example = https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart
+  (including webGray, webGreen, webMaroon, webPurple, and eight
+  others that Qt would reject), and adds Gray_X11 Green_X11 Maroon_X11 Purple_X11
+  -- not exactly the same as Qt names, and not exactly the same as X11 for gray green maroon purple.
+  Doubtless this has been done many times, but I couldn't find examples.
+*/
+static const char *color_list[308]=
+{"AliceBlue","#F0F8FF",
+"AntiqueWhite","#FAEBD7",
+"Aqua","#00FFFF",
+"Aquamarine","#7FFFD4",
+"Azure","#F0FFFF",
+"Beige","#F5F5DC",
+"Bisque","#FFE4C4",
+"Black","#000000",
+"BlanchedAlmond","#FFEBCD",
+"Blue","#0000FF",
+"BlueViolet","#8A2BE2",
+"Brown","#A52A2A",
+"Burlywood","#DEB887",
+"CadetBlue","#5F9EA0",
+"Chartreuse","#7FFF00",
+"Chocolate","#D2691E",
+"Coral","#FF7F50",
+"CornflowerBlue","#6495ED",
+"Cornsilk","#FFF8DC",
+"Crimson","#DC143C",
+"Cyan","#00FFFF",
+"DarkBlue","#00008B",
+"DarkCyan","#008B8B",
+"DarkGoldenrod","#B8860B",
+"DarkGray","#A9A9A9",
+"DarkGreen","#006400",
+"DarkKhaki","#BDB76B",
+"DarkMagenta","#8B008B",
+"DarkOliveGreen","#556B2F",
+"DarkOrange","#FF8C00",
+"DarkOrchid","#9932CC",
+"DarkRed","#8B0000",
+"DarkSalmon","#E9967A",
+"DarkSeaGreen","#8FBC8F",
+"DarkSlateBlue","#483D8B",
+"DarkSlateGray","#2F4F4F",
+"DarkTurquoise","#00CED1",
+"DarkViolet","#9400D3",
+"DeepPink","#FF1493",
+"DeepSkyBlue","#00BFFF",
+"DimGray","#696969",
+"DodgerBlue","#1E90FF",
+"Firebrick","#B22222",
+"FloralWhite","#FFFAF0",
+"ForestGreen","#228B22",
+"Fuchsia","#FF00FF",
+"Gainsboro","#DCDCDC",
+"GhostWhite","#F8F8FF",
+"Gold","#FFD700",
+"Goldenrod","#DAA520",
+"Gray","#808080",
+"GrayX11","#BEBEBE",
+"Green","#008000",
+"GreenX11","#00FF00",
+"GreenYellow","#ADFF2F",
+"Honeydew","#F0FFF0",
+"HotPink","#FF69B4",
+"IndianRed","#CD5C5C",
+"Indigo","#4B0082",
+"Ivory","#FFFFF0",
+"Khaki","#F0E68C",
+"Lavender","#E6E6FA",
+"LavenderBlush","#FFF0F5",
+"LawnGreen","#7CFC00",
+"LemonChiffon","#FFFACD",
+"LightBlue","#ADD8E6",
+"LightCoral","#F08080",
+"LightCyan","#E0FFFF",
+"LightGoldenrodYellow","#FAFAD2",
+"LightGray","#D3D3D3",
+"LightGreen","#90EE90",
+"LightPink","#FFB6C1",
+"LightSalmon","#FFA07A",
+"LightSeaGreen","#20B2AA",
+"LightSkyBlue","#87CEFA",
+"LightSlateGray","#778899",
+"LightSteelBlue","#B0C4DE",
+"LightYellow","#FFFFE0",
+"Lime","#00FF00",
+"LimeGreen","#32CD32",
+"Linen","#FAF0E6",
+"Magenta","#FF00FF",
+"Maroon","#800000",
+"MaroonX11","#B03060",
+"MediumAquamarine","#66CDAA",
+"MediumBlue","#0000CD",
+"MediumOrchid","#BA55D3",
+"MediumPurple","#9370DB",
+"MediumSeaGreen","#3CB371",
+"MediumSlateBlue","#7B68EE",
+"MediumSpringGreen","#00FA9A",
+"MediumTurquoise","#48D1CC",
+"MediumVioletRed","#C71585",
+"MidnightBlue","#191970",
+"MintCream","#F5FFFA",
+"MistyRose","#FFE4E1",
+"Moccasin","#FFE4B5",
+"NavajoWhite","#FFDEAD",
+"Navy","#000080",
+"OldLace","#FDF5E6",
+"Olive","#808000",
+"OliveDrab","#6B8E23",
+"Orange","#FFA500",
+"OrangeRed","#FF4500",
+"Orchid","#DA70D6",
+"PaleGoldenrod","#EEE8AA",
+"PaleGreen","#98FB98",
+"PaleTurquoise","#AFEEEE",
+"PaleVioletRed","#DB7093",
+"PapayaWhip","#FFEFD5",
+"PeachPuff","#FFDAB9",
+"Peru","#CD853F",
+"Pink","#FFC0CB",
+"Plum","#DDA0DD",
+"PowderBlue","#B0E0E6",
+"Purple","#800080",
+"PurpleX11","#A020F0",
+"RebeccaPurple","#663399",
+"Red","#FF0000",
+"RosyBrown","#BC8F8F",
+"RoyalBlue","#4169E1",
+"SaddleBrown","#8B4513",
+"Salmon","#FA8072",
+"SandyBrown","#F4A460",
+"SeaGreen","#2E8B57",
+"Seashell","#FFF5EE",
+"Sienna","#A0522D",
+"Silver","#C0C0C0",
+"SkyBlue","#87CEEB",
+"SlateBlue","#6A5ACD",
+"SlateGray","#708090",
+"Snow","#FFFAFA",
+"SpringGreen","#00FF7F",
+"SteelBlue","#4682B4",
+"Tan","#D2B48C",
+"Teal","#008080",
+"Thistle","#D8BFD8",
+"Tomato","#FF6347",
+"Turquoise","#40E0D0",
+"Violet","#EE82EE",
+"WebGray","#808080",
+"WebGreen","#008000",
+"WebMaroon","#7F0000",
+"WebPurple","#7F007F",
+"Wheat","#F5DEB3",
+"White","#FFFFFF",
+"WhiteSmoke","#F5F5F5",
+"Yellow","#FFFF00",
+"YellowGreen","#9ACD32",
+"",""};
+
 
 class MainWindow : public QMainWindow
 {
@@ -149,6 +315,7 @@ public:
   QString ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color;
   QString ocelot_statement_highlight_reserved_color, new_ocelot_statement_highlight_reserved_color;
   QString ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color;
+  QString ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color;
   QString ocelot_statement_style_string;
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
@@ -221,6 +388,11 @@ public:
   QString ocelot_opt_ssl_verify;
   QString options_files_read;
 
+  QList<QString> q_color_list;
+  QString q_color_list_name(QString rgb_name);
+  QString qt_color(QString);
+  QString canonical_color_name(QString);
+  void assign_names_for_colors();
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
 
   QString ocelot_dbms;                    /* for CONNECT */
@@ -353,7 +525,7 @@ private:
   void action_execute_one_statement(QString text);
 
   void history_markup_make_strings();
-  void history_markup_append();
+  void history_markup_append(QString result_set_for_history);
   QString history_markup_copy_for_history(QString);
   int history_tee_start(QString);             /* for tee */
   void history_tee_stop();                    /* for tee */
@@ -2243,7 +2415,154 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 //  grid_scroll_area->setWidgetResizable(true);              /* Without this, the QTextEdit widget heights won't change */
 
   /* area->horizontalScrollBar()->setSingleStep(client->width() / 24); */ /* single-stepping seems pointless */
+
 }
+
+/*
+  Move a limited part of a result set to history.
+  We want to show what it looks like, but dumping the whole thing might waste time and space,
+  so it's throttled by three ocelot_history variables that are set to small values:
+  ocelot_history_max_column_width= 10;
+  ocelot_history_max_column_count= 5;
+  ocelot_history_max_row_count= 5;
+  This is called after preparing a result set in fillup(), but doesn't really depend on most
+  of the fillup() preparations except for max column widths.
+  Example output:
+  +==========+==========+==========+==========+======+
+  |TABLE_CATA|TABLE_SCHE|TABLE_NAME|TABLE_TYPE|ENGINE|
+  +==========+==========+==========+==========+======+
+  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
+  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
+  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
+  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
+  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
+  +==========+==========+==========+==========+======+
+  Todo: this could be adapted for an alternate way to display the result grid.
+  Todo: this is repetitious, for example code for "+===+===+' is done three times. Clean up.
+  Warning: making the copy bigger would slow down the way the Previous and Next keys work.
+*/
+QString copy(unsigned int ocelot_history_max_column_width,
+          unsigned int ocelot_history_max_column_count,
+          unsigned long ocelot_history_max_row_count)
+{
+  unsigned int col;
+  long unsigned int xrow;
+  unsigned int length;
+  unsigned int history_result_column_count;
+  unsigned long *history_max_column_widths;
+  unsigned long history_result_row_count;
+  char *history_line;
+  char *pointer_to_history_line;
+  unsigned int history_line_width;
+  QString s;
+
+  s= "";
+  history_max_column_widths= 0;
+  history_line= 0;
+
+  if (result_column_count > ocelot_history_max_column_count) history_result_column_count= ocelot_history_max_column_count;
+  else history_result_column_count= result_column_count;
+
+  history_max_column_widths= new long unsigned int[history_result_column_count];
+  history_line_width= 2;
+  unsigned int column_width;
+  for (col= 0; col < history_result_column_count; ++col)
+  {
+    if (ocelot_result_grid_column_names_copy == 1) column_width= fields[col].name_length;
+    else column_width= 0;
+    if (column_width < grid_max_column_widths[col]) column_width= grid_max_column_widths[col];
+    if (column_width > ocelot_history_max_column_width) column_width= ocelot_history_max_column_width;
+    history_max_column_widths[col]= column_width;
+    history_line_width+= column_width + 1;
+  }
+
+  history_line= new char[history_line_width + 1];
+
+  if (ocelot_result_grid_column_names_copy == 1)
+  {
+    pointer_to_history_line= history_line;
+    *(pointer_to_history_line++)= '+';
+    for (col= 0; col < history_result_column_count; ++col)
+    {
+      memset(pointer_to_history_line, '=', history_max_column_widths[col]);
+      pointer_to_history_line+= history_max_column_widths[col];
+      *(pointer_to_history_line++)= '+';
+    }
+    *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+    s.append(history_line);
+
+    pointer_to_history_line= history_line;
+    *(pointer_to_history_line++)= '|';
+    for (col= 0; col < history_result_column_count; ++col)
+    {
+      length= fields[col].name_length;
+      if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
+      memcpy(pointer_to_history_line, fields[col].name, length);
+      pointer_to_history_line+= length;
+      if (length < history_max_column_widths[col])
+      {
+        length= history_max_column_widths[col] - length;
+        memset(pointer_to_history_line, ' ', length);
+        pointer_to_history_line+= length;
+      }
+      *(pointer_to_history_line++)= '|';
+    }
+    *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+    s.append(history_line);
+  }
+
+  pointer_to_history_line= history_line;
+  *(pointer_to_history_line++)= '+';
+  for (col= 0; col < history_result_column_count; ++col)
+  {
+    memset(pointer_to_history_line, '=', history_max_column_widths[col]);
+    pointer_to_history_line+= history_max_column_widths[col];
+    *(pointer_to_history_line++)= '+';
+  }
+  *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+  s.append(history_line);
+
+  if (grid_result_row_count > ocelot_history_max_row_count) history_result_row_count= ocelot_history_max_row_count;
+  else history_result_row_count= grid_result_row_count;
+  for (xrow= 0; (xrow < history_result_row_count); ++xrow)
+  {
+    pointer_to_history_line= history_line;
+    *(pointer_to_history_line++)= '|';
+    for (col= 0; col < history_result_column_count; ++col)
+    {
+      length= lengths[col];
+      if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
+      memcpy(pointer_to_history_line, row[col], length);
+      pointer_to_history_line+= length;
+      if (length < history_max_column_widths[col])
+      {
+        length= history_max_column_widths[col] - length;
+        memset(pointer_to_history_line, ' ', length);
+        pointer_to_history_line+= length;
+      }
+      *(pointer_to_history_line++)= '|';
+    }
+    *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+    s.append(history_line);
+  }
+
+  pointer_to_history_line= history_line;
+  *(pointer_to_history_line++)= '+';
+  for (col= 0; col < history_result_column_count; ++col)
+  {
+    memset(pointer_to_history_line, '=', history_max_column_widths[col]);
+    pointer_to_history_line+= history_max_column_widths[col];
+    *(pointer_to_history_line++)= '+';
+  }
+  *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+  s.append(history_line);
+
+  if (history_line != 0) delete [] history_line;
+  if (history_max_column_widths != 0) delete [] history_max_column_widths;
+
+  return s;
+}
+
 
 /*
   Headings (not yet implemented, just intended)
@@ -3170,7 +3489,7 @@ class CodeEditor : public QPlainTextEdit
     Q_OBJECT
 
 public:
-    CodeEditor(QWidget *parent= 0);
+    CodeEditor(MainWindow *parent= 0);
 
     void prompt_widget_paintevent(QPaintEvent *event);
     int prompt_width_calculate();
@@ -3209,16 +3528,17 @@ public:
         QString prompt_as_input_by_user;            /* = What the user input with latest PROMPT statement, or prompt_default */
         /* QString prompt_translated;     */             /* = prompt_as_input_by_user, but with some \s converted for ease of parse */
         QString prompt_current;                     /* = latest result of prompt_reform() */
+        MainWindow *main_window;
 
 public slots:
     void update_prompt_width(int newBlockCount);
+    void highlightCurrentLine();
 
 protected:
     void resizeEvent(QResizeEvent *event);
 
 private slots:
 
-    void highlightCurrentLine();
     void update_prompt(const QRect &, int);
 
 private:
@@ -3250,7 +3570,6 @@ private:
 
 #endif
 
-
 /*********************************************************************************************************/
 /* THE SETTINGS WIDGET */
 
@@ -3262,15 +3581,16 @@ public:
 /*
 private slots:
   void handle_combo_box_1(int);
-  void handle_button_for_color_pick_0();
-  void handle_button_for_color_pick_1();
-  void handle_button_for_color_pick_2();
-  void handle_button_for_color_pick_3();
-  void handle_button_for_color_pick_4();
-  void handle_button_for_color_pick_5();
-  void handle_button_for_color_pick_6();
-  void handle_button_for_color_pick_7();
-  void handle_button_for_color_pick_8();
+  void handle_combo_box_for_color_pick_0();
+  void handle_combo_box_for_color_pick_1();
+  void handle_combo_box_for_color_pick_2();
+  void handle_combo_box_for_color_pick_3();
+  void handle_combo_box_for_color_pick_4();
+  void handle_combo_box_for_color_pick_5();
+  void handle_combo_box_for_color_pick_6();
+  void handle_combo_box_for_color_pick_7();
+  void handle_combo_box_for_color_pick_8();
+  void handle_combo_box_for_color_pick_9();
 */
 
 public:
@@ -3281,10 +3601,10 @@ public:
   QPushButton *button_for_cancel, *button_for_ok, *button_for_font_dialog;
   QLabel *widget_colors_label, *widget_font_label;
 
-  QWidget *widget_for_color[9];
-  QHBoxLayout *hbox_layout_for_color[9];
-  QLabel *label_for_color[9];
-  QLabel *label_for_color_rgb[9];
+  QWidget *widget_for_color[10];
+  QHBoxLayout *hbox_layout_for_color[10];
+  QLabel *label_for_color[10];
+  QLabel *label_for_color_rgb[10];
   QLabel *label_for_font_dialog;
 
   QWidget *widget_for_size[3];
@@ -3292,8 +3612,8 @@ public:
   QLabel *label_for_size[3];
   QComboBox *combo_box_for_size[3];
 
-  QPushButton *button_for_color_pick[9];
-  QPushButton *button_for_color_show[9];
+  QComboBox *combo_box_for_color_pick[10];
+  QLabel *label_for_color_show[10];
   MainWindow *copy_of_parent;
 
   int current_widget; /* 0 = statement, 1 = grid, 2 = history, 3 = main, as in #define statements earlier */
@@ -3321,6 +3641,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_highlight_operator_color= copy_of_parent->ocelot_statement_highlight_operator_color;
   copy_of_parent->new_ocelot_statement_highlight_reserved_color= copy_of_parent->ocelot_statement_highlight_reserved_color;
   copy_of_parent->new_ocelot_statement_prompt_background_color= copy_of_parent->ocelot_statement_prompt_background_color;
+  copy_of_parent->new_ocelot_statement_highlight_current_line_color= copy_of_parent->ocelot_statement_highlight_current_line_color;
 
   copy_of_parent->new_ocelot_grid_text_color= copy_of_parent->ocelot_grid_text_color;
   copy_of_parent->new_ocelot_grid_background_color= copy_of_parent->ocelot_grid_background_color;
@@ -3358,33 +3679,56 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   /* Hboxes for foreground, background, and highlights */
   /* Todo: following calculation should actually be width of largest tr(label) + approximately 5. */
   int label_for_color_width= this->fontMetrics().boundingRect("W").width();
-  for (int ci= 0; ci < 9; ++ci)
+  for (int ci= 0; ci < 10; ++ci)
   {
     widget_for_color[ci]= new QWidget(this);
     label_for_color[ci]= new QLabel();
     label_for_color_rgb[ci]= new QLabel();
-    button_for_color_pick[ci]= new QPushButton(tr("Pick new color"), this);
-    button_for_color_show[ci]= new QPushButton("", this);
+    combo_box_for_color_pick[ci]= new QComboBox(this);
+
+    {
+      /*
+        When theme = CleanLooks or GTK+, the non-editable combobox's list view has no scroll bar.
+        Finding the problem and putting in this one-line solution took 20 man-hours.
+      */
+      combo_box_for_color_pick[ci]->view()->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+      QPixmap pixmap= QPixmap(100, 100);
+      QIcon icon;
+      int i_44;
+      for (i_44= 0; i_44 < copy_of_parent->q_color_list.size() / 2; ++i_44)
+      {
+        pixmap.fill(QColor(copy_of_parent->q_color_list[(i_44 * 2) + 1]));
+        icon= pixmap;
+        combo_box_for_color_pick[ci]->addItem(icon, copy_of_parent->q_color_list[(i_44 * 2)]);
+      }
+    }
+
+    label_for_color_show[ci]= new QLabel(this);
     set_widget_values(ci);
     label_for_color[ci]->setFixedWidth(label_for_color_width * 20);
-    label_for_color_rgb[ci]->setFixedWidth(label_for_color_width * 8);
-    button_for_color_show[ci]->setEnabled(false);
+    //label_for_color_rgb[ci]->setFixedWidth(label_for_color_width * 12);
+    label_for_color_rgb[ci]->setFixedWidth(this->fontMetrics().boundingRect("LightGoldenrodYellow").width());
+    //label_for_color_show[ci]->setEnabled(false);
+    label_for_color_show[ci]->setMinimumWidth(40);
     hbox_layout_for_color[ci]= new QHBoxLayout();
     hbox_layout_for_color[ci]->addWidget(label_for_color[ci]);
     hbox_layout_for_color[ci]->addWidget(label_for_color_rgb[ci]);
-    hbox_layout_for_color[ci]->addWidget(button_for_color_show[ci]);
-    hbox_layout_for_color[ci]->addWidget(button_for_color_pick[ci]);
+    hbox_layout_for_color[ci]->addWidget(label_for_color_show[ci]);
+    hbox_layout_for_color[ci]->addWidget(combo_box_for_color_pick[ci]);
     widget_for_color[ci]->setLayout(hbox_layout_for_color[ci]);
   }
-  connect(button_for_color_pick[0], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_0()));
-  connect(button_for_color_pick[1], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_1()));
-  connect(button_for_color_pick[2], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_2()));
-  connect(button_for_color_pick[3], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_3()));
-  connect(button_for_color_pick[4], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_4()));
-  connect(button_for_color_pick[5], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_5()));
-  connect(button_for_color_pick[6], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_6()));
-  connect(button_for_color_pick[7], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_7()));
-  connect(button_for_color_pick[8], SIGNAL(clicked()), this, SLOT(handle_button_for_color_pick_8()));
+  connect(combo_box_for_color_pick[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_0(int)));
+  connect(combo_box_for_color_pick[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_1(int)));
+  connect(combo_box_for_color_pick[2], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_2(int)));
+  connect(combo_box_for_color_pick[3], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_3(int)));
+  connect(combo_box_for_color_pick[4], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_4(int)));
+  connect(combo_box_for_color_pick[5], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_5(int)));
+  connect(combo_box_for_color_pick[6], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_6(int)));
+  connect(combo_box_for_color_pick[7], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_7(int)));
+  connect(combo_box_for_color_pick[8], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_8(int)));
+  connect(combo_box_for_color_pick[9], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_9(int)));
+
+
 
   widget_font_label= new QLabel(tr("Font"));
 
@@ -3446,7 +3790,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   /* Put the HBoxes in a VBox */
   main_layout= new QVBoxLayout();
   main_layout->addWidget(widget_colors_label);
-  for (int ci= 0; ci < 9; ++ci) main_layout->addWidget(widget_for_color[ci]);
+  for (int ci= 0; ci < 10; ++ci) main_layout->addWidget(widget_for_color[ci]);
   main_layout->addWidget(widget_font_label);
   main_layout->addWidget(widget_for_font_dialog);
   if (current_widget == GRID_WIDGET) for (int ci= 0; ci < 3; ++ci) main_layout->addWidget(widget_for_size[ci]);
@@ -3477,6 +3821,7 @@ void set_widget_values(int ci)
     case 6: { color_type= tr("Statement Highlight Reserved Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_reserved_color; break; }
     case 7: { color_type= tr("Statement Prompt Background Color"); color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
     case 8: { color_type= tr("Statement Border Color"); color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
+    case 9: { color_type= tr("Statement Highlight Current Line Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_current_line_color; break; }
     }
   }
   if (current_widget == GRID_WIDGET)
@@ -3510,10 +3855,16 @@ void set_widget_values(int ci)
     }
   }
   label_for_color[ci]->setText(color_type);
-  label_for_color_rgb[ci]->setText(color_name);
-  QString sss= "background-color: ";
-  sss.append(color_name);
-  button_for_color_show[ci]->setStyleSheet(sss);
+  //label_for_color_rgb[ci]->setText(color_name);
+
+  int cli;
+  cli= q_color_list_index(color_name);
+  combo_box_for_color_pick[ci]->setCurrentIndex(cli);
+  label_for_color_rgb[ci]->setText(combo_box_for_color_pick[ci]->currentText());
+
+  QString sss= "border: 1px solid black; background-color: ";
+  sss.append(copy_of_parent->qt_color(color_name));
+  label_for_color_show[ci]->setStyleSheet(sss);
 }
 
 
@@ -3530,17 +3881,17 @@ void handle_combo_box_1(int i)
 
   current_widget= i;
 
-  for (ci= 0; ci <= 8; ++ci) set_widget_values(ci);
+  for (ci= 0; ci < 10; ++ci) set_widget_values(ci);
   if (i == 0)
   {                                       /* statement? */
     color_type= "Prompt background";               /* ?? unnecessary now that set_widget_values() does it, eh? */
     label_for_color[7]->setText(color_type);
-    for (ci= 2; ci < 8 ; ++ci)
+    for (ci= 2; ci < 10 ; ++ci)
     {
       label_for_color[ci]->show();
       label_for_color_rgb[ci]->show();
-      button_for_color_show[ci]->show();
-      button_for_color_pick[ci]->show();
+      label_for_color_show[ci]->show();
+      combo_box_for_color_pick[ci]->show();
     }
   }
 
@@ -3552,15 +3903,15 @@ void handle_combo_box_1(int i)
     {
       label_for_color[ci]->hide();
       label_for_color_rgb[ci]->hide();
-      button_for_color_show[ci]->hide();
-      button_for_color_pick[ci]->hide();
+      label_for_color_show[ci]->hide();
+      combo_box_for_color_pick[ci]->hide();
     }
     for (ci= 7; ci < 8; ++ci)
     {
       label_for_color[ci]->show();
       label_for_color_rgb[ci]->show();
-      button_for_color_show[ci]->show();
-      button_for_color_pick[ci]->show();
+      label_for_color_show[ci]->show();
+      combo_box_for_color_pick[ci]->show();
     }
   }
   if (i > 1)
@@ -3569,8 +3920,8 @@ void handle_combo_box_1(int i)
     {
       label_for_color[ci]->hide();
       label_for_color_rgb[ci]->hide();
-      button_for_color_show[ci]->hide();
-      button_for_color_pick[ci]->hide();
+      label_for_color_show[ci]->hide();
+      combo_box_for_color_pick[ci]->hide();
     }
   }
 }
@@ -3672,327 +4023,275 @@ void handle_button_for_cancel()
 
 
 /*
-  For all the handle_button_for_color_pick slots:
-  If the user clicks on the button, a dialog box comes up with title hinting what section is being changed.
-  If the user then clicks Cancel, isValid() will fail so do nothing.
-  If the user then clicks OK, is Valid() will succeed so change the color.
+  For all the handle_combo_box_for_color_pick slots:
+  We no longer use QColorDialog dialog box, instead there's a QComboBox.
+  Why I didn't like QColorDialog ...
+    For the "name:" control: if I typed in SkyBlue, it echoed as rrggbb,
+    if I typed in Silver, it did nothing, and there was no clear list
+    of what color names were available. For the other controls: I thought
+    brightness/hue etc., and the color wheel, would intimidate users
+    since they're not obvious and I expect typical users want names
+    rather than numbers.
+  The QComboBox for color picking gets around those problems but ...
+  Todo: There is no validity check for "SET [ocelot color name] = 'literal'.
+  Todo: Allow for adding new rrggbb colors if user clicks 'Add' (as last item on list).
+  STILL TO DO:
+  !! show what #rrggbb is
+  !! no need for label any more
+  !! SET custom_color_1 = '#rrggbb'
+     !!! Do an isValid for custom colors
+  !! Try setMaxCount(20)
+  !! Make sure garbage_collect is working
+  !! The Settings menu item  itself does not have the font or colors declared by settings menu
+  !! There surely isn't any need for the blank lines -- so it's not a matter of "hide()", you just don't create
+  !! History Settings -- default -- "Ubuntu 16pt 16" ... so what's the "16" for? It's just "Regular"
+  !! You need to look harder at what Tab settings are (it's hard to see what the focus is for the combobox items
 */
-void handle_button_for_color_pick_0()
+void handle_combo_box_for_color_pick_0(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_text_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Text Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_text_color= color_name(curr_color);
-      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_statement_text_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_text_color);
-      button_for_color_show[0]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_text_color= new_color;
+    label_for_color_rgb[0]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[0]->setStyleSheet(s);
   }
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_text_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Text Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_grid_text_color= color_name(curr_color);
-      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_grid_text_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_text_color);
-      button_for_color_show[0]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
+    copy_of_parent->new_ocelot_grid_text_color= new_color;
+    label_for_color_rgb[0]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[0]->setStyleSheet(s);
   }
   if (current_widget == HISTORY_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_history_text_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("History Text Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_history_text_color= color_name(curr_color);
-      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_history_text_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_history_text_color);
-      button_for_color_show[0]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
+    copy_of_parent->new_ocelot_history_text_color= new_color;
+    label_for_color_rgb[0]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[0]->setStyleSheet(s);
   }
   if (current_widget == MAIN_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_menu_text_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Menu Text Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_menu_text_color= color_name(curr_color);
-      label_for_color_rgb[0]->setText(copy_of_parent->new_ocelot_menu_text_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_menu_text_color);
-      button_for_color_show[0]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
+    copy_of_parent->new_ocelot_menu_text_color= new_color;
+    label_for_color_rgb[0]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[0]->setStyleSheet(s);
   }
 }
 
 
-void handle_button_for_color_pick_1()
+void handle_combo_box_for_color_pick_1(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Background Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_background_color= color_name(curr_color);
-      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_statement_background_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_background_color);
-      button_for_color_show[1]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_background_color= new_color;
+    label_for_color_rgb[1]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[1]->setStyleSheet(s);
   }
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Background Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_grid_background_color= color_name(curr_color);
-      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_grid_background_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_background_color);
-      button_for_color_show[1]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    copy_of_parent->new_ocelot_grid_background_color= new_color;
+    label_for_color_rgb[1]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[1]->setStyleSheet(s);
   }
   if (current_widget == HISTORY_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("History Background Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_history_background_color= color_name(curr_color);
-      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_history_background_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_history_background_color);
-      button_for_color_show[1]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    copy_of_parent->new_ocelot_history_background_color= new_color;
+    label_for_color_rgb[1]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[1]->setStyleSheet(s);
   }
   if (current_widget == MAIN_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_menu_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Menu Background Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_menu_background_color= color_name(curr_color);
-      label_for_color_rgb[1]->setText(copy_of_parent->new_ocelot_menu_background_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_menu_background_color);
-      button_for_color_show[1]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    copy_of_parent->new_ocelot_menu_background_color= new_color;
+    label_for_color_rgb[1]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[1]->setStyleSheet(s);
   }
 }
 
-
-void handle_button_for_color_pick_2()
+void handle_combo_box_for_color_pick_2(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_literal_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Literal Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_highlight_literal_color= color_name(curr_color);
-      label_for_color_rgb[2]->setText(copy_of_parent->new_ocelot_statement_highlight_literal_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_highlight_literal_color);
-      button_for_color_show[2]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[2]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_highlight_literal_color= new_color;
+    label_for_color_rgb[2]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[2]->setStyleSheet(s);
   }
 
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_cell_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Cell Border Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_grid_cell_border_color= color_name(curr_color);
-      label_for_color_rgb[2]->setText(copy_of_parent->new_ocelot_grid_cell_border_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_cell_border_color);
-      button_for_color_show[2]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[2]->itemText(item_number);
+    copy_of_parent->new_ocelot_grid_cell_border_color= new_color;
+    label_for_color_rgb[2]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[2]->setStyleSheet(s);
   }
 }
 
 
-void handle_button_for_color_pick_3()
+void handle_combo_box_for_color_pick_3(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_identifier_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight identifier Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_highlight_identifier_color= color_name(curr_color);
-      label_for_color_rgb[3]->setText(copy_of_parent->new_ocelot_statement_highlight_identifier_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_highlight_identifier_color);
-      button_for_color_show[3]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[3]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_highlight_identifier_color= new_color;
+    label_for_color_rgb[3]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[3]->setStyleSheet(s);
   }
 
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_cell_drag_line_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Cell Drag Line Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_grid_cell_drag_line_color= color_name(curr_color);
-      label_for_color_rgb[3]->setText(copy_of_parent->new_ocelot_grid_cell_drag_line_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_cell_drag_line_color);
-       button_for_color_show[3]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[3]->itemText(item_number);
+    copy_of_parent->new_ocelot_grid_cell_drag_line_color= new_color;
+    label_for_color_rgb[3]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[3]->setStyleSheet(s);
   }
 }
 
 
-void handle_button_for_color_pick_4()
+void handle_combo_box_for_color_pick_4(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_comment_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Comment Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_highlight_comment_color= color_name(curr_color);
-      label_for_color_rgb[4]->setText(copy_of_parent->new_ocelot_statement_highlight_comment_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_highlight_comment_color);
-      button_for_color_show[4]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[4]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_highlight_comment_color= new_color;
+    label_for_color_rgb[4]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[4]->setStyleSheet(s);
   }
 }
 
 
-void handle_button_for_color_pick_5()
+void handle_combo_box_for_color_pick_5(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_operator_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Operator Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_highlight_operator_color= color_name(curr_color);
-      label_for_color_rgb[5]->setText(copy_of_parent->new_ocelot_statement_highlight_operator_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_highlight_operator_color);
-      button_for_color_show[5]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[5]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_highlight_operator_color= new_color;
+    label_for_color_rgb[5]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[5]->setStyleSheet(s);
   }
 }
 
 
-void handle_button_for_color_pick_6()
+void handle_combo_box_for_color_pick_6(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_highlight_reserved_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Highlight Reserved Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_highlight_reserved_color= color_name(curr_color);
-      label_for_color_rgb[6]->setText(copy_of_parent->new_ocelot_statement_highlight_reserved_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_highlight_reserved_color);
-      button_for_color_show[6]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[6]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_highlight_reserved_color= new_color;
+    label_for_color_rgb[6]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[6]->setStyleSheet(s);
   }
 }
 
 
-void handle_button_for_color_pick_7()
+void handle_combo_box_for_color_pick_7(int item_number)
 {
  if (current_widget == STATEMENT_WIDGET)
  {
-   QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_prompt_background_color);
-   curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Prompt Background Color"));
-   if (curr_color.isValid())
-   {
-     copy_of_parent->new_ocelot_statement_prompt_background_color= color_name(curr_color);
-     label_for_color_rgb[7]->setText(copy_of_parent->new_ocelot_statement_prompt_background_color);
-     QString s= "background-color: ";
-     s.append(copy_of_parent->new_ocelot_statement_prompt_background_color);
-     button_for_color_show[7]->setStyleSheet(s);
-    }
+   QString new_color= combo_box_for_color_pick[7]->itemText(item_number);
+   copy_of_parent->new_ocelot_statement_prompt_background_color= new_color;
+   label_for_color_rgb[7]->setText(new_color);
+   QString s= "border: 1px solid black; background-color: ";
+   s.append(copy_of_parent->qt_color(new_color));
+   label_for_color_show[7]->setStyleSheet(s);
   }
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_header_background_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Header Background Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_grid_header_background_color= color_name(curr_color);
-      label_for_color_rgb[7]->setText(copy_of_parent->new_ocelot_grid_header_background_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_header_background_color);
-      button_for_color_show[7]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[7]->itemText(item_number);
+    copy_of_parent->new_ocelot_grid_header_background_color= new_color;
+    label_for_color_rgb[7]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[7]->setStyleSheet(s);
   }
 }
 
 
-void handle_button_for_color_pick_8()
+void handle_combo_box_for_color_pick_8(int item_number)
 {
   if (current_widget == STATEMENT_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_statement_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Statement Border Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_statement_border_color= color_name(curr_color);
-      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_statement_border_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_statement_border_color);
-      button_for_color_show[8]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_border_color= new_color;
+    label_for_color_rgb[8]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[8]->setStyleSheet(s);
   }
   if (current_widget == GRID_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_grid_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Grid Border Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_grid_border_color= color_name(curr_color);
-      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_grid_border_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_grid_border_color);
-      button_for_color_show[8]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    copy_of_parent->new_ocelot_grid_border_color= new_color;
+    label_for_color_rgb[8]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[8]->setStyleSheet(s);
   }
   if (current_widget == HISTORY_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_history_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("History Border Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_history_border_color= color_name(curr_color);
-      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_history_border_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_history_border_color);
-      button_for_color_show[8]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    copy_of_parent->new_ocelot_history_border_color= new_color;
+    label_for_color_rgb[8]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[8]->setStyleSheet(s);
   }
   if (current_widget == MAIN_WIDGET)
   {
-    QColor curr_color= QColor(copy_of_parent->new_ocelot_menu_border_color);
-    curr_color= QColorDialog::getColor(curr_color, this, tr("Menu Border Color"));
-    if (curr_color.isValid())
-    {
-      copy_of_parent->new_ocelot_menu_border_color= color_name(curr_color);
-      label_for_color_rgb[8]->setText(copy_of_parent->new_ocelot_menu_border_color);
-      QString s= "background-color: ";
-      s.append(copy_of_parent->new_ocelot_menu_border_color);
-      button_for_color_show[8]->setStyleSheet(s);
-    }
+    QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    copy_of_parent->new_ocelot_menu_border_color= new_color;
+    label_for_color_rgb[8]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[8]->setStyleSheet(s);
+  }
+}
+
+
+void handle_combo_box_for_color_pick_9(int item_number)
+{
+  if (current_widget == STATEMENT_WIDGET)
+  {
+    QString new_color= combo_box_for_color_pick[9]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_highlight_current_line_color= new_color;
+    label_for_color_rgb[9]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[9]->setStyleSheet(s);
   }
 }
 
@@ -4013,6 +4312,8 @@ void handle_combo_box_for_size_2(int i)
 {
   copy_of_parent->new_ocelot_grid_cell_drag_line_size= QString::number(i);
 }
+
+
 
 
 /* Some of the code in handle_button_for_font_dialog() is a near-duplicate of code in set_colors_and_fonts(). */
@@ -4092,171 +4393,25 @@ void handle_button_for_font_dialog()
   }
 }
 
-QString color_name(QColor curr_color)
+
+int q_color_list_index(QString color_name_string)
 {
+//  char color_name_string_as_utf8[64];
+//  int color_name_string_len;
 
-/*
-  Called from handle_button_for_color_pick_* after getting name(), which is in fact hex.
-  Includes list of X11 color names and hex values, commonly-available list, example =
-  https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart
-  (but excluding webGray, webGreen, webMaroon, webPurple)
-  Colors can be entered as either hex codes or names.
-  -- not exactly the same as Qt names, and not exactly the same as W3C for gray green maroon purple.
-  The dialog box accepts X11 color name but QColor::name() returns hex code.
-  This is for translating hex codes back to names.
-  Doubtless this has been done many times, but I couldn't find examples.
-*/
-static const char *color_list[292]=
-{"AliceBlue","#F0F8FF",
-"AntiqueWhite","#FAEBD7",
-"Aqua","#00FFFF",
-"Aquamarine","#7FFFD4",
-"Azure","#F0FFFF",
-"Beige","#F5F5DC",
-"Bisque","#FFE4C4",
-"Black","#000000",
-"BlanchedAlmond","#FFEBCD",
-"Blue","#0000FF",
-"BlueViolet","#8A2BE2",
-"Brown","#A52A2A",
-"Burlywood","#DEB887",
-"CadetBlue","#5F9EA0",
-"Chartreuse","#7FFF00",
-"Chocolate","#D2691E",
-"Coral","#FF7F50",
-"Cornflower","#6495ED",
-"Cornsilk","#FFF8DC",
-"Crimson","#DC143C",
-"Cyan","#00FFFF",
-"DarkBlue","#00008B",
-"DarkCyan","#008B8B",
-"DarkGoldenrod","#B8860B",
-"DarkGray","#A9A9A9",
-"DarkGreen","#006400",
-"DarkKhaki","#BDB76B",
-"DarkMagenta","#8B008B",
-"DarkOlive Green","#556B2F",
-"DarkOrange","#FF8C00",
-"DarkOrchid","#9932CC",
-"DarkRed","#8B0000",
-"DarkSalmon","#E9967A",
-"DarkSeaGreen","#8FBC8F",
-"DarkSlateBlue","#483D8B",
-"DarkSlateGray","#2F4F4F",
-"DarkTurquoise","#00CED1",
-"DarkViolet","#9400D3",
-"DeepPink","#FF1493",
-"DeepSkyBlue","#00BFFF",
-"DimGray","#696969",
-"DodgerBlue","#1E90FF",
-"Firebrick","#B22222",
-"FloralWhite","#FFFAF0",
-"ForestGreen","#228B22",
-"Fuchsia","#FF00FF",
-"Gainsboro","#DCDCDC",
-"GhostWhite","#F8F8FF",
-"Gold","#FFD700",
-"Goldenrod","#DAA520",
-"Gray","#BEBEBE",
-"Green","#00FF00",
-"GreenYellow","#ADFF2F",
-"Honeydew","#F0FFF0",
-"HotPink","#FF69B4",
-"IndianRed","#CD5C5C",
-"Indigo","#4B0082",
-"Ivory","#FFFFF0",
-"Khaki","#F0E68C",
-"Lavender","#E6E6FA",
-"Lavender Blush","#FFF0F5",
-"LawnGreen","#7CFC00",
-"LemonChiffon","#FFFACD",
-"LightBlue","#ADD8E6",
-"LightCoral","#F08080",
-"LightCyan","#E0FFFF",
-"LightGoldenrod","#FAFAD2",
-"LightGray","#D3D3D3",
-"LightGreen","#90EE90",
-"LightPink","#FFB6C1",
-"LightSalmon","#FFA07A",
-"LightSeaGreen","#20B2AA",
-"LightSkyBlue","#87CEFA",
-"LightSlateGray","#778899",
-"Light SteelBlue","#B0C4DE",
-"LightYellow","#FFFFE0",
-"Lime","#00FF00",
-"LimeGreen","#32CD32",
-"Linen","#FAF0E6",
-"Magenta","#FF00FF",
-"Maroon","#B03060",
-"MediumAquamarine","#66CDAA",
-"MediumBlue","#0000CD",
-"MediumOrchid","#BA55D3",
-"MediumPurple","#9370DB",
-"MediumSeaGreen","#3CB371",
-"MediumSlateBlue","#7B68EE",
-"MediumSpringGreen","#00FA9A",
-"MediumTurquoise","#48D1CC",
-"MediumVioletRed","#C71585",
-"MidnightBlue","#191970",
-"MintCream","#F5FFFA",
-"MistyRose","#FFE4E1",
-"Moccasin","#FFE4B5",
-"NavajoWhite","#FFDEAD",
-"NavyBlue","#000080",
-"OldLace","#FDF5E6",
-"Olive","#808000",
-"OliveDrab","#6B8E23",
-"Orange","#FFA500",
-"OrangeRed","#FF4500",
-"Orchid","#DA70D6",
-"PaleGoldenrod","#EEE8AA",
-"PaleGreen","#98FB98",
-"PaleTurquoise","#AFEEEE",
-"PaleVioletRed","#DB7093",
-"PapayaWhip","#FFEFD5",
-"PeachPuff","#FFDAB9",
-"Peru","#CD853F",
-"Pink","#FFC0CB",
-"Plum","#DDA0DD",
-"PowderBlue","#B0E0E6",
-"Purple","#A020F0",
-"RebeccaPurple","#663399",
-"Red","#FF0000",
-"RosyBrown","#BC8F8F",
-"RoyalBlue","#4169E1",
-"SaddleBrown","#8B4513",
-"Salmon","#FA8072",
-"SandyBrown","#F4A460",
-"SeaGreen","#2E8B57",
-"Seashell","#FFF5EE",
-"Sienna","#A0522D",
-"Silver","#C0C0C0",
-"SkyBlue","#87CEEB",
-"SlateBlue","#6A5ACD",
-"SlateGray","#708090",
-"Snow","#FFFAFA",
-"SpringGreen","#00FF7F",
-"SteelBlue","#4682B4",
-"Tan","#D2B48C",
-"Teal","#008080",
-"Thistle","#D8BFD8",
-"Tomato","#FF6347",
-"Turquoise","#40E0D0",
-"Violet","#EE82EE",
-"Wheat","#F5DEB3",
-"White","#FFFFFF",
-"WhiteSmoke","#F5F5F5",
-"Yellow","#FFFF00",
-"YellowGreen","#9ACD32",
-"",""};
+//  color_name_string_len= color_name_string.size();             /* See comment "UTF8 Conversion" */
+//  memcpy(color_name_string_as_utf8, color_name_string.toUtf8().constData(), color_name_string_len);
+//  color_name_string_as_utf8[color_name_string_len]= '\0';
 
-  QString color_name_string= curr_color.name().toUpper();
-  for (int i= 1; strcmp(color_list[i], "") > 0; i+= 2)
+
+  for (int i= 0; i < copy_of_parent->q_color_list.size(); i+= 2)
   {
-    if (color_name_string == color_list[i]) return color_list[i - 1];
+    if (QString::compare(color_name_string, copy_of_parent->q_color_list[i], Qt::CaseInsensitive) == 0) return i / 2;
   }
-  return color_name_string;
+  //return (i - 1) / 2;
+  return 0;  /* TEST! */
 }
+
 
 };
 
@@ -4282,4 +4437,5 @@ public:
     return QTabWidget::tabBar();
   }
 };
+
 

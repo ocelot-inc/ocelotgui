@@ -1,0 +1,49 @@
+#Example showing some Ocelot-specific settings
+#This could be appended to an option file such as ~.my.cnf
+#... but it's only an example of syntax, not of good taste
+[ocelot]
+
+ocelot_grid_text_color='Indigo'
+ocelot_grid_background_color='DodgerBlue'
+ocelot_grid_border_color='Firebrick'
+ocelot_grid_header_background_color='Ivory'
+ocelot_grid_font_family='Courier'
+ocelot_grid_font_size=11
+ocelot_grid_font_style='Normal'
+ocelot_grid_font_weight='Bold'
+ocelot_grid_cell_border_color='Honeydew'
+ocelot_grid_cell_drag_line_color='HotPink'
+ocelot_grid_border_size=5
+ocelot_grid_cell_border_size=4
+ocelot_grid_cell_drag_line_size=5
+
+ocelot_history_color='coral'
+ocelot_history_background_color='tan'
+ocelot_history_border_color='cadetblue'
+ocelot_history_font_family='Ubuntu'
+ocelot_history_font_size=16
+ocelot_history_font_style='normal'
+ocelot_history_font_weight=16
+
+ocelot_menu_text_color= 'skyblue'
+ocelot_menu_background_color='tomato'
+ocelot_main_border_color='red'
+ocelot_menu_font_family='Ubuntu'
+ocelot_menu_font_size=32
+ocelot_menu_font_style='italic'
+ocelot_menu_font_weight='bold'
+
+ocelot_statement_text_color='red'
+ocelot_statement_background_color='blue'
+ocelot_statement_border_color='green'
+ocelot_statement_font_family='Courier'
+ocelot_statement_font_size=16
+ocelot_statement_font_style='normal'
+ocelot_statement_font_weight='bold'
+ocelot_statement_highlight_literal_color='SeaGreen'
+ocelot_statement_highlight_identifier_color='brown'
+ocelot_statement_highlight_comment_color='chartreuse'
+ocelot_statement_highlight_operator_color='#7F007F'
+ocelot_statement_highlight_reserved_color='purple'
+ocelot_statement_prompt_background_color='#0DF8F3'
+ocelot_statement_highlight_current_line_color='yellow'
