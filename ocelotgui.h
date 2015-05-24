@@ -56,6 +56,7 @@
 /* The include path for mysql.h is hard coded in ocelotgui.pro. */
 #include <mysql.h>
 
+
 #ifdef __linux
 #include <dlfcn.h>
 #endif
@@ -95,172 +96,6 @@ class TextEditWidget;
 class QThread48;
 class QTabWidget48;
 QT_END_NAMESPACE
-
-/*
-  We use color_list only twice, when checking command-line parameters
-  and then to copy its data to q_color_list,
-  which will be what we actually use for handle_combo_box_for_color_pick_*
-  in the Settings class. This list of color names prefers W3C names
-  http://www.w3.org/wiki/CSS/Properties/color/keywords
-  but also includes all X11 color names and hex values, a commonly-available list,
-  example = https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart
-  (including webGray, webGreen, webMaroon, webPurple, and eight
-  others that Qt would reject), and adds Gray_X11 Green_X11 Maroon_X11 Purple_X11
-  -- not exactly the same as Qt names, and not exactly the same as X11 for gray green maroon purple.
-  Doubtless this has been done many times, but I couldn't find examples.
-*/
-static const char *color_list[308]=
-{"AliceBlue","#F0F8FF",
-"AntiqueWhite","#FAEBD7",
-"Aqua","#00FFFF",
-"Aquamarine","#7FFFD4",
-"Azure","#F0FFFF",
-"Beige","#F5F5DC",
-"Bisque","#FFE4C4",
-"Black","#000000",
-"BlanchedAlmond","#FFEBCD",
-"Blue","#0000FF",
-"BlueViolet","#8A2BE2",
-"Brown","#A52A2A",
-"Burlywood","#DEB887",
-"CadetBlue","#5F9EA0",
-"Chartreuse","#7FFF00",
-"Chocolate","#D2691E",
-"Coral","#FF7F50",
-"CornflowerBlue","#6495ED",
-"Cornsilk","#FFF8DC",
-"Crimson","#DC143C",
-"Cyan","#00FFFF",
-"DarkBlue","#00008B",
-"DarkCyan","#008B8B",
-"DarkGoldenrod","#B8860B",
-"DarkGray","#A9A9A9",
-"DarkGreen","#006400",
-"DarkKhaki","#BDB76B",
-"DarkMagenta","#8B008B",
-"DarkOliveGreen","#556B2F",
-"DarkOrange","#FF8C00",
-"DarkOrchid","#9932CC",
-"DarkRed","#8B0000",
-"DarkSalmon","#E9967A",
-"DarkSeaGreen","#8FBC8F",
-"DarkSlateBlue","#483D8B",
-"DarkSlateGray","#2F4F4F",
-"DarkTurquoise","#00CED1",
-"DarkViolet","#9400D3",
-"DeepPink","#FF1493",
-"DeepSkyBlue","#00BFFF",
-"DimGray","#696969",
-"DodgerBlue","#1E90FF",
-"Firebrick","#B22222",
-"FloralWhite","#FFFAF0",
-"ForestGreen","#228B22",
-"Fuchsia","#FF00FF",
-"Gainsboro","#DCDCDC",
-"GhostWhite","#F8F8FF",
-"Gold","#FFD700",
-"Goldenrod","#DAA520",
-"Gray","#808080",
-"GrayX11","#BEBEBE",
-"Green","#008000",
-"GreenX11","#00FF00",
-"GreenYellow","#ADFF2F",
-"Honeydew","#F0FFF0",
-"HotPink","#FF69B4",
-"IndianRed","#CD5C5C",
-"Indigo","#4B0082",
-"Ivory","#FFFFF0",
-"Khaki","#F0E68C",
-"Lavender","#E6E6FA",
-"LavenderBlush","#FFF0F5",
-"LawnGreen","#7CFC00",
-"LemonChiffon","#FFFACD",
-"LightBlue","#ADD8E6",
-"LightCoral","#F08080",
-"LightCyan","#E0FFFF",
-"LightGoldenrodYellow","#FAFAD2",
-"LightGray","#D3D3D3",
-"LightGreen","#90EE90",
-"LightPink","#FFB6C1",
-"LightSalmon","#FFA07A",
-"LightSeaGreen","#20B2AA",
-"LightSkyBlue","#87CEFA",
-"LightSlateGray","#778899",
-"LightSteelBlue","#B0C4DE",
-"LightYellow","#FFFFE0",
-"Lime","#00FF00",
-"LimeGreen","#32CD32",
-"Linen","#FAF0E6",
-"Magenta","#FF00FF",
-"Maroon","#800000",
-"MaroonX11","#B03060",
-"MediumAquamarine","#66CDAA",
-"MediumBlue","#0000CD",
-"MediumOrchid","#BA55D3",
-"MediumPurple","#9370DB",
-"MediumSeaGreen","#3CB371",
-"MediumSlateBlue","#7B68EE",
-"MediumSpringGreen","#00FA9A",
-"MediumTurquoise","#48D1CC",
-"MediumVioletRed","#C71585",
-"MidnightBlue","#191970",
-"MintCream","#F5FFFA",
-"MistyRose","#FFE4E1",
-"Moccasin","#FFE4B5",
-"NavajoWhite","#FFDEAD",
-"Navy","#000080",
-"OldLace","#FDF5E6",
-"Olive","#808000",
-"OliveDrab","#6B8E23",
-"Orange","#FFA500",
-"OrangeRed","#FF4500",
-"Orchid","#DA70D6",
-"PaleGoldenrod","#EEE8AA",
-"PaleGreen","#98FB98",
-"PaleTurquoise","#AFEEEE",
-"PaleVioletRed","#DB7093",
-"PapayaWhip","#FFEFD5",
-"PeachPuff","#FFDAB9",
-"Peru","#CD853F",
-"Pink","#FFC0CB",
-"Plum","#DDA0DD",
-"PowderBlue","#B0E0E6",
-"Purple","#800080",
-"PurpleX11","#A020F0",
-"RebeccaPurple","#663399",
-"Red","#FF0000",
-"RosyBrown","#BC8F8F",
-"RoyalBlue","#4169E1",
-"SaddleBrown","#8B4513",
-"Salmon","#FA8072",
-"SandyBrown","#F4A460",
-"SeaGreen","#2E8B57",
-"Seashell","#FFF5EE",
-"Sienna","#A0522D",
-"Silver","#C0C0C0",
-"SkyBlue","#87CEEB",
-"SlateBlue","#6A5ACD",
-"SlateGray","#708090",
-"Snow","#FFFAFA",
-"SpringGreen","#00FF7F",
-"SteelBlue","#4682B4",
-"Tan","#D2B48C",
-"Teal","#008080",
-"Thistle","#D8BFD8",
-"Tomato","#FF6347",
-"Turquoise","#40E0D0",
-"Violet","#EE82EE",
-"WebGray","#808080",
-"WebGreen","#008000",
-"WebMaroon","#7F0000",
-"WebPurple","#7F007F",
-"Wheat","#F5DEB3",
-"White","#FFFFFF",
-"WhiteSmoke","#F5F5F5",
-"Yellow","#FFFF00",
-"YellowGreen","#9ACD32",
-"",""};
-
 
 class MainWindow : public QMainWindow
 {
@@ -503,7 +338,8 @@ private:
 
   void connect_mysql_options_2(int w_argc, char *argv[]);
   void connect_read_command_line(int argc, char *argv[]);
-  void connect_read_my_cnf(const char *file_name);
+  void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
+  int connect_readmylogin(FILE *, unsigned char *);
   QString connect_stripper(QString value_to_strip);
   void connect_set_variable(QString token0, QString token2);
   void connect_make_statement();
@@ -1348,10 +1184,14 @@ void garbage_collect ()
 
   Initiate with: ldbms *lmysql;
                  lmysql= new ldbms();
-                 if (lmysql == NULL) printf("fail\n");
-                 (Failure is possible if library cannot be loaded.)
+                 if (lmysql == NULL) ... (Failure is possible if library cannot be loaded.)
   Call with:     lmysql->ldbms_function();
 */
+
+#ifndef HEADER_AES_H
+#define AES_BLOCK_SIZE 16
+typedef struct aes_key_st { unsigned char x[244]; } AES_KEY;
+#endif
 
 class ldbms : public QWidget
 {
@@ -1391,8 +1231,10 @@ public:
   typedef char*           (*tmysql_sqlstate)     (MYSQL *);
   typedef MYSQL_RES*      (*tmysql_store_result) (MYSQL *);
   typedef unsigned int    (*tmysql_warning_count)(MYSQL *);
+  typedef int             (*tAES_set_decrypt_key)(unsigned char *, int, AES_KEY *);
+  typedef void            (*tAES_decrypt)        (unsigned char *, unsigned char *, AES_KEY *);
 
-  tmysql_affected_rows t__mysql_affected_rows;
+  tmysql_affected_rows t__mysql_affected_rows;   /* libmysqlclient */
   tmysql_close t__mysql_close;
   tmysql_data_seek t__mysql_data_seek;
   tmysql_errno t__mysql_errno;
@@ -1416,8 +1258,19 @@ public:
   tmysql_sqlstate t__mysql_sqlstate;
   tmysql_store_result t__mysql_store_result;
   tmysql_warning_count t__mysql_warning_count;
+  tAES_set_decrypt_key t__AES_set_decrypt_key;
+  tAES_decrypt t__AES_decrypt;
 
-  ldbms(QString ocelot_ld_run_path, int *is_libmysqlclient_loaded, QString *return_string) : QWidget()
+ldbms() : QWidget()
+{
+  return;
+}
+
+
+void ldbms_get_library(QString ocelot_ld_run_path,
+        int *is_library_loaded,           /* points to is_libmysqlclient_loaded */
+        QString *return_string,
+        int which_library)                /* 0 = libmysqlclient. 1 = libcrypto */
   {
     char *query;
     int query_len;
@@ -1433,7 +1286,7 @@ public:
 
       There is a description re finding libmysqlclient if one types Help | libmysqlclient.
     */
-    if (*is_libmysqlclient_loaded == 1)
+    if (*is_library_loaded == 1)
     {
       /*
         Since this is called when we're re-connecting,
@@ -1442,13 +1295,14 @@ public:
       */
       return;
     }
-    if (*is_libmysqlclient_loaded == -2)
+    if (*is_library_loaded == -2)
     {
       /* The last error was that we got the wrong library. Unrecoverable. */
       return;
     }
 #ifndef __linux
-    QLibrary lib("libmysqlclient");
+    if (which_library == 0) QLibrary lib("libmysqlclient");
+    if (which_library == 1) QLibrary lib("libcrypto");
 #endif
     /*
       Finding libmysqlclient
@@ -1480,106 +1334,127 @@ public:
         if (ld_run_path_part > "")
         {
 #ifdef __linux
-          ld_run_path_part.append("/libmysqlclient.so");
+          if (which_library == 0) ld_run_path_part.append("/libmysqlclient.so");
+          if (which_library == 1) ld_run_path_part.append("/libcrypto.so");
           query_len= ld_run_path_part.toUtf8().size();         /* See comment "UTF8 Conversion" */
           query= new char[query_len + 1];
           memcpy(query, ld_run_path_part.toUtf8().constData(), query_len + 1);
           query[query_len]= '\0';
           dlopen_handle= dlopen(query,  RTLD_DEEPBIND | RTLD_NOW);
           delete []query;
-          if (dlopen_handle == 0) {*is_libmysqlclient_loaded= 0; error_string= dlerror(); }
-          else *is_libmysqlclient_loaded= 1;
+          if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
+          else *is_library_loaded= 1;
 #else
-          ld_run_path_part.append("/libmysqlclient");
+          if (which_library == 0) ld_run_path_part.append("/libmysqlclient");
+          if (which_library == 1) ld_run_path_part.append("/libcrypto");
           lib.setFileName(ld_run_path_part);
-          *is_libmysqlclient_loaded= lib.load();
+          *is_library_loaded= lib.load();
           error_string= lib.errorString();
 #endif
-          if (*is_libmysqlclient_loaded == 1) break;
+          if (*is_library_loaded == 1) break;
         }
         if (*(ld_run_path + i) == '\0') break;
         prev_i= i + 1;
       }
       delete []ld_run_path;
     }
+
     /* If it wasn't found via LD_RUN_PATH, use defaults e.g. LD_LIBRARY_PATH */
-    if (*is_libmysqlclient_loaded == 0)
+    if (*is_library_loaded == 0)
     {
 #ifdef __linux
-      dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
-      if (dlopen_handle == 0) {*is_libmysqlclient_loaded= 0; error_string= dlerror(); }
-      else *is_libmysqlclient_loaded= 1;
+      if (which_library == 0) dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
+      if (which_library == 1) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
+      if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
+      else *is_library_loaded= 1;
 #else
-      lib.setFileName("libmysqlclient");
-      *is_libmysqlclient_loaded= lib.load();
+      if (which_library == 0) lib.setFileName("libmysqlclient");
+      if (which_library == 1) lib.setFileName("libcrypto");
+      *is_library_loaded= lib.load();
       error_string= lib.errorString();
 #endif
     }
-    if (*is_libmysqlclient_loaded == 0)
+    if (*is_library_loaded == 0)
     {
       *return_string= error_string;
       return;
     }
-    if (*is_libmysqlclient_loaded == 1)
+    if (*is_library_loaded == 1)
     {
       QString s= "";
 #ifdef __linux
-      t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows"); if (dlerror() != 0) s.append("mysql_affected_rows ");
-      t__mysql_close= (tmysql_close) dlsym(dlopen_handle, "mysql_close"); if (dlerror() != 0) s.append("mysql_close ");
-      t__mysql_data_seek= (tmysql_data_seek) dlsym(dlopen_handle, "mysql_data_seek"); if (dlerror() != 0) s.append("mysql_data_seek ");
-      t__mysql_errno= (tmysql_errno) dlsym(dlopen_handle, "mysql_errno"); if (dlerror() != 0) s.append("mysql_errno ");
-      t__mysql_error= (tmysql_error) dlsym(dlopen_handle, "mysql_error"); if (dlerror() != 0) s.append("mysql_errorinit ");
-      t__mysql_fetch_fields= (tmysql_fetch_fields) dlsym(dlopen_handle, "mysql_fetch_fields"); if (dlerror() != 0) s.append("mysql_fetch_fields ");
-      t__mysql_fetch_lengths= (tmysql_fetch_lengths) dlsym(dlopen_handle, "mysql_fetch_lengths"); if (dlerror() != 0) s.append("mysql_fetch_lengths ");
-      t__mysql_fetch_row= (tmysql_fetch_row) dlsym(dlopen_handle, "mysql_fetch_row"); if (dlerror() != 0) s.append("mysql_fetch_rows ");
-      t__mysql_free_result= (tmysql_free_result) dlsym(dlopen_handle, "mysql_free_result"); if (dlerror() != 0) s.append("mysql_free_result ");
-      t__mysql_get_host_info= (tmysql_get_host_info) dlsym(dlopen_handle, "mysql_get_host_info"); if (dlerror() != 0) s.append("mysql_get_host_info ");
-      t__mysql_info= (tmysql_info) dlsym(dlopen_handle, "mysql_info"); if (dlerror() != 0) s.append("mysql_info ");
-      t__mysql_init= (tmysql_init) dlsym(dlopen_handle, "mysql_init"); if (dlerror() != 0) s.append("mysql_init ");
-      t__mysql_more_results= (tmysql_more_results) dlsym(dlopen_handle, "mysql_more_results"); if (dlerror() != 0) s.append("mysql_more_results ");
-      t__mysql_next_result= (tmysql_next_result) dlsym(dlopen_handle, "mysql_next_result"); if (dlerror() != 0) s.append("mysql_next_result ");
-      t__mysql_num_fields= (tmysql_num_fields) dlsym(dlopen_handle, "mysql_num_fields"); if (dlerror() != 0) s.append("mysql_num_fields ");
-      t__mysql_num_rows= (tmysql_num_rows) dlsym(dlopen_handle, "mysql_num_rows"); if (dlerror() != 0) s.append("mysql_num_rows ");
-      t__mysql_options= (tmysql_options) dlsym(dlopen_handle, "mysql_options"); if (dlerror() != 0) s.append("mysql_options ");
-      t__mysql_query= (tmysql_query) dlsym(dlopen_handle, "mysql_query"); if (dlerror() != 0) s.append("mysql_query ");
-      t__mysql_real_connect= (tmysql_real_connect) dlsym(dlopen_handle, "mysql_real_connect"); if (dlerror() != 0) s.append("mysql_real_connect ");
-      t__mysql_real_query= (tmysql_real_query) dlsym(dlopen_handle, "mysql_real_query"); if (dlerror() != 0) s.append("mysql_real_query ");
-      t__mysql_select_db= (tmysql_select_db) dlsym(dlopen_handle, "mysql_select_db"); if (dlerror() != 0) s.append("mysql_select_db ");
-      t__mysql_sqlstate= (tmysql_sqlstate) dlsym(dlopen_handle, "mysql_sqlstate"); if (dlerror() != 0) s.append("mysql_sqlstate ");
-      t__mysql_store_result= (tmysql_store_result) dlsym(dlopen_handle, "mysql_store_result"); if (dlerror() != 0) s.append("mysql_store_result ");
-      t__mysql_warning_count= (tmysql_warning_count) dlsym(dlopen_handle, "mysql_warning_count"); if (dlerror() != 0) s.append("mysql_warning_count ");
+      if (which_library == 0)
+      {
+        t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows"); if (dlerror() != 0) s.append("mysql_affected_rows ");
+        t__mysql_close= (tmysql_close) dlsym(dlopen_handle, "mysql_close"); if (dlerror() != 0) s.append("mysql_close ");
+        t__mysql_data_seek= (tmysql_data_seek) dlsym(dlopen_handle, "mysql_data_seek"); if (dlerror() != 0) s.append("mysql_data_seek ");
+        t__mysql_errno= (tmysql_errno) dlsym(dlopen_handle, "mysql_errno"); if (dlerror() != 0) s.append("mysql_errno ");
+        t__mysql_error= (tmysql_error) dlsym(dlopen_handle, "mysql_error"); if (dlerror() != 0) s.append("mysql_errorinit ");
+        t__mysql_fetch_fields= (tmysql_fetch_fields) dlsym(dlopen_handle, "mysql_fetch_fields"); if (dlerror() != 0) s.append("mysql_fetch_fields ");
+        t__mysql_fetch_lengths= (tmysql_fetch_lengths) dlsym(dlopen_handle, "mysql_fetch_lengths"); if (dlerror() != 0) s.append("mysql_fetch_lengths ");
+        t__mysql_fetch_row= (tmysql_fetch_row) dlsym(dlopen_handle, "mysql_fetch_row"); if (dlerror() != 0) s.append("mysql_fetch_rows ");
+        t__mysql_free_result= (tmysql_free_result) dlsym(dlopen_handle, "mysql_free_result"); if (dlerror() != 0) s.append("mysql_free_result ");
+        t__mysql_get_host_info= (tmysql_get_host_info) dlsym(dlopen_handle, "mysql_get_host_info"); if (dlerror() != 0) s.append("mysql_get_host_info ");
+        t__mysql_info= (tmysql_info) dlsym(dlopen_handle, "mysql_info"); if (dlerror() != 0) s.append("mysql_info ");
+        t__mysql_init= (tmysql_init) dlsym(dlopen_handle, "mysql_init"); if (dlerror() != 0) s.append("mysql_init ");
+        t__mysql_more_results= (tmysql_more_results) dlsym(dlopen_handle, "mysql_more_results"); if (dlerror() != 0) s.append("mysql_more_results ");
+        t__mysql_next_result= (tmysql_next_result) dlsym(dlopen_handle, "mysql_next_result"); if (dlerror() != 0) s.append("mysql_next_result ");
+        t__mysql_num_fields= (tmysql_num_fields) dlsym(dlopen_handle, "mysql_num_fields"); if (dlerror() != 0) s.append("mysql_num_fields ");
+        t__mysql_num_rows= (tmysql_num_rows) dlsym(dlopen_handle, "mysql_num_rows"); if (dlerror() != 0) s.append("mysql_num_rows ");
+        t__mysql_options= (tmysql_options) dlsym(dlopen_handle, "mysql_options"); if (dlerror() != 0) s.append("mysql_options ");
+        t__mysql_query= (tmysql_query) dlsym(dlopen_handle, "mysql_query"); if (dlerror() != 0) s.append("mysql_query ");
+        t__mysql_real_connect= (tmysql_real_connect) dlsym(dlopen_handle, "mysql_real_connect"); if (dlerror() != 0) s.append("mysql_real_connect ");
+        t__mysql_real_query= (tmysql_real_query) dlsym(dlopen_handle, "mysql_real_query"); if (dlerror() != 0) s.append("mysql_real_query ");
+        t__mysql_select_db= (tmysql_select_db) dlsym(dlopen_handle, "mysql_select_db"); if (dlerror() != 0) s.append("mysql_select_db ");
+        t__mysql_sqlstate= (tmysql_sqlstate) dlsym(dlopen_handle, "mysql_sqlstate"); if (dlerror() != 0) s.append("mysql_sqlstate ");
+        t__mysql_store_result= (tmysql_store_result) dlsym(dlopen_handle, "mysql_store_result"); if (dlerror() != 0) s.append("mysql_store_result ");
+        t__mysql_warning_count= (tmysql_warning_count) dlsym(dlopen_handle, "mysql_warning_count"); if (dlerror() != 0) s.append("mysql_warning_count ");
+      }
+      if (which_library == 1)
+      {
+        t__AES_set_decrypt_key= (tAES_set_decrypt_key) dlsym(dlopen_handle, "AES_set_decrypt_key"); if (dlerror() != 0) s.append("AES_set_decrypt_key ");
+        t__AES_decrypt= (tAES_decrypt) dlsym(dlopen_handle, "AES_decrypt"); if (dlerror() != 0) s.append("AES_decrypt ");
+      }
 #else
-      if ((t__mysql_affected_rows= (tmysql_affected_rows) lib.resolve("mysql_affected_rows")) == 0) s.append("mysql_affected_rows ");
-      if ((t__mysql_close= (tmysql_close) lib.resolve("mysql_close")) == 0) s.append("mysql_close ");
-      if ((t__mysql_data_seek= (tmysql_data_seek) lib.resolve("mysql_data_seek")) == 0) s.append("mysql_data_seek ");
-      if ((t__mysql_errno= (tmysql_errno) lib.resolve("mysql_errno")) == 0) s.append("mysql_errno ");
-      if ((t__mysql_error= (tmysql_error) lib.resolve("mysql_error")) == 0) s.append("mysql_error ");
-      if ((t__mysql_fetch_fields= (tmysql_fetch_fields) lib.resolve("mysql_fetch_fields")) == 0) s.append("mysql_fetch_fields ");
-      if ((t__mysql_fetch_lengths= (tmysql_fetch_lengths) lib.resolve("mysql_fetch_lengths")) == 0) s.append("mysql_fetch_lengths ");
-      if ((t__mysql_fetch_row= (tmysql_fetch_row) lib.resolve("mysql_fetch_row")) == 0) s.append("mysql_fetch_row ");
-      if ((t__mysql_free_result= (tmysql_free_result) lib.resolve("mysql_free_result")) == 0) s.append("mysql_free_result ");
-      if ((t__mysql_get_host_info= (tmysql_get_host_info) lib.resolve("mysql_get_host_info")) == 0) s.append("mysql_get_host_info ");
-      if ((t__mysql_info= (tmysql_info) lib.resolve("mysql_info")) == 0) s.append("mysql_info ");
-      if ((t__mysql_init= (tmysql_init) lib.resolve("mysql_init")) == 0) s.append("mysql_init ");
-      if ((t__mysql_more_results= (tmysql_more_results) lib.resolve("mysql_more_results")) == 0) s.append("mysql_more_results ");
-      if ((t__mysql_next_result= (tmysql_next_result) lib.resolve("mysql_next_result")) == 0) s.append("mysql_next_result ");
-      if ((t__mysql_num_fields= (tmysql_num_fields) lib.resolve("mysql_num_fields")) == 0) s.append("mysql_num_fields ");
-      if ((t__mysql_num_rows= (tmysql_num_rows) lib.resolve("mysql_num_rows")) == 0) s.append("mysql_num_rows ");
-      if ((t__mysql_options= (tmysql_options) lib.resolve("mysql_options")) == 0) s.append("mysql_options ");
-      if ((t__mysql_query= (tmysql_query) lib.resolve("mysql_query")) == 0) s.append("mysql_query ");
-      if ((t__mysql_real_connect= (tmysql_real_connect) lib.resolve("mysql_real_connect")) == 0) s.append("mysql_real_connect ");
-      if ((t__mysql_real_query= (tmysql_real_query) lib.resolve("mysql_real_query")) == 0) s.append("mysql_real_query ");
-      if ((t__mysql_select_db= (tmysql_select_db) lib.resolve("mysql_select_db")) == 0) s.append("mysql_select_db ");
-      if ((t__mysql_sqlstate= (tmysql_sqlstate) lib.resolve("mysql_sqlstate")) == 0) s.append("mysql_sqlstate ");
-      if ((t__mysql_store_result= (tmysql_store_result) lib.resolve("mysql_store_result")) == 0) s.append("mysql_store_result ");
-      if ((t__mysql_warning_count= (tmysql_warning_count) lib.resolve("mysql_warning_count")) == 0) s.append("mysql_warning_count ");
+      if (which_library == 0)
+      {
+        if ((t__mysql_affected_rows= (tmysql_affected_rows) lib.resolve("mysql_affected_rows")) == 0) s.append("mysql_affected_rows ");
+        if ((t__mysql_close= (tmysql_close) lib.resolve("mysql_close")) == 0) s.append("mysql_close ");
+        if ((t__mysql_data_seek= (tmysql_data_seek) lib.resolve("mysql_data_seek")) == 0) s.append("mysql_data_seek ");
+        if ((t__mysql_errno= (tmysql_errno) lib.resolve("mysql_errno")) == 0) s.append("mysql_errno ");
+        if ((t__mysql_error= (tmysql_error) lib.resolve("mysql_error")) == 0) s.append("mysql_error ");
+        if ((t__mysql_fetch_fields= (tmysql_fetch_fields) lib.resolve("mysql_fetch_fields")) == 0) s.append("mysql_fetch_fields ");
+        if ((t__mysql_fetch_lengths= (tmysql_fetch_lengths) lib.resolve("mysql_fetch_lengths")) == 0) s.append("mysql_fetch_lengths ");
+        if ((t__mysql_fetch_row= (tmysql_fetch_row) lib.resolve("mysql_fetch_row")) == 0) s.append("mysql_fetch_row ");
+        if ((t__mysql_free_result= (tmysql_free_result) lib.resolve("mysql_free_result")) == 0) s.append("mysql_free_result ");
+        if ((t__mysql_get_host_info= (tmysql_get_host_info) lib.resolve("mysql_get_host_info")) == 0) s.append("mysql_get_host_info ");
+        if ((t__mysql_info= (tmysql_info) lib.resolve("mysql_info")) == 0) s.append("mysql_info ");
+        if ((t__mysql_init= (tmysql_init) lib.resolve("mysql_init")) == 0) s.append("mysql_init ");
+        if ((t__mysql_more_results= (tmysql_more_results) lib.resolve("mysql_more_results")) == 0) s.append("mysql_more_results ");
+        if ((t__mysql_next_result= (tmysql_next_result) lib.resolve("mysql_next_result")) == 0) s.append("mysql_next_result ");
+        if ((t__mysql_num_fields= (tmysql_num_fields) lib.resolve("mysql_num_fields")) == 0) s.append("mysql_num_fields ");
+        if ((t__mysql_num_rows= (tmysql_num_rows) lib.resolve("mysql_num_rows")) == 0) s.append("mysql_num_rows ");
+        if ((t__mysql_options= (tmysql_options) lib.resolve("mysql_options")) == 0) s.append("mysql_options ");
+        if ((t__mysql_query= (tmysql_query) lib.resolve("mysql_query")) == 0) s.append("mysql_query ");
+        if ((t__mysql_real_connect= (tmysql_real_connect) lib.resolve("mysql_real_connect")) == 0) s.append("mysql_real_connect ");
+        if ((t__mysql_real_query= (tmysql_real_query) lib.resolve("mysql_real_query")) == 0) s.append("mysql_real_query ");
+        if ((t__mysql_select_db= (tmysql_select_db) lib.resolve("mysql_select_db")) == 0) s.append("mysql_select_db ");
+        if ((t__mysql_sqlstate= (tmysql_sqlstate) lib.resolve("mysql_sqlstate")) == 0) s.append("mysql_sqlstate ");
+        if ((t__mysql_store_result= (tmysql_store_result) lib.resolve("mysql_store_result")) == 0) s.append("mysql_store_result ");
+        if ((t__mysql_warning_count= (tmysql_warning_count) lib.resolve("mysql_warning_count")) == 0) s.append("mysql_warning_count ");
+      }
+      if (which_library == 1)
+      {
+        if ((t__AES_set_decrypt_key= (tAES_set_decrypt_key) lib.resolve("AES_set_decrypt_key")) == 0) s.append("AES_set_decrypt_key ");
+        if ((t__AES_decrypt= (tAES_decrypt) lib.resolve("AES_decrypt")) == 0) s.append("AES_decrypt ");
+      }
 #endif
       if (s > "")
       {
         {
           /* Unrecoverable error -- one or more names not found. Return the names. */
           *return_string= s;
-          *is_libmysqlclient_loaded= -2;
+          *is_library_loaded= -2;
           return;
           }
       }
@@ -1707,6 +1582,15 @@ public:
     return t__mysql_warning_count(mysql);
   }
 
+  int ldbms_AES_set_decrypt_key(unsigned char *a, int b, AES_KEY *c)
+  {
+    return t__AES_set_decrypt_key(a, b, c);
+  }
+
+  void ldbms_AES_decrypt(unsigned char *a, unsigned char *b, AES_KEY *c)
+  {
+    t__AES_decrypt(a, b, c);
+  }
 };
 
 
@@ -3913,6 +3797,10 @@ void handle_combo_box_1(int i)
       label_for_color_show[ci]->show();
       combo_box_for_color_pick[ci]->show();
     }
+    label_for_color[9]->hide();
+    label_for_color_rgb[9]->hide();
+    label_for_color_show[9]->hide();
+    combo_box_for_color_pick[9]->hide();
   }
   if (i > 1)
   {
@@ -3923,6 +3811,10 @@ void handle_combo_box_1(int i)
       label_for_color_show[ci]->hide();
       combo_box_for_color_pick[ci]->hide();
     }
+    label_for_color[9]->hide();
+    label_for_color_rgb[9]->hide();
+    label_for_color_show[9]->hide();
+    combo_box_for_color_pick[9]->hide();
   }
 }
 

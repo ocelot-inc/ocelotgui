@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.4.0 Alpha
-   Last modified: May 17 2015
+   Last modified: May 24 2015
 */
 
 /*
@@ -193,6 +193,170 @@
 */
 
 
+/*
+  We use s_color_list only twice, when checking command-line parameters
+  and then to copy its data to q_color_list,
+  which will be what we actually use for handle_combo_box_for_color_pick_*
+  in the Settings class. This list of color names prefers W3C names
+  http://www.w3.org/wiki/CSS/Properties/color/keywords
+  but also includes all X11 color names and hex values, a commonly-available list,
+  example = https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart
+  (including webGray, webGreen, webMaroon, webPurple, and eight
+  others that Qt would reject), and adds Gray_X11 Green_X11 Maroon_X11 Purple_X11
+  -- not exactly the same as Qt names, and not exactly the same as X11 for gray green maroon purple.
+  Doubtless this has been done many times, but I couldn't find examples.
+*/
+static const char *s_color_list[308]=
+{"AliceBlue","#F0F8FF",
+"AntiqueWhite","#FAEBD7",
+"Aqua","#00FFFF",
+"Aquamarine","#7FFFD4",
+"Azure","#F0FFFF",
+"Beige","#F5F5DC",
+"Bisque","#FFE4C4",
+"Black","#000000",
+"BlanchedAlmond","#FFEBCD",
+"Blue","#0000FF",
+"BlueViolet","#8A2BE2",
+"Brown","#A52A2A",
+"Burlywood","#DEB887",
+"CadetBlue","#5F9EA0",
+"Chartreuse","#7FFF00",
+"Chocolate","#D2691E",
+"Coral","#FF7F50",
+"CornflowerBlue","#6495ED",
+"Cornsilk","#FFF8DC",
+"Crimson","#DC143C",
+"Cyan","#00FFFF",
+"DarkBlue","#00008B",
+"DarkCyan","#008B8B",
+"DarkGoldenrod","#B8860B",
+"DarkGray","#A9A9A9",
+"DarkGreen","#006400",
+"DarkKhaki","#BDB76B",
+"DarkMagenta","#8B008B",
+"DarkOliveGreen","#556B2F",
+"DarkOrange","#FF8C00",
+"DarkOrchid","#9932CC",
+"DarkRed","#8B0000",
+"DarkSalmon","#E9967A",
+"DarkSeaGreen","#8FBC8F",
+"DarkSlateBlue","#483D8B",
+"DarkSlateGray","#2F4F4F",
+"DarkTurquoise","#00CED1",
+"DarkViolet","#9400D3",
+"DeepPink","#FF1493",
+"DeepSkyBlue","#00BFFF",
+"DimGray","#696969",
+"DodgerBlue","#1E90FF",
+"Firebrick","#B22222",
+"FloralWhite","#FFFAF0",
+"ForestGreen","#228B22",
+"Fuchsia","#FF00FF",
+"Gainsboro","#DCDCDC",
+"GhostWhite","#F8F8FF",
+"Gold","#FFD700",
+"Goldenrod","#DAA520",
+"Gray","#808080",
+"GrayX11","#BEBEBE",
+"Green","#008000",
+"GreenX11","#00FF00",
+"GreenYellow","#ADFF2F",
+"Honeydew","#F0FFF0",
+"HotPink","#FF69B4",
+"IndianRed","#CD5C5C",
+"Indigo","#4B0082",
+"Ivory","#FFFFF0",
+"Khaki","#F0E68C",
+"Lavender","#E6E6FA",
+"LavenderBlush","#FFF0F5",
+"LawnGreen","#7CFC00",
+"LemonChiffon","#FFFACD",
+"LightBlue","#ADD8E6",
+"LightCoral","#F08080",
+"LightCyan","#E0FFFF",
+"LightGoldenrodYellow","#FAFAD2",
+"LightGray","#D3D3D3",
+"LightGreen","#90EE90",
+"LightPink","#FFB6C1",
+"LightSalmon","#FFA07A",
+"LightSeaGreen","#20B2AA",
+"LightSkyBlue","#87CEFA",
+"LightSlateGray","#778899",
+"LightSteelBlue","#B0C4DE",
+"LightYellow","#FFFFE0",
+"Lime","#00FF00",
+"LimeGreen","#32CD32",
+"Linen","#FAF0E6",
+"Magenta","#FF00FF",
+"Maroon","#800000",
+"MaroonX11","#B03060",
+"MediumAquamarine","#66CDAA",
+"MediumBlue","#0000CD",
+"MediumOrchid","#BA55D3",
+"MediumPurple","#9370DB",
+"MediumSeaGreen","#3CB371",
+"MediumSlateBlue","#7B68EE",
+"MediumSpringGreen","#00FA9A",
+"MediumTurquoise","#48D1CC",
+"MediumVioletRed","#C71585",
+"MidnightBlue","#191970",
+"MintCream","#F5FFFA",
+"MistyRose","#FFE4E1",
+"Moccasin","#FFE4B5",
+"NavajoWhite","#FFDEAD",
+"Navy","#000080",
+"OldLace","#FDF5E6",
+"Olive","#808000",
+"OliveDrab","#6B8E23",
+"Orange","#FFA500",
+"OrangeRed","#FF4500",
+"Orchid","#DA70D6",
+"PaleGoldenrod","#EEE8AA",
+"PaleGreen","#98FB98",
+"PaleTurquoise","#AFEEEE",
+"PaleVioletRed","#DB7093",
+"PapayaWhip","#FFEFD5",
+"PeachPuff","#FFDAB9",
+"Peru","#CD853F",
+"Pink","#FFC0CB",
+"Plum","#DDA0DD",
+"PowderBlue","#B0E0E6",
+"Purple","#800080",
+"PurpleX11","#A020F0",
+"RebeccaPurple","#663399",
+"Red","#FF0000",
+"RosyBrown","#BC8F8F",
+"RoyalBlue","#4169E1",
+"SaddleBrown","#8B4513",
+"Salmon","#FA8072",
+"SandyBrown","#F4A460",
+"SeaGreen","#2E8B57",
+"Seashell","#FFF5EE",
+"Sienna","#A0522D",
+"Silver","#C0C0C0",
+"SkyBlue","#87CEEB",
+"SlateBlue","#6A5ACD",
+"SlateGray","#708090",
+"Snow","#FFFAFA",
+"SpringGreen","#00FF7F",
+"SteelBlue","#4682B4",
+"Tan","#D2B48C",
+"Teal","#008080",
+"Thistle","#D8BFD8",
+"Tomato","#FF6347",
+"Turquoise","#40E0D0",
+"Violet","#EE82EE",
+"WebGray","#808080",
+"WebGreen","#008000",
+"WebMaroon","#7F0000",
+"WebPurple","#7F007F",
+"Wheat","#F5DEB3",
+"White","#FFFFFF",
+"WhiteSmoke","#F5F5F5",
+"Yellow","#FFFF00",
+"YellowGreen","#9ACD32",
+"",""};
 
 
 #include "ocelotgui.h"
@@ -310,6 +474,7 @@
   static unsigned int ocelot_opt_write_timeout= 0; /* for MYSQL_OPT_WRITE_TIMEOUT */
 
   int is_libmysqlclient_loaded= 0;
+  int is_libcrypto_loaded= 0;
 
 /* copy of an information_schema.columns select, used for rehash */
   static  unsigned int rehash_result_column_count= 0;
@@ -421,6 +586,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_history_border_color= "black";
   ocelot_menu_border_color= "black";
 
+  lmysql= new ldbms();
+
   /* picking up possible settings options from argc+argv after setting initial defaults, so late */
   /* as a result, ocelotgui --version and ocelotgui --help will look slow */
   connect_mysql_options_2(argc, argv);               /* pick up my.cnf and command-line MySQL-related options, if any */
@@ -437,8 +604,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     exit(0);
   }
 
-  if (color_list[0][0] == 0) { ;  }                 /* kludge to avoid "variable not used" warning */
-  for (int q_i= 0; strcmp(color_list[q_i]," ") > 0; ++q_i) q_color_list.append(color_list[q_i]);
+  for (int q_i= 0; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
 
   make_style_strings();
@@ -2366,9 +2532,9 @@ void MainWindow::set_current_colors_and_font()
 QString MainWindow::canonical_color_name(QString color_name_string)
 {
   QString s;
-  for (int i= 0; strcmp(color_list[i], "") > 0; i+= 2)
+  for (int i= 0; strcmp(s_color_list[i], "") > 0; i+= 2)
   {
-    s= color_list[i];
+    s= s_color_list[i];
     if (QString::compare(color_name_string, s, Qt::CaseInsensitive) == 0)
     {
       return s;
@@ -2389,12 +2555,12 @@ QString MainWindow::canonical_color_name(QString color_name_string)
   qq_color.setNamedColor(color_name_string);
   if (qq_color.isValid() == false) return "";                 /* bad color, maybe bad format */
   QString qq_color_name= qq_color.name();                      /* returns name as "#RRGGBB" */
-  for (int i= 1; strcmp(color_list[i], "") > 0; i+= 2)
+  for (int i= 1; strcmp(s_color_list[i], "") > 0; i+= 2)
   {
-    s= color_list[i];
+    s= s_color_list[i];
     if (QString::compare(qq_color_name, s, Qt::CaseInsensitive) == 0)
     {
-      s= color_list[i - 1];
+      s= s_color_list[i - 1];
       return s;
     }
   }
@@ -5460,8 +5626,13 @@ void MainWindow::action_execute_one_statement(QString text)
           result_grid_tab_widget->tabBar()->hide();
           result_grid_table_widget[0]->show();
           result_grid_tab_widget->show(); /* Maybe this only has to happen once */
+
+
           QString result_set_for_history;
-          result_set_for_history= result_grid_table_widget[0]->copy(ocelot_history_max_column_width, ocelot_history_max_column_count, ocelot_history_max_row_count);
+          /*
+            Todo: restore this call to copy(), but copy() should be more obviously correct.
+          */
+          //result_set_for_history= result_grid_table_widget[0]->copy(ocelot_history_max_column_width, ocelot_history_max_column_count, ocelot_history_max_row_count);
 
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
@@ -7888,7 +8059,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   /* First find libmysqlclient.so */
   if (is_libmysqlclient_loaded != 1)
   {
-    lmysql= new ldbms(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string);
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, 0);
   }
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
 
@@ -8774,7 +8945,7 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
 
 void connect_set_variable(QString token0, QString token2);
 void connect_read_command_line(int argc, char *argv[]);
-void connect_read_my_cnf(const char *file_name);
+void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
 QString connect_stripper(QString value_to_strip);
 
 #include <pwd.h>
@@ -8901,30 +9072,38 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   if (QString::compare(ocelot_defaults_file, " ") > 0)
   {
     strcpy(tmp_my_cnf, ocelot_defaults_file.toUtf8());
-    connect_read_my_cnf(tmp_my_cnf);
+    connect_read_my_cnf(tmp_my_cnf, 0);
   }
   else
   {
     if (ocelot_no_defaults == 0)
     {
-      connect_read_my_cnf("/etc/my.cnf");
-      connect_read_my_cnf("/etc/mysql/my.cnf");
+      connect_read_my_cnf("/etc/my.cnf", 0);
+      connect_read_my_cnf("/etc/mysql/my.cnf", 0);
       /* todo: think: is argv[0] what you want for SYSCONFDIR? not exact, but it's where the program is now. no, it might be a copy. */
-      // connect_read_my_cnf("SYSCONFDIR/etc/my.cnf") /* ?? i.e. [installation-directory]/etc/my.cnf but this should be changeable */
+      // connect_read_my_cnf("SYSCONFDIR/etc/my.cnf", 0) /* ?? i.e. [installation-directory]/etc/my.cnf but this should be changeable */
       /* skip $MYSQL_HOME/my.cnf, only server stuff should be in it */
-      // connect_read_my_cnf("file specified with --defaults-extra-file");
+      // connect_read_my_cnf("file specified with --defaults-extra-file", 0);
       if (QString::compare(ocelot_defaults_extra_file, " ") > 0)
       {
         strcpy(tmp_my_cnf, ocelot_defaults_extra_file.toUtf8());
-        connect_read_my_cnf(tmp_my_cnf);
+        connect_read_my_cnf(tmp_my_cnf, 0);
       }
       strcpy(tmp_my_cnf, home);                              /* $HOME/.my.cnf */
       strcat(tmp_my_cnf, "/.my.cnf");
-      connect_read_my_cnf(tmp_my_cnf);
+      connect_read_my_cnf(tmp_my_cnf, 0);
     }
-    strcpy(tmp_my_cnf, home);                          /* $HOME/.mylogin.cnf */
-    strcat(tmp_my_cnf, "/.mylogin.cnf");
-    connect_read_my_cnf(tmp_my_cnf);
+
+    if (getenv("MYSQL_TEST_LOGIN_FILE") != NULL)
+    {
+      strcpy(tmp_my_cnf, getenv("MYSQL_TEST_LOGIN_FILE"));
+    }
+    else
+    {
+      strcpy(tmp_my_cnf, home);                             /* $HOME/.mylogin.cnf */
+      strcat(tmp_my_cnf, "/.mylogin.cnf");
+    }
+    connect_read_my_cnf(tmp_my_cnf, 1);
   }
   connect_read_command_line(argc, argv);
   //connect_make_statement();
@@ -9042,7 +9221,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
          maybe we should use main_token_offsets and main_token_lengths? */
 /* todo: check if we've already looked at the file (this is possible if !include or !includedir happens)
          if so, skip */
-void MainWindow::connect_read_my_cnf(const char *file_name)
+void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 {
   FILE *file;
   char line[2048];
@@ -9052,16 +9231,38 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
   QString token0, token1, token2, token_for_value;
   QString group;                                         /* what was in the last [...] e.g. mysqld, client, mysql, ocelot */
   int token0_length, token1_length, token2_length;
+  unsigned char output_buffer[65536];                    /* todo: should be dynamic size */
 
   group= "";                                             /* group identifier doesn't carry over from last .cnf file that we read */
   file= fopen(file_name, "r");                           /* Open specified file, read only */
-  if (file == NULL)                                      /* (if file doesn't exist, ok, no error */
+  if (file == NULL) return;                              /* (if file doesn't exist, ok, no error */
+  if (is_mylogin_cnf == 1)
   {
-    return;
+    if (connect_readmylogin(file, output_buffer) != 0)
+    {
+      fclose(file);
+      return;                                            /* (if decryption fails, ignore */
+    }
   }
   options_files_read.append(file_name); options_files_read.append(" ");
-  while(fgets(line, sizeof line, file) != NULL)
+  char *fgets_result;
+  int file_offset= 0;
+  int line_offset= 0;
+  for (;;)
   {
+    if (is_mylogin_cnf == 0) fgets_result= fgets(line, sizeof line, file);
+    else
+    {
+      for (line_offset= 0; *(output_buffer + file_offset) != '\0'; ++line_offset, ++file_offset)
+      {
+        *(line + line_offset)= *(output_buffer + file_offset);
+        if (*(line + line_offset) == '\n') { ++line_offset; ++file_offset; break; }
+      }
+      *(line + line_offset)= '\0';
+      if (line_offset > 0) fgets_result= (char*) output_buffer;
+      else fgets_result= NULL;
+    }
+    if (fgets_result == NULL) break;
     QString s= line;
     /* tokenize, ignore # comments or / * comments * /, treat '-' as part of token not operator */
     tokenize(s.data(),
@@ -9094,7 +9295,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
       char new_file_name[2048];
       strcpy(new_file_name,token2.toUtf8());
       *(new_file_name + token2_length)= 0;
-      connect_read_my_cnf(new_file_name);
+      connect_read_my_cnf(new_file_name, 0);
     }
     /* See if it's !includedir */
     if ((QString::compare(token0, "!") == 0) && (QString::compare(token1, "includedir", Qt::CaseInsensitive) == 0))
@@ -9115,7 +9316,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
             strcpy(new_file_name, new_directory_name);
             strcat(new_file_name, "/");
             strcat(new_file_name, dir->d_name);
-            connect_read_my_cnf(new_file_name);
+            connect_read_my_cnf(new_file_name, 0);
           }
         }
         closedir(d);
@@ -9128,11 +9329,19 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
       group= token1;
       continue;
     }
-    /* Skip if it's not one of the groups that we care about i.e. client or mysql or ocelot */
-    /* Todo: Consider: should our group be "ocelot", "ocelotgui", or both? */
-    if ((QString::compare(group, "client", Qt::CaseInsensitive) != 0)
-    &&  (QString::compare(group, "mysql", Qt::CaseInsensitive) != 0)
-    &&  (QString::compare(group, "ocelot", Qt::CaseInsensitive) != 0)) continue;
+
+    if ((is_mylogin_cnf == 1) && (QString::compare(group, ocelot_login_path, Qt::CaseInsensitive) == 0))
+    {
+      /* it's in .mylogin.cnf and the group matches the specified login path */
+    }
+    else
+    {
+      /* Skip if it's not one of the groups that we care about i.e. client or mysql or ocelot */
+      /* Todo: Consider: should our group be "ocelot", "ocelotgui", or both? */
+      if ((QString::compare(group, "client", Qt::CaseInsensitive) != 0)
+      &&  (QString::compare(group, "mysql", Qt::CaseInsensitive) != 0)
+      &&  (QString::compare(group, "ocelot", Qt::CaseInsensitive) != 0)) continue;
+    }
 
     /* Remove ''s or ""s around the value, then strip lead or trail spaces. */
     token2= connect_stripper(token2);
@@ -9160,6 +9369,70 @@ void MainWindow::connect_read_my_cnf(const char *file_name)
     connect_set_variable(token0, token2);
   }
   fclose(file);
+}
+
+/*
+  connect_readmylogin() is a variation of readmylogin.c
+  AES_KEY and AES_BLOCK_SIZE are defined in ocelotgui.h
+  If openSSL is not available, ignore it (mysql would always read because YaSSL is bundled).
+  If .mylogin.cnf is not an encrypted file, ignore it (same as what mysql would do).
+*/
+
+/*
+  todo: close file when return, including return for error
+*/
+int MainWindow::connect_readmylogin(FILE *file, unsigned char *output_buffer)
+{
+  QString ldbms_return_string;
+
+  ldbms_return_string= "";
+
+  /* First find libcrypto.so */
+  if (is_libcrypto_loaded != 1)
+  {
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &ldbms_return_string, 1);
+  }
+  if (is_libcrypto_loaded != 1)
+  {
+    return -1;
+  }
+
+  unsigned char cipher_chunk[4096];
+  unsigned int cipher_chunk_length, output_length= 0, i;
+  unsigned char key_in_file[20];
+  unsigned char key_after_xor[AES_BLOCK_SIZE] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+  AES_KEY key_for_aes;
+
+  if (fseek(file, 4, SEEK_SET) != 0)
+  {
+    return -1;
+  }
+  if (fread(key_in_file, 1, 20, file) != 20)
+  {
+    return -1;
+  }
+
+  for (i= 0; i < 20; ++i) *(key_after_xor + (i%16))^= *(key_in_file + i);
+  lmysql->ldbms_AES_set_decrypt_key(key_after_xor, 128, &key_for_aes);
+  while (fread(&cipher_chunk_length, 1, 4, file) == 4)
+  {
+    if (cipher_chunk_length > sizeof(cipher_chunk))
+    {
+      return -1;
+    }
+    if (fread(cipher_chunk, 1, cipher_chunk_length, file) != cipher_chunk_length)
+    {
+      return -1;
+    }
+    for (i= 0; i < cipher_chunk_length; i+= AES_BLOCK_SIZE)
+    {
+      lmysql->ldbms_AES_decrypt(cipher_chunk+i, output_buffer+output_length, &key_for_aes);
+      output_length+= AES_BLOCK_SIZE;
+      while ((output_length > 0) && (*(output_buffer+(output_length-1)) < ' ') && (*(output_buffer+(output_length-1)) != '\n')) --output_length;
+    }
+  }
+  *(output_buffer + output_length)= '\0';
+  return 0;
 }
 
 
