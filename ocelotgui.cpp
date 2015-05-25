@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.4.0 Alpha
-   Last modified: May 24 2015
+   Version: 0.5.0 Alpha
+   Last modified: May 25 2015
 */
 
 /*
@@ -485,7 +485,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static char ocelotgui_version[]="0.4 Alpha"; /* For --version. Make sure it's in manual too. */
+  static char ocelotgui_version[]="0.5 Alpha"; /* For --version. Make sure it's in manual too. */
 
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
@@ -1890,7 +1890,7 @@ void MainWindow::create_the_manual_widget()
   the_manual_text_edit->setText("\
 <BR><h1>The ocelotgui user manual</h1>  \
 <BR>  \
-<BR>Version 0.4.0, April 2 2015  \
+<BR>Version 0.5.0, May 25 2015  \
 <BR>  \
 <BR>  \
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -9166,6 +9166,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
       if (token0 == "-i") token0= "ignore_spaces";
       if (token0 == "-j") token0= "syslog";
       if (token0 == "-L") token0= "skip_line_numbers";
+      /* Somewhere I think I saw "l login-path" but it doesn't work with mysql client. */
       if (token0 == "-N") token0= "skip_column_names";
       if (token0 == "-n") token0= "unbuffered";
       if (token0 == "-o") token0= "one_database";
