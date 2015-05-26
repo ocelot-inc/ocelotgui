@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.5.0 Alpha
-   Last modified: May 25 2015
+   Last modified: May 26 2015
 */
 
 /*
@@ -1353,12 +1353,18 @@ void MainWindow::create_menu()
   connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
 
   menu_options= ui->menuBar->addMenu(tr("Options"));
-
-
   menu_options_action_option_display_blob_as_image= menu_options->addAction(tr("display BLOB as image"));
   menu_options_action_option_display_blob_as_image->setCheckable(true);
   menu_options_action_option_display_blob_as_image->setChecked(ocelot_display_blob_as_image);
   connect(menu_options_action_option_display_blob_as_image, SIGNAL(triggered(bool)), this, SLOT(action_option_display_blob_as_image(bool)));
+  menu_options_action_option_detach_history_widget= menu_options->addAction(tr("detach history widget"));
+  menu_options_action_option_detach_history_widget->setCheckable(true);
+  menu_options_action_option_detach_history_widget->setChecked(ocelot_detach_history_widget);
+  connect(menu_options_action_option_detach_history_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_history_widget(bool)));
+  menu_options_action_option_detach_result_grid_widget= menu_options->addAction(tr("detach result grid widget"));
+  menu_options_action_option_detach_result_grid_widget->setCheckable(true);
+  menu_options_action_option_detach_result_grid_widget->setChecked(ocelot_detach_result_grid_widget);
+  connect(menu_options_action_option_detach_result_grid_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_result_grid_widget(bool)));
 
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(tr("Debug"));
@@ -1841,6 +1847,46 @@ void MainWindow::action_exit()
 void MainWindow::action_option_display_blob_as_image(bool checked)
 {
   ocelot_display_blob_as_image= checked;
+  if (checked) menu_options_action_option_display_blob_as_image->setText("display BLOB as text");
+  else menu_options_action_option_display_blob_as_image->setText("display BLOB as image");
+}
+
+/* menu item = Options|detach history widget */
+void MainWindow::action_option_detach_history_widget(bool checked)
+{
+  bool is_visible= history_edit_widget->isVisible();
+  ocelot_detach_history_widget= checked;
+  if (checked)
+  {
+    menu_options_action_option_detach_history_widget->setText("attach history widget");
+    history_edit_widget->setWindowFlags(Qt::Window | Qt::WindowStaysOnTopHint);
+    history_edit_widget->setWindowTitle("history widget");
+  }
+  else
+  {
+    menu_options_action_option_detach_history_widget->setText("detach history widget");
+    history_edit_widget->setWindowFlags(Qt::Widget);
+  }
+  if (is_visible) history_edit_widget->show();
+}
+
+/* menu item = Options|detach result grid widget */
+void MainWindow::action_option_detach_result_grid_widget(bool checked)
+{
+  bool is_visible= result_grid_tab_widget->isVisible();
+  ocelot_detach_result_grid_widget= checked;
+  if (checked)
+  {
+    menu_options_action_option_detach_result_grid_widget->setText("attach result grid widget");
+    result_grid_tab_widget->setWindowFlags(Qt::Window | Qt::WindowStaysOnTopHint);
+    result_grid_tab_widget->setWindowTitle("result grid widget");
+  }
+  else
+  {
+    menu_options_action_option_detach_result_grid_widget->setText("detach result grid widget");
+    result_grid_tab_widget->setWindowFlags(Qt::Widget);
+  }
+  if (is_visible) result_grid_tab_widget->show();
 }
 
 

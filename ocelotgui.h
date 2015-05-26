@@ -71,6 +71,8 @@
   Weirdly, ocelotgui.h is included in two places, so say 'static'
 */
   static bool ocelot_display_blob_as_image= false;
+  static bool ocelot_detach_history_widget= false;
+  static bool ocelot_detach_result_grid_widget= false;
 
 namespace Ui
 {
@@ -266,6 +268,8 @@ public slots:
   void history_markup_previous();
   void history_markup_next();
   void action_option_display_blob_as_image(bool checked);
+  void action_option_detach_history_widget(bool checked);
+  void action_option_detach_result_grid_widget(bool checked);
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -741,6 +745,8 @@ private:
     QAction *menu_settings_action_menu;
   QMenu *menu_options;
     QAction *menu_options_action_option_display_blob_as_image;
+    QAction *menu_options_action_option_detach_history_widget;
+    QAction *menu_options_action_option_detach_result_grid_widget;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
