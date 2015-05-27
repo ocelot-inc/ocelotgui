@@ -1235,6 +1235,11 @@ public:
   typedef int             (*tmysql_real_query)   (MYSQL *, const char *, unsigned long);
   typedef int             (*tmysql_select_db)    (MYSQL *, const char *);
   typedef char*           (*tmysql_sqlstate)     (MYSQL *);
+  typedef bool            (*tmysql_ssl_set)      (MYSQL *, const char *,
+                                                  const char *,
+                                                  const char *,
+                                                  const char *,
+                                                  const char *);
   typedef MYSQL_RES*      (*tmysql_store_result) (MYSQL *);
   typedef unsigned int    (*tmysql_warning_count)(MYSQL *);
   typedef int             (*tAES_set_decrypt_key)(unsigned char *, int, AES_KEY *);
@@ -1262,6 +1267,7 @@ public:
   tmysql_real_query t__mysql_real_query;
   tmysql_select_db t__mysql_select_db;
   tmysql_sqlstate t__mysql_sqlstate;
+  tmysql_ssl_set t__mysql_ssl_set;
   tmysql_store_result t__mysql_store_result;
   tmysql_warning_count t__mysql_warning_count;
   tAES_set_decrypt_key t__AES_set_decrypt_key;
@@ -1413,6 +1419,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__mysql_real_query= (tmysql_real_query) dlsym(dlopen_handle, "mysql_real_query"); if (dlerror() != 0) s.append("mysql_real_query ");
         t__mysql_select_db= (tmysql_select_db) dlsym(dlopen_handle, "mysql_select_db"); if (dlerror() != 0) s.append("mysql_select_db ");
         t__mysql_sqlstate= (tmysql_sqlstate) dlsym(dlopen_handle, "mysql_sqlstate"); if (dlerror() != 0) s.append("mysql_sqlstate ");
+        t__mysql_ssl_set= (tmysql_ssl_set) dlsym(dlopen_handle, "mysql_ssl_set"); if (dlerror() != 0) t__mysql_ssl_set= NULL;
         t__mysql_store_result= (tmysql_store_result) dlsym(dlopen_handle, "mysql_store_result"); if (dlerror() != 0) s.append("mysql_store_result ");
         t__mysql_warning_count= (tmysql_warning_count) dlsym(dlopen_handle, "mysql_warning_count"); if (dlerror() != 0) s.append("mysql_warning_count ");
       }
@@ -1446,6 +1453,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_real_query= (tmysql_real_query) lib.resolve("mysql_real_query")) == 0) s.append("mysql_real_query ");
         if ((t__mysql_select_db= (tmysql_select_db) lib.resolve("mysql_select_db")) == 0) s.append("mysql_select_db ");
         if ((t__mysql_sqlstate= (tmysql_sqlstate) lib.resolve("mysql_sqlstate")) == 0) s.append("mysql_sqlstate ");
+        if ((t__mysql_ssl_set= (tmysql_ssl_set) lib.resolve("mysql_ssl_set")) == 0) t__mysql_ssl_set= NULL;
         if ((t__mysql_store_result= (tmysql_store_result) lib.resolve("mysql_store_result")) == 0) s.append("mysql_store_result ");
         if ((t__mysql_warning_count= (tmysql_warning_count) lib.resolve("mysql_warning_count")) == 0) s.append("mysql_warning_count ");
       }
@@ -1581,6 +1589,12 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   const char *ldbms_mysql_sqlstate(MYSQL *mysql)
   {
     return t__mysql_sqlstate(mysql);
+  }
+
+  bool ldbms_mysql_ssl_set(MYSQL *mysql, const char *a, const char *b, const char *c, const char *d, const char *e)
+  {
+    if (t__mysql_ssl_set == NULL) return 0;
+    return t__mysql_ssl_set(mysql, a, b, c, d, e);
   }
 
   unsigned int ldbms_mysql_warning_count(MYSQL *mysql)

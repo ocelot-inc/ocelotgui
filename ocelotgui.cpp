@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.5.0 Alpha
-   Last modified: May 26 2015
+   Last modified: May 27 2015
 */
 
 /*
@@ -10110,26 +10110,30 @@ int options_and_connect(
 #ifdef MYSQL_OPT_RECONNECT
   if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_RECONNECT, (char*)&ocelot_opt_reconnect);
 #endif
-#ifdef MYSQL_OPT_SSL_CA
-  if (ocelot_opt_ssl_ca_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CA, ocelot_ocelot_opt_ssl_ca_as_utf8);
-#endif
-#ifdef MYSQL_OPT_SSL_CAPATH
-  if (ocelot_opt_ssl_capath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CAPATH, ocelot_ocelot_opt_ssl_capath_as_utf8);
-#endif
-#ifdef MYSQL_OPT_SSL_CERT
-  if (ocelot_opt_ssl_cert_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CERT, ocelot_ocelot_opt_ssl_cert_as_utf8);
-#endif
-#ifdef MYSQL_OPT_SSL_CIPHER
-  if (ocelot_opt_ssl_cipher_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CIPHER, ocelot_ocelot_opt_ssl_cipher_as_utf8);
-#endif
+
+  /*
+    If dlopen() failed for "myql_ssl_set" then ldbms_mysql_ssl_set is a no-op, which is not an error.
+    For some options use mysql_ssl_set because it's in MySQL 5.5, for others use mysql_options.
+    We treat "" as the same as NULL, and prefer to pass NULL.
+    Instead of looking at ocelot_opt_ssl, we check whether anything is non-NULL.
+  */
+  {
+    char *a= 0, *b= 0, *c= 0, *d= 0, *e= 0;
+    if (ocelot_opt_ssl_key_as_utf8[0] != '\0') a= ocelot_opt_ssl_key_as_utf8;
+    if (ocelot_opt_ssl_cert_as_utf8[0] != '\0') b= ocelot_opt_ssl_cert_as_utf8;
+    if (ocelot_opt_ssl_ca_as_utf8[0] != '\0') c= ocelot_opt_ssl_ca_as_utf8;
+    if (ocelot_opt_ssl_capath_as_utf8[0] != '\0') d= ocelot_opt_ssl_capath_as_utf8;
+    if (ocelot_opt_ssl_cipher_as_utf8[0] != '\0') e= ocelot_opt_ssl_cipher_as_utf8;
+    if ((a != 0) || (b != 0) || (c != 0) || (d != 0) || (e != 0))
+    {
+      lmysql->ldbms_mysql_ssl_set(&mysql[connection_number], a, b, c, d, e);
+    }
+  }
 #ifdef MYSQL_OPT_SSL_CRL
   if (ocelot_opt_ssl_crl_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRL, ocelot_ocelot_opt_ssl_crl_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_CRLPATH
   if (ocelot_opt_ssl_crlpath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRLPATH, ocelot_ocelot_opt_ssl_crlpath_as_utf8);
-#endif
-#ifdef MYSQL_OPT_SSL_KEY
-  if (ocelot_opt_ssl_key_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_key, ocelot_ocelot_opt_ssl_key_as_utf8);
 #endif
 #ifdef MYSQL_OPT_SSL_VERIFY_SERVER_CERT
   if (ocelot_opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*) &ocelot_ocelot_opt_ssl_verify_server_cert);
