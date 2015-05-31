@@ -1740,6 +1740,7 @@ public:
   unsigned short ocelot_result_grid_column_names_copy;
   char *mysql_res_copy;                                          /* gets a copy of mysql_res contents, if necessary */
   char **mysql_res_copy_rows;                                      /* dynamic-sized list of mysql_res_copy row offsets, if necessary */
+  char *mysql_field_names_copy;                                  /* gets a copy of fields[].name */
   unsigned int ocelot_grid_max_grid_height_in_lines;             /* Todo: should be user-settable and passed */
 //  unsigned int grid_actual_grid_height_in_rows;
   unsigned int grid_actual_row_height_in_lines;
@@ -1893,6 +1894,7 @@ ResultGrid(
 
   mysql_res_copy= 0;
   mysql_res_copy_rows= 0;
+  mysql_field_names_copy= 0;
   text_edit_widget_font= this->font();
   set_frame_color_setting();
 }
@@ -1948,7 +1950,6 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
       grid_row_widgets[i_rp]->setLayout(grid_row_layouts[i_rp]);
     }
   }
-
 
   if (old_cell_pool_size < new_cell_pool_size)
   {
@@ -2056,6 +2057,9 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
     if (cell_pool_size < minimum_number_of_cells) cell_pool_size= minimum_number_of_cells;
   }
 
+
+
+
   /*
     Dynamic-sized arrays for rows and columns.
     Some are two-dimensional e.g. text_edit_widgets; I'll address its elements with text_edit_widgets[row*col+col].
@@ -2082,6 +2086,8 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   scan_rows(mysql_more_results_flag, result_column_count, result_row_count,
             grid_mysql_res, &mysql_res_copy, &mysql_res_copy_rows,
             &grid_max_column_widths);
+
+  scan_field_names(result_column_count, &mysql_field_names_copy);
 
 
   /*
@@ -2136,6 +2142,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
       //text_edit_frames[ki]->setStyleSheet(frame_color_setting);
 
+      /* Todo: remove this line and test whether anything goes wrong. */
       text_edit_frames[ki]->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);   /* This doesn't seem to do anything */
 
       /* Todo: I'm not sure exactly where the following three lines should go. Consider moving them. */
@@ -2148,6 +2155,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
   /* Set header text and colour. We will revert some of these changes during garbage_collect. */
   QString yy;
+  char *field_names_pointer= mysql_field_names_copy;
   for (unsigned int i_h= 0; i_h < result_column_count; ++i_h)                      /* row 0 is header */
   {
     text_edit_frames[0 * result_column_count + i_h]->is_style_sheet_set_flag= false;
@@ -2163,10 +2171,20 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
     /* We don't do the following because header might get lost if there are multiple result sets. */
     //text_edit_widgets[0 * result_column_count + i_h]->pointer= fields[i].name;
     //text_edit_widgets[0 * result_column_count + i_h]->length= fields[i].name_length;
-    text_edit_widgets[0 * result_column_count + i_h]->setText(QString::fromUtf8(fields[i_h].name, fields[i_h].name_length));
+    /* TEST! Removed setText and changed so is_retrieved_flag= false */
+    //text_edit_widgets[0 * result_column_count + i_h]->setText(QString::fromUtf8(fields[i_h].name, fields[i_h].name_length));
 
     //text_edit_widgets[0 * result_column_count + i_h]->setPlainText(yy);
-    text_edit_frames[0 * result_column_count + i_h]->is_retrieved_flag= true;
+
+    //text_edit_frames[i_h]->length= fields[i_h].name_length;
+    //text_edit_frames[i_h]->pointer_to_content= fields[i_h].name;
+
+    memcpy(&(text_edit_frames[i_h]->length), field_names_pointer, sizeof(unsigned long));
+    field_names_pointer+= sizeof(unsigned long);
+    text_edit_frames[i_h]->pointer_to_content= field_names_pointer;
+    field_names_pointer+= text_edit_frames[i_h]->length;
+
+    text_edit_frames[0 * result_column_count + i_h]->is_retrieved_flag= false;
     text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_column_number= i_h;
     text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_row_number= -1;          /* means header row */
     text_edit_frames[0 * result_column_count + i_h]->is_image_flag= false;
@@ -2188,10 +2206,12 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
       if (grid_row_number >= (result_row_count * result_column_count)) break;
       if (ocelot_result_grid_column_names > 0)
       {
+        /* todo: test whether we really need to show always */
         text_edit_frames[text_edit_frame_index]->show();
         grid_row_layouts[grid_row_number]->addWidget(text_edit_frames[text_edit_frame_index], 0, Qt::AlignTop | Qt::AlignLeft);
         ++text_edit_frame_index;
       }
+      /* todo: test whether we really need to show always */
       text_edit_frames[text_edit_frame_index]->show();
       grid_row_layouts[grid_row_number]->addWidget(text_edit_frames[text_edit_frame_index], 0, Qt::AlignTop | Qt::AlignLeft);
       ++text_edit_frame_index;
@@ -2279,15 +2299,16 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
                            + ocelot_grid_cell_drag_line_size_as_int;
           if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
           text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
-          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
-          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
+//          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
+//          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
         }
         else
         {
           text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], grid_column_heights[col]);
-          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(grid_column_heights[col]);
-          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(grid_column_heights[col]);
+//          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(grid_column_heights[col]);
+//          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(grid_column_heights[col]);
         }
+        /* todo: test whether we really need to show always */
         text_edit_frames[xrow * result_column_count + col]->show();
         grid_row_layouts[xrow]->addWidget(text_edit_frames[xrow * result_column_count + col], 0, Qt::AlignTop | Qt::AlignLeft);
       }
@@ -2616,7 +2637,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
   sum_tmp_column_lengths= 0;
 
   /*
-    The first approximation:
+    The first approximation
     Take it that grid_column_widths[i] = defined column width or max actual column width.
     If this is good enough, then grid_row_heights[i] = 1 char and column width = grid_column_widths[i] chars.
     Todo: the lengths are in bytes; take into account that they might arrive in a multi-byte character set.
@@ -2625,19 +2646,12 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
   {
     grid_column_widths[i]= dbms_get_field_name_length(i); /* this->fields[i].name_length; */
     if (grid_column_widths[i] < dbms_get_field_length(i)) grid_column_widths[i]= dbms_get_field_length(i); /* fields[i].length */
-
     /* For explanation of next line, see comment "Extra size". */
     if ((grid_column_widths[i] < 2) && (ocelot_grid_cell_drag_line_size_as_int > 0)) grid_column_widths[i]= 2;
-
     ++grid_column_widths[i]; /* ?? something do do with border width, I suppose */
-
-//    grid_column_widths[i]= grid_column_widths[i] * max_width_of_a_char+(border_size * 2) + 10; /* to pixels */
-
-
     grid_column_widths[i]= (grid_column_widths[i] * max_width_of_a_char)
                             + ocelot_grid_cell_border_size_as_int * 2
                             + ocelot_grid_cell_drag_line_size_as_int;
-
     sum_tmp_column_lengths+= grid_column_widths[i];
   }
 
@@ -2821,6 +2835,43 @@ void scan_rows(bool p_mysql_more_results_flag,
 }
 
 /*
+  Using the same technique as in scan_rows, make a copy of field names.
+
+  Todo: Wherever there is a reference to fields[...].name or fields[...].name_length,
+  replace with a reference to the appropriate spot in mysql_field_names_copy.
+
+*/
+void scan_field_names(
+               unsigned int p_result_column_count,
+               char **p_mysql_field_names_copy)
+{
+  unsigned int i;
+  unsigned long v_lengths;
+
+  /*
+    First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
+  */
+  unsigned int total_size= 0;
+  char *mysql_field_names_copy_pointer;
+  for (i= 0; i < p_result_column_count; ++i)                                /* first loop */
+  {
+      total_size+= sizeof(v_lengths);
+      total_size+= fields[i].name_length;
+  }
+  *p_mysql_field_names_copy= new char[total_size];                                              /* allocate */
+  mysql_field_names_copy_pointer= *p_mysql_field_names_copy;
+  for (i= 0; i < p_result_column_count; ++i)                                 /* second loop */
+  {
+    v_lengths= fields[i].name_length;
+    memcpy(mysql_field_names_copy_pointer, &v_lengths, sizeof(v_lengths));
+    mysql_field_names_copy_pointer+= sizeof(v_lengths);
+    memcpy(mysql_field_names_copy_pointer, fields[i].name, v_lengths);
+    mysql_field_names_copy_pointer+= v_lengths;
+  }
+}
+
+
+/*
    Set alignment and height of a cell.
    Todo: There's a terrible amount of duplication:
    If vertical == false, this happens once before we do any displaying (but we don't call this).
@@ -2919,6 +2970,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
     }
     for (;;)
     {
+      /* todo: bug: use mysql_field_names_copy, do not use fields[].name */
       ki= grid_row * columns_per_row;
       if (columns_per_row == 2)
       {
@@ -3174,6 +3226,7 @@ void garbage_collect()
   if (grid_column_dbms_field_numbers != 0) { delete [] grid_column_dbms_field_numbers; grid_column_dbms_field_numbers= 0; }
   if (mysql_res_copy != 0) { delete [] mysql_res_copy; mysql_res_copy= 0; }
   if (mysql_res_copy_rows != 0) { delete [] mysql_res_copy_rows; mysql_res_copy_rows= 0; }
+  if (mysql_field_names_copy != 0) { delete [] mysql_field_names_copy; mysql_field_names_copy= 0; }
   for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear();
 }
 
@@ -3182,7 +3235,7 @@ void set_frame_color_setting()
 {
   ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
   ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
-  frame_color_setting= "TextEditFrame {background-color: ";
+  frame_color_setting= "TextEditFrame{background-color: ";
   frame_color_setting.append(ocelot_grid_cell_drag_line_color);
   //frame_color_setting.append(";border: 0px");              /* TEST !! */
   frame_color_setting.append("}");
@@ -3197,7 +3250,8 @@ void set_frame_color_setting()
   the new style string, and to get its font we will create a temporary QTextEdit.
   Todo: I don't really want to "show" tmp_text_edit_widget, there's a cleverer way to get font which I've forgotten.
 */
-void set_all_style_sheets(QString new_ocelot_grid_style_string)
+void set_all_style_sheets(QString new_ocelot_grid_style_string,
+                          QString new_ocelot_grid_cell_drag_line_size)
 {
   TextEditWidget *tmp_text_edit_widget= new TextEditWidget(this);
   tmp_text_edit_widget->setStyleSheet(new_ocelot_grid_style_string);
@@ -3207,6 +3261,8 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string)
   delete tmp_text_edit_widget;
 //  this->setStyleSheet(ocelot_grid_style_string);
   unsigned int i_h;
+
+  ocelot_grid_cell_drag_line_size_as_int= new_ocelot_grid_cell_drag_line_size.toInt();
 
   set_frame_color_setting();
   for (i_h= 0; i_h < cell_pool_size; ++i_h)

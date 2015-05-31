@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.5.0 Alpha
-   Last modified: May 27 2015
+   Last modified: May 31 2015
 */
 
 /*
@@ -614,7 +614,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   initialize_widget_statement();
   for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
-    result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string);
+    result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
   }
 
   main_layout->addWidget(history_edit_widget);
@@ -6392,7 +6392,7 @@ int MainWindow::execute_client_statement(QString text)
         make_style_strings();
         for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
         {
-          result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string);
+          result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
         }
         statement_edit_widget->result= tr("OK");return 1;
       }
