@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.5.0 Alpha
-   Last modified: May 31 2015
+   Last modified: June 8 2015
 */
 
 /*
@@ -8680,7 +8680,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
   if (!(event->buttons() & Qt::LeftButton))
   {
     /* If cursor is over frame, set it to look like a point-both-ways arrow */
-    /* Actuallly "> border_size won't happen, if mouse is on frame it's draggable. */
+    /* Actually "> border_size won't happen, if mouse is on frame it's draggable. */
     /* Actually LEFT is impossible; we set left margin width= 0 earlier */
     /* if (event->x() <= border_size) {
        widget_side= LEFT;
@@ -8781,6 +8781,7 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
 */
 void TextEditFrame::paintEvent(QPaintEvent *event)
 {
+
   if (event == 0) return; /* this is just to avoid an "unused parameter" warning */
   if (ancestor_result_grid_widget->is_paintable == 1)
   {
