@@ -358,6 +358,7 @@ static const char *s_color_list[308]=
 "YellowGreen","#9ACD32",
 "",""};
 
+#include <assert.h>
 
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
@@ -514,6 +515,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   QMainWindow(parent),
   ui(new Ui::MainWindow)
 {
+
+  /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
+  assert(sizeof(int) >= 4);
+
   /* Initialization */
 
   ui->setupUi(this);              /* needed so that the menu will show up */
@@ -6562,7 +6567,7 @@ int MainWindow::rehash_scan()
 {
   MYSQL_RES *res= NULL;
 //  QString s;
-  unsigned long *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
+  unsigned int *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
 
   grid_max_column_widths= 0;
 
@@ -6585,7 +6590,7 @@ int MainWindow::rehash_scan()
 
   rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
   rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
-  grid_max_column_widths= new long unsigned int[rehash_result_column_count];
+  grid_max_column_widths= new unsigned int[rehash_result_column_count];
   result_grid_table_widget[0]->scan_rows(
           true, /* mysql_more_results_flag, */
           rehash_result_column_count, /* result_column_count, */
@@ -8812,8 +8817,8 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
         {
           if (is_image_flag == false)
           {
-            if (pointer_to_content == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
-            else text_edit->setText(QString::fromUtf8(pointer_to_content, length));
+            if (content_pointer == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+            else text_edit->setText(QString::fromUtf8(content_pointer, content_length));
           }
           is_retrieved_flag= true;
         }
@@ -8856,15 +8861,15 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
   }
   //QPixmap p= QPixmap(QSize(event->rect().width(), event->rect().height()));
   QPixmap p= QPixmap();
-  if (p.loadFromData((const uchar*) text_edit_frame_of_cell->pointer_to_content,
-                     text_edit_frame_of_cell->length,
+  if (p.loadFromData((const uchar*) text_edit_frame_of_cell->content_pointer,
+                     text_edit_frame_of_cell->content_length,
                      0,
                      Qt::AutoColor) == false)
   {
-    if (text_edit_frame_of_cell->pointer_to_content != 0)
+    if (text_edit_frame_of_cell->content_pointer != 0)
     {
-      setText(QString::fromUtf8(text_edit_frame_of_cell->pointer_to_content,
-                                text_edit_frame_of_cell->length));
+      setText(QString::fromUtf8(text_edit_frame_of_cell->content_pointer,
+                                text_edit_frame_of_cell->content_length));
     }
     QTextEdit::paintEvent(event);
     return;
@@ -8874,6 +8879,165 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
   painter.drawPixmap(event->rect(), p);
   return;
 }
+
+
+/*
+  If the user changes the contents of a cell, that indicates a desire to update the row.
+  Make a statement: UPDATE table SET changed-columns WHERE short-columns.
+  Re WHERE clause:
+    Ideally there is a set of columns in the result set which
+    appear in a unique not-null index, such as a primary-key index.
+    But we don't check for that! We merely check for values which
+    are shorter than 128 bytes (thus avoiding most BLOB searches).
+    If we get 50 thousand hits, so be it, the user asked for it.
+    Alternative: we could put a LIMIT on.
+    Alternative: we could SELECT first, and then UPDATE.
+    Alternative: we could UPDATE, then ROLLBACK to savepoint if too many.
+    Alternative: we could select from information_schema.statistics.
+  TODO: figure out what to do with the string -- is it a hint? does it go direct to statement?
+        Perhaps: when the user clicks on a different row, or tries to leave: suggest it.
+  TODO: If it's binary or blob, we should do the editing as 0x... rather than '...'.
+  TODO: Trail spaces should not matter for char, should matter for binary.
+  TODO: I am not distinguishing between NULL and 'NULL'
+  TODO: If the SELECT originally had a search-condition X = literal, you could incorporate that
+  TODO: If different columns come from different tables, update is impossible, do nothing
+*/
+#define MAX_WHERE_CLAUSE_LITERAL_SIZE 128   /* arbitrary. maybe should be user-settable. */
+void TextEditWidget::keyPressEvent(QKeyEvent *event)
+{
+  QString content_in_result_set;
+  QString content_in_text_edit_widget;
+  QString name_in_result_set;
+  QString update_statement, where_clause;
+  QString content_in_cell_before_keypress= toPlainText();
+  QTextEdit::keyPressEvent(event);
+  QString content_in_cell_after_keypress= toPlainText();
+  TextEditFrame *text_edit_frame;
+  int xrow= text_edit_frame_of_cell->ancestor_grid_row_number;
+  if ((xrow != -1) && (content_in_cell_before_keypress != content_in_cell_after_keypress))
+  {
+    ++xrow; /* possible bug: should this be done if there's no header row? */
+    /* Content has changed since the last keyPressEvent. */
+    /* column number = text_edit_frame_of_cell->ancestor_grid_column_number */
+    /* length = text_edit_frame_of_cell->content_length */
+    /* *content = text_edit_frame_of_cell->content_pointer, which should be 0 for null */
+    ResultGrid *result_grid= text_edit_frame_of_cell->ancestor_result_grid_widget;
+    /* result_grid->text_edit_frames[0] etc. have all the TextEditFrame widgets of the rows */
+    update_statement= "";
+    where_clause= "";
+    char *name_pointer, *table_pointer, *db_pointer;
+    unsigned int name_length, table_length, db_length;
+    char *field_names_pointer, *org_tables_pointer, *dbs_pointer;
+    field_names_pointer= result_grid->mysql_field_org_names_copy;
+    org_tables_pointer= result_grid->mysql_field_org_tables_copy;
+    dbs_pointer= result_grid->mysql_field_dbs_copy;
+    for (unsigned int column_number= 0; column_number < result_grid->result_column_count; ++column_number)
+    {
+      memcpy(&name_length, field_names_pointer, sizeof(unsigned int));
+      field_names_pointer+= sizeof(unsigned int);
+      name_pointer= field_names_pointer;
+      field_names_pointer+= name_length;
+
+      memcpy(&table_length, org_tables_pointer, sizeof(unsigned int));
+      org_tables_pointer+= sizeof(unsigned int);
+      table_pointer= org_tables_pointer;
+      org_tables_pointer+= table_length;
+
+      memcpy(&db_length, dbs_pointer, sizeof(unsigned int));
+      dbs_pointer+= sizeof(unsigned int);
+      db_pointer= dbs_pointer;
+      dbs_pointer+= db_length;
+      if (name_length == 0) continue; /* if in UNION or column-expression, skip it */
+
+      int ki= xrow * result_grid->result_column_count + column_number;
+      text_edit_frame= result_grid->text_edit_frames[ki];
+      char *p= text_edit_frame->content_pointer;
+      int l;
+      if (p == 0) l= 0; /* if content_pointer == 0, that means null */
+      else
+      {
+        l= text_edit_frame->content_length;
+        content_in_result_set= QString::fromUtf8(p, l);
+      }
+      name_in_result_set= QString::fromUtf8(name_pointer, name_length);
+      if (l <= MAX_WHERE_CLAUSE_LITERAL_SIZE)
+      {
+        if (where_clause == "") where_clause= " WHERE ";
+        else where_clause.append(" AND ");
+        where_clause.append(name_in_result_set);
+        if (p == 0) where_clause.append(" IS NULL");
+        else
+        {
+          where_clause.append("=");
+          QString s;
+          if (result_grid->grid_column_dbms_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
+            s= content_in_result_set;
+          else s= unstripper(content_in_result_set);
+          where_clause.append(s);
+        }
+      }
+      if (text_edit_frame->is_retrieved_flag == true)
+      {
+        content_in_text_edit_widget= result_grid->text_edit_widgets[ki]->toPlainText();
+        bool contents_changed_flag= true;
+        if ((p == 0) && (content_in_text_edit_widget == NULL_STRING)) contents_changed_flag= false;
+        else if (content_in_text_edit_widget == content_in_result_set) contents_changed_flag= false;
+        if (contents_changed_flag == true)
+        {
+          if (update_statement == "")
+          {
+            update_statement= "/* generated */ UPDATE ";
+            update_statement.append(QString::fromUtf8(db_pointer, db_length));
+            update_statement.append(".");
+            update_statement.append(QString::fromUtf8(table_pointer, table_length));
+            update_statement.append(" SET ");
+          }
+          else update_statement.append(",");
+          update_statement.append(name_in_result_set);
+          update_statement.append('=');
+          if ((result_grid->grid_column_dbms_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
+          || (content_in_text_edit_widget == NULL_STRING))
+            update_statement.append(content_in_text_edit_widget);
+          else update_statement.append(unstripper(content_in_text_edit_widget));
+        }
+      }
+    }
+    /* We've got a string. If it's not blank, put it in the statement widget, overwriting. */
+    /* It might be blank because user returned to the original values, if so wipe out. */
+    MainWindow *m= result_grid->copy_of_parent;
+    CodeEditor *c= m->statement_edit_widget;
+    if (update_statement != "")
+    {
+      update_statement.append(where_clause);
+      update_statement.append(";");
+      c->setPlainText(update_statement);
+    }
+    else
+    {
+      if (c->toPlainText().mid(0, 23) == "/* generated */ UPDATE ") c->setPlainText("");
+    }
+  }
+}
+
+
+/* Add ' at start and end of a string. Change ' to '' within string. Compare connect_stripper(). */
+/* mysql_hex_string() might be useful for some column types here */
+QString TextEditWidget::unstripper(QString value_to_unstrip)
+{
+  QString s;
+  QString c;
+
+  s= "'";
+  for (int i= 0; i < value_to_unstrip.count(); ++i)
+  {
+    c= value_to_unstrip.mid(i, 1);
+    s.append(c);
+    if (c == "'") s.append(c);
+  }
+  s.append("'");
+  return s;
+}
+
 
 /*
   CONNECT

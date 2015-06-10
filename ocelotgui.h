@@ -247,6 +247,8 @@ public:
   QString ocelot_history_tee_file_name;      /* for tee */
   FILE *ocelot_history_tee_file;             /* for tee */
 
+  CodeEditor *statement_edit_widget;
+
 public slots:
   void action_connect();
   void action_connect_once(QString);
@@ -709,7 +711,6 @@ private:
   QWidget *main_window;
   QVBoxLayout *main_layout;
 
-  CodeEditor *statement_edit_widget;
   QTextEdit *history_edit_widget;
 #ifdef DEBUGGER
 #define DEBUG_TAB_WIDGET_MAX 10
@@ -830,8 +831,8 @@ public:
   unsigned int text_edit_frames_index;                 /* e.g. for text_edit_frames[5] this will contain 5 */
   int ancestor_grid_column_number;
   int ancestor_grid_row_number;
-  int length;
-  char *pointer_to_content;
+  unsigned int content_length;
+  char *content_pointer;
   bool is_retrieved_flag;
   bool is_style_sheet_set_flag;
   bool is_image_flag;                    /* true if data type = blob and appropriate flag is on */
@@ -864,6 +865,9 @@ public:
 
 protected:
   void paintEvent(QPaintEvent *event);
+  void keyPressEvent(QKeyEvent *event);
+
+  QString unstripper(QString value_to_unstrip);
 
 };
 
@@ -1715,12 +1719,13 @@ public:
 
   unsigned int result_column_count;
   long unsigned int result_row_count, grid_result_row_count;
-  unsigned long *lengths;
-  unsigned long *grid_column_widths;                         /* dynamic-sized list of widths */
-  unsigned long *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
+  long unsigned int *lengths;
+  unsigned int *grid_column_widths;                         /* dynamic-sized list of widths */
+  unsigned int *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
   unsigned int *grid_column_heights;                         /* dynamic-sized list of heights */
   unsigned char *grid_column_dbms_sources;                   /* dynamic-sized list of sources */
   unsigned short int *grid_column_dbms_field_numbers;        /* dynamic-sized list of field numbers */
+  unsigned short int *grid_column_dbms_field_types;          /* dynamic-sized list of types */
   unsigned long r;
   MYSQL_ROW row;
   int is_paintable;
@@ -1743,6 +1748,9 @@ public:
   char *mysql_res_copy;                                          /* gets a copy of mysql_res contents, if necessary */
   char **mysql_res_copy_rows;                                      /* dynamic-sized list of mysql_res_copy row offsets, if necessary */
   char *mysql_field_names_copy;                                  /* gets a copy of fields[].name */
+  char *mysql_field_org_names_copy;                              /* gets a copy of fields[].org_name */
+  char *mysql_field_org_tables_copy;                             /* gets a copy of fields[].org_table */
+  char *mysql_field_dbs_copy;                                    /* gets a copy of fields[].db */
 //  unsigned int grid_actual_grid_height_in_rows;
   unsigned int grid_actual_row_height_in_lines;
   /* ocelot_grid_height_of_highest_column will be between 1 and ocelot_grid_max_column_height_in_lines, * pixels-per-line */
@@ -1800,6 +1808,7 @@ ResultGrid(
   grid_column_heights= 0;
   grid_column_dbms_sources= 0;
   grid_column_dbms_field_numbers= 0;
+  grid_column_dbms_field_types= 0;
   grid_vertical_scroll_bar= 0;
   grid_scroll_area= 0;
   /* grid_layout= 0; */
@@ -1898,6 +1907,9 @@ ResultGrid(
   mysql_res_copy= 0;
   mysql_res_copy_rows= 0;
   mysql_field_names_copy= 0;
+  mysql_field_org_names_copy= 0;
+  mysql_field_org_tables_copy= 0;
+  mysql_field_dbs_copy= 0;
   text_edit_widget_font= this->font();
   set_frame_color_setting();
 }
@@ -2067,11 +2079,12 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   */
   /* ... */
 
-  grid_column_widths= new long unsigned int[result_column_count];
-  grid_max_column_widths= new long unsigned int[result_column_count];
+  grid_column_widths= new unsigned int[result_column_count];
+  grid_max_column_widths= new unsigned int[result_column_count];
   grid_column_heights= new unsigned int[result_column_count];
   grid_column_dbms_sources= new unsigned char[result_column_count];
   grid_column_dbms_field_numbers= new unsigned short int[result_column_count];
+  grid_column_dbms_field_types= new unsigned short int[result_column_count];
   /* ... */
 
   dbms_set_grid_column_sources();                                             /* Todo: this could return an error? */
@@ -2087,8 +2100,12 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
             grid_mysql_res, &mysql_res_copy, &mysql_res_copy_rows,
             &grid_max_column_widths);
 
-  scan_field_names(result_column_count, &mysql_field_names_copy);
-
+  scan_field_names("name", result_column_count, &mysql_field_names_copy);
+  /* Next three scan_field_names calls are only needed if user will edit the result set */
+  scan_field_names("org_name", result_column_count, &mysql_field_org_names_copy);
+  scan_field_names("org_table", result_column_count, &mysql_field_org_tables_copy);
+  scan_field_names("db", result_column_count, &mysql_field_dbs_copy);
+  for (unsigned int i= 0; i < result_column_count; ++i) grid_column_dbms_field_types[i]= fields[i].type;
 
   /*
     Calculate desired width and height based on parent width and height.
@@ -2154,7 +2171,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   }
 
   /* Set header text and colour. We will revert some of these changes during garbage_collect. */
-  QString yy;
+  //QString yy;
   char *field_names_pointer= mysql_field_names_copy;
   for (unsigned int i_h= 0; i_h < result_column_count; ++i_h)                      /* row 0 is header */
   {
@@ -2176,13 +2193,13 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
     //text_edit_widgets[0 * result_column_count + i_h]->setPlainText(yy);
 
-    //text_edit_frames[i_h]->length= fields[i_h].name_length;
-    //text_edit_frames[i_h]->pointer_to_content= fields[i_h].name;
+    //text_edit_frames[i_h]->content_length= fields[i_h].name_length;
+    //text_edit_frames[i_h]->content_pointer= fields[i_h].name;
 
-    memcpy(&(text_edit_frames[i_h]->length), field_names_pointer, sizeof(unsigned long));
-    field_names_pointer+= sizeof(unsigned long);
-    text_edit_frames[i_h]->pointer_to_content= field_names_pointer;
-    field_names_pointer+= text_edit_frames[i_h]->length;
+    memcpy(&(text_edit_frames[i_h]->content_length), field_names_pointer, sizeof(unsigned int));
+    field_names_pointer+= sizeof(unsigned int);
+    text_edit_frames[i_h]->content_pointer= field_names_pointer;
+    field_names_pointer+= text_edit_frames[i_h]->content_length;
 
     text_edit_frames[0 * result_column_count + i_h]->is_retrieved_flag= false;
     text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_column_number= i_h;
@@ -2374,7 +2391,7 @@ QString copy(unsigned int ocelot_history_max_column_width,
   long unsigned int xrow;
   unsigned int length;
   unsigned int history_result_column_count;
-  unsigned long *history_max_column_widths;
+  unsigned int *history_max_column_widths;
   unsigned long history_result_row_count;
   char *history_line;
   char *pointer_to_history_line;
@@ -2388,7 +2405,7 @@ QString copy(unsigned int ocelot_history_max_column_width,
   if (result_column_count > ocelot_history_max_column_count) history_result_column_count= ocelot_history_max_column_count;
   else history_result_column_count= result_column_count;
 
-  history_max_column_widths= new long unsigned int[history_result_column_count];
+  history_max_column_widths= new unsigned int[history_result_column_count];
   history_line_width= 2;
   unsigned int column_width;
   for (col= 0; col < history_result_column_count; ++col)
@@ -2619,12 +2636,12 @@ QString copy(unsigned int ocelot_history_max_column_width,
 void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_drag_line_size_as_int)
 {
   unsigned int i;
-  /* long unsigned int tmp_column_lengths[MAX_COLUMNS]; */
-  long unsigned int sum_tmp_column_lengths;
-  long unsigned int sum_amount_reduced;
-  long unsigned int necessary_reduction;
-  long unsigned int amount_being_reduced;
-  long unsigned int max_reduction;
+  /* unsigned int tmp_column_lengths[MAX_COLUMNS]; */
+  unsigned int sum_tmp_column_lengths;
+  unsigned int sum_amount_reduced;
+  unsigned int necessary_reduction;
+  unsigned int amount_being_reduced;
+  unsigned int max_reduction;
   QFont *pointer_to_font;
 
   pointer_to_font= &text_edit_widget_font;
@@ -2744,7 +2761,7 @@ void scan_rows(bool p_mysql_more_results_flag,
                MYSQL_RES *p_mysql_res,
                char **p_mysql_res_copy,
                char ***p_mysql_res_copy_rows,
-               unsigned long **p_grid_max_column_widths)
+               unsigned int **p_grid_max_column_widths)
 {
   unsigned long int v_r;
   unsigned int i;
@@ -2792,12 +2809,12 @@ void scan_rows(bool p_mysql_more_results_flag,
 //      ki= (v_r + 1) * result_column_count + i;
       if ((v_row == 0) || (v_row[i] == 0))
       {
-        total_size+= sizeof(v_lengths[i]);
+        total_size+= sizeof(unsigned int);
         total_size+= sizeof(NULL_STRING) - 1;
       }
       else
       {
-        total_size+= sizeof(v_lengths[i]);
+        total_size+= sizeof(unsigned int);
         total_size+= v_lengths[i];
       }
     }
@@ -2819,15 +2836,15 @@ void scan_rows(bool p_mysql_more_results_flag,
       {
         if (sizeof(NULL_STRING) - 1 > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
         memcpy(mysql_res_copy_pointer, &null_length, sizeof(null_length));
-        mysql_res_copy_pointer+= sizeof(v_lengths[i]);
+        mysql_res_copy_pointer+= sizeof(unsigned int);
         memcpy(mysql_res_copy_pointer,NULL_STRING, sizeof(NULL_STRING) - 1);
         mysql_res_copy_pointer+= sizeof(NULL_STRING) - 1;
       }
       else
       {
         if (v_lengths[i] > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= v_lengths[i];
-        memcpy(mysql_res_copy_pointer, &v_lengths[i], sizeof(v_lengths[i]));
-        mysql_res_copy_pointer+= sizeof(v_lengths[i]);
+        memcpy(mysql_res_copy_pointer, &v_lengths[i], sizeof(unsigned int));
+        mysql_res_copy_pointer+= sizeof(unsigned int);
         memcpy(mysql_res_copy_pointer, v_row[i], v_lengths[i]);
         mysql_res_copy_pointer+= v_lengths[i];
       }
@@ -2841,13 +2858,19 @@ void scan_rows(bool p_mysql_more_results_flag,
   Todo: Wherever there is a reference to fields[...].name or fields[...].name_length,
   replace with a reference to the appropriate spot in mysql_field_names_copy.
 
+  MYSQL_FIELD has: name, org_name, org_table, db. We only need name for result set
+  display, but we need the others if user edits the result set (see TextEditWidget::keyPressEvent).
+  Todo: we could try going through the token list to find this out, but it's tough
+  to watch for AS clauses + UNIONs + expressions + which-field-is-which-table, and
+  I'm not sure what would occur when the SELECT is inside a stored procedure.
 */
 void scan_field_names(
+               const char *which_field,
                unsigned int p_result_column_count,
                char **p_mysql_field_names_copy)
 {
   unsigned int i;
-  unsigned long v_lengths;
+  unsigned int v_lengths;
 
   /*
     First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
@@ -2856,21 +2879,29 @@ void scan_field_names(
   char *mysql_field_names_copy_pointer;
   for (i= 0; i < p_result_column_count; ++i)                                /* first loop */
   {
-      total_size+= sizeof(v_lengths);
-      total_size+= fields[i].name_length;
+      total_size+= sizeof(unsigned int);
+      if (strcmp(which_field, "name") == 0) total_size+= fields[i].name_length;
+      else if (strcmp(which_field, "org_name") == 0) total_size+= fields[i].org_name_length;
+      else if (strcmp(which_field, "org_table") == 0) total_size+= fields[i].org_table_length;
+      else /* if (strcmp(which_field, "db") == 0) */ total_size+= fields[i].db_length;
   }
   *p_mysql_field_names_copy= new char[total_size];                                              /* allocate */
   mysql_field_names_copy_pointer= *p_mysql_field_names_copy;
   for (i= 0; i < p_result_column_count; ++i)                                 /* second loop */
   {
-    v_lengths= fields[i].name_length;
-    memcpy(mysql_field_names_copy_pointer, &v_lengths, sizeof(v_lengths));
-    mysql_field_names_copy_pointer+= sizeof(v_lengths);
-    memcpy(mysql_field_names_copy_pointer, fields[i].name, v_lengths);
+    if (strcmp(which_field, "name") == 0) v_lengths= fields[i].name_length;
+    else if (strcmp(which_field, "org_name") == 0) v_lengths= fields[i].org_name_length;
+    else if (strcmp(which_field, "org_table") == 0) v_lengths= fields[i].org_table_length;
+    else /* if (strcmp(which_field, "db") == 0) */ v_lengths= fields[i].db_length;
+    memcpy(mysql_field_names_copy_pointer, &v_lengths, sizeof(unsigned int));
+    mysql_field_names_copy_pointer+= sizeof(unsigned int);
+    if (strcmp(which_field, "name") == 0) memcpy(mysql_field_names_copy_pointer, fields[i].name, v_lengths);
+    else if (strcmp(which_field, "org_name") == 0) memcpy(mysql_field_names_copy_pointer, fields[i].org_name, v_lengths);
+    else if (strcmp(which_field, "org_table") == 0) memcpy(mysql_field_names_copy_pointer, fields[i].org_table, v_lengths);
+    else /* if (strcmp(which_field, "db") == 0) */ memcpy(mysql_field_names_copy_pointer, fields[i].db, v_lengths);
     mysql_field_names_copy_pointer+= v_lengths;
   }
 }
-
 
 /*
    Set alignment and height of a cell.
@@ -2916,7 +2947,7 @@ void set_alignment_and_height(int ki, int col, int grid_col)
     if (grid_col == 0)
     {
       /* Todo: this should be based on QFontMetrics, 20 is so arbitrary */
-      this_width= (20) * (text_edit_frames[ki]->length + 1);
+      this_width= (20) * (text_edit_frames[ki]->content_length + 1);
     }
     else this_width= grid_column_widths[col];
     text_edit_frames[ki]->setFixedSize(this_width, grid_column_heights[col]);
@@ -2975,8 +3006,8 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       ki= grid_row * columns_per_row;
       if (columns_per_row == 2)
       {
-        text_edit_frames[ki]->length= fields[i].name_length;
-        text_edit_frames[ki]->pointer_to_content= fields[i].name;
+        text_edit_frames[ki]->content_length= fields[i].name_length;
+        text_edit_frames[ki]->content_pointer= fields[i].name;
         text_edit_frames[ki]->is_retrieved_flag= false;
         text_edit_frames[ki]->ancestor_grid_column_number= i;
         text_edit_frames[ki]->ancestor_grid_row_number= r;
@@ -2985,8 +3016,8 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
         text_edit_frames[ki]->show();
         ++ki;
       }
-      text_edit_frames[ki]->length= lengths[i];
-      text_edit_frames[ki]->pointer_to_content= row[i];
+      text_edit_frames[ki]->content_length= lengths[i];
+      text_edit_frames[ki]->content_pointer= row[i];
       text_edit_frames[ki]->is_retrieved_flag= false;
       text_edit_frames[ki]->ancestor_grid_column_number= i;
       text_edit_frames[ki]->ancestor_grid_row_number= r;
@@ -3040,15 +3071,15 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
         ki= grid_row * result_column_count + i;
         if ((row == 0) || (row[i] == 0))
         {
-          text_edit_frames[ki]->length= sizeof(NULL_STRING) - 1;
-          text_edit_frames[ki]->pointer_to_content= 0;
+          text_edit_frames[ki]->content_length= sizeof(NULL_STRING) - 1;
+          text_edit_frames[ki]->content_pointer= 0;
           text_edit_frames[ki]->is_image_flag= false;
 //          if (sizeof(NULL_STRING) - 1 > grid_max_column_widths[i]) grid_max_column_widths[i]= sizeof(NULL_STRING) - 1;
         }
         else
         {
-          text_edit_frames[ki]->length= lengths[i];
-          text_edit_frames[ki]->pointer_to_content= row[i];
+          text_edit_frames[ki]->content_length= lengths[i];
+          text_edit_frames[ki]->content_pointer= row[i];
 //          if (lengths[i] > grid_max_column_widths[i]) grid_max_column_widths[i]= lengths[i];
           if ((fields[i].type == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
           {
@@ -3082,10 +3113,10 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
     for (i= 0; i < result_column_count; ++i)
     {
       ki= grid_row * result_column_count + i;
-      memcpy(&(text_edit_frames[ki]->length), row_pointer, sizeof(lengths[i]));
-      row_pointer+= sizeof(lengths[i]);
-      text_edit_frames[ki]->pointer_to_content= row_pointer;
-      row_pointer+= text_edit_frames[ki]->length;
+      memcpy(&(text_edit_frames[ki]->content_length), row_pointer, sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int);
+      text_edit_frames[ki]->content_pointer= row_pointer;
+      row_pointer+= text_edit_frames[ki]->content_length;
       text_edit_frames[ki]->is_retrieved_flag= false;
       text_edit_frames[ki]->ancestor_grid_column_number= i;
       text_edit_frames[ki]->ancestor_grid_row_number= r;
@@ -3261,9 +3292,13 @@ void garbage_collect()
   if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
   if (grid_column_dbms_sources != 0) { delete [] grid_column_dbms_sources; grid_column_dbms_sources= 0; }
   if (grid_column_dbms_field_numbers != 0) { delete [] grid_column_dbms_field_numbers; grid_column_dbms_field_numbers= 0; }
+  if (grid_column_dbms_field_types != 0) { delete [] grid_column_dbms_field_types; grid_column_dbms_field_types= 0; }
   if (mysql_res_copy != 0) { delete [] mysql_res_copy; mysql_res_copy= 0; }
   if (mysql_res_copy_rows != 0) { delete [] mysql_res_copy_rows; mysql_res_copy_rows= 0; }
   if (mysql_field_names_copy != 0) { delete [] mysql_field_names_copy; mysql_field_names_copy= 0; }
+  if (mysql_field_org_names_copy != 0) { delete [] mysql_field_org_names_copy; mysql_field_org_names_copy= 0; }
+  if (mysql_field_org_tables_copy != 0) { delete [] mysql_field_org_tables_copy; mysql_field_org_tables_copy= 0; }
+  if (mysql_field_dbs_copy != 0) { delete [] mysql_field_dbs_copy; mysql_field_dbs_copy= 0; }
   for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear();
 }
 
@@ -3393,6 +3428,7 @@ unsigned int dbms_get_field_length(unsigned int column_number)
   }
   return 0; /* to avoid "control reaches end of non-void function" warning */
 }
+
 
 unsigned int dbms_get_field_flag(unsigned int column_number)
 {
