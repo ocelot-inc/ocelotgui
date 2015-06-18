@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.5.0 Alpha
-   Last modified: June 8 2015
+   Last modified: June 18 2015
 */
 
 /*
@@ -480,8 +480,8 @@ static const char *s_color_list[308]=
 /* copy of an information_schema.columns select, used for rehash */
   static  unsigned int rehash_result_column_count= 0;
   static unsigned int rehash_result_row_count= 0;
-  static char *rehash_mysql_res_copy= 0;       /* gets a copy of mysql_res contents, if necessary */
-  static char **rehash_mysql_res_copy_rows= 0; /* dynamic-sized list of mysql_res_copy row offsets, if necessary */
+  static char *rehash_result_set_copy= 0;       /* gets a copy of mysql_res contents, if necessary */
+  static char **rehash_result_set_copy_rows= 0; /* dynamic-sized list of result_set_copy row offsets, if necessary */
 
   int options_and_connect(unsigned int connection_number);
 
@@ -5670,9 +5670,9 @@ void MainWindow::action_execute_one_statement(QString text)
           }
           //QFont tmp_font;
           //tmp_font= result_grid_table_widget[0]->font();
-          result_grid_table_widget[0]->fillup(mysql_res, this, lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]),
+          result_grid_table_widget[0]->fillup(mysql_res, this,
                                               is_vertical, ocelot_result_grid_column_names,
-                                              lmysql);
+                                              lmysql, ocelot_line_numbers);
           result_grid_tab_widget->setCurrentWidget(result_grid_table_widget[0]);
           result_grid_tab_widget->tabBar()->hide();
           result_grid_table_widget[0]->show();
@@ -5727,10 +5727,11 @@ void MainWindow::action_execute_one_statement(QString text)
               {
                 result_grid_tab_widget->tabBar()->show(); /* is this in the wrong place? */
                 result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
-                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, this, true,
+                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, this,
                                                                                  is_vertical,
                                                                                  ocelot_result_grid_column_names,
-                                                                                 lmysql);
+                                                                                 lmysql,
+                                                                                 ocelot_line_numbers);
                 result_grid_table_widget[result_grid_table_widget_index]->show();
 
                 //Put in something based on this if you want extra results to go to history:
@@ -6567,13 +6568,13 @@ int MainWindow::rehash_scan()
 {
   MYSQL_RES *res= NULL;
 //  QString s;
-  unsigned int *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
+  unsigned int *result_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
 
-  grid_max_column_widths= 0;
+  result_max_column_widths= 0;
 
   /* garbage_collect from the last rehash, if any */
-  if (rehash_mysql_res_copy != 0) { delete [] rehash_mysql_res_copy; rehash_mysql_res_copy= 0; }
-  if (rehash_mysql_res_copy_rows != 0) { delete [] rehash_mysql_res_copy_rows; rehash_mysql_res_copy_rows= 0; }
+  if (rehash_result_set_copy != 0) { delete [] rehash_result_set_copy; rehash_result_set_copy= 0; }
+  if (rehash_result_set_copy_rows != 0) { delete [] rehash_result_set_copy_rows; rehash_result_set_copy_rows= 0; }
   rehash_result_column_count= 0;
   rehash_result_row_count= 0;
 
@@ -6590,19 +6591,18 @@ int MainWindow::rehash_scan()
 
   rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
   rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
-  grid_max_column_widths= new unsigned int[rehash_result_column_count];
+  result_max_column_widths= new unsigned int[rehash_result_column_count];
   result_grid_table_widget[0]->scan_rows(
-          true, /* mysql_more_results_flag, */
           rehash_result_column_count, /* result_column_count, */
           rehash_result_row_count, /* result_row_count, */
           res, /* grid_mysql_res, */
-          &rehash_mysql_res_copy,
-          &rehash_mysql_res_copy_rows,
-          &grid_max_column_widths);
+          &rehash_result_set_copy,
+          &rehash_result_set_copy_rows,
+          &result_max_column_widths);
 
   lmysql->ldbms_mysql_free_result(res);
 
-  delete [] grid_max_column_widths;
+  delete [] result_max_column_widths;
 
   return rehash_result_row_count;
 }
@@ -6625,11 +6625,11 @@ void MainWindow::rehash_search(char *search_string)
 
   for (r= 0; r < rehash_result_row_count; ++r)
   {
-    row_pointer= rehash_mysql_res_copy_rows[r];
+    row_pointer= rehash_result_set_copy_rows[r];
     for (i= 0; i < rehash_result_column_count; ++i)
     {
-      memcpy(&column_length, row_pointer, sizeof(column_length));
-      row_pointer+= sizeof(column_length);
+      memcpy(&column_length, row_pointer, sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int) + sizeof(char);
       /* Now row_pointer points to contents, length has # of bytes */
       if (i == 1)
       {
@@ -8710,20 +8710,22 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
   {
     if (event->x() > minimum_width)
     {
-      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy > 0)
+      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy != 0)
       {
         setFixedSize(event->x(), height());
       }
       else
       {
         /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
+        /* Todo: find out why it's "result_row_count + 1" rather than based on gridx_row_count */
         ancestor_result_grid_widget->grid_column_widths[ancestor_grid_column_number]= event->x();
         int xheight;
         for (long unsigned int xrow= 0;
-             (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
+             (xrow < ancestor_result_grid_widget->result_row_count + 1)
+             && (xrow < ancestor_result_grid_widget->result_grid_widget_max_height_in_lines_at_fillup_time);
              ++xrow)
         {
-          TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_grid_column_number];
+          TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
           if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
           if (xrow == 0) xheight= f->height();
           f->setFixedSize(event->x(), xheight);
@@ -8759,7 +8761,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
                (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
                ++xrow)
           {
-            TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->result_column_count + ancestor_grid_column_number];
+            TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
             if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
             if (xrow == 0) xheight= f->height();
             f->setFixedSize(event->x(), xheight);
@@ -8786,7 +8788,6 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
 */
 void TextEditFrame::paintEvent(QPaintEvent *event)
 {
-
   if (event == 0) return; /* this is just to avoid an "unused parameter" warning */
   if (ancestor_result_grid_widget->is_paintable == 1)
   {
@@ -8809,7 +8810,7 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
         if (is_style_sheet_set_flag == false)
         {
           setStyleSheet(ancestor_result_grid_widget->frame_color_setting); /* for drag line color */
-          if (ancestor_grid_row_number == -1) text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_header_style_string);
+          if (cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER) text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_header_style_string);
           else text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_style_string);
           is_style_sheet_set_flag= true;
         }
@@ -8817,7 +8818,11 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
         {
           if (is_image_flag == false)
           {
-            if (content_pointer == 0) text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+            if (content_pointer == 0)
+            {
+              if (is_row_number_flag == true) text_edit->setText(QString::number(ancestor_grid_result_row_number + 1));
+              else text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+            }
             else text_edit->setText(QString::fromUtf8(content_pointer, content_length));
           }
           is_retrieved_flag= true;
@@ -8859,6 +8864,14 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     QTextEdit::paintEvent(event);
     return;
   }
+
+  if (text_edit_frame_of_cell->content_pointer == 0)
+  {
+    setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+    QTextEdit::paintEvent(event);
+    return;
+  }
+
   //QPixmap p= QPixmap(QSize(event->rect().width(), event->rect().height()));
   QPixmap p= QPixmap();
   if (p.loadFromData((const uchar*) text_edit_frame_of_cell->content_pointer,
@@ -8875,8 +8888,16 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     return;
   }
   QPainter painter(this->viewport());
-  /* Todo: this will scale to the size of the cell. Better would be: fragment + scrollbar. */
-  painter.drawPixmap(event->rect(), p);
+  /*
+    There were choices for QPixmap display. We could have said Qt::IgnoreAspectRatio (the default)
+    or Qt::KeepAspectRatioByExpanding. We could have used this->viewport()->size().
+    We could have shown a fragment with a scrollbar.
+    We could have shown a portion without a scrollbar (one can see the rest by dragging)
+    by leaving out the line with the "p.scaled()" function. Maybe users would want such choices?
+  */
+  p= p.scaled(event->rect().size(), Qt::KeepAspectRatio);
+  painter.drawPixmap(0, 0, p);
+  //painter.drawPixmap(event->rect(), p);
   return;
 }
 
@@ -8913,26 +8934,57 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
   QTextEdit::keyPressEvent(event);
   QString content_in_cell_after_keypress= toPlainText();
   TextEditFrame *text_edit_frame;
-  int xrow= text_edit_frame_of_cell->ancestor_grid_row_number;
-  if ((xrow != -1) && (content_in_cell_before_keypress != content_in_cell_after_keypress))
+
+  int xrow;
+  if ((content_in_cell_before_keypress != content_in_cell_after_keypress)
+   && (text_edit_frame_of_cell->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
+   && (text_edit_frame_of_cell->is_image_flag == false)
+   && (text_edit_frame_of_cell->is_row_number_flag == false))
   {
+    xrow= text_edit_frame_of_cell->ancestor_grid_result_row_number;
+
     ++xrow; /* possible bug: should this be done if there's no header row? */
     /* Content has changed since the last keyPressEvent. */
     /* column number = text_edit_frame_of_cell->ancestor_grid_column_number */
     /* length = text_edit_frame_of_cell->content_length */
     /* *content = text_edit_frame_of_cell->content_pointer, which should be 0 for null */
+
     ResultGrid *result_grid= text_edit_frame_of_cell->ancestor_result_grid_widget;
     /* result_grid->text_edit_frames[0] etc. have all the TextEditFrame widgets of the rows */
+
+    /* Go up the line to find first text_edit_frame for the row */
+    int text_edit_frame_index_of_first_cell;
+    for (text_edit_frame_index_of_first_cell= text_edit_frame_of_cell->text_edit_frames_index;
+         text_edit_frame_index_of_first_cell > 0;
+         --text_edit_frame_index_of_first_cell)
+    {
+      int crow= result_grid->text_edit_frames[text_edit_frame_index_of_first_cell]->ancestor_grid_result_row_number + 1;
+      if (crow != xrow)
+      {
+        ++text_edit_frame_index_of_first_cell;
+        break;
+      }
+    }
     update_statement= "";
     where_clause= "";
     char *name_pointer, *table_pointer, *db_pointer;
     unsigned int name_length, table_length, db_length;
     char *field_names_pointer, *org_tables_pointer, *dbs_pointer;
-    field_names_pointer= result_grid->mysql_field_org_names_copy;
-    org_tables_pointer= result_grid->mysql_field_org_tables_copy;
-    dbs_pointer= result_grid->mysql_field_dbs_copy;
-    for (unsigned int column_number= 0; column_number < result_grid->result_column_count; ++column_number)
+    field_names_pointer= result_grid->result_original_field_names;
+    org_tables_pointer= result_grid->result_original_table_names;
+    dbs_pointer= result_grid->result_original_database_names;
+    unsigned int column_number;
+    unsigned int tefi= text_edit_frame_index_of_first_cell;
+    for (column_number= 0; column_number < result_grid->result_column_count; )
     {
+      text_edit_frame= result_grid->text_edit_frames[tefi];
+      if ((text_edit_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
+       || (text_edit_frame->is_row_number_flag == true))
+      {
+        ++tefi;
+        continue;
+      }
+
       memcpy(&name_length, field_names_pointer, sizeof(unsigned int));
       field_names_pointer+= sizeof(unsigned int);
       name_pointer= field_names_pointer;
@@ -8949,8 +9001,6 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       dbs_pointer+= db_length;
       if (name_length == 0) continue; /* if in UNION or column-expression, skip it */
 
-      int ki= xrow * result_grid->result_column_count + column_number;
-      text_edit_frame= result_grid->text_edit_frames[ki];
       char *p= text_edit_frame->content_pointer;
       int l;
       if (p == 0) l= 0; /* if content_pointer == 0, that means null */
@@ -8970,7 +9020,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
         {
           where_clause.append("=");
           QString s;
-          if (result_grid->grid_column_dbms_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
+          if (result_grid->result_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
             s= content_in_result_set;
           else s= unstripper(content_in_result_set);
           where_clause.append(s);
@@ -8978,7 +9028,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       }
       if (text_edit_frame->is_retrieved_flag == true)
       {
-        content_in_text_edit_widget= result_grid->text_edit_widgets[ki]->toPlainText();
+        content_in_text_edit_widget= result_grid->text_edit_widgets[tefi]->toPlainText();
         bool contents_changed_flag= true;
         if ((p == 0) && (content_in_text_edit_widget == NULL_STRING)) contents_changed_flag= false;
         else if (content_in_text_edit_widget == content_in_result_set) contents_changed_flag= false;
@@ -8995,12 +9045,14 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
           else update_statement.append(",");
           update_statement.append(name_in_result_set);
           update_statement.append('=');
-          if ((result_grid->grid_column_dbms_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
+          if ((result_grid->result_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
           || (content_in_text_edit_widget == NULL_STRING))
             update_statement.append(content_in_text_edit_widget);
           else update_statement.append(unstripper(content_in_text_edit_widget));
         }
       }
+      ++column_number;
+      ++tefi;
     }
     /* We've got a string. If it's not blank, put it in the statement widget, overwriting. */
     /* It might be blank because user returned to the original values, if so wipe out. */
@@ -10532,6 +10584,7 @@ int MainWindow::the_connect(unsigned int connection_number)
   return x;
 }
 
+
 /* --version, or version in an option file, causes version display and exit */
 void MainWindow::print_version()
 {
@@ -10543,6 +10596,7 @@ void MainWindow::print_version()
   printf(" using Qt version %s", qVersion()); /* i.e. Qt runtime, maybe != QT_VERSION_STR */
   printf("\n");
 }
+
 
 /* --help, or help in an option file, causes help display and exit */
 void MainWindow::print_help()

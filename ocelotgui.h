@@ -816,6 +816,9 @@ private:
 /* THE TEXTEDITFRAME WIDGET */
 /* See comments containing the word TextEditFrame, in ResultGrid code. */
 
+#define TEXTEDITFRAME_CELL_TYPE_DETAIL 0
+#define TEXTEDITFRAME_CELL_TYPE_HEADER 1
+
 class TextEditFrame : public QFrame
 {
   Q_OBJECT
@@ -830,12 +833,15 @@ public:
   ResultGrid *ancestor_result_grid_widget;
   unsigned int text_edit_frames_index;                 /* e.g. for text_edit_frames[5] this will contain 5 */
   int ancestor_grid_column_number;
-  int ancestor_grid_row_number;
+  int ancestor_grid_result_row_number;
   unsigned int content_length;
+  unsigned short int cell_type;                        /* detail or header */
   char *content_pointer;
   bool is_retrieved_flag;
   bool is_style_sheet_set_flag;
   bool is_image_flag;                    /* true if data type = blob and appropriate flag is on */
+  bool is_row_number_flag; /* true if row number. also consider "SELECT ocelot_row_number() ..." */
+
 
 protected:
   void mousePressEvent(QMouseEvent *event);
@@ -1176,8 +1182,8 @@ void garbage_collect ()
   Eventually there might be a separate class with all dbms-related calls.
   But we're still a long way from having dbms-independent code here.
   We have these new lists, which are created when we make the grid and deleted when we stop:
-    grid_column_dbms_sources[].       = DBMS_SOURCE_IS_MYSQL_FIELD or DBMS_SOURCE_IS_ROW_NUMBER
-    grid_column_dbms_field_numbers[]. = mysql field number, or irrelevant
+    grid_column_dbms_sources[].       = obsolete
+    grid_column_dbms_field_numbers[]. = obsolete
   The idea is that any column can be special, that is, can have a source other than
   the DBMS field. So far the only special column is the row number, experimentally.
 */
@@ -1721,19 +1727,19 @@ public:
   long unsigned int result_row_count, grid_result_row_count;
   long unsigned int *lengths;
   unsigned int *grid_column_widths;                         /* dynamic-sized list of widths */
-  unsigned int *grid_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
+  unsigned int *result_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
   unsigned int *grid_column_heights;                         /* dynamic-sized list of heights */
   unsigned char *grid_column_dbms_sources;                   /* dynamic-sized list of sources */
-  unsigned short int *grid_column_dbms_field_numbers;        /* dynamic-sized list of field numbers */
-  unsigned short int *grid_column_dbms_field_types;          /* dynamic-sized list of types */
-  unsigned long r;
+  unsigned short int *result_field_types;          /* dynamic-sized list of types */
+  unsigned long result_row_number;                    /* row number in result set */
   MYSQL_ROW row;
   int is_paintable;
   unsigned int max_text_edit_frames_count;                       /* used for a strange error check during paint events */
 
   unsigned int result_grid_widget_max_height_in_lines;
+  unsigned int result_grid_widget_max_height_in_lines_at_fillup_time;
 
-  MYSQL_FIELD *fields;
+  MYSQL_FIELD *mysql_fields;
   QScrollArea *grid_scroll_area;
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
@@ -1742,15 +1748,23 @@ public:
   TextEditFrame **text_edit_frames;
 
   MYSQL_RES *grid_mysql_res;
-  bool mysql_more_results_flag;
   unsigned short ocelot_result_grid_vertical_copy;
   unsigned short ocelot_result_grid_column_names_copy;
-  char *mysql_res_copy;                                          /* gets a copy of mysql_res contents, if necessary */
-  char **mysql_res_copy_rows;                                      /* dynamic-sized list of mysql_res_copy row offsets, if necessary */
-  char *mysql_field_names_copy;                                  /* gets a copy of fields[].name */
-  char *mysql_field_org_names_copy;                              /* gets a copy of fields[].org_name */
-  char *mysql_field_org_tables_copy;                             /* gets a copy of fields[].org_table */
-  char *mysql_field_dbs_copy;                                    /* gets a copy of fields[].db */
+  unsigned short ocelot_line_numbers_copy;
+  char *result_set_copy;                                     /* gets a copy of mysql_res contents, if necessary */
+  char **result_set_copy_rows;                               /* dynamic-sized list of result_set_copy row offsets, if necessary */
+  char *result_field_names;                                  /* gets a copy of mysql_fields[].name */
+  char *result_original_field_names;                         /* gets a copy of mysql_fields[].org_name */
+  char *result_original_table_names;                         /* gets a copy of mysql_fields[].org_table */
+  char *result_original_database_names;                      /* gets a copy of mysql_fields[].db */
+
+  unsigned int gridx_column_count;
+  long unsigned int gridx_row_count;
+  char *gridx_field_names;                                   /* gets a copy of result_field_names */
+  unsigned int *gridx_max_column_widths;                     /* gets a copy of result_max_column_widths */
+  unsigned int *gridx_result_indexes;                        /* points to result_ lists */
+  unsigned char *gridx_flags;                                /* 0 = normal, 1 = row counter */
+
 //  unsigned int grid_actual_grid_height_in_rows;
   unsigned int grid_actual_row_height_in_lines;
   /* ocelot_grid_height_of_highest_column will be between 1 and ocelot_grid_max_column_height_in_lines, * pixels-per-line */
@@ -1803,12 +1817,22 @@ ResultGrid(
   text_edit_widgets= 0;                                     /* all dynamic-sized items should be initially zero */
   text_edit_layouts= 0;
   text_edit_frames= 0;
-  grid_column_widths= 0;
-  grid_max_column_widths= 0;
+  grid_column_widths= 0;                                    /* initializing for garbage_collect */
+  result_max_column_widths= 0;
   grid_column_heights= 0;
   grid_column_dbms_sources= 0;
-  grid_column_dbms_field_numbers= 0;
-  grid_column_dbms_field_types= 0;
+  result_field_types= 0;  
+  result_set_copy= 0;
+  result_set_copy_rows= 0;
+  result_field_names= 0;
+  result_original_field_names= 0;
+  result_original_table_names= 0;
+  result_original_database_names= 0;
+  gridx_field_names= 0;
+
+  gridx_max_column_widths= 0;
+  gridx_result_indexes= 0;
+  gridx_flags= 0;
   grid_vertical_scroll_bar= 0;
   grid_scroll_area= 0;
   /* grid_layout= 0; */
@@ -1819,12 +1843,12 @@ ResultGrid(
   /* grid_main_widget= 0; */
   border_size= 1;                                          /* Todo: This actually has to depend on stylesheet */
 
-  result_row_count= 0;
-  result_column_count= 0;
+  //result_row_count= 0;
+  //result_column_count= 0;
   grid_result_row_count= 0;
   max_text_edit_frames_count= 0;
 
-  result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_MAX_HEIGHT; /* unnecessary assignment */
+  result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_MAX_HEIGHT; /* bad if big screen? */
 
   /* With result_grid_widget_max_height_in_lines=20 and 20 pixels per row this might be safe though it's sure arbitrary. */
   /* TEST! Has this become unnecessary now? */
@@ -1904,12 +1928,6 @@ ResultGrid(
 
   client->setLayout(grid_main_layout);
 
-  mysql_res_copy= 0;
-  mysql_res_copy_rows= 0;
-  mysql_field_names_copy= 0;
-  mysql_field_org_names_copy= 0;
-  mysql_field_org_tables_copy= 0;
-  mysql_field_dbs_copy= 0;
   text_edit_widget_font= this->font();
   set_frame_color_setting();
 }
@@ -2014,98 +2032,110 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
-void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_parameter,
+void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
             unsigned short ocelot_result_grid_vertical,
             unsigned short ocelot_result_grid_column_names,
-            ldbms *passed_lmysql)
+            ldbms *passed_lmysql,
+            int ocelot_line_numbers)
 {
   long unsigned int xrow;
-  unsigned int col;
+  unsigned int xcol;
+
+  result_grid_widget_max_height_in_lines_at_fillup_time= result_grid_widget_max_height_in_lines;
+
+  /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
 
   lmysql= passed_lmysql;
 
-  /* mysql_more_results_flag affects whether we use mysql_res directly, or make a copy */
-  mysql_more_results_flag= mysql_more_results_parameter;
-
-  /*
-    This is a kludge. We're not ready to handle mysql_more_results with vertical mode.
-    Todo: Remove this kludge and handle results correctly with vertical mode.
-  */
-  if (ocelot_result_grid_vertical > 0) mysql_more_results_flag= false;
-
   ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
   ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
+  ocelot_line_numbers_copy= ocelot_line_numbers;
+
+  grid_mysql_res= mysql_res;
+
+  result_column_count= lmysql->ldbms_mysql_num_fields(grid_mysql_res);
+  result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
+
+  result_max_column_widths= new unsigned int[result_column_count];
+  result_field_types= new unsigned short int[result_column_count];
+
+  mysql_fields= lmysql->ldbms_mysql_fetch_fields(grid_mysql_res);
+
+
+
+  scan_rows(result_column_count, result_row_count,
+            grid_mysql_res, &result_set_copy, &result_set_copy_rows,
+            &result_max_column_widths);
+  scan_field_names("name", result_column_count, &result_field_names);
+
+  /* Next three scan_field_names calls are only needed if user will edit the result set */
+  scan_field_names("org_name", result_column_count, &result_original_field_names);
+  scan_field_names("org_table", result_column_count, &result_original_table_names);
+  scan_field_names("db", result_column_count, &result_original_database_names);
+
+  for (unsigned int i= 0; i < result_column_count; ++i) result_field_types[i]= mysql_fields[i].type;
+
+  /*
+    At this point, we have:
+      result_column_count, result_row_count
+      result_set_copy, result_set_copy_rows,
+      result_field_names,
+      result_original_field_names, result_original_table_names, result_original_database_names,
+      result_max_column_widths
+      mysql_fields (which we should not use, but we do)
+    From now on there should be no need to call mysql_ functions again for this result set.
+  */
+
+  /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
+
+  copy_result_to_gridx(ocelot_line_numbers);
 
   /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
   hide();
   is_paintable= 0;
 
-  grid_mysql_res= mysql_res;
-
-  /* Before changing result_column_count -- revert style sheet changes that were done for header cells */
-  /* Currently the check about cell pool size is unnecessary, it's just there in case someday the pool is shrinkable. */
-  for (unsigned int i_h= 0; i_h < result_column_count; ++i_h)
-  {
-    if (i_h >= cell_pool_size) break;
-    text_edit_frames[0 * result_column_count + i_h]->is_style_sheet_set_flag= false;
-  }
-
-  ocelot_grid_text_color= parent->ocelot_grid_text_color;
-  ocelot_grid_background_color= parent->ocelot_grid_background_color;
-  /* ocelot_grid_cell_drag_line_size_as_int= parent->ocelot_grid_cell_drag_line_size.toInt(); */
-  /* ocelot_grid_cell_drag_line_color= parent->ocelot_grid_cell_drag_line_color; */
-  dbms_set_result_column_count();                                  /* this will be the width of the grid */
-  result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
-  if (ocelot_result_grid_vertical == 0) grid_result_row_count= result_row_count + 1;
+  /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
+     said what gridx_row_count is. */
+  if (ocelot_result_grid_vertical == 0) grid_result_row_count= gridx_row_count + 1;
   else grid_result_row_count= result_row_count * result_column_count;
+
+  if (ocelot_result_grid_vertical == 0)
+  {
+    gridx_row_count= grid_result_row_count + 1;
+  }
+  if (ocelot_result_grid_vertical != 0)
+  {
+    gridx_row_count= result_row_count * result_column_count;
+    gridx_column_count= 1;
+    if (ocelot_result_grid_column_names != 0) ++gridx_column_count;
+    if (ocelot_line_numbers != 0) ++gridx_column_count;
+  }
 
   {
     unsigned int minimum_number_of_cells;
-    if (ocelot_result_grid_vertical == 0) minimum_number_of_cells= result_grid_widget_max_height_in_lines * result_column_count;
-    else
-    {
-      if (ocelot_result_grid_column_names == 0) minimum_number_of_cells= result_grid_widget_max_height_in_lines;
-      else minimum_number_of_cells= result_grid_widget_max_height_in_lines * 2;
-    }
+    minimum_number_of_cells= result_grid_widget_max_height_in_lines * gridx_column_count;
     pools_resize(row_pool_size, result_grid_widget_max_height_in_lines, cell_pool_size, minimum_number_of_cells);
     if (row_pool_size < result_grid_widget_max_height_in_lines) row_pool_size= result_grid_widget_max_height_in_lines;
     if (cell_pool_size < minimum_number_of_cells) cell_pool_size= minimum_number_of_cells;
   }
 
-  /*
-    Dynamic-sized arrays for rows and columns.
-    Some are two-dimensional e.g. text_edit_widgets; I'll address its elements with text_edit_widgets[row*col+col].
-    For every "new " here, there should be a "delete []" in the clear() or garbage_collect() function.
-  */
-  /* ... */
+  grid_column_widths= new unsigned int[gridx_column_count];
+  grid_column_heights= new unsigned int[gridx_column_count];
+  grid_column_dbms_sources= new unsigned char[gridx_column_count];
 
-  grid_column_widths= new unsigned int[result_column_count];
-  grid_max_column_widths= new unsigned int[result_column_count];
-  grid_column_heights= new unsigned int[result_column_count];
-  grid_column_dbms_sources= new unsigned char[result_column_count];
-  grid_column_dbms_field_numbers= new unsigned short int[result_column_count];
-  grid_column_dbms_field_types= new unsigned short int[result_column_count];
-  /* ... */
+  dbms_set_grid_column_sources();                 /* Todo: this could return an error? */
 
-  dbms_set_grid_column_sources();                                             /* Todo: this could return an error? */
+  ocelot_grid_text_color= parent->ocelot_grid_text_color;
+  ocelot_grid_background_color= parent->ocelot_grid_background_color;
+  /* ocelot_grid_cell_drag_line_size_as_int= parent->ocelot_grid_cell_drag_line_size.toInt(); */
+  /* ocelot_grid_cell_drag_line_color= parent->ocelot_grid_cell_drag_line_color; */
 
-//  grid_scroll_area= new QScrollArea(this);                                    /* Todo: see why parent can't be client */
+  //  grid_scroll_area= new QScrollArea(this);                                    /* Todo: see why parent can't be client */
 
-//  grid_scroll_area->verticalScrollBar()->setMaximum(result_row_count);
-//  grid_scroll_area->verticalScrollBar()->setSingleStep(1);
-//  grid_scroll_area->verticalScrollBar()->setPageStep(result_row_count / 10);    /* Todo; check if this could become 0 */
+  //  grid_scroll_area->verticalScrollBar()->setMaximum(gridx_row_count);
+  //  grid_scroll_area->verticalScrollBar()->setSingleStep(1);
+  //  grid_scroll_area->verticalScrollBar()->setPageStep(gridx_row_count / 10);    /* Todo; check if this could become 0 */
   grid_vertical_scroll_bar_value= -1;
-
-  scan_rows(mysql_more_results_flag, result_column_count, result_row_count,
-            grid_mysql_res, &mysql_res_copy, &mysql_res_copy_rows,
-            &grid_max_column_widths);
-
-  scan_field_names("name", result_column_count, &mysql_field_names_copy);
-  /* Next three scan_field_names calls are only needed if user will edit the result set */
-  scan_field_names("org_name", result_column_count, &mysql_field_org_names_copy);
-  scan_field_names("org_table", result_column_count, &mysql_field_org_tables_copy);
-  scan_field_names("db", result_column_count, &mysql_field_dbs_copy);
-  for (unsigned int i= 0; i < result_column_count; ++i) grid_column_dbms_field_types[i]= fields[i].type;
 
   /*
     Calculate desired width and height based on parent width and height.
@@ -2142,11 +2172,12 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   pointer_to_font_2= &text_edit_widget_font;
   QFontMetrics fm= QFontMetrics(*pointer_to_font_2);
 
-  for (xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
+  /* Todo: see whether this loop could be shifted somewhere so it's not repeated for every fillup */
+  for (xrow= 0; (xrow < gridx_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
   {
-    for (unsigned int column_number= 0; column_number < result_column_count; ++column_number)
+    for (unsigned int column_number= 0; column_number < gridx_column_count; ++column_number)
     {
-      int ki= xrow * result_column_count + column_number;
+      int ki= xrow * gridx_column_count + column_number;
       text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
       text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
       text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
@@ -2170,48 +2201,65 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
     }
   }
 
-  /* Set header text and colour. We will revert some of these changes during garbage_collect. */
-  //QString yy;
-  char *field_names_pointer= mysql_field_names_copy;
-  for (unsigned int i_h= 0; i_h < result_column_count; ++i_h)                      /* row 0 is header */
+  /*
+    For each cell:
+      Set cell type = detail or header, depending on is_vertical + whether it's first row
+      If header: indicate where header text is.
+    Todo: this is just assuming top line is header, which is wrong now.
+  */
+  char *field_names_pointer;
+  for (xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
   {
-    text_edit_frames[0 * result_column_count + i_h]->is_style_sheet_set_flag= false;
-    /* Todo: we use set>StyleSheet, apparently that's overriding this. */
-    //text_edit_widgets[0 * result_column_count + i_h]->setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
-    /*
-    QPalette p= text_edit_widgets[0*result_column_count+i]->palette();
-     p.setColor(QPalette::Base, QColor(copy_of_parent->ocelot_grid_header_background_color));
-     text_edit_widgets[0*result_column_count+i]->setPalette(p);
-     */
-    //yy= dbms_get_field_name(i_h); /* fields[i].name; */ /* Todo: use name_length somehow so we don't get fooled by \0 */
-
-    /* We don't do the following because header might get lost if there are multiple result sets. */
-    //text_edit_widgets[0 * result_column_count + i_h]->pointer= fields[i].name;
-    //text_edit_widgets[0 * result_column_count + i_h]->length= fields[i].name_length;
-    /* TEST! Removed setText and changed so is_retrieved_flag= false */
-    //text_edit_widgets[0 * result_column_count + i_h]->setText(QString::fromUtf8(fields[i_h].name, fields[i_h].name_length));
-
-    //text_edit_widgets[0 * result_column_count + i_h]->setPlainText(yy);
-
-    //text_edit_frames[i_h]->content_length= fields[i_h].name_length;
-    //text_edit_frames[i_h]->content_pointer= fields[i_h].name;
-
-    memcpy(&(text_edit_frames[i_h]->content_length), field_names_pointer, sizeof(unsigned int));
-    field_names_pointer+= sizeof(unsigned int);
-    text_edit_frames[i_h]->content_pointer= field_names_pointer;
-    field_names_pointer+= text_edit_frames[i_h]->content_length;
-
-    text_edit_frames[0 * result_column_count + i_h]->is_retrieved_flag= false;
-    text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_column_number= i_h;
-    text_edit_frames[0 * result_column_count + i_h]->ancestor_grid_row_number= -1;          /* means header row */
-    text_edit_frames[0 * result_column_count + i_h]->is_image_flag= false;
+    field_names_pointer= gridx_field_names; /* unnecessary reset if ocelot_result_grid_vertical = 0 */
+    for (unsigned int column_number= 0; column_number < gridx_column_count; ++column_number)
+    {
+      int ki= xrow * gridx_column_count + column_number;
+      bool is_header= false;
+      if (ocelot_result_grid_vertical != 0)
+      {
+        if (ocelot_result_grid_column_names != 0)
+        {
+          if ((ocelot_line_numbers == 0) && (column_number == 0)) is_header= true;
+          if ((ocelot_line_numbers != 0) && (column_number == 1)) is_header= true;
+        }
+      }
+      if ((ocelot_result_grid_vertical == 0) && (xrow == 0)) is_header=true;
+      if (is_header == true)
+      {
+        memcpy(&(text_edit_frames[ki]->content_length), field_names_pointer, sizeof(unsigned int));
+        field_names_pointer+= sizeof(unsigned int);
+        text_edit_frames[ki]->content_pointer= field_names_pointer;
+        field_names_pointer+= text_edit_frames[ki]->content_length;
+        text_edit_frames[ki]->is_retrieved_flag= false;
+        text_edit_frames[ki]->ancestor_grid_column_number= column_number;
+        text_edit_frames[ki]->ancestor_grid_result_row_number= -1;          /* probably unnecessary */
+        if (text_edit_frames[ki]->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
+        {
+          text_edit_frames[ki]->cell_type= TEXTEDITFRAME_CELL_TYPE_HEADER;
+          text_edit_frames[ki]->is_style_sheet_set_flag= false;
+        }
+        text_edit_frames[ki]->is_image_flag= false;
+        text_edit_frames[ki]->is_row_number_flag= false;
+      }
+      else
+      {
+        if (text_edit_frames[ki]->cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL)
+        {
+          text_edit_frames[ki]->cell_type= TEXTEDITFRAME_CELL_TYPE_DETAIL;
+          text_edit_frames[ki]->is_style_sheet_set_flag= false;
+        }
+        if (gridx_flags[column_number] == 1) text_edit_frames[ki]->is_row_number_flag= true;
+        else text_edit_frames[ki]->is_row_number_flag= false;
+      }
+    }
   }
 
-  if (ocelot_result_grid_vertical > 0)
-  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
-                        ocelot_grid_cell_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
+  //if (ocelot_result_grid_vertical != 0)
+  //  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
+  //                      ocelot_grid_cell_drag_line_size_as_int,
+  //                      0); /* get grid_column_widths[] and grid_column_heights[] */
 
-  if (ocelot_result_grid_vertical > 0)
+  if (ocelot_result_grid_vertical != 0)
   {
     /* TODO: Make sure considerations for horizontal are all considered for vertical. */
     /* We'll have to figure out the alignment etc. each time we get ready to display */
@@ -2220,23 +2268,19 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
          grid_row_number < result_grid_widget_max_height_in_lines;
          ++grid_row_number)
     {
-      if (grid_row_number >= (result_row_count * result_column_count)) break;
-      if (ocelot_result_grid_column_names > 0)
+      if (grid_row_number >= gridx_row_count) break;
+      for (unsigned int mi= 0; mi < gridx_column_count; ++mi)
       {
         /* todo: test whether we really need to show always */
         text_edit_frames[text_edit_frame_index]->show();
         grid_row_layouts[grid_row_number]->addWidget(text_edit_frames[text_edit_frame_index], 0, Qt::AlignTop | Qt::AlignLeft);
         ++text_edit_frame_index;
       }
-      /* todo: test whether we really need to show always */
-      text_edit_frames[text_edit_frame_index]->show();
-      grid_row_layouts[grid_row_number]->addWidget(text_edit_frames[text_edit_frame_index], 0, Qt::AlignTop | Qt::AlignLeft);
-      ++text_edit_frame_index;
     }
     /* How many text_edit_frame widgets are we actually using? This assumes number-of-columns-per-row is fixed. */
     max_text_edit_frames_count= text_edit_frame_index;
   }
-  else max_text_edit_frames_count= (grid_result_row_count) * result_column_count;
+  else max_text_edit_frames_count= (grid_result_row_count) * gridx_column_count;
 
   /*
     grid detail rows
@@ -2261,14 +2305,15 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
   if (ocelot_result_grid_vertical == 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
-                        ocelot_grid_cell_drag_line_size_as_int); /* get grid_column_widths[] and grid_column_heights[] */
+                        ocelot_grid_cell_drag_line_size_as_int,
+                        ocelot_result_grid_column_names_copy); /* get grid_column_widths[] and grid_column_heights[] */
 
   /*
     grid_actual_grid_height_in_rows = # of rows that are actually showable at a time,
     = lesser of (grid_max_grid_height_in_lines/grid_max_row_height_in_lines, # of rows in result set + 1)
   */
-  //grid_actual_grid_height_in_rows= result_row_count;
-  //if (grid_actual_grid_height_in_rows > result_row_count + 1) grid_actual_grid_height_in_rows= result_row_count + 1;
+  //grid_actual_grid_height_in_rows= gridx_row_count;
+  //if (grid_actual_grid_height_in_rows > gridx_row_count + 1) grid_actual_grid_height_in_rows= gridx_row_count + 1;
 
   /* Put the QTextEdit widgets in a layout. Remember grid row 0 is for the header.
     Horizontal (default):
@@ -2287,9 +2332,9 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
   {
     for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
     {
-      for (col= 0; col < result_column_count; ++col)
+      for (xcol= 0; xcol < gridx_column_count; ++xcol)
       {
-        TextEditWidget *cell_text_edit_widget= text_edit_widgets[xrow * result_column_count + col];
+        TextEditWidget *cell_text_edit_widget= text_edit_widgets[xrow * gridx_column_count + xcol];
         /*
           I'll right-align if type is number and this isn't the header.
           But I read somewhere that might not be compatible with wrapping,
@@ -2297,7 +2342,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
           Do not assume it's left-aligned otherwise; there's a pool.
         */
         /* Todo: some other types e.g. BLOBs might also need special handling. */
-        if ((xrow > 0) && (dbms_get_field_flag(col) & NUM_FLAG))
+        if ((xrow > 0) && (dbms_get_field_flag(xcol) & NUM_FLAG))
         {
           cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
           cell_text_edit_widget->setAlignment(Qt::AlignRight);
@@ -2308,6 +2353,16 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
           cell_text_edit_widget->setAlignment(Qt::AlignLeft);
           cell_text_edit_widget->setWordWrapMode(QTextOption::WrapAnywhere);
         }
+
+        if (text_edit_frames[xrow * gridx_column_count + xcol]->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
+        {
+          if ((result_field_types[xcol] == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
+          {
+            text_edit_frames[xrow * gridx_column_count + xcol]->is_image_flag= true;
+          }
+          else text_edit_frames[xrow * gridx_column_count + xcol]->is_image_flag= false;
+        }
+
         /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
         if (xrow == 0)
         {
@@ -2315,19 +2370,19 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
                            + ocelot_grid_cell_border_size_as_int * 2
                            + ocelot_grid_cell_drag_line_size_as_int;
           if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
-          text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
-//          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
-//          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
+          text_edit_frames[xrow * gridx_column_count + xcol]->setFixedSize(grid_column_widths[xcol], header_height);
+//          text_edit_frames[xrow * gridx_column_count + xcol]->setMaximumHeight(header_height);
+//          text_edit_frames[xrow * gridx_column_count + xcol]->setMinimumHeight(header_height);
         }
         else
         {
-          text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], grid_column_heights[col]);
-//          text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(grid_column_heights[col]);
-//          text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(grid_column_heights[col]);
+          text_edit_frames[xrow * gridx_column_count + xcol]->setFixedSize(grid_column_widths[xcol], grid_column_heights[xcol]);
+//          text_edit_frames[xrow * gridx_column_count + xcol]->setMaximumHeight(grid_column_heights[col]);
+//          text_edit_frames[xrow * gridx_column_count + xcol]->setMinimumHeight(grid_column_heights[col]);
         }
         /* todo: test whether we really need to show always */
-        text_edit_frames[xrow * result_column_count + col]->show();
-        grid_row_layouts[xrow]->addWidget(text_edit_frames[xrow * result_column_count + col], 0, Qt::AlignTop | Qt::AlignLeft);
+        text_edit_frames[xrow * gridx_column_count + xcol]->show();
+        grid_row_layouts[xrow]->addWidget(text_edit_frames[xrow * gridx_column_count + xcol], 0, Qt::AlignTop | Qt::AlignLeft);
       }
     }
   }
@@ -2358,6 +2413,101 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent, bool mysql_more_results_pa
 
   /* area->horizontalScrollBar()->setSingleStep(client->width() / 24); */ /* single-stepping seems pointless */
 
+}
+
+/*
+ The grid may have columns that are not in the result set.
+ So far the only one is "row count" and (for vertical) "header",
+ but there will be more.
+ So we want to copy the result_ lists to gridx_ lists, possibly adding extra non-result-set columns.
+ The values are for a single detail row or single header row.
+   gridx_field_names
+   gridx_original_field_names
+   gridx_original_table_names
+   gridx_original_database_names
+   gridx_max_column_widths
+   gridx_flags                         row count | header | refer to result _ lists
+   gridx_result_indexes                use as index for result_ lists
+   gridx_column_count, gridx_row_count
+*/
+void copy_result_to_gridx(int ocelot_line_numbers)
+{
+  unsigned int i, j;
+  unsigned int v_lengths;
+  char *result_field_names_pointer;
+  char *gridx_field_names_pointer;
+
+  if (gridx_field_names != 0) { delete [] gridx_field_names; gridx_field_names= 0; }
+  if (gridx_max_column_widths != 0) { delete [] gridx_max_column_widths; gridx_max_column_widths= 0; }
+  if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
+  if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
+
+  gridx_column_count= result_column_count;
+  if (ocelot_line_numbers == 1) ++gridx_column_count;
+  gridx_row_count= result_row_count;
+  /* result_set_copy, result_set_copy_rows are left alone */
+
+  /*
+    First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
+  */
+
+  result_field_names_pointer= &result_field_names[0];
+  unsigned int total_size= 0;
+  if (ocelot_line_numbers == 1)
+  {
+    total_size+= sizeof("row_count") + sizeof(unsigned int); /* arbitrary */
+  }
+  for (i= 0; i < result_column_count; ++i)
+  {
+    memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+    total_size+= v_lengths + sizeof(unsigned int);
+    result_field_names_pointer+= v_lengths + sizeof(unsigned int);
+  }
+
+  gridx_field_names= new char[total_size];                                   /* allocate */
+
+  result_field_names_pointer= &result_field_names[0];
+  gridx_field_names_pointer= &gridx_field_names[0];
+  if (ocelot_line_numbers)
+  {
+    v_lengths= sizeof("row_count");
+    memcpy(gridx_field_names_pointer, &v_lengths, sizeof(unsigned int));
+    gridx_field_names_pointer+= sizeof(unsigned int);
+    memcpy(gridx_field_names_pointer, "row_count", v_lengths);
+    gridx_field_names_pointer+= v_lengths;
+  }
+  for (i= 0; i < result_column_count; ++i)
+  {
+    memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+    memcpy(gridx_field_names_pointer, &v_lengths, sizeof(unsigned int));
+    result_field_names_pointer+= sizeof(unsigned int);
+    gridx_field_names_pointer+= sizeof(unsigned int);
+    memcpy(gridx_field_names_pointer, result_field_names_pointer, v_lengths);
+    result_field_names_pointer+= v_lengths;
+    gridx_field_names_pointer+= v_lengths;
+  }
+
+  gridx_max_column_widths= new unsigned int[gridx_column_count];
+  gridx_result_indexes= new unsigned int[gridx_column_count];
+  gridx_flags= new unsigned char[gridx_column_count];
+  j= 0;
+  if (ocelot_line_numbers == 1)
+  {
+    gridx_max_column_widths[0]= sizeof("row_count");
+    gridx_result_indexes[0]= 0;
+    gridx_flags[0]= 1;
+    ++j;
+  }
+  for (i= 0; i < result_column_count; ++i)
+  {
+    gridx_max_column_widths[j]= result_max_column_widths[i];
+    gridx_result_indexes[j]= i;
+    gridx_flags[j]= 0;
+    ++j;
+  }
+
+  //result_field_names,
+  //result_original_field_names, result_original_table_names, result_original_database_names,
 }
 
 /*
@@ -2402,17 +2552,17 @@ QString copy(unsigned int ocelot_history_max_column_width,
   history_max_column_widths= 0;
   history_line= 0;
 
-  if (result_column_count > ocelot_history_max_column_count) history_result_column_count= ocelot_history_max_column_count;
-  else history_result_column_count= result_column_count;
+  if (gridx_column_count > ocelot_history_max_column_count) history_result_column_count= ocelot_history_max_column_count;
+  else history_result_column_count= gridx_column_count;
 
   history_max_column_widths= new unsigned int[history_result_column_count];
   history_line_width= 2;
   unsigned int column_width;
   for (col= 0; col < history_result_column_count; ++col)
   {
-    if (ocelot_result_grid_column_names_copy == 1) column_width= fields[col].name_length;
+    if (ocelot_result_grid_column_names_copy == 1) column_width= mysql_fields[col].name_length;
     else column_width= 0;
-    if (column_width < grid_max_column_widths[col]) column_width= grid_max_column_widths[col];
+    if (column_width < gridx_max_column_widths[col]) column_width= gridx_max_column_widths[col];
     if (column_width > ocelot_history_max_column_width) column_width= ocelot_history_max_column_width;
     history_max_column_widths[col]= column_width;
     history_line_width+= column_width + 1;
@@ -2437,9 +2587,9 @@ QString copy(unsigned int ocelot_history_max_column_width,
     *(pointer_to_history_line++)= '|';
     for (col= 0; col < history_result_column_count; ++col)
     {
-      length= fields[col].name_length;
+      length= mysql_fields[col].name_length;
       if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
-      memcpy(pointer_to_history_line, fields[col].name, length);
+      memcpy(pointer_to_history_line, mysql_fields[col].name, length);
       pointer_to_history_line+= length;
       if (length < history_max_column_widths[col])
       {
@@ -2505,10 +2655,9 @@ QString copy(unsigned int ocelot_history_max_column_width,
   return s;
 }
 
-
 /*
-  Headings (not yet implemented, just intended)
-  --------
+  Thoughts about ocelot_result_grid_vertical
+  ------------------------------------------
 
   This is a row with headings-at-top.
   +-------+---------+-----------+
@@ -2524,7 +2673,7 @@ QString copy(unsigned int ocelot_history_max_column_width,
   +-------+---------------------+
   Headings-at-top is default.
   Headings-at-left is what you get with \G.
-  There's also a menu item to "pivot".
+  There could also be a menu item to "pivot".
   ? Should the right edge be ragged if headings-at-left?
 
   Other headings settings:
@@ -2540,42 +2689,7 @@ QString copy(unsigned int ocelot_history_max_column_width,
   Todo: stretch factors?
   Todo: scroll bar
   Todo: sometimes you don't want width(), you want frameGeometry().width()
-  The following code was part of an experiment for \G style or for clicking to zoom on a row. Come back to it someday.
 */
-//void experiment()
-//{
-//  QHBoxLayout *hbox_layout[100];
-//  QWidget *hbox_widget[100];
-//  QVBoxLayout *vbox_layout;
-//  QWidget *widget;
-//  unsigned int i;
-//  unsigned int row_number;
-//
-//  row_number= 3;
-//  vbox_layout= new QVBoxLayout();
-//
-//  vbox_layout->setContentsMargins(QMargins(0, 0, 0, 0));   /* Todo: find out whether this does anything */
-//  vbox_layout->setSpacing(0);                              /* Todo: find out whether this does anything */
-//  vbox_layout->setSizeConstraint(QLayout::SetFixedSize);   /* Todo: find out whether this does anything */
-//  vbox_layout->setAlignment(Qt::AlignTop | Qt::AlignLeft); /* Todo: find out whether this does anything */
-//  for (i= 0; i < result_column_count; ++i)
-//  {
-//    hbox_layout[i]= new QHBoxLayout();
-//
-//    hbox_layout[i]->setContentsMargins(QMargins(0, 0, 0, 0));   /* Todo: find out whether this does anything */
-//    hbox_layout[i]->setSpacing(0);                              /* Todo: find out whether this does anything */
-//    hbox_layout[i]->setSizeConstraint(QLayout::SetFixedSize);   /* Todo: find out whether this does anything */
-//    hbox_layout[i]->setAlignment(Qt::AlignTop | Qt::AlignLeft); /* Todo: find out whether this does anything */
-//    hbox_layout[i]->addWidget(text_edit_frames[i]);
-//    hbox_layout[i]->addWidget(text_edit_frames[(result_column_count * row_number) + i]);
-//    hbox_widget[i]= new QWidget();
-//    hbox_widget[i]->setLayout(hbox_layout[i]);
-//    vbox_layout->addWidget(hbox_widget[i]);
-//  }
-//  widget= new QWidget();
-//  widget->setLayout(vbox_layout);
-//  widget->show();
-//}
 
 
 /*
@@ -2597,9 +2711,9 @@ QString copy(unsigned int ocelot_history_max_column_width,
 */
 
 /*
-  We know the defined width (dbms_get_field_length will give us fields[i].length)
+  We know the defined width (update: rather than defined width we now use actual max width)
   and the number of columns
-  (result_column_count).
+  (result_column_count which became gridx_column_count).
   We don't want to exceed the maximum grid width if we can help it.
   So let's give each column exactly what it needs, and perform a
   "squeeze" (reducing big columns) until the rows will fit, or until
@@ -2607,7 +2721,7 @@ QString copy(unsigned int ocelot_history_max_column_width,
   Re <cr>: I'm not very worried because it merely causes elider
       This assumes that every header or cell in the table has the same font.
       I sometimes wish we could assume fixed-width font.
-      I don't look at fields[i].max_lengths, perhaps that's a mistake.
+      I don't look at mysql_fields[i].max_lengths, perhaps that's a mistake.
       Todo: this might have to be re-done after a font change
       Todo: take into account that a header is fixed, so you don't need to use 'W'.
       Todo: take into account that a number won't contain anything wider than '9'.
@@ -2633,7 +2747,9 @@ QString copy(unsigned int ocelot_history_max_column_width,
    but removing it doesn't solve the problem.
    Update: June 7 2015: the problem seems to have disappeared so I temporarily removed the line.
 */
-void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_grid_cell_drag_line_size_as_int)
+void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
+                           int ocelot_grid_cell_drag_line_size_as_int,
+                           unsigned short int is_using_column_names)
 {
   unsigned int i;
   /* unsigned int tmp_column_lengths[MAX_COLUMNS]; */
@@ -2660,10 +2776,14 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
     If this is good enough, then grid_row_heights[i] = 1 char and column width = grid_column_widths[i] chars.
     Todo: the lengths are in bytes; take into account that they might arrive in a multi-byte character set.
   */
-  for (i= 0; i < result_column_count; ++i)
+  for (i= 0; i < gridx_column_count; ++i)
   {
-    grid_column_widths[i]= dbms_get_field_name_length(i); /* this->fields[i].name_length; */
-    if (grid_column_widths[i] < dbms_get_field_length(i)) grid_column_widths[i]= dbms_get_field_length(i); /* fields[i].length */
+    if (is_using_column_names != 0)
+    {
+      grid_column_widths[i]= dbms_get_field_name_length(i); /* this->mysql_fields[i].name_length; */
+    }
+    else grid_column_widths[i]= 1;
+    if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
     /* For explanation of next line, see comment "Extra size". Removed temporarily. */
     if ((grid_column_widths[i] < 2) && (ocelot_grid_cell_drag_line_size_as_int > 0)) grid_column_widths[i]= 2;
     grid_column_widths[i]= (grid_column_widths[i] * max_width_of_a_char)
@@ -2689,15 +2809,15 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
   {
     necessary_reduction= sum_tmp_column_lengths - ocelot_grid_max_desired_width_in_pixels;
     sum_amount_reduced= 0;
-    for (i= 0; i < result_column_count; ++i)
+    for (i= 0; i < gridx_column_count; ++i)
     {
-      unsigned int min_width= (dbms_get_field_name_length(i) + 1) * max_width_of_a_char /* fields[i].name_length */
+      unsigned int min_width= (dbms_get_field_name_length(i) + 1) * max_width_of_a_char /* mysql_fields[i].name_length */
               + ocelot_grid_cell_border_size_as_int * 2
               + ocelot_grid_cell_drag_line_size_as_int;
 //              + border_size * 2;
       if (grid_column_widths[i] <= min_width) continue;
       max_reduction= grid_column_widths[i] - min_width;
-      if (grid_column_widths[i] >= (sum_tmp_column_lengths / result_column_count))
+      if (grid_column_widths[i] >= (sum_tmp_column_lengths / gridx_column_count))
       {
         amount_being_reduced= grid_column_widths[i] / 2;
 
@@ -2715,15 +2835,15 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
   grid_actual_row_height_in_lines= 1;
 
   /*
-    Each column's height = (dbms_get_field_length(i) i.e. fields[i].length) / grid_column_widths[i] rounded up.
+    Each column's height = (gridx_max_column_widths[i] i.e. actual max) / grid_column_widths[i] rounded up.
     If that's greater than the user-defined maximum, reduce to user-defined maximum
     (the QTextEdit will get a vertical scroll bar if there's an overflow).
   */
 
-  for (i= 0; i < result_column_count; ++i)
+  for (i= 0; i < gridx_column_count; ++i)
   {
-    grid_column_heights[i]= (dbms_get_field_length(i) * max_width_of_a_char) / grid_column_widths[i]; /* fields[i].length */
-    if ((grid_column_heights[i] * grid_column_widths[i]) < dbms_get_field_length(i)) ++grid_column_heights[i];
+    grid_column_heights[i]= (gridx_max_column_widths[i] * max_width_of_a_char) / grid_column_widths[i]; /* mysql_fields[i].length */
+    if ((grid_column_heights[i] * grid_column_widths[i]) < gridx_max_column_widths[i]) ++grid_column_heights[i];
     if (grid_column_heights[i] > ocelot_grid_max_column_height_in_lines) grid_column_heights[i]= ocelot_grid_max_column_height_in_lines;
     if (grid_column_heights[i] > grid_actual_row_height_in_lines) grid_actual_row_height_in_lines= grid_column_heights[i];
   }
@@ -2732,7 +2852,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
 
   /* Warning: header-height calculation is also "*(max_height_of_a_char+(border_size*2))", in a different place. */
   /* This calculation of height is horrendously difficult, and still does not seem to be exactly right. */
-  for (i= 0; i < result_column_count; ++i)
+  for (i= 0; i < gridx_column_count; ++i)
   {
 //    grid_column_heights[i]= (grid_column_heights[i] * (max_height_of_a_char+(border_size * 2))) + 9;
     /* For explanation of next line, see comment "Extra size". */
@@ -2746,22 +2866,24 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int, int ocelot_g
       grid_height_of_highest_column_in_pixels= grid_column_heights[i];
     }
   }
-
 }
 
 
 /*
-  If (!mysql_more_results_flag) all we want to know is: max actual length
-  If (mysql_more_results_flag) we want max actual length but also want to make a copy of mysql_res.
-  Todo: reconsider: maybe grid_max_column_widths should have come from max_length in MYSQL_FIELD.
+  Make a copy of mysql_res.
+    It's insane that I have to make a copy of what was in mysql_res, = result_set_copy.
+    But things get complicated if there are multiple result sets i.e. if mysql_more_results is true.
+    Also, after the copy, we're less (or not at all?) dependent on calls to MySQL functions.
+  For each column, we have: (unsigned int) length, (char) unused or null flag, (char[n]) contents.
+  We want max actual length too.
+  Todo: reconsider: maybe result_max_column_widths should have come from max_length in MYSQL_FIELD.
 */
-void scan_rows(bool p_mysql_more_results_flag,
-               unsigned int p_result_column_count,
+void scan_rows(unsigned int p_result_column_count,
                unsigned int p_result_row_count,
                MYSQL_RES *p_mysql_res,
-               char **p_mysql_res_copy,
-               char ***p_mysql_res_copy_rows,
-               unsigned int **p_grid_max_column_widths)
+               char **p_result_set_copy,
+               char ***p_result_set_copy_rows,
+               unsigned int **p_result_max_column_widths)
 {
   unsigned long int v_r;
   unsigned int i;
@@ -2769,36 +2891,13 @@ void scan_rows(bool p_mysql_more_results_flag,
   unsigned long *v_lengths;
 //  unsigned int ki;
 
-  for (i= 0; i < p_result_column_count; ++i) (*p_grid_max_column_widths)[i]= 0;
+  for (i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;
 
-  if (!p_mysql_more_results_flag)
-  {
-    lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
-    for (v_r= 0; v_r < p_result_row_count; ++v_r)
-    {
-      v_row= lmysql->ldbms_mysql_fetch_row(p_mysql_res);
-      v_lengths= lmysql->ldbms_mysql_fetch_lengths(p_mysql_res);
-      for (i= 0; i < p_result_column_count; ++i)
-      {
-        if ((v_row == 0) || (v_row[i] == 0))
-        {
-          if (sizeof(NULL_STRING) - 1 > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
-        }
-        else
-        {
-          if (v_lengths[i] > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= v_lengths[i];
-        }
-      }
-    }
-  return;
-  }
   /*
-    It's insane that I have to make a copy of what was in mysql_res, = mysql_res_copy.
-    But things get complicated if there are multiple result sets i.e. if mysql_more_results is true.
     First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
   */
   unsigned int total_size= 0;
-  char *mysql_res_copy_pointer;
+  char *result_set_copy_pointer;
   lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                /* first loop */
   {
@@ -2809,54 +2908,54 @@ void scan_rows(bool p_mysql_more_results_flag,
 //      ki= (v_r + 1) * result_column_count + i;
       if ((v_row == 0) || (v_row[i] == 0))
       {
-        total_size+= sizeof(unsigned int);
-        total_size+= sizeof(NULL_STRING) - 1;
+        total_size+= sizeof(unsigned int) + sizeof(char);
+        //total_size+= sizeof(NULL_STRING) - 1;
       }
       else
       {
-        total_size+= sizeof(unsigned int);
+        total_size+= sizeof(unsigned int) + sizeof(char);
         total_size+= v_lengths[i];
       }
     }
   }
-  *p_mysql_res_copy= new char[total_size];                                              /* allocate */
-  *p_mysql_res_copy_rows= new char*[p_result_row_count];
-  mysql_res_copy_pointer= *p_mysql_res_copy;
+  *p_result_set_copy= new char[total_size];                                              /* allocate */
+  *p_result_set_copy_rows= new char*[p_result_row_count];
+  result_set_copy_pointer= *p_result_set_copy;
   lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
-  int null_length= sizeof(NULL_STRING) - 1;
+
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
   {
-    (*p_mysql_res_copy_rows)[v_r]= mysql_res_copy_pointer;
+    (*p_result_set_copy_rows)[v_r]= result_set_copy_pointer;
     v_row= lmysql->ldbms_mysql_fetch_row(p_mysql_res);
     v_lengths= lmysql->ldbms_mysql_fetch_lengths(p_mysql_res);
     for (i= 0; i < p_result_column_count; ++i)
     {
-//      ki= (r + 1) * p_result_column_count + i;
       if ((v_row == 0) || (v_row[i] == 0))
       {
-        if (sizeof(NULL_STRING) - 1 > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
-        memcpy(mysql_res_copy_pointer, &null_length, sizeof(null_length));
-        mysql_res_copy_pointer+= sizeof(unsigned int);
-        memcpy(mysql_res_copy_pointer,NULL_STRING, sizeof(NULL_STRING) - 1);
-        mysql_res_copy_pointer+= sizeof(NULL_STRING) - 1;
+        if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
+        memset(result_set_copy_pointer, 0, sizeof(unsigned int));
+        *(result_set_copy_pointer + sizeof(unsigned int))= 1;
+        result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
       }
       else
       {
-        if (v_lengths[i] > (*p_grid_max_column_widths)[i]) (*p_grid_max_column_widths)[i]= v_lengths[i];
-        memcpy(mysql_res_copy_pointer, &v_lengths[i], sizeof(unsigned int));
-        mysql_res_copy_pointer+= sizeof(unsigned int);
-        memcpy(mysql_res_copy_pointer, v_row[i], v_lengths[i]);
-        mysql_res_copy_pointer+= v_lengths[i];
+        if (v_lengths[i] > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_lengths[i];
+        memcpy(result_set_copy_pointer, &v_lengths[i], sizeof(unsigned int));
+        *(result_set_copy_pointer + sizeof(unsigned int))= 0;
+        result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
+        memcpy(result_set_copy_pointer, v_row[i], v_lengths[i]);
+        result_set_copy_pointer+= v_lengths[i];
       }
     }
   }
 }
 
+
 /*
   Using the same technique as in scan_rows, make a copy of field names.
 
-  Todo: Wherever there is a reference to fields[...].name or fields[...].name_length,
-  replace with a reference to the appropriate spot in mysql_field_names_copy.
+  Todo: Wherever there is a reference to mysql_fields[...].name or mysql_fields[...].name_length,
+  replace with a reference to the appropriate spot in result_field_names.
 
   MYSQL_FIELD has: name, org_name, org_table, db. We only need name for result set
   display, but we need the others if user edits the result set (see TextEditWidget::keyPressEvent).
@@ -2867,7 +2966,7 @@ void scan_rows(bool p_mysql_more_results_flag,
 void scan_field_names(
                const char *which_field,
                unsigned int p_result_column_count,
-               char **p_mysql_field_names_copy)
+               char **p_result_field_names)
 {
   unsigned int i;
   unsigned int v_lengths;
@@ -2876,32 +2975,35 @@ void scan_field_names(
     First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
   */
   unsigned int total_size= 0;
-  char *mysql_field_names_copy_pointer;
+  char *result_field_names_pointer;
+
   for (i= 0; i < p_result_column_count; ++i)                                /* first loop */
   {
       total_size+= sizeof(unsigned int);
-      if (strcmp(which_field, "name") == 0) total_size+= fields[i].name_length;
-      else if (strcmp(which_field, "org_name") == 0) total_size+= fields[i].org_name_length;
-      else if (strcmp(which_field, "org_table") == 0) total_size+= fields[i].org_table_length;
-      else /* if (strcmp(which_field, "db") == 0) */ total_size+= fields[i].db_length;
+      if (strcmp(which_field, "name") == 0) total_size+= mysql_fields[i].name_length;
+      else if (strcmp(which_field, "org_name") == 0) total_size+= mysql_fields[i].org_name_length;
+      else if (strcmp(which_field, "org_table") == 0) total_size+= mysql_fields[i].org_table_length;
+      else /* if (strcmp(which_field, "db") == 0) */ total_size+= mysql_fields[i].db_length;
   }
-  *p_mysql_field_names_copy= new char[total_size];                                              /* allocate */
-  mysql_field_names_copy_pointer= *p_mysql_field_names_copy;
+  *p_result_field_names= new char[total_size];                               /* allocate */
+
+  result_field_names_pointer= *p_result_field_names;
   for (i= 0; i < p_result_column_count; ++i)                                 /* second loop */
   {
-    if (strcmp(which_field, "name") == 0) v_lengths= fields[i].name_length;
-    else if (strcmp(which_field, "org_name") == 0) v_lengths= fields[i].org_name_length;
-    else if (strcmp(which_field, "org_table") == 0) v_lengths= fields[i].org_table_length;
-    else /* if (strcmp(which_field, "db") == 0) */ v_lengths= fields[i].db_length;
-    memcpy(mysql_field_names_copy_pointer, &v_lengths, sizeof(unsigned int));
-    mysql_field_names_copy_pointer+= sizeof(unsigned int);
-    if (strcmp(which_field, "name") == 0) memcpy(mysql_field_names_copy_pointer, fields[i].name, v_lengths);
-    else if (strcmp(which_field, "org_name") == 0) memcpy(mysql_field_names_copy_pointer, fields[i].org_name, v_lengths);
-    else if (strcmp(which_field, "org_table") == 0) memcpy(mysql_field_names_copy_pointer, fields[i].org_table, v_lengths);
-    else /* if (strcmp(which_field, "db") == 0) */ memcpy(mysql_field_names_copy_pointer, fields[i].db, v_lengths);
-    mysql_field_names_copy_pointer+= v_lengths;
+    if (strcmp(which_field, "name") == 0) v_lengths= mysql_fields[i].name_length;
+    else if (strcmp(which_field, "org_name") == 0) v_lengths= mysql_fields[i].org_name_length;
+    else if (strcmp(which_field, "org_table") == 0) v_lengths= mysql_fields[i].org_table_length;
+    else /* if (strcmp(which_field, "db") == 0) */ v_lengths= mysql_fields[i].db_length;
+    memcpy(result_field_names_pointer, &v_lengths, sizeof(unsigned int));
+    result_field_names_pointer+= sizeof(unsigned int);
+    if (strcmp(which_field, "name") == 0) memcpy(result_field_names_pointer, mysql_fields[i].name, v_lengths);
+    else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, mysql_fields[i].org_name, v_lengths);
+    else if (strcmp(which_field, "org_table") == 0) memcpy(result_field_names_pointer, mysql_fields[i].org_table, v_lengths);
+    else /* if (strcmp(which_field, "db") == 0) */ memcpy(result_field_names_pointer, mysql_fields[i].db, v_lengths);
+    result_field_names_pointer+= v_lengths;
   }
 }
+
 
 /*
    Set alignment and height of a cell.
@@ -2909,7 +3011,7 @@ void scan_field_names(
    If vertical == false, this happens once before we do any displaying (but we don't call this).
    If vertical == true, this happens at start and every time we scroll.
 */
-void set_alignment_and_height(int ki, int col, int grid_col)
+void set_alignment_and_height(int ki, int col, int grid_col, int field_type)
 {
   TextEditWidget *cell_text_edit_widget= text_edit_widgets[ki];
   /*
@@ -2919,7 +3021,7 @@ void set_alignment_and_height(int ki, int col, int grid_col)
     Do not assume it's left-aligned otherwise; there's a pool.
   */
   /* Todo: some other types e.g. BLOBs might also need special handling. */
-  if ( (grid_col == 1) && (dbms_get_field_flag(col) & NUM_FLAG))
+  if (field_type <= MYSQL_TYPE_DOUBLE)
   {
     cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
     cell_text_edit_widget->setAlignment(Qt::AlignRight);
@@ -2937,22 +3039,23 @@ void set_alignment_and_height(int ki, int col, int grid_col)
 //                     + ocelot_grid_cell_border_size_as_int * 2
 //                     + ocelot_grid_cell_drag_line_size_as_int;
 //    if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
-//    text_edit_frames[xrow * result_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
-//    text_edit_frames[xrow * result_column_count + col]->setMaximumHeight(header_height);
-//    text_edit_frames[xrow * result_column_count + col]->setMinimumHeight(header_height);
+//    text_edit_frames[xrow * gridx_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
+//    text_edit_frames[xrow * gridx_column_count + col]->setMaximumHeight(header_height);
+//    text_edit_frames[xrow * gridx_column_count + col]->setMinimumHeight(header_height);
 //  }
 //  else
   {
     int this_width;
-    if (grid_col == 0)
-    {
-      /* Todo: this should be based on QFontMetrics, 20 is so arbitrary */
-      this_width= (20) * (text_edit_frames[ki]->content_length + 1);
-    }
-    else this_width= grid_column_widths[col];
-    text_edit_frames[ki]->setFixedSize(this_width, grid_column_heights[col]);
-    text_edit_frames[ki]->setMaximumHeight(grid_column_heights[col]);
-    text_edit_frames[ki]->setMinimumHeight(grid_column_heights[col]);
+    //if (grid_col == 0)
+    //{
+    //  /* Todo: this should be based on QFontMetrics, 20 is so arbitrary */
+    //  this_width= (20) * (text_edit_frames[ki]->content_length + 1);
+    //}
+    //else
+    this_width= grid_column_widths[grid_col];
+    text_edit_frames[ki]->setFixedSize(this_width, grid_column_heights[grid_col]);
+    text_edit_frames[ki]->setMaximumHeight(grid_column_heights[grid_col]);
+    text_edit_frames[ki]->setMinimumHeight(grid_column_heights[grid_col]);
   }
 }
 
@@ -2963,173 +3066,182 @@ void set_alignment_and_height(int ki, int col, int grid_col)
   Todo: this points directly to a mysql_res row, ignoring the earlier clever ideas in dbms_get_field_value().
 */
 /* The big problem is that setVerticalSpacing(0) goes awry if I use hide(). */
+/* Todo: Think whether there's a chance that, while somebody scroll to the end,
+   the hide() comes too late, i.e. a paint might occur for an invalid row.
+   Maybe show() should be delayed until after hide(), or painting should be prevented for a while. */
 
 void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
 {
   unsigned int i;
-  unsigned int ki;
+  unsigned int text_edit_frames_index;
   unsigned int grid_row;
   int first_row;
+  char *row_pointer;
 
   first_row= new_grid_vertical_scroll_bar_value;
 
-  if (ocelot_result_grid_vertical_copy > 0)
+  if (ocelot_result_grid_vertical_copy != 0)
   {
-    int columns_per_row;
-    if (ocelot_result_grid_column_names_copy > 0) columns_per_row= 2;
-    else columns_per_row= 1;
+    unsigned int result_column_number; /* i.e. column number in result set, not column number in grid */
     first_row= new_grid_vertical_scroll_bar_value / result_column_count;
-    i= new_grid_vertical_scroll_bar_value % result_column_count;
-    lmysql->ldbms_mysql_data_seek(grid_mysql_res, first_row);
-    r= first_row;
+    result_column_number= new_grid_vertical_scroll_bar_value % result_column_count;
+    unsigned int new_content_length= 0;
+    row_pointer= result_set_copy_rows[first_row];
+    for (unsigned int j= 0; ; ++j)
+    {
+      memcpy(&new_content_length, row_pointer, sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int) + sizeof(char);
+      if (j >= result_column_number) break;
+      row_pointer+= new_content_length;
+    }
+
+    /* now row_pointer -> result column, and each subsequent result column is a grid row */
+    //grid_row= first_row;
+
     grid_row= 0;
-    row= lmysql->ldbms_mysql_fetch_row(grid_mysql_res);
-    if (row == NULL)
-    {
-      printf("mysql_fetch_row error A\n");
-      printf("r=%ld\n", r);
-      printf("first_row=%d\n", first_row);
-      printf("new_grid_vertical_scroll_bar_value=%d\n", new_grid_vertical_scroll_bar_value);
-      printf("grid_row=%d\n", grid_row);
-      printf("i=%d\n", i);
-      exit(0);
-    }
-    lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
-    if (lengths == NULL)
-    {
-      printf("mysql_fetch_lengths error\n");
-      exit(0);
-    }
+    result_row_number= first_row;
+
     for (;;)
     {
-      /* todo: bug: use mysql_field_names_copy, do not use fields[].name */
-      ki= grid_row * columns_per_row;
-      if (columns_per_row == 2)
-      {
-        text_edit_frames[ki]->content_length= fields[i].name_length;
-        text_edit_frames[ki]->content_pointer= fields[i].name;
-        text_edit_frames[ki]->is_retrieved_flag= false;
-        text_edit_frames[ki]->ancestor_grid_column_number= i;
-        text_edit_frames[ki]->ancestor_grid_row_number= r;
-        text_edit_frames[ki]->is_image_flag= false;
-        set_alignment_and_height(ki, i, 0);
-        text_edit_frames[ki]->show();
-        ++ki;
-      }
-      text_edit_frames[ki]->content_length= lengths[i];
-      text_edit_frames[ki]->content_pointer= row[i];
-      text_edit_frames[ki]->is_retrieved_flag= false;
-      text_edit_frames[ki]->ancestor_grid_column_number= i;
-      text_edit_frames[ki]->ancestor_grid_row_number= r;
-      if ((fields[i].type == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
-      {
-        text_edit_frames[ki]->is_image_flag= true;
-      }
-      else text_edit_frames[ki]->is_image_flag= false;
-      set_alignment_and_height(ki, i, 1);
-      text_edit_frames[ki]->show();
-      ++i;
-      if (i == result_column_count)
-      {
-        ++r;
-        if (r >= result_row_count) break;
-        row= lmysql->ldbms_mysql_fetch_row(grid_mysql_res);
-        if (row == NULL)
-        {
-          printf("mysql_fetch_row error B\n");
-          printf("r=%ld\n", r);
-          printf("first_row=%d\n", first_row);
-          printf("new_grid_vertical_scroll_bar_value=%d\n", new_grid_vertical_scroll_bar_value);
-          printf("grid_row=%d\n", grid_row);
-          exit(0);
-        }
-        lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
-        if (lengths == NULL)
-        {
-          printf("mysql_fetch_lengths error\n");
-          exit(0);
-        }
-        i= 0;
-      }
-      ++grid_row;
-      if (grid_row >= result_grid_widget_max_height_in_lines) break;
-    }
+      unsigned int v_lengths= 0;
 
-    for (ki= ki + 1; ki < max_text_edit_frames_count; ++ki) text_edit_frames[ki]->hide();
-    return;
+      text_edit_frames_index= grid_row * gridx_column_count;
+      unsigned int o_text_edit_frames_index= text_edit_frames_index;
+
+      /* result_column_number is still known */
+      if (ocelot_line_numbers_copy != 0)                         /* include row#? */
+      {
+        text_edit_frames[text_edit_frames_index]->content_length= 0;
+        text_edit_frames[text_edit_frames_index]->content_pointer= 0;
+        text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
+        text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
+        text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
+        text_edit_frames[text_edit_frames_index]->is_image_flag= false;
+        ++text_edit_frames_index;
+      }
+      if (ocelot_result_grid_column_names_copy != 0)               /* include column header? */
+      {
+        char *result_field_names_pointer= &result_field_names[0];
+        for (unsigned int mi= 0; ; ++mi)
+        {
+          memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+          result_field_names_pointer+= sizeof(unsigned int);
+          if (mi >= result_column_number) break;
+          result_field_names_pointer+= v_lengths;
+        }
+        text_edit_frames[text_edit_frames_index]->content_length= v_lengths;
+        text_edit_frames[text_edit_frames_index]->content_pointer= result_field_names_pointer;
+        text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
+        text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
+        text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
+        text_edit_frames[text_edit_frames_index]->is_image_flag= false;
+        ++text_edit_frames_index;
+      }
+      text_edit_frames[text_edit_frames_index]->content_length= new_content_length; /* include value. */
+      if (*(row_pointer - 1) == 1)
+      {
+        text_edit_frames[text_edit_frames_index]->content_pointer= 0;
+      }
+      else text_edit_frames[text_edit_frames_index]->content_pointer= row_pointer;
+      text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
+      text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
+      text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
+      if ((result_field_types[result_column_number] == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
+      {
+        text_edit_frames[text_edit_frames_index]->is_image_flag= true;
+      }
+      else text_edit_frames[text_edit_frames_index]->is_image_flag= false;
+
+      int column_number_within_gridx= 0;
+      if (ocelot_line_numbers_copy != 0) gridx_max_column_widths[column_number_within_gridx++]= sizeof("row_number");
+      if (ocelot_result_grid_column_names_copy != 0) gridx_max_column_widths[column_number_within_gridx++]= v_lengths;
+
+      if (*(row_pointer - 1) == 1)
+      {
+        gridx_max_column_widths[column_number_within_gridx]= sizeof(NULL_STRING) - 1;
+      }
+      else gridx_max_column_widths[column_number_within_gridx]= new_content_length;
+      grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
+                            ocelot_grid_cell_drag_line_size_as_int,
+                            0); /* get grid_column_widths[] and grid_column_heights[] */
+      column_number_within_gridx= 0;
+      if (ocelot_line_numbers_copy != 0)
+      {
+        set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
+                                 result_column_number, column_number_within_gridx,
+                                 MYSQL_TYPE_SHORT);
+        text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
+        ++column_number_within_gridx;
+      }
+      if (ocelot_result_grid_column_names_copy != 0)
+      {
+        set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
+                                 result_column_number, column_number_within_gridx,
+                                 MYSQL_TYPE_STRING);
+        text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
+        ++column_number_within_gridx;
+      }
+      set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
+                               result_column_number, column_number_within_gridx,
+                               result_field_types[result_column_number]);
+      text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
+      ++result_column_number;
+      ++grid_row;
+      if (result_column_number == result_column_count)
+      {
+        ++result_row_number;
+        result_column_number= 0;
+      }
+      if (result_row_number >= result_row_count) break;
+      if (grid_row >= result_grid_widget_max_height_in_lines_at_fillup_time) break;
+      row_pointer+= new_content_length;
+      memcpy(&new_content_length, row_pointer, sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int) + sizeof(unsigned char);
+    }
+    //for (text_edit_frames_index= text_edit_frames_index + 1; text_edit_frames_index < max_text_edit_frames_count; ++text_edit_frames_index) text_edit_frames[text_edit_frames_index]->hide();
   }
 
-  if (!mysql_more_results_flag)
+  else /* if ocelot_result_grid_vertical_copy == 0 */
   {
-    lmysql->ldbms_mysql_data_seek(grid_mysql_res, first_row);
-    for (r= first_row, grid_row= 1; (r < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines); ++r, ++grid_row)
+    for (result_row_number= first_row, grid_row= 1;
+         (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines_at_fillup_time);
+         ++result_row_number, ++grid_row)
     {
-      row= lmysql->ldbms_mysql_fetch_row(grid_mysql_res);
-      lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
-      for (i= 0; i < result_column_count; ++i)
+      row_pointer= result_set_copy_rows[result_row_number];
+//      lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
+      for (i= 0; i < gridx_column_count; ++i)
       {
-        ki= grid_row * result_column_count + i;
-        if ((row == 0) || (row[i] == 0))
+        text_edit_frames_index= grid_row * gridx_column_count + i;
+        if (gridx_flags[i] == 1)        /* row number? */
         {
-          text_edit_frames[ki]->content_length= sizeof(NULL_STRING) - 1;
-          text_edit_frames[ki]->content_pointer= 0;
-          text_edit_frames[ki]->is_image_flag= false;
-//          if (sizeof(NULL_STRING) - 1 > grid_max_column_widths[i]) grid_max_column_widths[i]= sizeof(NULL_STRING) - 1;
+          text_edit_frames[text_edit_frames_index]->content_length= 0;
+          text_edit_frames[text_edit_frames_index]->content_pointer= 0;
         }
         else
         {
-          text_edit_frames[ki]->content_length= lengths[i];
-          text_edit_frames[ki]->content_pointer= row[i];
-//          if (lengths[i] > grid_max_column_widths[i]) grid_max_column_widths[i]= lengths[i];
-          if ((fields[i].type == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
+          memcpy(&(text_edit_frames[text_edit_frames_index]->content_length), row_pointer, sizeof(unsigned int));
+          row_pointer+= sizeof(unsigned int) + sizeof(char);
+          if (*(row_pointer - 1) == 1)
           {
-            text_edit_frames[ki]->is_image_flag= true;
+            text_edit_frames[text_edit_frames_index]->content_pointer= 0;
           }
-          else text_edit_frames[ki]->is_image_flag= false;
+          else text_edit_frames[text_edit_frames_index]->content_pointer= row_pointer;
+          row_pointer+= text_edit_frames[text_edit_frames_index]->content_length;
         }
-        text_edit_frames[ki]->is_retrieved_flag= false;
-        text_edit_frames[ki]->ancestor_grid_column_number= i;
-        text_edit_frames[ki]->ancestor_grid_row_number= r;
-        text_edit_frames[ki]->show();
+        text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
+        text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= i;
+        text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
+        text_edit_frames[text_edit_frames_index]->show();
       }
     }
-    for (grid_row= grid_row; grid_row < result_grid_widget_max_height_in_lines; ++grid_row) /* so if scroll bar goes past end we won't see these */
-    {
-      for (i= 0; i < result_column_count; ++i)
-      {
-        ki= grid_row * result_column_count + i;
-        text_edit_frames[ki]->hide();
-      }
-    }
-  return;
   }
-
-  char *row_pointer;
-//  int length;
-  for (r= first_row, grid_row= 1; (r < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines); ++r, ++grid_row)
+  /* todo: maybe what we really want is to hide as far as # of used rows, which may be < max */
+  for (grid_row= grid_row; grid_row < result_grid_widget_max_height_in_lines_at_fillup_time; ++grid_row) /* so if scroll bar goes past end we won't see these */
   {
-    row_pointer= mysql_res_copy_rows[r];
-//    lengths= lmysql->ldbms_mysql_fetch_lengths(grid_mysql_res);
-    for (i= 0; i < result_column_count; ++i)
+    for (i= 0; i < gridx_column_count; ++i)
     {
-      ki= grid_row * result_column_count + i;
-      memcpy(&(text_edit_frames[ki]->content_length), row_pointer, sizeof(unsigned int));
-      row_pointer+= sizeof(unsigned int);
-      text_edit_frames[ki]->content_pointer= row_pointer;
-      row_pointer+= text_edit_frames[ki]->content_length;
-      text_edit_frames[ki]->is_retrieved_flag= false;
-      text_edit_frames[ki]->ancestor_grid_column_number= i;
-      text_edit_frames[ki]->ancestor_grid_row_number= r;
-
-      text_edit_frames[ki]->show();
-    }
-  }
-  for (grid_row= grid_row; grid_row < result_grid_widget_max_height_in_lines; ++grid_row) /* so if scroll bar goes past end we won't see these */
-  {
-    for (i= 0; i < result_column_count; ++i)
-    {
-      ki= grid_row * result_column_count + i;
-      text_edit_frames[ki]->hide();
+      text_edit_frames_index= grid_row * gridx_column_count + i;
+      text_edit_frames[text_edit_frames_index]->hide();
     }
   }
 }
@@ -3240,8 +3352,7 @@ bool vertical_scroll_bar_event()
     For each row:
       For each column: remove frame widget from row layout
       Remove row widget from main layout
-  Todo: Actually we only need to remove widgets if row-count goes down, add when row-count goes up.
-  Todo: Consider whether it would be neater to use the takeAt()
+  Assumption: a blank row i.e. a row with no cells marks the end.
 */
 void remove_layouts()
 {
@@ -3252,11 +3363,9 @@ void remove_layouts()
   client->hide(); /* client->show() will happen again soon */
   if (grid_main_layout != 0)
   {
-    for (xrow= 0; (xrow < grid_result_row_count)
-                  && (xrow < result_grid_widget_max_height_in_lines)
-                  && (xrow < row_pool_size);
-         ++xrow)
+    for (xrow= 0; xrow < row_pool_size; ++xrow)
     {
+      if (grid_row_layouts[xrow]->count() == 0) break;
       for (;;)
       {
         text_edit_frame_item= grid_row_layouts[xrow]->itemAt(0);
@@ -3288,18 +3397,21 @@ void garbage_collect()
 {
   remove_layouts();
   if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
-  if (grid_max_column_widths != 0) { delete [] grid_max_column_widths; grid_max_column_widths= 0; }
+  if (result_max_column_widths != 0) { delete [] result_max_column_widths; result_max_column_widths= 0; }
   if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
   if (grid_column_dbms_sources != 0) { delete [] grid_column_dbms_sources; grid_column_dbms_sources= 0; }
-  if (grid_column_dbms_field_numbers != 0) { delete [] grid_column_dbms_field_numbers; grid_column_dbms_field_numbers= 0; }
-  if (grid_column_dbms_field_types != 0) { delete [] grid_column_dbms_field_types; grid_column_dbms_field_types= 0; }
-  if (mysql_res_copy != 0) { delete [] mysql_res_copy; mysql_res_copy= 0; }
-  if (mysql_res_copy_rows != 0) { delete [] mysql_res_copy_rows; mysql_res_copy_rows= 0; }
-  if (mysql_field_names_copy != 0) { delete [] mysql_field_names_copy; mysql_field_names_copy= 0; }
-  if (mysql_field_org_names_copy != 0) { delete [] mysql_field_org_names_copy; mysql_field_org_names_copy= 0; }
-  if (mysql_field_org_tables_copy != 0) { delete [] mysql_field_org_tables_copy; mysql_field_org_tables_copy= 0; }
-  if (mysql_field_dbs_copy != 0) { delete [] mysql_field_dbs_copy; mysql_field_dbs_copy= 0; }
-  for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear();
+  if (result_field_types != 0) { delete [] result_field_types; result_field_types= 0; }
+  if (result_set_copy != 0) { delete [] result_set_copy; result_set_copy= 0; }
+  if (result_set_copy_rows != 0) { delete [] result_set_copy_rows; result_set_copy_rows= 0; }
+  if (result_field_names != 0) { delete [] result_field_names; result_field_names= 0; }
+  if (result_original_field_names != 0) { delete [] result_original_field_names; result_original_field_names= 0; }
+  if (result_original_table_names != 0) { delete [] result_original_table_names; result_original_table_names= 0; }
+  if (result_original_database_names != 0) { delete [] result_original_database_names; result_original_database_names= 0; }
+  if (gridx_field_names != 0) { delete [] gridx_field_names; gridx_field_names= 0; }
+  if (gridx_max_column_widths != 0) { delete [] gridx_max_column_widths; gridx_max_column_widths= 0; }
+  if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
+  if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
+  for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear(); /* unnecessary? */
 }
 
 
@@ -3366,131 +3478,67 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
 //  else  grid_vertical_scroll_bar->hide();
 //}
 
-/*
-  Ordinarily DBMS_ROW_NUMBER_TEST is 0 = off.
-  Turn it to 1 = on if testing to get row numbers as leftmost column.
-  Todo: If it's 1, then the test will succeed, but is this really the way you want to do things?
-  Maybe it's something for "Settings".
-  Maybe it should be in the background like a header.
-  Maybe you really need "select ocelot.row_number(), * from t;" i.e. you want an application-level function.
-*/
-#define DBMS_ROW_NUMBER_TEST 0
-
-#define DBMS_SOURCE_IS_MYSQL_FIELD 0
-#define DBMS_SOURCE_IS_ROW_NUMBER  1
-
-/*
-  dbms_set_result_column_count() gets the number of columns in the grid
-  It might be the same as the number of fields returned by lmysql->ldbms_mysql_num_fields().
-  But if there is an additional field for row-number, ++.
-  Todo: check if this will crash if somebody changes the setting for row numbers (if we allow that)?
-*/
-void dbms_set_result_column_count()
-{
-  result_column_count= lmysql->ldbms_mysql_num_fields(grid_mysql_res);           /* this will be the width of the grid */
-  if (DBMS_ROW_NUMBER_TEST == 1) ++result_column_count;
-}
 
 void dbms_set_grid_column_sources()
 {
   unsigned int column_number;
   unsigned int dbms_field_number;
 
-  fields= lmysql->ldbms_mysql_fetch_fields(grid_mysql_res);
   dbms_field_number= 0;
   for (column_number= 0; column_number < result_column_count; ++column_number)
   {
-    if (column_number == 0 && DBMS_ROW_NUMBER_TEST == 1) grid_column_dbms_sources[column_number]= DBMS_SOURCE_IS_ROW_NUMBER;
-    else
     {
-      grid_column_dbms_sources[column_number]= DBMS_SOURCE_IS_MYSQL_FIELD;            /* i.e. use mysql field# */
-      grid_column_dbms_field_numbers[column_number]= dbms_field_number;
       ++dbms_field_number;
     }
   }
 }
 
-unsigned int dbms_get_field_length(unsigned int column_number)
-{
-  QString s;
-  unsigned int dbms_field_number;
-
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
-  {
-    dbms_field_number= grid_column_dbms_field_numbers[column_number];
-    /* The defined length is fields[dbms_field_number].length. We prefer actual max length which usually is shorter. */
-    return grid_max_column_widths[dbms_field_number];
-  }
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
-  {
-    s= QString::number(result_row_count);
-    return s.length();
-  }
-  return 0; /* to avoid "control reaches end of non-void function" warning */
-}
+//unsigned int dbms_get_field_length(unsigned int column_number)
+//{
+//  QString s;
+//  unsigned int dbms_field_number;
+//
+//  dbms_field_number= grid_column_dbms_field_numbers[column_number];
+//  /* The defined length is mysql_fields[dbms_field_number].length. We prefer actual max length which usually is shorter. */
+//  return gridx_max_column_widths[dbms_field_number];
+//}
 
 
 unsigned int dbms_get_field_flag(unsigned int column_number)
 {
-  unsigned int dbms_field_number;
-
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
-  {
-    dbms_field_number= grid_column_dbms_field_numbers[column_number];
-    return fields[dbms_field_number].flags;
-  }
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
-    return NUM_FLAG;
-  return 0; /* to avoid "control reaches end of non-void function" warning */
+  return mysql_fields[column_number].flags;
 }
 
 
 QString dbms_get_field_name(unsigned int column_number)
 {
-  unsigned int dbms_field_number;
-
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
-  {
-    dbms_field_number= grid_column_dbms_field_numbers[column_number];
-    return fields[dbms_field_number].name;
-  }
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
-    return "row_number";
-  return ""; /* to avoid "control reaches end of non-void function" warning */
+  return mysql_fields[column_number].name;
 }
+
 
 unsigned int dbms_get_field_name_length(unsigned int column_number)
 {
-  unsigned int dbms_field_number;
-
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
-  {
-    dbms_field_number= grid_column_dbms_field_numbers[column_number];
-    return fields[dbms_field_number].name_length;
-  }
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
-    return 10; /* i.e. length of "row_number" */
-  return 0; /* to avoid "control reaches end of non-void function" warning */
+  return mysql_fields[column_number].name_length;
 }
 
 
-QString dbms_get_field_value(int row_number, unsigned int column_number)
-{
-  QString s;
-  unsigned int dbms_field_number;
-
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
-  {
-    dbms_field_number= grid_column_dbms_field_numbers[column_number];
-    return row[dbms_field_number];
-  }
-  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
-  {
-    s= QString::number(row_number);
-    return s;
-  }
-  return ""; /* to avoid "control reaches end of non-void function" warning */
-}
+//QString dbms_get_field_value(int row_number, unsigned int column_number)
+//{
+//  QString s;
+//  unsigned int dbms_field_number;
+//
+//  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_MYSQL_FIELD)
+//  {
+//    dbms_field_number= grid_column_dbms_field_numbers[column_number];
+//    return row[dbms_field_number];
+//  }
+//  if (grid_column_dbms_sources[column_number] == DBMS_SOURCE_IS_ROW_NUMBER)
+//  {
+//    s= QString::number(row_number);
+//    return s;
+//  }
+//  return ""; /* to avoid "control reaches end of non-void function" warning */
+//}
 
 public slots:
 private:
