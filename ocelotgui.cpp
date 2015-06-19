@@ -1941,7 +1941,7 @@ void MainWindow::create_the_manual_widget()
   the_manual_text_edit->setText("\
 <BR><h1>The ocelotgui user manual</h1>  \
 <BR>  \
-<BR>Version 0.5.0, May 25 2015  \
+<BR>Version 0.5.0, June 19 2015  \
 <BR>  \
 <BR>  \
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -1967,8 +1967,7 @@ The Ocelot Graphical User Interface', allows users to connect to  \
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.  \
 Some of its features are: syntax highlighting, user-settable colors  \
 and fonts for each part of the screen, and result-set displays  \
-with multi-line rows and resizable columns.  \
-NEW: And a debugger, see section 'Debugger'.  \
+with multi-line rows and resizable columns, and a debugger.  \
 <BR>  \
 <BR><h2>The company, the product, and the status</h2>  \
 <BR>  \
@@ -1982,14 +1981,14 @@ In some ways it is like the basic mysql client program,  \
 with added GUI features: full-screen editing, syntax  \
 highlighting, tabular display, customized fonts and colors.  \
 It differs from some other front-end GUI products because  \
-it is open source (GPL), is written in C++, and makes use  \
+it is open source (GPL), is written in C++, and it makes use  \
 of the Qt multi-platform widget library.  \
 <BR>  \
 <BR>The product status is: alpha. It has been known to work as described in  \
-this manual on several Linux distros. But testing has been short  \
-and the 'todo' list is long. We are making an early release for  \
-tire kickers who will want to confirm what the manual describes,  \
-or want to see the source code and do their own builds.  \
+this manual on several Linux distros but it would be premature  \
+to recommend use with critical production systems. We are making only  \
+one guarantee, that we will try to address any bug reports  \
+and answer questions from people examining the source code.  \
 <BR>  \
 <BR><h2>Downloading, installing, and building</h2>  \
 <BR>  \
@@ -2070,9 +2069,9 @@ in a single sequence.  \
 of the client (that is, of the ocelotgui front end) but does not  \
 necessarily go to the MySQL/MariaDB server. Of the statements  \
 that the MySQL Reference manual describes in section  \
-'mysql commands' http://dev.mysql.com/doc/refman/5.6/en/mysql-commands.html.  \
+'mysql commands' http://dev.mysql.com/doc/refman/5.6/en/mysql-commands.html  \
 <BR>  \
-<BR>The ocelotgui program has working equivalents for: clear, delimiter, exit,  \
+<BR>the ocelotgui program has working equivalents for: clear, delimiter, exit,  \
 prompt, source, and warnings. For example, entering 'quit;'  \
 followed by Enter will cause the program to stop. It is  \
 sometimes not mandatory to end a client statement with ';',  \
@@ -2176,6 +2175,34 @@ Currently-supported instructions are:  \
 For a walk through a debugger example, with screenshots, see  \
 this blog post: ocelot.ca/blog/the-ocelotgui-debugger.  \
 <BR>  \
+<BR><h2>Recent Enhancements</h2>  \
+<BR>  \
+Here are new features which work (or work more correctly) when ocelotgui is built  \
+from source, and will appear in binary executables  \
+when the next release occurs.  \
+<BR>Vertical: If a user starts the program with ocelotgui --vertical=1  \
+or ends a statement with backslash G, results come up with one column per row.  \
+<BR>Images: If a user chooses Options | display BLOB as image from the menu,  \
+and selects rows which contain LONGBLOB columns, and the column values are  \
+images (such as PNG or JPEG or BMP or GIF format data), ocelotgui will display  \
+the result as images.  \
+<BR>Result-set editing: If a user clicks on a column in the result set  \
+and makes a change, an update statement will appear in the statement widget.  \
+For example, if a result set is the result from SELECT column1, column2 FROM t;,  \
+and the column1 value is 5, and the column2 value is 'ABC', and the user changes  \
+the column2 value to 'AB', then the  \
+statement widget will show UPDATE t SET column2 = 'AB' WHERE column1 = 5 AND column2 = 'AB';.  \
+The user then has the choice of ignoring the update statement or executing it.  \
+<BR>Detaching: If a user chooses Options | detach history widget or  \
+Options | detach result grid widget, then the widget will become a separate window  \
+which can be moved or resized.  \
+<BR>Colors: The Colors and fonts dialog boxes now have a simpler way to choose  \
+colors, by selecting from a choice of 148 color names / color icons. Users can also  \
+change colors by saying SET object_name_color = color-name | hex-rgb-value.  \
+<BR>Run|Kill: When an SQL statement is taking a long time, the menu changes so  \
+that Run|Execute (Ctrl+E) is disabled and Run|Kill (Ctrl+C) is enabled.  \
+Selecting Run|Kill stops the statement if possible.  \
+<BR>  \
 <BR><h2>Contact</h2>  \
 <BR>  \
 <BR>Bug reports and feature requests may go on  \
@@ -2183,7 +2210,7 @@ https://github.com/ocelot-inc/ocelotgui/issues.  \
 <BR>  \
 There may be announcements from time to time on Ocelot's  \
 web page (ocelot.ca) or on the employee blog (ocelot.ca/blog).  \
-This manual will also be available on ocelot.ca soon.  \
+This manual may also be available on ocelot.ca soon.  \
 <BR>  \
 <BR>Any contributions will be appreciated.  \
   ");
