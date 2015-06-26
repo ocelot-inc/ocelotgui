@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.5.0 Alpha
-   Last modified: June 18 2015
+   Last modified: June 28 2015
 */
 
 /*
@@ -358,8 +358,6 @@ static const char *s_color_list[308]=
 "YellowGreen","#9ACD32",
 "",""};
 
-#include <assert.h>
-
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
 
@@ -444,8 +442,7 @@ static const char *s_color_list[308]=
   static unsigned short int ocelot_opt_ssl_verify_server_cert= 0;  /* --ssl-verify-server-cert for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert (5.7) */
   static unsigned short ocelot_syslog= 0;           /* --syslog (5.7) */
   static unsigned short ocelot_table= 0;            /* --table */
-  /* todo: ocelot_history_tee_file_name exists as QString. Fix that. */
-  static bool ocelot_history_tee= false;            /* --tee for tee */
+  static bool ocelot_history_tee= false;            /* --tee for tee  ... arg=history_tee_file_name*/
   static unsigned short ocelot_unbuffered= 0;       /* --unbuffered */
   static unsigned short ocelot_verbose= 0;          /* --verbose */
   static unsigned short ocelot_version= 0;          /* --version */
@@ -473,6 +470,9 @@ static const char *s_color_list[308]=
   /* I gather that one is supposed to read the charset file. I don't think we do. */
   static unsigned short ocelot_opt_named_pipe;          /* for MYSQL_OPT_NAMED_PIPE */
   static unsigned int ocelot_opt_write_timeout= 0; /* for MYSQL_OPT_WRITE_TIMEOUT */
+
+  static bool ocelot_detach_history_widget= false;
+  static bool ocelot_detach_result_grid_widget= false;
 
   int is_libmysqlclient_loaded= 0;
   int is_libcrypto_loaded= 0;
@@ -531,7 +531,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   /* client variable defaults */
   /* Most settings done here might be overridden when connect_mysql_options_2 reads options. */
   ocelot_dbms= "mysql";
-  ocelot_grid_detached= 0;
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
   ocelot_statement_prompt_background_color= "lightGray"; /* set early because initialize_widget_statement() depends on this */
   ocelot_grid_border_color= "black";
@@ -930,7 +929,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   * Find | Goto
     * you need these menu items for history soon, so might as well have them for statements too
   * Hide prompt + Hide result + Hide result set
-  + Settings: History Widget: Colors and Fonts has different colors for prompt/statement/result/result set
+  + Settings: History Widget has different colors for prompt/statement/result/result set
 
   Comments unrelated to HTML work:
   Possible difficulty: our history is statement-at-a-time, not screen-at-a-time", if there are multi statements
@@ -1029,7 +1028,7 @@ void MainWindow::history_markup_append(QString result_set_for_history)
   /* Todo: There should be a better way to ensure that Qt realizes the whole widget is rich text. */
   /* Todo: Some of this could be at start of history_edit_widget but what would happen if I cleared the whole area? */
   /* Todo: background-color of prompt could be settable for history widget, rather than = statement background color. */
-  /* Todo: there's a weird bug that splits prompt into 'm' and 'ysql>', but the output still looks okay. */
+  /* Todo: the width of the prompt is greater than necessary */
   history_statement= "<i></i>";                                           /* hint that what's coming is HTML */
   history_statement.append(history_markup_statement_start);
 
@@ -1214,13 +1213,13 @@ int MainWindow::history_markup_previous_or_next()
   * the options --tee=filename and --no-tee exist and are checked (I think)
   * the client statements tee filename and notee will be seen
   * there are no menu options (todo: decide whether this is a flaw)
-  * apparently the mysql client would flush, but we don't (todo: maybe change this)
+  * apparently the mysql client would flush, therefore we call fflush() after writing
   * the mysql client would include results from queries, but we don't (todo: this is a flaw)
   * there might be html in the output (todo: decide whether this is a flaw)
 */
 void MainWindow::history_tee_write(QString text_line)  /* for tee */
 {
-  if (ocelot_history_tee)                              /* for tee */
+  if (ocelot_history_tee)
   {
     QString s= text_line;
     int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
@@ -1237,16 +1236,26 @@ void MainWindow::history_tee_write(QString text_line)  /* for tee */
 
 int MainWindow::history_tee_start(QString file_name) /* for tee */
 {
-  int query_len= file_name.toUtf8().size();                  /* See comment "UTF8 Conversion" */
+  QString file_name_to_open;
+
+  if (file_name == "")  file_name_to_open= ocelot_history_tee_file_name;
+  else file_name_to_open= file_name;
+
+  int query_len= file_name_to_open.toUtf8().size();  /* See comment "UTF8 Conversion" */
   char *query= new char[query_len + 1];
-  memcpy(query, file_name.toUtf8().constData(), query_len + 1);
+  memcpy(query, file_name_to_open.toUtf8().constData(), query_len + 1);
   query[query_len]= '\0';                            /* todo: think: is this necessary? */
-  ocelot_history_tee_file= fopen(query, "a");        /* Open specified file, read only */
+  if (ocelot_history_tee == true)
+  {
+    fclose(ocelot_history_tee_file);
+    ocelot_history_tee= false;
+  }
+  ocelot_history_tee_file= fopen(query, "a");        /* Open specified file, append */
   delete []query;
   if (ocelot_history_tee_file != NULL)
   {
     ocelot_history_tee= true;
-    ocelot_history_tee_file_name= file_name;
+    ocelot_history_tee_file_name= file_name_to_open;
     return 1;
   }
   return 0;
@@ -1348,20 +1357,18 @@ void MainWindow::create_menu()
   menu_run_action_kill->setEnabled(false);
 
   menu_settings= ui->menuBar->addMenu(tr("Settings"));
-  menu_settings_action_statement= menu_settings->addAction(tr("Statement Widget: Colors and Fonts"));
-  menu_settings_action_grid= menu_settings->addAction(tr("Grid Widget: Colors and Fonts"));
-  menu_settings_action_history= menu_settings->addAction(tr("History Widget: Colors and Fonts"));
-  menu_settings_action_menu= menu_settings->addAction(tr("Menu: Colors and Fonts"));
-  connect(menu_settings_action_statement, SIGNAL(triggered()), this, SLOT(action_statement()));
-  connect(menu_settings_action_grid, SIGNAL(triggered()), this, SLOT(action_grid()));
-  connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
+  menu_settings_action_menu= menu_settings->addAction(tr("Menu"));
+  menu_settings_action_history= menu_settings->addAction(tr("History Widget"));
+  menu_settings_action_grid= menu_settings->addAction(tr("Grid Widget"));
+  menu_settings_action_statement= menu_settings->addAction(tr("Statement Widget"));
+  menu_settings_action_extra_rule_1= menu_settings->addAction(tr("Extra Rule 1"));
   connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
+  connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
+  connect(menu_settings_action_grid, SIGNAL(triggered()), this, SLOT(action_grid()));
+  connect(menu_settings_action_statement, SIGNAL(triggered()), this, SLOT(action_statement()));
+  connect(menu_settings_action_extra_rule_1, SIGNAL(triggered()), this, SLOT(action_extra_rule_1()));
 
   menu_options= ui->menuBar->addMenu(tr("Options"));
-  menu_options_action_option_display_blob_as_image= menu_options->addAction(tr("display BLOB as image"));
-  menu_options_action_option_display_blob_as_image->setCheckable(true);
-  menu_options_action_option_display_blob_as_image->setChecked(ocelot_display_blob_as_image);
-  connect(menu_options_action_option_display_blob_as_image, SIGNAL(triggered(bool)), this, SLOT(action_option_display_blob_as_image(bool)));
   menu_options_action_option_detach_history_widget= menu_options->addAction(tr("detach history widget"));
   menu_options_action_option_detach_history_widget->setCheckable(true);
   menu_options_action_option_detach_history_widget->setChecked(ocelot_detach_history_widget);
@@ -1580,7 +1587,7 @@ void MainWindow::action_connect()
 
 
 /*
-  If we're connecting, action_calls action_connect_once with arg = "FIle|Connect".
+  If we're connecting, action_calls action_connect_once with arg = "File|Connect".
   If we're printing for --help, print_help calls action_connect_once with arg = "Print".
   Todo:
   If user types OK and there's an error, repeat the dialog box with a new message e.g. "Connect failed ...".
@@ -1845,16 +1852,17 @@ void MainWindow::action_exit()
 }
 
 
-
-
-
-/* menu item = Options|display BLOB as image */
-void MainWindow::action_option_display_blob_as_image(bool checked)
-{
-  ocelot_display_blob_as_image= checked;
-  if (checked) menu_options_action_option_display_blob_as_image->setText("display BLOB as text");
-  else menu_options_action_option_display_blob_as_image->setText("display BLOB as image");
-}
+/*
+  detach
+  Would "floating" be a better word than "detached"? or "undock"? or "detachable"?
+  Todo: We need a client statement for detached, e.g. SET result_grid_detached = 1;
+  Todo: Change border, size, title, frame width, position
+  Todo: The title bar shouldn't have a "close" option, or it should only mean "no more detached".
+  Todo: Menu keys should be slotted to the new window as well as the main window. E.g. control-Q.
+  Todo: How to bring to front / bring to back? Currently it's always in front of main widget.
+  Todo: Debug widget should be detachable too.
+  Probably PM_DefaultFrameWidth won't matter but I'm not sure what it is.
+*/
 
 /* menu item = Options|detach history widget */
 void MainWindow::action_option_detach_history_widget(bool checked)
@@ -1874,6 +1882,7 @@ void MainWindow::action_option_detach_history_widget(bool checked)
   }
   if (is_visible) history_edit_widget->show();
 }
+
 
 /* menu item = Options|detach result grid widget */
 void MainWindow::action_option_detach_result_grid_widget(bool checked)
@@ -1941,7 +1950,7 @@ void MainWindow::create_the_manual_widget()
   the_manual_text_edit->setText("\
 <BR><h1>The ocelotgui user manual</h1>  \
 <BR>  \
-<BR>Version 0.5.0, June 19 2015  \
+<BR>Version 0.5.0, June 28 2015  \
 <BR>  \
 <BR>  \
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -2072,7 +2081,7 @@ that the MySQL Reference manual describes in section  \
 'mysql commands' http://dev.mysql.com/doc/refman/5.6/en/mysql-commands.html  \
 <BR>  \
 <BR>the ocelotgui program has working equivalents for: clear, delimiter, exit,  \
-prompt, source, and warnings. For example, entering 'quit;'  \
+prompt, source, tee, and warnings. For example, entering 'quit;'  \
 followed by Enter will cause the program to stop. It is  \
 sometimes not mandatory to end a client statement with ';',  \
 but is strongly recommended.  \
@@ -2120,8 +2129,8 @@ each row has multiple lines and the number of rows is small.  \
 <BR>  \
 <BR><h2>Menu</h2>  \
 <BR>  \
-<BR>The menu at the top of the screen has File, Settings, Run,  \
-Exit and Help.  \
+<BR>The menu at the top of the screen has File, Edit, Run, Settings,  \
+Options, Debug and Help.  \
 <BR>  \
 <BR>File|Connect, or Ctrl+O, starts the Connect dialog box.  \
 <BR>File|Exit, or Ctrl+Q, stops the program.  \
@@ -2134,11 +2143,12 @@ except Edit|Redo which can only redo the last change.  \
 <BR>Run|Execute or Ctrl+E or Ctrl+Enter causes execution of whatever is in the  \
 statement widget.  \
 <BR>  \
-<BR>Settings|Statement Widget: Colors + Fonts,  \
-Settings|Grid Widget: Colors + Fonts,  \
-Settings|History Widget: Colors + Fonts, and  \
-Settings|Main Widget: Colors + Fonts are the  \
-items which affect the behavior of each of each  \
+<BR>Settings|Menu,  \
+Settings|History Widget,  \
+Settings|Grid Widget,  \
+Settings|Statement, and  \
+Settings|Extra Rule 1 \
+are the items which affect the behavior of each  \
 individual widget. The color settings affect foregrounds,  \
 backgrounds, borders, and (for the statement widget only)  \
 the syntax highlights. The font settings affect font family,  \
@@ -2147,6 +2157,10 @@ involve further dialog boxes which are standard with Qt.  \
 There may be additional choices affecting appearance,  \
 for example the width of the border used to drag columns  \
 in the result widget.  \
+Settings|Extra Rule 1 is conditional -- for example, to specify  \
+that BLOBs should be displayed as images on a pink background,  \
+set Grid Background Color Pink, set Condition = data_type LIKE  \
+'%BLOB', set Display As = image, then click OK.  \
 <BR>  \
 <BR>Help|About will show the license and copyright and version.  \
 Help|Manual will show the manual.  \
@@ -2182,7 +2196,8 @@ from source, and will appear in binary executables  \
 when the next release occurs.  \
 <BR>Vertical: If a user starts the program with ocelotgui --vertical=1  \
 or ends a statement with backslash G, results come up with one column per row.  \
-<BR>Images: If a user chooses Options | display BLOB as image from the menu,  \
+<BR>Images: If a user chooses Settings | Extra Rule 1 from the menu,  \
+and sets the Condition and Display As boxes as described earlier,  \
 and selects rows which contain LONGBLOB columns, and the column values are  \
 images (such as PNG or JPEG or BMP or GIF format data), ocelotgui will display  \
 the result as images.  \
@@ -2386,7 +2401,7 @@ void MainWindow::action_statement()
     action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,"ocelot_statement_prompt_background_color");
     action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,"ocelot_statement_highlight_current_line_color");
 
-    /* Todo: consider: maybe you hve to do a restore like this */
+    /* Todo: consider: maybe you have to do a restore like this */
     //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
     //tokenize(text.data(),
     //         text.size(),
@@ -2400,8 +2415,7 @@ void MainWindow::action_statement()
 }
 
 /*
-  Todo: the setstylesheet here takes a long time because there are so many child widgets.
-  One way to speed it up could be: invalidate the text_edit_frames the way you do for content
+  The setstylesheet here could take a long time if there are many child widgets being displayed.
 */
 void MainWindow::action_grid()
 {
@@ -2428,6 +2442,26 @@ void MainWindow::action_grid()
   }
   delete(se);
 }
+
+/*
+  TODO: extra_rule_1 could affect statement | prompt | word, not just cell
+  TODO: Action could be to invoke a Lua procedure, not just char/hex/image
+  TODO: There are lots of things to add to Condition and to Display As
+*/
+void MainWindow::action_extra_rule_1()
+{
+  Settings *se= new Settings(EXTRA_RULE_1, this);
+  int result= se->exec();
+  if (result == QDialog::Accepted)
+  {
+    action_change_one_setting(ocelot_extra_rule_1_condition, new_ocelot_extra_rule_1_condition, "ocelot_extra_rule_1_condition");
+    action_change_one_setting(ocelot_extra_rule_1_text_color, new_ocelot_extra_rule_1_text_color, "ocelot_extra_rule_1_text_color");
+    action_change_one_setting(ocelot_extra_rule_1_background_color, new_ocelot_extra_rule_1_background_color, "ocelot_extra_rule_1_background_color");
+    action_change_one_setting(ocelot_extra_rule_1_display_as, new_ocelot_extra_rule_1_display_as, "ocelot_extra_rule_1_display_as");
+ }
+  delete(se);
+}
+
 
 void MainWindow::action_history()
 {
@@ -2476,7 +2510,9 @@ void MainWindow::action_menu()
   SET ocelot_statement_background_color = 'red'
   and execute it.
 */
-void MainWindow::action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting)
+void MainWindow::action_change_one_setting(QString old_setting,
+                                           QString new_setting,
+                                           const char *name_of_setting)
 {
   if (old_setting != new_setting)
   {
@@ -2485,15 +2521,21 @@ void MainWindow::action_change_one_setting(QString old_setting, QString new_sett
     main_token_number= 0;
     text= "SET ";
     text.append(name_of_setting);
-    text.append(" = '");
-    text.append(new_setting);
+    text.append(" = ");
+    text.append("'");
+    for (int i= 0; i < new_setting.length(); ++i)
+    {
+      QString c= new_setting.mid(i, 1);
+      text.append(c);
+      if (c == "'") text.append(c);
+    }
     text.append("'");
     main_token_count_in_statement= 4;
     tokenize(text.data(),
              text.size(),
              &main_token_lengths, &main_token_offsets, MAX_TOKENS,(QChar*)"33333", 1, ocelot_delimiter_str, 1);
-    tokens_to_keywords(text);
-    action_execute_one_statement(text);
+   tokens_to_keywords(text);
+   action_execute_one_statement(text);
   }
 }
 
@@ -2550,7 +2592,10 @@ void MainWindow::assign_names_for_colors()
   if (ocelot_menu_text_color.left(1) == "#") ocelot_menu_text_color= q_color_list_name(ocelot_menu_text_color);
   if (ocelot_menu_background_color.left(1) == "#") ocelot_menu_background_color= q_color_list_name(ocelot_menu_background_color);
   if (ocelot_menu_border_color.left(1) == "#") ocelot_menu_border_color= q_color_list_name(ocelot_menu_border_color);
+  if (ocelot_extra_rule_1_text_color.left(1) == "#") ocelot_extra_rule_1_text_color= q_color_list_name(ocelot_extra_rule_1_text_color);
+  if (ocelot_extra_rule_1_background_color.left(1) == "#") ocelot_extra_rule_1_background_color= q_color_list_name(ocelot_extra_rule_1_background_color);
 }
+
 
 /*
   Todo: something has to be figured out about border width and border colors.
@@ -2572,7 +2617,7 @@ void MainWindow::set_current_colors_and_font()
   if (font.weight() >= QFont::Bold) ocelot_statement_font_weight= "bold"; else ocelot_statement_font_weight= "normal";
 
   ocelot_grid_text_color= result_grid_table_widget[0]->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
-  ocelot_grid_background_color=result_grid_table_widget[0]->palette().color(QPalette::Window).name(); /* = QPalette::Background */
+  ocelot_grid_background_color= result_grid_table_widget[0]->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   font= result_grid_table_widget[0]->font();
   ocelot_grid_font_family= font.family();
   if (font.italic()) ocelot_grid_font_style= "italic"; else ocelot_grid_font_style= "normal";
@@ -2594,7 +2639,13 @@ void MainWindow::set_current_colors_and_font()
   if (font.italic()) ocelot_menu_font_style= "italic"; else ocelot_menu_font_style= "normal";
   ocelot_menu_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   if (font.weight() >= QFont::Bold) ocelot_menu_font_weight= "bold"; else ocelot_menu_font_weight= "normal";
+
+  ocelot_extra_rule_1_text_color= result_grid_table_widget[0]->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
+  ocelot_extra_rule_1_background_color= result_grid_table_widget[0]->palette().color(QPalette::Window).name(); /* = QPalette::Background */
+  ocelot_extra_rule_1_condition= "data_type LIKE '%BLOB'";
+  ocelot_extra_rule_1_display_as= "char";
 }
+
 
 /*
   Pass: a string which is supposed to have a color name. Return: a canonical color name.
@@ -2677,7 +2728,6 @@ QString MainWindow::qt_color(QString color_name)
 /* Called from: action_statement() etc. Make a string that setStyleSheet() can use. */
 /*
   Todo: I wasn't able to figure out a simple way to emphasize widget title, for example make it bold.
-  Todo: Set a border around a widget if it's detached, when detaching is supported again.
 */
 void MainWindow::make_style_strings()
 {
@@ -2726,6 +2776,17 @@ void MainWindow::make_style_strings()
   ocelot_menu_style_string.append(";font-size:"); ocelot_menu_style_string.append(ocelot_menu_font_size);
   ocelot_menu_style_string.append("pt;font-style:"); ocelot_menu_style_string.append(ocelot_menu_font_style);
   ocelot_menu_style_string.append(";font-weight:"); ocelot_menu_style_string.append(ocelot_menu_font_weight);
+
+  ocelot_extra_rule_1_style_string= "color:"; ocelot_extra_rule_1_style_string.append(qt_color(ocelot_extra_rule_1_text_color));
+  ocelot_extra_rule_1_style_string.append(";background-color:"); ocelot_extra_rule_1_style_string.append(qt_color(ocelot_extra_rule_1_background_color));
+  ocelot_extra_rule_1_style_string.append(";border:");
+  ocelot_extra_rule_1_style_string.append(ocelot_grid_cell_border_size);
+  ocelot_extra_rule_1_style_string.append("px solid ");
+  ocelot_extra_rule_1_style_string.append(qt_color(ocelot_grid_border_color));
+  ocelot_extra_rule_1_style_string.append(";font-family:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_family);
+  ocelot_extra_rule_1_style_string.append(";font-size:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_size);
+  ocelot_extra_rule_1_style_string.append("pt;font-style:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_style);
+  ocelot_extra_rule_1_style_string.append(";font-weight:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_weight);
 }
 
 
@@ -4795,9 +4856,9 @@ void MainWindow::debug_highlight_line()
   for (debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
   {
     debuggee_schema_identifier= debuggee_information_status_schema_identifier;
-    debuggee_schema_identifier= connect_stripper(debuggee_schema_identifier);
+    debuggee_schema_identifier= connect_stripper(debuggee_schema_identifier, false);
     debuggee_routine_identifier= debuggee_information_status_routine_identifier;
-    debuggee_routine_identifier= connect_stripper(debuggee_routine_identifier);
+    debuggee_routine_identifier= connect_stripper(debuggee_routine_identifier, false);
     if (QString::compare(debuggee_schema_identifier, debug_routine_schema_name[debug_widget_index]) == 0)
     {
       if (QString::compare(debuggee_routine_identifier, debug_routine_name[debug_widget_index]) == 0)
@@ -5793,26 +5854,11 @@ void MainWindow::action_execute_one_statement(QString text)
 /*
  Handle "client statements" -- statements that the client itself executes.
   Possible client statements:
-  SET OCELOT_GRID_DETACHED= 1
-  SET OCELOT_GRID_DETACHED = 0 (todo)
   DELIMITER delimiter
   CONNECT ... (Todo: CONNECT depends entirely on settings, it should be possible to have arguments)
 */
-/*
-  Detach:
-  Update: any code related to detaching is old and probably doesn't work.
-  Would "floating" be a better word than "detached"? or "undock"? or "detachable"?
-  ignore if already detached
-  make new window etc. -- earlier the idea was dock widgets, but now I'm dubious
-  append to "statements to pass on before execution of next real statement"
-  return 1;  / * i.e. we don't pass on immediately, it's a client statement  * /
 
-  Todo: Finishing off the "SET OCELOT_GRID_DETACHED=1;" tricks ...
-  None of the menu keys work. They must be slotted to the new window as well as the old window. E.g. control-Q.
-  "SET OCELOT_GRID_DETACHED= 0;" should reverse the effect.
-  Consider the title bar. Should it be possible to close it, and what should the effect be?
-  Initial window dimension + position should be = current widget dimension + position (unless it's hidden or obscured).
-*/
+
 /*
   Todo: We want all the mysql commands to work just the way that they work in mysql.
         We will not depend on TOKEN_KEYWORD_... for this because "\" and "q" are separate tokens,
@@ -5826,7 +5872,6 @@ int MainWindow::execute_client_statement(QString text)
   int  sub_token_offsets[10];
   int  sub_token_lengths[10];
   int  sub_token_types[10];
-  int is_client_format= 0;
   int true_text_size, true_token_count; /* size and count ignoring delimiter */
   //QString text;                      /* Todo: see if text should be a global */
   unsigned int statement_type;
@@ -5917,7 +5962,7 @@ int MainWindow::execute_client_statement(QString text)
       return 1;
     }
     /* If database name is in quotes or delimited, strip. Todo: stripping might be necessary in lots of cases. */
-    s= connect_stripper(s);
+    s= connect_stripper(s, false);
     int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
     char *query= new char[query_len + 1];
     memcpy(query, s.toUtf8().constData(), query_len + 1);
@@ -6141,22 +6186,13 @@ int MainWindow::execute_client_statement(QString text)
   }
   if (statement_type == TOKEN_KEYWORD_TEE) /* for tee */
   {
-    if (ocelot_history_tee == true)
-    {
-      statement_edit_widget->result= tr("TEE is already done.");
-      return 1;
-    }
     /* Everything as far as statement end is tee file name. Compare how we do SOURCE file name. */
     QString s;
     unsigned statement_length= /* text.size() */ true_text_size;
     if (i2 >= 2) s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
-    else
-    {
-      statement_edit_widget->result= tr("Error, TEE statement has no argument");
-      return 1;
-    }
+    else s= "";
     if (history_tee_start(s) == 0) statement_edit_widget->result= tr("Error, fopen failed");
-    statement_edit_widget->result= tr("OK");
+    else statement_edit_widget->result= tr("OK");
     return 1;
   }
 #ifdef DEBUGGER
@@ -6232,22 +6268,16 @@ int MainWindow::execute_client_statement(QString text)
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
       /* Todo: figure out why sometimes we say connect_stripper() and sometimes we don't */
-      /* Todo: make ocelot_grid_detached a keyword so you can compare sub_token_types[i] instead. */
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "OCELOT_GRID_DETACHED", Qt::CaseInsensitive) == 0)
-      {
-        /* Todo: we should compare the rest of the tokens too. */
-        is_client_format= 1;
-      }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_text_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_text_color= ccn;
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_background_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_background_color= ccn;
         make_style_strings();
@@ -6256,7 +6286,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_border_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_border_color= ccn;
         make_style_strings();
@@ -6272,63 +6302,63 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_statement_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
         statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_style", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_statement_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_weight", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_statement_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_literal_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_highlight_literal_color= ccn;
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_identifier_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_highlight_identifier_color= ccn;
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_comment_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_highlight_comment_color= ccn;
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_operator_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_highlight_operator_color= ccn;
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_reserved_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_highlight_reserved_color= ccn;
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_prompt_background_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_prompt_background_color= ccn;
         statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
@@ -6336,7 +6366,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_current_line_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_highlight_current_line_color= ccn;
         statement_edit_widget->highlightCurrentLine();
@@ -6345,28 +6375,28 @@ int MainWindow::execute_client_statement(QString text)
       bool is_result_grid_style_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_text_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_grid_text_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_grid_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_background_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_grid_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_header_background_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_grid_header_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
@@ -6378,46 +6408,46 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_grid_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_style", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_grid_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_weight", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_grid_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_grid_cell_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_grid_cell_drag_line_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_grid_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_cell_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_grid_cell_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_cell_drag_line_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_grid_cell_drag_line_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         is_result_grid_style_changed= true;
       }
       if (is_result_grid_style_changed == true)
@@ -6429,9 +6459,40 @@ int MainWindow::execute_client_statement(QString text)
         }
         statement_edit_widget->result= tr("OK");return 1;
       }
+      bool is_extra_rule_1_style_changed= false;
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_text_color", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_extra_rule_1_text_color= ccn;
+        assign_names_for_colors(); is_extra_rule_1_style_changed= true;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_background_color", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
+        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        ocelot_extra_rule_1_background_color= ccn;
+        assign_names_for_colors(); is_extra_rule_1_style_changed= true;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_condition", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_extra_rule_1_condition= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), true);
+        is_extra_rule_1_style_changed= true;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_display_as", Qt::CaseInsensitive) == 0)
+      {
+        ocelot_extra_rule_1_display_as= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        is_extra_rule_1_style_changed= true;
+      }
+      if (is_extra_rule_1_style_changed == true)
+      {
+        make_style_strings();
+        statement_edit_widget->result= tr("OK");return 1;
+      }
+
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_text_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_history_text_color= ccn;
         make_style_strings();
@@ -6440,7 +6501,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_background_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_history_background_color= ccn;
         make_style_strings();
@@ -6449,7 +6510,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_border_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_history_border_color= ccn;
         make_style_strings();
@@ -6458,35 +6519,35 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_family", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_history_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_history_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_style", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_history_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_weight", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_history_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_text_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_menu_text_color= ccn;
         make_style_strings();
@@ -6495,7 +6556,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_background_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_menu_background_color= ccn;
         make_style_strings();
@@ -6504,7 +6565,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_border_color", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3])));
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_menu_border_color= ccn;
         make_style_strings();
@@ -6513,7 +6574,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_font_family", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_menu_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
@@ -6521,7 +6582,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_menu_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
@@ -6529,7 +6590,7 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_style", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_menu_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
@@ -6537,39 +6598,13 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_weight", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        ocelot_menu_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
             statement_edit_widget->result= tr("OK");return 1;
       }
     }
-  }
-
-  if (is_client_format == 1)
-  {
-    /*
-      Todo: Here is where we should make a new window. See earlier comments about detaching.
-      But the code is old, probably doesn't work any more, and is therefore commented out.
-      Todo: consider: should the title bar contain a title?
-      Todo: consider alternative non-docking method.
-        addWidget                      <- to new window
-        setvisible(true)
-        new window->show()
-        You still have the problem that it won't be at the front, and will be hidden if main window is maximized.
-        But there's a way to tell Qt to put something at the front. Look up: raise().
-    */
-    //test_dock= new QDockWidget(tr(""), this);
-    //test_dock->setWidget(statement_edit_widget);
-    //addDockWidget(Qt::BottomDockWidgetArea, test_dock);
-    //test_dock->show();
-    //return 1;
-    //statement_edit_widget->hide();                       /* ?? or maybe I should be saying setvisible(false) */
-    //main_layout->removeWidget(statement_edit_widget);
-    //statement_edit_widget->setParent(0);           /* ?? does removeWidget automatically remove parent anyway? */
-    ///* Actually I should be making this a component of a new window, no? */
-    //statement_edit_widget->show();
-    //return 1;
   }
 
   return 0;
@@ -6684,21 +6719,20 @@ void MainWindow::rehash_search(char *search_string)
   Call widget_sizer() from action_execute() to resize the three
   main_layout widgets if necessary.
   Todo: so far widget_sizer() is just ideas, mostly unimplemented.
-  The widgets are in a layout (I don't think it's possible to have them in a layout if one uses dock windows).
+  The widgets are in a layout (although grid and history leave the layout if detached).
   But the maximum sizing can be helped by me. Some rules are:
   * If history_edit_widget is higher than needed without scrolling, shrink it.
   * If user has manually expanded a window, leave it.
     ** But a grid should snap back to a minimum size
   * A select() should be visible, up to some maximum line count, even if a result set has many rows.
   * We need a scroll bar for the whole main window. But maybe not for all the main_layout widgets?
-  * The widget might be undocked -- in that case the sizes of other docked widgets won't matter.
+  * The widget might be detached -- in that case the sizes of other widgets won't matter.
   * The statement window can shrink quite a bit because after action_execute() there's nothing in it.
   Probably TitleBarHeight won't matter because we set the bar to vertical (update: no, I gave up on vertical)
   Probably PM_DefaultFrameWidth won't matter but I'm not sure what it is.
-  Probably there is no space between dock windows. ... Update: no, look at it, there is a space.
-  So far all I've thought about is a special case for history_dock.
+  So far all I've thought about is a special case for detaching.
     It's a bit silly to allow for height of a horizontal scroll bar, if there is no scroll bar.
-  Maybe we should use the WA_DontShowOnScreen trick.
+  Maybe we should use the WA_DontShowOnScreen trick for this and for size_calc.
 */
 void MainWindow::widget_sizer()
 {
@@ -6735,10 +6769,10 @@ void MainWindow::put_diagnostics_in_result()
   mysql_errno_result= lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]);
   if (mysql_errno_result == 0)
   {
-    s1= tr("OK");
+    s1= tr("OK ");
 
     /* This should output, e.g. "Records: 3 Duplicates: 0 Warnings: 0" -- but actually nothing happens. */
-    if (lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])!=NULL)
+    if (lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])!= NULL)
     {
       /* This only works for certain insert, load, alter or update statements */
       s1.append(tr(lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])));
@@ -6754,7 +6788,7 @@ void MainWindow::put_diagnostics_in_result()
     qint64 elapsed_time= statement_end_time - statement_edit_widget->start_time;
     long int elapsed_time_as_long_int= (long int) elapsed_time;
     float elapsed_time_as_float= (float) elapsed_time_as_long_int / 1000;
-    sprintf(mysql_error_and_state, "(%.1f seconds)", elapsed_time_as_float);
+    sprintf(mysql_error_and_state, " (%.1f seconds)", elapsed_time_as_float);
     s1.append(mysql_error_and_state);
     if (lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]) > 0)
     {
@@ -7977,7 +8011,7 @@ int MainWindow::find_start_of_body(QString text, int *i_of_function)
 
 /*
   The special cases of FUNCTION, ROW, DO, END, BEGIN. We don't want to mark them as special unless
-  we know they're really serving a non-identifier role in the statment, but they might be,
+  we know they're really serving a non-identifier role in the statement, but they might be,
   because they're not reserved. This has to be right because later we might count BEGINs
   minus ENDs in order to figure out whether a compound statement has ended.
   FUNCTION is a keyword if: previous == DROP or CREATE [definer=...] or DROP (this is known in advance)
@@ -8838,7 +8872,8 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
         {
           setStyleSheet(ancestor_result_grid_widget->frame_color_setting); /* for drag line color */
           if (cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER) text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_header_style_string);
-          else text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_style_string);
+          else if (cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL) text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_style_string);
+          else text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_extra_rule_1_style_string);
           is_style_sheet_set_flag= true;
         }
         if (is_retrieved_flag == false)
@@ -9047,7 +9082,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
         {
           where_clause.append("=");
           QString s;
-          if (result_grid->result_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
+          if (result_grid->result_field_types[column_number] <= OCELOT_DATA_TYPE_DOUBLE)
             s= content_in_result_set;
           else s= unstripper(content_in_result_set);
           where_clause.append(s);
@@ -9072,7 +9107,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
           else update_statement.append(",");
           update_statement.append(name_in_result_set);
           update_statement.append('=');
-          if ((result_grid->result_field_types[column_number] <= MYSQL_TYPE_DOUBLE)
+          if ((result_grid->result_field_types[column_number] <= OCELOT_DATA_TYPE_DOUBLE)
           || (content_in_text_edit_widget == NULL_STRING))
             update_statement.append(content_in_text_edit_widget);
           else update_statement.append(unstripper(content_in_text_edit_widget));
@@ -9236,7 +9271,6 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
 void connect_set_variable(QString token0, QString token2);
 void connect_read_command_line(int argc, char *argv[]);
 void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
-QString connect_stripper(QString value_to_strip);
 
 #include <pwd.h>
 #include <unistd.h>
@@ -9635,7 +9669,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     }
 
     /* Remove ''s or ""s around the value, then strip lead or trail spaces. */
-    token2= connect_stripper(token2);
+    token2= connect_stripper(token2, true);
     token2_length= token2.count();
 
     /* Convert escape sequences in the value \b backspace, \t tab, \n newline, \r carriage return, \\ \, \s space */
@@ -9731,12 +9765,14 @@ int MainWindow::connect_readmylogin(FILE *file, unsigned char *output_buffer)
   Remove ''s or ""s or ``s around a QString, then remove lead or trail spaces.
   Called for connect, and also for things like USE `test`.
   I didn't say remove lead or trail whitespace, so QString "trimmed()" is no good.
+  Todo: This will also change 'xxx''yyy' to 'xxx'yyy', I'm not sure that's always good.
   todo: I'm not sure that `` (tildes) should be removed for my.cnf values, check that
         (we are depending on stripping of ``s when we call connect_stripper() with debuggee information status values)
   todo: I am fairly sure that I need to call this from other places too.
-  todo: Does not look for 'xxx''yyy'. should it?
+  Todo: strip_doublets_flag, i.e. change 'xxx''yyy' to xxx'yyy' etc., is currently only true
+        for condition_1 and for command-line options. Maybe it should be more, maybe less.
 */
-QString MainWindow::connect_stripper(QString value_to_strip)
+QString MainWindow::connect_stripper(QString value_to_strip, bool strip_doublets_flag)
 {
   QString s;
   int s_length;
@@ -9755,6 +9791,7 @@ QString MainWindow::connect_stripper(QString value_to_strip)
     ||  ((s.mid(0, 1) == QString(c_doublequote)) && (s.mid(s_length - 1, 1) == QString(c_doublequote)))
     ||  ((s.mid(0, 1) == QString(c_grave_accent)) && (s.mid(s_length - 1, 1) == QString(c_grave_accent))))
     {
+      QString strippable_char= s.mid(0, 1);                    /* strippable_char = " or ' or ` */
       s= s.mid(1, s_length - 2);
       while ((s.count() > 0) && (s.mid(0, 1) == " "))
       {
@@ -9765,6 +9802,17 @@ QString MainWindow::connect_stripper(QString value_to_strip)
       {
         s_length= s.count();
         s= s.mid(0, s_length - 1);
+      }
+      if (strip_doublets_flag == true)
+      {
+        QString s2= "";
+        for (int i= 0; i < s.size(); ++i)
+        {
+          QString c= s.mid(i, 1);
+          s2.append(c);
+          if ((c == strippable_char) && (i < (s.size() - 1)) && (c == s.mid(i + 1, 1))) ++i;
+        }
+        return s2;
       }
     }
   }
@@ -10003,6 +10051,12 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   QString ccn;
   /* Changes to ocelot_* settings. But we don't check that they're in the [ocelot] group. */
   /* Todo: validity checks */
+  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_text_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_extra_rule_1_text_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_background_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_extra_rule_1_background_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_condition") == 0) { ocelot_extra_rule_1_condition= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_display_as") == 0) { ocelot_extra_rule_1_display_as= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_text_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_background_color") == 0)

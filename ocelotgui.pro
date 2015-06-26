@@ -20,6 +20,10 @@ greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
 TARGET = ocelotgui
 TEMPLATE = app
 
+CONFIG += warn_on
+QMAKE_CFLAGS_WARN_ON    = -Wall -Wextra
+QMAKE_CXXFLAGS_WARN_ON  = -Wall -Wextra
+
 SOURCES +=\
         ocelotgui.cpp 
 HEADERS  += ocelotgui.h

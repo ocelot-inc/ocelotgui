@@ -47,3 +47,9 @@ ocelot_statement_highlight_operator_color='#7F007F'
 ocelot_statement_highlight_reserved_color='purple'
 ocelot_statement_prompt_background_color='#0DF8F3'
 ocelot_statement_highlight_current_line_color='yellow'
+
+ocelot_extra_rule_1_text_color='WebGreen'
+ocelot_extra_rule_1_background_color='MistyRose'
+ocelot_extra_rule_1_condition='data_type LIKE ''%BINARY'''
+ocelot_extra_rule_1_display_as='image'
+

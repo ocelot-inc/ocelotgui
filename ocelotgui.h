@@ -17,40 +17,40 @@
 /* The debugger is integrated now, but "ifdef DEBUGGER" directives help to delineate code that is debugger-specific. */
 #define DEBUGGER
 
+#include <assert.h>
+
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
 /* All Qt includes go here. Most of them could be handled by just saying "#include <QtWidgets>". */
-#include <QMainWindow>
-#include <QScrollBar>
-#include <QHBoxLayout>
-#include <QScrollArea>
-#include <QTextEdit>
-#include <QDialog>
-#include <QLabel>
-#include <QPushButton>
-#include <QLineEdit>
-#include <QComboBox>
-//#include <QColorDialog>
-#include <QFontDialog>
-#include <QPlainTextEdit>
-#include <QWidget>
-#include <QMessageBox>
-#include <QPainter>
-#include <QTextBlock>
-#include <QDateTime>
-//#include <QDockWidget>
-#include <QFrame>
-//#include <QLibraryInfo>
-#ifdef DEBUGGER
-#include <QThread>
-#include <QTimer>
-#endif
+#include <QAbstractItemView>
 #ifndef __linux
-#include <QLibrary>
 #include <QApplication>
 #endif
-#include <QAbstractItemView>
+#include <QComboBox>
+#include <QDateTime>
+#include <QDialog>
+#include <QFontDialog>
+#include <QFrame>
+#include <QHBoxLayout>
+#include <QLabel>
+#ifndef __linux
+#include <QLibrary>
+#endif
+//#include <QLibraryInfo>
+#include <QLineEdit>
+#include <QMainWindow>
+#include <QMessageBox>
+#include <QPainter>
+#include <QPlainTextEdit>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QScrollBar>
+#include <QTextBlock>
+#include <QTextEdit>
+#include <QThread>
+#include <QTimer>
+#include <QWidget>
 
 /* All mysql includes go here */
 /* The include path for mysql.h is hard coded in ocelotgui.pro. */
@@ -66,13 +66,10 @@
 #define NUM_FLAG 32768
 
 /*
-  This might be appropriate place for all "global" variables that
-  are affected by option settings. They're mostly in ocelotgui.cpp though.
-  Weirdly, ocelotgui.h is included in two places, so say 'static'
+  Most ocelot_ variables are in ocelotgui.cpp but if one is required by ocelotgui.h, say so here.
+  Weirdly, ocelotgui.h is included in two places, so say 'static' if you do that.
+  Todo: ELiminate redundancy of mentioning ocelotgui.h in both ocelotgui.pro and ocelotgui.cpp.
 */
-  static bool ocelot_display_blob_as_image= false;
-  static bool ocelot_detach_history_widget= false;
-  static bool ocelot_detach_result_grid_widget= false;
 
 namespace Ui
 {
@@ -169,6 +166,11 @@ public:
   QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size;
   QString ocelot_grid_style_string;
   QString ocelot_grid_header_style_string;
+  QString ocelot_extra_rule_1_background_color, new_ocelot_extra_rule_1_background_color;
+  QString ocelot_extra_rule_1_text_color, new_ocelot_extra_rule_1_text_color;
+  QString ocelot_extra_rule_1_condition, new_ocelot_extra_rule_1_condition;
+  QString ocelot_extra_rule_1_display_as, new_ocelot_extra_rule_1_display_as;
+  QString ocelot_extra_rule_1_style_string;
   QString ocelot_history_text_color, new_ocelot_history_text_color;
   QString ocelot_history_background_color, new_ocelot_history_background_color;
   QString ocelot_history_border_color, new_ocelot_history_border_color;
@@ -176,7 +178,7 @@ public:
   QString ocelot_history_font_size, new_ocelot_history_font_size;
   QString ocelot_history_font_style, new_ocelot_history_font_style;
   QString ocelot_history_font_weight, new_ocelot_history_font_weight;
-  QString ocelot_history_style_string, new_ocelot_history_style_string;
+  QString ocelot_history_style_string;
   QString ocelot_menu_text_color, new_ocelot_menu_text_color;
   QString ocelot_menu_background_color, new_ocelot_menu_background_color;
   QString ocelot_menu_border_color, new_ocelot_menu_border_color;
@@ -233,7 +235,6 @@ public:
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
 
   QString ocelot_dbms;                    /* for CONNECT */
-  int ocelot_grid_detached;
   unsigned int ocelot_grid_max_row_lines;          /* ?? should be unsigned long? */
   /* unsigned int ocelot_grid_max_desired_width_in_chars; */
 
@@ -262,14 +263,14 @@ public slots:
   void action_settings();
   void action_statement_edit_widget_text_changed();
   void action_undo();
-  void action_statement();
   void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
-  void action_grid();
-  void action_history();
   void action_menu();
+  void action_history();
+  void action_grid();
+  void action_extra_rule_1();
+  void action_statement();
   void history_markup_previous();
   void history_markup_next();
-  void action_option_display_blob_as_image(bool checked);
   void action_option_detach_history_widget(bool checked);
   void action_option_detach_result_grid_widget(bool checked);
 #ifdef DEBUGGER
@@ -346,7 +347,7 @@ private:
   void connect_read_command_line(int argc, char *argv[]);
   void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
   int connect_readmylogin(FILE *, unsigned char *);
-  QString connect_stripper(QString value_to_strip);
+  QString connect_stripper(QString value_to_strip, bool strip_doublets_flag);
   void connect_set_variable(QString token0, QString token2);
   void connect_make_statement();
   long to_long(QString token);
@@ -721,8 +722,6 @@ private:
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
 
-//  QDockWidget *test_dock;
-
   QMenuBar *menuBar;
   QMenu *menu_file;
     QAction *menu_file_action_connect;
@@ -740,12 +739,12 @@ private:
     QAction *menu_run_action_execute;
     QAction *menu_run_action_kill;
   QMenu *menu_settings;
-    QAction *menu_settings_action_statement;
-    QAction *menu_settings_action_grid;
-    QAction *menu_settings_action_history;
     QAction *menu_settings_action_menu;
+    QAction *menu_settings_action_history;
+    QAction *menu_settings_action_grid;
+    QAction *menu_settings_action_extra_rule_1;
+    QAction *menu_settings_action_statement;
   QMenu *menu_options;
-    QAction *menu_options_action_option_display_blob_as_image;
     QAction *menu_options_action_option_detach_history_widget;
     QAction *menu_options_action_option_detach_result_grid_widget;
 #ifdef DEBUGGER
@@ -818,6 +817,7 @@ private:
 
 #define TEXTEDITFRAME_CELL_TYPE_DETAIL 0
 #define TEXTEDITFRAME_CELL_TYPE_HEADER 1
+#define TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1 2
 
 class TextEditFrame : public QFrame
 {
@@ -835,7 +835,7 @@ public:
   int ancestor_grid_column_number;
   int ancestor_grid_result_row_number;
   unsigned int content_length;
-  unsigned short int cell_type;                        /* detail or header */
+  unsigned short int cell_type;                        /* detail or header or detail_extra_rule_1 */
   char *content_pointer;
   bool is_retrieved_flag;
   bool is_style_sheet_set_flag;
@@ -1166,11 +1166,6 @@ void garbage_collect ()
 
 };
 
-
-#define STATEMENT_WIDGET 0
-#define GRID_WIDGET 1
-#define HISTORY_WIDGET 2
-#define MAIN_WIDGET 3
 
 /***********************************************************/
 /* The Low-Level DBMS calls */
@@ -1623,6 +1618,12 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   }
 };
 
+#define MAIN_WIDGET 0
+#define HISTORY_WIDGET 1
+#define GRID_WIDGET 2
+#define STATEMENT_WIDGET 3
+#define DEBUG_WIDGET 4
+#define EXTRA_RULE_1 5
 
 /*********************************************************************************************************/
 
@@ -1686,8 +1687,6 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   Todo: There can be a bit of flicker during drag though I doubt that anyone will care.
   Todo: BUG: If the QTextEdit gets a vertical scroll bar, then the horizontal cursor appears over the scroll bar,
         and dragging won't work. The problem is alleviated if border_size > 1. (Check: maybe this is fixed.)
-  Todo: Install an event filter for each text_edit_widgets[i]. If user double-clicks: find which widget it is,
-        figure out from that which row it is, and put up a dialog box for that row with row_form_box.
   Todo: Find out why cut-and-paste often fails. Maybe it's that selecting doesn't change colour or paintevent returns wrong.
   Re cursor shapes, see http://qt-project.org/doc/qt-4.8/qcursor.html#details
 */
@@ -1764,6 +1763,7 @@ public:
   unsigned int *gridx_max_column_widths;                     /* gets a copy of result_max_column_widths */
   unsigned int *gridx_result_indexes;                        /* points to result_ lists */
   unsigned char *gridx_flags;                                /* 0 = normal, 1 = row counter */
+  unsigned short int *gridx_field_types;                     /* gets a copy of result_field_types */
 
 //  unsigned int grid_actual_grid_height_in_rows;
   unsigned int grid_actual_row_height_in_lines;
@@ -1833,6 +1833,7 @@ ResultGrid(
   gridx_max_column_widths= 0;
   gridx_result_indexes= 0;
   gridx_flags= 0;
+  gridx_field_types= 0;
   grid_vertical_scroll_bar= 0;
   grid_scroll_area= 0;
   /* grid_layout= 0; */
@@ -2030,6 +2031,43 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
   }
 }
 
+/*
+  Often an OCELOT_DATA_TYPE value is the same as a MYSQL_TYPE value, for example
+  MYSQL_TYPE_LONG_BLOB=251 in mysql_com.h and #define OCELOT_DATA_TYPE_LONG_BLOG 251 here.
+  But we have additional TEXT and BINARY types because we distinguish when charsetnr=63.
+  DECIMAL and NEWDECIMAL are both DECIMAL. LONG is INT. INT24 is MEDIUMINT. LONGLONG is BIGINT.
+  STRING is CHAR (only). VAR_STRING is VARCHAR (only). BLOB is BLOB (only).
+*/
+#define OCELOT_DATA_TYPE_DECIMAL     0
+#define OCELOT_DATA_TYPE_TINY        1
+#define OCELOT_DATA_TYPE_SHORT       2
+#define OCELOT_DATA_TYPE_LONG        3
+#define OCELOT_DATA_TYPE_FLOAT       4
+#define OCELOT_DATA_TYPE_DOUBLE      5
+#define OCELOT_DATA_TYPE_NULL        6
+#define OCELOT_DATA_TYPE_TIMESTAMP   7
+#define OCELOT_DATA_TYPE_LONGLONG    8
+#define OCELOT_DATA_TYPE_INT24       9
+#define OCELOT_DATA_TYPE_DATE        10
+#define OCELOT_DATA_TYPE_TIME        11
+#define OCELOT_DATA_TYPE_DATETIME    12
+#define OCELOT_DATA_TYPE_YEAR        13
+//#define OCELOT_DATA_TYPE_NEWDATE     14
+//#define OCELOT_DATA_TYPE_VARCHAR     15
+#define OCELOT_DATA_TYPE_BIT         16
+#define OCELOT_DATA_TYPE_NEWDECIMAL  246
+#define OCELOT_DATA_TYPE_ENUM        247
+#define OCELOT_DATA_TYPE_SET         248
+//#define OCELOT_DATA_TYPE_TINY_BLOB   249
+//#define OCELOT_DATA_TYPE_MEDIUM_BLOB 250
+//#define OCELOT_DATA_TYPE_LONG_BLOB   251
+#define OCELOT_DATA_TYPE_BLOB        252
+#define OCELOT_DATA_TYPE_VAR_STRING  253       /* i.e. VARCHAR or VARBINARY */
+#define OCELOT_DATA_TYPE_STRING      254       /* i.e. CHAR or BINARY */
+#define OCELOT_DATA_TYPE_GEOMETRY    255
+#define OCELOT_DATA_TYPE_BINARY      10001
+#define OCELOT_DATA_TYPE_VARBINARY   10002
+#define OCELOT_DATA_TYPE_TEXT        10003
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
 void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
@@ -2243,10 +2281,21 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
       }
       else
       {
-        if (text_edit_frames[ki]->cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL)
+        if (is_extra_rule_1(column_number) == true)
         {
-          text_edit_frames[ki]->cell_type= TEXTEDITFRAME_CELL_TYPE_DETAIL;
-          text_edit_frames[ki]->is_style_sheet_set_flag= false;
+          if (text_edit_frames[ki]->cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1)
+          {
+            text_edit_frames[ki]->cell_type= TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1;
+            text_edit_frames[ki]->is_style_sheet_set_flag= false;
+          }
+        }
+        else
+        {
+          if (text_edit_frames[ki]->cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL)
+          {
+            text_edit_frames[ki]->cell_type= TEXTEDITFRAME_CELL_TYPE_DETAIL;
+            text_edit_frames[ki]->is_style_sheet_set_flag= false;
+          }
         }
         if (gridx_flags[column_number] == 1) text_edit_frames[ki]->is_row_number_flag= true;
         else text_edit_frames[ki]->is_row_number_flag= false;
@@ -2356,7 +2405,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
 
         if (text_edit_frames[xrow * gridx_column_count + xcol]->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
         {
-          if ((result_field_types[xcol] == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
+          if (is_image(xcol) == true)
           {
             text_edit_frames[xrow * gridx_column_count + xcol]->is_image_flag= true;
           }
@@ -2427,6 +2476,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
    gridx_original_database_names
    gridx_max_column_widths
    gridx_flags                         row count | header | refer to result _ lists
+   gridx_field_types
    gridx_result_indexes                use as index for result_ lists
    gridx_column_count, gridx_row_count
 */
@@ -2441,6 +2491,7 @@ void copy_result_to_gridx(int ocelot_line_numbers)
   if (gridx_max_column_widths != 0) { delete [] gridx_max_column_widths; gridx_max_column_widths= 0; }
   if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
   if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
+  if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
 
   gridx_column_count= result_column_count;
   if (ocelot_line_numbers == 1) ++gridx_column_count;
@@ -2490,12 +2541,14 @@ void copy_result_to_gridx(int ocelot_line_numbers)
   gridx_max_column_widths= new unsigned int[gridx_column_count];
   gridx_result_indexes= new unsigned int[gridx_column_count];
   gridx_flags= new unsigned char[gridx_column_count];
+  gridx_field_types= new short unsigned int[gridx_column_count];
   j= 0;
   if (ocelot_line_numbers == 1)
   {
     gridx_max_column_widths[0]= sizeof("row_count");
     gridx_result_indexes[0]= 0;
     gridx_flags[0]= 1;
+    gridx_field_types[0]= MYSQL_TYPE_LONG;
     ++j;
   }
   for (i= 0; i < result_column_count; ++i)
@@ -2503,12 +2556,55 @@ void copy_result_to_gridx(int ocelot_line_numbers)
     gridx_max_column_widths[j]= result_max_column_widths[i];
     gridx_result_indexes[j]= i;
     gridx_flags[j]= 0;
+    gridx_field_types[j]= result_field_types[i];
+    if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_VAR_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_VARBINARY;
+    if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_BINARY;
+    if ((mysql_fields[i].charsetnr != 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_BLOB)) gridx_field_types[j]= OCELOT_DATA_TYPE_TEXT;
     ++j;
   }
 
   //result_field_names,
   //result_original_field_names, result_original_table_names, result_original_database_names,
 }
+
+/*
+  Return true if extra_rule_1 is applicable for this column
+*/
+bool is_extra_rule_1(int col)
+{
+  QString condition= copy_of_parent->ocelot_extra_rule_1_condition;
+  if (condition == "data_type LIKE '%BLOB'")
+  {
+    if (gridx_field_types[col] == OCELOT_DATA_TYPE_BLOB)
+    {
+      return true;
+    }
+  }
+  if (condition == "data_type LIKE '%BINARY'")
+  {
+    if ((gridx_field_types[col] == OCELOT_DATA_TYPE_BINARY) || (gridx_field_types[col] == OCELOT_DATA_TYPE_VARBINARY))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+/*
+  Return true if this column should be displayed as an image,
+  that is, the image flag should be turned on.
+*/
+bool is_image(int col)
+{
+  QString display_as;
+  display_as= copy_of_parent->ocelot_extra_rule_1_display_as;
+  if (display_as == "image")
+  {
+    if (is_extra_rule_1(col) == true) return true;
+  }
+  return false;
+}
+
 
 /*
   Move a limited part of a result set to history.
@@ -3011,7 +3107,7 @@ void scan_field_names(
    If vertical == false, this happens once before we do any displaying (but we don't call this).
    If vertical == true, this happens at start and every time we scroll.
 */
-void set_alignment_and_height(int ki, int col, int grid_col, int field_type)
+void set_alignment_and_height(int ki, int grid_col, int field_type)
 {
   TextEditWidget *cell_text_edit_widget= text_edit_widgets[ki];
   /*
@@ -3146,7 +3242,23 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
       text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
       text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
-      if ((result_field_types[result_column_number] == MYSQL_TYPE_BLOB) && (ocelot_display_blob_as_image == true))
+      if (is_extra_rule_1(result_column_number) == true)
+      {
+        if (text_edit_frames[text_edit_frames_index]->cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL)
+        {
+          text_edit_frames[text_edit_frames_index]->cell_type= TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1;
+          text_edit_frames[text_edit_frames_index]->is_style_sheet_set_flag= false;
+        }
+      }
+      else
+      {
+        if (text_edit_frames[text_edit_frames_index]->cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1)
+        {
+          text_edit_frames[text_edit_frames_index]->cell_type= TEXTEDITFRAME_CELL_TYPE_DETAIL;
+          text_edit_frames[text_edit_frames_index]->is_style_sheet_set_flag= false;
+        }
+      }
+      if (is_image(result_column_number) == true)
       {
         text_edit_frames[text_edit_frames_index]->is_image_flag= true;
       }
@@ -3168,7 +3280,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       if (ocelot_line_numbers_copy != 0)
       {
         set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
-                                 result_column_number, column_number_within_gridx,
+                                 column_number_within_gridx,
                                  MYSQL_TYPE_SHORT);
         text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
         ++column_number_within_gridx;
@@ -3176,13 +3288,13 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       if (ocelot_result_grid_column_names_copy != 0)
       {
         set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
-                                 result_column_number, column_number_within_gridx,
+                                 column_number_within_gridx,
                                  MYSQL_TYPE_STRING);
         text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
         ++column_number_within_gridx;
       }
       set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
-                               result_column_number, column_number_within_gridx,
+                               column_number_within_gridx,
                                result_field_types[result_column_number]);
       text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
       ++result_column_number;
@@ -3411,6 +3523,7 @@ void garbage_collect()
   if (gridx_max_column_widths != 0) { delete [] gridx_max_column_widths; gridx_max_column_widths= 0; }
   if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
   if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
+  if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
   for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear(); /* unnecessary? */
 }
 
@@ -3697,8 +3810,11 @@ public:
   QLabel *label_for_color_show[10];
   MainWindow *copy_of_parent;
 
-  int current_widget; /* 0 = statement, 1 = grid, 2 = history, 3 = main, as in #define statements earlier */
+  /* current_widget = MAIN_WIDGET | HISTORY_WIDGET | GRID_WIDGET | STATEMENT_WIDGET | etc. */
+  int current_widget;
 
+
+/* TODO: probably some memory is leaking. I don't say "(this)" every time I say "new". */
 public:
 Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 {
@@ -3709,6 +3825,41 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   current_widget= passed_widget_number;
 
   /* Copy the parent's settings. They'll be copied back to the parent, possibly changed, if the user presses OK. */
+  copy_of_parent->new_ocelot_menu_text_color= copy_of_parent->ocelot_menu_text_color;
+  copy_of_parent->new_ocelot_menu_background_color= copy_of_parent->ocelot_menu_background_color;
+  copy_of_parent->new_ocelot_menu_border_color= copy_of_parent->ocelot_menu_border_color;
+  copy_of_parent->new_ocelot_menu_font_family= copy_of_parent->ocelot_menu_font_family;
+  copy_of_parent->new_ocelot_menu_font_size= copy_of_parent->ocelot_menu_font_size;
+  copy_of_parent->new_ocelot_menu_font_style= copy_of_parent->ocelot_menu_font_style;
+  copy_of_parent->new_ocelot_menu_font_weight= copy_of_parent->ocelot_menu_font_weight;
+
+  copy_of_parent->new_ocelot_history_text_color= copy_of_parent->ocelot_history_text_color;
+  copy_of_parent->new_ocelot_history_background_color= copy_of_parent->ocelot_history_background_color;
+  copy_of_parent->new_ocelot_history_border_color= copy_of_parent->ocelot_history_border_color;
+  copy_of_parent->new_ocelot_history_font_family= copy_of_parent->ocelot_history_font_family;
+  copy_of_parent->new_ocelot_history_font_size= copy_of_parent->ocelot_history_font_size;
+  copy_of_parent->new_ocelot_history_font_style= copy_of_parent->ocelot_history_font_style;
+  copy_of_parent->new_ocelot_history_font_weight= copy_of_parent->ocelot_history_font_weight;
+
+  copy_of_parent->new_ocelot_grid_text_color= copy_of_parent->ocelot_grid_text_color;
+  copy_of_parent->new_ocelot_grid_background_color= copy_of_parent->ocelot_grid_background_color;
+  copy_of_parent->new_ocelot_grid_border_color= copy_of_parent->ocelot_grid_border_color;
+  copy_of_parent->new_ocelot_grid_header_background_color= copy_of_parent->ocelot_grid_header_background_color;
+  copy_of_parent->new_ocelot_grid_font_family= copy_of_parent->ocelot_grid_font_family;
+  copy_of_parent->new_ocelot_grid_font_size= copy_of_parent->ocelot_grid_font_size;
+  copy_of_parent->new_ocelot_grid_font_style= copy_of_parent->ocelot_grid_font_style;
+  copy_of_parent->new_ocelot_grid_font_weight= copy_of_parent->ocelot_grid_font_weight;
+  copy_of_parent->new_ocelot_grid_cell_border_color= copy_of_parent->ocelot_grid_cell_border_color;
+  copy_of_parent->new_ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
+  copy_of_parent->new_ocelot_grid_border_size= copy_of_parent->ocelot_grid_border_size;
+  copy_of_parent->new_ocelot_grid_cell_border_size= copy_of_parent->ocelot_grid_cell_border_size;
+  copy_of_parent->new_ocelot_grid_cell_drag_line_size= copy_of_parent->ocelot_grid_cell_drag_line_size;
+
+  copy_of_parent->new_ocelot_extra_rule_1_text_color= copy_of_parent->ocelot_extra_rule_1_text_color;
+  copy_of_parent->new_ocelot_extra_rule_1_background_color= copy_of_parent->ocelot_extra_rule_1_background_color;
+  copy_of_parent->new_ocelot_extra_rule_1_condition= copy_of_parent->ocelot_extra_rule_1_condition;
+  copy_of_parent->new_ocelot_extra_rule_1_display_as= copy_of_parent->ocelot_extra_rule_1_display_as;
+
   copy_of_parent->new_ocelot_statement_text_color= copy_of_parent->ocelot_statement_text_color;
   copy_of_parent->new_ocelot_statement_background_color= copy_of_parent->ocelot_statement_background_color;
   copy_of_parent->new_ocelot_statement_border_color= copy_of_parent->ocelot_statement_border_color;
@@ -3724,37 +3875,15 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_prompt_background_color= copy_of_parent->ocelot_statement_prompt_background_color;
   copy_of_parent->new_ocelot_statement_highlight_current_line_color= copy_of_parent->ocelot_statement_highlight_current_line_color;
 
-  copy_of_parent->new_ocelot_grid_text_color= copy_of_parent->ocelot_grid_text_color;
-  copy_of_parent->new_ocelot_grid_background_color= copy_of_parent->ocelot_grid_background_color;
-  copy_of_parent->new_ocelot_grid_border_color= copy_of_parent->ocelot_grid_border_color;
-  copy_of_parent->new_ocelot_grid_header_background_color= copy_of_parent->ocelot_grid_header_background_color;
-  copy_of_parent->new_ocelot_grid_font_family= copy_of_parent->ocelot_grid_font_family;
-  copy_of_parent->new_ocelot_grid_font_size= copy_of_parent->ocelot_grid_font_size;
-  copy_of_parent->new_ocelot_grid_font_style= copy_of_parent->ocelot_grid_font_style;
-  copy_of_parent->new_ocelot_grid_font_weight= copy_of_parent->ocelot_grid_font_weight;
-  copy_of_parent->new_ocelot_grid_cell_border_color= copy_of_parent->ocelot_grid_cell_border_color;
-  copy_of_parent->new_ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
-  copy_of_parent->new_ocelot_grid_border_size= copy_of_parent->ocelot_grid_border_size;
-  copy_of_parent->new_ocelot_grid_cell_border_size= copy_of_parent->ocelot_grid_cell_border_size;
-  copy_of_parent->new_ocelot_grid_cell_drag_line_size= copy_of_parent->ocelot_grid_cell_drag_line_size;
-  copy_of_parent->new_ocelot_history_text_color= copy_of_parent->ocelot_history_text_color;
-  copy_of_parent->new_ocelot_history_background_color= copy_of_parent->ocelot_history_background_color;
-  copy_of_parent->new_ocelot_history_border_color= copy_of_parent->ocelot_history_border_color;
-  copy_of_parent->new_ocelot_history_font_family= copy_of_parent->ocelot_history_font_family;
-  copy_of_parent->new_ocelot_history_font_size= copy_of_parent->ocelot_history_font_size;
-  copy_of_parent->new_ocelot_history_font_style= copy_of_parent->ocelot_history_font_style;
-  copy_of_parent->new_ocelot_history_font_weight= copy_of_parent->ocelot_history_font_weight;
-
-  copy_of_parent->new_ocelot_menu_text_color= copy_of_parent->ocelot_menu_text_color;
-  copy_of_parent->new_ocelot_menu_background_color= copy_of_parent->ocelot_menu_background_color;
-  copy_of_parent->new_ocelot_menu_border_color= copy_of_parent->ocelot_menu_border_color;
-  copy_of_parent->new_ocelot_menu_font_family= copy_of_parent->ocelot_menu_font_family;
-  copy_of_parent->new_ocelot_menu_font_size= copy_of_parent->ocelot_menu_font_size;
-  copy_of_parent->new_ocelot_menu_font_style= copy_of_parent->ocelot_menu_font_style;
-  copy_of_parent->new_ocelot_menu_font_weight= copy_of_parent->ocelot_menu_font_weight;
-
-  setWindowTitle(tr("Settings -- Colors and Fonts"));                        /* affects "this"] */
-
+  {
+    QString s= tr("Settings -- ");
+    if (current_widget == MAIN_WIDGET) s.append(" -- for Menu");
+    if (current_widget == HISTORY_WIDGET) s.append(" -- for History");
+    if (current_widget == GRID_WIDGET) s.append(" -- for Grid");
+    if (current_widget == STATEMENT_WIDGET) s.append(" -- for Statement");
+    if (current_widget == EXTRA_RULE_1) s.append(" -- for Extra Rule 1");
+    setWindowTitle(s);                                                /* affects "this"] */
+  }
   widget_colors_label= new QLabel(tr("Colors"));
 
   /* Hboxes for foreground, background, and highlights */
@@ -3846,7 +3975,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       hbox_layout_for_size[ci]= new QHBoxLayout();
       hbox_layout_for_size[ci]->addWidget(label_for_size[ci]);
       hbox_layout_for_size[ci]->addWidget(combo_box_for_size[ci]);
-    widget_for_size[ci]->setLayout(hbox_layout_for_size[ci]);
+      widget_for_size[ci]->setLayout(hbox_layout_for_size[ci]);
     }
     connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
@@ -3854,6 +3983,73 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     /* I could not get result grid border size to work so it is hidden until someday it is figured out -- maybe never */
     label_for_size[0]->hide();
     combo_box_for_size[0]->hide();
+  }
+
+  if (current_widget == EXTRA_RULE_1)
+  {
+    widget_for_size[0]= new QWidget(this);
+    label_for_size[0]= new QLabel(tr("Condition"));
+    combo_box_for_size[0]= new QComboBox();
+    //combo_box_for_size[0]->setFixedWidth(label_for_color_width * 30);
+/*
+    I'd like to be specific, but until there's a lot of time to spare,
+    let's go with just two options: LIKE '%BLOB' and LIKE '%BINARY'.
+    combo_box_for_size[0]->addItem("");
+    combo_box_for_size[0]->addItem("data_type = 'BIT'");
+    combo_box_for_size[0]->addItem("data_type = 'TINYINT'");
+    combo_box_for_size[0]->addItem("data_type = 'SMALLINT'");
+    combo_box_for_size[0]->addItem("data_type = 'MEDIUMINT'");
+    combo_box_for_size[0]->addItem("data_type = 'INT'");
+    combo_box_for_size[0]->addItem("data_type = 'BIGINT'");
+    combo_box_for_size[0]->addItem("data_type = 'DECIMAL'");
+    combo_box_for_size[0]->addItem("data_type = 'NUMERIC'");
+    combo_box_for_size[0]->addItem("data_type = 'FLOAT'");
+    combo_box_for_size[0]->addItem("data_type = 'DOUBLE'");
+    combo_box_for_size[0]->addItem("data_type = 'DATE'");
+    combo_box_for_size[0]->addItem("data_type = 'DATETIME'");
+    combo_box_for_size[0]->addItem("data_type = 'TIMESTAMP'");
+    combo_box_for_size[0]->addItem("data_type = 'TIME'");
+    combo_box_for_size[0]->addItem("data_type = 'CHAR'");
+    combo_box_for_size[0]->addItem("data_type = 'VARCHAR'");
+    combo_box_for_size[0]->addItem("data_type = 'BINARY'");
+    combo_box_for_size[0]->addItem("data_type = 'VARBINARY'");
+    combo_box_for_size[0]->addItem("data_type = 'TINYBLOB'");
+    combo_box_for_size[0]->addItem("data_type = 'TINYTEXT'");
+    combo_box_for_size[0]->addItem("data_type = 'BLOB'");
+    combo_box_for_size[0]->addItem("data_type = 'TEXT'");
+    combo_box_for_size[0]->addItem("data_type = 'MEDIUMBLOB'");
+    combo_box_for_size[0]->addItem("data_type = 'MEDIUMTEXT'");
+    combo_box_for_size[0]->addItem("data_type = 'LONGBLOB'");
+    combo_box_for_size[0]->addItem("data_type = 'LONGTEXT'");
+    combo_box_for_size[0]->addItem("data_type = 'ENUM'");
+    combo_box_for_size[0]->addItem("data_type = 'SET'");
+*/
+    combo_box_for_size[0]->addItem("");
+    combo_box_for_size[0]->addItem("data_type LIKE '%BLOB'");
+    combo_box_for_size[0]->addItem("data_type LIKE '%BINARY'");
+    //label_for_size[0]->setFixedWidth(label_for_color_width * 30);
+    combo_box_for_size[0]->setCurrentIndex(combo_box_for_size[0]->findText(copy_of_parent->new_ocelot_extra_rule_1_condition));
+
+    hbox_layout_for_size[0]= new QHBoxLayout();
+    hbox_layout_for_size[0]->addWidget(label_for_size[0]);
+    hbox_layout_for_size[0]->addWidget(combo_box_for_size[0]);
+    widget_for_size[0]->setLayout(hbox_layout_for_size[0]);
+    connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
+    widget_for_size[1]= new QWidget(this);
+    label_for_size[1]= new QLabel(tr("Display as"));
+    combo_box_for_size[1]= new QComboBox();
+    //combo_box_for_size[1]->setFixedWidth(label_for_color_width * 30);
+    combo_box_for_size[1]->addItem("char");
+    combo_box_for_size[1]->addItem("image");
+    //combo_box_for_size[1]->addItem("hex");
+    //combo_box_for_size[1]->addItem("number");
+    //label_for_size[1]->setFixedWidth(label_for_color_width * 30);
+    combo_box_for_size[1]->setCurrentIndex(combo_box_for_size[1]->findText(copy_of_parent->new_ocelot_extra_rule_1_display_as));
+    hbox_layout_for_size[1]= new QHBoxLayout();
+    hbox_layout_for_size[1]->addWidget(label_for_size[1]);
+    hbox_layout_for_size[1]->addWidget(combo_box_for_size[1]);
+    widget_for_size[1]->setLayout(hbox_layout_for_size[1]);
+    connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
   }
 
   /* The Cancel and OK buttons */
@@ -3875,6 +4071,8 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   main_layout->addWidget(widget_font_label);
   main_layout->addWidget(widget_for_font_dialog);
   if (current_widget == GRID_WIDGET) for (int ci= 0; ci < 3; ++ci) main_layout->addWidget(widget_for_size[ci]);
+  if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[0]);
+  if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
   main_layout->addWidget(widget_3);
 
   handle_combo_box_1(current_widget);
@@ -3915,6 +4113,14 @@ void set_widget_values(int ci)
     case 3: { color_type= tr("Grid Cell Drag Line Color"); color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color; break; }
     case 7: { color_type= tr("Grid Header Background Color"); color_name= copy_of_parent->new_ocelot_grid_header_background_color; break; }
     case 8: { color_type= tr("Grid Border Color"); color_name= copy_of_parent->new_ocelot_grid_border_color; break; }
+    }
+  }
+  if (current_widget == EXTRA_RULE_1)
+  {
+    switch (ci)
+    {
+    case 0: { color_type= tr("Grid Text Color"); color_name= copy_of_parent->new_ocelot_extra_rule_1_text_color; break; }
+    case 1: { color_type= tr("Grid Background Color"); color_name= copy_of_parent->new_ocelot_extra_rule_1_background_color; break; }
     }
   }
   if (current_widget == HISTORY_WIDGET)
@@ -3963,8 +4169,8 @@ void handle_combo_box_1(int i)
   current_widget= i;
 
   for (ci= 0; ci < 10; ++ci) set_widget_values(ci);
-  if (i == 0)
-  {                                       /* statement? */
+  if (i == STATEMENT_WIDGET)
+  {
     color_type= "Prompt background";               /* ?? unnecessary now that set_widget_values() does it, eh? */
     label_for_color[7]->setText(color_type);
     for (ci= 2; ci < 10 ; ++ci)
@@ -3976,7 +4182,7 @@ void handle_combo_box_1(int i)
     }
   }
 
-  if (i == 1)                                       /* grid? */
+  if (i == GRID_WIDGET)
   {
     color_type= "Grid Header Background Color";     /* ?? unnecessary now that set_widget_values() does it, eh? */
     label_for_color[7]->setText(color_type);
@@ -3999,7 +4205,20 @@ void handle_combo_box_1(int i)
     label_for_color_show[9]->hide();
     combo_box_for_color_pick[9]->hide();
   }
-  if (i > 1)
+  if (i == EXTRA_RULE_1)
+  {
+    for (ci= 2; ci < 10; ++ci)
+    {
+      label_for_color[ci]->hide();
+      label_for_color_rgb[ci]->hide();
+      label_for_color_show[ci]->hide();
+      combo_box_for_color_pick[ci]->hide();
+    }
+    widget_font_label->hide();
+    label_for_font_dialog->hide();
+    button_for_font_dialog->hide();
+  }
+  if ((i == HISTORY_WIDGET) || (i == MAIN_WIDGET))
   {
     for (ci= 2; ci < 8; ++ci)
     {
@@ -4156,6 +4375,15 @@ void handle_combo_box_for_color_pick_0(int item_number)
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
   }
+  if (current_widget == EXTRA_RULE_1)
+  {
+    QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
+    copy_of_parent->new_ocelot_extra_rule_1_text_color= new_color;
+    label_for_color_rgb[0]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[0]->setStyleSheet(s);
+  }
   if (current_widget == HISTORY_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
@@ -4192,6 +4420,15 @@ void handle_combo_box_for_color_pick_1(int item_number)
   {
     QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
     copy_of_parent->new_ocelot_grid_background_color= new_color;
+    label_for_color_rgb[1]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[1]->setStyleSheet(s);
+  }
+  if (current_widget == EXTRA_RULE_1)
+  {
+    QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    copy_of_parent->new_ocelot_extra_rule_1_background_color= new_color;
     label_for_color_rgb[1]->setText(new_color);
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
@@ -4387,13 +4624,19 @@ void handle_combo_box_for_color_pick_9(int item_number)
 
 void handle_combo_box_for_size_0(int i)
 {
-  copy_of_parent->new_ocelot_grid_border_size= QString::number(i);
+  if (current_widget == GRID_WIDGET)
+    copy_of_parent->new_ocelot_grid_border_size= QString::number(i);
+  if (current_widget == EXTRA_RULE_1)
+    copy_of_parent->new_ocelot_extra_rule_1_condition= combo_box_for_size[0]->itemText(i);
 }
 
 
 void handle_combo_box_for_size_1(int i)
 {
-  copy_of_parent->new_ocelot_grid_cell_border_size= QString::number(i);
+  if (current_widget == GRID_WIDGET)
+    copy_of_parent->new_ocelot_grid_cell_border_size= QString::number(i);
+  if (current_widget == EXTRA_RULE_1)
+    copy_of_parent->new_ocelot_extra_rule_1_display_as= combo_box_for_size[1]->itemText(i);
 }
 
 
@@ -4526,5 +4769,4 @@ public:
     return QTabWidget::tabBar();
   }
 };
-
 
