@@ -118,7 +118,7 @@
     ocelotgui.h         headers but also quite a lot of executable
     ocelotgui.cpp       executable
     install_sql.cpp     for creating debugger routines
-    ocelotgui.ui        small. ui = user interface
+    ocelotgui.ui        small. used to make ui_ocelotgui.h
 
   There are three main widgets, which generally appear top-to-bottom on
   the screen: history_edit_widget = an uncomplicated text edit which gets
@@ -202,9 +202,8 @@
   but also includes all X11 color names and hex values, a commonly-available list,
   example = https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart
   (including webGray, webGreen, webMaroon, webPurple, and eight
-  others that Qt would reject), and adds Gray_X11 Green_X11 Maroon_X11 Purple_X11
-  -- not exactly the same as Qt names, and not exactly the same as X11 for gray green maroon purple.
-  Doubtless this has been done many times, but I couldn't find examples.
+  others that Qt would reject), and adds GrayX11 GreenX11 MaroonX11 PurpleX11.
+  Doubtless this has been done many times before, but I couldn't find examples.
 */
 static const char *s_color_list[308]=
 {"AliceBlue","#F0F8FF",
@@ -505,7 +504,7 @@ static const char *s_color_list[308]=
 int main(int argc, char *argv[])
 {
     QApplication main_application(argc, argv);
-    MainWindow w (argc, argv);
+    MainWindow w(argc, argv);
     w.showMaximized();
     return main_application.exec();
 }
@@ -574,8 +573,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   /*
     Defaults for items that can be changed with Settings menu item.
-    Todo: These should come from current values, after processing of any Qt options on the command line.
-          We already get "current values" somewhere.
+    First we get current values, after processing of any Qt options on the command line.
+    Then we make arbitrary colors for details that current values probably didn't supply.
+    Then we read option files.
   */
   set_current_colors_and_font(); /* set ocelot_statement_text_color, ocelot_grid_text_color, etc. */
   ocelot_statement_border_color= "black";
@@ -6293,6 +6293,10 @@ int MainWindow::execute_client_statement(QString text)
         statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
+      /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
+               because only 'Courier New' exists. There should be a warning, and
+               setting some style hint e.g. "at least it should be monospace" would be good.
+               This applies for all font_family settings. */
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_family", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);

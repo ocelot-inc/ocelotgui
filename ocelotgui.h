@@ -232,6 +232,7 @@ public:
   QString qt_color(QString);
   QString canonical_color_name(QString);
   void assign_names_for_colors();
+  QString connect_stripper(QString value_to_strip, bool strip_doublets_flag);
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
 
   QString ocelot_dbms;                    /* for CONNECT */
@@ -347,7 +348,6 @@ private:
   void connect_read_command_line(int argc, char *argv[]);
   void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
   int connect_readmylogin(FILE *, unsigned char *);
-  QString connect_stripper(QString value_to_strip, bool strip_doublets_flag);
   void connect_set_variable(QString token0, QString token2);
   void connect_make_statement();
   long to_long(QString token);
@@ -4652,34 +4652,38 @@ void handle_combo_box_for_size_2(int i)
 void handle_button_for_font_dialog()
 {
   bool ok;
-  QString s;
+  QString font_name;
   QFont font;
   int boldness= QFont::Normal;
   bool italics= false;
 
   if (current_widget == STATEMENT_WIDGET)
   {
-    if (QString::compare(copy_of_parent->new_ocelot_statement_font_weight, "bold") == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_statement_font_style, "italic") == 0) italics= true;
+    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_statement_font_family, false);
+    if (QString::compare(copy_of_parent->new_ocelot_statement_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
+    if (QString::compare(copy_of_parent->new_ocelot_statement_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
     font= QFontDialog::getFont(&ok, QFont(copy_of_parent->new_ocelot_statement_font_family, copy_of_parent->new_ocelot_statement_font_size.toInt(), boldness, italics), this);
   }
   if (current_widget == GRID_WIDGET)
   {
-    if (QString::compare(copy_of_parent->new_ocelot_grid_font_weight, "bold") == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_grid_font_style, "italic") == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(copy_of_parent->new_ocelot_grid_font_family, copy_of_parent->new_ocelot_grid_font_size.toInt(), boldness, italics), this);
+    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_grid_font_family, false);
+    if (QString::compare(copy_of_parent->new_ocelot_grid_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
+    if (QString::compare(copy_of_parent->new_ocelot_grid_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
+    font= QFontDialog::getFont(&ok, QFont(font_name, copy_of_parent->new_ocelot_grid_font_size.toInt(), boldness, italics), this);
   }
   if (current_widget == HISTORY_WIDGET)
   {
-    if (QString::compare(copy_of_parent->new_ocelot_history_font_weight, "bold") == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_history_font_style, "italic") == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(copy_of_parent->new_ocelot_history_font_family, copy_of_parent->new_ocelot_history_font_size.toInt(), boldness, italics), this);
+    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_history_font_family, false);
+    if (QString::compare(copy_of_parent->new_ocelot_history_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
+    if (QString::compare(copy_of_parent->new_ocelot_history_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
+    font= QFontDialog::getFont(&ok, QFont(font_name, copy_of_parent->new_ocelot_history_font_size.toInt(), boldness, italics), this);
   }
   if (current_widget == MAIN_WIDGET)
   {
-    if (QString::compare(copy_of_parent->new_ocelot_menu_font_weight, "bold") == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_menu_font_style, "italic") == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(copy_of_parent->new_ocelot_menu_font_family, copy_of_parent->new_ocelot_menu_font_size.toInt(), boldness, italics), this);
+    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_menu_font_family, false);
+    if (QString::compare(copy_of_parent->new_ocelot_menu_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
+    if (QString::compare(copy_of_parent->new_ocelot_menu_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
+    font= QFontDialog::getFont(&ok, QFont(font_name, copy_of_parent->new_ocelot_menu_font_size.toInt(), boldness, italics), this);
   }
 
   if (ok)
