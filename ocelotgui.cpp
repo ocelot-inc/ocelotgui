@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.5.0 Alpha
-   Last modified: June 28 2015
+   Version: 0.6.0 Alpha
+   Last modified: June 29 2015
 */
 
 /*
@@ -485,7 +485,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static char ocelotgui_version[]="0.5 Alpha"; /* For --version. Make sure it's in manual too. */
+  static char ocelotgui_version[]="0.6 Alpha"; /* For --version. Make sure it's in manual too. */
 
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
@@ -1950,7 +1950,7 @@ void MainWindow::create_the_manual_widget()
   the_manual_text_edit->setText("\
 <BR><h1>The ocelotgui user manual</h1>  \
 <BR>  \
-<BR>Version 0.5.0, June 28 2015  \
+<BR>Version 0.6.0, June 29 2015  \
 <BR>  \
 <BR>  \
 <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
