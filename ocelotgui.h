@@ -1199,6 +1199,51 @@ void garbage_collect ()
   Call with:     lmysql->ldbms_function();
 */
 
+enum ocelot_option
+{
+  OCELOT_OPTION_0=0, /* for ocelot_opt_connect_timeout */
+  OCELOT_OPTION_1=1,  /* for ocelot_opt_compress */
+  OCELOT_OPTION_2=2,  /* for ocelot_opt_named_pipe */
+  OCELOT_OPTION_3=3,  /* for ocelot_init_command */
+  OCELOT_OPTION_4=4,  /* for ocelot_read_default_file_as_utf8 */
+  OCELOT_OPTION_5=5,  /* for ocelot_read_default_group_as_utf8 */
+  OCELOT_OPTION_6=6,  /* for ocelot_set_charset_dir_as_utf8 */
+  OCELOT_OPTION_7=7,  /* for ocelot_set_charset_name_as_utf8 */
+  OCELOT_OPTION_8=8,  /* for ocelot_opt_local_infile */
+  OCELOT_OPTION_9=9,  /* for ocelot_protocol_as_int */
+  OCELOT_OPTION_10=10,  /* for ocelot_shared_memory_base_name_as_utf8 */
+  OCELOT_OPTION_11=11,  /* for ocelot_opt_read_timeout */
+  OCELOT_OPTION_12=12,  /* for ocelot_opt_write_timeout */
+  OCELOT_OPTION_13=13,  /* unused. in MySQL, opt_use_result */
+  OCELOT_OPTION_14=14,  /* unused. in MySQL, use_remote_connection */
+  OCELOT_OPTION_15=15,  /* unused. in MySQL, use_embedded_connection */
+  OCELOT_OPTION_16=16,  /* unused. in MySQL, opt_guess_connection */
+  OCELOT_OPTION_17=17,  /* unused. in MySQL, set_client_ip */
+  OCELOT_OPTION_18=18,  /* for ocelot_secure_auth */
+  OCELOT_OPTION_19=19,  /* for ocelot_report_data_truncation */
+  OCELOT_OPTION_20=20,  /* for ocelot_opt_reconnect */
+  OCELOT_OPTION_21=21,  /* ocelot_opt_ssl_verify_server_cert */
+  OCELOT_OPTION_22=22,  /* ocelot_plugin_dir_as_utf8 */
+  OCELOT_OPTION_23=23,  /* for ocelot_default_auth_as_utf8 */
+  OCELOT_OPTION_24=24,  /* for ocelot_opt_bind_as_utf8 */
+  OCELOT_OPTION_25=25,  /* unused. in MySQL, ssl_key */
+  OCELOT_OPTION_26=26,  /* unused. in MySQL, opt_ssl_cert */
+  OCELOT_OPTION_27=27,  /* unused. in MySQL, opt_ssl_ca */
+  OCELOT_OPTION_28=28,  /* unused. in MySQL, opt_ssl_capath */
+  OCELOT_OPTION_29=29,  /* unused. in MySQL, opt_ssl_cipher */
+  OCELOT_OPTION_30=30,  /* for ocelot_opt_ssl_crl_as_utf8 */
+  OCELOT_OPTION_31=31,  /* for ocelot_opt_ssl_crlpath_as_utf8 */
+  OCELOT_OPTION_32=32,  /* for ocelot_opt_connect_attr_reset */
+  OCELOT_OPTION_33=33,  /* unused. in MySQL, connect_attr_add */
+  OCELOT_OPTION_34=34,  /* for ocelot_opt_connect_attr_delete_as_utf8 */
+  OCELOT_OPTION_35=35,  /* for ocelot_server_public_key_as_utf8 */
+  OCELOT_OPTION_36=36,  /* for ocelot_enable_cleartext_plugin */
+  OCELOT_OPTION_37=37,  /* for ocelot_opt_can_handle_expired_passwords */
+  OCELOT_OPTION_5999=5999,  /*unused. In MariaDB, progress_callback */
+  OCELOT_OPTION_6000=6000,  /* unused. In MariaDB, nonblock */
+  OCELOT_OPTION_6001=6001  /* unused. in MariaDB, thread_specific_memory */
+};
+
 #ifndef HEADER_AES_H
 #define AES_BLOCK_SIZE 16
 typedef struct aes_key_st { unsigned char x[244]; } AES_KEY;
@@ -1228,7 +1273,7 @@ public:
   typedef int             (*tmysql_next_result)  (MYSQL *);
   typedef unsigned int    (*tmysql_num_fields)   (MYSQL_RES *);
   typedef my_ulonglong    (*tmysql_num_rows)     (MYSQL_RES *);
-  typedef int             (*tmysql_options)      (MYSQL *, enum mysql_option, const char *);
+  typedef int             (*tmysql_options)      (MYSQL *, enum ocelot_option, const char *);
   typedef int             (*tmysql_query)        (MYSQL *, const char *);
   typedef MYSQL*          (*tmysql_real_connect) (MYSQL *, const char *,
                                                   const char *,
@@ -1560,7 +1605,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     return t__mysql_num_rows(result);
   }
 
-  int ldbms_mysql_options(MYSQL *mysql, enum mysql_option option, const char *arg)
+  int ldbms_mysql_options(MYSQL *mysql, enum ocelot_option option, const char *arg)
   {
     return t__mysql_options(mysql, option, arg);
   }

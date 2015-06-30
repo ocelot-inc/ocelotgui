@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.6.0 Alpha
-   Last modified: June 29 2015
+   Last modified: June 30 2015
 */
 
 /*
@@ -153,6 +153,8 @@
   UTF8 Conversion
   Everything which will be passed to MySQL will first be converted to UTF8.
   Todo: Ensure that sending/receiving character set is UTF8, regardless of data language.
+        Currently we do say ocelot_set_charset_name= "utf8"; which is passed to mysql_options()
+        but the user can explicitly override that.
   Todo: When receiving, only convert characters, not binary or numeric.
   Todo: Handle Qt codecs for other character sets.
   Todo: Figure out how to handle a literal preceded by an _introducer.
@@ -9336,7 +9338,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   /* ocelot_secure_auth= 1; secure_auth is 1 by default anyway */ /* =1 if mysql 5.6.7 */
   ocelot_server_public_key= "";
   ocelot_set_charset_dir= "";
-  ocelot_set_charset_name= ""; /* ocelot_default_character_set= "";  */
+  ocelot_set_charset_name= "utf8"; /* ocelot_default_character_set= "";  */
   ocelot_shared_memory_base_name= "";
 
   ocelot_protocol= ""; ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
@@ -10367,6 +10369,7 @@ unsigned int MainWindow::get_ocelot_protocol_as_int(QString ocelot_protocol)
   return 0;
 }
 
+
 int options_and_connect(
     unsigned int connection_number)
 {
@@ -10376,42 +10379,24 @@ int options_and_connect(
     lmysql->ldbms_mysql_close(&mysql[connection_number]);
   }
   lmysql->ldbms_mysql_init(&mysql[connection_number]);
-#ifdef MYSQL_DEFAULT_AUTH
-  if (ocelot_default_auth_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_DEFAULT_AUTH, ocelot_default_auth_as_utf8);
-#endif
-#ifdef MYSQL_ENABLE_CLEARTEXT_PLUGIN
-  if (ocelot_enable_cleartext_plugin == true) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_ENABLE_CLEARTEXT_PLUGIN, ocelot_enable_cleartext_plugin);
-#endif
-  if (ocelot_init_command_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, ocelot_init_command_as_utf8);
-#ifdef MYSQL_OPT_BIND
-  if (ocelot_opt_bind_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_BIND, ocelot_opt_bind_as_utf8);
-#endif
-#ifdef MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS
-  if (ocelot_can_handle_expired_passwords != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS, ocelot_can_handle_expired_passwords);
-#endif
-  if (ocelot_opt_compress > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_COMPRESS, NULL);
-#ifdef MYSQL_OPT_CONNECT_ATTR_DELETE
-  if (ocelot_opt_connect_attr_delete_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_DELETE, ocelot_opt_connect_attr_delete_as_utf8);
-#endif
-#ifdef MYSQL_OPT_CONNECT_ATTR_RESET
-  if (ocelot_opt_connect_attr_reset != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_ATTR_RESET, (char*) &ocelot_opt_connect_attr_reset);
-#endif
+  if (ocelot_default_auth_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_23, ocelot_default_auth_as_utf8);
+  if (ocelot_enable_cleartext_plugin == true) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_36, (char *) &ocelot_enable_cleartext_plugin);
+  if (ocelot_init_command_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_3, ocelot_init_command_as_utf8);
+  if (ocelot_opt_bind_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_24, ocelot_opt_bind_as_utf8);
+  if (ocelot_opt_can_handle_expired_passwords != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_37, (char *) &ocelot_opt_can_handle_expired_passwords);
+  if (ocelot_opt_compress > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_1, NULL);
+  if (ocelot_opt_connect_attr_delete_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_34, ocelot_opt_connect_attr_delete_as_utf8);
+  if (ocelot_opt_connect_attr_reset != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_32, (char*) &ocelot_opt_connect_attr_reset);
   if (ocelot_opt_connect_timeout != 0)
   {
     unsigned int timeout= ocelot_opt_connect_timeout;
-    lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_CONNECT_TIMEOUT, (char*) &timeout);
+    lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_0, (char*) &timeout);
   }
-  if (ocelot_opt_local_infile > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_LOCAL_INFILE, (char*) &ocelot_opt_local_infile);
-#ifdef MYSQL_OPT_NAMED_PIPE
-  if (ocelot_opt_named_pipe > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_NAMED_PIPE, (char*) &ocelot_opt_named_pipe);
-#endif
-  if (ocelot_protocol_as_int > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_PROTOCOL, (char*)&ocelot_protocol_as_int);
-#ifdef MYSQL_OPT_READ_TIMEOUT
-  if (ocelot_opt_read_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_READ_TIMEOUT, (char*)&ocelot_opt_read_timeout);
-#endif
-#ifdef MYSQL_OPT_RECONNECT
-  if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_RECONNECT, (char*)&ocelot_opt_reconnect);
-#endif
+  if (ocelot_opt_local_infile > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_8, (char*) &ocelot_opt_local_infile);
+  if (ocelot_opt_named_pipe > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_2, (char*) &ocelot_opt_named_pipe);
+  if (ocelot_protocol_as_int > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_9, (char*)&ocelot_protocol_as_int);
+  if (ocelot_opt_read_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_11, (char*)&ocelot_opt_read_timeout);
+  if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_20, (char*)&ocelot_opt_reconnect);
 
   /*
     If dlopen() failed for "myql_ssl_set" then ldbms_mysql_ssl_set is a no-op, which is not an error.
@@ -10431,43 +10416,19 @@ int options_and_connect(
       lmysql->ldbms_mysql_ssl_set(&mysql[connection_number], a, b, c, d, e);
     }
   }
-#ifdef MYSQL_OPT_SSL_CRL
-  if (ocelot_opt_ssl_crl_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRL, ocelot_ocelot_opt_ssl_crl_as_utf8);
-#endif
-#ifdef MYSQL_OPT_SSL_CRLPATH
-  if (ocelot_opt_ssl_crlpath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_CRLPATH, ocelot_ocelot_opt_ssl_crlpath_as_utf8);
-#endif
-#ifdef MYSQL_OPT_SSL_VERIFY_SERVER_CERT
-  if (ocelot_opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_SSL_VERIFY_SERVER_CERT, (char*) &ocelot_ocelot_opt_ssl_verify_server_cert);
-#endif
-#ifdef MYSQL_OPT_WRITE_TIMEOUT
-  if (ocelot_opt_write_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_OPT_WRITE_TIMEOUT, (char*)&ocelot_opt_write_timeout);
-#endif
-#ifdef MYSQL_PLUGIN_DIR
-  if (ocelot_plugin_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[], MYSQL_PLUGIN_DIR, ocelot_plugin_dir_as_utf8);
-#endif
-#ifdef MYSQL_READ_DEFAULT_FILE
-  if (ocelot_read_default_file_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_FILE, ocelot_read_default_file_as_utf8);
-#endif
-#ifdef MYSQL_READ_DEFAULT_GROUP
-  if (ocelot_read_default_group_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_READ_DEFAULT_GROUP, ocelot_read_default_group_as_utf8);
-#endif
-#ifdef MYSQL_REPORT_DATA_TRUNCATION
-  if (ocelot_report_data_truncation > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_REPORT_DATA_TRUNCATION, (char*) ocelot_report_data_truncation);
-#endif
-  if (ocelot_secure_auth > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SECURE_AUTH, (char *) &ocelot_secure_auth);
-#ifdef MYSQL_SERVER_PUBLIC_KEY
-  if (ocelot_server_public_key_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SERVER_PUBLIC_KEY, (char *) ocelot_server_public_key_as_utf8);
-#endif
-#ifdef MYSQL_SET_CHARSET_DIR
-  if (ocelot_set_charset_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_DIR, ocelot_set_charset_dir_as_utf8);
-#endif
-#ifdef MYSQL_SET_CHARSET_NAME
-  if (ocelot_set_charset_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SET_CHARSET_NAME, ocelot_set_charset_name_as_utf8);
-#endif
-#ifdef MYSQL_SHARED_MEMORY_BASE_NAME
-  if (ocelot_shared_memory_base_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_SHARED_MEMORY_BASE_NAME, ocelot_shared_memory_base_name_as_utf8);
-#endif
+  if (ocelot_opt_ssl_crl_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_30, ocelot_opt_ssl_crl_as_utf8);
+  if (ocelot_opt_ssl_crlpath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_31, ocelot_opt_ssl_crlpath_as_utf8);
+  if (ocelot_opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_21, (char*) &ocelot_opt_ssl_verify_server_cert);
+  if (ocelot_opt_write_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_12, (char*) &ocelot_opt_write_timeout);
+  if (ocelot_plugin_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_22, ocelot_plugin_dir_as_utf8);
+  if (ocelot_read_default_file_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_4, ocelot_read_default_file_as_utf8);
+  if (ocelot_read_default_group_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_5, ocelot_read_default_group_as_utf8);
+  if (ocelot_report_data_truncation > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_19, (char*) &ocelot_report_data_truncation);
+  if (ocelot_secure_auth > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_18, (char *) &ocelot_secure_auth);
+  if (ocelot_server_public_key_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_35, ocelot_server_public_key_as_utf8);
+  if (ocelot_set_charset_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_6, ocelot_set_charset_dir_as_utf8);
+  if (ocelot_set_charset_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_7, ocelot_set_charset_name_as_utf8);
+  if (ocelot_shared_memory_base_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_10, ocelot_shared_memory_base_name_as_utf8);
 
   if (ocelot_safe_updates > 0)
   {
@@ -10475,7 +10436,7 @@ int options_and_connect(
     sprintf(init_command,
         "SET sql_select_limit = %lu, sql_safe_updates = 1, max_join_size = %lu",
         ocelot_select_limit, ocelot_max_join_size);
-    lmysql->ldbms_mysql_options(&mysql[connection_number], MYSQL_INIT_COMMAND, init_command);
+    lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_3, init_command);
   }
 
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
