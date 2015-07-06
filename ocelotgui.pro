@@ -32,8 +32,19 @@ FORMS    += ocelotgui.ui
 
 # INCLUDEPATH is where the compiler will search for mysql.h at build time.
 # Replace this with the actual location of the file as supplied by MySQL or MariaDB.
-# Todo: don't hard code a single path, find where mysql.h should be!
-INCLUDEPATH += /home/pgulutzan/mariadb-10.0.17/include/mysql
+# If build fails because mysql.h is not found:
+#   () If you installed MySQL or MariaDB from a distro repository,
+#      check that you installed the "dev" package
+#      it might be called libmysqlclient-dev
+#   () If you can't remember whether it was installed, use
+#      sudo find / -name "mysql.h"
+#   When you find mysql.h, add its directory to this list.
+INCLUDEPATH+= /usr/include/mysql
+INCLUDEPATH+= /usr/local/include/mysql
+INCLUDEPATH+= /usr/local/mysql/include
+INCLUDEPATH+= /usr/local/mysql/include/mysql
+INCLUDEPATH+= /opt/local/include/mysql
+INCLUDEPATH+= /sw/include/mysql
 
 # QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time,
 # but first it will try several other ways.

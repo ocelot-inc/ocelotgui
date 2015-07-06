@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.6.0 Alpha
-   Last modified: June 30 2015
+   Last modified: July 6 2015
 */
 
 /*
@@ -474,6 +474,7 @@ static const char *s_color_list[308]=
 
   static bool ocelot_detach_history_widget= false;
   static bool ocelot_detach_result_grid_widget= false;
+  static bool ocelot_detach_debug_widget= false;
 
   int is_libmysqlclient_loaded= 0;
   int is_libcrypto_loaded= 0;
@@ -670,7 +671,7 @@ MainWindow::~MainWindow()
 void MainWindow::initialize_widget_statement()
 {
 
-  statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+  statement_edit_widget_setstylesheet();
 
   statement_edit_widget->setLineWrapMode(QPlainTextEdit::NoWrap);
   /* statement_edit_widget->setAcceptRichText(false); */ /* Todo: test whether this works */
@@ -707,6 +708,21 @@ void MainWindow::initialize_widget_statement()
   emit statement_edit_widget->update_prompt_width(0);
 
   statement_edit_widget->installEventFilter(this);
+}
+
+
+/* Statement widget and debug widgets both use ocelot_statement_style_string. */
+void MainWindow::statement_edit_widget_setstylesheet()
+{
+  statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+
+  for (int debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
+  {
+    if (debug_widget[debug_widget_index] != 0)
+    {
+      debug_widget[debug_widget_index]->setStyleSheet(ocelot_statement_style_string);
+    }
+  }
 }
 
 
@@ -896,7 +912,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   ocelot_history_text_font                         default unknown
   ocelot_history_error_font                        default unknown
   ocelot_history_prompt_font                       default unknown
-  ocelot_history_detached                          default no
   ocelot_history_includes_warnings                 default no
 
   The statement is always followed by an error message,
@@ -1379,6 +1394,10 @@ void MainWindow::create_menu()
   menu_options_action_option_detach_result_grid_widget->setCheckable(true);
   menu_options_action_option_detach_result_grid_widget->setChecked(ocelot_detach_result_grid_widget);
   connect(menu_options_action_option_detach_result_grid_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_result_grid_widget(bool)));
+  menu_options_action_option_detach_debug_widget= menu_options->addAction(tr("detach debug widget"));
+  menu_options_action_option_detach_debug_widget->setCheckable(true);
+  menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
+  connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
 
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(tr("Debug"));
@@ -1862,7 +1881,7 @@ void MainWindow::action_exit()
   Todo: The title bar shouldn't have a "close" option, or it should only mean "no more detached".
   Todo: Menu keys should be slotted to the new window as well as the main window. E.g. control-Q.
   Todo: How to bring to front / bring to back? Currently it's always in front of main widget.
-  Todo: Debug widget should be detachable too.
+        That's due to WindowStaysOnTopHint.
   Probably PM_DefaultFrameWidth won't matter but I'm not sure what it is.
 */
 
@@ -1903,6 +1922,25 @@ void MainWindow::action_option_detach_result_grid_widget(bool checked)
     result_grid_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) result_grid_tab_widget->show();
+}
+
+/* menu item = Options|detach debug widget */
+void MainWindow::action_option_detach_debug_widget(bool checked)
+{
+  bool is_visible= debug_tab_widget->isVisible();
+  ocelot_detach_debug_widget= checked;
+  if (checked)
+  {
+    menu_options_action_option_detach_debug_widget->setText("attach debug widget");
+    debug_tab_widget->setWindowFlags(Qt::Window | Qt::WindowStaysOnTopHint);
+    debug_tab_widget->setWindowTitle("debug widget");
+  }
+  else
+  {
+    menu_options_action_option_detach_debug_widget->setText("detach debug widget");
+    debug_tab_widget->setWindowFlags(Qt::Widget);
+  }
+  if (is_visible) debug_tab_widget->show();
 }
 
 
@@ -2386,7 +2424,7 @@ void MainWindow::action_statement()
   if (result == QDialog::Accepted)
   {
     //make_style_strings();
-    //statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+    //statement_edit_widget_setstylesheet();
     /* For each changed Settings item, produce and execute a settings-change statement. */
     action_change_one_setting(ocelot_statement_text_color, new_ocelot_statement_text_color,"ocelot_statement_text_color");
     action_change_one_setting(ocelot_statement_background_color,new_ocelot_statement_background_color,"ocelot_statement_background_color");
@@ -4311,6 +4349,8 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
 
     debug_maintain_prompt(0, debug_widget_index, 0); /* clear prompt_as_input_by_user */
 
+    debug_widget[debug_widget_index]->setStyleSheet(ocelot_statement_style_string);
+
     /* todo: call 'refresh breakpoints' and debug_maintain_prompt() for breakpoints that already have been set up. */
     debug_widget[debug_widget_index]->prompt_default= (QString)"\\2 \\L";
     debug_widget[debug_widget_index]->result= (QString)"ABCDEFG";
@@ -4907,7 +4947,8 @@ void MainWindow::debug_highlight_line()
 
   QTextEdit::ExtraSelection selection;
 
-  QColor lineColor= QColor(Qt::red).lighter(160);
+  /* debug highlight color = current line color e.g. yellow. used to be QColor(Qt::red) */
+  QColor lineColor= QColor(ocelot_statement_highlight_current_line_color).lighter(160);
 
   QTextDocument* doc= debug_widget[debug_widget_index]->document();
   QTextBlock block;
@@ -6283,7 +6324,7 @@ int MainWindow::execute_client_statement(QString text)
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_background_color= ccn;
         make_style_strings();
-        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        statement_edit_widget_setstylesheet();
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_border_color", Qt::CaseInsensitive) == 0)
@@ -6292,7 +6333,7 @@ int MainWindow::execute_client_statement(QString text)
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_border_color= ccn;
         make_style_strings();
-        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        statement_edit_widget_setstylesheet();
         assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
       }
       /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
@@ -6303,28 +6344,28 @@ int MainWindow::execute_client_statement(QString text)
       {
         ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
         make_style_strings();
-        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        statement_edit_widget_setstylesheet();
         statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
-        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        statement_edit_widget_setstylesheet();
         statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_style", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
-        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        statement_edit_widget_setstylesheet();
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_weight", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
-        statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
+        statement_edit_widget_setstylesheet();
             statement_edit_widget->result= tr("OK");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_literal_color", Qt::CaseInsensitive) == 0)
@@ -6725,7 +6766,7 @@ void MainWindow::rehash_search(char *search_string)
   Call widget_sizer() from action_execute() to resize the three
   main_layout widgets if necessary.
   Todo: so far widget_sizer() is just ideas, mostly unimplemented.
-  The widgets are in a layout (although grid and history leave the layout if detached).
+  The widgets are in a layout (although grid and history and debug leave the layout if detached).
   But the maximum sizing can be helped by me. Some rules are:
   * If history_edit_widget is higher than needed without scrolling, shrink it.
   * If user has manually expanded a window, leave it.
@@ -8622,7 +8663,6 @@ void CodeEditor::resizeEvent(QResizeEvent *e)
 /*
   We get to highlightCurrentline because of earlier
   "connect(this, SIGNAL(cursorPositionChanged()), this, SLOT(highlightCurrentLine()));"
-  Todo: the hard coding Qt::yellow should instead be something chosen for action_statement().
   I made one change from the original code:
     Originally there was a } brace after "extraSelections.append(selection);".
     I moved it so there is a } brace after "setExtraSelections(extraSelections);".

@@ -274,6 +274,7 @@ public slots:
   void history_markup_next();
   void action_option_detach_history_widget(bool checked);
   void action_option_detach_result_grid_widget(bool checked);
+  void action_option_detach_debug_widget(bool checked);
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -373,6 +374,8 @@ private:
   int history_tee_start(QString);             /* for tee */
   void history_tee_stop();                    /* for tee */
   void history_tee_write(QString);            /* for tee */
+
+  void statement_edit_widget_setstylesheet();
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
 
@@ -747,6 +750,7 @@ private:
   QMenu *menu_options;
     QAction *menu_options_action_option_detach_history_widget;
     QAction *menu_options_action_option_detach_result_grid_widget;
+    QAction *menu_options_action_option_detach_debug_widget;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
