@@ -8,9 +8,9 @@ This is Ocelot GUI (ocelotgui), a GPL-license database client.
 Copyright (c) 2014, Ocelot Computer Services Inc.
 All rights reserved.
 
-For the GPL license terms see https://github.com/ocelot-inc/ocelotgui/LICENSE.GPL.
+For the GPL license terms see https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL.
 
-For instructions for end users see https://github.com/ocelot-inc/ocelotgui/manual.htm.
+For instructions for end users see https://github.com/ocelot-inc/ocelotgui/blob/master/manual.htm.
 
 For ocelotgui screenshots see http://ocelot.ca/screenshots.htm.
 
