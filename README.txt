@@ -7,9 +7,14 @@ This is Ocelot GUI (ocelotgui), a GPL-license database client.
 
 Copyright (c) 2014, Ocelot Computer Services Inc.
 All rights reserved.
-Read file LICENSE.GPL to see the terms of the license.
 
-The file manual.htm has instructions for end users.
+For the GPL license terms see https://github.com/ocelot-inc/ocelotgui/LICENSE.GPL.
+
+For instructions for end users see https://github.com/ocelot-inc/ocelotgui/manual.htm.
+
+For ocelotgui screenshots see http://ocelot.ca/screenshots.htm.
+
+For ocelotgui/debugger screenshots see http://ocelot.ca/blog/the-ocelotgui-debugger.
 
 This README file has instructions for getting started.
 Ocelot does not supply the Qt libraries or the libmysqlclient
