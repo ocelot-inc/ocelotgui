@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.6.0 Alpha
-   Last modified: July 6 2015
+   Last modified: July 16 2015
 */
 
 /*
@@ -490,6 +490,7 @@ static const char *s_color_list[308]=
   /* This should correspond to the version number in the comment at the start of this program. */
   static char ocelotgui_version[]="0.6 Alpha"; /* For --version. Make sure it's in manual too. */
 
+
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
 #define MYSQL_DEBUGGER_CONNECTION 1
@@ -508,6 +509,7 @@ int main(int argc, char *argv[])
 {
     QApplication main_application(argc, argv);
     MainWindow w(argc, argv);
+    /* We depend on w being maximized in resizeEvent() */
     w.showMaximized();
     return main_application.exec();
 }
@@ -522,6 +524,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   assert(sizeof(int) >= 4);
 
   /* Initialization */
+
+  main_window_maximum_width= 0;
+  main_window_maximum_height= 0;
 
   ui->setupUi(this);              /* needed so that the menu will show up */
 
@@ -659,6 +664,21 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 MainWindow::~MainWindow()
 {
   delete ui;
+}
+
+/*
+  We want to know the maximum widget size for dialog boxes.
+  We can get this from the second time resizeEvent happens
+  on MainWindow, which is asserted to be maximized.
+*/
+void MainWindow::resizeEvent(QResizeEvent *ev)
+{
+  (void) ev; /* suppress "unused parameter" warning */
+  QSize main_window_size= size();
+  if (main_window_size.width() > main_window_maximum_width)
+    main_window_maximum_width= main_window_size.width();
+  if (main_window_size.height() > main_window_maximum_height)
+    main_window_maximum_height= main_window_size.height();
 }
 
 
@@ -8643,7 +8663,6 @@ void CodeEditor::update_prompt(const QRect &rect, int dy)
   if (rect.contains(viewport()->rect()))
     update_prompt_width(0);
 }
-
 
 /*
   This slot is invoked when the editor's viewport has been scrolled.

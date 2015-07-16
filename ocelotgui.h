@@ -50,7 +50,7 @@
 #include <QTextEdit>
 #include <QThread>
 #include <QTimer>
-#include <QWidget>
+#include <QWidget>            /* todo: remove this line and see if everything is still ok */
 
 /* All mysql includes go here */
 /* The include path for mysql.h is hard coded in ocelotgui.pro. */
@@ -92,6 +92,7 @@ class ResultGrid;
 class Settings;
 class TextEditFrame;
 class TextEditWidget;
+class QScrollAreaWithSize;
 class QThread48;
 class QTabWidget48;
 QT_END_NAMESPACE
@@ -251,6 +252,9 @@ public:
 
   CodeEditor *statement_edit_widget;
 
+  int main_window_maximum_width;
+  int main_window_maximum_height;
+
 public slots:
   void action_connect();
   void action_connect_once(QString);
@@ -318,6 +322,7 @@ public slots:
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
+  void resizeEvent(QResizeEvent *ev);
 
 private:
   Ui::MainWindow *ui;
@@ -882,6 +887,7 @@ protected:
 };
 
 
+
 /*********************************************************************************************************/
 /* THE ROW_FORM_BOX WIDGET */
 
@@ -990,6 +996,7 @@ Row_form_box(int column_count, QString *row_form_label,
   is_ok= 0;
 
   /* Component height = enough for two lines. I tried using QFontMetrics, it didn't work. */
+  /* Todo: another way to calculate a size involves layout->activate(). */
   label_for_component_size_calc= new QLabel(this);
   label_for_component_size_calc->setStyleSheet(parent->ocelot_grid_style_string);
   label_for_component_size_calc->show();
@@ -2891,6 +2898,7 @@ QString copy(unsigned int ocelot_history_max_column_width,
    I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
    but removing it doesn't solve the problem.
    Update: June 7 2015: the problem seems to have disappeared so I temporarily removed the line.
+   Todo: another way to calculate a size involves layout->activate().
 */
 void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
                            int ocelot_grid_cell_drag_line_size_as_int,
@@ -3814,6 +3822,35 @@ private:
 #endif
 
 /*********************************************************************************************************/
+/* THE QSCROLLARESWITHSIZE WIDGET */
+
+/*
+  It's really really really hard to make a dialog box have a good size
+  if it might scroll. With this subclass I can give a size hint when creating.
+  Alas the Height hint tends to be ignored. (Todo: find out why.)
+  It also tends to be ignored if I try sizeHint() for the Settings dialog box.
+  The workaround is to check main_window_maximum_width later.
+*/
+class QScrollAreaWithSize : public QScrollArea
+{
+
+public:
+  int settings_width, settings_height;
+
+QScrollAreaWithSize(int width, int height)
+{
+  settings_width= width;
+  settings_height= height;
+}
+
+virtual QSize sizeHint() const
+{
+  return QSize(settings_width, settings_height);
+}
+
+};
+
+/*********************************************************************************************************/
 /* THE SETTINGS WIDGET */
 
 class Settings: public QDialog
@@ -3867,6 +3904,7 @@ public:
 public:
 Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 {
+  int settings_width, settings_height;
 
   /* settings = new QWidget(this); ... this might come later */
 
@@ -4125,9 +4163,33 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   main_layout->addWidget(widget_3);
 
   handle_combo_box_1(current_widget);
+  /*
+    If one merely says
+    this->setLayout(main_layout);
+    that almost always works because the dialog box fits within the
+    typical screen area. But if it doesn't, e.g. 640x480 display, we need a scroll bar.
+    Additional problem: sizeHint() seems to work for horizontal but not for vertical,
+    which is why the setMinimumHeight line exists.
+  */
   this->setLayout(main_layout);
+  main_layout->activate();
+  settings_width= this->width() + 20; /* todo: 20 is arbitrary */
+  settings_height= this->height() + 20; /* todo: 20 is arbitrary */
+  QWidget *widget_with_main_layout= new QWidget();
+  widget_with_main_layout->setLayout(main_layout);
+  QScrollAreaWithSize *scroll_area= new QScrollAreaWithSize(settings_width, settings_height);
+  scroll_area->setWidget(widget_with_main_layout);
+  QHBoxLayout *scroll_area_layout= new QHBoxLayout();
+  scroll_area_layout->addWidget(widget_with_main_layout);
+  scroll_area->setLayout(scroll_area_layout);
+  scroll_area->setWidgetResizable(true);
+  QHBoxLayout *upper_layout= new QHBoxLayout();
+  upper_layout->addWidget(scroll_area);
+  setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+  //if (parent->main_window_maximum_width > settings_width) setMinimumWidth(settings_width);
+  if (parent->main_window_maximum_height > settings_height) setMinimumHeight(settings_height);
+  setLayout(upper_layout);
 }
-
 
 private:
 
@@ -4797,8 +4859,8 @@ int q_color_list_index(QString color_name_string)
   return 0;  /* TEST! */
 }
 
-
 };
+
 
 /* QThread::msleep is protected in qt 4.8. so you have to say QThread48::msleep */
 class QThread48 : public QThread
