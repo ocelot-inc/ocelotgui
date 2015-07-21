@@ -30,6 +30,7 @@
 #include <QComboBox>
 #include <QDateTime>
 #include <QDialog>
+#include <QFileInfo>
 #include <QFontDialog>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -1202,7 +1203,11 @@ void garbage_collect ()
   On the other hand, this is a pretty convoluted wrapper -- probably there's a more standard way
   to do it.
   (I could have checked out Qt's DBMS wrappers, but preferred to learn something at the lower level.)
-  Todo: check library version (not sure how I do that, though).
+  Todo: check library version (not sure how I do that, though). Maybe mysql_client_version()?
+  Todo: consider allowing library name as parameter e.g. --library=perconaserverclient.so'
+  Todo: if error, error message should say what you looked for. if okay, say what you found.
+  Todo: consider adding in ocelotgui.pro: /opt/mysql/lib /opt/mysql/lib/mysql /usr/sfw/lib
+  Todo: consider executing mysql_config --libs and using what it returns
 
   Initiate with: ldbms *lmysql;
                  lmysql= new ldbms();
@@ -1339,11 +1344,14 @@ ldbms() : QWidget()
   return;
 }
 
+#define WHICH_LIBRARY_LIBMYSQLCLIENT 0
+#define WHICH_LIBRARY_LIBCRYPTO 1
+#define WHICH_LIBRARY_LIBMYSQLCLIENT18 2
 
 void ldbms_get_library(QString ocelot_ld_run_path,
         int *is_library_loaded,           /* points to is_libmysqlclient_loaded */
         QString *return_string,
-        int which_library)                /* 0 = libmysqlclient. 1 = libcrypto */
+        int which_library)                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
   {
     char *query;
     int query_len;
@@ -1374,8 +1382,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       return;
     }
 #ifndef __linux
-    if (which_library == 0) QLibrary lib("libmysqlclient");
-    if (which_library == 1) QLibrary lib("libcrypto");
+    /* I don't know how Windows handles shared-library version numbers */
+    if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) QLibrary lib("libmysqlclient");
+    if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) QLibrary lib("libmysqlclient");
+    if (which_library == WHICH_LIBRARY_LIBCRYPTO) QLibrary lib("libcrypto");
 #endif
     /*
       Finding libmysqlclient
@@ -1407,8 +1417,9 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if (ld_run_path_part > "")
         {
 #ifdef __linux
-          if (which_library == 0) ld_run_path_part.append("/libmysqlclient.so");
-          if (which_library == 1) ld_run_path_part.append("/libcrypto.so");
+          if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient.so.18");
+          if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient.so");
+          if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto.so");
           query_len= ld_run_path_part.toUtf8().size();         /* See comment "UTF8 Conversion" */
           query= new char[query_len + 1];
           memcpy(query, ld_run_path_part.toUtf8().constData(), query_len + 1);
@@ -1418,8 +1429,9 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
           else *is_library_loaded= 1;
 #else
-          if (which_library == 0) ld_run_path_part.append("/libmysqlclient");
-          if (which_library == 1) ld_run_path_part.append("/libcrypto");
+          if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient");
+          if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient");
+          if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto");
           lib.setFileName(ld_run_path_part);
           *is_library_loaded= lib.load();
           error_string= lib.errorString();
@@ -1436,13 +1448,15 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     if (*is_library_loaded == 0)
     {
 #ifdef __linux
-      if (which_library == 0) dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
-      if (which_library == 1) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
+      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) dlopen_handle= dlopen("libmysqlclient.so.18",  RTLD_DEEPBIND | RTLD_NOW);
+      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
+      if (which_library == WHICH_LIBRARY_LIBCRYPTO) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
       else *is_library_loaded= 1;
 #else
-      if (which_library == 0) lib.setFileName("libmysqlclient");
-      if (which_library == 1) lib.setFileName("libcrypto");
+      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysqlclient");
+      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysqlclient");
+      if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libcrypto");
       *is_library_loaded= lib.load();
       error_string= lib.errorString();
 #endif
@@ -1456,7 +1470,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     {
       QString s= "";
 #ifdef __linux
-      if (which_library == 0)
+      if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT))
       {
         t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows"); if (dlerror() != 0) s.append("mysql_affected_rows ");
         t__mysql_close= (tmysql_close) dlsym(dlopen_handle, "mysql_close"); if (dlerror() != 0) s.append("mysql_close ");
@@ -1484,13 +1498,13 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__mysql_store_result= (tmysql_store_result) dlsym(dlopen_handle, "mysql_store_result"); if (dlerror() != 0) s.append("mysql_store_result ");
         t__mysql_warning_count= (tmysql_warning_count) dlsym(dlopen_handle, "mysql_warning_count"); if (dlerror() != 0) s.append("mysql_warning_count ");
       }
-      if (which_library == 1)
+      if (which_library == WHICH_LIBRARY_LIBCRYPTO)
       {
         t__AES_set_decrypt_key= (tAES_set_decrypt_key) dlsym(dlopen_handle, "AES_set_decrypt_key"); if (dlerror() != 0) s.append("AES_set_decrypt_key ");
         t__AES_decrypt= (tAES_decrypt) dlsym(dlopen_handle, "AES_decrypt"); if (dlerror() != 0) s.append("AES_decrypt ");
       }
 #else
-      if (which_library == 0)
+      if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT))
       {
         if ((t__mysql_affected_rows= (tmysql_affected_rows) lib.resolve("mysql_affected_rows")) == 0) s.append("mysql_affected_rows ");
         if ((t__mysql_close= (tmysql_close) lib.resolve("mysql_close")) == 0) s.append("mysql_close ");
@@ -1518,7 +1532,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_store_result= (tmysql_store_result) lib.resolve("mysql_store_result")) == 0) s.append("mysql_store_result ");
         if ((t__mysql_warning_count= (tmysql_warning_count) lib.resolve("mysql_warning_count")) == 0) s.append("mysql_warning_count ");
       }
-      if (which_library == 1)
+      if (which_library == WHICH_LIBRARY_LIBCRYPTO)
       {
         if ((t__AES_set_decrypt_key= (tAES_set_decrypt_key) lib.resolve("AES_set_decrypt_key")) == 0) s.append("AES_set_decrypt_key ");
         if ((t__AES_decrypt= (tAES_decrypt) lib.resolve("AES_decrypt")) == 0) s.append("AES_decrypt ");

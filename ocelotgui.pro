@@ -49,21 +49,22 @@ INCLUDEPATH+= /sw/include/mysql
 # QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time,
 # but first it will try several other ways.
 # Start ocelotgui and say Help | libmysqlclient for details.
-QMAKE_RPATHDIR += /usr/local/lib
 QMAKE_RPATHDIR += /usr/mysql/lib
-QMAKE_RPATHDIR += /usr/local/mysql/lib
 QMAKE_RPATHDIR += /usr/lib
-QMAKE_RPATHDIR += /usr/local/lib/mysql
 QMAKE_RPATHDIR += /usr/lib/mysql
 QMAKE_RPATHDIR += /usr/local
+QMAKE_RPATHDIR += /usr/local/lib
+QMAKE_RPATHDIR += /usr/local/lib/mysql
 QMAKE_RPATHDIR += /usr/local/mysql
-QMAKE_RPATHDIR += /usr/local
+QMAKE_RPATHDIR += /usr/local/mysql/lib
 QMAKE_RPATHDIR += /usr
-
-
-
-
-
+contains(QMAKE_HOST.arch, x86_64) {
+  QMAKE_RPATHDIR += /usr/lib/x86_64-linux-gnu
+  QMAKE_RPATHDIR += /usr/lib64
+  QMAKE_RPATHDIR += /usr/lib64/mysql
+  } else {
+  QMAKE_RPATHDIR += /usr/lib/i386-linux-gnu
+  }
 
 
 

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.6.0 Alpha
-   Last modified: July 16 2015
+   Last modified: July 21 2015
 */
 
 /*
@@ -815,9 +815,52 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   }
 #endif
 
-  if (obj != statement_edit_widget) return false;
   if (event->type() != QEvent::KeyPress) return false;
   QKeyEvent *key= static_cast<QKeyEvent *>(event);
+
+  /* See comment with label "Shortcut Duplication" */
+  if (key->matches(QKeySequence::Open)) { action_connect(); return true; }
+  if (key->matches(QKeySequence::Quit)) { action_exit(); return true; }
+  if (key->matches(QKeySequence::Undo)) { action_undo(); return true; }
+  //if (key->matches(QKeySequence::Redo)) { redo(); return true; } TODO: handle this, eh?
+  Qt::KeyboardModifiers modifiers= key->modifiers();
+  if ((modifiers & (Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier | Qt::MetaModifier)) == Qt::ControlModifier)
+  {
+    if (key->key() == Qt::Key_P) { history_markup_previous(); return true; }
+    if (key->key() == Qt::Key_N) { history_markup_next(); return true; }
+    if (key->key() == Qt::Key_E) { action_execute(); return true; }
+    if (menu_run_action_kill->isEnabled() == true)
+    {
+      if (key->key() == Qt::Key_C) { action_kill(); return true; }
+    }
+  }
+  if ((modifiers & (Qt::ControlModifier | Qt::ShiftModifier | Qt::AltModifier | Qt::MetaModifier)) == Qt::AltModifier)
+  {
+    if (menu_debug_action_breakpoint->isEnabled())
+      if (key->key() == Qt::Key_1) { action_debug_breakpoint(); return true; }
+    if (menu_debug_action_continue->isEnabled())
+      if (key->key() == Qt::Key_2) { action_debug_continue(); return true; }
+    if (menu_debug_action_next->isEnabled())
+      if (key->key() == Qt::Key_3) { action_debug_next(); return true; }
+    if (menu_debug_action_step->isEnabled())
+      if (key->key() == Qt::Key_5) { action_debug_step(); return true; }
+    if (menu_debug_action_clear->isEnabled())
+      if (key->key() == Qt::Key_6) { action_debug_clear(); return true; }
+    if (menu_debug_action_exit->isEnabled())
+      if (key->key() == Qt::Key_7) { action_debug_exit(); return true; }
+    if (menu_debug_action_information->isEnabled())
+      if (key->key() == Qt::Key_8) { action_debug_information(); return true; }
+    if (menu_debug_action_refresh_server_variables->isEnabled())
+      if (key->key() == Qt::Key_9) { action_debug_refresh_server_variables(); return true; }
+    if (menu_debug_action_refresh_user_variables->isEnabled())
+      if (key->key() == Qt::Key_0) { action_debug_refresh_user_variables(); return true; }
+    if (menu_debug_action_refresh_variables->isEnabled())
+      if (key->key() == Qt::Key_A) { action_debug_refresh_variables(); return true; }
+    if (menu_debug_action_refresh_call_stack->isEnabled())
+      if (key->key() == Qt::Key_B) { action_debug_refresh_call_stack(); return true; }
+  }
+
+  if (obj != statement_edit_widget) return false;
 
   if ((key->key() == Qt::Key_Tab) && (ocelot_auto_rehash > 0))
   {
@@ -1305,6 +1348,23 @@ void MainWindow::history_tee_stop()                 /* for tee */
   ocelot_history_tee= false;
 }
 
+/*
+  Shortcut duplication
+  Example:
+    In create_menu():
+      connect(menu_file_action_exit, SIGNAL(triggered()), this, SLOT(action_exit()));
+      menu_file_action_exit->setShortcut(QKeySequence::Quit);
+    In eventFilter():
+      if (key->matches(QKeySequence::Quit))
+      {
+        action_exit();
+        return true;
+      }
+  With Ubuntu 12.04 the menu shortcut is executed.
+  With Ubuntu 15.04 the event filer is executed.
+  That is: the duplication in the event filter is a workaround for the fact that,
+  on some distro versions, some menu shortcuts are missed. Maybe it's a Qt bug.
+*/
 
 /*
   Create the menu.
@@ -2313,16 +2373,17 @@ void MainWindow::action_libmysqlclient()
   msgBox.setText("<b>libmysqlclient</b><br>\
   Before ocelotgui can try to connect to a MySQL server, \
   it needs a shared library named libmysqlclient \
-  (file name on Linux is 'libmysqlclient.so'). \
-  If a mysql client was installed, then this file exists \
-  ... somewhere. \
+  (file name on Linux is 'libmysqlclient.so' and/or 'libmysqlclient.so.18'). \
+  If a mysql client was installed, possibly due to install \
+  of a package named 'libmysqlclient-dev' or something similar, \
+  then this file exists ... somewhere. \
   ocelotgui searches for libmysqlclient.so in these directories:<br> \
   (1) as specified by environment variable LD_RUN_PATH<br> \
   (2) as specified by environment variable LD_LIBRARY_PATH<br> \
   (3) as specified during build in file ocelotgui.pro, \
   which are by default hard-coded as: /usr/local/lib \
   /usr/mysql/lib /usr/local/mysql/lib /usr/lib /usr/local/lib/mysql \
-  /usr/lib/mysql /usr/local /usr/local/mysql /usr/local /usr.<br> \
+  /usr/lib/mysql /usr/local /usr/local/mysql /usr/local /usr, etc.<br> \
   If a message appears saying libmysqlclient cannot be found, \
   or if there is a suspicion that an obsolete copy of libmysqlclient \
   was found, a possible solution is:<br> \
@@ -8235,10 +8296,15 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   ldbms_return_string= "";
 
-  /* First find libmysqlclient.so */
+  /* First find libmysqlclient.so.18 */
   if (is_libmysqlclient_loaded != 1)
   {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, 0);
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
+  }
+  /* if libmysqlclient.so.18 didn't get loaded, try libmysqlclient without a version number*/
+  if (is_libmysqlclient_loaded != 1)
+  {
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
   }
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
 
@@ -9780,7 +9846,7 @@ int MainWindow::connect_readmylogin(FILE *file, unsigned char *output_buffer)
   /* First find libcrypto.so */
   if (is_libcrypto_loaded != 1)
   {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &ldbms_return_string, 1);
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
   }
   if (is_libcrypto_loaded != 1)
   {
