@@ -55,15 +55,18 @@ The official location of the project is on github:
 https://github.com/ocelot-inc/ocelotgui
 This is where the latest source files are. This is what can be "cloned".
 
-The releases for ocelot-inc/ocelotgui are elsewhere on github:
-https://github.com/pgulutzan/ocelotgui/releases
+The releases for ocelot-inc/ocelotgui are also on github:
+https://github.com/ocelot-inc/ocelotgui/releases
+or https://github.com/pgulutzan/ocelotgui/releases
+
 A release includes the source files as of the release time,
 and also two binary (executable) files.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, the existence of the executables
 might be convenient. A release file is highlighted in green
 by github and is named ocelotgui.tar.gz. Thus release 0.6.0 is at
-https://github.com/pgulutzan/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+https://github.com/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+or https://github.com/pgulutzan/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
 
 The installation examples that follow assume that download is
 of a release.
@@ -78,7 +81,7 @@ cd ~/Downloads
 #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
 tar -zxvf ocelotgui.tar.gz
 cd ocelotgui
-#Install a package containing libmysqlclient.so
+#Install a package containing libmysqlclient.so and/or libmysqlclient.so.18
 #Maybe mysql-common would have sufficed.
 sudo apt-get install mysql-client
 #Install a package containing libQtGui.so.4
@@ -99,11 +102,11 @@ cd ocelotgui
 #Maybe mysql-common would have sufficed.
 sudo apt-get install mysql-client
 #Install a package containing libQtGui.so.5
-#This is unnecessary, apt-get install will say "already installed"
+#This is unnecessary, apt-get install will say "already latest version"
 sudo apt-get install libqt5core5a
 #Then, as an ordinary non-root user, say something like
 ./ocelotgui-qt5 --host=127.0.0.1 --user=root
-Warning: Some menu shortcut keys do not work properly with this distro.
+Warning: Some menu shortcut keys may not work properly with this distro.
 
 An installation with Mageia 4.1, 64-bit
 ---------------------------------------
@@ -160,17 +163,18 @@ sudo zypper install libqt4-devel
 sudo zypper install mariadb-client
 cd [path to ocelotgui source files]
 #Edit ocelotgui.pro.
-#Change line that begins with "LIBS + ..."
-#so that it points to where libmysqlclient.so really is now. Example:
-#"LIBS += /usr/local/mysql/lib/mysql/libmysqlclient.so"
-#Change line that begins with "INCLUDEPATH ..."
-#so that it points to where mysql.h really is now. Example:
+#Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
+#points to where libmysqlclient.so really is now. Example:
+#"QMAKE_RPATHDIR += /usr/local/mysql/lib/mysql"
+#Make sure that any of the lines that begins with "INCLUDEPATH+ ..."
+#points to where mysql.h really is now. Example:
 #"INCLUDEPATH += /usr/local/mysql/include/mysql"
 make clean             #usually unnecessary; ignore any error message
 rm Makefile            #usually unnecessary; ignore any error message
 qmake -config release
 #In the following line, if /usr/local/mysql/lib/mysql is not the path
 #where libmysqlclient.so is, replace with the correct name.
+#(This is usually not necessary.)
 export LD_LIBRARY_PATH=/usr/local/mysql/lib/mysql
 make
 #Then, as an ordinary non-root user, say something like
@@ -204,6 +208,20 @@ make
 #Then, as an ordinary non-root user, say something like
 ./ocelotgui --protocol=tcp
 
+Installing by rebuilding source, on Ubuntu 15.04
+------------------------------------------------
+
+#These steps have been known to work for an experiment.
+#Get Qt 5
+sudo apt-get install qtdeclarative5-dev
+#Get latest source from github repository, non-release
+cd ~
+git clone https://github.com/ocelot-inc/ocelotgui
+#Build
+cd ~/ocelotgui
+/usr/lib/x86_64-linux-gnu/qt5/bin/qmake 
+make
+./ocelotgui
 
 Installing by rebuilding source, with Qt Creator
 ------------------------------------------------
@@ -221,10 +239,20 @@ that includes the file "mysql.h". It comes with MySQL or
 MariaDB developer packages, for example "sudo apt-get
 libmysqlclient-dev" will put it in directory /usr/include/mysql.
 
-Edit [path]/ocelotgui.pro: change LIBS to the file
-"libmysqlclient.so". It comes with MySQL or MariaDB,
-for example "sudo apt-get mysqlclient" will put it
-in file /usr/lib/x86_64-linux-gnu/libmysqlclient.so.
+#Edit [path]/ocelotgui.pro.
+#Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
+#points to where libmysqlclient.so really is now.
+#It comes with MySQL or MariaDB,
+#for example "sudo apt-get mysqlclient" will put it
+#in file/usr/lib/x86_64-linux-gnu/libmysqlclient.so.
+#Example:
+#"QMAKE_RPATHDIR += /usr/local/mysql/lib/mysql"
+#Make sure that any of the lines that begins with "INCLUDEPATH+ ..."
+#points to where mysql.h really is now. Example:
+#"INCLUDEPATH += /usr/local/mysql/include/mysql"
+#(mysql.h comes with MySQL or MariaDB developer packages.
+# For example "sudo apt-get libmysqlclient-dev" will
+# put it in directory /usr/nclude/mysql).
 
 You will need to state a compiler for the kit.
 Steps for Qt Creator use are:

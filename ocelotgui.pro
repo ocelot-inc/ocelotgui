@@ -46,6 +46,9 @@ INCLUDEPATH+= /usr/local/mysql/include/mysql
 INCLUDEPATH+= /opt/local/include/mysql
 INCLUDEPATH+= /sw/include/mysql
 
+# ocelotgui uses dlopen + dlsym. Some linkers might demand this.
+LIBS += -ldl
+
 # QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time,
 # but first it will try several other ways.
 # Start ocelotgui and say Help | libmysqlclient for details.
