@@ -30,7 +30,6 @@
 #include <QComboBox>
 #include <QDateTime>
 #include <QDialog>
-#include <QFileInfo>
 #include <QFontDialog>
 #include <QFrame>
 #include <QHBoxLayout>

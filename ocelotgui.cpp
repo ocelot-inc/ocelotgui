@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.6.0 Alpha
-   Last modified: July 21 2015
+   Last modified: July 22 2015
 */
 
 /*
@@ -9323,6 +9323,7 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
   For environment variables:
   Follow http://dev.mysql.com/doc/refman/5.7/en/environment-variables.html
   * Watch: LD_RUN_PATH MYSQL_GROUP_SUFFIX MYSQL_HOST MYSQL_PS1 MYSQL_PWD MYSQL_TCP_PORT TZ USER
+           MYSQL_UNIX_PORT
 
   For option files:
   Follow MySQL manual http://dev.mysql.com/doc/refman/5.7/en/option-files.html
@@ -9518,6 +9519,13 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   if (getenv("MYSQL_TCP_PORT") != 0) ocelot_port= atoi(getenv("MYSQL_TCP_PORT"));         /* "" */
   //tz_user= getenv("TZ_USER");
   home= getenv("HOME");
+
+  if (getenv("MYSQL_UNIX_PORT") != 0)
+  {
+    char *tmp_ocelot_unix_socket;
+    tmp_ocelot_unix_socket= getenv("MYSQL_UNIX_PORT");
+    ocelot_unix_socket= tmp_ocelot_unix_socket;
+  }
 
   /*
     Options files i.e. Configuration files i.e. my_cnf files
@@ -10565,9 +10573,33 @@ int options_and_connect(
   }
 
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
-  if (lmysql->ldbms_mysql_real_connect(&mysql[connection_number], ocelot_host_as_utf8, ocelot_user_as_utf8, ocelot_password_as_utf8,
-                          ocelot_database_as_utf8, ocelot_port, ocelot_unix_socket_as_utf8,
-                          CLIENT_MULTI_RESULTS) == 0)
+
+  MYSQL *connect_result;
+  char *socket_parameter= ocelot_unix_socket_as_utf8;
+  for (int connect_attempt= 0; connect_attempt < 6; ++connect_attempt)
+  {
+    connect_result= lmysql->ldbms_mysql_real_connect(&mysql[connection_number],
+                                                     ocelot_host_as_utf8,
+                                                     ocelot_user_as_utf8,
+                                                     ocelot_password_as_utf8,
+                                                     ocelot_database_as_utf8,
+                                                     ocelot_port,
+                                                     socket_parameter,
+                                                     CLIENT_MULTI_RESULTS);
+     if (connect_result != 0) break;
+     /* See ocelot.ca blog post = Connecting to MySQL or MariaDB with sockets on Linux */
+     /* Todo: you should provide info somewhere how the connection was actually done. */
+     if ((ocelot_protocol_as_int != 0) && (ocelot_protocol_as_int != PROTOCOL_SOCKET)) break;
+     if ((ocelot_unix_socket_as_utf8 != 0) && (strcmp(ocelot_unix_socket_as_utf8, "") != 0)) break;
+     if ((ocelot_host_as_utf8 != 0) && (strcmp(ocelot_host_as_utf8,"") != 0) && (strcmp(ocelot_host_as_utf8, "localhost") != 0)) break;
+     if (lmysql->ldbms_mysql_errno(&mysql[connection_number]) != 2002) break; /* 2002 == CR_CONNECTION_ERROR */
+     if (connect_attempt == 0) socket_parameter= (char *) "/tmp/mysql.sock";
+     if (connect_attempt == 1) socket_parameter= (char *) "/var/lib/mysql/mysql.sock";
+     if (connect_attempt == 2) socket_parameter= (char *) "/var/run/mysqld/mysqld.sock";
+     if (connect_attempt == 3) socket_parameter= (char *) "/var/run/mysql/mysql.sock";
+     if (connect_attempt == 4) socket_parameter= (char *) "/tmp/mysqld.sock";
+   }
+  if (connect_result == 0)
   {
     /* connect failed. todo: better diagnostics? anyway, user can retry, a dialog box will come up. */
     return -1;					// Retryable
