@@ -161,6 +161,7 @@ tar -zxvf ocelotgui.tar.gz
 #Use "cnf qmake" to confirm that these package names are correct.
 sudo zypper install libqt4-devel
 sudo zypper install mariadb-client
+sudo zypper install libmysqlclient-devel
 cd [path to ocelotgui source files]
 #Edit ocelotgui.pro.
 #Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
@@ -197,30 +198,25 @@ make clean
 /usr/bin/qmake-qt4 -config release
 make
 
-If the intent is to rebuild for Qt 5 from source:
-sudo apt-get install libqt5-default
-sudo apt-get install libqt5-qmake
-(These are just guesses. We used Qt Creator.)
-cd [path to ocelotgui source files]
-make clean
-[path-to-qt5-qmake]/qmake -config release
-make
-#Then, as an ordinary non-root user, say something like
-./ocelotgui --protocol=tcp
-
 Installing by rebuilding source, on Ubuntu 15.04
 ------------------------------------------------
 
 #These steps have been known to work for an experiment.
-#Get Qt 5
-sudo apt-get install qtdeclarative5-dev
+
+#Get Qt libraries. The message "already installed" might appear.
+sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools
+#Get MySQL libraries. Either libmysqlclient-dev or libmariadbclient-dev.
+sudo apt-get install libmariadbclient-dev
+
 #Get latest source from github repository, non-release
 cd ~
 git clone https://github.com/ocelot-inc/ocelotgui
 #Build
 cd ~/ocelotgui
-/usr/lib/x86_64-linux-gnu/qt5/bin/qmake 
+#Following might have to be /usr/lib/x86_64-linux-gnu/qt5/bin/qmake
+qmake
 make
+#Start the program to make sure it starts (stop again with File|Exit or ^Q).
 ./ocelotgui
 
 Installing by rebuilding source, with Qt Creator
