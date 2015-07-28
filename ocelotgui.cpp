@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.6.0 Alpha
-   Last modified: July 22 2015
+   Last modified: July 28 2015
 */
 
 /*
@@ -396,7 +396,7 @@ static const char *s_color_list[308]=
   static char* ocelot_set_charset_name_as_utf8= 0;  /* --default_character_set=s for MYSQL_SET_CHARSET_NAME */
   /* exists as QString */                    /* --defaults_extra_file=s */
   /* exists as QString */                    /* --defaults_file=s */
-  /* QString ocelot_defaults_group_suffix */ /* --defaults_group_suffix=s */
+  /* exists as QString */                    /* --defaults_group_suffix=s */
   /* exists as QString */                    /* --delimiter=s */
   static unsigned short ocelot_enable_cleartext_plugin= 0;  /* --enable_cleartext_plugin for MYSQL_ENABLE_CLEARTEXT_PLUGIN */
   /* QString ocelot_execute */               /* --execute=s */
@@ -1748,7 +1748,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "default_character_set"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_set_charset_name; row_form_width[i]= 5;
   row_form_label[++i]= "defaults_extra_file"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_extra_file; row_form_width[i]= 5;
   row_form_label[++i]= "defaults_file"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_file; row_form_width[i]= 5;
-  row_form_label[++i]= "defaults_group_suffix"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_read_default_group; row_form_width[i]= 5;
+  row_form_label[++i]= "defaults_group_suffix"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_group_suffix; row_form_width[i]= 5;
   row_form_label[++i]= "delimiter"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_delimiter_str; row_form_width[i]= 5;
   row_form_label[++i]= "enable_cleartext_plugin"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_enable_cleartext_plugin); row_form_width[i]= 5;
   row_form_label[++i]= "execute"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_execute; row_form_width[i]= 5;
@@ -1860,7 +1860,7 @@ void MainWindow::action_connect_once(QString message)
       ocelot_set_charset_name= row_form_data[i++].trimmed(); /* "default_character_set" */
       ocelot_defaults_extra_file= row_form_data[i++].trimmed();
       ocelot_defaults_file= row_form_data[i++].trimmed();
-      ocelot_read_default_group= row_form_data[i++].trimmed();
+      ocelot_defaults_group_suffix= row_form_data[i++].trimmed();
       ocelot_delimiter_str= row_form_data[i++].trimmed();
       ocelot_enable_cleartext_plugin= to_long(row_form_data[i++].trimmed());
       ocelot_execute= row_form_data[i++].trimmed();
@@ -9434,6 +9434,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   /* ocelot_port= MYSQL_PORT; */ /* already initialized */
   ocelot_unix_socket= "";
   ocelot_default_auth= "";
+  ocelot_defaults_group_suffix= "";
   /* ocelot_enable_cleartext_plugin= 0; */ /* already initialized */
   ocelot_init_command= "";
   ocelot_opt_bind= "";
@@ -9507,9 +9508,31 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     ocelot_ld_run_path= ld_run_path;
   }
 
-  //group_suffix= getenv("GROUP_SUFFIX");
-  //mysql_host= getenv("MYSQL_HOST");
-  //mysql_ps1= getenv("MYSQL_PS1");
+  if (getenv("MYSQL_GROUP_SUFFIX") != 0)
+  {
+    char *tmp_ocelot_defaults_group_suffix;
+    tmp_ocelot_defaults_group_suffix= getenv("MYSQL_GROUP_SUFFIX");
+    ocelot_defaults_group_suffix= tmp_ocelot_defaults_group_suffix;
+  }
+
+  //getenv("MYSQL_HISTFILE");                            /* todo */
+  //getenv("MYSQL_HISTIGNORE");                          /* todo */
+  //getenv("MYSQL_HOME");                                /* skip, this is only for server */
+
+  if (getenv("MYSQL_HOST") != 0)
+  {
+    char *tmp_ocelot_host;
+    tmp_ocelot_host= getenv("MYSQL_HOST");
+    ocelot_host= tmp_ocelot_host;
+  }
+
+  if (getenv("MYSQL_PS1") != 0)
+  {
+    char *tmp_ocelot_prompt;
+    tmp_ocelot_prompt= getenv("MYSQL_PS1");
+    ocelot_prompt= tmp_ocelot_prompt;
+  }
+
   if (getenv("MYSQL_PWD") != 0)
   {
     mysql_pwd= getenv("MYSQL_PWD");
@@ -9517,7 +9540,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     ocelot_password_was_specified= 1;
   }
   if (getenv("MYSQL_TCP_PORT") != 0) ocelot_port= atoi(getenv("MYSQL_TCP_PORT"));         /* "" */
-  //tz_user= getenv("TZ_USER");
+  //user= getenv("USER"); no, this is for Windows
+  //tz= getenv("TZ");
   home= getenv("HOME");
 
   if (getenv("MYSQL_UNIX_PORT") != 0)
@@ -9804,7 +9828,10 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
       /* Todo: Consider: should our group be "ocelot", "ocelotgui", or both? */
       if ((QString::compare(group, "client", Qt::CaseInsensitive) != 0)
       &&  (QString::compare(group, "mysql", Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "ocelot", Qt::CaseInsensitive) != 0)) continue;
+      &&  (QString::compare(group, "ocelot", Qt::CaseInsensitive) != 0)
+      &&  (QString::compare(group, "client" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
+      &&  (QString::compare(group, "mysql" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
+      &&  (QString::compare(group, "ocelot" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)) continue;
     }
 
     /* Remove ''s or ""s around the value, then strip lead or trail spaces. */
@@ -10127,6 +10154,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "defaults_file") == 0)
   {
     ocelot_defaults_file= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "defaults_group_suffix") == 0)
+  {
+    ocelot_defaults_group_suffix= token2;
     return;
   }
   if ((token0_length >= sizeof("del") - 1) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))

@@ -204,7 +204,6 @@ public:
   QString ocelot_execute;
   QString ocelot_ld_run_path;
   QString ocelot_login_path;
-  QString ocelot_pager;
   QString ocelot_opt_ssl;
   QString ocelot_opt_ssl_ca;
   QString ocelot_opt_ssl_capath;
@@ -213,6 +212,7 @@ public:
   QString ocelot_opt_ssl_crl;
   QString ocelot_opt_ssl_crlpath;
   QString ocelot_opt_ssl_key;
+  QString ocelot_pager;
   QString ocelot_plugin_dir;
   QString ocelot_read_default_file;
   QString ocelot_read_default_group;
@@ -224,6 +224,7 @@ public:
   //unsigned short ocelot_no_defaults;         /* for CONNECT */
   QString ocelot_defaults_file;              /* for CONNECT */
   QString ocelot_defaults_extra_file;        /* for CONNECT */
+  QString ocelot_defaults_group_suffix;
   QString ocelot_prompt;
   QString ocelot_opt_ssl_verify;
   QString options_files_read;
