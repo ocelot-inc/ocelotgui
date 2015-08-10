@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.6.0 Alpha
-   Last modified: July 28 2015
+   Last modified: August 10 2015
 */
 
 /*
@@ -402,7 +402,10 @@ static const char *s_color_list[308]=
   /* QString ocelot_execute */               /* --execute=s */
   static unsigned short ocelot_force= 0;     /* --force */
   static unsigned short ocelot_help= 0;      /* --help */
-  static unsigned short ocelot_histignore= 0;/* --histignore=s */
+  static bool ocelot_history_hist_file_is_open= false;
+  static bool ocelot_history_hist_file_is_copied= false;
+  /* exists as QString */                    /* --histfile=s */
+  /* exists as QString */                    /* --histignore=s */
   static unsigned short ocelot_html= 0;      /* --html */
   static unsigned short ocelot_ignore_spaces= 0;  /* --ignore_spaces */
   /* QString ocelot_ld_run_path */                /* --ld_run_path=s */
@@ -443,7 +446,7 @@ static const char *s_color_list[308]=
   static unsigned short int ocelot_opt_ssl_verify_server_cert= 0;  /* --ssl-verify-server-cert for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert (5.7) */
   static unsigned short ocelot_syslog= 0;           /* --syslog (5.7) */
   static unsigned short ocelot_table= 0;            /* --table */
-  static bool ocelot_history_tee= false;            /* --tee for tee  ... arg=history_tee_file_name*/
+  static bool ocelot_history_tee_file_is_open= false;            /* --tee for tee  ... arg=history_tee_file_name*/
   static unsigned short ocelot_unbuffered= 0;       /* --unbuffered */
   static unsigned short ocelot_verbose= 0;          /* --verbose */
   static unsigned short ocelot_version= 0;          /* --version */
@@ -623,6 +626,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   //main_window->setStyleSheet(ocelot_menu_style_string);
   ui->menuBar->setStyleSheet(ocelot_menu_style_string);
   initialize_widget_history();
+
   initialize_widget_statement();
   for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
@@ -1094,8 +1098,9 @@ void MainWindow::history_markup_make_strings()
 
 /* The following will append the statement to history, line-at-a-time with prompts. */
 /* It seems to work except that the prompt is not right-justified. */
+/* is_interactive == false if we're reading from mysql_histfile during start */
 /* Todo: right justify. Make it optional to show the prompt, unless prompt can be hidden. */
-void MainWindow::history_markup_append(QString result_set_for_history)
+void MainWindow::history_markup_append(QString result_set_for_history, bool is_interactive)
 {
   QString plainTextEditContents;
   QStringList statement_lines;
@@ -1118,7 +1123,8 @@ void MainWindow::history_markup_append(QString result_set_for_history)
     history_statement.append(ocelot_statement_prompt_background_color);
     history_statement.append(";\">");
     history_statement.append(history_markup_prompt_start);
-    history_statement.append(history_markup_copy_for_history(statement_edit_widget->prompt_translate(statement_line_index + 1)));
+    if (is_interactive == true) history_statement.append(history_markup_copy_for_history(statement_edit_widget->prompt_translate(statement_line_index + 1)));
+    else history_statement.append("-");
     history_statement.append(history_markup_prompt_end);
     history_statement.append("</span>");
     history_statement.append(history_markup_copy_for_history(statement_lines[statement_line_index]));
@@ -1126,7 +1132,9 @@ void MainWindow::history_markup_append(QString result_set_for_history)
   }
 
   history_statement.append(history_markup_result);
-  history_statement.append(history_markup_copy_for_history(statement_edit_widget->result)); /* the main "OK" or error message */
+  if (is_interactive == true)
+    history_statement.append(history_markup_copy_for_history(statement_edit_widget->result)); /* the main "OK" or error message */
+  else history_statement.append("--");
   if (result_set_for_history > "")
   {
     history_statement.append("<pre>");
@@ -1139,8 +1147,12 @@ void MainWindow::history_markup_append(QString result_set_for_history)
 
   history_markup_counter= 0;
 
-  history_tee_write(query_utf16); /* not related to markup, just a convenient place to call */
-  history_tee_write(statement_edit_widget->result);
+  if (is_interactive == false) return;
+
+  /*  not related to markup, just a convenient place to call */
+  history_file_write("TEE", query_utf16);
+  history_file_write("HIST", query_utf16);
+  history_file_write("TEE", statement_edit_widget->result);
 }
 
 
@@ -1286,67 +1298,172 @@ int MainWindow::history_markup_previous_or_next()
 
 
 /*
-  for tee
-  -------
+  tee+hist
+  --------
+  TEE
   * Code related to tee should have the comment somewhere = "for tee"
-  * bool ocelot_history_tee initially is false
+  * bool ocelot_history_tee_file_is_open initially is false
   * the options --tee=filename and --no-tee exist and are checked (I think)
   * the client statements tee filename and notee will be seen
   * there are no menu options (todo: decide whether this is a flaw)
   * apparently the mysql client would flush, therefore we call fflush() after writing
   * the mysql client would include results from queries, but we don't (todo: this is a flaw)
   * there might be html in the output (todo: decide whether this is a flaw)
+  HIST
+  * read http://ocelot.ca/blog/blog/2015/08/04/mysql_histfile-and-mysql_history/
+  * bool ocelot_history_hist_file_is_open initially is false but it's opened if successful connect
+  * --batch or --silent or setting name to /deev/null turns history off
+  EITHER
+  * Ignore if filename is "", is "/dev/null", or is a link to "/dev/null"
 */
-void MainWindow::history_tee_write(QString text_line)  /* for tee */
+void MainWindow::history_file_write(QString history_type, QString text_line)  /* see comment=tee+hist */
 {
-  if (ocelot_history_tee)
+  FILE *history_file;
+  if (history_type == "TEE")
   {
-    QString s= text_line;
-    int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
-    char *query= new char[query_len + 1];
-    memcpy(query, s.toUtf8().constData(), query_len + 1);
-    query[query_len]= '\0';                            /* todo: think: is this necessary? */
-    fputs(query, ocelot_history_tee_file);
-    fputs("\n", ocelot_history_tee_file);
-    fflush(ocelot_history_tee_file);
-    delete []query;
+    if (ocelot_history_tee_file_is_open == false) return;
+    history_file= ocelot_history_tee_file;
   }
+  else
+  {
+    if (ocelot_history_hist_file_is_open == false) return;
+    history_file= ocelot_history_hist_file;
+  }
+
+  QString s= text_line;
+  int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
+  char *query= new char[query_len + 1];
+  memcpy(query, s.toUtf8().constData(), query_len + 1);
+  query[query_len]= '\0';                            /* todo: think: is this necessary? */
+  fputs(query, history_file);
+  fputs("\n", history_file);
+  fflush(history_file);
+  delete []query;
 }
 
 
-int MainWindow::history_tee_start(QString file_name) /* for tee */
+int MainWindow::history_file_start(QString history_type, QString file_name) /* see comment=tee+hist */
 {
   QString file_name_to_open;
+  FILE *history_file;
 
-  if (file_name == "")  file_name_to_open= ocelot_history_tee_file_name;
-  else file_name_to_open= file_name;
+  if (history_type == "TEE")
+  {
+    file_name_to_open= ocelot_history_tee_file_name;
+    if (ocelot_history_tee_file_is_open == true)
+    {
+      fclose(ocelot_history_tee_file);
+      ocelot_history_tee_file_is_open= false;
+    }
+  }
+  else
+  {
+    file_name_to_open= ocelot_history_hist_file_name;
+    if (ocelot_history_hist_file_is_open == true)
+    {
+      fclose(ocelot_history_hist_file);
+      ocelot_history_hist_file_is_open= false;
+    }
+    if (ocelot_batch != 0) return 1;                     /* if --batch happened, no history */
+    if (ocelot_silent != 0) return 1;                    /* if --silent happened, no history */
+  }
 
+  if (file_name != "") file_name_to_open= file_name;
   int query_len= file_name_to_open.toUtf8().size();  /* See comment "UTF8 Conversion" */
   char *query= new char[query_len + 1];
   memcpy(query, file_name_to_open.toUtf8().constData(), query_len + 1);
   query[query_len]= '\0';                            /* todo: think: is this necessary? */
-  if (ocelot_history_tee == true)
+
+  /* If file name == "/dev/null" or something that links to "/dev/null", don't try to open. */
+  if (file_name_to_open == "/dev/null") return 0;
+#ifdef __linux
+  char tmp_link_file[9 + 1];
+  if (readlink(query, tmp_link_file, 9 + 1) == 9)
   {
-    fclose(ocelot_history_tee_file);
-    ocelot_history_tee= false;
+    if (memcmp(tmp_link_file, "/dev/null", 9) == 0) return 0;
   }
-  ocelot_history_tee_file= fopen(query, "a");        /* Open specified file, append */
+#endif
+
+  history_file= fopen(query, "a");        /* Open specified file, append */
   delete []query;
-  if (ocelot_history_tee_file != NULL)
+  if (history_file != NULL)
   {
-    ocelot_history_tee= true;
-    ocelot_history_tee_file_name= file_name_to_open;
+    if (history_type == "TEE")
+    {
+      ocelot_history_tee_file_is_open= true;
+      ocelot_history_tee_file_name= file_name_to_open;
+      ocelot_history_tee_file= history_file;
+    }
+    else
+    {
+      ocelot_history_hist_file_is_open= true;
+      ocelot_history_hist_file_name= file_name_to_open;
+      ocelot_history_hist_file= history_file;
+    }
     return 1;
   }
   return 0;
 }
 
 
-void MainWindow::history_tee_stop()                 /* for tee */
+void MainWindow::history_file_stop(QString history_type)   /* see comment=tee+hist */
 {
-  fclose(ocelot_history_tee_file);
-  ocelot_history_tee= false;
+  if (history_type == "TEE")
+  {
+    fclose(ocelot_history_tee_file);
+    ocelot_history_tee_file_is_open= false;
+  }
+  else
+  {
+    fclose(ocelot_history_hist_file);
+    ocelot_history_hist_file_is_open= false;
+  }
 }
+
+
+/*
+  This is putting in the history widget, indeed, BUT ...
+  2. The history widget seems to grow when I type something for the first time
+  4. Make sure there's no disaster if file is /dev/null or blank.
+  5. ^P doesn't work, and that's probably because we depend on markup to see statement start.
+  Nothing happens if --batch or --silent
+  We try to open the history file during each connect.
+  If we successfully open, but only the first time, we copy its lines to the history widget.
+  3. We have to limit the number of lines, since the file might be big.
+     So we do an fseek to the last 10000 bytes of the file, then skip the first line from there.
+*/
+#define HISTFILESIZE 10000
+void MainWindow::history_file_to_history_widget()         /* see comment=tee+hist */
+{
+  FILE *history_file;
+  if (ocelot_batch != 0) return;                          /* if --batch happened, no history */
+  if (ocelot_silent != 0) return;                         /* if --silent happened, no history */
+  if (ocelot_history_hist_file_is_copied == true) return;        /* we've alredy done this */
+  //if (ocelot_history_hist_file_is_open == false) return;
+  int query_len= ocelot_history_hist_file_name.toUtf8().size();  /* See comment "UTF8 Conversion" */
+  char *query= new char[query_len + 1];
+  memcpy(query, ocelot_history_hist_file_name.toUtf8().constData(), query_len + 1);
+  query[query_len]= '\0';                            /* todo: think: is this necessary? */
+  history_file= fopen(query, "r");
+  if (history_file == NULL) return;
+  if (fseek(history_file, 0 , SEEK_END) == 0)
+  {
+    int file_size = ftell(history_file);
+    if (file_size > HISTFILESIZE) fseek(history_file, HISTFILESIZE, SEEK_END);
+    else fseek(history_file, 0, SEEK_SET);
+  }
+  char line[4096];
+  while(fgets(line, sizeof line, history_file) != NULL) /* put all non-"" in history  widget */
+  {
+    query_utf16= line;
+    query_utf16= query_utf16.trimmed();
+    if (query_utf16 > "") history_markup_append("", false);
+  }
+  fclose(history_file);
+  ocelot_history_hist_file_is_copied= true;
+  query_utf16= "/* Start Of Session */;";
+}
+
 
 /*
   Shortcut duplication
@@ -1714,7 +1831,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_is_password= 0;
   row_form_data= 0;
   row_form_width= 0;
-  column_count= 81; /* If you add or remove items, you have to change this */
+  column_count= 82; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
   row_form_is_password= new int[column_count];
@@ -1754,7 +1871,8 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "execute"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_execute; row_form_width[i]= 5;
   row_form_label[++i]= "force"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_force); row_form_width[i]= 5;
   row_form_label[++i]= "help"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0;  row_form_data[i]= QString::number(ocelot_help); row_form_width[i]= 5;
-  row_form_label[++i]= "histignore"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_histignore); row_form_width[i]= 5;
+  row_form_label[++i]= "histfile"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_history_hist_file_name; row_form_width[i]= 5;
+  row_form_label[++i]= "histignore"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_histignore; row_form_width[i]= 5;
   row_form_label[++i]= "html"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_html); row_form_width[i]= 5;
   row_form_label[++i]= "ignore_spaces"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ignore_spaces); row_form_width[i]= 5;
   row_form_label[++i]= "ld_run_path"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_ld_run_path; row_form_width[i]= 5;
@@ -1866,7 +1984,8 @@ void MainWindow::action_connect_once(QString message)
       ocelot_execute= row_form_data[i++].trimmed();
       ocelot_force= to_long(row_form_data[i++].trimmed());
       ocelot_help= to_long(row_form_data[i++].trimmed());
-      ocelot_histignore= to_long(row_form_data[i++].trimmed());
+      ocelot_history_hist_file_name= row_form_data[i++].trimmed();
+      ocelot_histignore= row_form_data[i++].trimmed();
       ocelot_html= to_long(row_form_data[i++].trimmed());
       ocelot_ignore_spaces= to_long(row_form_data[i++].trimmed());
       ocelot_ld_run_path= row_form_data[i++].trimmed();
@@ -5900,7 +6019,7 @@ void MainWindow::action_execute_one_statement(QString text)
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(); /* Do this while we still have number of rows */
-          history_markup_append(result_set_for_history);
+          history_markup_append(result_set_for_history, true);
 
           if (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]))
           {
@@ -5970,7 +6089,7 @@ void MainWindow::action_execute_one_statement(QString text)
 
   /* statement is over */
 
-  history_markup_append(""); /* add prompt+statement+result to history, with markup */
+  history_markup_append("", true); /* add prompt+statement+result to history, with markup */
 
 }
 
@@ -6051,8 +6170,10 @@ int MainWindow::execute_client_statement(QString text)
   /* Todo: We could easily modify so that we don't need sub_token_..., we could just skip comments. */
   if (statement_type == TOKEN_KEYWORD_CONNECT)
   {
-      if (QString::compare(ocelot_dbms, "mysql", Qt::CaseInsensitive) == 0) connect_mysql(MYSQL_MAIN_CONNECTION);
-      return 1;
+    history_file_to_history_widget(); /* TODO: Maybe this is the wrong time to call? */
+    history_file_start("HIST", ocelot_history_hist_file_name);
+    if (QString::compare(ocelot_dbms, "mysql", Qt::CaseInsensitive) == 0) connect_mysql(MYSQL_MAIN_CONNECTION);
+    return 1;
   }
 
   /* QUIT or \q. mysql equivalent. Todo: add to history box before exiting. */
@@ -6234,9 +6355,9 @@ int MainWindow::execute_client_statement(QString text)
     statement_edit_widget->result= tr("NOPAGER is not implemented.");
     return 1;
   }
-  if (statement_type == TOKEN_KEYWORD_NOTEE) /* for tee */
+  if (statement_type == TOKEN_KEYWORD_NOTEE) /* see comment=tee+hist */
   {
-    history_tee_stop();
+    history_file_stop("TEE");
     statement_edit_widget->result= tr("OK");
     return 1;
   }
@@ -6308,14 +6429,14 @@ int MainWindow::execute_client_statement(QString text)
     delete [] command_string;
     return 1;
   }
-  if (statement_type == TOKEN_KEYWORD_TEE) /* for tee */
+  if (statement_type == TOKEN_KEYWORD_TEE) /* see comment=tee+hist */
   {
     /* Everything as far as statement end is tee file name. Compare how we do SOURCE file name. */
     QString s;
     unsigned statement_length= /* text.size() */ true_text_size;
     if (i2 >= 2) s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     else s= "";
-    if (history_tee_start(s) == 0) statement_edit_widget->result= tr("Error, fopen failed");
+    if (history_file_start("TEE", s) == 0) statement_edit_widget->result= tr("Error, fopen failed");
     else statement_edit_widget->result= tr("OK");
     return 1;
   }
@@ -8286,6 +8407,7 @@ int MainWindow::next_token(int i)
   return i2;
 }
 
+
 /*
   Todo: disconnect old if already connected.
   TODO: LOTS OF ERROR CHECKS NEEDED IN THIS!
@@ -8301,7 +8423,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   {
     lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
   }
-  /* if libmysqlclient.so.18 didn't get loaded, try libmysqlclient without a version number*/
+  /* if libmysqlclient.so.18 didn't get loaded, try libmysqlclient without a version number */
   if (is_libmysqlclient_loaded != 1)
   {
     lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
@@ -9436,6 +9558,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_default_auth= "";
   ocelot_defaults_group_suffix= "";
   /* ocelot_enable_cleartext_plugin= 0; */ /* already initialized */
+  ocelot_history_hist_file_name= "/.mysql_history";
+  ocelot_histignore= "";
   ocelot_init_command= "";
   ocelot_opt_bind= "";
   /* ocelot_opt_can_handle_expired_passwords= 0; */ /* already initialized */
@@ -9502,6 +9626,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 
   /* Environment variables */
 
+  home= getenv("HOME");
+
   if (getenv("LD_RUN_PATH") != 0)
   {
     ld_run_path= getenv("LD_RUN_PATH");                  /* maybe used to find libmysqlclient */
@@ -9515,9 +9641,22 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     ocelot_defaults_group_suffix= tmp_ocelot_defaults_group_suffix;
   }
 
-  //getenv("MYSQL_HISTFILE");                            /* todo */
-  //getenv("MYSQL_HISTIGNORE");                          /* todo */
   //getenv("MYSQL_HOME");                                /* skip, this is only for server */
+
+  if (getenv("MYSQL_HISTFILE") != 0)
+  {
+    char *tmp_ocelot_histfile;
+    tmp_ocelot_histfile= getenv("MYSQL_HISTFILE");
+    ocelot_history_hist_file_name= tmp_ocelot_histfile;
+  }
+  else ocelot_history_hist_file_name= home + ocelot_history_hist_file_name;
+
+  if (getenv("MYSQL_HISTIGNORE") != 0)
+  {
+    char *tmp_ocelot_histignore;
+    tmp_ocelot_histignore= getenv("MYSQL_HISTIGNORE");
+    ocelot_histignore= tmp_ocelot_histignore;
+  }
 
   if (getenv("MYSQL_HOST") != 0)
   {
@@ -9542,7 +9681,6 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   if (getenv("MYSQL_TCP_PORT") != 0) ocelot_port= atoi(getenv("MYSQL_TCP_PORT"));         /* "" */
   //user= getenv("USER"); no, this is for Windows
   //tz= getenv("TZ");
-  home= getenv("HOME");
 
   if (getenv("MYSQL_UNIX_PORT") != 0)
   {
@@ -10174,7 +10312,8 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "execute") == 0) { ocelot_execute= token2; return; }
   if (strcmp(token0_as_utf8, "force") == 0) { ocelot_force= is_enable; return; }
   if (strcmp(token0_as_utf8, "help") == 0) { ocelot_help= is_enable; return; }
-  if (strcmp(token0_as_utf8, "histignore") == 0) { ocelot_histignore= is_enable; return; }
+  if (strcmp(token0_as_utf8, "histfile") == 0) { ocelot_history_hist_file_name= token2; return; }
+  if (strcmp(token0_as_utf8, "histignore") == 0) { ocelot_histignore= token2; return; }
   if ((token0_length >= sizeof("ho") - 1) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
   {
     ocelot_host= token2;
@@ -10217,7 +10356,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (strcmp(token0_as_utf8, "no_defaults") == 0) { ocelot_no_defaults= is_enable; return; }
   if (strcmp(token0_as_utf8, "no_named_commands") == 0) { ocelot_named_commands= 0; return; }
-  if (strcmp(token0_as_utf8, "no_tee") == 0) { history_tee_stop(); return; }/* for tee */
+  if (strcmp(token0_as_utf8, "no_tee") == 0) { history_file_stop("TEE"); return; }/* see comment=tee+hist */
 
   QString ccn;
   /* Changes to ocelot_* settings. But we don't check that they're in the [ocelot] group. */
@@ -10439,7 +10578,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
    }
    if (strcmp(token0_as_utf8, "syslog") == 0) { ocelot_syslog= is_enable; return; }
    if (strcmp(token0_as_utf8, "table") == 0) { ocelot_table= is_enable; return; }
-   if (strcmp(token0_as_utf8, "tee") == 0) { history_tee_start(token2); /* todo: check whether history_tee_start returned NULL which is an error */ return; }/* for tee */
+   if (strcmp(token0_as_utf8, "tee") == 0) { history_file_start("TEE", token2); /* todo: check whether history_file_start returned NULL which is an error */ return; }/* see comment=tee+hist */
    if (strcmp(token0_as_utf8, "unbuffered") == 0) { ocelot_unbuffered= is_enable; return; }
    if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
    {

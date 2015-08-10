@@ -18,6 +18,9 @@
 #define DEBUGGER
 
 #include <assert.h>
+#ifdef __linux
+#include <unistd.h>
+#endif
 
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
@@ -190,6 +193,7 @@ public:
   QString ocelot_menu_style_string;
 
   /* Strings for CONNECT. Some of these will be converted e.g. ocelot_host to ocelot_host_as_utf8 */
+  QString ocelot_histignore;
   QString ocelot_host;
   QString ocelot_database;
   QString ocelot_user;
@@ -248,8 +252,10 @@ public:
   QString history_markup_result;             /* for markup */
   QString history_markup_entity;             /* for markup */
 
-  QString ocelot_history_tee_file_name;      /* for tee */
-  FILE *ocelot_history_tee_file;             /* for tee */
+  QString ocelot_history_tee_file_name;      /* see comment=tee+hist */
+  FILE *ocelot_history_tee_file;             /* see comment=tee+hist */
+  QString ocelot_history_hist_file_name;     /* see comment=tee+hist */
+  FILE *ocelot_history_hist_file;            /* see comment=tee+hist */
 
   CodeEditor *statement_edit_widget;
 
@@ -375,11 +381,12 @@ private:
   void action_execute_one_statement(QString text);
 
   void history_markup_make_strings();
-  void history_markup_append(QString result_set_for_history);
+  void history_markup_append(QString result_set_for_history, bool is_interactive);
   QString history_markup_copy_for_history(QString);
-  int history_tee_start(QString);             /* for tee */
-  void history_tee_stop();                    /* for tee */
-  void history_tee_write(QString);            /* for tee */
+  int history_file_start(QString, QString);        /* see comment=tee+hist */
+  void history_file_stop(QString);                 /* see comment=tee+hist */
+  void history_file_write(QString, QString);       /* see comment=tee+hist */
+  void history_file_to_history_widget();           /* see comment=tee+hist */
 
   void statement_edit_widget_setstylesheet();
 
