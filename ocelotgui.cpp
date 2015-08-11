@@ -1327,6 +1327,23 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
   else
   {
     if (ocelot_history_hist_file_is_open == false) return;
+    /* see Wildcard Matching section in http://doc.qt.io/qt-4.8/qregexp.html */
+    int qfrom= 0;
+    int qindex;
+    QString qs;
+    for (;;)
+    {
+      QRegExp rx;
+      if (qfrom >= ocelot_histignore.length()) break;
+      qindex= ocelot_histignore.indexOf(":", qfrom, Qt::CaseInsensitive);
+      if (qindex == -1) qindex= ocelot_histignore.length();
+      qs= ocelot_histignore.mid(qfrom, qindex - qfrom);
+      rx= QRegExp(qs);
+      rx.setPatternSyntax(QRegExp::Wildcard);
+      rx.setCaseSensitivity(Qt::CaseInsensitive);
+      if (rx.exactMatch(text_line) == true) return;
+      qfrom= qindex + 1;
+    }
     history_file= ocelot_history_hist_file;
   }
 
