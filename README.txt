@@ -20,6 +20,22 @@ This README file has instructions for getting started.
 Ocelot does not supply the Qt libraries or the libmysqlclient
 library. Therefore you will have to download them separately.
 
+Feeling Lucky?
+--------------
+
+Often a machine already has Qt and libmysqlclient.
+In that case, be up and running in 15 seconds with:
+
+mkdir ~/ocelotgui-test
+cd ~/ocelotgui-test
+wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+tar -zxvf ocelotgui.tar.gz
+cd ocelotgui
+./ocelotgui-qt4 #or ./ocelotgui-qt5
+
+If the above instructions succeed, there is no need to read
+the rest of this document. But usually there is more to do.
+
 Getting the Qt libraries
 ------------------------
 
@@ -54,6 +70,9 @@ Getting the ocelotgui source and executable files
 The official location of the project is on github:
 https://github.com/ocelot-inc/ocelotgui
 This is where the latest source files are. This is what can be "cloned".
+Typically, to get it, one would install git, cd to a download directory, then
+git clone https://github.com/ocelot-inc/ocelotgui
+A clone has the latest source, but not executables.
 
 The releases for ocelot-inc/ocelotgui are also on github:
 https://github.com/ocelot-inc/ocelotgui/releases
@@ -65,10 +84,14 @@ Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, the existence of the executables
 might be convenient. A release file is highlighted in green
 by github and is named ocelotgui.tar.gz. Thus release 0.6.0 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+https://github.com/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
 or https://github.com/pgulutzan/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+Typically, to get it, one would cd to a download directory, then
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+or use a browser to go to https://github.com/ocelot-inc/ocelotgui/releases
+and click ocelotgui.tar.gz.
 
-The installation examples that follow assume that download is
+Most of the installation examples that follow assume that download is
 of a release.
 
 
@@ -82,7 +105,7 @@ cd ~/Downloads
 tar -zxvf ocelotgui.tar.gz
 cd ocelotgui
 #Install a package containing libmysqlclient.so and/or libmysqlclient.so.18
-#Maybe mysql-common or libmysqlclient-dev would have sufficed.
+#Maybe mysql-common would have sufficed.
 sudo apt-get install mysql-client
 #Install a package containing libQtGui.so.4
 sudo apt-get install libqt4-core
@@ -181,6 +204,44 @@ make
 #Then, as an ordinary non-root user, say something like
 ./ocelotgui
 
+An installation with SUSE 42.1, from source in release tar
+----------------------------------------------------------
+#This builds using the source files in the 0.6.0 "release"
+#To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
+sudo zypper install libqt4-devel
+sudo zypper install libmysqlclient-devel
+sudo zypper install git
+sudo zypper install gcc
+sudo zypper install gcc-c++
+sudo zypper install make
+mkdir ~/ocelotgui-test
+cd ~/ocelotgui-test
+wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+tar -zxvf ocelotgui.tar.gz
+cd ocelotgui
+qmake -config release
+make
+#To uninstall, say: rm -r ~/ocelotgui-test
+
+An installation with SUSE 42.1, from source in git clone
+--------------------------------------------------------
+#This builds using the source files in the very latest "post-release"
+#To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
+sudo zypper install libqt4-devel
+sudo zypper install libmysqlclient-devel
+sudo zypper install git
+sudo zypper install gcc
+sudo zypper install gcc-c++
+sudo zypper install make
+mkdir ~/ocelotgui-test
+cd ~/ocelotgui-test
+git clone https://github.com/ocelot-inc/ocelotgui
+cd ocelotgui
+qmake -config release
+make
+#To uninstall, say: rm -r ~/ocelotgui-test
+
+
 Installing by rebuilding source, on Ubuntu 12.04, without Qt Creator
 --------------------------------------------------------------------
 
@@ -218,6 +279,8 @@ qmake
 make
 #Start the program to make sure it starts (stop again with File|Exit or ^Q).
 ./ocelotgui
+
+
 
 Installing by rebuilding source, with Qt Creator
 ------------------------------------------------
