@@ -21,6 +21,25 @@ This README file has instructions for getting started.
 Ocelot does not supply the Qt libraries or the libmysqlclient
 library. Therefore you will have to download them separately.
 
+### Contents
+------------
+
+[Feeling lucky?](#feeling-lucky)
+[Getting the Qt libraries](#getting-the-qt-libraries)
+[Getting the libmysqlclient.so library](#getting-the-libmysqlclientso-library)
+[Getting the Qt libraries](#getting-the-ocelotgui-source-and-executable-files)
+[Getting the ocelotgui source and executable files](#an-installation-with-ubuntu-1204-64-bit)
+[An installation with Ubuntu 14.04, 64-bit](#an-installation-with-ubuntu-1404-64-bit)
+[An installation with Mageia 4.1, 64-bit](#an-installation-with-mageia-41-64-bit)
+[An installation with Fedora 20, 64-bit](#an-installation-with-fedora-20-64-bit)
+[An installation with SUSE 13.1, 32-bit, from source](#an-installation-with-suse-131-32-bit-from-source)
+[An installation with SUSE 42.1, from source in release tar](#an-installation-with-suse-421-from-source-in-release-tar)
+[An installation with SUSE 42.1, from source in git clone](#an-installation-with-suse-421-from-source-in-git-clone)
+[Installing by rebuilding source, on Ubuntu 12.04, without Qt Creator](#installing-by-rebuilding-source-on-ubuntu-1204-without-qt-creator)
+[Installing by rebuilding source, on Ubuntu 15.04](#installing-by-rebuilding-source-on-ubuntu-1504)
+[Installing by rebuilding source, with Qt Creator](#installing-by-rebuilding-source-with-qt-creator)
+[Some screenshots](#some-screenshots)
+
 ### Feeling Lucky?
 ------------------
 
@@ -342,26 +361,22 @@ For more commentary about compiling and building,
 read an ocelotgui.cpp comment that begins with the words
 "General comments".
 
-## CONTENTS
------------
-
-[](#getting-the-qt-libraries)  
-[Getting the Qt libraries](#getting-the-qt-libraries)  
-[*Getting the Qt libraries*](#getting-the-qt-libraries)  
-[](getting-the-qt-libraries)  
-[Getting the Qt libraries](getting-the-qt-libraries)  
-[*Getting the Qt libraries*](getting-the-qt-libraries)  
-
-
 
 ## Some screenshots
 -------------------
 
-<a href="shot1"><img src="http://ocelot.ca/shot1.jpg" align="left" height="192"></a>  
+<a href="shot1"><img src="http://ocelot.ca/shot1.jpg" align="left" height="150"></a>
+<a href="shot2"><img src="http://ocelot.ca/shot2.jpg" height="150"></a> 
+<a href="shot3"><img src="http://ocelot.ca/shot3.png" height="150"></a> 
+<a href="shot4"><img src="http://ocelot.ca/shot4.jpg" height="150"></a> 
+<a href="shot5"><img src="http://ocelot.ca/shot5.jpg" height="150"></a> 
+<a href="shot6"><img src="http://ocelot.ca/shot6.jpg" height="150"></a> 
+<a href="shot7"><img src="http://ocelot.ca/shot7.jpg" height="150"></a> 
+<a href="shot8"><img src="http://ocelot.ca/shot8.jpg" height="150"></a> 
+<a href="shot9"><img src="http://ocelot.ca/shot9.jpg" height="150"></a> 
+<a href="shot10"><img src="http://ocelot.ca/shot10.jpg" height="150"></a> 
+<a href="shot11"><img src="http://ocelot.ca/shot11.png" height="150"></a> 
 
-<a href="shot2"><img src="http://ocelot.ca/shot2.jpg" align="left" width="192"></a>  
-
-Shot #4. <a href="shot2"><img src="http://ocelot.ca/shot4.jpg" align="right" height="128"></a>  
 
 
 
