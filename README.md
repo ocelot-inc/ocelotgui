@@ -25,6 +25,7 @@ library. Therefore you will have to download them separately.
 
 Often a machine already has Qt and libmysqlclient.
 In that case, be up and running in 15 seconds with:
+
     mkdir ~/ocelotgui-test
     cd ~/ocelotgui-test
     wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
@@ -67,10 +68,14 @@ is already installed.
 ----------------------------------------------------
 
 The official location of the project is on github:
+
     https://github.com/ocelot-inc/ocelotgui
+
 This is where the latest source files are. This is what can be "cloned".
 Typically, to get it, one would install git, cd to a download directory, then
+
     git clone https://github.com/ocelot-inc/ocelotgui
+
 A clone has the latest source, but not executables.
 
 The releases for ocelot-inc/ocelotgui are also on github:
@@ -85,7 +90,9 @@ by github and is named ocelotgui.tar.gz. Thus release 0.6.0 is at
 https://github.com/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
 or https://github.com/pgulutzan/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz.
 Typically, to get it, one would cd to a download directory, then
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+
+    wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+
 or use a browser to go to https://github.com/ocelot-inc/ocelotgui/releases
 and click ocelotgui.tar.gz.
 
@@ -98,6 +105,7 @@ of a release.
 
 These steps worked after a fresh installation of Ubuntu 12.04,
 a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+
     cd ~/Downloads
     #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
     tar -zxvf ocelotgui.tar.gz
@@ -115,6 +123,7 @@ a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 
 These steps worked after a fresh installation of Ubuntu 14.04,
 a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+
     cd ~/Downloads
     #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
     tar -zxvf ocelotgui.tar.gz
@@ -134,6 +143,7 @@ Warning: Some menu shortcut keys may not work properly with this distro.
 
 These steps worked after a fresh installation of Mageia 4.1,
 a KDE-based Linux distro, after downloading ocelotgui.tar.gz to !Downloads.
+
     cd ~/Downloads
     #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
     tar -zxvf ocelotgui.tar.gz
@@ -154,6 +164,7 @@ An installation with Fedora 20, 64-bit
 
 These steps worked after a fresh installation of Fedora 20, a
 GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+
     cd ~/Downloads
     #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
     tar -zxvf ocelotgui.tar.gz
