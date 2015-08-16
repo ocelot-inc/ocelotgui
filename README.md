@@ -10,7 +10,8 @@ All rights reserved.
 
 For the GPL license terms see https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL.
 
-For instructions for end users see https://github.com/ocelot-inc/ocelotgui/blob/master/manual.htm.
+For instructions for end users see
+http://htmlpreview.github.io/?https://github.com/ocelot-inc/ocelotgui/blob/master/manual.htm.
 
 For ocelotgui screenshots see http://ocelot.ca/screenshots.htm.
 
@@ -344,18 +345,25 @@ read an ocelotgui.cpp comment that begins with the words
 ## CONTENTS
 -----------
 
-[](Getting-the-Qt-libraries)  
-[Getting the Qt libraries](Getting-the-Qt-libraries)  
-[*Getting the Qt libraries*](Getting-the-Qt-libraries)  
+[](#getting-the-qt-libraries)  
+[Getting the Qt libraries](#getting-the-qt-libraries)  
+[*Getting the Qt libraries*](#getting-the-qt-libraries)  
+[](getting-the-qt-libraries)  
+[Getting the Qt libraries](getting-the-qt-libraries)  
+[*Getting the Qt libraries*](getting-the-qt-libraries)  
+
+
 
 ## Some screenshots
 -------------------
 
-<a href="shot1"><img src="http://ocelot.ca/shot1.jpg" align="left" height="96" width="96"></a>
+<a href="shot1"><img src="http://ocelot.ca/shot1.jpg" align="left" height="192"></a>  
 
-<a href="shot2"><img src="http://ocelot.ca/shot2.jpg" align="left" height="96"></a>
+<a href="shot2"><img src="http://ocelot.ca/shot2.jpg" align="left" width="192"></a>  
 
-Shot #4. <a href="shot2"><img src="http://ocelot.ca/shot2.jpg" align="right" height="128"></a>
+Shot #4. <a href="shot2"><img src="http://ocelot.ca/shot4.jpg" align="right" height="128"></a>  
+
+
 
 
 
