@@ -1,4 +1,6 @@
 
+[ README.txt is superseded by README.md and may be discarded in the next release ]
+
 Ocelot ocelotgui
 
 Version 0.6.0
