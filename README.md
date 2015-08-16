@@ -20,8 +20,8 @@ This README file has instructions for getting started.
 Ocelot does not supply the Qt libraries or the libmysqlclient
 library. Therefore you will have to download them separately.
 
-## Feeling Lucky?
------------------
+### Feeling Lucky?
+------------------
 
 Often a machine already has Qt and libmysqlclient.
 In that case, be up and running in 15 seconds with:
@@ -36,8 +36,8 @@ In that case, be up and running in 15 seconds with:
 If the above instructions succeed, there is no need to read
 the rest of this document. But usually there is more to do.
 
-## Getting the Qt libraries
----------------------------
+### Getting the Qt libraries
+----------------------------
 
 The Ocelot-supplied 64-bit executable "ocelotgui-qt4" will
 try to load libQtGui.so.4, the Qt 4 library. The Ocelot-supplied
@@ -50,27 +50,26 @@ most likely Qt 4.
 The installation examples that follow do not assume that the
 Qt libraries are already installed.
 
-## Getting the libmysqlclient.so library
-----------------------------------------
+### Getting the libmysqlclient.so library
+-----------------------------------------
 
 The assumption is that you have already installed MySQL or MariaDB somewhere.
 Therefore you may have a copy of libmysqlclient.so somewhere.
 If it is not already on the default path, then an error or warning
 will appear when you try to run ocelotgui. Find it, and say something like
+
 export LD_RUN_PATH=[path to directory that contains libmysqlclient.so]
+
 Several other directories are searched; for details start ocelotgui and 
 choose Help | libmysqlclient.
 
 The installation examples that follow do not assume that libmysqlclient.so
 is already installed.
 
-## Getting the ocelotgui source and executable files
-----------------------------------------------------
+### Getting the ocelotgui source and executable files
+-----------------------------------------------------
 
-The official location of the project is on github:
-
-    https://github.com/ocelot-inc/ocelotgui
-
+The official location of the project is on github: https://github.com/ocelot-inc/ocelotgui.
 This is where the latest source files are. This is what can be "cloned".
 Typically, to get it, one would install git, cd to a download directory, then
 
@@ -100,8 +99,8 @@ Most of the installation examples that follow assume that download is
 of a release.
 
 
-## An installation with Ubuntu 12.04, 64-bit
---------------------------------------------
+### An installation with Ubuntu 12.04, 64-bit
+---------------------------------------------
 
 These steps worked after a fresh installation of Ubuntu 12.04,
 a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
@@ -118,8 +117,8 @@ a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
     #Then, as an ordinary non-root user, say something like
     ./ocelotgui-qt4 --host=127.0.0.1
 
-## An installation with Ubuntu 14.04, 64-bit
---------------------------------------------
+### An installation with Ubuntu 14.04, 64-bit
+---------------------------------------------
 
 These steps worked after a fresh installation of Ubuntu 14.04,
 a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
@@ -138,8 +137,8 @@ a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
     ./ocelotgui-qt5 --host=127.0.0.1 --user=root
 Warning: Some menu shortcut keys may not work properly with this distro.
 
-## An installation with Mageia 4.1, 64-bit
-------------------------------------------
+### An installation with Mageia 4.1, 64-bit
+-------------------------------------------
 
 These steps worked after a fresh installation of Mageia 4.1,
 a KDE-based Linux distro, after downloading ocelotgui.tar.gz to !Downloads.
@@ -159,8 +158,8 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to !Downloads.
     #Then, as an ordinary non-root user, say something like
     ./ocelotgui-qt4 --host=127.0.0.1
 
-An installation with Fedora 20, 64-bit
---------------------------------------
+### An installation with Fedora 20, 64-bit
+------------------------------------------
 
 These steps worked after a fresh installation of Fedora 20, a
 GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
@@ -180,7 +179,7 @@ GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
     #Then, as an ordinary non-root user, say something like
     ./ocelotgui-qt4 --host=127.0.0.1
 
-## An installation with SUSE 13.1, 32-bit, from source
+### An installation with SUSE 13.1, 32-bit, from source
 -------------------------------------------------------
 
 These steps worked after a non-fresh installation of openSUSE 13.1,
@@ -212,8 +211,8 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
     #Then, as an ordinary non-root user, say something like
     ./ocelotgui
 
-## An installation with SUSE 42.1, from source in release tar
--------------------------------------------------------------
+### An installation with SUSE 42.1, from source in release tar
+--------------------------------------------------------------
     #This builds using the source files in the 0.6.0 "release"
     #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
     sudo zypper install libqt4-devel
@@ -231,8 +230,8 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
     make
     #To uninstall, say: rm -r ~/ocelotgui-test
 
-## An installation with SUSE 42.1, from source in git clone
------------------------------------------------------------
+### An installation with SUSE 42.1, from source in git clone
+------------------------------------------------------------
     #This builds using the source files in the very latest "post-release"
     #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
     sudo zypper install libqt4-devel
@@ -250,8 +249,8 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
     #To uninstall, say: rm -r ~/ocelotgui-test
 
 
-## Installing by rebuilding source, on Ubuntu 12.04, without Qt Creator
------------------------------------------------------------------------
+### Installing by rebuilding source, on Ubuntu 12.04, without Qt Creator
+------------------------------------------------------------------------
 
 All Ocelot source files are supplied in subdirectory ocelotgui.
 
@@ -260,6 +259,7 @@ Other Linux distros will have different methods, such as "yum" or "yast2",
 and will have different names for the Qt packages.
 
 If the intent is to rebuild for Qt 4 from source:
+
     sudo apt-get install qt4-qmake
     sudo apt-get install libqt4-dev
     cd [path to ocelotgui source files]
@@ -267,8 +267,8 @@ If the intent is to rebuild for Qt 4 from source:
     /usr/bin/qmake-qt4 -config release
     make
 
-## Installing by rebuilding source, on Ubuntu 15.04
----------------------------------------------------
+### Installing by rebuilding source, on Ubuntu 15.04
+----------------------------------------------------
 
     #These steps have been known to work for an experiment.
 
@@ -289,8 +289,8 @@ If the intent is to rebuild for Qt 4 from source:
     ./ocelotgui
 
 
-## Installing by rebuilding source, with Qt Creator
----------------------------------------------------
+### Installing by rebuilding source, with Qt Creator
+----------------------------------------------------
 
 For any version or common distro, one can download Qt Creator
 from the Qt download site http://qt-project.org/downloads.
@@ -322,6 +322,7 @@ libmysqlclient-dev" will put it in directory /usr/include/mysql.
 
 You will need to state a compiler for the kit.
 Steps for Qt Creator use are:
+
     Click File | Open File or Project ...
     In "Open File" dialog box, in field "File name:", enter [path]/ocelotgui.pro
     Click Next
@@ -339,3 +340,26 @@ it requires a large amount of disk space.
 For more commentary about compiling and building,
 read an ocelotgui.cpp comment that begins with the words
 "General comments".
+
+## CONTENTS
+-----------
+
+[](Getting-the-Qt-libraries)  
+[Getting the Qt libraries](Getting-the-Qt-libraries)  
+[*Getting the Qt libraries*](Getting-the-Qt-libraries)  
+
+## Some screenshots
+-------------------
+
+<a href="shot1"><img src="http://ocelot.ca/shot1.jpg" align="left" height="96" width="96"></a>
+
+<a href="shot2"><img src="http://ocelot.ca/shot2.jpg" align="left" height="96"></a>
+
+Shot #4. <a href="shot2"><img src="http://ocelot.ca/shot2.jpg" align="right" height="128"></a>
+
+
+
+
+
+
+
