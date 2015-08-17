@@ -1,0 +1,264 @@
+Some details about ocelotgui options. Subject to change.
+
+An option is a named value which affects connecting and behavior.
+Most Ocelot options are very similar to options of the mysql client.
+
+The places that an option might be specified are:
+within the program for example the default port value is 3306,
+in an environment variable for example "export MYSQL_TCP_PORT=3306",
+in a configuration file for example "port=3306" in $HOME/.my.cnf,
+on the command line for example "./ocelotgui --port=3306",
+or on the File|Connect dialog box.
+
+Environment Variables
+
+The ocelotgui program will look at these variables:
+HOME, LD_RUN_PATH, MYSQL_GROUP_SUFFIX, MYSQL_HISTFILE,
+MYSQL_HISTIGNORE, MYSQL_HOST, MYSQL_PS1, MYSQL_PWD.
+MYSQL_TCP_PORT, MYSQL_UNIX_PORT, MYSQL_TEST_LOGIN_FILE.
+
+Option Files
+
+The ocelotgui program will look in these option files:
+/etc/my.cnf, /etc/mysql/my.cnf, [SYSCONFDIR]/my.cnf,
+[defaults-extra-file], $HOME/.my.cnf, $HOME/.mylogin.cnf.
+Within option files, the ocelotgui program will look
+in these groups: [client] [mysql] [ocelot], as well
+as groups specified by MYSQL_GROUP_SUFFIX.
+
+Command Line
+
+The ocelotgui program will look at command-line arguments
+which are specified in short form such as "-p 3306", or
+which are specified in long form such as "--port=3306".
+
+Dialog Box
+
+A dialog box will appear if the user enters a user statement
+"CONNECT;" or if the user chooses menu item File|Connect.
+The user will be advised to do this at startup time if an
+initial attempt to connect fails.
+
+Example
+
+The default value for "port" is 3306, this is
+hard coded in the ocelotgui source.
+The environment variable value for "port" is 3307, this is
+set by "export MYSQL_TCP_PORT=3307" before starting ocelotgui.
+The option file value for "port" is 3308, this is
+set by putting "PORT=3308" in the [mysql] group in
+the $HOME/.mysql.cnf file.
+The command-line value for "port" is 3309, this is
+set by putting "--port=3309" on the command line
+when starting the ocelotgui program.
+The dialog-box value for "port" is 3310, this is
+set by choosing File|Connect, entering "3310" in
+the widget labelled "Port", and clicking "OK".
+The ocelotgui program reads the settings in the
+above order, therefore the port number is 3310.
+
+
+
+The Options
+
+Options in the following list are in the same order that one sees
+on the File|Connect dialog box: first come the 8 important connect
+options (host, port, user, database, socket, password, protocol,
+init_command), then all the other options in alphabetical order.
+Unless otherwise stated, options are specifiable by saying
+[option_name] = [value] in an option file or
+--[option_name] = [value] on the command line
+(sometimes --[option_name] alone is sufficient for true|false values),
+or in the dialog box.
+If an option value is irrelevant or invalid, the ocelotgui program
+ignores it without displaying an error message.
+
+host: Server address. Specifiable with MYSQL_HOST
+environment variable, with host= in an option file, with
+-h or --host on the command line, or in dialog box.
+Example values: localhost 192.15.8.44 w@ww.com.
+Warning: if host=localhost, ocelotgui tries to use a socket,
+if this is not desirable then say localhost=127.0.0.1 instead.
+
+port: Port that the server listens on, if the protocol is
+TCP. Specifiable with
+MYSQL_TCP_PORT environment variable, with port= in an option
+file, with -P or --port on the command line, or in dialog box.
+Example values: 3306 3307.
+
+user: User name. Specifiable with user= in an option file,
+with -u or --user on the command line, or in dialog box.
+Example values: root guest jsmith.
+
+database: Database name also known as schema name. Specifiable
+with database= in an option file, with -D or --database on the
+command line, or in dialog box. Example values: test account_data.
+
+socket: Socket name that the server receives on, if the
+protocol is SOCKET. Specifiable with socket= in an option file,
+with -S or --socket= on the command line, or in dialog box.
+Examples: var/lib/special.sock /home/user/x.sock.
+
+password: Password associated with the user. Specifiable
+with password= in an option file, with -p or --password= on
+the command line, or in dialog box. If the password is
+required but not specified, the dialog box will always appear.
+Examples: sesame top_secret#1
+
+protocol: How the connection to the server occurs. Possible
+values are: blank or TCP or SOCKET. If host=localhost and
+protocol is blank, then SOCKET is assumed. Specifiable with
+protocol= in an option file, with --protocol= on the command
+line, or in dialog box. Examples: tcp socket.
+
+init_command: Initial statement that should be executed as
+soon as connect is complete. Example: "select current_user()".
+
+auto_rehash. If 1 (true), ocelotgui may try to
+complete names.
+
+auto_vertical_output. If 1 (true), ocelotgui will display
+with one column per row.
+
+batch. Mostly ignored, but if 1 (true), history is not written.
+
+compress. If 1 (true), value is passed to the server.
+
+connect_expired_password. Ignored.
+
+connect_timeout. Ignored.
+
+debug. Ignored.
+
+debug_check. Ignored.
+
+debug_info. Ignored.
+
+default_auth. Ignored.
+
+default_character_set. Ignored, ocelotgui needs UTF-8.
+
+defaults_extra_file. Name of an additional option file.
+
+defaults_file. Ignored.
+
+defaults_group_suffix. Suffix that is added to the regular group
+names for option files. For example, if defaults_group_suffix=_X,
+then ocelotgui will look at options in groups client_X and mysql_X and
+ocelot_X in addition to options in groups client and mysql and ocelot.
+
+delimiter. What ends a statement, usually semicolon ";".
+
+enable_cleartext_plugin. Ignored.
+
+execute. String to execute followed by program exit.
+
+force. Ignored, ocelotgui always ignores errors in options.
+
+help. Display a help message followed by program exit.
+
+histfile. Name of file where statements are logged to, usually
+".mysql_history". Ignored if batch=1. Ignored if
+histfile=/dev/null.
+
+histignore. Pattern to ignore when writing to histfile.
+For example, if histignoreis "*select*", then statements
+containing the string "select" will not be written.
+
+html. Ignored.
+
+ignore_spaces. Ignored.
+
+ld_run_path. Where to look for libmysqlclient.so. Click help|libmysqlclient
+for details.
+
+line_numbers. If 1 (true), statement line numbers appear in the prompt.
+
+local_infile. If 1 (true), passed to the server.
+
+login_path. Where to find login file if it's not "~/.mylogin.cnf".
+
+max_allowed_packet. Passed to the server. Default 16777216.
+
+max_join_size. Passed to the server. Default 1000000.
+
+named_commands. Ignored.
+
+net_buffer_length. Passed to the server. Default 16384.
+
+no_beep. Ignored, ocelotgui does not usually beep when errors occur.
+
+no_defaults. If 1 (true), options in environment variables and option
+files are read but not used.
+
+one_database. Ignored.
+
+pager. Ignored.
+
+pipe. Ignored.
+
+plugin_dir. Ignored.
+
+print_defaults. If 1 (true), ocelotgui displays defaults and exits.
+
+prompt. What to display on left of statement lines. Default is "mysql>"
+but there are several options that affect format.
+
+quick. Ignored.
+
+raw. Ignored.
+
+reconnect. Ignored.
+
+safe_updates. If 1 (true), ocelotgui passes 1 to the server.
+
+secure_auth. If 1 (true), ocelotgui passes 1 to the server.
+
+select_limit. The maximum number of rows to select; default is 0
+which means infinity; ocelotgui passes this to the server.
+
+server_public_key. Ignored.
+
+shared_memory_base_name. Ignored.
+
+show_warnings. If 1 (true), ocelotgui displays warnings which
+result from problems that the server detects.
+
+sigint_ignore. If 1 (true), ocelotgui will not stop statements
+when user types control-C or chooses the menu item Run|Kill.
+
+silent. Ignored.
+
+ssl, ssl_ca, ssl_capath, ssl_cert, ssl_cipher, ssl_crl,
+ssl_crlpath, ssl_key, ssl_verify_server_cert. SSL options
+are accepted and passed to the server; however, the effects
+have not been thoroughly tested.
+
+syslog. Ignored.
+
+table. Ignored.
+
+tee. Name of a file to dump statements and results to.
+
+unbuffered. Ignored.
+
+verbose. Ignored.
+
+version. If 1 (true), ocelotgui displays a version number and exits.
+
+vertical. If 1 (true), results are displayed with one column
+per line.
+
+wait. Ignored.
+
+xml. Ignored.
+
+
+
+
+
+
+
+
+
+
