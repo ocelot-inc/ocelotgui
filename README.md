@@ -10,8 +10,7 @@ All rights reserved.
 
 For the GPL license terms see https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL.
 
-For instructions for end users see
-[The ocelotgui user manual](#the-ocelotgui-user-manual).
+For instructions for end users see the [User Manual](#user-manual).
 
 For ocelotgui screenshots see http://ocelot.ca/screenshots.htm.
 
@@ -41,8 +40,8 @@ library. Therefore you will have to download them separately.
 ... [Installing by rebuilding source, with Qt Creator](#installing-by-rebuilding-source-with-qt-creator)  
 ####Illustrating
 ... [Some screenshots](#some-screenshots)
-####User Manual
-... [The ocelotgui user manual](#the-ocelotgui-user-manual)
+####Using
+... [User Manual](#user-manual)
 ... [Executive Summary](#executive-summary)
 ... [The company, the product, and the status](#the-company-the-product-and-the-status)
 ... [Downloading, installing, and building](#downloading-installing-and-building)
@@ -394,12 +393,10 @@ read an ocelotgui.cpp comment that begins with the words
 <a href="shot10"><img src="http://ocelot.ca/shot10.jpg" height="150"></a> 
 <a href="shot11"><img src="http://ocelot.ca/shot11.png" height="150"></a> 
 
-## The ocelotgui user manual
-----------------------------
- 
+## User Manual
+-------------- 
   
 Version 0.6.0, June 29 2015  
-  
   
 Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  
   
@@ -691,7 +688,7 @@ Bug reports and feature requests may go on
 https://github.com/ocelot-inc/ocelotgui/issues.  
   
 There may be announcements from time to time on Ocelot's
-web page (ocelot.ca) or on the employee blog (ocelot.ca/blog).  
+web page (ocelot.ca) or on the employee blog (http://ocelot.ca/blog).  
 This manual may also be available on ocelot.ca soon.  
   
 Any contributions will be appreciated.  
