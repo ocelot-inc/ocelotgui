@@ -585,9 +585,12 @@ each row has multiple lines and the number of rows is small.
 
 The menu at the top of the screen has File, Edit, Run, Settings,
 Options, Debug and Help.  
-  
+
+<P>
+<a href="url"><img src="menu-file.png" align="right" height="48"></a>
 File|Connect, or Ctrl+O, starts the Connect dialog box.  
 File|Exit, or Ctrl+Q, stops the program.  
+</P>
   
 Edit|Undo or Ctrl+Z,  
 Edit|Redo or Ctrl+Shift+Z,  
