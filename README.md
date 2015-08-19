@@ -16,7 +16,7 @@ For ocelotgui screenshots see http://ocelot.ca/screenshots.htm.
 
 For ocelotgui/debugger screenshots see http://ocelot.ca/blog/the-ocelotgui-debugger.
 
-This README file has instructions for getting started.
+This README file has instructions for getting started, and the user manual.
 Ocelot does not supply the Qt libraries or the libmysqlclient
 library. Therefore you will have to download them separately.
 
@@ -52,7 +52,7 @@ library. Therefore you will have to download them separately.
 ... [Result widget](#result-widget)
 ... [Menu](#menu)
 ... [Debugger](#debugger)
-... [Recent enhancements](#recent-enhancements)
+... [Special effects](#special-effects)
 ... [Contact](#contact)
 
 
@@ -674,6 +674,7 @@ and clicking it will put the widget back in its original position.
 The items on the Debug menu are enabled only when a debug session
 is in progress. The way to debug SQL stored procedures or functions
 will be explained in a later section, [Debugger](#debugger).
+<BR clear="all">
 </P>
   
   
@@ -697,23 +698,24 @@ This version of ocelotgui incorporates MDBug
 All debugger instructions can be entered on the ocelotgui command line;  
 some operations can also be done via the Debug menu or by clicking on the stored-procedure display.  
 Currently-supported instructions are:  
-$install -- this is always the first thing to do  
-$setup routine_name [, routine_name ...] -- prepares so '$debug routine_name' is possible  
-$debug routine_name -- starts a debug session, shows routines in a tabbed widget  
-$breakpoint routine_name line_number or Debug|breakpoint -- sets a breakpoint  
-$clear routine_name line_number -- clears a breakpoint  
-$next or Debug|Next -- goes to next executable line, without dropping into subroutines  
-$step or Debug|Step -- goes to next executable line, will drop into subroutines  
-$continue or Debug|Continue -- executes until breakpoint or until end of procedure  
-$refresh breakpoints -- refreshes xxxmdbug.breakpoints table  
-$refresh server_variables -- refreshes xxxmdbug.server_variables table  
-$refresh variables -- refreshes xxxmdbug.variables table  
-$refresh user_variables -- refereshes xxxmdbug.user_variables table  
-$exit or Debug|Exit -- stops a debug session  
+$install -- this is always the first thing to do.  
+$setup routine_name [, routine_name ...] -- prepares so '$debug routine_name' is possible.  
+$debug routine_name -- starts a debug session, shows routines in a tabbed widget.  
+$breakpoint routine_name line_number or Debug|breakpoint -- sets a breakpoint.  
+$clear routine_name line_number -- clears a breakpoint.  
+$next or Debug|Next -- goes to next executable line, without dropping into subroutines.  
+$step or Debug|Step -- goes to next executable line, will drop into subroutines.  
+$continue or Debug|Continue -- executes until breakpoint or until end of procedure.  
+$refresh breakpoints -- refreshes xxxmdbug.breakpoints table.  
+$refresh server_variables -- refreshes xxxmdbug.server_variables table.  
+$refresh variables -- refreshes xxxmdbug.variables table.  
+$refresh user_variables -- refereshes xxxmdbug.user_variables table.  
+$exit or Debug|Exit -- stops a debug session.  
+<BR clear="all">
 </P>
 <P>
 For a walk through a debugger example, with screenshots, see
-this blog post: ocelot.ca/blog/the-ocelotgui-debugger.  
+this blog post: http://ocelot.ca/blog/the-ocelotgui-debugger.  
 </P>
 
 ### Special Effects 
@@ -723,15 +725,17 @@ this blog post: ocelot.ca/blog/the-ocelotgui-debugger.
 <a href="special-vertical"><img src="special-vertical.png" align="right" height="384"></a>
 Vertical: If a user starts the program with ocelotgui --vertical=1
 or ends a statement with backslash G, results come up with one column per row.  
+<BR clear="all"> 
 </P>
   
 <P>
-<a href="special-images"><img src="special-images.png" align="right" height="384"></a>
+<a href="special-images"><img src="special-images.png" align="right" height="256"></a>
 Images: If a user chooses Settings | Extra Rule 1 from the menu,
 and sets the Condition and Display As boxes as described earlier,
 and selects rows which contain LONGBLOB columns, and the column values are
 images (such as PNG or JPEG or BMP or GIF format data), ocelotgui will display
 the result as images.  
+<BR clear="all">
 </P>
 <P>
 Result-set editing: If a user clicks on a column in the result set
@@ -752,6 +756,7 @@ which can be moved or resized.
 Colors: The Colors and fonts dialog boxes now have a simpler way to choose
 colors, by selecting from a choice of 148 color names / color icons. Users can also
 change colors by saying SET object_name_color = color-name | hex-rgb-value.  
+<BR clear="all">
 </P>
 
 ### Contact
@@ -761,7 +766,7 @@ We need feedback!
 
 Send bug reports and feature requests to  
 https://github.com/ocelot-inc/ocelotgui/issues.  
-Or send a private note to pgulutzan at-sign ocelot.ca.
+Or send a private note to pgulutzan at ocelot.ca.
   
 There may be announcements from time to time on Ocelot's
 web page (ocelot.ca) or on the employee blog (http://ocelot.ca/blog).
