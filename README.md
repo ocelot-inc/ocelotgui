@@ -591,26 +591,29 @@ Options, Debug and Help.
 File|Connect, or Ctrl+O, starts the Connect dialog box.  
 File|Exit, or Ctrl+Q, stops the program.  
 </P>
-  
-Edit|Undo or Ctrl+Z,  
-Edit|Redo or Ctrl+Shift+Z,  
-Edit|Cut or Ctrl+X,  
-Edit|Copy,  
-Edit|Cut,  
-Edit|Copy,  
-Edit|Paste,  
-and Edit|Select  
-All work in the conventional manner,
-except Edit|Redo which can only redo the last change.  
-  
+<P>
+<a href="url"><img src="menu-edit.png" align="right" height="192"></a>
+Edit|Undo or Ctrl+Z, Edit|Redo or Ctrl+Shift+Z, Edit|Cut or Ctrl+X,
+Edit|Cut or Ctrl+X, Edit|Copy or Ctrl+C, Edit|Paste or Ctrl+V,
+and Edit|Select or Ctrl+A, all work in the conventional manner.
+Edit|Redo can only redo the last change.  
+Previous Statement or Ctrl+P and Next Statement or Ctrl+N will
+copy earlier statements from the history widget into the statement
+widget, so that they can be edited or re-executed with Run|Execute
+or Ctrl+E.  
+</P>
+<P>
+<a href="url"><img src="menu-edit.png" align="right" height="48"></a>
 Run|Execute or Ctrl+E or Ctrl+Enter causes execution of whatever is in the
 statement widget.  
-  
-Settings|Menu,  
-Settings|History Widget,  
-Settings|Grid Widget,  
-Settings|Statement, and  
-Settings|Extra Rule 1  
+Run|Kill or Ctrl+C tries to stop execution -- this
+menu item is enabled only when a long-running statement
+needs to be aborted by user intervention.  
+</P>
+<P>
+<a href="url"><img src="menu-settings.png" align="right" height="120"></a>
+Settings|Menu, Settings|History Widget, Settings|Grid Widget,
+Settings|Statement, and Settings|Extra Rule 1 are
 items which affect the behavior of each
 individual widget. The color settings affect foregrounds,
 backgrounds, borders, and (for the statement widget only)
@@ -624,9 +627,34 @@ Settings|Extra Rule 1 is conditional -- for example, to specify
 that BLOBs should be displayed as images on a pink background,
 set Grid Background Color Pink, set Condition = data_type LIKE
 '%BLOB', set Display As = image, then click OK.  
-  
-Help|About will show the license and copyright and version.  
-Help|Manual will show the manual.  
+</P>
+<P>
+<a href="url"><img src="menu-options.png" align="right" height="72"></a>
+Options|detach history widget,
+Options|detach result grid widget,
+Options|detach debug widget are
+for turning the respective widgets into independent windows,
+so that they can be moved away from the statement widget,
+or resized. A detached widget is always kept on top of the
+other widgets in the application screen. When a widget is
+already detached, the menu item text will change to "attached"
+and clicking it will put the widget back in its original position.  
+</P>
+<P>
+<a href="url"><img src="menu-debug.png" align="right" height="132"></a>
+The items on the Debug menu are enabled only when a debug session
+is in progress. The way to debug SQL stored procedures or functions
+will be explained in a later section.  
+</P>
+<P>
+<a href="url"><img src="menu-help.png" align="right" height="96"></a>
+Help|About will show the license and copyright and version.
+Help|The Manual will show the manual, a shortened version of what you are reading now.
+Help|libmysqlclient will advise about finding and loading the libmysqlclient.so library.
+Help|settings will advise about how to use the Settings menu items.
+
+Help|
+</P>  
 
 ### Debugger
 ------------
