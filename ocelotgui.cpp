@@ -466,9 +466,9 @@ static const char *s_color_list[308]=
   static unsigned short int ocelot_opt_use_result= 0; /* for MYSQL_OPT_USE_RESULT */
 
   /* Items affecting history which cannot be changed except by modifying + rebuilding */
-  unsigned int ocelot_history_max_column_width= 10;
-  unsigned int ocelot_history_max_column_count= 5;
-  unsigned int ocelot_history_max_row_count= 5;
+  //static unsigned int ocelot_history_max_column_width= 10;
+  //static unsigned int ocelot_history_max_column_count= 5;
+  //static unsigned int ocelot_history_max_row_count= 5;
 
   /* Some items we allow, but the reasons we allow them are lost in the mists of time */
   /* I gather that one is supposed to read the charset file. I don't think we do. */
@@ -479,8 +479,8 @@ static const char *s_color_list[308]=
   static bool ocelot_detach_result_grid_widget= false;
   static bool ocelot_detach_debug_widget= false;
 
-  int is_libmysqlclient_loaded= 0;
-  int is_libcrypto_loaded= 0;
+  static int is_libmysqlclient_loaded= 0;
+  static int is_libcrypto_loaded= 0;
 
 /* copy of an information_schema.columns select, used for rehash */
   static  unsigned int rehash_result_column_count= 0;
@@ -491,7 +491,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static char ocelotgui_version[]="0.6 Alpha"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="0.6 Alpha"; /* For --version. Make sure it's in manual too. */
 
 
 /* Global mysql definitions */
@@ -952,7 +952,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
       return true;
     }
   }
-
 
   if (s != ocelot_delimiter_str) return false;
 
@@ -2169,8 +2168,7 @@ void MainWindow::action_about()
   msgBox.setText("<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
-the Free Software Foundation, either version 3 of the License, or \
-(at your option) any later version.<br>\
+the Free Software Foundation, version 2 of the License,<br>\
 <br>\
 This program is distributed in the hope that it will be useful, \
 but WITHOUT ANY WARRANTY; without even the implied warranty of \
@@ -3403,7 +3401,7 @@ void MainWindow::create_widget_debug()
 }
 
 
-#include <pthread.h>
+//#include <pthread.h>
 
 /*
   The debuggee is a separate thread and makes its own connection using ocelot_ parameters just like the main connection.
@@ -9537,14 +9535,14 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
         stuff would still come in or have to be disabled.
 */
 
-#include <dirent.h>
+//#include <dirent.h>
 
 void connect_set_variable(QString token0, QString token2);
 void connect_read_command_line(int argc, char *argv[]);
 void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
 
-#include <pwd.h>
-#include <unistd.h>
+//#include <pwd.h>
+//#include <unistd.h>
 
 void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 {
@@ -9640,6 +9638,27 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   }
 
   connect_read_command_line(argc, argv);               /* We're doing this twice, the first time won't count. */
+
+  /*
+    ocelotgui.pro variables
+    Looking at https://dev.mysql.com/doc/refman/5.6/en/source-configuration-options.html
+    I gather that some items can be defined at cmake time. The possibly interesting ones
+    that we could do in ocelotgui.pro are, for example:
+    DEFINES += MYSQL_TCP_PORT=3306
+    DEFINES += MYSQL_UNIX_ADDR="/tmp/mysql.sock"
+    DEFINES += SYSCONFDIR="..."
+    which in cmake terms is -DMYSQL_TCP_PORT=3306 -DMYSQL_UNIX_ADDR="/tmp/mysql.sock" etc.
+    MySQL_UNIX_ADDR must go through stringification.
+    Following shows how we'd do stringification, but then we don't do anything with it.
+    Warning: The stringification might be adding extra "s.
+    Warning: MYSQL_UNIX_ADDR has a definition in a mysql.h-related include file.
+    Todo: pay attention to these settings.
+  */
+//#define xstr(a) str(a)
+//#define str(a) #a
+//#ifdef MYSQL_UNIX_ADDR
+//  printf("Ignoring MYSQL_UNIX_ADDR=%s.\n", xstr(MYSQL_UNIX_ADDR));
+//#endif
 
   /* Environment variables */
 

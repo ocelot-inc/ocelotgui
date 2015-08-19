@@ -18,9 +18,6 @@
 #define DEBUGGER
 
 #include <assert.h>
-#ifdef __linux
-#include <unistd.h>
-#endif
 
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
@@ -53,15 +50,25 @@
 #include <QTextEdit>
 #include <QThread>
 #include <QTimer>
-#include <QWidget>            /* todo: remove this line and see if everything is still ok */
+//#include <QWidget>
 
-/* All mysql includes go here */
-/* The include path for mysql.h is hard coded in ocelotgui.pro. */
+/* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
 
-
+/*
+  Linux-specific:
+  We use dlopen() when opening libmysqlclient.so and libcrypto.so, therefore include dlfcn.h.
+  We use readlink() when checking if histfile links to dev/null, therefore include unistd.h.
+  We use opendir() readdir() closedir() when getting options, therefore include dirent.h.
+  We use getpwuid() when getting password, therefore include pwd.h.
+  We use pthread_create() for debug and kill, therefore include pthread.h.
+*/
 #ifdef __linux
 #include <dlfcn.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <pwd.h>
+#include <pthread.h>
 #endif
 
 /* Flags used for row_form_box. NUM_FLAG is also defined in mysql include, with same value. */
@@ -70,8 +77,8 @@
 
 /*
   Most ocelot_ variables are in ocelotgui.cpp but if one is required by ocelotgui.h, say so here.
-  Weirdly, ocelotgui.h is included in two places, so say 'static' if you do that.
-  Todo: ELiminate redundancy of mentioning ocelotgui.h in both ocelotgui.pro and ocelotgui.cpp.
+  Weirdly, ocelotgui.h is included in two places, ocelotgui.pro + ocelotgui.cpp,
+  so say 'static' if you do that.
 */
 
 namespace Ui
@@ -80,16 +87,16 @@ class MainWindow;
 }
 
 QT_BEGIN_NAMESPACE
-class QAction;
-class QLabel;
-class QMenu;
-class QMenuBar;
-class QComboBox;
-class QPushButton;
-class QTextEdit;
-class QPlainTextEdit;
-class QScrollArea;
-class QVBoxLayout;
+//class QAction;
+//class QLabel;
+//class QMenu;
+//class QMenuBar;
+//class QComboBox;
+//class QPushButton;
+//class QTextEdit;
+//class QPlainTextEdit;
+//class QScrollArea;
+//class QVBoxLayout;
 class CodeEditor;
 class ResultGrid;
 class Settings;
@@ -113,17 +120,15 @@ public:
     Client variables can be changed via Settings menu or via SET statements.
     Client variables have the prefix 'ocelot_'.
     Every client variable has an item on the Settings menu,
-    and may be changed with the SET statement. For example,
+    and most may be changed with the SET statement. For example,
     ocelot_grid_cell_drag_line_color is on menu item Settings | Grid Widget,
     SET ocelot_grid_cell_drag_line_color = value; will change.
     The important thing is: if it's changed on the Settings menu, then
     a SET statement is generated, so that can be saved and replayed.
     Naming convention: ocelot_ + settings-menu-item + object + color|size|font.
-    Todo: pass it on to the server, without interfering with ordinary SET statements.
+    Todo: (unlikely) pass it on to the server, without interfering with ordinary SET statements.
     Todo: use keywords.
     Todo: allow SET ocelot_... = DEFAULT
-    Todo: pass it on to the server iff there's a server in existence
-    Todo: REFRESH-FROM-SERVER in case server value changed during a function
     Todo: need a more flexible parser, eventually.
     Todo: should it be optional whether such statements go to history?
     Todo: do not consider it an error if you're not connected but it's a SET statement
@@ -133,7 +138,7 @@ public:
     Todo: isValid() check
     Todo: rename the Settings menu items and let the prompts match the names
     Todo: there is also  Qt way to save current settings, maybe it's another option
-    Todo: menu item = "save settings" which would put a file in ~/ocelot.ini
+    Todo: menu item = "save settings" which would put a file in ~/ocelot.ini or ~/.my.cnf
     Todo: a single big setting
     Todo: a comment e.g. / *! OCELOT CLIENT * / meaning do not pass to server
     Problem: you cannot muck statement itself because menu might be changed while statement is up
@@ -832,6 +837,9 @@ private:
 /* THE TEXTEDITFRAME WIDGET */
 /* See comments containing the word TextEditFrame, in ResultGrid code. */
 
+#ifndef TEXTEDITFRAME_H
+#define TEXTEDITFRAME_H
+
 #define TEXTEDITFRAME_CELL_TYPE_DETAIL 0
 #define TEXTEDITFRAME_CELL_TYPE_HEADER 1
 #define TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1 2
@@ -872,10 +880,14 @@ private:
   enum {LEFT= 1, RIGHT= 2, TOP= 3, BOTTOM= 4};
 
 };
+#endif // TEXTEDITFRAME_H
 
 /*********************************************************************************************************/
 /* THE TEXTEDITWIDGET WIDGET */
 /* subclassed QTextEdit so paintEvent can be caught, for use in result_grid */
+
+#ifndef TEXTEDITWIDGET_H
+#define TEXTEDITWIDGET_H
 class TextEditWidget : public QTextEdit
 {
   Q_OBJECT
@@ -893,7 +905,7 @@ protected:
   QString unstripper(QString value_to_unstrip);
 
 };
-
+#endif // TEXTEDITWIDGET_H
 
 
 /*********************************************************************************************************/
@@ -906,10 +918,9 @@ protected:
 */
 
 /*
-  Todo:
-
-  settle minimum width of dialog box
-  settle maximum width of each item
+  Todo: Settle minimum and maximum width of dialog box.
+        The calculation of main_window_maximum_width has been helpful here.
+        Settle maximum width of each item.
 
   If user hits Enter, that should get Cancel or OK working.
 
@@ -924,6 +935,8 @@ protected:
   Make spacing between widgets smaller: see comments about "no effect" below.
 */
 
+#ifndef ROW_FORM_BOX_H
+#define ROW_FORM_BOX_H
 class Row_form_box: public QDialog
 {
   Q_OBJECT
@@ -1185,6 +1198,7 @@ void garbage_collect ()
 
 };
 
+#endif // ROW_FORM_BOX_H
 
 /***********************************************************/
 /* The Low-Level DBMS calls */
@@ -1221,6 +1235,9 @@ void garbage_collect ()
                  if (lmysql == NULL) ... (Failure is possible if library cannot be loaded.)
   Call with:     lmysql->ldbms_function();
 */
+
+#ifndef LDBMS_H
+#define LDBMS_H
 
 enum ocelot_option
 {
@@ -1695,6 +1712,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   }
 };
 
+#endif // LDBMS_H
+
 #define MAIN_WIDGET 0
 #define HISTORY_WIDGET 1
 #define GRID_WIDGET 2
@@ -1791,7 +1810,11 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   We create a pool of cell widgets and a pool of row widgets, which only needs expanding if there are many many columns per row.
   When it comes time to display a cell, if it was previously used  for displaying a different row + column, we change it.
   There's some added complication if sql_more_results is true; in that case we make a copy of the contents of mysql_res.
+  Actually I think sql_more_results is always true nowadays.
 */
+
+#ifndef RESULTGRID_H
+#define RESULTGRID_H
 
 class ResultGrid: public QWidget
 {
@@ -3734,6 +3757,7 @@ unsigned int dbms_get_field_name_length(unsigned int column_number)
 public slots:
 private:
 };
+#endif // RESULTGRID_H
 
 /*********************************************************************************************************/
 
@@ -3840,10 +3864,10 @@ private:
   CodeEditor *codeEditor;
 };
 
-#endif
+#endif // CODEEDITOR_H
 
 /*********************************************************************************************************/
-/* THE QSCROLLARESWITHSIZE WIDGET */
+/* THE QSCROLLAREAWITHSIZE WIDGET */
 
 /*
   It's really really really hard to make a dialog box have a good size
@@ -3852,6 +3876,9 @@ private:
   It also tends to be ignored if I try sizeHint() for the Settings dialog box.
   The workaround is to check main_window_maximum_width later.
 */
+
+#ifndef QSCROLLAREAWITHSIZE_H
+#define QSCROLLAREAWITHSIZE_H
 class QScrollAreaWithSize : public QScrollArea
 {
 
@@ -3870,10 +3897,13 @@ virtual QSize sizeHint() const
 }
 
 };
+#endif // QSCROLLAREAWITHSIZE_H
 
 /*********************************************************************************************************/
 /* THE SETTINGS WIDGET */
 
+#ifndef SETTINGS_H
+#define SETTINGS_H
 class Settings: public QDialog
 {
   Q_OBJECT
@@ -4881,9 +4911,12 @@ int q_color_list_index(QString color_name_string)
 }
 
 };
+#endif // SETTINGS_H
 
 
 /* QThread::msleep is protected in qt 4.8. so you have to say QThread48::msleep */
+#ifndef QTHREAD48_H
+#define QTHREAD48_H
 class QThread48 : public QThread
 {
 public:
@@ -4892,8 +4925,13 @@ public:
     QThread::msleep(ms);
   }
 };
+#endif // QTHREAD48_H
 
 /* QTabWidget:tabBar is protected in qt 4.8. so you have to say QTabWidget48::tabBar */
+
+#ifndef QTABWIDGET48_H
+#define QTABWIDGET48_H
+
 class QTabWidget48 : public QTabWidget
 {
 public:
@@ -4906,3 +4944,4 @@ public:
   }
 };
 
+#endif // QTABWIDGET48_H

@@ -24,9 +24,8 @@ CONFIG += warn_on
 QMAKE_CFLAGS_WARN_ON    = -Wall -Wextra
 QMAKE_CXXFLAGS_WARN_ON  = -Wall -Wextra
 
-SOURCES +=\
-        ocelotgui.cpp 
-HEADERS  += ocelotgui.h
+SOURCES += ocelotgui.cpp 
+HEADERS += ocelotgui.h
 
 FORMS    += ocelotgui.ui
 
@@ -68,6 +67,9 @@ contains(QMAKE_HOST.arch, x86_64) {
   } else {
   QMAKE_RPATHDIR += /usr/lib/i386-linux-gnu
   }
+
+
+
 
 
 
