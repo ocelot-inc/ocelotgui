@@ -506,14 +506,21 @@ here too; see the later description of Menu Item: Edit.
 The program includes a tokenizer and can recognize the parts of
 speech in typical MySQL grammar. It will do syntax highlighting
 by changing the color, for example comments will appear in red,
-dentifiers in blue, operators in green, and so on.  
+identifiers in blue, operators in green, and so on.  
 The colors can be
 customized, see the later description of Menu Item: Settings.  
-  
+<P>
 The left side of the statement widget is reserved for the prompt,
 and cannot be typed over. Initially the prompt will be 'mysql&gt;',
 but this can be changed, see the later description of
 Client Statements: Prompt.  
+</P>
+<P>
+<a href="statement-widget-example"><img src="statement-widget-example.png" align="right" height="192"></a>
+For example, this screenshot shows what the statement widget
+looks like after the user has changed the default prompt and
+entered an SQL statement.  
+</P>
   
 Once a statement has been entered and is ready to be executed,
 the user can hit control-E, choose menu item Run|Execute, or
@@ -665,7 +672,7 @@ Help|About will show the license and copyright and version.
 Help|The Manual will show the manual, a shortened version of what you are reading now.
 Help|libmysqlclient will advise about finding and loading the libmysqlclient.so library.
 Help|settings will advise about how to use the Settings menu items.  
-</P
+</P>
 
 
 ### Debugger
