@@ -467,23 +467,27 @@ source.
  
 ### Starting
 ------------
-
+<P>
 There must be an instance of MySQL or MariaDB running somewhere.  
-  
+</P>
+<P>
 If connection is possible with the mysql client and does not require
 unusual options, then connection is possible with ocelotgui. If there is
 a my.cnf file, ocelotgui will read it, just as the mysql client would.
 If there are connection-related options on the command line, ocelotgui
 will accept them just as the mysql client would. Therefore the typical
-way to start the program is to say
-ocelotgui [--option [ --option...]]  
-  
+way to start the program is to say  
+ocelotgui [--option [--option...]]  
+</P>
+<P>
 If a password is required but not supplied, or if the initial
 attempt to connect fails, a dialog box will appear.  
 Fill in or correct the fields on the dialog box and click OK.  
 If the connection still fails, then ocelotgui will still come up,
 but only non-DBMS tasks such as screen customizing will be possible.  
-  
+</P>
+<P>
+<a href="starting"><img src="starting.png" align="right" height="256"></a>
 In any case, an initial screen will appear. After some activity has
 taken place, the screen will have four parts, from top to bottom:  
 menu  
@@ -491,10 +495,12 @@ history widget, where retired statements and diagnostics end up
 results widget, where SELECT result sets appear  
 statement widget, where users can type in instructions.  
 Initially, though, only the menu and statement widget will appear.  
-  
+</P>
+<P>
 Again, this should be reminiscent of the way the mysql client works:
 statements are typed at the bottom of the screen, and appear to
 scroll off the top after they are executed, with results in the middle.  
+</P>
  
 ### Statement widget
 --------------------
