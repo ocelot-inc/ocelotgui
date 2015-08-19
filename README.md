@@ -558,13 +558,14 @@ or 'Next statement' menu items.
 
 ### Result widget
 -----------------
-
+<P>
 If a statement is SELECT or SHOW or some other statement that
 returns a result set, it will appear in the result widget in
 the middle area of the screen. The result widget is split up
 into columns. Each column has a header and details taken from
 what the DBMS returns.  
-  
+</P>
+<P>
 The width of the column depends on the result set's definition,
 but extremely wide columns will be split onto multiple lines.
 That is, one result-set row may take up to five lines.  
@@ -573,12 +574,24 @@ then the cell will get a vertical scroll bar. The user can
 change the width of a column by dragging the column's right
 border to the right to make the column wider, or to the left
 to make it narrower.  
-  
+</P>
+<P>
 The result widget as a whole may have a horizontal and a vertical
 scroll bar. The vertical scroll bar moves a row at a time rather
 than a pixel at a time -- this makes large result sets more
 manageable, but makes the vertical scroll bar unresponsive if
 each row has multiple lines and the number of rows is small.  
+</P>
+<P>
+<a href="result-widget-example"><img src="result-widget-example.png" align="right" height="480"></a>
+For example, this screenshot shows the whole screen after the
+user has typed the statement "select * from information_schema.tables;"
+on the statement widget and then executed it. The statement text
+has been copied to the history widget, the statement widget has
+been cleared, the result widget has the rows. The user has
+dragged the border of the fourth column to the left, causing
+a scroll bar to appear.  
+</P>
 
 ### Menu
 --------
@@ -587,12 +600,12 @@ The menu at the top of the screen has File, Edit, Run, Settings,
 Options, Debug and Help.  
 
 <P>
-<a href="url"><img src="menu-file.png" align="right" height="48"></a>
+<a href="menu-file"><img src="menu-file.png" align="right" height="48"></a>
 File|Connect, or Ctrl+O, starts the Connect dialog box.  
 File|Exit, or Ctrl+Q, stops the program.  
 </P>
 <P>
-<a href="url"><img src="menu-edit.png" align="right" height="192"></a>
+<a href="menu-edit"><img src="menu-edit.png" align="right" height="192"></a>
 Edit|Undo or Ctrl+Z, Edit|Redo or Ctrl+Shift+Z, Edit|Cut or Ctrl+X,
 Edit|Cut or Ctrl+X, Edit|Copy or Ctrl+C, Edit|Paste or Ctrl+V,
 and Edit|Select or Ctrl+A, all work in the conventional manner.
@@ -603,7 +616,7 @@ widget, so that they can be edited or re-executed with Run|Execute
 or Ctrl+E.  
 </P>
 <P>
-<a href="url"><img src="menu-edit.png" align="right" height="48"></a>
+<a href="menu-run"><img src="menu-run.png" align="right" height="48"></a>
 Run|Execute or Ctrl+E or Ctrl+Enter causes execution of whatever is in the
 statement widget.  
 Run|Kill or Ctrl+C tries to stop execution -- this
@@ -611,7 +624,7 @@ menu item is enabled only when a long-running statement
 needs to be aborted by user intervention.  
 </P>
 <P>
-<a href="url"><img src="menu-settings.png" align="right" height="120"></a>
+<a href="menu-settings"><img src="menu-settings.png" align="right" height="120"></a>
 Settings|Menu, Settings|History Widget, Settings|Grid Widget,
 Settings|Statement, and Settings|Extra Rule 1 are
 items which affect the behavior of each
@@ -629,7 +642,7 @@ set Grid Background Color Pink, set Condition = data_type LIKE
 '%BLOB', set Display As = image, then click OK.  
 </P>
 <P>
-<a href="url"><img src="menu-options.png" align="right" height="72"></a>
+<a href="menu-options"><img src="menu-options.png" align="right" height="72"></a>
 Options|detach history widget,
 Options|detach result grid widget,
 Options|detach debug widget are
@@ -641,20 +654,19 @@ already detached, the menu item text will change to "attached"
 and clicking it will put the widget back in its original position.  
 </P>
 <P>
-<a href="url"><img src="menu-debug.png" align="right" height="132"></a>
+<a href="menu-debug"><img src="menu-debug.png" align="right" height="132"></a>
 The items on the Debug menu are enabled only when a debug session
 is in progress. The way to debug SQL stored procedures or functions
 will be explained in a later section.  
 </P>
 <P>
-<a href="url"><img src="menu-help.png" align="right" height="96"></a>
+<a href="menu-help"><img src="menu-help.png" align="right" height="96"></a>
 Help|About will show the license and copyright and version.
 Help|The Manual will show the manual, a shortened version of what you are reading now.
 Help|libmysqlclient will advise about finding and loading the libmysqlclient.so library.
-Help|settings will advise about how to use the Settings menu items.
+Help|settings will advise about how to use the Settings menu items.  
+</P
 
-Help|
-</P>  
 
 ### Debugger
 ------------
