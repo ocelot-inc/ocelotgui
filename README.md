@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-Version 0.6.0
+Version 0.7.0
 
 This is Ocelot GUI (ocelotgui), a GPL-license database client.
 
@@ -64,7 +64,7 @@ In that case, be up and running in 15 seconds with:
 
     mkdir ~/ocelotgui-test
     cd ~/ocelotgui-test
-    wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+    wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
     tar -zxvf ocelotgui.tar.gz
     cd ocelotgui
     ./ocelotgui-qt4 #or ./ocelotgui-qt5
@@ -121,12 +121,12 @@ and also two binary (executable) files.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, the existence of the executables
 might be convenient. A release file is highlighted in green
-by github and is named ocelotgui.tar.gz. Thus release 0.6.0 is at
-https://github.com/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
-or https://github.com/pgulutzan/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz.
+by github and is named ocelotgui.tar.gz. Thus release 0.7.0 is at
+https://github.com/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
+or https://github.com/pgulutzan/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 
-    wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+    wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
 
 or use a browser to go to https://github.com/ocelot-inc/ocelotgui/releases
 and click ocelotgui.tar.gz.
@@ -249,7 +249,7 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 
 ### An installation with SUSE 42.1, from source in release tar
 --------------------------------------------------------------
-    #This builds using the source files in the 0.6.0 "release"
+    #This builds using the source files in the 0.7.0 "release"
     #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
     sudo zypper install libqt4-devel
     sudo zypper install libmysqlclient-devel
@@ -259,7 +259,7 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
     sudo zypper install make
     mkdir ~/ocelotgui-test
     cd ~/ocelotgui-test
-    wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.6.0/ocelotgui.tar.gz
+    wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
     tar -zxvf ocelotgui.tar.gz
     cd ocelotgui
     qmake -config release
@@ -396,7 +396,7 @@ read an ocelotgui.cpp comment that begins with the words
 ## User Manual
 -------------- 
   
-Version 0.6.0, June 29 2015  
+Version 0.7.0, August 19 2015  
   
 Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  
   
@@ -436,7 +436,7 @@ In some ways it is like the basic mysql client program,
 with added GUI features: full-screen editing, syntax
 highlighting, tabular display, customized fonts and colors.
 It differs from some other front-end GUI products because
-it is open source (GPL), is written in C++, and it makes use
+it is open source (GPL), it is written in C++, and it makes use
 of the Qt multi-platform widget library.  
   
 The product status is: alpha. It has been known to work as described in
@@ -478,6 +478,7 @@ If there are connection-related options on the command line, ocelotgui
 will accept them just as the mysql client would. Therefore the typical
 way to start the program is to say  
 ocelotgui [--option [--option...]]  
+For a description of options see https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt.
 </P>
 <P>
 If a password is required but not supplied, or if the initial
@@ -568,6 +569,8 @@ Thus its main function is to show what recent statements and
 results were. Statements in the history can be retrieved while
 the focus is on the statement widget, by selecting 'Previous statement'
 or 'Next statement' menu items.  
+Initially the history widget will show some statements from past
+sessions which are stored in a history file.
 
 ### Result widget
 -----------------
@@ -670,12 +673,14 @@ and clicking it will put the widget back in its original position.
 <a href="menu-debug"><img src="menu-debug.png" align="right" height="132"></a>
 The items on the Debug menu are enabled only when a debug session
 is in progress. The way to debug SQL stored procedures or functions
-will be explained in a later section.  
+will be explained in a later section, [Debugger](#debugger).
 </P>
+  
+  
 <P>
 <a href="menu-help"><img src="menu-help.png" align="right" height="96"></a>
 Help|About will show the license and copyright and version.
-Help|The Manual will show the manual, a shortened version of what you are reading now.
+Help|The Manual will show a copyright, a GPL license, and a pointer to the manual that you are reading now.
 Help|libmysqlclient will advise about finding and loading the libmysqlclient.so library.
 Help|settings will advise about how to use the Settings menu items.  
 </P>
@@ -684,6 +689,8 @@ Help|settings will advise about how to use the Settings menu items.
 ### Debugger
 ------------
 
+<P>
+<a href="menu-options"><img src="debugger.png" align="right" height="384"></a>
 It's possible to debug stored procedures and functions.  
 This version of ocelotgui incorporates MDBug
 (read about MDBug at http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt).  
@@ -703,50 +710,62 @@ $refresh server_variables -- refreshes xxxmdbug.server_variables table
 $refresh variables -- refreshes xxxmdbug.variables table  
 $refresh user_variables -- refereshes xxxmdbug.user_variables table  
 $exit or Debug|Exit -- stops a debug session  
-  
+</P>
+<P>
 For a walk through a debugger example, with screenshots, see
 this blog post: ocelot.ca/blog/the-ocelotgui-debugger.  
+</P>
 
-### Recent Enhancements 
------------------------
+### Special Effects 
+-------------------
 
-Here are new features which work (or work more correctly) when ocelotgui is built
-from source, and will appear in binary executables
-when the next release occurs.  
+<P>
+<a href="special-vertical"><img src="special-vertical.png" align="right" height="384"></a>
 Vertical: If a user starts the program with ocelotgui --vertical=1
 or ends a statement with backslash G, results come up with one column per row.  
+</P>
+  
+<P>
+<a href="special-images"><img src="special-images.png" align="right" height="384"></a>
 Images: If a user chooses Settings | Extra Rule 1 from the menu,
 and sets the Condition and Display As boxes as described earlier,
 and selects rows which contain LONGBLOB columns, and the column values are
 images (such as PNG or JPEG or BMP or GIF format data), ocelotgui will display
 the result as images.  
+</P>
+<P>
 Result-set editing: If a user clicks on a column in the result set
 and makes a change, an update statement will appear in the statement widget.
 For example, if a result set is the result from SELECT column1, column2 FROM t;,
 and the column1 value is 5, and the column2 value is 'ABC', and the user changes
 the column2 value to 'AB', then the
 statement widget will show UPDATE t SET column2 = 'AB' WHERE column1 = 5 AND column2 = 'AB';.
-The user then has the choice of ignoring the update statement or executing it.
+The user then has the choice of ignoring the update statement or executing it.  
+</P>
+<P>
 Detaching: If a user chooses Options | detach history widget or
 Options | detach result grid widget, then the widget will become a separate window
 which can be moved or resized.  
+</P>
+<P>
+<a href="special-settings"><img src="special-settings.png" align="right" height="512"></a>
 Colors: The Colors and fonts dialog boxes now have a simpler way to choose
 colors, by selecting from a choice of 148 color names / color icons. Users can also
 change colors by saying SET object_name_color = color-name | hex-rgb-value.  
-Run|Kill: When an SQL statement is taking a long time, the menu changes so
-that Run|Execute (Ctrl+E) is disabled and Run|Kill (Ctrl+C) is enabled.
-Selecting Run|Kill stops the statement if possible.  
+</P>
 
 ### Contact
 -----------  
 
-Bug reports and feature requests may go on  
+We need feedback!
+
+Send bug reports and feature requests to  
 https://github.com/ocelot-inc/ocelotgui/issues.  
+Or send a private note to pgulutzan at-sign ocelot.ca.
   
 There may be announcements from time to time on Ocelot's
-web page (ocelot.ca) or on the employee blog (http://ocelot.ca/blog).  
-This manual may also be available on ocelot.ca soon.  
-  
+web page (ocelot.ca) or on the employee blog (http://ocelot.ca/blog).
+
 Any contributions will be appreciated.  
 
 
