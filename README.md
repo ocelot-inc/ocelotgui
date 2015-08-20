@@ -3,7 +3,11 @@ Ocelot ocelotgui
 
 Version 0.7.0
 
-This is Ocelot GUI (ocelotgui), a database client.
+The Ocelot GUI (ocelotgui), a database client, allows users to connect to
+a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
+Some of its features are: syntax highlighting, user-settable colors
+and fonts for each part of the screen, result-set displays
+with multi-line rows and resizable columns, and a debugger.
 
 Copyright (c) 2014, Ocelot Computer Services Inc.
 All rights reserved.
@@ -365,7 +369,7 @@ libmysqlclient-dev" will put it in directory /usr/include/mysql.
     #"INCLUDEPATH += /usr/local/mysql/include/mysql"
     #(mysql.h comes with MySQL or MariaDB developer packages.
     # For example "sudo apt-get libmysqlclient-dev" will
-    # put it in directory /usr/nclude/mysql).
+    # put it in directory /usr/include/mysql).
 
 You will need to state a compiler for the kit.
 Steps for Qt Creator use are:
@@ -725,7 +729,7 @@ $continue or Debug|Continue -- executes until breakpoint or until end of procedu
 $refresh breakpoints -- refreshes xxxmdbug.breakpoints table.  
 $refresh server_variables -- refreshes xxxmdbug.server_variables table.  
 $refresh variables -- refreshes xxxmdbug.variables table.  
-$refresh user_variables -- refereshes xxxmdbug.user_variables table.  
+$refresh user_variables -- refreshes xxxmdbug.user_variables table.  
 $exit or Debug|Exit -- stops a debug session.  
 <BR clear="all">
 </P>
