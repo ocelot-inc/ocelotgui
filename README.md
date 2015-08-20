@@ -3,7 +3,7 @@ Ocelot ocelotgui
 
 Version 0.7.0
 
-This is Ocelot GUI (ocelotgui), a GPL-license database client.
+This is Ocelot GUI (ocelotgui), a database client.
 
 Copyright (c) 2014, Ocelot Computer Services Inc.
 All rights reserved.
@@ -16,14 +16,13 @@ For ocelotgui screenshots see http://ocelot.ca/screenshots.htm.
 
 For ocelotgui/debugger screenshots see http://ocelot.ca/blog/the-ocelotgui-debugger.
 
-This README file has instructions for getting started, and the user manual.
-Ocelot does not supply the Qt libraries or the libmysqlclient
-library. Therefore you will have to download them separately.
+This README file has installation instructions, screenshots, and the user manual.
 
 ### Contents
 ------------
 
 ####Installing
+... [What is included or not included](#what-is-included-or-not-included)
 ... [Feeling lucky?](#feeling-lucky)
 ... [Getting the Qt libraries](#getting-the-qt-libraries)
 ... [Getting the libmysqlclient.so library](#getting-the-libmysqlclientso-library)
@@ -55,6 +54,17 @@ library. Therefore you will have to download them separately.
 ... [Special effects](#special-effects)
 ... [Contact](#contact)
 
+### What is included or not included
+------------------------------------
+
+On the download directory: files with the extension *.png
+or *.htm or *.md or *.txt are for documentation, the file
+LICENSE.GPL is for legal requirements, ocelotgui-qt4 and
+ocelotgui-qt5 are executable copies of the program, and
+files with the extension *.cpp or *.pro or *.h are source code.  
+
+Ocelot does not supply the Qt libraries or the libmysqlclient
+library. They must be downloaded separately.  
 
 ### Feeling Lucky?
 ------------------
@@ -70,7 +80,8 @@ In that case, be up and running in 15 seconds with:
     ./ocelotgui-qt4 #or ./ocelotgui-qt5
 
 If the above instructions succeed, there is no need to read
-the rest of this document. But usually there is more to do.
+the rest of these installation instructions.
+But usually there is more to do.
 
 ### Getting the Qt libraries
 ----------------------------
@@ -481,9 +492,14 @@ ocelotgui [--option [--option...]]
 For a description of options see https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt.
 </P>
 <P>
-If a password is required but not supplied, or if the initial
-attempt to connect fails, a dialog box will appear.  
-Fill in or correct the fields on the dialog box and click OK.  
+<a href="starting-dialog"><img src="starting-dialog.png" align="right" height="128"></a>
+If a password is required but not supplied, a dialog box will appear.
+Or, if the initial attempt to connect fails, an error message will appear
+saying it is necessary to choose File|Connect, which will cause the dialog
+box to appear. The dialog box has many possible settings
+(see the list in https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt);
+however, for getting started, the ones that matter most are the ones
+at the top: host, port, user, socket, password, protocol.  
 If the connection still fails, then ocelotgui will still come up,
 but only non-DBMS tasks such as screen customizing will be possible.  
 </P>
@@ -673,7 +689,7 @@ and clicking it will put the widget back in its original position.
 <a href="menu-debug"><img src="menu-debug.png" align="right" height="132"></a>
 The items on the Debug menu are enabled only when a debug session
 is in progress. The way to debug SQL stored procedures or functions
-will be explained in a later section, [Debugger](#debugger).
+will be explained in a later section.
 <BR clear="all">
 </P>
   
@@ -722,7 +738,7 @@ this blog post: http://ocelot.ca/blog/the-ocelotgui-debugger.
 -------------------
 
 <P>
-<a href="special-vertical"><img src="special-vertical.png" align="right" height="384"></a>
+<a href="special-vertical"><img src="special-vertical.png" align="right" height="256"></a>
 Vertical: If a user starts the program with ocelotgui --vertical=1
 or ends a statement with backslash G, results come up with one column per row.  
 <BR clear="all"> 
@@ -747,15 +763,21 @@ statement widget will show UPDATE t SET column2 = 'AB' WHERE column1 = 5 AND col
 The user then has the choice of ignoring the update statement or executing it.  
 </P>
 <P>
+<a href="special-detach"><img src="special-detach.png" align="right" height="256"></a>
 Detaching: If a user chooses Options | detach history widget or
 Options | detach result grid widget, then the widget will become a separate window
 which can be moved or resized.  
+<BR clear="all">
 </P>
 <P>
 <a href="special-settings"><img src="special-settings.png" align="right" height="512"></a>
-Colors: The Colors and fonts dialog boxes now have a simpler way to choose
+Colors: The Colors and fonts dialog boxes have a simpler way to choose
 colors, by selecting from a choice of 148 color names / color icons. Users can also
 change colors by saying SET object_name_color = color-name | hex-rgb-value.  
+In fact ocelotgui mixes the modes: for example if a user chooses Settings | Grid Text Color,
+then clicks on the 'Red' icon, then clicks OK, ocelotgui generates a
+statement "SET ocelot_grid_text_color = 'Red'". This makes the instruction
+easy to repeat or put in a script.
 <BR clear="all">
 </P>
 
