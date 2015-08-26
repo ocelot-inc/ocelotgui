@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: August 19 2015
+   Last modified: August 28 2015
 */
 
 /*
@@ -481,6 +481,8 @@ static const char *s_color_list[308]=
 
   static int is_libmysqlclient_loaded= 0;
   static int is_libcrypto_loaded= 0;
+  static void *libmysqlclient_handle= NULL;
+  static void *libcrypto_handle= NULL;
 
 /* copy of an information_schema.columns select, used for rehash */
   static  unsigned int rehash_result_column_count= 0;
@@ -499,14 +501,18 @@ static const char *s_color_list[308]=
 #define MYSQL_DEBUGGER_CONNECTION 1
 #define MYSQL_KILL_CONNECTION 2
 #ifdef DEBUGGER
-  MYSQL mysql[3];
+  #define MYSQL_MAX_CONNECTIONS 3
+  static MYSQL mysql[3];
   static int connected[3]= {0, 0, 0};
 #else
-  MYSQL mysql[1];
+  #define MYSQL_MAX_CONNECTIONS 1
+  static MYSQL mysql[1];
   static int connected[1]= {0};
 #endif
 
-  ldbms *lmysql= 0;
+  static ldbms *lmysql= 0;
+
+  static bool is_mysql_library_init_done= false;
 
 int main(int argc, char *argv[])
 {
@@ -522,7 +528,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   QMainWindow(parent),
   ui(new Ui::MainWindow)
 {
-
   /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
   assert(sizeof(int) >= 4);
 
@@ -556,8 +561,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 //  saved_font=&tmp_font;
 //  result_grid_table_widget= new ResultGrid(0, saved_font, this);
 
-  /* Todo: I used to say "(this)" i.e. have mainwindow parent. Maybe setParent later? */
-  result_grid_tab_widget= new QTabWidget48();
+  result_grid_tab_widget= new QTabWidget48(this); /* 2015-08-25 added "this" */
   result_grid_tab_widget->hide();
   for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
@@ -570,9 +574,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     result_grid_table_widget[i_r]->installEventFilter(this); /* must catch fontChange, show, etc. */
     result_grid_table_widget[i_r]->grid_vertical_scroll_bar->installEventFilter(this);
   }
-  main_layout= new QVBoxLayout();               /* todo: do I need to say "this"? */
+  main_layout= new QVBoxLayout();
 
-  history_edit_widget= new QTextEdit();
+  history_edit_widget= new QTextEdit(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
 
 
@@ -580,7 +584,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   create_widget_debug();
 #endif
 
-  main_window= new QWidget();
+  main_window= new QWidget(this);                  /* 2015-08-25 added "this" */
 
   /*
     Defaults for items that can be changed with Settings menu item.
@@ -601,7 +605,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_history_border_color= "black";
   ocelot_menu_border_color= "black";
 
-  lmysql= new ldbms();
+  lmysql= new ldbms();                               /* lmysql will be deleted in action_exit(). */
 
   /* picking up possible settings options from argc+argv after setting initial defaults, so late */
   /* as a result, ocelotgui --version and ocelotgui --help will look slow */
@@ -641,11 +645,13 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
 
   main_window->setLayout(main_layout);
+
   setCentralWidget(main_window);
 
   create_menu();    /* Do this at a late stage because widgets must exist before we call connect() */
 
   create_the_manual_widget(); /* Make the text for Help | The Manual */
+
 
   /*
     If the command-line option was -p but not a password, then password input is necessary
@@ -661,7 +667,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   {
     action_connect();
   }
+
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
+
 }
 
 
@@ -1077,7 +1085,6 @@ void MainWindow::initialize_widget_history()
   return;
 }
 
-
 /*
   Set the strings that will be used for markup comments in history widget.
   Call history_markup_make_strings() at program start.
@@ -1391,12 +1398,12 @@ int MainWindow::history_file_start(QString history_type, QString file_name) /* s
   query[query_len]= '\0';                            /* todo: think: is this necessary? */
 
   /* If file name == "/dev/null" or something that links to "/dev/null", don't try to open. */
-  if (file_name_to_open == "/dev/null") return 0;
+  if (file_name_to_open == "/dev/null") { delete []query; return 0; }
 #ifdef __linux
   char tmp_link_file[9 + 1];
   if (readlink(query, tmp_link_file, 9 + 1) == 9)
   {
-    if (memcmp(tmp_link_file, "/dev/null", 9) == 0) return 0;
+    if (memcmp(tmp_link_file, "/dev/null", 9) == 0) {delete []query; return 0; }
   }
 #endif
 
@@ -1456,11 +1463,14 @@ void MainWindow::history_file_to_history_widget()         /* see comment=tee+his
   if (ocelot_silent != 0) return;                         /* if --silent happened, no history */
   if (ocelot_history_hist_file_is_copied == true) return;        /* we've alredy done this */
   //if (ocelot_history_hist_file_is_open == false) return;
-  int query_len= ocelot_history_hist_file_name.toUtf8().size();  /* See comment "UTF8 Conversion" */
-  char *query= new char[query_len + 1];
-  memcpy(query, ocelot_history_hist_file_name.toUtf8().constData(), query_len + 1);
-  query[query_len]= '\0';                            /* todo: think: is this necessary? */
-  history_file= fopen(query, "r");
+  {
+    int query_len= ocelot_history_hist_file_name.toUtf8().size();  /* See comment "UTF8 Conversion" */
+    char *query= new char[query_len + 1];
+    memcpy(query, ocelot_history_hist_file_name.toUtf8().constData(), query_len + 1);
+    query[query_len]= '\0';                            /* todo: think: is this necessary? */
+    history_file= fopen(query, "r");
+    delete []query;
+  }
   if (history_file == NULL) return;
   if (fseek(history_file, 0 , SEEK_END) == 0)
   {
@@ -2083,7 +2093,25 @@ void MainWindow::action_exit()
   /* Todo: this might not be enough. Maybe you should be intercepting the "close window" event. */
   if (menu_debug_action_exit->isEnabled() == true) action_debug_exit();
 #endif
-  /* Todo: Check: is there any point doing a dlclose for the libmysqlclient if it's loaded? */
+  /* Usually this closes main connection, kill connection or debug connection probably are = 0 */
+  for (int i= 0; i < MYSQL_MAX_CONNECTIONS; ++i)
+  {
+    if (connected[i] != 0)
+    {
+      lmysql->ldbms_mysql_close(&mysql[i]);
+      connected[i]= 0;
+    }
+  }
+  if (is_mysql_library_init_done == true)
+  {
+    lmysql->ldbms_mysql_library_end();
+    is_mysql_library_init_done= false;
+  }
+  /* Some code added 2015-08-25 due to valgrind */
+  if (lmysql != 0) { delete lmysql; lmysql= 0; }
+  if (is_libmysqlclient_loaded == 1) { dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
+  if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
+  delete_utf8_copies();
   close();
 }
 
@@ -2184,18 +2212,21 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.");
 /*
   the_manual_widget will be shown when user clicks Help | The Manual.
   It does not inherit the fonts+colors settings of the main window.
-  The text is copied from manual.htm; all lines in manual.htm end
-  with two spaces so there is a blanket replacement of all "  " to "  \".
+  The text used to be copied from manual.htm; all lines in manual.htm ended
+  with two spaces so there was a blanket replacement of all "  " to "  \".
 */
 void MainWindow::create_the_manual_widget()
 {
-  the_manual_text_edit= new QTextEdit();
-  the_manual_pushbutton= new QPushButton(tr("Close"));
+
+  the_manual_widget= new QWidget(this);
+  the_manual_text_edit= new QTextEdit(the_manual_widget);
+  the_manual_pushbutton= new QPushButton(tr("Close"), the_manual_widget);
+
   connect(the_manual_pushbutton, SIGNAL(clicked()), this, SLOT(action_the_manual_close()));
-  the_manual_layout= new QVBoxLayout();
+  the_manual_layout= new QVBoxLayout(the_manual_widget);
   the_manual_layout->addWidget(the_manual_text_edit);
   the_manual_layout->addWidget(the_manual_pushbutton);
-  the_manual_widget= new QWidget();
+
   the_manual_widget->setLayout(the_manual_layout);
 
   the_manual_widget->setWindowTitle(tr("The Manual"));
@@ -2226,6 +2257,7 @@ void MainWindow::create_the_manual_widget()
 <BR>For the most recent version of the manual, see \
 <BR>https://github.com/ocelot-inc/ocelotgui#user-manual \
   ");
+  the_manual_widget->hide();
   }
 
 void MainWindow::action_the_manual()
@@ -3118,7 +3150,7 @@ void MainWindow::create_widget_debug()
 {
   /* We make debug_tab_widget now but we don't expect anyone to see it until debug|setup happens. */
   /* Todo: should you create with an initially-hidden flag? */
-  debug_top_widget= new QWidget();
+  debug_top_widget= new QWidget(this);              /* 2015-08-25 added "this" */
   debug_top_widget->hide();                         /* hidden until debug|initialize is executed */
 
   /*
@@ -3141,6 +3173,10 @@ void MainWindow::create_widget_debug()
   /* We make debug_timer now but we don't start it until debug status can be shown. */
   debug_timer= new QTimer(this);
   connect(debug_timer, SIGNAL(timeout()), this, SLOT(action_debug_timer_status()));
+
+  /* This must be done before we set statement stylesheet. */
+  for (int i= 0; i < DEBUG_TAB_WIDGET_MAX; ++i) debug_widget[i]= 0;
+
 }
 
 
@@ -3173,7 +3209,6 @@ void* debuggee_thread(void* unused)
   {
     /*
       The debuggee connection.
-      I don't think I need to say lmysql->ldbms_mysql_init(&mysql[connection_number]);
       Todo: the_connect() could easily fail: parameters are changed, # of connections = max, password no longer works, etc.
             ... so you should try to pass back a better explanation if the_connect() fails here.
     */
@@ -5682,7 +5717,7 @@ void MainWindow::action_execute_one_statement(QString text)
     }
     if (do_something == true)
     {
-
+      /* todo: figure out why you used global dbms_query for this */
       dbms_query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
       dbms_query= new char[dbms_query_len + 1];
       dbms_query_len= make_statement_ready_to_send(text, query_utf16_copy,
@@ -5924,6 +5959,7 @@ int MainWindow::execute_client_statement(QString text)
     Currently the only possible dbms is "mysql", otherwise nothing happens.
     Ignore any other words in the statement.
     Todo: accept the mysql-client syntax, which has a few extras on it for reconnect.
+    Todo: connect_mysql() returns an int, find out why you're not looking at it
   */
   /* Todo: We could easily modify so that we don't need sub_token_..., we could just skip comments. */
   if (statement_type == TOKEN_KEYWORD_CONNECT)
@@ -8179,12 +8215,12 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   /* First find libmysqlclient.so.18 */
   if (is_libmysqlclient_loaded != 1)
   {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
   }
   /* if libmysqlclient.so.18 didn't get loaded, try libmysqlclient without a version number */
   if (is_libmysqlclient_loaded != 1)
   {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
   }
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
 
@@ -8215,7 +8251,20 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     return 1;
   }
 
-  lmysql->ldbms_mysql_init(&mysql[connection_number]); /* Todo: avoid repetition, this is init'd elsewhere. */
+  if (is_mysql_library_init_done == false)
+  {
+    if (lmysql->ldbms_mysql_library_init(0, NULL, NULL))
+    {
+      QMessageBox msgbox;
+      msgbox.setText("Error, mysql_library_init() failed");
+      msgbox.exec();
+      return 1;
+    }
+    is_mysql_library_init_done= true;
+  }
+
+  /* I decided this line is unnecessary, mysql_init is done in options_and_connect() */
+  //lmysql->ldbms_mysql_init(&mysql[connection_number]);
 
   if (the_connect(connection_number))
   {
@@ -8257,7 +8306,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   i= s.indexOf(QRegExp("@"), 0);
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_current_user_without_host= s;
-  statement_edit_widget->dbms_connection_id=atoi(connect_row[4]);
+  statement_edit_widget->dbms_connection_id= atoi(connect_row[4]);
   s= lmysql->ldbms_mysql_get_host_info(&mysql[connection_number]);
   i= s.indexOf(QRegExp(" "), 0);
   if (i > 0) s= s.left(i);
@@ -9175,7 +9224,7 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
    on the command line with phrases such as --port=x.
    Todo: meld that with whatever a user might say in a CONNECT command line
          or maybe even a dialog box.
-   Assume lmysql->ldbms_mysql_init() has already happened. (Currently it's in this function, but it shouldn't be.)
+   Assume lmysql->ldbms_mysql_init() has not already happened.
    Qt gets to see argc+argv first, and Qt will process options that it recognizes
    such as -style, -session, -graphicssystem. See
    http://qt-project.org/doc/qt-4.8/qapplication.html#details.
@@ -9798,7 +9847,7 @@ int MainWindow::connect_readmylogin(FILE *file, unsigned char *output_buffer)
   /* First find libcrypto.so */
   if (is_libcrypto_loaded != 1)
   {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
   }
   if (is_libcrypto_loaded != 1)
   {
@@ -10598,127 +10647,137 @@ long MainWindow::to_long(QString token)
 
 }
 
+/*
+  called from: copy_connect_strings_to_utf8(), to initialize before making new copies
+  called from: action_exit(), to avoid valgrind complaints
+*/
+void MainWindow::delete_utf8_copies()
+{
+  if (ocelot_host_as_utf8 != 0) { delete [] ocelot_host_as_utf8; ocelot_host_as_utf8= 0; }
+  if (ocelot_database_as_utf8 != 0) { delete [] ocelot_database_as_utf8; ocelot_database_as_utf8= 0; }
+  if (ocelot_user_as_utf8 != 0) { delete [] ocelot_user_as_utf8; ocelot_user_as_utf8= 0; }
+  if (ocelot_password_as_utf8 != 0) { delete [] ocelot_password_as_utf8; ocelot_password_as_utf8= 0; }
+  if (ocelot_default_auth_as_utf8 != 0) { delete [] ocelot_default_auth_as_utf8; ocelot_default_auth_as_utf8= 0; }
+  if (ocelot_default_auth_as_utf8 != 0) { delete [] ocelot_default_auth_as_utf8; ocelot_default_auth_as_utf8= 0; }
+  if (ocelot_default_auth_as_utf8 != 0) { delete [] ocelot_default_auth_as_utf8; ocelot_default_auth_as_utf8= 0; }
+  if (ocelot_opt_bind_as_utf8 != 0) { delete [] ocelot_opt_bind_as_utf8; ocelot_opt_bind_as_utf8= 0; }
+  if (ocelot_opt_connect_attr_delete_as_utf8 != 0) { delete [] ocelot_opt_connect_attr_delete_as_utf8; ocelot_opt_connect_attr_delete_as_utf8= 0; }
+  if (ocelot_opt_ssl_as_utf8 != 0) { delete [] ocelot_opt_ssl_as_utf8; ocelot_opt_ssl_as_utf8= 0; }
+  if (ocelot_opt_ssl_ca_as_utf8 != 0) { delete [] ocelot_opt_ssl_ca_as_utf8; ocelot_opt_ssl_ca_as_utf8= 0; }
+  if (ocelot_opt_ssl_capath_as_utf8 != 0) { delete [] ocelot_opt_ssl_capath_as_utf8; ocelot_opt_ssl_capath_as_utf8= 0; }
+  if (ocelot_opt_ssl_cert_as_utf8 != 0) { delete [] ocelot_opt_ssl_cert_as_utf8; ocelot_opt_ssl_cert_as_utf8= 0; }
+  if (ocelot_opt_ssl_cipher_as_utf8 != 0) { delete [] ocelot_opt_ssl_cipher_as_utf8; ocelot_opt_ssl_cipher_as_utf8= 0; }
+  if (ocelot_opt_ssl_crl_as_utf8 != 0) { delete [] ocelot_opt_ssl_crl_as_utf8; ocelot_opt_ssl_crl_as_utf8= 0; }
+  if (ocelot_opt_ssl_crlpath_as_utf8 != 0) { delete [] ocelot_opt_ssl_crlpath_as_utf8; ocelot_opt_ssl_crlpath_as_utf8= 0; }
+  if (ocelot_opt_ssl_key_as_utf8 != 0) { delete [] ocelot_opt_ssl_key_as_utf8; ocelot_opt_ssl_key_as_utf8= 0; }
+  if (ocelot_plugin_dir_as_utf8 != 0) { delete [] ocelot_plugin_dir_as_utf8; ocelot_plugin_dir_as_utf8= 0; }
+  if (ocelot_read_default_group_as_utf8 != 0) { delete [] ocelot_read_default_group_as_utf8; ocelot_read_default_group_as_utf8= 0; }
+  if (ocelot_read_default_file_as_utf8 != 0) { delete [] ocelot_read_default_file_as_utf8; ocelot_read_default_file_as_utf8= 0; }
+  if (ocelot_server_public_key_as_utf8 != 0) { delete [] ocelot_server_public_key_as_utf8; ocelot_server_public_key_as_utf8= 0; }
+  if (ocelot_unix_socket_as_utf8 != 0) { delete [] ocelot_unix_socket_as_utf8; ocelot_unix_socket_as_utf8= 0; }
+  if (ocelot_set_charset_dir_as_utf8 != 0) { delete [] ocelot_set_charset_dir_as_utf8; ocelot_set_charset_dir_as_utf8= 0; }
+  if (ocelot_set_charset_name_as_utf8 != 0) { delete [] ocelot_set_charset_name_as_utf8; ocelot_set_charset_name_as_utf8= 0; }
+  if (ocelot_shared_memory_base_name_as_utf8 != 0) { delete [] ocelot_shared_memory_base_name_as_utf8; ocelot_shared_memory_base_name_as_utf8= 0; }
+}
 
 /* Todo: check every one of the "new ..." results for failure. */
 void MainWindow::copy_connect_strings_to_utf8()
 {
+  delete_utf8_copies();
   /* See comment "UTF8 Conversion" */
-  if (ocelot_host_as_utf8 != 0) { delete [] ocelot_host_as_utf8; ocelot_host_as_utf8= 0; }
+
   int tmp_host_len= ocelot_host.toUtf8().size();
   ocelot_host_as_utf8= new char[tmp_host_len + 1];
   memcpy(ocelot_host_as_utf8, ocelot_host.toUtf8().constData(), tmp_host_len + 1);
 
-  if (ocelot_database_as_utf8 != 0) { delete [] ocelot_database_as_utf8; ocelot_database_as_utf8= 0; }
   int tmp_database_len= ocelot_database.toUtf8().size();
   ocelot_database_as_utf8= new char[tmp_database_len + 1];
   memcpy(ocelot_database_as_utf8, ocelot_database.toUtf8().constData(), tmp_database_len + 1);
 
-  if (ocelot_user_as_utf8 != 0) { delete [] ocelot_user_as_utf8; ocelot_user_as_utf8= 0; }
   int tmp_user_len= ocelot_user.toUtf8().size();
   ocelot_user_as_utf8= new char[tmp_user_len + 1];
   memcpy(ocelot_user_as_utf8, ocelot_user.toUtf8().constData(), tmp_user_len + 1);
 
-  if (ocelot_password_as_utf8 != 0) { delete [] ocelot_password_as_utf8; ocelot_password_as_utf8= 0; }
   int tmp_password_len= ocelot_password.toUtf8().size();
   ocelot_password_as_utf8= new char[tmp_password_len + 1];
   memcpy(ocelot_password_as_utf8, ocelot_password.toUtf8().constData(), tmp_password_len + 1);
 
-  if (ocelot_default_auth_as_utf8 != 0) { delete [] ocelot_default_auth_as_utf8; ocelot_default_auth_as_utf8= 0; }
   int tmp_default_auth_len= ocelot_default_auth.toUtf8().size();
   ocelot_default_auth_as_utf8= new char[tmp_default_auth_len + 1];
   memcpy(ocelot_default_auth_as_utf8, ocelot_default_auth.toUtf8().constData(), tmp_default_auth_len + 1);
 
-  if (ocelot_init_command_as_utf8 != 0) { delete [] ocelot_init_command_as_utf8; ocelot_init_command_as_utf8= 0; }
   int tmp_init_command_len= ocelot_init_command.toUtf8().size();
   ocelot_init_command_as_utf8= new char[tmp_init_command_len + 1];
   memcpy(ocelot_init_command_as_utf8, ocelot_init_command.toUtf8().constData(), tmp_init_command_len + 1);
 
-  if (ocelot_opt_bind_as_utf8 != 0) { delete [] ocelot_opt_bind_as_utf8; ocelot_opt_bind_as_utf8= 0; }
   int tmp_opt_bind_len= ocelot_opt_bind.toUtf8().size();
   ocelot_opt_bind_as_utf8= new char[tmp_opt_bind_len + 1];
   memcpy(ocelot_opt_bind_as_utf8, ocelot_opt_bind.toUtf8().constData(), tmp_opt_bind_len + 1);
 
-  if (ocelot_opt_connect_attr_delete_as_utf8 != 0) { delete [] ocelot_opt_connect_attr_delete_as_utf8; ocelot_opt_connect_attr_delete_as_utf8= 0; }
   int tmp_opt_connect_attr_delete_len= ocelot_opt_connect_attr_delete.toUtf8().size();
   ocelot_opt_connect_attr_delete_as_utf8= new char[tmp_opt_connect_attr_delete_len + 1];
   memcpy(ocelot_opt_connect_attr_delete_as_utf8, ocelot_opt_connect_attr_delete.toUtf8().constData(), tmp_opt_connect_attr_delete_len + 1);
 
-  if (ocelot_opt_ssl_as_utf8 != 0) { delete [] ocelot_opt_ssl_as_utf8; ocelot_opt_ssl_as_utf8= 0; }
   int tmp_opt_ssl_len= ocelot_opt_ssl.toUtf8().size();
   ocelot_opt_ssl_as_utf8= new char[tmp_opt_ssl_len + 1];
   memcpy(ocelot_opt_ssl_as_utf8, ocelot_opt_ssl.toUtf8().constData(), tmp_opt_ssl_len + 1);
 
-  if (ocelot_opt_ssl_ca_as_utf8 != 0) { delete [] ocelot_opt_ssl_ca_as_utf8; ocelot_opt_ssl_ca_as_utf8= 0; }
   int tmp_opt_ssl_ca_len= ocelot_opt_ssl_ca.toUtf8().size();
   ocelot_opt_ssl_ca_as_utf8= new char[tmp_opt_ssl_ca_len + 1];
   memcpy(ocelot_opt_ssl_ca_as_utf8, ocelot_opt_ssl_ca.toUtf8().constData(), tmp_opt_ssl_ca_len + 1);
 
-  if (ocelot_opt_ssl_capath_as_utf8 != 0) { delete [] ocelot_opt_ssl_capath_as_utf8; ocelot_opt_ssl_capath_as_utf8= 0; }
   int tmp_opt_ssl_capath_len= ocelot_opt_ssl_capath.toUtf8().size();
   ocelot_opt_ssl_capath_as_utf8= new char[tmp_opt_ssl_capath_len + 1];
   memcpy(ocelot_opt_ssl_capath_as_utf8, ocelot_opt_ssl_capath.toUtf8().constData(), tmp_opt_ssl_capath_len + 1);
 
-  if (ocelot_opt_ssl_cert_as_utf8 != 0) { delete [] ocelot_opt_ssl_cert_as_utf8; ocelot_opt_ssl_cert_as_utf8= 0; }
   int tmp_opt_ssl_cert_len= ocelot_opt_ssl_cert.toUtf8().size();
   ocelot_opt_ssl_cert_as_utf8= new char[tmp_opt_ssl_cert_len + 1];
   memcpy(ocelot_opt_ssl_cert_as_utf8, ocelot_opt_ssl_cert.toUtf8().constData(), tmp_opt_ssl_cert_len + 1);
 
-  if (ocelot_opt_ssl_cipher_as_utf8 != 0) { delete [] ocelot_opt_ssl_cipher_as_utf8; ocelot_opt_ssl_cipher_as_utf8= 0; }
   int tmp_opt_ssl_cipher_len= ocelot_opt_ssl_cipher.toUtf8().size();
   ocelot_opt_ssl_cipher_as_utf8= new char[tmp_opt_ssl_cipher_len + 1];
   memcpy(ocelot_opt_ssl_cipher_as_utf8, ocelot_opt_ssl_cipher.toUtf8().constData(), tmp_opt_ssl_cipher_len + 1);
 
-  if (ocelot_opt_ssl_crl_as_utf8 != 0) { delete [] ocelot_opt_ssl_crl_as_utf8; ocelot_opt_ssl_crl_as_utf8= 0; }
   int tmp_opt_ssl_crl_len= ocelot_opt_ssl_crl.toUtf8().size();
   ocelot_opt_ssl_crl_as_utf8= new char[tmp_opt_ssl_crl_len + 1];
   memcpy(ocelot_opt_ssl_crl_as_utf8, ocelot_opt_ssl_crl.toUtf8().constData(), tmp_opt_ssl_crl_len + 1);
 
-  if (ocelot_opt_ssl_crlpath_as_utf8 != 0) { delete [] ocelot_opt_ssl_crlpath_as_utf8; ocelot_opt_ssl_crlpath_as_utf8= 0; }
   int tmp_opt_ssl_crlpath_len= ocelot_opt_ssl_crlpath.toUtf8().size();
   ocelot_opt_ssl_crlpath_as_utf8= new char[tmp_opt_ssl_crlpath_len + 1];
   memcpy(ocelot_opt_ssl_crlpath_as_utf8, ocelot_opt_ssl_crlpath.toUtf8().constData(), tmp_opt_ssl_crlpath_len + 1);
 
-  if (ocelot_opt_ssl_key_as_utf8 != 0) { delete [] ocelot_opt_ssl_key_as_utf8; ocelot_opt_ssl_key_as_utf8= 0; }
   int tmp_opt_ssl_key_len= ocelot_opt_ssl_key.toUtf8().size();
   ocelot_opt_ssl_key_as_utf8= new char[tmp_opt_ssl_key_len + 1];
   memcpy(ocelot_opt_ssl_key_as_utf8, ocelot_opt_ssl_key.toUtf8().constData(), tmp_opt_ssl_key_len + 1);
 
-  if (ocelot_plugin_dir_as_utf8 != 0) { delete [] ocelot_plugin_dir_as_utf8; ocelot_plugin_dir_as_utf8= 0; }
   int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
   ocelot_plugin_dir_as_utf8= new char[tmp_plugin_dir_len + 1];
   memcpy(ocelot_plugin_dir_as_utf8, ocelot_plugin_dir.toUtf8().constData(), tmp_plugin_dir_len + 1);
 
-  if (ocelot_read_default_file_as_utf8 != 0) { delete [] ocelot_read_default_file_as_utf8; ocelot_read_default_file_as_utf8= 0; }
   int tmp_read_default_file_len= ocelot_read_default_file.toUtf8().size();
   ocelot_read_default_file_as_utf8= new char[tmp_read_default_file_len + 1];
   memcpy(ocelot_read_default_file_as_utf8, ocelot_read_default_file.toUtf8().constData(), tmp_read_default_file_len + 1);
 
-  if (ocelot_read_default_group_as_utf8 != 0) { delete [] ocelot_read_default_group_as_utf8; ocelot_read_default_group_as_utf8= 0; }
   int tmp_read_default_group_len= ocelot_read_default_group.toUtf8().size();
   ocelot_read_default_group_as_utf8= new char[tmp_read_default_group_len + 1];
   memcpy(ocelot_read_default_group_as_utf8, ocelot_read_default_group.toUtf8().constData(), tmp_read_default_group_len + 1);
 
-  if (ocelot_server_public_key_as_utf8 != 0) { delete [] ocelot_server_public_key_as_utf8; ocelot_server_public_key_as_utf8= 0; }
   int tmp_server_public_key_len= ocelot_server_public_key.toUtf8().size();
   ocelot_server_public_key_as_utf8= new char[tmp_server_public_key_len + 1];
   memcpy(ocelot_server_public_key_as_utf8, ocelot_server_public_key.toUtf8().constData(), tmp_server_public_key_len + 1);
 
-  if (ocelot_unix_socket_as_utf8 != 0) { delete [] ocelot_unix_socket_as_utf8; ocelot_unix_socket_as_utf8= 0; }
   int tmp_unix_socket_len= ocelot_unix_socket.toUtf8().size();
   ocelot_unix_socket_as_utf8= new char[tmp_unix_socket_len + 1];
   memcpy(ocelot_unix_socket_as_utf8, ocelot_unix_socket.toUtf8().constData(), tmp_unix_socket_len + 1);
 
-  if (ocelot_set_charset_dir_as_utf8 != 0) { delete [] ocelot_set_charset_dir_as_utf8; ocelot_set_charset_dir_as_utf8= 0; }
   int tmp_set_charset_dir_len= ocelot_set_charset_dir.toUtf8().size();
   ocelot_set_charset_dir_as_utf8= new char[tmp_set_charset_dir_len + 1];
   memcpy(ocelot_set_charset_dir_as_utf8, ocelot_set_charset_dir.toUtf8().constData(), tmp_set_charset_dir_len + 1);
 
-  if (ocelot_set_charset_name_as_utf8 != 0) { delete [] ocelot_set_charset_name_as_utf8; ocelot_set_charset_name_as_utf8= 0; }
   int tmp_set_charset_name_len= ocelot_set_charset_name.toUtf8().size();
   ocelot_set_charset_name_as_utf8= new char[tmp_set_charset_name_len + 1];
   memcpy(ocelot_set_charset_name_as_utf8, ocelot_set_charset_name.toUtf8().constData(), tmp_set_charset_name_len + 1);
 
-  if (ocelot_shared_memory_base_name_as_utf8 != 0) { delete [] ocelot_shared_memory_base_name_as_utf8; ocelot_shared_memory_base_name_as_utf8= 0; }
   int tmp_shared_memory_base_name_len= ocelot_shared_memory_base_name.toUtf8().size();
   ocelot_shared_memory_base_name_as_utf8= new char[tmp_shared_memory_base_name_len + 1];
   memcpy(ocelot_shared_memory_base_name_as_utf8, ocelot_shared_memory_base_name.toUtf8().constData(), tmp_shared_memory_base_name_len + 1);
@@ -10770,5 +10829,70 @@ void MainWindow::print_help()
   printf("--------------------------------- ----------------------------------------\n");
   action_connect_once("Print");
 }
+
+/*
+  Valgrind
+  --------
+
+  We get lots of complaints from valgrind about problems that seem to be in
+  libraries, including gtk_ and g_ routines, so there is a suppression file.
+  Even with the suppressions, some possibly-tolerable leakages are happening:
+  * simply closing MainWindow, as opposed to ^Q, will not go via action_exit()
+  * --version and --help end with exit(0)
+  * dlopen() and mysql_real_connect() are leaving something behind
+
+    This is what is in valgrind suppression file valgrind_suppressions.supp.
+    Run valgrind with --suppressions=valgrind_suppressions.supp.
+    Put the list in the source files somewhere.
+    {
+       <Addr4s>
+       Memcheck:Addr4
+       ...
+       fun:FcConfig*
+    }
+    {
+       <Conds>
+       Memcheck:Cond
+       ...
+       fun:g_*
+    }
+    {
+       <Params>
+       Memcheck:Param
+       ioctl(generic)
+       ...
+       fun:ioctl*
+    }
+    {
+       <Leaks_g>
+       Memcheck:Leak
+       ...
+       fun:g_*
+    }
+    {
+       <Leaks_gtk>
+       Memcheck:Leak
+       ...
+       fun:gtk_*
+    }
+    {
+       <Leaks_pango>
+       Memcheck:Leak
+       ...
+       fun:pango*
+    }
+    {
+       <Leaks_gl>
+       Memcheck:Leak
+       ...
+       fun:glXGetFBConfigs
+    }
+    {
+       <Leaks_Fc>
+       Memcheck:Leak
+       ...
+       fun:FcConfigParseAndLoad
+    }
+*/
 
 #include "install_sql.cpp"

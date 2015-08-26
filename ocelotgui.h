@@ -373,6 +373,7 @@ private:
   void print_help();
 
   void copy_options_to_main_window();
+  void delete_utf8_copies();
   void copy_connect_strings_to_utf8(); /* in effect, copy options from main_window */
   int the_connect(unsigned int connection_number);
   int the_connect_2(); /* intended replacement for the_connect() */
@@ -1224,6 +1225,10 @@ void garbage_collect ()
   On the other hand, this is a pretty convoluted wrapper -- probably there's a more standard way
   to do it.
   (I could have checked out Qt's DBMS wrappers, but preferred to learn something at the lower level.)
+  Re: mysql_library_end + mysql_library_init versus mysql_server_end + mysql_server_init:
+      supposedly mysql_server_* functions are deprecated since MySQL version 5.0.3, but
+      I still ran into a recent MariaDB libmysqlclient that used them, therefore if
+      initially we can't find mysql_library_* functions we look for mysql_server_* functions.
   Todo: check library version (not sure how I do that, though). Maybe mysql_client_version()?
   Todo: consider allowing library name as parameter e.g. --library=perconaserverclient.so'
   Todo: if error, error message should say what you looked for. if okay, say what you found.
@@ -1309,6 +1314,8 @@ public:
   typedef const char*     (*tmysql_get_host_info)(MYSQL *);
   typedef const char*     (*tmysql_info)         (MYSQL *);
   typedef MYSQL*          (*tmysql_init)         (MYSQL *);
+  typedef void            (*tmysql_library_end)  (void);
+  typedef int             (*tmysql_library_init) (int, char **, char **);
   typedef my_bool         (*tmysql_more_results) (MYSQL *);
   typedef int             (*tmysql_next_result)  (MYSQL *);
   typedef unsigned int    (*tmysql_num_fields)   (MYSQL_RES *);
@@ -1347,6 +1354,8 @@ public:
   tmysql_get_host_info t__mysql_get_host_info;
   tmysql_info t__mysql_info;
   tmysql_init t__mysql_init;
+  tmysql_library_end t__mysql_library_end;
+  tmysql_library_init t__mysql_library_init;
   tmysql_more_results t__mysql_more_results;
   tmysql_next_result t__mysql_next_result;
   tmysql_num_fields t__mysql_num_fields;
@@ -1373,7 +1382,8 @@ ldbms() : QWidget()
 #define WHICH_LIBRARY_LIBMYSQLCLIENT18 2
 
 void ldbms_get_library(QString ocelot_ld_run_path,
-        int *is_library_loaded,           /* points to is_libmysqlclient_loaded */
+        int *is_library_loaded,           /* points to is_libXXX_loaded */
+        void **library_handle,            /* points to libXXX_handle */
         QString *return_string,
         int which_library)                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
   {
@@ -1452,6 +1462,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           delete []query;
           if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
           else *is_library_loaded= 1;
+          *library_handle= dlopen_handle;
 #else
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient");
@@ -1477,6 +1488,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
       else *is_library_loaded= 1;
+      *library_handle= dlopen_handle;
 #else
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysqlclient");
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysqlclient");
@@ -1508,6 +1520,22 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__mysql_get_host_info= (tmysql_get_host_info) dlsym(dlopen_handle, "mysql_get_host_info"); if (dlerror() != 0) s.append("mysql_get_host_info ");
         t__mysql_info= (tmysql_info) dlsym(dlopen_handle, "mysql_info"); if (dlerror() != 0) s.append("mysql_info ");
         t__mysql_init= (tmysql_init) dlsym(dlopen_handle, "mysql_init"); if (dlerror() != 0) s.append("mysql_init ");
+        {
+          t__mysql_library_end= (tmysql_library_end) dlsym(dlopen_handle, "mysql_library_end");
+          if (dlerror() != 0)
+          {
+            t__mysql_library_end= (tmysql_library_end) dlsym(dlopen_handle, "mysql_server_end");
+            if (dlerror() != 0) s.append("mysql_library_end ");
+          }
+        }
+        {
+          t__mysql_library_init= (tmysql_library_init) dlsym(dlopen_handle, "mysql_library_init");
+          if (dlerror() != 0)
+          {
+            t__mysql_library_init= (tmysql_library_init) dlsym(dlopen_handle, "mysql_server_init");
+            if (dlerror() != 0) s.append("mysql_library_init ");
+          }
+        }
         t__mysql_more_results= (tmysql_more_results) dlsym(dlopen_handle, "mysql_more_results"); if (dlerror() != 0) s.append("mysql_more_results ");
         t__mysql_next_result= (tmysql_next_result) dlsym(dlopen_handle, "mysql_next_result"); if (dlerror() != 0) s.append("mysql_next_result ");
         t__mysql_num_fields= (tmysql_num_fields) dlsym(dlopen_handle, "mysql_num_fields"); if (dlerror() != 0) s.append("mysql_num_fields ");
@@ -1542,6 +1570,9 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_get_host_info= (tmysql_get_host_info) lib.resolve("mysql_get_host_info")) == 0) s.append("mysql_get_host_info ");
         if ((t__mysql_info= (tmysql_info) lib.resolve("mysql_info")) == 0) s.append("mysql_info ");
         if ((t__mysql_init= (tmysql_init) lib.resolve("mysql_init")) == 0) s.append("mysql_init ");
+        (do not forget to allow for mysql_server_end + mysql_server_init as in Linux, above)
+        if ((t__mysql_library_end= (tmysql_library_end) lib.resolve("mysql_library_end")) == 0) s.append("mysql_library_end ");
+        if ((t__mysql_library_init= (tmysql_library_init) lib.resolve("mysql_library_init")) == 0) s.append("mysql_library_init ");
         if ((t__mysql_more_results= (tmysql_more_results) lib.resolve("mysql_more_results")) == 0) s.append("mysql_more_results ");
         if ((t__mysql_next_result= (tmysql_next_result) lib.resolve("mysql_next_result")) == 0) s.append("mysql_next_result ");
         if ((t__mysql_num_fields= (tmysql_num_fields) lib.resolve("mysql_num_fields")) == 0) s.append("mysql_num_fields ");
@@ -1632,6 +1663,16 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   MYSQL *ldbms_mysql_init(MYSQL *mysql)
   {
     return t__mysql_init(mysql);
+  }
+
+  void ldbms_mysql_library_end()
+  {
+    t__mysql_library_end();
+  }
+
+  int ldbms_mysql_library_init(int argc, char **argv, char **groups)
+  {
+    return t__mysql_library_init(argc, argv, groups);
   }
 
   my_bool ldbms_mysql_more_results(MYSQL *mysql)
@@ -1969,7 +2010,7 @@ ResultGrid(
   grid_scroll_area->setWidget(client);
   grid_scroll_area->setWidgetResizable(true);              /* Without this, the QTextEdit widget heights won't change */
 
-  grid_vertical_scroll_bar= new QScrollBar();                                 /* Todo: check if it's bad that this has no parent */
+  grid_vertical_scroll_bar= new QScrollBar(this);
 
   /* setContentsMargins overrides style settings, I suppose. */
   /* Will setSpacing(0) keep scroll bar beside scroll area? Apparently not. Useless. */
@@ -3753,6 +3794,31 @@ unsigned int dbms_get_field_name_length(unsigned int column_number)
 //  }
 //  return ""; /* to avoid "control reaches end of non-void function" warning */
 //}
+
+/*
+  Deleting ResultGrid
+  This probably will never be called explicitly, but if MainWindow parent is deleted when
+  the program ends, we'll get here.
+*/
+~ResultGrid()
+{
+  //printf("deleting ResultGrid()\n");
+  //remove_layouts(); /* I think this is unnecessary */
+  garbage_collect();
+  if (row_pool_size != 0)
+  {
+    delete [] grid_row_layouts;
+    delete [] grid_row_widgets;
+    row_pool_size= 0;
+  }
+  if (cell_pool_size != 0)
+  {
+    delete [] text_edit_widgets;
+    delete [] text_edit_layouts;
+    delete [] text_edit_frames;
+    cell_pool_size= 0;
+  }
+}
 
 public slots:
 private:
