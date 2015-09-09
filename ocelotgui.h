@@ -358,6 +358,7 @@ private:
   void widget_sizer();
   int execute_client_statement(QString text);
   void put_diagnostics_in_result();
+  void put_message_in_result(QString);
   unsigned int get_ocelot_protocol_as_int(QString s);
 //  int options_and_connect(char *host, char *database, char *user, char *password, char *tmp_init_command,
 //                       char *tmp_plugin_dir, char *tmp_default_auth, char *unix_socket, unsigned int connection_number);
@@ -803,9 +804,6 @@ private:
 
   /* QTableWidget *grid_table_widget; */
   QTabWidget48 *result_grid_tab_widget;
-/* It's easy to increase this so more multi results are seen but then start time is longer. */
-#define RESULT_GRID_TAB_WIDGET_MAX 2
-  ResultGrid *result_grid_table_widget[RESULT_GRID_TAB_WIDGET_MAX];
 
   unsigned long result_row_count;
 
@@ -1338,6 +1336,7 @@ public:
                                                   const char *,
                                                   const char *);
   typedef MYSQL_RES*      (*tmysql_store_result) (MYSQL *);
+  typedef void            (*tmysql_thread_end)   (void);
   typedef unsigned int    (*tmysql_warning_count)(MYSQL *);
   typedef int             (*tAES_set_decrypt_key)(unsigned char *, int, AES_KEY *);
   typedef void            (*tAES_decrypt)        (unsigned char *, unsigned char *, AES_KEY *);
@@ -1368,6 +1367,7 @@ public:
   tmysql_sqlstate t__mysql_sqlstate;
   tmysql_ssl_set t__mysql_ssl_set;
   tmysql_store_result t__mysql_store_result;
+  tmysql_thread_end t__mysql_thread_end;
   tmysql_warning_count t__mysql_warning_count;
   tAES_set_decrypt_key t__AES_set_decrypt_key;
   tAES_decrypt t__AES_decrypt;
@@ -1548,6 +1548,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__mysql_sqlstate= (tmysql_sqlstate) dlsym(dlopen_handle, "mysql_sqlstate"); if (dlerror() != 0) s.append("mysql_sqlstate ");
         t__mysql_ssl_set= (tmysql_ssl_set) dlsym(dlopen_handle, "mysql_ssl_set"); if (dlerror() != 0) t__mysql_ssl_set= NULL;
         t__mysql_store_result= (tmysql_store_result) dlsym(dlopen_handle, "mysql_store_result"); if (dlerror() != 0) s.append("mysql_store_result ");
+        t__mysql_thread_end= (tmysql_thread_end) dlsym(dlopen_handle, "mysql_thread_end"); if (dlerror() != 0) s.append("mysql_thread_end ");
         t__mysql_warning_count= (tmysql_warning_count) dlsym(dlopen_handle, "mysql_warning_count"); if (dlerror() != 0) s.append("mysql_warning_count ");
       }
       if (which_library == WHICH_LIBRARY_LIBCRYPTO)
@@ -1585,6 +1586,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_sqlstate= (tmysql_sqlstate) lib.resolve("mysql_sqlstate")) == 0) s.append("mysql_sqlstate ");
         if ((t__mysql_ssl_set= (tmysql_ssl_set) lib.resolve("mysql_ssl_set")) == 0) t__mysql_ssl_set= NULL;
         if ((t__mysql_store_result= (tmysql_store_result) lib.resolve("mysql_store_result")) == 0) s.append("mysql_store_result ");
+        if ((t__mysql_thread_end= (tmysql_thread_end) lib.resolve("mysql_thread_end")) == 0) s.append("mysql_thread_end ");
         if ((t__mysql_warning_count= (tmysql_warning_count) lib.resolve("mysql_warning_count")) == 0) s.append("mysql_warning_count ");
       }
       if (which_library == WHICH_LIBRARY_LIBCRYPTO)
@@ -1721,11 +1723,6 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     return t__mysql_select_db(mysql, db);
   }
 
-  MYSQL_RES *ldbms_mysql_store_result(MYSQL *mysql)
-  {
-    return t__mysql_store_result(mysql);
-  }
-
   const char *ldbms_mysql_sqlstate(MYSQL *mysql)
   {
     return t__mysql_sqlstate(mysql);
@@ -1735,6 +1732,16 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     if (t__mysql_ssl_set == NULL) return 0;
     return t__mysql_ssl_set(mysql, a, b, c, d, e);
+  }
+
+  MYSQL_RES *ldbms_mysql_store_result(MYSQL *mysql)
+  {
+    return t__mysql_store_result(mysql);
+  }
+
+  void ldbms_mysql_thread_end()
+  {
+    t__mysql_thread_end();
   }
 
   unsigned int ldbms_mysql_warning_count(MYSQL *mysql)

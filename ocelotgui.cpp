@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: August 28 2015
+   Last modified: September 9 2015
 */
 
 /*
@@ -144,7 +144,7 @@
   The code #includes header files from MySQL/Oracle and from Qt/Digia,
   and relies on the MySQL client library and the Qt core, gui,
   and widgets libraries. Builds have been successful with several
-  Linux distros and gcc 4.6. Build instructions are in the user manual or
+  Linux distros and gcc 4.6/4.7. Build instructions are in the user manual or
   in a readme file
 
   There are many comments. Searching for the word "Todo:" in the comments
@@ -167,9 +167,9 @@
 
   Todo: Allow right-click for changing individual widgets.
 
-  Todo: Some more checks for garbage collection, then some equivalent to valgrind.
+  See end of program for comments re valgrind.
 
-  The usual ways to build are described in README.txt.
+  The usual ways to build are described in README.txt (actually README.md).
   An unusual way would be with Qt 4.8 source-code libraries supplied by Digia:
       Download 4.8 libraries via http://qt-project.org/downloads
          This is a source download; you'll need to do ./configure and make.
@@ -464,6 +464,8 @@ static const char *s_color_list[308]=
   static unsigned int ocelot_opt_read_timeout= 0;          /* for MYSQL_OPT_READ_TIMEOUT */
   static unsigned short int ocelot_report_data_truncation= 0; /* for MYSQL_REPORT_DATA_TRUNCATION */
   static unsigned short int ocelot_opt_use_result= 0; /* for MYSQL_OPT_USE_RESULT */
+  /* It's easy to increase ocelot_grid_tabs so more multi results are seen but then start time is longer. */
+  static unsigned short int ocelot_grid_tabs= 2;
 
   /* Items affecting history which cannot be changed except by modifying + rebuilding */
   //static unsigned int ocelot_history_max_column_width= 10;
@@ -484,7 +486,6 @@ static const char *s_color_list[308]=
   static void *libmysqlclient_handle= NULL;
   static void *libcrypto_handle= NULL;
 
-/* copy of an information_schema.columns select, used for rehash */
   static  unsigned int rehash_result_column_count= 0;
   static unsigned int rehash_result_row_count= 0;
   static char *rehash_result_set_copy= 0;       /* gets a copy of mysql_res contents, if necessary */
@@ -504,6 +505,8 @@ static const char *s_color_list[308]=
   #define MYSQL_MAX_CONNECTIONS 3
   static MYSQL mysql[3];
   static int connected[3]= {0, 0, 0};
+  pthread_t debug_thread_id;
+  bool debug_thread_exists= false;
 #else
   #define MYSQL_MAX_CONNECTIONS 1
   static MYSQL mysql[1];
@@ -563,17 +566,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   result_grid_tab_widget= new QTabWidget48(this); /* 2015-08-25 added "this" */
   result_grid_tab_widget->hide();
-  for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
-  {
-    result_grid_table_widget[i_r]= new ResultGrid(lmysql, this);
-    result_grid_tab_widget->addTab(result_grid_table_widget[i_r], QString::number(i_r + 1));
-    result_grid_table_widget[i_r]->hide(); /* Maybe this isn't necessary */
-  }
-  for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
-  {
-    result_grid_table_widget[i_r]->installEventFilter(this); /* must catch fontChange, show, etc. */
-    result_grid_table_widget[i_r]->grid_vertical_scroll_bar->installEventFilter(this);
-  }
+
   main_layout= new QVBoxLayout();
 
   history_edit_widget= new QTextEdit(this);         /* 2015-08-25 added "this" */
@@ -632,9 +625,27 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   initialize_widget_history();
 
   initialize_widget_statement();
-  for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
-    result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
+    ResultGrid *r;
+    int i_r;
+    for (i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
+    {
+      r= new ResultGrid(lmysql, this);
+      result_grid_tab_widget->addTab(r, QString::number(i_r + 1));
+      r->hide(); /* Maybe this isn't necessary */
+    }
+    for (i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
+    {
+      r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+      assert(r != 0);
+      r->installEventFilter(this); /* must catch fontChange, show, etc. */
+      r->grid_vertical_scroll_bar->installEventFilter(this);
+    }
+    for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
+    {
+      r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+      r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
+    }
   }
 
   main_layout->addWidget(history_edit_widget);
@@ -677,6 +688,7 @@ MainWindow::~MainWindow()
 {
   delete ui;
 }
+
 
 /*
   We want to know the maximum widget size for dialog boxes.
@@ -771,7 +783,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
       instruction is "return QMainWindow::eventFilter(obj, event);".
       I think the idea there is to go direct to the main processor
       for text editing, bypassing other event filters.
-  Todo: Consider: Perhaps this should not be in Main>Window:: but in CodeEditor::.
+  Todo: Consider: Perhaps this should not be in MainWindow:: but in CodeEditor::.
   Todo: Consider: Perhaps this should be a menu item, not a filter event.
                   (There's already a menu item, but it's not for Enter|Return.)
   There are a few "Ocelot keyword" items that do not require ";" or delimiter
@@ -799,19 +811,22 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 //  }
 
 
-  for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
   {
-    if (obj == result_grid_table_widget[i_r])
+    ResultGrid* r;
+    for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
     {
-      if (event->type() == QEvent::FontChange) return (result_grid_table_widget[i_r]->fontchange_event());
-      if (event->type() == QEvent::Show) return (result_grid_table_widget[i_r]->show_event());
-    }
-    if (obj == result_grid_table_widget[i_r]->grid_vertical_scroll_bar)
-    {
-      return (result_grid_table_widget[i_r]->vertical_scroll_bar_event());
+      r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+      if (obj == r)
+      {
+        if (event->type() == QEvent::FontChange) return (r->fontchange_event());
+        if (event->type() == QEvent::Show) return (r->show_event());
+      }
+      if (obj == r->grid_vertical_scroll_bar)
+      {
+        return (r->vertical_scroll_bar_event());
+      }
     }
   }
-
 
 #ifdef DEBUGGER
   for (int debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
@@ -1084,6 +1099,7 @@ void MainWindow::initialize_widget_history()
   history_markup_make_strings();
   return;
 }
+
 
 /*
   Set the strings that will be used for markup comments in history widget.
@@ -1507,6 +1523,7 @@ void MainWindow::history_file_to_history_widget()         /* see comment=tee+his
   With Ubuntu 15.04 the event filer is executed.
   That is: the duplication in the event filter is a workaround for the fact that,
   on some distro versions, some menu shortcuts are missed. Maybe it's a Qt bug.
+  Maybe it's an Ubuntu bug: https://bugs.launchpad.net/ubuntu/+source/texmaker/+bug/1386111
 */
 
 /*
@@ -1528,7 +1545,6 @@ void MainWindow::history_file_to_history_widget()         /* see comment=tee+his
     I should show what the shortcuts are; unfortunately for most actions the shortcut differs according to platform
     Maybe instead of "Execute ctrl+E" I should be using "Run ctrl+R"
     Sure, I tried using & for various menu items e.g. E&xit -- but then Alt+x did not work!
-  Todo: With Ubuntu 14.04 the ^O and ^E and ^Q keys didn't work, find out what goes on.
 */
 void MainWindow::create_menu()
 {
@@ -1831,7 +1847,7 @@ void MainWindow::action_connect()
 
 
 /*
-  If we're connecting, action_calls action_connect_once with arg = "File|Connect".
+  If we're connecting, action_connect() calls action_connect_once with arg = "File|Connect".
   If we're printing for --help, print_help calls action_connect_once with arg = "Print".
   Todo:
   If user types OK and there's an error, repeat the dialog box with a new message e.g. "Connect failed ...".
@@ -2104,6 +2120,11 @@ void MainWindow::action_exit()
   }
   if (is_mysql_library_init_done == true)
   {
+    /*
+      This assumes mysql_thread_end() was done for any debugger or kill threads,
+      but we don't call mysql_thread_end() for the main thread (is that okay?).
+      If we don't call mysql_library_end(), we'll get a few extra valgrind complaints.
+    */
     lmysql->ldbms_mysql_library_end();
     is_mysql_library_init_done= false;
   }
@@ -2638,6 +2659,9 @@ void MainWindow::assign_names_for_colors()
 void MainWindow::set_current_colors_and_font()
 {
   QFont font;
+
+  QWidget *widget= new QWidget(); /* A dummy to which Qt will assign default settings for palette() etc. */
+
   ocelot_statement_text_color= statement_edit_widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_statement_background_color= statement_edit_widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   font= statement_edit_widget->font();
@@ -2646,9 +2670,9 @@ void MainWindow::set_current_colors_and_font()
   ocelot_statement_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   if (font.weight() >= QFont::Bold) ocelot_statement_font_weight= "bold"; else ocelot_statement_font_weight= "normal";
 
-  ocelot_grid_text_color= result_grid_table_widget[0]->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
-  ocelot_grid_background_color= result_grid_table_widget[0]->palette().color(QPalette::Window).name(); /* = QPalette::Background */
-  font= result_grid_table_widget[0]->font();
+  ocelot_grid_text_color= widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
+  ocelot_grid_background_color= widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
+  font= widget->font();
   ocelot_grid_font_family= font.family();
   if (font.italic()) ocelot_grid_font_style= "italic"; else ocelot_grid_font_style= "normal";
   ocelot_grid_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
@@ -2670,10 +2694,12 @@ void MainWindow::set_current_colors_and_font()
   ocelot_menu_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   if (font.weight() >= QFont::Bold) ocelot_menu_font_weight= "bold"; else ocelot_menu_font_weight= "normal";
 
-  ocelot_extra_rule_1_text_color= result_grid_table_widget[0]->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
-  ocelot_extra_rule_1_background_color= result_grid_table_widget[0]->palette().color(QPalette::Window).name(); /* = QPalette::Background */
+  ocelot_extra_rule_1_text_color= widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
+  ocelot_extra_rule_1_background_color= widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   ocelot_extra_rule_1_condition= "data_type LIKE '%BLOB'";
   ocelot_extra_rule_1_display_as= "char";
+
+  delete widget;
 }
 
 
@@ -2727,12 +2753,6 @@ QString MainWindow::canonical_color_name(QString color_name_string)
 }
 
 
-//QPalette qp;
-//QColor c;
-//qp.setColor(QPalette::Window,"red");
-//QString tl= qp.color(QPalette::Window).name();
-
-
 /* Called from: make_style_strings(). We allow sixteen color names that Qt doesn't like. */
 QString MainWindow::qt_color(QString color_name)
 {
@@ -2754,6 +2774,7 @@ QString MainWindow::qt_color(QString color_name)
   if (QString::compare(color_name, "WebPurple", Qt::CaseInsensitive) == 0) return "#7F007F";
   return color_name;
 }
+
 
 /* Called from: action_statement() etc. Make a string that setStyleSheet() can use. */
 /*
@@ -3411,7 +3432,9 @@ void* debuggee_thread(void* unused)
   /* Here I am overwriting DEBUGGEE_WAIT_LOOP_ERROR / DEBUGGEE_STATE_END. Maybe they're informative but they caused trouble. */
   //debuggee_state= DEBUGGEE_STATE_0;
 
-  /* The thread will end, but mysql[MYSQL_DEBUGGER_CONNECTION] will still exist. */
+  /* options_and_connect called mysql_init which called mysql_thread_init, so cancel it */
+  lmysql->ldbms_mysql_thread_end();
+  /* The thread will end. */
   return ((void*) NULL);
 }
 
@@ -3596,9 +3619,8 @@ void MainWindow::debug_setup_mysql_proc_insert()
     lmysql->ldbms_mysql_free_result(res);
     if (num_rows - 3 >= DEBUG_TAB_WIDGET_MAX)
     {
-      sprintf(command, "SIGNAL SQLSTATE '05678' SET message_text='$setup generated %d surrogates but the current maximum is %d'", num_rows - 3, DEBUG_TAB_WIDGET_MAX - 1);
-      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
-      put_diagnostics_in_result();
+      sprintf(command, "$setup generated %d surrogates but the current maximum is %d'", num_rows - 3, DEBUG_TAB_WIDGET_MAX - 1);
+      put_message_in_result(command);
       return;
     }
   }
@@ -3688,7 +3710,6 @@ void MainWindow::debug_setup_mysql_proc_insert()
             row_2= lmysql->ldbms_mysql_fetch_row(res_2);
             if ((row_2 == NULL) || (row_2[0] == NULL) || (strcmp(row_2[0],"") == 0))
             {
-              char command[512];
               lmysql->ldbms_mysql_free_result(res_2);
               strcpy(tmp, "Could not get a routine definition for ");
               strcat(tmp, row[0]);
@@ -3696,10 +3717,8 @@ void MainWindow::debug_setup_mysql_proc_insert()
               strcat(tmp, row[1]);
               strcat(tmp, ". Are you the routine creator and/or do you have SELECT privilege for mysql.proc?");
               /* Todo: merge this sort of stuff into debug_error() */
-              sprintf(command, "SIGNAL sqlstate '05678' set message_text = '%s'", tmp);
-              lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
               unexpected_error= "create failed";
-              put_diagnostics_in_result();
+              put_message_in_result(tmp);
               second_iteration_is_necessary= 1;
               break;
             }
@@ -3761,8 +3780,8 @@ void MainWindow::debug_setup_mysql_proc_insert()
   if (unexpected_error != NULL)
   {
     if (strcmp(unexpected_error, "create failed") ==0) return; /* we already have the diagnostics */
-    sprintf(command, "SIGNAL SQLSTATE '05678' SET message_text='%s'", unexpected_error);
-    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
+    put_message_in_result(unexpected_error);
+    return;
   }
   put_diagnostics_in_result();
 }
@@ -4126,8 +4145,6 @@ int MainWindow::debug_parse_statement(QString text,
 */
 int MainWindow::debug_error(char *text)
 {
-  char command[2048];
-
 //  unsigned int statement_type;
 
   if (is_mysql_connected == 0)
@@ -4147,22 +4164,19 @@ int MainWindow::debug_error(char *text)
       strcpy(tmp_string, debuggee_state_error);
       for (int i= 0; tmp_string[i] != '\0'; ++i) if (tmp_string[i] == '\047') tmp_string[i]= ' ';
     }
-    sprintf(tmp_string_2, "SIGNAL sqlstate '05678' set message_text = '%s %d. %s'", "debuggee_state:", debuggee_state, tmp_string);
+    sprintf(tmp_string_2, "'%s %d. %s'", "debuggee_state:", debuggee_state, tmp_string);
     if (debuggee_state == DEBUGGEE_STATE_END)
     {
-      sprintf(tmp_string_2, "SIGNAL sqlstate '05678' set message_text = 'Routine has stopped. Suggested next step is: $EXIT'");
+      sprintf(tmp_string_2, "Routine has stopped. Suggested next step is: $EXIT");
     }
-    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp_string_2);
-    put_diagnostics_in_result();
+    put_message_in_result(tmp_string_2);
     return 1;
   }
 
 
   if (strcmp(text,"") != 0)
   {
-    sprintf(command, "SIGNAL sqlstate '05678' set message_text = '%s'", text);
-    lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], command);
-    put_diagnostics_in_result();
+    put_message_in_result(text);
     return 1;
   }
 
@@ -4382,11 +4396,11 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
 
   sprintf(debuggee_channel_name, "ch#%d", statement_edit_widget->dbms_connection_id);
 
-  pthread_t thread_id;
-
   /* Create a debuggee thread. */
   /* Todo: consider whether it would have been better to use the Qt QThread function */
-  pthread_create(&thread_id, NULL, &debuggee_thread, NULL);
+  int pthread_create_result= pthread_create(&debug_thread_id, NULL, &debuggee_thread, NULL);
+  assert(pthread_create_result == 0);
+  debug_thread_exists= true;
 
   /*
     Wait till debuggee has indicated that it is about to call debuggee_wait_loop().
@@ -4653,8 +4667,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 */
 void MainWindow::debug_delete_go()
 {
-  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
-  put_diagnostics_in_result();
+  put_message_in_result("The $DELETE statement is not supported at this time");
 }
 
 
@@ -4756,15 +4769,13 @@ void MainWindow::action_debug_step()
 /* $SKIP seems to act like $CONT which isn't terribly useful */
 void MainWindow::debug_skip_go()
 {
-  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SKIP statement is not supported at this time'");
-  put_diagnostics_in_result();
+  put_message_in_result("The $SKIP statement is not supported at this time");
 }
 
 
 void MainWindow::debug_source_go()
 {
-  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $SOURCE statement is not supported at this time'");
-  put_diagnostics_in_result();
+  put_message_in_result("The $SOURCE statement is not supported at this time");
 }
 
 
@@ -4798,8 +4809,7 @@ void MainWindow::debug_set_go(QString text)
 */
 void MainWindow::debug_execute_go()
 {
-  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='The $EXECUTE statement is not supported at this time'");
-  put_diagnostics_in_result();
+  put_message_in_result("The $EXECUTE statement is not supported at this time");
 
 //  QString s;
 //  char command_string[5120];
@@ -4818,8 +4828,7 @@ void MainWindow::debug_execute_go()
 //  printf("command_string=%s.\n", command_string);
 //  debug_call_xxxmdbug_command(s.toUtf8());
 //  put_diagnostics_in_result();
-////  lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SIGNAL SQLSTATE '05678' SET message_text='This statement is not supported at this time'");
-////  put_diagnostics_in_result();
+////  put_message_in_result("This statement is not supported at this time");
 }
 
 
@@ -4992,7 +5001,6 @@ void MainWindow::action_debug_exit()
 }
 
 
-/* todo: somewhere there should be a pthread_join with the thread_id made in debug_debug_go() */
 /* flagger == 0 means this is a regular $exit; flagger == 1 means we're getting rid of stuff due to a severe severe error */
 void MainWindow::debug_exit_go(int flagger)
 {
@@ -5003,8 +5011,7 @@ void MainWindow::debug_exit_go(int flagger)
     /* Todo: merge this with debug_error somehow, and make sure nothing's enabled/disabled unless debug/exit succeeded! */
     if (menu_debug_action_exit->isEnabled() == false)
     {
-      lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "signal sqlstate '05678' set message_text = '$DEBUG not done'");
-      put_diagnostics_in_result();
+      put_message_in_result("$DEBUG not done");
       return;
     }
   }
@@ -5050,6 +5057,19 @@ void MainWindow::debug_exit_go(int flagger)
 
   /* $install was saying "Suggested next step is: $EXIT" even though $EXIT was already done. */
   debuggee_state= DEBUGGEE_STATE_0;
+
+  /*
+     We call pthread_join so that memory is freed.
+     But it might wait forever if debug thread is loopy.
+     Perhaps we should kill the thread if we suspect that.
+     Anyway: $exit is slow, and pthread_join is probably the cause.
+  */
+  if (debug_thread_exists == true)
+  {
+    int pthread_join_result= pthread_join(debug_thread_id, NULL);
+    assert(pthread_join_result == 0);
+    debug_thread_exists= false;
+  }
 
   if (flagger == 0)
   {
@@ -5511,7 +5531,8 @@ void* kill_thread(void* unused)
     kill_state= KILL_STATE_ENDED;
     break;
   }
-  if (is_connected == 1) lmysql->ldbms_mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
+  if (is_connected == 1) lmysql->ldbms_mysql_close(&mysql[MYSQL_KILL_CONNECTION]);
+  lmysql->ldbms_mysql_thread_end();
   return ((void*) NULL);
 }
 
@@ -5788,20 +5809,24 @@ void MainWindow::action_execute_one_statement(QString text)
 
           result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
 
-          for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
           {
-            result_grid_table_widget[i_r]->garbage_collect();
+            ResultGrid *r;
+            for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
+            {
+              r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+              r->garbage_collect();
+            }
+            r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+            //QFont tmp_font;
+            //tmp_font= r->font();
+            r->fillup(mysql_res, this,
+                      is_vertical, ocelot_result_grid_column_names,
+                      lmysql, ocelot_line_numbers);
+            result_grid_tab_widget->setCurrentWidget(r);
+            result_grid_tab_widget->tabBar()->hide();
+            r->show();
+            result_grid_tab_widget->show(); /* Maybe this only has to happen once */
           }
-          //QFont tmp_font;
-          //tmp_font= result_grid_table_widget[0]->font();
-          result_grid_table_widget[0]->fillup(mysql_res, this,
-                                              is_vertical, ocelot_result_grid_column_names,
-                                              lmysql, ocelot_line_numbers);
-          result_grid_tab_widget->setCurrentWidget(result_grid_table_widget[0]);
-          result_grid_tab_widget->tabBar()->hide();
-          result_grid_table_widget[0]->show();
-          result_grid_tab_widget->show(); /* Maybe this only has to happen once */
-
 
           QString result_set_for_history;
           /*
@@ -5847,16 +5872,18 @@ void MainWindow::action_execute_one_statement(QString text)
               /* I think the following will help us avoid the "status" return. */
               if (mysql_res == NULL) continue;
 
-              if (result_grid_table_widget_index < RESULT_GRID_TAB_WIDGET_MAX)
+              if (result_grid_table_widget_index < ocelot_grid_tabs)
               {
+                ResultGrid* r;
+                r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(result_grid_table_widget_index));
                 result_grid_tab_widget->tabBar()->show(); /* is this in the wrong place? */
                 result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
-                result_grid_table_widget[result_grid_table_widget_index]->fillup(mysql_res, this,
-                                                                                 is_vertical,
-                                                                                 ocelot_result_grid_column_names,
-                                                                                 lmysql,
-                                                                                 ocelot_line_numbers);
-                result_grid_table_widget[result_grid_table_widget_index]->show();
+                r->fillup(mysql_res, this,
+                          is_vertical,
+                          ocelot_result_grid_column_names,
+                          lmysql,
+                          ocelot_line_numbers);
+                r->show();
 
                 //Put in something based on this if you want extra results to go to history:
                 //... result_grid_table_widget[result_grid_table_widget_index]->copy(); etc.
@@ -5997,7 +6024,7 @@ int MainWindow::execute_client_statement(QString text)
     else if (i2 >= 3) s= text.mid(sub_token_offsets[2], sub_token_lengths[2]);
     else
     {
-      statement_edit_widget->result= tr("Error. USE statement has no argument.");
+      put_message_in_result(tr("Error. USE statement has no argument."));
       return 1;
     }
     /* If database name is in quotes or delimited, strip. Todo: stripping might be necessary in lots of cases. */
@@ -6012,7 +6039,7 @@ int MainWindow::execute_client_statement(QString text)
     else
     {
       statement_edit_widget->dbms_database= s;
-      statement_edit_widget->result= tr("Database changed");
+      put_message_in_result(tr("Database changed"));
     }
     return 1;
   }
@@ -6033,7 +6060,7 @@ int MainWindow::execute_client_statement(QString text)
     if (i2 >= 2) s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     else
     {
-      statement_edit_widget->result= tr("Error, SOURCE statement has no argument");
+      put_message_in_result(tr("Error, SOURCE statement has no argument"));
       return 1;
     }
     int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
@@ -6044,7 +6071,7 @@ int MainWindow::execute_client_statement(QString text)
     delete []query;
     if (file == NULL)
     {
-      statement_edit_widget->result= tr("Error, fopen failed");
+      put_message_in_result(tr("Error, fopen failed"));
       return 1;
     }
     char line[2048];
@@ -6073,7 +6100,7 @@ int MainWindow::execute_client_statement(QString text)
       return 1;
     }
     statement_edit_widget->prompt_as_input_by_user= s;
-    statement_edit_widget->result= tr("OK");
+    put_message_in_result(tr("OK"));
     return 1;
   }
 
@@ -6081,7 +6108,7 @@ int MainWindow::execute_client_statement(QString text)
   if (statement_type == TOKEN_KEYWORD_WARNINGS)
   {
     ocelot_history_includes_warnings= 1;
-    statement_edit_widget->result= tr("OK");
+    put_message_in_result(tr("OK"));
     return 1;
   }
 
@@ -6089,7 +6116,7 @@ int MainWindow::execute_client_statement(QString text)
   if (statement_type == TOKEN_KEYWORD_NOWARNING)
   {
     ocelot_history_includes_warnings= 0;
-    statement_edit_widget->result= tr("OK");
+    put_message_in_result(tr("OK"));
     return 1;
   }
 
@@ -6098,7 +6125,7 @@ int MainWindow::execute_client_statement(QString text)
   {
     if (sub_token_lengths[1] == 0)
     {
-      statement_edit_widget->result= tr("Error, delimiter should not be blank");
+      put_message_in_result(tr("Error, delimiter should not be blank"));
       return 1;
     }
     /* delimiter = rest of string except lead/trail whitespace */
@@ -6106,63 +6133,63 @@ int MainWindow::execute_client_statement(QString text)
     unsigned statement_length= true_text_size /* text.size() */;
     s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
 //        if (s.contains("/")) {
-//            statement_edit_widget->result= tr("Error, delimiter should not contain slash");
+//            put_message_in_result(tr("Error, delimiter should not contain slash"));
 //            return 1; }
     ocelot_delimiter_str= s.trimmed(); /* Todo: probably trimmed() isn't necessary, but make sure */
-    statement_edit_widget->result= tr("OK");
+    put_message_in_result(tr("OK"));
     return 1;
     }
 
   /* Todo: the following are placeholders, we want actual actions like what mysql would do. */
   if (statement_type == TOKEN_KEYWORD_QUESTIONMARK)
   {
-    statement_edit_widget->result= tr("HELP is not implemented.");
+    put_message_in_result(tr("HELP is not implemented."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_CHARSET)
   {
-    statement_edit_widget->result= tr("CHARSET is not implemented.");
+    put_message_in_result(tr("CHARSET is not implemented."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_EDIT)
   {
-    statement_edit_widget->result= tr("EDIT is not implemented.");
+    put_message_in_result(tr("EDIT is not implemented."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_EGO)
   {
-    statement_edit_widget->result= tr("EGO does nothing unless it's on its own line after an executable statement, and --named-commands is true.");
+    put_message_in_result(tr("EGO does nothing unless it's on its own line after an executable statement, and --named-commands is true."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_GO)
   {
-    statement_edit_widget->result= tr("GO does nothing unless it's on its own line after an executable statement, and --named-commands is true.");
+    put_message_in_result(tr("GO does nothing unless it's on its own line after an executable statement, and --named-commands is true."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_HELP)
   {
-    statement_edit_widget->result= tr("HELP is not implemented.");
+    put_message_in_result(tr("HELP is not implemented."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_NOPAGER)
   {
-    statement_edit_widget->result= tr("NOPAGER is not implemented.");
+    put_message_in_result(tr("NOPAGER is not implemented."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_NOTEE) /* see comment=tee+hist */
   {
     history_file_stop("TEE");
-    statement_edit_widget->result= tr("OK");
+    put_message_in_result(tr("OK"));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_PAGER)
   {
-    statement_edit_widget->result= tr("PAGER is not implemented.");
+    put_message_in_result(tr("PAGER is not implemented."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_PRINT)
   {
-    statement_edit_widget->result= tr("PRINT is not implemented.");
+    put_message_in_result(tr("PRINT is not implemented."));
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_REHASH)   /* This overrides a command-line option */
@@ -6170,22 +6197,23 @@ int MainWindow::execute_client_statement(QString text)
     char result[32];
     sprintf(result, "OK, result set size = %d", rehash_scan());
     ocelot_auto_rehash= 1;
-    statement_edit_widget->result= result;
+    put_message_in_result(result);
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_STATUS)
   {
-    if (is_mysql_connected != 1) statement_edit_widget->result= tr("not connected.");
+    if (is_mysql_connected != 1) put_message_in_result(tr("not connected."));
     else
     {
-      QString s;
-      statement_edit_widget->result= "";
+      QString s, s2;
+      s2= "";
       s= "DBMS version = " + statement_edit_widget->dbms_version;
-      statement_edit_widget->result.append(s);
+      s2.append(s);
       s= " Host = " + statement_edit_widget->dbms_host;
-      statement_edit_widget->result.append(s);
+      s2.append(s);
       s= " Port = " + statement_edit_widget->dbms_port.toUtf8();
-      statement_edit_widget->result.append(s);
+      s2.append(s);
+      put_message_in_result(s2);
     }
     return 1;
   }
@@ -6195,7 +6223,7 @@ int MainWindow::execute_client_statement(QString text)
       With mysql client "system ls" would do an ls with system. We use popen not system.
       I don't know whether there is a Windows equivalent; mysql client doesn't support one.
       So the easiest thing for a Windows port is:
-      statement_edit_widget->result= tr("SYSTEM is not implemented.");
+      put_message_in_result(tr("SYSTEM is not implemented."));
       Todo: allow "kill" -- some research required about how to stop a shell command.
       Todo: reconsider: maybe output should go to result grid rather than history.
     */
@@ -6204,7 +6232,7 @@ int MainWindow::execute_client_statement(QString text)
     s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     char *command_string= new char[s.size() + 1];
     memcpy(command_string, s.toUtf8().constData(), s.size() + 1);
-    statement_edit_widget->result= ""; /* unnecessary? */
+    put_message_in_result(""); /* unnecessary? */
     FILE *fp;
     int status;
     char result_line[STRING_LENGTH_512]; /* arbitrary maximum expected line length */
@@ -6230,8 +6258,8 @@ int MainWindow::execute_client_statement(QString text)
     unsigned statement_length= /* text.size() */ true_text_size;
     if (i2 >= 2) s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     else s= "";
-    if (history_file_start("TEE", s) == 0) statement_edit_widget->result= tr("Error, fopen failed");
-    else statement_edit_widget->result= tr("OK");
+    if (history_file_start("TEE", s) == 0) put_message_in_result(tr("Error, fopen failed"));
+    else put_message_in_result(tr("OK"));
     return 1;
   }
 #ifdef DEBUGGER
@@ -6310,27 +6338,27 @@ int MainWindow::execute_client_statement(QString text)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_text_color= ccn;
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_background_color= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_border_color= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
       }
       /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
                because only 'Courier New' exists. There should be a warning, and
@@ -6341,106 +6369,106 @@ int MainWindow::execute_client_statement(QString text)
         ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_style", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         statement_edit_widget_setstylesheet();
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_weight", Qt::CaseInsensitive) == 0)
       {
         ocelot_statement_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         statement_edit_widget_setstylesheet();
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_literal_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_highlight_literal_color= ccn;
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_identifier_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
         ocelot_statement_highlight_identifier_color= ccn;
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_comment_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_highlight_comment_color= ccn;
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_operator_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_highlight_operator_color= ccn;
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_reserved_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_highlight_reserved_color= ccn;
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_prompt_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_prompt_background_color= ccn;
         statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_current_line_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_statement_highlight_current_line_color= ccn;
         statement_edit_widget->highlightCurrentLine();
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
       }
       bool is_result_grid_style_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_grid_text_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_grid_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_grid_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_header_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_grid_header_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
@@ -6467,14 +6495,14 @@ int MainWindow::execute_client_statement(QString text)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_grid_cell_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_grid_cell_drag_line_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
@@ -6495,25 +6523,27 @@ int MainWindow::execute_client_statement(QString text)
       }
       if (is_result_grid_style_changed == true)
       {
+        ResultGrid* r;
         make_style_strings();
-        for (int i_r= 0; i_r < RESULT_GRID_TAB_WIDGET_MAX; ++i_r)
+        for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
         {
-          result_grid_table_widget[i_r]->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
+          r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+          r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
         }
-        statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       bool is_extra_rule_1_style_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_extra_rule_1_text_color= ccn;
         assign_names_for_colors(); is_extra_rule_1_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_extra_rule_1_background_color= ccn;
         assign_names_for_colors(); is_extra_rule_1_style_changed= true;
       }
@@ -6530,90 +6560,90 @@ int MainWindow::execute_client_statement(QString text)
       if (is_extra_rule_1_style_changed == true)
       {
         make_style_strings();
-        statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
 
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_history_text_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_history_background_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_history_border_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_family", Qt::CaseInsensitive) == 0)
       {
         ocelot_history_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_size", Qt::CaseInsensitive) == 0)
       {
         ocelot_history_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_style", Qt::CaseInsensitive) == 0)
       {
         ocelot_history_font_style= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_weight", Qt::CaseInsensitive) == 0)
       {
         ocelot_history_font_weight= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_menu_text_color= ccn;
         make_style_strings();
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_menu_background_color= ccn;
         make_style_strings();
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
         ocelot_menu_border_color= ccn;
         make_style_strings();
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); statement_edit_widget->result= tr("OK");return 1;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_font_family", Qt::CaseInsensitive) == 0)
       {
@@ -6621,7 +6651,7 @@ int MainWindow::execute_client_statement(QString text)
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_size", Qt::CaseInsensitive) == 0)
       {
@@ -6629,7 +6659,7 @@ int MainWindow::execute_client_statement(QString text)
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_style", Qt::CaseInsensitive) == 0)
       {
@@ -6637,7 +6667,7 @@ int MainWindow::execute_client_statement(QString text)
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_weight", Qt::CaseInsensitive) == 0)
       {
@@ -6645,7 +6675,7 @@ int MainWindow::execute_client_statement(QString text)
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-            statement_edit_widget->result= tr("OK");return 1;
+        put_message_in_result(tr("OK")); return 1;
       }
     }
   }
@@ -6697,7 +6727,9 @@ int MainWindow::rehash_scan()
   rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
   rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
   result_max_column_widths= new unsigned int[rehash_result_column_count];
-  result_grid_table_widget[0]->scan_rows(
+  ResultGrid* r;
+  r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+  r->scan_rows(
           rehash_result_column_count, /* result_column_count, */
           rehash_result_row_count, /* result_row_count, */
           res, /* grid_mysql_res, */
@@ -6868,6 +6900,16 @@ void MainWindow::put_diagnostics_in_result()
   statement_edit_widget->result= s1;
 }
 
+/*
+  Called from execute_client_statement() and from debugger.
+  Effect is like put_diagnostics_in_result() when the server returns an error,
+  but without elapsed time or sqlstate or error number.
+  Todo: consider putting in elapsed time.
+*/
+void MainWindow::put_message_in_result(QString s1)
+{
+  statement_edit_widget->result= s1;
+}
 
 /*
    tokenize(): Produce a list of tokens given an SQL statement using MySQL rules.
@@ -10214,6 +10256,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "ocelot_grid_border_size") == 0) { ocelot_grid_border_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_cell_border_size") == 0) { ocelot_grid_cell_border_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_size") == 0) { ocelot_grid_cell_drag_line_size= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_tabs") == 0) { ocelot_grid_tabs= to_long(token2); return; }
   if (strcmp(token0_as_utf8, "ocelot_history_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_text_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_background_color") == 0)
