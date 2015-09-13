@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: September 9 2015
+   Last modified: September 13 2015
 */
 
 /*
@@ -1693,11 +1693,11 @@ void MainWindow::create_menu()
   connect(menu_debug_action_information, SIGNAL(triggered()), this, SLOT(action_debug_information()));
   menu_debug_action_information->setShortcut(QKeySequence(tr("Alt+8")));
 
-  menu_debug_action_refresh_server_variables= menu_debug->addAction(tr("Refresh server variables"));
+  menu_debug_action_refresh_server_variables= menu_debug->addAction(tr("Refresh server_variables"));
   connect(menu_debug_action_refresh_server_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_server_variables()));
   menu_debug_action_refresh_server_variables->setShortcut(QKeySequence(tr("Alt+9")));
 
-  menu_debug_action_refresh_user_variables= menu_debug->addAction(tr("Refresh user variables"));
+  menu_debug_action_refresh_user_variables= menu_debug->addAction(tr("Refresh user_variables"));
   connect(menu_debug_action_refresh_user_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_user_variables()));
   menu_debug_action_refresh_user_variables->setShortcut(QKeySequence(tr("Alt+0")));
 
@@ -2913,6 +2913,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number, int *
     }
   }
   *returned_begin_count= begin_count;
+
   return i - passed_main_token_number;
 }
 
@@ -4212,16 +4213,20 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     if (debug_error((char*)"Missing routine name") != 0) return;
   }
 
-  /* This is in case an error left tab widget up. Todo: Examine if other debuggee errors should get the same treatment. */
-  if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR)
+  /*
+    If a $debug was started before, and didn't finish, we demand that the user do $exit.
+    We could instead call debug_exit_go(1).
+    Perhaps $exit will fail somehow, and users will be falsely told they can't debug.
+    That's a bug but better than hanging, which is a risk if we make two debug threads.
+  */
+  if (debug_thread_exists == true)
   {
-    debug_exit_go(1);
+    if (debug_error((char*)"Debug is already running. Use Debug|exit to stop it. This could be temporary.") != 0) return;
   }
 
   if (debuggee_state < 0) debuggee_state= DEBUGGEE_STATE_0;
   if (debuggee_state == DEBUGGEE_STATE_END) debuggee_state= DEBUGGEE_STATE_0;
   if (debug_error((char*)"") != 0) return;
-
 
   strcpy(routine_schema, q_routine_schema.toUtf8());
   strcpy(routine_name, q_routine_name.toUtf8());
@@ -4575,6 +4580,8 @@ void MainWindow::action_debug_breakpoint()
 /*
   "breakpoint" and "clear" and "tbreakpoint" have the same argument syntax so we use the same routine for all,
   passing statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT or TOKEN_KEYWORD_DEBUG_CLEAR.
+  Todo: "$breakpoint ... hit_count = N" is not working.
+  Todo: "$breakpoint ... variable_name <> old" is not working.
 */
 void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 {
@@ -4591,7 +4598,13 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 
   if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
   {
-    if (debug_error((char*)"Overflow") != 0) return;
+    char error_message[512];
+    strcpy(error_message, "Error, correct statement format is ");
+    if (statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT) strcat(error_message," $breakpoint ");
+    else if (statement_type == TOKEN_KEYWORD_DEBUG_TBREAKPOINT) strcat(error_message," $tbreakpoint ");
+    else strcat(error_message," $clear ");
+    strcat(error_message,"[schema_identifier.].routine_identifier] line_number_minimum [-line_number_maximum]");
+    if (debug_error(error_message) != 0) return;
   }
   schema_name= debug_q_schema_name_in_statement;
   routine_name= debug_q_routine_name_in_statement;
@@ -4758,6 +4771,10 @@ void MainWindow::action_debug_step()
 
 /*
   Debug|Leave
+  This isn't working quite right. It gets out of loops, but if it's
+  in a subroutine then it will try to execute all the way to the end
+  of the main routine. (A breakpoint can stop that from happening.)
+  So we will allow the $LEAVE statement but not advertise it on the menu.
 */
 //void MainWindow::action_debug_leave()
 //{
@@ -4782,6 +4799,7 @@ void MainWindow::debug_source_go()
 /*
   $SET declared_variable_name = value;
   Todo: As an additional error check: look up declared_variable_name in xxxmdbug.variables.
+  TODO: BUG: $set x = 'literal'; results in a syntax error so say only numbers are allowed.
 */
 void MainWindow::debug_set_go(QString text)
 {
@@ -4887,7 +4905,6 @@ void MainWindow::action_debug_next()
   After the cursor is set to the line, the CodeEditor's highlightCurrentLine wil highlight it.
   Remember, blockNumber() is base 0
   Todo: If the call was completed, you shouldn't be here -- the line number will be too big!
-  Todo: Make sure highlight line goes off if execution switches to a different routine's tab. (I think that's okay now.)
 */
 void MainWindow::debug_highlight_line()
 {
@@ -4949,7 +4966,7 @@ void MainWindow::debug_highlight_line()
 
   QTextEdit::ExtraSelection selection;
 
-  /* debug highlight color = current line color e.g. yellow. used to be QColor(Qt::red) */
+  /* debug highlight color = current line color e.g. yellow, but faded */
   QColor lineColor= QColor(ocelot_statement_highlight_current_line_color).lighter(160);
 
   QTextDocument* doc= debug_widget[debug_widget_index]->document();
@@ -4964,10 +4981,23 @@ void MainWindow::debug_highlight_line()
   selection.format.setProperty(QTextFormat::FullWidthSelection, true);
   selection.cursor= QTextCursor(doc);
   selection.cursor.setPosition(pos, QTextCursor::MoveAnchor);
-  selection.cursor.setPosition(pos+1, QTextCursor::KeepAnchor);
+  selection.cursor.setPosition(pos + 1, QTextCursor::KeepAnchor);
   selection.cursor.clearSelection();
   extraSelections.append(selection);
   debug_widget[debug_widget_index]->setExtraSelections(extraSelections);
+
+  /*
+    I don't understand why selection.cursor.setPosition(pos) does not
+    really move the cursor, I think it's got do with whether the cursor
+    is a copy. Anyway, without the following code, if the highlighted
+    line moves off the screen, it won't be visible unless the user
+    scrolls up or down.
+    The user can move the cursor too, this only overrides temporarily.
+  */
+  QTextCursor c =  debug_widget[debug_widget_index]->textCursor();
+  c.setPosition(pos);
+  debug_widget[debug_widget_index]->setTextCursor(c);
+  //debug_widget[debug_widget_index]->ensureCursorVisible(); /* I think we don't need this */
 }
 
 
@@ -5101,6 +5131,8 @@ void MainWindow::debug_delete_tab_widgets()
 void MainWindow::action_debug_information()
 {
   if (debug_call_xxxmdbug_command("information status") != 0) return;
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.information_status");
+  emit action_execute();
 }
 
 
@@ -5113,7 +5145,7 @@ void MainWindow::action_debug_refresh_server_variables()
   {
     if (debug_error((char*)"No debug session in progress") != 0) return;
   }
-  if (debug_call_xxxmdbug_command("refresh server variables") != 0) return;
+  if (debug_call_xxxmdbug_command("refresh server_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables");
   emit action_execute();
 }
@@ -5128,7 +5160,7 @@ void MainWindow::action_debug_refresh_user_variables()
   {
     if (debug_error((char*)"No debug session in progress") != 0) return;
   }
-  if (debug_call_xxxmdbug_command("refresh user variables") != 0) return;
+  if (debug_call_xxxmdbug_command("refresh user_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.user_variables");
   emit action_execute();
 }
@@ -5739,8 +5771,20 @@ void MainWindow::action_execute_one_statement(QString text)
     if (do_something == true)
     {
       /* todo: figure out why you used global dbms_query for this */
+      /* TODO: BUG. This statement caused a crash when ocelot_comments == 0:
+               create procedure p27 ()
+               begin
+               declare xxx int;
+               declare yyy int;
+               set xxx = 0;
+               while xxx < 1000 do
+                 set xxx = xxx;
+                 set xxx = xxx + 1;
+                 end while;
+               end
+          We work around it by allocating double what we need for dbms_query. */
       dbms_query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
-      dbms_query= new char[dbms_query_len + 1];
+      dbms_query= new char[(dbms_query_len + 1) * 2];
       dbms_query_len= make_statement_ready_to_send(text, query_utf16_copy,
                                                    dbms_query, dbms_query_len,
                                                    strip_last_token);
@@ -5758,9 +5802,9 @@ void MainWindow::action_execute_one_statement(QString text)
  //     dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
  //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
-
       if (dbms_long_query_result)
       {
+
         /* beep() hasn't been tested because getting sound to work on my computer is so hard */
         if (ocelot_no_beep == 0) QApplication::beep();
         delete []dbms_query;

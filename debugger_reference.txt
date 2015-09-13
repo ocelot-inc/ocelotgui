@@ -89,7 +89,24 @@ $exit
   Shortcuts:     Alt+7, or via menu: Debug|Exit
   Requirements:  The debugger must be already running.
   Example:       $exit;
-$information
+$information status
+  What it's for: showing information about debugger status
+  Syntax:        $inf[ormation status]
+  Shortcuts:     Alt+8, or via menu: Debug|Information
+                 (At time of writing, Menu does not work properly.)
+  Example:       $information status;
+                 select * from xxxmdbug.information_status;
+  Remarks:       The $information status statement will populate a table
+                 named xxxmdbug.information_status, which contains
+                 debugger_name, debugger_version,
+                 timestamp_of_status_message, number_of_status_message,
+                 icc_count, schema_identifier, routine_identifier,
+                 line_number, is_at_breakpoint, is_at_tbreakpoint,
+                 is_at_routine_exit, stack_depth, last_command,
+                 last_command_result, commands_count.
+                 The most important items of information status are
+                 displayed automatically along with the Debug Widget,
+                 so $information status is only for advanced users.
 $install
   What it's for: install the debugger
   Syntax:        $ins[tall]
@@ -138,6 +155,24 @@ $next
                  or (if this was the last line) routine exit.
   Remarks:       $next is different from $step because $step
                  can drop into a subroutine, $next does not.
+$refresh breakpoints
+  What it's for: showing what breakpoints exist.
+  Syntax:        $refresh breakpoints;
+  Shortcuts:     None. $refresh breakpoints is not on the Debug menu.
+  Example:       $refresh breakpoints;
+                 select * from xxxmdbug.breakpoints;
+  Remarks:       The $refresh breakpoints statement will populate a table
+                 named xxxmdbug.server_breakpoints, which contains
+                 breakpoint_identifier, schema_identifier,
+                 routine_identifier, routine_type, line_number_minimum,
+                 line_number_maximum, condition_identifier,
+                 condition_operator, condition_value, hit_count,
+                 is_temporary, is_temporary_and_to_be_cleared,
+                 is_matching_location, call_stack_depth_when_set,
+                 command. For simple breakpoints which were set up with
+                 $breakpoint schema.routine line_number,
+                 $refresh breakpoints is unnecessary because
+                 breakpointed lines are marked in the Debug Widget.
 $refresh call_stack
   What it's for: showing what the routines are that got us here.
   Syntax:        $refresh call_stack
@@ -235,7 +270,8 @@ $set
                  are specified with "DECLARE variable_name ...")
                  can be changed with $set. There is no
                  statement for changing user variables or
-                 system variables.     
+                 system variables.
+                 $set should only be done while at a breakpoint.
 $setup
   Requirements:  The debugger must be installed (see $install).
   Syntax:        $setu[p] [schema_identifier.]routine_identifier
@@ -258,6 +294,7 @@ $setup
                  The maximum number of routines per setup is 10.
                  The $setup statement makes copies of routines,
                  but never never changes the original routines.
+                 The default schema is "test".
 $step
   What it's for: Making the program go to the next statement
                  in the current routine or a subroutine.
