@@ -959,7 +959,6 @@ private:
   QWidget *widget_with_main_layout;
   QVBoxLayout *upper_layout;
   QWidget *widget_for_size_hint;
-  QLabel *label_for_component_size_calc;
 
   int column_count_copy;
   int *row_form_is_password_copy;
@@ -997,7 +996,6 @@ Row_form_box(int column_count, QString *row_form_label,
   widget_with_main_layout= 0;
   upper_layout= 0;
   widget_for_size_hint= 0;
-  label_for_component_size_calc= 0;
 
   label= new QLabel*[column_count];
   line_edit= new QLineEdit*[column_count];
@@ -1015,26 +1013,49 @@ Row_form_box(int column_count, QString *row_form_label,
   }
   is_ok= 0;
 
-  /* Component height = enough for two lines. I tried using QFontMetrics, it didn't work. */
-  /* Todo: another way to calculate a size involves layout->activate(). */
-  label_for_component_size_calc= new QLabel(this);
-  label_for_component_size_calc->setStyleSheet(parent->ocelot_grid_style_string);
-  label_for_component_size_calc->show();
-  int component_height= label_for_component_size_calc->height();
-  label_for_component_size_calc->close();
+  /*
+    Component height
+    This is always a problem. I tried using QFontMetrics, it didn't work.
+    One difficult is that height() alone is internal height, and (although I
+    have no idea why) I want setMinimumSize to depend on external height, so
+    component_height= label_for_component_size_calc->frameGeometry().height().
+    But http://doc.qt.io/qt-4.8/application-windows.html "X11 Peculiarities"
+    says I can't really depend on that, even after show(). Adding 5 works,
+    but looks like wasting space if font size is small.
+    Multiplying component height by 2 works too, it's what I had before.
+    Another way to calculate a size involves layout->activate(), I didn't try it.
+    Subsequently, for spacing between lines, I finally realized that it's not enough
+    to do setSpacing + setContentsMargins for the QVBoxLayout, I have to do them
+    for each QHBoxLayout as well.
+    Todo: probably the spacing could look a little tidier.
+  */
+  int component_height;
+  {
+    QLineEdit *line_edit_for_component_size_calc;
+    line_edit_for_component_size_calc= new QLineEdit(this);
+    line_edit_for_component_size_calc->setStyleSheet(parent->ocelot_grid_style_string);
+    line_edit_for_component_size_calc->show();
+    component_height= line_edit_for_component_size_calc->height();
+    component_height+= parent->ocelot_grid_cell_border_size.toInt() * 2 + 5;
+    line_edit_for_component_size_calc->close();
+    delete line_edit_for_component_size_calc;
+  }
 
   main_layout= new QVBoxLayout();
-  main_layout->setSpacing(0); /* Todo: check why this doesn't seem to have any effect */
-  main_layout->setContentsMargins(0, 0, 0, 0); /* Todo: check why this doesn't seem to have any effect */
+  main_layout->setSpacing(0);
+  main_layout->setContentsMargins(QMargins(0, 0, 0, 0));
   main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* necessary, but I don't know why */
   label_for_message= new QLabel(row_form_message);
   main_layout->addWidget(label_for_message);
   for (i= 0; i < column_count; ++i)
   {
     hbox_layout[i]= new QHBoxLayout();
+    //hbox_layout[i]->setSpacing(0);
+    hbox_layout[i]->setContentsMargins(QMargins(2, 2, 2, 2));
+    hbox_layout[i]->setSizeConstraint(QLayout::SetFixedSize);  /* necessary, but I don't know why */
     label[i]= new QLabel();
     label[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
-    label[i]->setMinimumHeight(component_height * 2);
+    label[i]->setMinimumHeight(component_height);
     label[i]->setText(row_form_label[i]);
     hbox_layout[i]->addWidget(label[i]);
 
@@ -1044,8 +1065,8 @@ Row_form_box(int column_count, QString *row_form_label,
       line_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
       line_edit[i]->insert(row_form_data[i]);
       line_edit[i]->setEchoMode(QLineEdit::Password); /* maybe PasswordEchoOnEdit would be better */
-      line_edit[i]->setMaximumHeight(component_height * 2);
-      line_edit[i]->setMinimumHeight(component_height * 2);
+      line_edit[i]->setMaximumHeight(component_height);
+      line_edit[i]->setMinimumHeight(component_height);
       hbox_layout[i]->addWidget(line_edit[i]);
     }
     else
@@ -1063,8 +1084,8 @@ Row_form_box(int column_count, QString *row_form_label,
         text_edit[i]->setReadOnly(false);
       }
       text_edit[i]->setText(row_form_data[i]);
-      text_edit[i]->setMaximumHeight(component_height * 2);
-      text_edit[i]->setMinimumHeight(component_height * 2);
+      text_edit[i]->setMaximumHeight(component_height);
+      text_edit[i]->setMinimumHeight(component_height);
       text_edit[i]->setTabChangesFocus(true);
       /* The following line will work, but I'm undecided whether it's desirable. */
       //if ((row_form_type[i] & NUM_FLAG) != 0) text_edit[i]->setAlignment(Qt::AlignRight);
@@ -1192,7 +1213,6 @@ void garbage_collect ()
   if (upper_layout != 0) delete upper_layout;
   if (scroll_area != 0) delete scroll_area;
   if (widget_for_size_hint != 0) delete widget_for_size_hint;
-  if (label_for_component_size_calc != 0) delete label_for_component_size_calc;
 }
 
 };

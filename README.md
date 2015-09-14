@@ -736,6 +736,7 @@ $exit or Debug|Exit -- stops a debug session.
 <P>
 For a walk through a debugger example, with screenshots, see
 this blog post: http://ocelot.ca/blog/the-ocelotgui-debugger.  
+For reference, read: https://github.com/ocelot-inc/ocelotgui/blob/master/debugger_reference.txt.
 </P>
 
 ### Special Effects 

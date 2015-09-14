@@ -1976,7 +1976,7 @@ void MainWindow::action_connect_once(QString message)
       printf("%s\n", output_string);
     }
   }
-  else /* if (message == "FIle|Connect") */
+  else /* if (message == "File|Connect") */
   {
 
     row_form_title= tr("Connection Dialog Box");
@@ -1986,7 +1986,9 @@ void MainWindow::action_connect_once(QString message)
                                        row_form_type,
                                        row_form_is_password, row_form_data,
   //                                     row_form_width,
-                                       row_form_title, row_form_message, this);
+                                       row_form_title,
+                                       "File|Connect. Usually only the first 8 fields are important.",
+                                       this);
     co->exec();
 
     if (co->is_ok == 1)
