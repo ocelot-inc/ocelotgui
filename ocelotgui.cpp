@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: September 13 2015
+   Last modified: September 15 2015
 */
 
 /*
@@ -5690,25 +5690,12 @@ void MainWindow::action_execute_one_statement(QString text)
 
   ++statement_edit_widget->statement_count;
 
-  /* Clear the old result sets. */
-  //unsigned int old_result_column_count= result_grid_table_widget->result_column_count;
-
   /*
     Todo: There should be an indication that something is being executed.
     Possibly, on the title bar, setPlainText(tr("Executing ...")
     Possibly there should be a status widget or a progress bar.
     Whatever it is, turn it on now and turn it off when statement is done.
-  */
-
-  /*
-    When we get a new result set, we want to remove all the old widgets inside result_grid_form.
-    It's probably easy, but I didn't know how to get the original layout as a QFormLayout.
-    So I delete the old layout too, and make a new one.
-    Also I'm unsure whether the "delete item" will get rid of memory leaking, or merely fail.
-    Update: "delete item;" fails so I commented it out. Maybe removeItem is failing too, I didn't check.
-    Something about "must be implemented in subclasses" is possibly a hint that I'm doing it wrong.
-    ... Perhaps I should create MAX_COLUMNS widgets at the start, and never delete them.
-    ... Update: Qt documentation talks about clear() in places, maybe relevantly.
+    Update: the Run|Execute menu item changes, which is slightly helpful.
   */
 
   /* Apparently there is no need for a call to tokenize() here, it seems certain that it's already been called. */
@@ -5721,8 +5708,8 @@ void MainWindow::action_execute_one_statement(QString text)
 
   QString last_token;
   bool strip_last_token= false;
-  int length_of_last_token_in_statement= main_token_lengths[main_token_number+main_token_count_in_statement - 1];
-  int type_of_last_token_in_statement= main_token_types[main_token_number+main_token_count_in_statement - 1];
+  int length_of_last_token_in_statement= main_token_lengths[main_token_number + main_token_count_in_statement - 1];
+  int type_of_last_token_in_statement= main_token_types[main_token_number + main_token_count_in_statement - 1];
   last_token= text.mid(main_token_offsets[main_token_number+main_token_count_in_statement - 1],
                        length_of_last_token_in_statement);
   if ((length_of_last_token_in_statement == 1) && ((type_of_last_token_in_statement == TOKEN_KEYWORD_EGO) || (type_of_last_token_in_statement == TOKEN_KEYWORD_GO)))
@@ -5825,7 +5812,6 @@ void MainWindow::action_execute_one_statement(QString text)
           That takes up memory. If it were easy to check in advance whether a statement
           caused a result set (e.g. with mysql_next_result or by looking at whether the
           statement is SELECT SHOW etc.), that would be better.
-          Todo: nothing is happening for multiple result sets, we throw away all but the first.
         */
         mysql_res_for_new_result_set= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
         if (mysql_res_for_new_result_set == 0) {
@@ -5936,8 +5922,6 @@ void MainWindow::action_execute_one_statement(QString text)
 
                 ++result_grid_table_widget_index;
               }
-
-
 
               if (mysql_res != 0) lmysql->ldbms_mysql_free_result(mysql_res);
 

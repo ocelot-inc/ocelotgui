@@ -2587,6 +2587,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
                            + ocelot_grid_cell_border_size_as_int * 2
                            + ocelot_grid_cell_drag_line_size_as_int;
           if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
+          else header_height+= max_height_of_a_char;
           text_edit_frames[xrow * gridx_column_count + xcol]->setFixedSize(grid_column_widths[xcol], header_height);
 //          text_edit_frames[xrow * gridx_column_count + xcol]->setMaximumHeight(header_height);
 //          text_edit_frames[xrow * gridx_column_count + xcol]->setMinimumHeight(header_height);
@@ -2992,11 +2993,6 @@ QString copy(unsigned int ocelot_history_max_column_width,
 */
 /* header height calculation should differ from ordinary-row height calculation */
 /*
-  Todo: This did not turn out well ...
-        Dunno why I had to say "* 2" towards the end.
-        Width is now too much.
-*/
-/*
    Extra size
    I'm saying "if width<2 then width=2" and "if height<2 then height=2".
    If I don't, then the drag line doesn't appear.
@@ -3009,6 +3005,7 @@ QString copy(unsigned int ocelot_history_max_column_width,
    calculations, but perhaps lineSpacing() shouldn't be added if there is only one line.
    I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
    but removing it doesn't solve the problem.
+   ... todo: check: Maybe setting minimum height / width of text_edit_frames[...] is a problem?
    Update: June 7 2015: the problem seems to have disappeared so I temporarily removed the line.
    Todo: another way to calculate a size involves layout->activate().
 */
@@ -3032,6 +3029,10 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   /* This was a bug: "this" might not have been updated by setStyleSheet() yet ... QFontMetrics mm(this->fontMetrics()); */
   unsigned int max_width_of_a_char= mm.width("W");    /* not really a maximum unless fixed-width font */
   max_height_of_a_char= mm.lineSpacing();             /* Actually this is mm.height() + mm.leading(). */
+
+  /* KLUDGE. Small fonts don't work, we have to pretend they're wider. No, I don't know why. */
+  if (max_width_of_a_char <= 5) max_width_of_a_char+= 2;
+  if (max_height_of_a_char <= 10) max_height_of_a_char+= 2;
 
   sum_tmp_column_lengths= 0;
 
@@ -3117,15 +3118,22 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
 
   /* Warning: header-height calculation is also "*(max_height_of_a_char+(border_size*2))", in a different place. */
   /* This calculation of height is horrendously difficult, and still does not seem to be exactly right. */
+  /* todo: it looks as if grid_height_of_highest_column_in_pixels is no longer used */
   for (i= 0; i < gridx_column_count; ++i)
   {
 //    grid_column_heights[i]= (grid_column_heights[i] * (max_height_of_a_char+(border_size * 2))) + 9;
     /* For explanation of next line, see comment "Extra size". */
-    if ((grid_column_heights[i] < 2) && (ocelot_grid_cell_drag_line_size_as_int > 0)) grid_column_heights[i]= 2;
+    int old_grid_column_height= grid_column_heights[i];
     grid_column_heights[i]= (grid_column_heights[i] * max_height_of_a_char)
                             + ocelot_grid_cell_border_size_as_int * 2
                             + ocelot_grid_cell_drag_line_size_as_int;
-
+    if (old_grid_column_height < 2)
+    {
+      int extra;
+      if (ocelot_grid_cell_drag_line_size_as_int > 0) extra= max_height_of_a_char;
+      else extra= max_height_of_a_char;
+      grid_column_heights[i]+= extra;
+    }
     if (grid_column_heights[i] > grid_height_of_highest_column_in_pixels)
     {
       grid_height_of_highest_column_in_pixels= grid_column_heights[i];
