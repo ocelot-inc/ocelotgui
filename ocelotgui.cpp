@@ -1491,7 +1491,7 @@ void MainWindow::history_file_to_history_widget()         /* see comment=tee+his
   if (fseek(history_file, 0 , SEEK_END) == 0)
   {
     int file_size = ftell(history_file);
-    if (file_size > HISTFILESIZE) fseek(history_file, HISTFILESIZE, SEEK_END);
+    if (file_size > HISTFILESIZE) fseek(history_file, file_size - HISTFILESIZE, SEEK_SET);
     else fseek(history_file, 0, SEEK_SET);
   }
   char line[4096];
@@ -8337,7 +8337,6 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   /* I decided this line is unnecessary, mysql_init is done in options_and_connect() */
   //lmysql->ldbms_mysql_init(&mysql[connection_number]);
-
   if (the_connect(connection_number))
   {
     put_diagnostics_in_result();
@@ -8356,10 +8355,18 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   /*
     Collect some variables in case they're needed for "prompt".
-    Todo: check for errors after these mysql_ calls.
+    Todo: handle errors better after mysql_ calls here.
+    A possible error is: Error 1226 (42000) User ... has exceeded the 'max_queries_per_hour' resource
     Not using the mysql_res global, since this is not for user to see.
   */
-  lmysql->ldbms_mysql_query(&mysql[connection_number], "select version(), database(), @@port, current_user(), connection_id()");
+  int query_result= lmysql->ldbms_mysql_query(&mysql[connection_number], "select version(), database(), @@port, current_user(), connection_id()");
+  if (query_result != 0 ){
+    QMessageBox msgbox;
+    msgbox.setText("'mysql_query() failed");
+    msgbox.exec();
+    is_mysql_connected= 1;
+    return 0;
+  }
   MYSQL_RES *mysql_res_for_connect;
   MYSQL_ROW connect_row;
   QString s;
@@ -8367,8 +8374,23 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   // unsigned long connect_lengths[1];
   mysql_res_for_connect= lmysql->ldbms_mysql_store_result(&mysql[connection_number]);
+  if (mysql_res_for_connect == NULL)
+  {
+    QMessageBox msgbox;
+    msgbox.setText("mysql_store_result failed");
+    msgbox.exec();
+    is_mysql_connected= 1;
+    return 0;
+  }
   connect_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_connect);
-
+  if (connect_row == NULL)
+  {
+    QMessageBox msgbox;
+    msgbox.setText("mysql_fetch_row failed");
+    msgbox.exec();
+    is_mysql_connected= 1;
+    return 0;
+  }
   /* lengths= lmysql->ldbms_mysql_fetch_lengths(mysql_res_for_connect); */
   statement_edit_widget->dbms_version= connect_row[0];
   statement_edit_widget->dbms_database= connect_row[1];
