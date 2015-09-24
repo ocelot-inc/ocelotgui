@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: September 15 2015
+   Last modified: September 23 2015
 */
 
 /*
@@ -539,7 +539,19 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   main_window_maximum_width= 0;
   main_window_maximum_height= 0;
 
+  /* Todo: At some point we should get rid of ocelot.ui. */
   ui->setupUi(this);              /* needed so that the menu will show up */
+
+/*
+  The Menu Bar did not appear with Ubuntu 14.04.
+  This might be the horrific bug
+  https://bugs.launchpad.net/ubuntu/+source/appmenu-qt5/+bug/1307619
+  But QT_QPA_PLATFORMTHEME= did not solve.
+  So insist that the menu goes in MainWindow.
+*/
+#ifdef __linux
+  ui->menuBar->setNativeMenuBar(false);
+#endif
 
   setWindowTitle("ocelotgui");
 
