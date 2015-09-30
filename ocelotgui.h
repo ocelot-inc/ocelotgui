@@ -17,6 +17,9 @@
 /* The debugger is integrated now, but "ifdef DEBUGGER" directives help to delineate code that is debugger-specific. */
 #define DEBUGGER
 
+/* We accept existence of MariaDB 10.1 roles and compound statements. */
+#define MARIADB
+
 #include <assert.h>
 
 #ifndef MAINWINDOW_H
@@ -275,7 +278,6 @@ public slots:
   void action_kill();
   void action_about();
   void action_the_manual();
-  void action_the_manual_close();
   void action_libmysqlclient();
   void action_settings();
   void action_statement_edit_widget_text_changed();
@@ -396,6 +398,7 @@ private:
   void history_file_to_history_widget();           /* see comment=tee+hist */
 
   void statement_edit_widget_setstylesheet();
+  void message_box(QString the_title, QString the_text);
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
 
@@ -726,9 +729,9 @@ private:
   int token_type(QChar *token, int token_length);
 
   void tokens_to_keywords(QString text);
-  void tokens_to_keywords_revert(int i_of_body, int i_of_function, QString text);
+  void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text);
   int next_token(int i);
-  int find_start_of_body(QString text, int *i_of_function);
+  int find_start_of_body(QString text, int *i_of_function, int *i_of_do);
   int connect_mysql(unsigned int connection_number);
   QString select_1_row(const char *select_statement);
 
@@ -1016,7 +1019,7 @@ Row_form_box(int column_count, QString *row_form_label,
   /*
     Component height
     This is always a problem. I tried using QFontMetrics, it didn't work.
-    One difficult is that height() alone is internal height, and (although I
+    One difficulty is that height() alone is internal height, and (although I
     have no idea why) I want setMinimumSize to depend on external height, so
     component_height= label_for_component_size_calc->frameGeometry().height().
     But http://doc.qt.io/qt-4.8/application-windows.html "X11 Peculiarities"
@@ -1218,6 +1221,75 @@ void garbage_collect ()
 };
 
 #endif // ROW_FORM_BOX_H
+
+
+/***********************************************************/
+/* THE MESSAGE_BOX WIDGET */
+/***********************************************************/
+
+/*
+  QMessageBox equivalent, but with scroll bars.
+  A simple QMessageBox has no scroll bars.
+  We need them for some Help displays especially if screen size is small.
+  Todo: delete dialog.
+*/
+#ifndef MESSAGE_BOX_H
+#define MESSAGE_BOX_H
+
+class Message_box: public QDialog
+{
+  Q_OBJECT
+public:
+  QDialog *message_box;
+  bool is_ok;
+
+private:
+  int width_for_size_hint, height_for_size_hint;
+
+public:
+Message_box(QString the_title, QString the_text, MainWindow *parent): QDialog(parent)
+{
+
+  QScrollArea *scroll_area= new QScrollArea(this);
+  scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+  QWidget *widget = new QWidget(this);
+  scroll_area->setWidget(widget);
+  scroll_area->setWidgetResizable(true);
+
+  QVBoxLayout *layout = new QVBoxLayout(widget);
+  widget->setLayout(layout);
+
+  QTextEdit *text_edit= new QTextEdit(this);
+  text_edit->setText(the_text);
+  text_edit->setReadOnly(true);
+  layout->addWidget(text_edit);
+
+  QPushButton *push_button= new QPushButton(this);
+  push_button->setText("OK");
+  layout->addWidget(push_button);
+
+  connect(push_button, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
+  this->setMinimumHeight(500);
+  this->setMinimumWidth(500);
+  this->setWindowTitle(the_title);
+  QHBoxLayout *dialog_layout= new QHBoxLayout(this);
+  this->setLayout(dialog_layout);
+  this->layout()->addWidget(scroll_area);
+}
+
+private slots:
+
+void handle_button_for_ok()
+{
+  /* Skipping garbag collect this time. */
+  close();
+}
+
+};
+
+#endif // MESSAGE_BOX_H
 
 /***********************************************************/
 /* The Low-Level DBMS calls */
