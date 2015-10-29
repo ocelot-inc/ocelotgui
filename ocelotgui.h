@@ -30,6 +30,7 @@
 #ifndef __linux
 #include <QApplication>
 #endif
+#include <QClipboard>
 #include <QComboBox>
 #include <QDateTime>
 #include <QDialog>
@@ -903,6 +904,7 @@ public:
 protected:
   void paintEvent(QPaintEvent *event);
   void keyPressEvent(QKeyEvent *event);
+  void copy();
 
   QString unstripper(QString value_to_unstrip);
 

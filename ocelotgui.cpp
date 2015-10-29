@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: September 30 2015
+   Last modified: October 29 2015
 */
 
 /*
@@ -9222,6 +9222,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
   QString content_in_text_edit_widget;
   QString name_in_result_set;
   QString update_statement, where_clause;
+  if (event->matches(QKeySequence::Copy)) { copy(); return; }
   QString content_in_cell_before_keypress= toPlainText();
   QTextEdit::keyPressEvent(event);
   QString content_in_cell_after_keypress= toPlainText();
@@ -9361,6 +9362,42 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       if (c->toPlainText().mid(0, 23) == "/* generated */ UPDATE ") c->setPlainText("");
     }
   }
+}
+
+
+/*
+  If the cell has text then we did setText() and QTextEdit::copy() should work okay.
+  The reason that we reimplement copy(), and call it from QKeySequence, is:
+  for images we do not do setText(). So we (?) have to loadfromData again and
+  put in the clipboard as a pixmap.
+  This gets the entire unclipped image because we're reloading from the source.
+  Todo: check for nulls.
+  Todo: decide whether we care about select() before copy().
+  Todo: although ^C seems okay, right-click and select copy does not seem okay.
+  Todo: With Qt4, when program ends, if there was a copy, we might see
+        "QClipboard: Unable to receive an event from the clipboard manager in a reasonable time"
+        which might be like https://bugreports.qt.io/browse/QTBUG-32853.
+*/
+void TextEditWidget::copy()
+{
+  if ((text_edit_frame_of_cell->is_image_flag == true)
+  &&  (text_edit_frame_of_cell->content_pointer != 0))
+  {
+    QPixmap p= QPixmap();
+    if (p.loadFromData((const uchar*) text_edit_frame_of_cell->content_pointer,
+                       text_edit_frame_of_cell->content_length,
+                       0,
+                       Qt::AutoColor) == false)
+    {
+      /* ?? dunno what would cause this. maybe it's null. */
+    }
+    else
+    {
+      QClipboard *p_clipboard= QApplication::clipboard();
+      p_clipboard->setPixmap(p);
+    }
+  }
+  else QTextEdit::copy();
 }
 
 
