@@ -66,6 +66,7 @@
   We use opendir() readdir() closedir() when getting options, therefore include dirent.h.
   We use getpwuid() when getting password, therefore include pwd.h.
   We use pthread_create() for debug and kill, therefore include pthread.h.
+  We use stat() to see if a configuration file is world-writable, therefore include stat.h.
 */
 #ifdef __linux
 #include <dlfcn.h>
@@ -73,6 +74,7 @@
 #include <dirent.h>
 #include <pwd.h>
 #include <pthread.h>
+#include <sys/stat.h>
 #endif
 
 /* Flags used for row_form_box. NUM_FLAG is also defined in mysql include, with same value. */

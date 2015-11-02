@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: October 29 2015
+   Last modified: November 1 2015
 */
 
 /*
@@ -367,7 +367,6 @@ static const char *s_color_list[308]=
 #define STRING_LENGTH_512 512
 
 /* Connect arguments and options */
-  /* todo: I doubt we're handling the "loose" or "enabled" possibilities */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
   static char* ocelot_database_as_utf8= 0;              /* --database=s */
   static char* ocelot_user_as_utf8= 0;                  /* --user=s */
@@ -6260,6 +6259,7 @@ int MainWindow::execute_client_statement(QString text)
     put_message_in_result(result);
     return 1;
   }
+  /* TODO: "STATUS" should output as much information as the mysql client does. */
   if (statement_type == TOKEN_KEYWORD_STATUS)
   {
     if (is_mysql_connected != 1) put_message_in_result(tr("not connected."));
@@ -9474,7 +9474,7 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
   $HOME/.my.cnf             MySQL manual says ~/.my.cnf which isn't necessarily the same thing, but I don't believe that
   $HOME/.mylogin.cnf        MySQL manual says ~/.mylogin.cnf which isn't necessarily the same thing, but I don't believe that
   ... There is no use of DATADIR, which is deprecated, and (I think) would only relate to server anyway.
-  Todo: On Unix, "ignore configuration files that are world-writable".
+  On Unix, "ignore configuration files that are world-writable" -- we use stat.h for this.
   * How to read ...
   for (;;)
     read line
@@ -9895,6 +9895,17 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   unsigned char output_buffer[65536];                    /* todo: should be dynamic size */
 
   group= "";                                             /* group identifier doesn't carry over from last .cnf file that we read */
+#ifdef __linux
+  struct stat st;
+  if (stat(file_name, &st) == 0)
+  {
+    if ((st.st_mode & S_IWOTH) == S_IWOTH)
+    {
+      printf("Ignoring world-writable configuration file %s.\n", file_name);
+      return;
+    }
+  }
+#endif
   file= fopen(file_name, "r");                           /* Open specified file, read only */
   if (file == NULL) return;                              /* (if file doesn't exist, ok, no error */
   if (is_mylogin_cnf == 1)
@@ -10171,9 +10182,7 @@ QString MainWindow::connect_stripper(QString value_to_strip, bool strip_doublets
     http://dev.mysql.com/doc/refman/5.6/en/program-options.html
   * '-' and '_' are interchangeable
     http://dev.mysql.com/doc/refman/5.6/en/command-line-options.html
-  * todo: if and only if the target is numeric, then before converting
-    the string to a number check whether it ends with K or M or G, and
-    if it does then multiply by a kilo or a mega or a giga
+  * if the target is numeric and ends with K etc., multiply by 1024 etc.
   option our variable name mysql variable name
   ------ ----------------- -------------------
   ho[st] ocelot_host       current_host
@@ -10202,6 +10211,25 @@ QString MainWindow::connect_stripper(QString value_to_strip, bool strip_doublets
   wait ocelot_wait
   default-character-set ocelot_default_character_set
 */
+/*
+  Re undocumented behaviour with option modifiers
+  The rules in http://dev.mysql.com/doc/refman/5.7/en/option-modifiers.html
+  "Program Option Modifiers" are weird already. To make it weirder, here's
+  a partial description of undocumented behaviour of mysql client.
+  For booleans:
+  ! If first letter of value = '0' it's 0, if first letter of value = '1' it's 1
+  ! --enable-disable-show-warnings is OK, the last prefix decides
+  ! If enable|disable|skip was stated, and [= value] is stated, then
+    If value = 0, then it reverses whatever enable|disable is in place so far
+      Else [= value] clause is ignored
+    Otherwise
+      If value is blank or invalid, ignore the whole specification and warn
+  For non-booleans:
+  ! If we say --skip-port=5, then port = 0 i.e. override previous setting
+  ! If we say --skip-delimiter=x then delimiter = ; i.e. return to default
+  ! If we say --skip-socket=x then socket='0' i.e. override previous setting
+  I try to follow some of this but not all.
+*/
 void MainWindow::connect_set_variable(QString token0, QString token2)
 {
   unsigned int token0_length;
@@ -10219,6 +10247,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
 
   /* option modifiers: ignore loose, set enable=true if enable or false if disable|skip */
   is_enable= 1;
+  bool is_enable_disable_skip_specified= false;
   for (;;)
   {
     if (strncmp(token0_as_utf8, "loose_", sizeof("loose_") - 1) == 0)
@@ -10228,25 +10257,34 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     }
     if (strncmp(token0_as_utf8, "enable_", sizeof("enable_") - 1) == 0)
     {
+      is_enable_disable_skip_specified= true;
       is_enable= 1;
       strcpy(token0_as_utf8, token0_as_utf8 + sizeof("enable_") - 1);
       continue;
     }
     if (strncmp(token0_as_utf8, "disable_", sizeof("disable_") - 1) == 0)
     {
+      is_enable_disable_skip_specified= true;
       is_enable= 0;
       strcpy(token0_as_utf8, token0_as_utf8 + sizeof("disable_") - 1);
       continue;
     }
     if (strncmp(token0_as_utf8, "skip_", sizeof("skip_") - 1) == 0)
     {
+      is_enable_disable_skip_specified= true;
       is_enable= 0;
       strcpy(token0_as_utf8, token0_as_utf8 + sizeof("skip_") - 1);
       continue;
     }
     break;
   }
-  if (token2 > "") is_enable= to_long(token2);  /* in case some fool says "--vertical = 5" etc. */
+  if ((is_enable_disable_skip_specified == false) && (token2 > ""))
+  {
+    QString token2_upper= token2.toUpper();
+    if ((token2 == "ON") || (token2 == "TRUE") || (token2.left(1) == "1")) ;
+    else if ((token2 == "OFF") || (token2 == "FALSE") || (token2.left(1) == "0")) is_enable= 0;
+    else /* error */ is_enable= 0;
+  }
 
   if (strcmp(token0_as_utf8, "auto_rehash") == 0) { ocelot_auto_rehash= is_enable; return; }
   if (strcmp(token0_as_utf8, "auto_vertical_output") == 0) { ocelot_auto_vertical_output= is_enable; return; }
@@ -11037,6 +11075,21 @@ void MainWindow::print_help()
   printf("--------------------------------- ----------------------------------------\n");
   action_connect_once("Print");
 }
+
+/*
+  SSL test
+  --------
+  This test was done with MariaDB 10.0.17 source, with files described in
+  "Configuring MySQL to use SSL Connections"
+  https://dev.mysql.com/doc/refman/5.0/en/using-ssl-connections.html
+  1. export MARIADB=10.0.17
+  2. Start server with
+     mysqld ... --ssl-ca=$HOME/$MARIADB/mysql-test/std_data/cacert.pem --ssl-cert=$HOME/$MARIADB/mysql-test/std_data/server-cert.pem --ssl-key=$HOME/$MARIADB/mysql-test/std_data/server-key.pem
+  3. Start client with
+     ocelotgui ... --ssl-cert=$HOME/$MARIADB/mysql-test/std_data/client-cert.pem --ssl-key=$HOME/$MARIADB/mysql-test/std_data/client-key.pem
+  4. SHOW STATUS LIKE 'Ssl_cipher';
+  The result value was DHE-RSA-AES256-SHA. So we declared the test successful.
+*/
 
 /*
   Valgrind
