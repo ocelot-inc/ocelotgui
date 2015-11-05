@@ -73,12 +73,12 @@ library. They must be downloaded separately.</P>
 <P>Often a machine already has Qt and libmysqlclient.
 In that case, be up and running in 15 seconds with:</P>
 <PRE>
-    mkdir ~/ocelotgui-test
-    cd ~/ocelotgui-test
-    wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
-    tar -zxvf ocelotgui.tar.gz
-    cd ocelotgui
-    ./ocelotgui-qt4 #or ./ocelotgui-qt5
+ mkdir ~/ocelotgui-test
+ cd ~/ocelotgui-test
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
+ tar -zxvf ocelotgui.tar.gz
+ cd ocelotgui
+ ./ocelotgui-qt4 #or ./ocelotgui-qt5
 </PRE>
 <P>If the above instructions succeed, there is no need to read
 the rest of these installation instructions.
@@ -148,35 +148,35 @@ of a release.</P>
 <P>These steps worked after a fresh installation of Ubuntu 12.04,
 a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <PRE>
-    cd ~/Downloads
-    #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
-    tar -zxvf ocelotgui.tar.gz
-    cd ocelotgui
-    #Install a package containing libmysqlclient.so and/or libmysqlclient.so.18
-    #Maybe mysql-common would have sufficed.
-    sudo apt-get install mysql-client
-    #Install a package containing libQtGui.so.4
-    sudo apt-get install libqt4-core
-    #Then, as an ordinary non-root user, say something like
-    ./ocelotgui-qt4 --host=127.0.0.1</PRE></P>
+ cd ~/Downloads
+ #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui.tar.gz
+ cd ocelotgui
+ #Install a package containing libmysqlclient.so and/or libmysqlclient.so.18
+ #Maybe mysql-common would have sufficed.
+ sudo apt-get install mysql-client
+ #Install a package containing libQtGui.so.4
+ sudo apt-get install libqt4-core
+ #Then, as an ordinary non-root user, say something like
+ ./ocelotgui-qt4 --host=127.0.0.1</PRE></P>
 
 <H3 id="an-installation-with-ubuntu-1404-64-bit">An installation with Ubuntu 14.04, 64-bit</H3><HR>
 
 <P>These steps worked after a fresh installation of Ubuntu 14.04,
 a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <PRE>
-    cd ~/Downloads
-    #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
-    tar -zxvf ocelotgui.tar.gz
-    cd ocelotgui
-    #Install a package containing libmysqlclient.so
-    #Maybe mysql-common would have sufficed.
-    sudo apt-get install mysql-client
-    #Install a package containing libQtGui.so.5
-    #This is unnecessary, apt-get install will say "already latest version"
-    sudo apt-get install libqt5core5a
-    #Then, as an ordinary non-root user, say something like
-    ./ocelotgui-qt5 --host=127.0.0.1 --user=root</PRE>
+ cd ~/Downloads
+ #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui.tar.gz
+ cd ocelotgui
+ #Install a package containing libmysqlclient.so
+ #Maybe mysql-common would have sufficed.
+ sudo apt-get install mysql-client
+ #Install a package containing libQtGui.so.5
+ #This is unnecessary, apt-get install will say "already latest version"
+ sudo apt-get install libqt5core5a
+ #Then, as an ordinary non-root user, say something like
+ ./ocelotgui-qt5 --host=127.0.0.1 --user=root</PRE>
 
 Warning: Some menu shortcut keys may not work properly with this distro.</P>
 
@@ -185,40 +185,40 @@ Warning: Some menu shortcut keys may not work properly with this distro.</P>
 <P>These steps worked after a fresh installation of Mageia 4.1,
 a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <PRE>
-    cd ~/Downloads
-    #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
-    tar -zxvf ocelotgui.tar.gz
-    cd ocelotgui
-    #Install a package containing libmysqlclient.so
-    #You can use "urpmf <library name>" to find
-    #what packages contain libmysqlclient.so.
-    #If the answer is lib64mariadb18, you can say as root:
-    sudo urpmi lib64mariadb18
-    #You will probably find that libQtGui.so.4 is already
-    #present, so there is no need to install Qt libraries.
-    #Use "whereis libQtGui.so.4" to make sure.
-    #Then, as an ordinary non-root user, say something like
-    ./ocelotgui-qt4 --host=127.0.0.1</PRE></P>
+ cd ~/Downloads
+ #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui.tar.gz
+ cd ocelotgui
+ #Install a package containing libmysqlclient.so
+ #You can use "urpmf <library name>" to find
+ #what packages contain libmysqlclient.so.
+ #If the answer is lib64mariadb18, you can say as root:
+ sudo urpmi lib64mariadb18
+ #You will probably find that libQtGui.so.4 is already
+ #present, so there is no need to install Qt libraries.
+ #Use "whereis libQtGui.so.4" to make sure.
+ #Then, as an ordinary non-root user, say something like
+ ./ocelotgui-qt4 --host=127.0.0.1</PRE></P>
 
 <H3 id="an-installation-with-fedora-20-64-bit">An installation with Fedora 20, 64-bit</H3><HR>
 
 <P>These steps worked after a fresh installation of Fedora 20, a
 GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <PRE>
-    cd ~/Downloads
-    #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
-    tar -zxvf ocelotgui.tar.gz
-    cd ocelotgui
-    #Install a package containing libmysqlclient.so
-    #This actually brings in the package supplied by MariaDB
-    sudo yum install mysql
-    #Find out where library libQtGui.so.4 is
-    yum provides 'libQtGui.so.4'
-    #Suppose "yum provides" says that you need qt-x11-4.8.6-10.fc20.i686
-    #That's nice, but i686 is a 32-bit version, so change i686 to x86_64
-    sudo yum install qt-x11-4.8.6-10.fc20.x86_64
-    #Then, as an ordinary non-root user, say something like
-    ./ocelotgui-qt4 --host=127.0.0.1</PRE></P>
+ cd ~/Downloads
+ #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui.tar.gz
+ cd ocelotgui
+ #Install a package containing libmysqlclient.so
+ #This actually brings in the package supplied by MariaDB
+ sudo yum install mysql
+ #Find out where library libQtGui.so.4 is
+ yum provides 'libQtGui.so.4'
+ #Suppose "yum provides" says that you need qt-x11-4.8.6-10.fc20.i686
+ #That's nice, but i686 is a 32-bit version, so change i686 to x86_64
+ sudo yum install qt-x11-4.8.6-10.fc20.x86_64
+ #Then, as an ordinary non-root user, say something like
+ ./ocelotgui-qt4 --host=127.0.0.1</PRE></P>
 
 <H3 id="an-installation-with-suse-131-32-bit-from-source">An installation with SUSE 13.1, 32-bit, from source</H3><HR>
 
@@ -254,41 +254,41 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <H3 id="an-installation-with-suse-411-from-source-in-release-tar">An installation with SUSE 42.1, from source in release tar</H3><HR>
 <P>
 <PRE>
-    #This builds using the source files in the 0.7.0 "release"
-    #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
-    sudo zypper install libqt4-devel
-    sudo zypper install libmysqlclient-devel
-    sudo zypper install git
-    sudo zypper install gcc
-    sudo zypper install gcc-c++
-    sudo zypper install make
-    mkdir ~/ocelotgui-test
-    cd ~/ocelotgui-test
-    wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
-    tar -zxvf ocelotgui.tar.gz
-    cd ocelotgui
-    qmake -config release
-    make
-    #To uninstall, say: rm -r ~/ocelotgui-test</PRE></P>
+ #This builds using the source files in the 0.7.0 "release"
+ #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
+ sudo zypper install libqt4-devel
+ sudo zypper install libmysqlclient-devel
+ sudo zypper install git
+ sudo zypper install gcc
+ sudo zypper install gcc-c++
+ sudo zypper install make
+ mkdir ~/ocelotgui-test
+ cd ~/ocelotgui-test
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
+ tar -zxvf ocelotgui.tar.gz
+ cd ocelotgui
+ qmake -config release
+ make
+ #To uninstall, say: rm -r ~/ocelotgui-test</PRE></P>
 
 <H3 id="an-installation-with-suse-411-from-source-in-git-clone">An installation with SUSE 42.1, from source in git clone</H3><HR>
 <P>
 <PRE>
-    #This builds using the source files in the very latest "post-release"
-    #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
-    sudo zypper install libqt4-devel
-    sudo zypper install libmysqlclient-devel
-    sudo zypper install git
-    sudo zypper install gcc
-    sudo zypper install gcc-c++
-    sudo zypper install make
-    mkdir ~/ocelotgui-test
-    cd ~/ocelotgui-test
-    git clone https://github.com/ocelot-inc/ocelotgui
-    cd ocelotgui
-    qmake -config release
-    make
-    #To uninstall, say: rm -r ~/ocelotgui-test</PRE></P>
+ #This builds using the source files in the very latest "post-release"
+ #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
+ sudo zypper install libqt4-devel
+ sudo zypper install libmysqlclient-devel
+ sudo zypper install git
+ sudo zypper install gcc
+ sudo zypper install gcc-c++
+ sudo zypper install make
+ mkdir ~/ocelotgui-test
+ cd ~/ocelotgui-test
+ git clone https://github.com/ocelot-inc/ocelotgui
+ cd ocelotgui
+ qmake -config release
+ make
+ #To uninstall, say: rm -r ~/ocelotgui-test</PRE></P>
 
 
 <H3 id="installing-by-rebuilding-source-on-ubuntu-1404-without-qt-creator">Installing by rebuilding source, on Ubuntu 12.04, without Qt Creator</H3><HR>
@@ -301,33 +301,33 @@ and will have different names for the Qt packages.</P>
 
 <P>If the intent is to rebuild for Qt 4 from source:
 <PRE>
-    sudo apt-get install qt4-qmake
-    sudo apt-get install libqt4-dev
-    cd [path to ocelotgui source files]
-    make clean
-    /usr/bin/qmake-qt4 -config release
-    make</PRE></P>
+ sudo apt-get install qt4-qmake
+ sudo apt-get install libqt4-dev
+ cd [path to ocelotgui source files]
+ make clean
+ /usr/bin/qmake-qt4 -config release
+ make</PRE></P>
 
 <H3 id="installing-by-rebuilding-source-on-ubuntu-1504">Installing by rebuilding source, on Ubuntu 15.04</H3><HR>
 <P>
 <PRE>
-    #These steps have been known to work for an experiment.
+ #These steps have been known to work for an experiment.
 
-    #Get Qt libraries. The message "already installed" might appear.
-    sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools
-    #Get MySQL libraries. Either libmysqlclient-dev or libmariadbclient-dev.
-    sudo apt-get install libmariadbclient-dev
+ #Get Qt libraries. The message "already installed" might appear.
+ sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools
+ #Get MySQL libraries. Either libmysqlclient-dev or libmariadbclient-dev.
+ sudo apt-get install libmariadbclient-dev
 
-    #Get latest source from github repository, non-release
-    cd ~
-    git clone https://github.com/ocelot-inc/ocelotgui
-    #Build
-    cd ~/ocelotgui
-    #Following might have to be /usr/lib/x86_64-linux-gnu/qt5/bin/qmake
-    qmake
-    make
-    #Start the program to make sure it starts (stop again with File|Exit or ^Q).
-    ./ocelotgui</PRE></P>
+ #Get latest source from github repository, non-release
+ cd ~
+ git clone https://github.com/ocelot-inc/ocelotgui
+ #Build
+ cd ~/ocelotgui
+ #Following might have to be /usr/lib/x86_64-linux-gnu/qt5/bin/qmake
+ qmake
+ make
+ #Start the program to make sure it starts (stop again with File|Exit or ^Q).
+ ./ocelotgui</PRE></P>
 
 <H3 id="installing-by-rebuilding-source-with-qt-creator">Installing by rebuilding source, with Qt Creator</H3><HR>
 <P>
@@ -344,28 +344,28 @@ that includes the file "mysql.h". It comes with MySQL or
 MariaDB developer packages, for example "sudo apt-get
 libmysqlclient-dev" will put it in directory /usr/include/mysql.
 <PRE>
-    #Edit [path]/ocelotgui.pro.
-    #Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
-    #points to where libmysqlclient.so really is now.
-    #It comes with MySQL or MariaDB,
-    #for example "sudo apt-get mysqlclient" will put it
-    #in file/usr/lib/x86_64-linux-gnu/libmysqlclient.so.
-    #Example:
-    #"QMAKE_RPATHDIR += /usr/local/mysql/lib/mysql"
-    #Make sure that any of the lines that begins with "INCLUDEPATH+ ..."
-    #points to where mysql.h really is now. Example:
-    #"INCLUDEPATH += /usr/local/mysql/include/mysql"
-    #(mysql.h comes with MySQL or MariaDB developer packages.
-    # For example "sudo apt-get libmysqlclient-dev" will
-    # put it in directory /usr/include/mysql).</PRE></P>
+ #Edit [path]/ocelotgui.pro.
+ #Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
+ #points to where libmysqlclient.so really is now.
+ #It comes with MySQL or MariaDB,
+ #for example "sudo apt-get mysqlclient" will put it
+ #in file/usr/lib/x86_64-linux-gnu/libmysqlclient.so.
+ #Example:
+ #"QMAKE_RPATHDIR += /usr/local/mysql/lib/mysql"
+ #Make sure that any of the lines that begins with "INCLUDEPATH+ ..."
+ #points to where mysql.h really is now. Example:
+ #"INCLUDEPATH += /usr/local/mysql/include/mysql"
+ #(mysql.h comes with MySQL or MariaDB developer packages.
+ # For example "sudo apt-get libmysqlclient-dev" will
+ # put it in directory /usr/include/mysql).</PRE></P>
 
 <P>You will need to state a compiler for the kit.
 Steps for Qt Creator use are:
 <PRE>
-    Click File | Open File or Project ...
-    In "Open File" dialog box, in field "File name:", enter [path]/ocelotgui.pro
-    Click Next
-    Click Configure Project</PRE></P>
+ Click File | Open File or Project ...
+ In "Open File" dialog box, in field "File name:", enter [path]/ocelotgui.pro
+ Click Next
+ Click Configure Project</PRE></P>
 <P>
 If you get a message "cannot find -lGL" when you
 try to run the project, try to install GL.
@@ -494,7 +494,7 @@ but only non-DBMS tasks such as screen customizing will be possible.
 <P>
 <A href="starting"><img src="starting.png" align="right" height="256"></A>
 In any case, an initial screen will appear. After some activity has
-taken place, the screen will have four parts, from top to bottom:  
+taken place, the screen will have four parts, from top to bottom:<BR>
 menu <BR>
 history widget, where retired statements and diagnostics end up <BR>
 results widget, where SELECT result sets appear <BR>
