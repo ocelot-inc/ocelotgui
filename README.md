@@ -225,31 +225,31 @@ GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <P>These steps worked after a non-fresh installation of openSUSE 13.1,
 a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <PRE>
-    cd ~/Downloads
-    #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
-    tar -zxvf ocelotgui.tar.gz
-    #Use "cnf qmake" to confirm that these package names are correct.
-    sudo zypper install libqt4-devel
-    sudo zypper install mariadb-client
-    sudo zypper install libmysqlclient-devel
-    cd [path to ocelotgui source files]
-    #Edit ocelotgui.pro.
-    #Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
-    #points to where libmysqlclient.so really is now. Example:
-    #"QMAKE_RPATHDIR += /usr/local/mysql/lib/mysql"
-    #Make sure that any of the lines that begins with "INCLUDEPATH+ ..."
-    #points to where mysql.h really is now. Example:
-    #"INCLUDEPATH += /usr/local/mysql/include/mysql"
-    make clean             #usually unnecessary; ignore any error message
-    rm Makefile            #usually unnecessary; ignore any error message
-    qmake -config release
-    #In the following line, if /usr/local/mysql/lib/mysql is not the path
-    #where libmysqlclient.so is, replace with the correct name.
-    #(This is usually not necessary.)
-    export LD_LIBRARY_PATH=/usr/local/mysql/lib/mysql
-    make
-    #Then, as an ordinary non-root user, say something like
-    ./ocelotgui</PRE></P>
+ cd ~/Downloads
+ #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui.tar.gz
+ #Use "cnf qmake" to confirm that these package names are correct.
+ sudo zypper install libqt4-devel
+ sudo zypper install mariadb-client
+ sudo zypper install libmysqlclient-devel
+ cd [path to ocelotgui source files]
+ #Edit ocelotgui.pro.
+ #Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
+ #points to where libmysqlclient.so really is now. Example:
+ #"QMAKE_RPATHDIR += /usr/local/mysql/lib/mysql"
+ #Make sure that any of the lines that begins with "INCLUDEPATH+ ..."
+ #points to where mysql.h really is now. Example:
+ #"INCLUDEPATH += /usr/local/mysql/include/mysql"
+ make clean             #usually unnecessary; ignore any error message
+ rm Makefile            #usually unnecessary; ignore any error message
+ qmake -config release
+ #In the following line, if /usr/local/mysql/lib/mysql is not the path
+ #where libmysqlclient.so is, replace with the correct name.
+ #(This is usually not necessary.)
+ export LD_LIBRARY_PATH=/usr/local/mysql/lib/mysql
+ make
+ #Then, as an ordinary non-root user, say something like
+ ./ocelotgui</PRE></P>
 
 <H3 id="an-installation-with-suse-411-from-source-in-release-tar">An installation with SUSE 42.1, from source in release tar</H3><HR>
 <P>
