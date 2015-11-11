@@ -55,6 +55,7 @@
 #include <QThread>
 #include <QTimer>
 //#include <QWidget>
+#include <QTextStream>
 
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
@@ -387,7 +388,7 @@ private:
   void connect_init();
   void set_current_colors_and_font();
   void make_style_strings();
-  void create_the_manual_widget();
+  //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count);
   int make_statement_ready_to_send(QString, QString, char *, int, bool);
   void action_execute_one_statement(QString text);
@@ -803,10 +804,10 @@ private:
     QAction *menu_help_action_libmysqlclient;
     QAction *menu_help_action_settings;
 
-  QWidget *the_manual_widget;
-    QVBoxLayout *the_manual_layout;
-    QTextEdit *the_manual_text_edit;
-    QPushButton *the_manual_pushbutton;
+  //QWidget *the_manual_widget;
+  //  QVBoxLayout *the_manual_layout;
+  //  QTextEdit *the_manual_text_edit;
+  //  QPushButton *the_manual_pushbutton;
 
   /* QTableWidget *grid_table_widget; */
   QTabWidget48 *result_grid_tab_widget;
@@ -1233,9 +1234,10 @@ void garbage_collect ()
 
 /*
   QMessageBox equivalent, but with scroll bars.
-  A simple QMessageBox has no scroll bars.
-  We need them for some Help displays especially if screen size is small.
-  Todo: delete dialog.
+  (A simple QMessageBox has no scroll bars.)
+  We need scroll bars for some Help displays especially if screen size is small.
+  Todo: size calculation as in Row_form_box.
+  Todo: Use colors and fonts specified for menu.
 */
 #ifndef MESSAGE_BOX_H
 #define MESSAGE_BOX_H
@@ -1251,7 +1253,7 @@ private:
   int width_for_size_hint, height_for_size_hint;
 
 public:
-Message_box(QString the_title, QString the_text, MainWindow *parent): QDialog(parent)
+Message_box(QString the_title, QString the_text, int minimum_width, MainWindow *parent): QDialog(parent)
 {
 
   QScrollArea *scroll_area= new QScrollArea(this);
@@ -1276,7 +1278,7 @@ Message_box(QString the_title, QString the_text, MainWindow *parent): QDialog(pa
 
   connect(push_button, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
   this->setMinimumHeight(500);
-  this->setMinimumWidth(500);
+  this->setMinimumWidth(minimum_width);
   this->setWindowTitle(the_title);
   QHBoxLayout *dialog_layout= new QHBoxLayout(this);
   this->setLayout(dialog_layout);
@@ -1287,7 +1289,7 @@ private slots:
 
 void handle_button_for_ok()
 {
-  /* Skipping garbag collect this time. */
+  /* Skipping garbage collect this time. */
   close();
 }
 

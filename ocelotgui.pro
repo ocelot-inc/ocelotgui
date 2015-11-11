@@ -67,9 +67,3 @@ contains(QMAKE_HOST.arch, x86_64) {
   } else {
   QMAKE_RPATHDIR += /usr/lib/i386-linux-gnu
   }
-
-
-
-
-
-

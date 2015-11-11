@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.7.0 Alpha
-   Last modified: November 1 2015
+   Last modified: November 12 2015
 */
 
 /*
@@ -2243,7 +2243,7 @@ You should have received a copy of the GNU General Public License \
 along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 
     Message_box *message_box;
-    message_box= new Message_box("Help|About", the_text, this);
+    message_box= new Message_box("Help|About", the_text, 500, this);
     message_box->exec();
     delete message_box;
 }
@@ -2251,16 +2251,24 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 
 /*
   the_manual_widget will be shown when user clicks Help | The Manual.
-  It does not inherit the fonts+colors settings of the main window.
-  The text used to be copied from manual.htm; all lines in manual.htm ended
-  with two spaces so there was a blanket replacement of all "  " to "  \".
+  It does not inherit the fonts+colors settings of the main window (that's a message_box todo).
+  It reads the manual from README.md.
+  It uses HTML.
+  Todo: have more choice where to look for README.md
+        currently we only look on the directory that the executable (this program) is on, i.e.
+        applicationDirPath() ""Returns the directory that contains the application executable."
+        we could try: according to an option = "documentation" directory
+                      ld_run_path, ocelot_login_path, ocelot_plugin_dir
+                      some other path used by Qt or MySQL or Linux
+                      (prefer the path that has everything)
+   Todo: Help | X should find X in the manual and display only X.
 */
 void MainWindow::action_the_manual()
 {
-    QString the_text= "\
+  QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 0.7.0, August 19 2015  \
+  <BR>Version 0.7.0, November 12 2015  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -2282,8 +2290,31 @@ void MainWindow::action_the_manual()
   <BR>For the most recent version of the manual, see \
   <BR>https://github.com/ocelot-inc/ocelotgui#user-manual \
     ";
+
+  QString readme_path= QCoreApplication::applicationDirPath();
+  readme_path.append("/");
+  readme_path.append("README.md");
+  QFile file(readme_path);
+  if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
+  {
+    /* README.md file not found. Not an error but we'll end up using default the_text. */
+  }
+  else
+  {
+    QString line;
+    QTextStream in(&file);
+    the_text= "";
+    while(!in.atEnd())
+    {
+      line= in.readLine();
+      the_text.append(line);
+      the_text.append(" ");
+    }
+    file.close();
+  }
+
   Message_box *message_box;
-  message_box= new Message_box("Help|The Manual", the_text, this);
+  message_box= new Message_box("Help|The Manual", the_text, 960, this);
   message_box->exec();
   delete message_box;
 }
@@ -2313,7 +2344,7 @@ void MainWindow::action_libmysqlclient()
   2. Specify the library when starting ocelotgui, thus:<br> \
   LD_RUN_PATH=/home/jeanmartin ocelotgui";
   Message_box *message_box;
-  message_box= new Message_box("Help|libmysqlclient", the_text, this);
+  message_box= new Message_box("Help|libmysqlclient", the_text, 500, this);
   message_box->exec();
   delete message_box;
 }
@@ -2365,7 +2396,7 @@ void MainWindow::action_settings()
   Some extremely large font sizes will be accepted but \
   the results will be ugly.";
   Message_box *message_box;
-  message_box= new Message_box("Help|libmysqlclient", the_text, this);
+  message_box= new Message_box("Help|libmysqlclient", the_text, 500, this);
   message_box->exec();
   delete message_box;
 }
