@@ -1,7 +1,7 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.7.0 Alpha
+   Version: 0.8.0 Alpha
    Last modified: November 12 2015
 */
 
@@ -493,7 +493,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="0.7 Alpha"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="0.8 Alpha"; /* For --version. Make sure it's in manual too. */
 
 
 /* Global mysql definitions */
@@ -2254,6 +2254,7 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
   It does not inherit the fonts+colors settings of the main window (that's a message_box todo).
   It reads the manual from README.md.
   It uses HTML.
+  README.md refers to img src="...png|jpg" files, we expect them on the same directory as README.md.
   Todo: have more choice where to look for README.md
         currently we only look on the directory that the executable (this program) is on, i.e.
         applicationDirPath() ""Returns the directory that contains the application executable."
@@ -2268,7 +2269,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 0.7.0, November 12 2015  \
+  <BR>Version 0.8.0, November 12 2015  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -2291,7 +2292,8 @@ void MainWindow::action_the_manual()
   <BR>https://github.com/ocelot-inc/ocelotgui#user-manual \
     ";
 
-  QString readme_path= QCoreApplication::applicationDirPath();
+  QString application_dir_path= QCoreApplication::applicationDirPath();
+  QString readme_path= application_dir_path;
   readme_path.append("/");
   readme_path.append("README.md");
   QFile file(readme_path);
@@ -2311,8 +2313,11 @@ void MainWindow::action_the_manual()
       the_text.append(" ");
     }
     file.close();
+    QString img_path= "img src=\"";
+    img_path.append(application_dir_path);
+    img_path.append("/");
+    the_text.replace("img src=\"", img_path);
   }
-
   Message_box *message_box;
   message_box= new Message_box("Help|The Manual", the_text, 960, this);
   message_box->exec();
