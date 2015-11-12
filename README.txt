@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 0.7.0</P>
+<P>Version 0.8.0</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -75,7 +75,7 @@ In that case, be up and running in 15 seconds with:</P>
 <PRE>
  mkdir ~/ocelotgui-test
  cd ~/ocelotgui-test
- wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
  tar -zxvf ocelotgui.tar.gz
  cd ocelotgui
  ./ocelotgui-qt4 #or ./ocelotgui-qt5
@@ -130,12 +130,12 @@ and also two binary (executable) files.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, the existence of the executables
 might be convenient. A release file is highlighted in green
-by github and is named ocelotgui.tar.gz. Thus release 0.7.0 is at
-https://github.com/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
-or https://github.com/pgulutzan/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz.
+by github and is named ocelotgui.tar.gz. Thus release 0.8.0 is at
+https://github.com/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
+or https://github.com/pgulutzan/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
 and click ocelotgui.tar.gz.</P>
@@ -254,7 +254,7 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <H3 id="an-installation-with-suse-411-from-source-in-release-tar">An installation with SUSE 42.1, from source in release tar</H3><HR>
 <P>
 <PRE>
- #This builds using the source files in the 0.7.0 "release"
+ #This builds using the source files in the 0.8.0 "release"
  #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
  sudo zypper install libqt4-devel
  sudo zypper install libmysqlclient-devel
@@ -264,7 +264,7 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
  sudo zypper install make
  mkdir ~/ocelotgui-test
  cd ~/ocelotgui-test
- wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.7.0/ocelotgui.tar.gz
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
  tar -zxvf ocelotgui.tar.gz
  cd ocelotgui
  qmake -config release
@@ -397,7 +397,7 @@ read an ocelotgui.cpp comment that begins with the words
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 0.7.0, November 12 2015</P>
+<P>Version 0.8.0, November 12 2015</P>
 
 <P>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.</P>
   
