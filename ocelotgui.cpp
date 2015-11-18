@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: November 12 2015
+   Last modified: November 18 2015
 */
 
 /*
@@ -589,7 +589,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   history_edit_widget= new QTextEdit(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
-
+  statement_edit_widget->is_debug_widget= false;
 
 #ifdef DEBUGGER
   create_widget_debug();
@@ -1150,7 +1150,6 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
   /* Todo: There should be a better way to ensure that Qt realizes the whole widget is rich text. */
   /* Todo: Some of this could be at start of history_edit_widget but what would happen if I cleared the whole area? */
   /* Todo: background-color of prompt could be settable for history widget, rather than = statement background color. */
-  /* Todo: the width of the prompt is greater than necessary */
   history_statement= "<i></i>";                                           /* hint that what's coming is HTML */
   history_statement.append(history_markup_statement_start);
 
@@ -2157,14 +2156,21 @@ void MainWindow::action_exit()
 /*
   detach
   Would "floating" be a better word than "detached"? or "undock"? or "detachable"?
-  Todo: We need a client statement for detached, e.g. SET result_grid_detached = 1;
-  Todo: Change border, size, title, frame width, position
-  Todo: The title bar shouldn't have a "close" option, or it should only mean "no more detached".
+  Todo: We need a client statement for detached, e.g. SET result_grid_detached = 1; or "detach".
+  Todo: Change border, size, title, frame width, position. Perhaps in Settings dialog.
   Todo: Menu keys should be slotted to the new window as well as the main window. E.g. control-Q.
   Todo: How to bring to front / bring to back? Currently it's always in front of main widget.
-        That's due to WindowStaysOnTopHint.
-  Probably PM_DefaultFrameWidth won't matter but I'm not sure what it is.
+  Todo: title bar of result grid widget could show part of query and number of rows.
+  Todo: Maybe these should be detached by default, or always detached.
+  Todo: Check: Do you lose the parent? If that happens, there will be memory leaks.
 */
+
+/*
+  Flags for setWindowFlags().
+  Doesn't include Qt::WindowCloseButtonHint so there will be no close button.
+  Doesn't include Qt::WindowStaysOnTopHint but in fact it will be on top of other widgets of app.
+*/
+#define DETACHED_WINDOW_FLAGS Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint | Qt::WindowSystemMenuHint
 
 /* menu item = Options|detach history widget */
 void MainWindow::action_option_detach_history_widget(bool checked)
@@ -2174,7 +2180,7 @@ void MainWindow::action_option_detach_history_widget(bool checked)
   if (checked)
   {
     menu_options_action_option_detach_history_widget->setText("attach history widget");
-    history_edit_widget->setWindowFlags(Qt::Window | Qt::WindowStaysOnTopHint);
+    history_edit_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     history_edit_widget->setWindowTitle("history widget");
   }
   else
@@ -2194,7 +2200,7 @@ void MainWindow::action_option_detach_result_grid_widget(bool checked)
   if (checked)
   {
     menu_options_action_option_detach_result_grid_widget->setText("attach result grid widget");
-    result_grid_tab_widget->setWindowFlags(Qt::Window | Qt::WindowStaysOnTopHint);
+    result_grid_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     result_grid_tab_widget->setWindowTitle("result grid widget");
   }
   else
@@ -2205,6 +2211,7 @@ void MainWindow::action_option_detach_result_grid_widget(bool checked)
   if (is_visible) result_grid_tab_widget->show();
 }
 
+
 /* menu item = Options|detach debug widget */
 void MainWindow::action_option_detach_debug_widget(bool checked)
 {
@@ -2213,7 +2220,7 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
   if (checked)
   {
     menu_options_action_option_detach_debug_widget->setText("attach debug widget");
-    debug_tab_widget->setWindowFlags(Qt::Window | Qt::WindowStaysOnTopHint);
+    debug_tab_widget->setWindowFlags(Qt::Window| DETACHED_WINDOW_FLAGS);
     debug_tab_widget->setWindowTitle("debug widget");
   }
   else
@@ -2223,7 +2230,6 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
   }
   if (is_visible) debug_tab_widget->show();
 }
-
 
 
 /* Todo: consider adding   //printf(qVersion()); */
@@ -2269,7 +2275,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 0.8.0, November 12 2015  \
+  <BR>Version 0.8.0, November 18 2015  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -4423,6 +4429,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     }
 
     debug_widget[debug_widget_index]= new CodeEditor(this);
+    debug_widget[debug_widget_index]->is_debug_widget= true;
     debug_widget[debug_widget_index]->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
     debug_widget[debug_widget_index]->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_text_color);
 
@@ -7898,6 +7905,7 @@ void MainWindow::tokens_to_keywords(QString text)
     start, could be at the end, or could be at the end before a delimiter.
     The list is in order by TOKEN_KEYWORD_... value.
   */
+  /* Todo: There is interference with the statement "prompt \u" and maybe other special prompts */
   int xx= -1;
   if (i2  >= 2)
   {
@@ -8511,8 +8519,10 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   statement_edit_widget->dbms_current_user= s;
   i= s.indexOf(QRegExp("@"), 0);
   if (i > 0) s= s.left(i);
+  else s= "";
   statement_edit_widget->dbms_current_user_without_host= s;
   statement_edit_widget->dbms_connection_id= atoi(connect_row[4]);
+  /* Todo: find out why this returns capitalized e.g. "Localhost" rather than "localhost" */
   s= lmysql->ldbms_mysql_get_host_info(&mysql[connection_number]);
   i= s.indexOf(QRegExp(" "), 0);
   if (i > 0) s= s.left(i);
@@ -8611,6 +8621,10 @@ QString CodeEditor::prompt_translate(int line_number_x)
       if (s_char == "2")        /* \2 is to indicate that following items come on lines 2ff, not just line 1. Ocelot-only. */
       {
         s_char= (QString)""; is_2_seen= 1;
+      }
+      if (s_char == "C")        /* \C is for connection_id, mysql 5.7.6ff. */
+      {
+        s_char= QString::number(dbms_connection_id);
       }
       if (s_char == "c")        /* \c is for statement counter. We keep it in statement_edit_widget, not main window -- maybe that's bad. */
       {
@@ -8719,10 +8733,14 @@ QString CodeEditor::prompt_translate(int line_number_x)
         strftime(formatted_time, sizeof(formatted_time) - 1, "%Y", timeinfo);
         s_char= formatted_time;
       }
-      if (s_char == "y")
+      if (s_char == "y")        /* \y is for current year in 2-digit format, e.g. "14" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%y", timeinfo);
         s_char= formatted_time;
+      }
+      if (s_char == "_")        /* \_ is space. Odd, since "\ " is space and more obvious. */
+      {
+        s_char= " ";
       }
     }
     if ((line_number_x < 2) || (is_2_seen == 1))
@@ -8803,22 +8821,15 @@ int CodeEditor::prompt_translate_k(QString s, int i)
 
 
 /*
-  Set left margin of viewport to the size we need to draw the prompt.
-   This, presumably, is what prompt_width_calculate returns.
-   Take the number of digits in the last line, multiply that by maximum width of a digit.
-   We don't know in advance whether which is wider, the first line or the last line.
-   (It's calculable in advance, but I didn't bother.)
-   So we calculate both, and take the wider one, even if line 1 might not be visible.
-   Todo: It's possible that width("11") is less than width("2"), so counting digits would be sensible.
+  We'll be setting left margin of viewport to the size we need to draw the prompt.
+  Take the width of the first line or the width of the last line, whichever is greater.
+  Add the width of "B " if this CodEditor is for a debug widget rather than for the statement widget.
 */
 int CodeEditor::prompt_width_calculate()
 {
   int line_width_first, line_width_last;
   QString sq;
-  /* The new style. Ignoring all the above, give us width. */
-  /* Todo: following should be a real interpretation. */
-  /* this->prompt_current= this->prompt_translate(blockCount() + 1); */
-  int prompt_width= 3;
+  int prompt_width;
 
   sq= prompt_translate(1);
   line_width_first= fontMetrics().width(sq);
@@ -8827,15 +8838,8 @@ int CodeEditor::prompt_width_calculate()
   if (line_width_first < line_width_last) prompt_width= line_width_last;
   else prompt_width= line_width_first;
 #ifdef DEBUGGER
-  /* TEST */
-  prompt_width+= fontMetrics().width("B ");
+  if (is_debug_widget == true) prompt_width+= fontMetrics().width("B ");
 #endif
-  return prompt_width;
-
-  /* Todo: check why this doesn't work -- prompt_width+= fontMetrics().width(this->prompt_current); */
-  /* QString ss= prompt_translate(xxx); */
-  QString ss;
-  for (int i= 0; ss[i] != 0; ++i) prompt_width+= fontMetrics().width(ss[i]);
   return prompt_width;
 }
 

@@ -3949,6 +3949,8 @@ private:
   at the start of ocelotgui.cpp, applicable solely to what was copied.
 */
 
+/* CodeEditor is actually used for both the statement widget and the debug widgets. */
+
 #ifndef CODEEDITOR_H
 #define CODEEDITOR_H
 
@@ -3974,6 +3976,7 @@ public:
 #ifdef DEBUGGER
     unsigned int block_number;                                               /* current line number, base 0 */
 #endif
+    bool is_debug_widget;
     QString dbms_version; /* Set to "" at start, select version() at connect, maybe display in prompt. */
     QString dbms_database;/* Set to "" at start, select database() at connect, maybe display in prompt. */
     QString dbms_port;/* Set to "" at start, select @@port at connect, maybe display in prompt. */
