@@ -29,6 +29,8 @@ HEADERS += ocelotgui.h
 
 FORMS    += ocelotgui.ui
 
+RESOURCES = ocelotgui.qrc
+
 # INCLUDEPATH is where the compiler will search for mysql.h at build time.
 # Replace this with the actual location of the file as supplied by MySQL or MariaDB.
 # If build fails because mysql.h is not found:

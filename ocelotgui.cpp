@@ -2235,7 +2235,9 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
 /* Todo: consider adding   //printf(qVersion()); */
 void MainWindow::action_about()
 {
-  QString the_text= "<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014 by Ocelot Computer Services Inc.<br>\
+  QString the_text= "\
+<img src=\":/ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
+<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
