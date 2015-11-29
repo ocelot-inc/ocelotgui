@@ -728,7 +728,7 @@ private:
 #endif
        };
 
-  void tokenize(QChar *text, int text_length, int (*token_lengths)[MAX_TOKENS], int (*token_offsets)[MAX_TOKENS], int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
+  void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
 
   int token_type(QChar *token, int token_length);
 
@@ -1330,6 +1330,7 @@ void handle_button_for_ok()
   Todo: if error, error message should say what you looked for. if okay, say what you found.
   Todo: consider adding in ocelotgui.pro: /opt/mysql/lib /opt/mysql/lib/mysql /usr/sfw/lib
   Todo: consider executing mysql_config --libs and using what it returns
+  Todo: MySQL 5.7 has libmysqlclient.so.20, maybe look for that before libmysqlclient.so.18
 
   Initiate with: ldbms *lmysql;
                  lmysql= new ldbms();
@@ -1576,6 +1577,12 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       }
       delete []ld_run_path;
     }
+
+    /*
+      If ld_run_path was passed, and we found nothing, return now. We want to check for libmysqlclient.so.18
+      along run path first (regardless whether it's for libmysqlclient.so.18 or libmysqlclient.so)
+    */
+    if ((ocelot_ld_run_path != "") && (*is_library_loaded == 0)) return;
 
     /* If it wasn't found via LD_RUN_PATH, use defaults e.g. LD_LIBRARY_PATH */
     if (*is_library_loaded == 0)
@@ -2301,6 +2308,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 //#define OCELOT_DATA_TYPE_NEWDATE     14
 //#define OCELOT_DATA_TYPE_VARCHAR     15
 #define OCELOT_DATA_TYPE_BIT         16
+#define OCELOT_DATA_TYPE_JSON        245       /* new in MySQL 5.7. todo: don't ignore it */
 #define OCELOT_DATA_TYPE_NEWDECIMAL  246
 #define OCELOT_DATA_TYPE_ENUM        247
 #define OCELOT_DATA_TYPE_SET         248
@@ -3664,7 +3672,7 @@ int fontchange_event()
   Called from eventfilter
   "    if (event->type() == QEvent::Show) return (result_grid_table_widget->show_event());"
   This is the more appropriate place to decide about the vertical scroll bar because now height is known.
-  Todo: catch QEvent::Resize() too!!
+  Todo: catch QEvent::Resize() too!! (maybe this is obsolete, we have void resizeEvent() above.
 */
 bool show_event()
 {
@@ -4681,23 +4689,14 @@ void handle_button_for_cancel()
     For the "name:" control: if I typed in SkyBlue, it echoed as rrggbb,
     if I typed in Silver, it did nothing, and there was no clear list
     of what color names were available. For the other controls: I thought
-    brightness/hue etc., and the color wheel, would intimidate users
+    brightness/hue etc., and the color wheel, would put off intimidate users
     since they're not obvious and I expect typical users want names
     rather than numbers.
   The QComboBox for color picking gets around those problems but ...
-  Todo: There is no validity check for "SET [ocelot color name] = 'literal'.
-  Todo: Allow for adding new rrggbb colors if user clicks 'Add' (as last item on list).
-  STILL TO DO:
-  !! show what #rrggbb is
-  !! no need for label any more
-  !! SET custom_color_1 = '#rrggbb'
-     !!! Do an isValid for custom colors
-  !! Try setMaxCount(20)
-  !! Make sure garbage_collect is working
-  !! The Settings menu item  itself does not have the font or colors declared by settings menu
-  !! There surely isn't any need for the blank lines -- so it's not a matter of "hide()", you just don't create
-  !! History Settings -- default -- "Ubuntu 16pt 16" ... so what's the "16" for? It's just "Regular"
-  !! You need to look harder at what Tab settings are (it's hard to see what the focus is for the combobox items
+  Todo: Make sure garbage_collect is working
+  Todo: The Settings menu item  itself does not have the font or colors declared by settings menu
+  Todo: There surely isn't any need for the blank lines -- so it's not a matter of "hide()", you just don't create
+  Todo: You need to look harder at what Tab settings are (it's hard to see what the focus is for the combobox items
 */
 void handle_combo_box_for_color_pick_0(int item_number)
 {

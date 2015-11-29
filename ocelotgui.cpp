@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: November 18 2015
+   Last modified: November 29 2015
 */
 
 /*
@@ -1781,7 +1781,7 @@ void MainWindow::action_statement_edit_widget_text_changed()
 
   tokenize(text.data(),
            text.size(),
-           &main_token_lengths, &main_token_offsets, MAX_TOKENS,(QChar*)"33333", 1, ocelot_delimiter_str, 1);
+           &main_token_lengths[0], &main_token_offsets[0], MAX_TOKENS, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
 
   tokens_to_keywords(text);
 
@@ -2494,7 +2494,7 @@ void MainWindow::action_statement()
     //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
     //tokenize(text.data(),
     //         text.size(),
-    //         &main_token_lengths, &main_token_offsets, MAX_TOKENS,(QChar*)"33333", 1, ocelot_delimiter_str, 1);
+    //         &main_token_lengths[0], &main_token_offsets[0], MAX_TOKENS, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
     //tokens_to_keywords(text);
     /* statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color); */
     statement_edit_widget->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_text_color);
@@ -2622,7 +2622,7 @@ void MainWindow::action_change_one_setting(QString old_setting,
     main_token_count_in_statement= 4;
     tokenize(text.data(),
              text.size(),
-             &main_token_lengths, &main_token_offsets, MAX_TOKENS,(QChar*)"33333", 1, ocelot_delimiter_str, 1);
+             &main_token_lengths[0], &main_token_offsets[0], MAX_TOKENS, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
    tokens_to_keywords(text);
    action_execute_one_statement(text);
   }
@@ -7074,8 +7074,8 @@ void MainWindow::put_message_in_result(QString s1)
   The original program is tokenize.c which is a standalone that uses unsigned char* not QString.
 */
 
-void MainWindow::tokenize(QChar *text, int text_length, int (*token_lengths)[MAX_TOKENS],
-                           int (*token_offsets)[MAX_TOKENS], int max_tokens,QChar *version,
+void MainWindow::tokenize(QChar *text, int text_length, int *token_lengths,
+                           int *token_offsets, int max_tokens, QChar *version,
                            int passed_comment_behaviour, QString special_token, int minus_behaviour)
 {
   int token_number;
@@ -7091,8 +7091,8 @@ void MainWindow::tokenize(QChar *text, int text_length, int (*token_lengths)[MAX
   token_number= 0;
   char_offset= 0;
 next_token:
-  (*token_lengths)[token_number]= 0;
-  (*token_offsets)[token_number]= char_offset;
+  token_lengths[token_number]= 0;
+  token_offsets[token_number]= char_offset;
 next_char:
   if (token_number >= (max_tokens - 1)) goto string_end;
   /* Following IFs happen to be in order by ASCII code */
@@ -7185,7 +7185,7 @@ next_char:
   if (text[char_offset] == '.')     /* . part of token if previous or following is digit. otherwise one-byte token */
   {
     if ((char_offset + 1 < text_length) && (text[char_offset + 1] >= '0') && (text[char_offset + 1] <= '9')) goto part_of_token;
-    if ((*token_lengths)[token_number] > 0)
+    if (token_lengths[token_number] > 0)
     {
       if ((text[char_offset - 1] >= '0') && (text[char_offset - 1] <= '9')) goto part_of_token;
     }
@@ -7235,8 +7235,8 @@ next_char:
   if (text[char_offset] == '?') goto one_byte_token; /* ? one-byte token? */
   if (text[char_offset] == '@') /* @ start of @token or start of @@token otherwise one-byte token */
   {
-    if ((*token_lengths)[token_number] == 0) goto part_of_token;
-    if ((*token_lengths)[token_number] == 1)
+    if (token_lengths[token_number] == 0) goto part_of_token;
+    if (token_lengths[token_number] == 1)
     {
       if (text[char_offset - 1] == '@') goto part_of_token;
     }
@@ -7270,13 +7270,13 @@ next_char:
      _ DEL */
 part_of_token:
   ++char_offset;
-  ++(*token_lengths)[token_number];
+  ++token_lengths[token_number];
   goto next_char;
 string_end:
-  if ((*token_lengths)[token_number] > 0) (*token_lengths)[token_number + 1]= 0;
+  if (token_lengths[token_number] > 0) token_lengths[token_number + 1]= 0;
   return;
 white_space:
-  if ((*token_lengths)[token_number] > 0) ++token_number;
+  if (token_lengths[token_number] > 0) ++token_number;
   ++char_offset;
   goto next_token;
 comment_starting_with_slash_start:
@@ -7334,7 +7334,7 @@ comment_start:
 skip_till_expected_char:
   /* No break if we're facing N'...' or X'...' or B'...' or @`...` or @a"..." */
   /* Todo: check: I might have forgotten N"..." etc. */
-  if ((*token_lengths)[token_number] == 1)
+  if (token_lengths[token_number] == 1)
   {
     if (expected_char == 39)
     {
@@ -7352,15 +7352,15 @@ skip_till_expected_char:
       }
     }
   }
-  if ((*token_lengths)[token_number] > 0)
+  if (token_lengths[token_number] > 0)
   {
     ++token_number;
-    (*token_lengths)[token_number]= 0;
-    (*token_offsets)[token_number]= char_offset;
+    token_lengths[token_number]= 0;
+    token_offsets[token_number]= char_offset;
   }
 skip_till_expected_char_2:
   ++char_offset;
-  ++(*token_lengths)[token_number];
+  ++token_lengths[token_number];
   if (char_offset >= text_length) goto string_end;
   if (text[char_offset] == 0) goto string_end;
   if (text[char_offset] != expected_char) goto skip_till_expected_char_2;
@@ -7373,12 +7373,12 @@ skip_till_expected_char_2:
     if ((char_offset + 1 < text_length) && (expected_char == text[char_offset + 1]))
     {
       ++char_offset;
-      ++(*token_lengths)[token_number];
+      ++token_lengths[token_number];
       goto skip_till_expected_char_2;
     }
   }
   ++char_offset;
-  ++(*token_lengths)[token_number];
+  ++token_lengths[token_number];
   if ((expected_char == '/') || (expected_char == '\n'))
   {
     if (comment_behaviour == 2)
@@ -7405,21 +7405,21 @@ skip_till_expected_char_2:
   ++token_number;
   goto next_token;
 one_byte_token: /* we know that coming token length is 1 */
-  if ((*token_lengths)[token_number] > 0) ++token_number;
-  (*token_offsets)[token_number]= char_offset;
-  (*token_lengths)[token_number]= 1;
+  if (token_lengths[token_number] > 0) ++token_number;
+  token_offsets[token_number]= char_offset;
+  token_lengths[token_number]= 1;
   ++char_offset;
   ++token_number;
   goto next_token;
 n_byte_token:   /* we know that coming token length is n */
-  if ((*token_lengths)[token_number] > 0) ++token_number;
-  (*token_offsets)[token_number]= char_offset;
-  (*token_lengths)[token_number]= n;
+  if (token_lengths[token_number] > 0) ++token_number;
+  token_offsets[token_number]= char_offset;
+  token_lengths[token_number]= n;
   char_offset+= n;
   ++token_number;
   goto next_token;
 n_byte_token_skip:
-  if ((*token_lengths)[token_number] > 0) ++token_number;
+  if (token_lengths[token_number] > 0) ++token_number;
   char_offset+= n;
   goto next_token;
 }
@@ -8406,7 +8406,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   ldbms_return_string= "";
 
-  /* First find libmysqlclient.so.18 */
+  /* Find libmysqlclient. Prefer ld_run_path, within that prefer libmysqlclient.so.18. */
   if (is_libmysqlclient_loaded != 1)
   {
     lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
@@ -8416,6 +8416,15 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   {
     lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
   }
+  if (is_libmysqlclient_loaded != 1)
+  {
+    lmysql->ldbms_get_library("", &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
+  }
+  if (is_libmysqlclient_loaded != 1)
+  {
+    lmysql->ldbms_get_library("", &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
+  }
+
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
 
   if (is_libmysqlclient_loaded == -2)
@@ -9981,7 +9990,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     /* tokenize, ignore # comments or / * comments * /, treat '-' as part of token not operator */
     tokenize(s.data(),
              s.size(),
-             &token_lengths, &token_offsets, MAX_TOKENS,(QChar*)"33333", 2, "", 2);
+             &token_lengths[0], &token_offsets[0], MAX_TOKENS, (QChar*)"33333", 2, "", 2);
     /* Ignore blank lines and lines that start with ';' */
     if (token_lengths[0] == 0) continue;
     if (QString::compare(s.mid(token_offsets[0], token_lengths[0]), ";", Qt::CaseInsensitive) == 0) continue;
@@ -10108,6 +10117,10 @@ int MainWindow::connect_readmylogin(FILE *file, unsigned char *output_buffer)
   if (is_libcrypto_loaded != 1)
   {
     lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
+  }
+  if (is_libcrypto_loaded != 1)
+  {
+    lmysql->ldbms_get_library("", &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
   }
   if (is_libcrypto_loaded != 1)
   {
