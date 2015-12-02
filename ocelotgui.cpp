@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: November 29 2015
+   Last modified: December 2 2015
 */
 
 /*
@@ -2532,6 +2532,7 @@ void MainWindow::action_grid()
   delete(se);
 }
 
+
 /*
   TODO: extra_rule_1 could affect statement | prompt | word, not just cell
   TODO: Action could be to invoke a Lua procedure, not just char/hex/image
@@ -2876,6 +2877,53 @@ void MainWindow::make_style_strings()
   ocelot_extra_rule_1_style_string.append(";font-size:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_size);
   ocelot_extra_rule_1_style_string.append("pt;font-style:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_style);
   ocelot_extra_rule_1_style_string.append(";font-weight:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_weight);
+}
+
+
+/*
+  Use: ocelot_grid_style string. Return: max height of one char, and combined height of borders.
+  Assume that ocelot_grid_style string always has "... font-size:...pt;...".
+  Assume that ocelot_gridstyle_string also has "...border:...px...".
+  The dialog box for getting a font always returns in points not pixels.
+  That's useful but for a widget's height calculation we need pixels not points.
+  This is always a problem.
+  Simply doing QFontMetrics() for the widget you're working on won't work till show() happens.
+  Todo: probably the spacing could look a little tidier.
+  Todo: right now we do nothing with width, we could add that later
+        (for one Latin character, or for a passed string).
+  Todo: Find out why one must magic numbers to prevent vertical scroll bars from appearing.
+        It seems to depend on font size -- with bigger fonts I could add smaller numbers.
+  Todo: This is working for Row_form_box, now get it working for the result grid.
+  Beware: height() is internal height but setMinimumSize() may depend on external height.
+*/
+void MainWindow::component_size_calc(int *character_height, int *borders_height)
+{
+  {
+    bool ok;
+    int font_size_start= ocelot_grid_style_string.indexOf("font-size:");
+    int font_size_end= ocelot_grid_style_string.indexOf("pt", font_size_start);
+    QString font_size= ocelot_grid_style_string.mid(font_size_start + 10, font_size_end - (font_size_start + 10));
+    font_size= font_size.trimmed(); /* probably unnecessary */
+    int font_size_as_int= font_size.toInt(&ok);
+    assert(ok == true);
+    assert(font_size_as_int >= 1);
+    QFont font;
+    font.setPointSize(font_size_as_int);
+    QFontMetrics fm(font);
+    *character_height= fm.lineSpacing();
+    /* See also the  kludge in grid_column_size_calc */
+  }
+  {
+    bool ok;
+    int border_size_start= ocelot_grid_style_string.indexOf("border:");
+    int border_size_end= ocelot_grid_style_string.indexOf("px", border_size_start);
+    QString border_size= ocelot_grid_style_string.mid(border_size_start + 7, border_size_end - (border_size_start + 7));
+    border_size= border_size.trimmed(); /* probably unnecessary */
+    int border_size_as_int= border_size.toInt(&ok);
+    assert(ok == true);
+    assert(border_size_as_int >= 0);
+    *borders_height= border_size_as_int * 2 + 9;
+  }
 }
 
 

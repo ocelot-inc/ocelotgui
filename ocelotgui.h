@@ -273,6 +273,7 @@ public:
 
   int main_window_maximum_width;
   int main_window_maximum_height;
+  void component_size_calc(int *character_height, int *borders_height);
 
 public slots:
   void action_connect();
@@ -1020,35 +1021,15 @@ Row_form_box(int column_count, QString *row_form_label,
     widget[i]= 0;
   }
   is_ok= 0;
+  int character_height, borders_height, component_height;
 
+  parent->component_size_calc(&character_height, &borders_height);
+  component_height= character_height + borders_height;
   /*
-    Component height
-    This is always a problem. I tried using QFontMetrics, it didn't work.
-    One difficulty is that height() alone is internal height, and (although I
-    have no idea why) I want setMinimumSize to depend on external height, so
-    component_height= label_for_component_size_calc->frameGeometry().height().
-    But http://doc.qt.io/qt-4.8/application-windows.html "X11 Peculiarities"
-    says I can't really depend on that, even after show(). Adding 5 works,
-    but looks like wasting space if font size is small.
-    Multiplying component height by 2 works too, it's what I had before.
-    Another way to calculate a size involves layout->activate(), I didn't try it.
     Subsequently, for spacing between lines, I finally realized that it's not enough
     to do setSpacing + setContentsMargins for the QVBoxLayout, I have to do them
     for each QHBoxLayout as well.
-    Todo: probably the spacing could look a little tidier.
   */
-  int component_height;
-  {
-    QLineEdit *line_edit_for_component_size_calc;
-    line_edit_for_component_size_calc= new QLineEdit(this);
-    line_edit_for_component_size_calc->setStyleSheet(parent->ocelot_grid_style_string);
-    line_edit_for_component_size_calc->show();
-    component_height= line_edit_for_component_size_calc->height();
-    component_height+= parent->ocelot_grid_cell_border_size.toInt() * 2 + 5;
-    line_edit_for_component_size_calc->close();
-    delete line_edit_for_component_size_calc;
-  }
-
   main_layout= new QVBoxLayout();
   main_layout->setSpacing(0);
   main_layout->setContentsMargins(QMargins(0, 0, 0, 0));
@@ -1138,6 +1119,7 @@ Row_form_box(int column_count, QString *row_form_label,
   this->setLayout(upper_layout);
   this->setWindowTitle(row_form_title);
 }
+
 
 /*
   Row_form_box will have the wrong width if everything is default:
@@ -5126,3 +5108,4 @@ public:
 };
 
 #endif // QTABWIDGET48_H
+
