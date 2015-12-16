@@ -250,6 +250,8 @@ public:
   QString qt_color(QString);
   QString canonical_color_name(QString);
   void assign_names_for_colors();
+  QString canonical_font_weight(QString);
+  QString canonical_font_style(QString);
   QString connect_stripper(QString value_to_strip, bool strip_doublets_flag);
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
 
@@ -274,6 +276,7 @@ public:
   int main_window_maximum_width;
   int main_window_maximum_height;
   void component_size_calc(int *character_height, int *borders_height);
+  QFont get_font_from_style_sheet(QString style_string);
 
 public slots:
   void action_connect();
@@ -2428,9 +2431,21 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
 
   /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
   ocelot_grid_max_desired_width_in_pixels=(parent->width() - (mm.width("W") * 3));
-  ocelot_grid_max_column_height_in_lines=((parent->height() / 3) - (mm.lineSpacing()) * 3) / mm.lineSpacing();
-  ocelot_grid_max_column_height_in_lines=ocelot_grid_max_column_height_in_lines / 3;
-  if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
+
+  {
+    /*
+      Try to ensure we can fit at least header (if there is a header) plus one row.
+      So there's a maximum number of lines per row.
+      We assume (border height + horizontal scroll bar height) < 11 (todo: calculate them).
+      We assume result grid height = height of main window / 3 (todo: calculate it).
+    */
+    int result_grid_height= (parent->height() / 3) - 11;
+    int line_height= mm.lineSpacing() + extra_height(1);
+    if ((ocelot_result_grid_column_names == 1) && (ocelot_result_grid_vertical == 0))
+        result_grid_height-= line_height;
+    ocelot_grid_max_column_height_in_lines= result_grid_height / line_height;
+    if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
+  }
 
   ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
 //  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
@@ -2453,7 +2468,9 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
     {
       int ki= xrow * gridx_column_count + column_number;
       text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
-      text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
+      /* TEST! */
+      //text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
+      text_edit_widgets[ki]->setMinimumHeight(fm.lineSpacing());
       text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
       /*
         Change the color of the frame. Be specific that it's TextEditFrame, because you don't want the
@@ -2497,7 +2514,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
           if ((ocelot_line_numbers != 0) && (column_number == 1)) is_header= true;
         }
       }
-      if ((ocelot_result_grid_vertical == 0) && (xrow == 0)) is_header=true;
+      if ((ocelot_result_grid_vertical == 0) && (xrow == 0)) is_header= true;
       if (is_header == true)
       {
         memcpy(&(text_edit_frames[ki]->content_length), field_names_pointer, sizeof(unsigned int));
@@ -2654,8 +2671,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
           int header_height= max_height_of_a_char
                            + ocelot_grid_cell_border_size_as_int * 2
                            + ocelot_grid_cell_drag_line_size_as_int;
-          if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
-          else header_height+= max_height_of_a_char;
+          header_height+= extra_height(1);
           text_edit_frames[xrow * gridx_column_count + xcol]->setFixedSize(grid_column_widths[xcol], header_height);
 //          text_edit_frames[xrow * gridx_column_count + xcol]->setMaximumHeight(header_height);
 //          text_edit_frames[xrow * gridx_column_count + xcol]->setMinimumHeight(header_height);
@@ -3060,23 +3076,6 @@ QString copy(unsigned int ocelot_history_max_column_width,
       Todo: take into account that a number won't contain anything wider than '9'.
 */
 /* header height calculation should differ from ordinary-row height calculation */
-/*
-   Extra size
-   I'm saying "if width<2 then width=2" and "if height<2 then height=2".
-   If I don't, then the drag line doesn't appear.
-   It seems I don't need to do this if drag line size = 0.
-   Todo: Maybe the problem is that Qt is allowing for a scroll bar,
-   but in that case the addition should be size of scroll bar
-   rather than size of char, i.e. QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent)
-   and in that case the scroll bar policy could be changed too.
-   Todo: Other than that, I can't figure out what else is screwing up the
-   calculations, but perhaps lineSpacing() shouldn't be added if there is only one line.
-   I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
-   but removing it doesn't solve the problem.
-   ... todo: check: Maybe setting minimum height / width of text_edit_frames[...] is a problem?
-   Update: June 7 2015: the problem seems to have disappeared so I temporarily removed the line.
-   Todo: another way to calculate a size involves layout->activate().
-*/
 void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
                            int ocelot_grid_cell_drag_line_size_as_int,
                            unsigned short int is_using_column_names)
@@ -3154,7 +3153,6 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
       if (grid_column_widths[i] >= (sum_tmp_column_lengths / gridx_column_count))
       {
         amount_being_reduced= grid_column_widths[i] / 2;
-
         if (amount_being_reduced > necessary_reduction) amount_being_reduced= necessary_reduction;
         if (amount_being_reduced > max_reduction) amount_being_reduced= max_reduction;
         grid_column_widths[i]= grid_column_widths[i] - amount_being_reduced;
@@ -3177,7 +3175,10 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   for (i= 0; i < gridx_column_count; ++i)
   {
     grid_column_heights[i]= (gridx_max_column_widths[i] * max_width_of_a_char) / grid_column_widths[i]; /* mysql_fields[i].length */
-    if ((grid_column_heights[i] * grid_column_widths[i]) < gridx_max_column_widths[i]) ++grid_column_heights[i];
+    if ((grid_column_heights[i] * grid_column_widths[i]) < (gridx_max_column_widths[i] * max_width_of_a_char))
+    {
+      ++grid_column_heights[i];
+    }
     if (grid_column_heights[i] > ocelot_grid_max_column_height_in_lines) grid_column_heights[i]= ocelot_grid_max_column_height_in_lines;
     if (grid_column_heights[i] > grid_actual_row_height_in_lines) grid_actual_row_height_in_lines= grid_column_heights[i];
   }
@@ -3190,23 +3191,55 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   for (i= 0; i < gridx_column_count; ++i)
   {
 //    grid_column_heights[i]= (grid_column_heights[i] * (max_height_of_a_char+(border_size * 2))) + 9;
-    /* For explanation of next line, see comment "Extra size". */
     int old_grid_column_height= grid_column_heights[i];
     grid_column_heights[i]= (grid_column_heights[i] * max_height_of_a_char)
                             + ocelot_grid_cell_border_size_as_int * 2
                             + ocelot_grid_cell_drag_line_size_as_int;
-    if (old_grid_column_height < 2)
-    {
-      int extra;
-      if (ocelot_grid_cell_drag_line_size_as_int > 0) extra= max_height_of_a_char;
-      else extra= max_height_of_a_char;
-      grid_column_heights[i]+= extra;
-    }
+    grid_column_heights[i]+= extra_height(old_grid_column_height);
     if (grid_column_heights[i] > grid_height_of_highest_column_in_pixels)
     {
       grid_height_of_highest_column_in_pixels= grid_column_heights[i];
     }
   }
+}
+
+
+/*
+  Increase the allowed height in pixels for a detail column or a header.
+  The numbers in this routine are the result of trial and error.
+  I have no idea why we need to allow for anything extra.
+*/
+/*
+   Extra size
+   I'm saying "if width<2 then width=2" and "if height<2 then height=2".
+   If I don't, then the drag line doesn't appear.
+   It seems I don't need to do this if drag line size = 0.
+   Todo: Maybe the problem is that Qt is allowing for a scroll bar,
+   but in that case the addition should be size of scroll bar
+   rather than size of char, i.e. QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent)
+   and in that case the scroll bar policy could be changed too.
+   Todo: Other than that, I can't figure out what else is screwing up the
+   calculations, but perhaps lineSpacing() shouldn't be added if there is only one line.
+   I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
+   but removing it doesn't solve the problem.
+   ... todo: check: Maybe setting minimum height / width of text_edit_frames[...] is a problem?
+   Update: June 7 2015: the problem seems to have disappeared so I temporarily removed the line.
+   Todo: another way to calculate a size involves layout->activate().
+*/
+int extra_height(int line_count)
+{
+  int extra= 6;
+  if (ocelot_grid_cell_drag_line_size_as_int > 0)
+  {
+    extra+= 3;
+    if (ocelot_grid_cell_drag_line_size_as_int > 8) ++extra;
+  }
+  else
+  {
+    extra+= 2;
+  }
+  if (line_count > 1) extra+= line_count;
+  return extra;
 }
 
 
@@ -3789,19 +3822,14 @@ void set_frame_color_setting()
   But we don't want all text_edit_frames and text_edit_widgets to change because that is slow.
   Let us set a flag which causes change at paint time. with setStyleSheet(copy_of_parent->ocelot_grid_header_style_string);
   This gets called just after we change colors + fonts with the dialog box, so we know
-  the new style string, and to get its font we will create a temporary QTextEdit.
-  Todo: I don't really want to "show" tmp_text_edit_widget, there's a cleverer way to get font which I've forgotten.
+  the new style string, and to get its font we used to create a temporary QTextEdit,
+  but nowadays we get font with a function that figures it out from the style sheet syntax.
 */
 void set_all_style_sheets(QString new_ocelot_grid_style_string,
                           QString new_ocelot_grid_cell_drag_line_size)
 {
-  TextEditWidget *tmp_text_edit_widget= new TextEditWidget(this);
-  tmp_text_edit_widget->setStyleSheet(new_ocelot_grid_style_string);
-  tmp_text_edit_widget->show();
-  text_edit_widget_font= tmp_text_edit_widget->font();
-  tmp_text_edit_widget->hide();
-  delete tmp_text_edit_widget;
-//  this->setStyleSheet(ocelot_grid_style_string);
+  text_edit_widget_font= copy_of_parent->get_font_from_style_sheet(new_ocelot_grid_style_string);
+
   unsigned int i_h;
 
   ocelot_grid_cell_drag_line_size_as_int= new_ocelot_grid_cell_drag_line_size.toInt();
@@ -4971,9 +4999,9 @@ void handle_combo_box_for_size_2(int i)
 }
 
 
-
-
 /* Some of the code in handle_button_for_font_dialog() is a near-duplicate of code in set_colors_and_fonts(). */
+/* This doesn't look for font_weight=light|demibold|black since QFontDialog ignores them anyway. */
+/* This passes italic==true but QFontDialog ignores that if it's expecting an oblique font. */
 void handle_button_for_font_dialog()
 {
   bool ok;
