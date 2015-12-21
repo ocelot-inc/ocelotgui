@@ -2637,25 +2637,8 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
       for (xcol= 0; xcol < gridx_column_count; ++xcol)
       {
         TextEditWidget *cell_text_edit_widget= text_edit_widgets[xrow * gridx_column_count + xcol];
-        /*
-          I'll right-align if type is number and this isn't the header.
-          But I read somewhere that might not be compatible with wrapping,
-          so I'll wrap only for non-number.
-          Do not assume it's left-aligned otherwise; there's a pool.
-        */
-        /* Todo: some other types e.g. BLOBs might also need special handling. */
-        if ((xrow > 0) && (dbms_get_field_flag(xcol) & NUM_FLAG))
-        {
-          cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
-          cell_text_edit_widget->setAlignment(Qt::AlignRight);
-        }
-        else
-        {
-          cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignLeft));
-          cell_text_edit_widget->setAlignment(Qt::AlignLeft);
-          cell_text_edit_widget->setWordWrapMode(QTextOption::WrapAnywhere);
-        }
-
+        if ((xrow > 0) && (dbms_get_field_flag(xcol) & NUM_FLAG)) text_align(cell_text_edit_widget, Qt::AlignRight);
+        else text_align(cell_text_edit_widget, Qt::AlignLeft);
         if (text_edit_frames[xrow * gridx_column_count + xcol]->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
         {
           if (is_image(xcol) == true)
@@ -3099,7 +3082,10 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
 
   /* KLUDGE. Small fonts don't work, we have to pretend they're wider. No, I don't know why. */
   if (max_width_of_a_char <= 5) max_width_of_a_char+= 2;
-  if (max_height_of_a_char <= 10) max_height_of_a_char+= 2;
+  if (max_height_of_a_char <= 11) max_height_of_a_char+= 3;
+
+  /* KlUDGE. Usually we don't need "+= 5" but before removing test with Courier New */
+  max_height_of_a_char+= 4;
 
   sum_tmp_column_lengths= 0;
 
@@ -3144,10 +3130,20 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
     sum_amount_reduced= 0;
     for (i= 0; i < gridx_column_count; ++i)
     {
-      unsigned int min_width= (dbms_get_field_name_length(i) + 1) * max_width_of_a_char /* mysql_fields[i].name_length */
-              + ocelot_grid_cell_border_size_as_int * 2
-              + ocelot_grid_cell_drag_line_size_as_int;
+      unsigned int min_width;
+      //min_width= (dbms_get_field_name_length(i) + 1) * max_width_of_a_char /* mysql_fields[i].name_length */
+      //       + ocelot_grid_cell_border_size_as_int * 2
+      //        + ocelot_grid_cell_drag_line_size_as_int;
 //              + border_size * 2;
+
+      /* KlUDGE. Usually we don't need "+= 3" but before removing test with Courier New */
+      min_width= mm.width(dbms_get_field_name(i))
+              + max_width_of_a_char
+              + ocelot_grid_cell_border_size_as_int * 2
+              + ocelot_grid_cell_drag_line_size_as_int
+              + max_width_of_a_char
+              + 3;
+
       if (grid_column_widths[i] <= min_width) continue;
       max_reduction= grid_column_widths[i] - min_width;
       if (grid_column_widths[i] >= (sum_tmp_column_lengths / gridx_column_count))
@@ -3179,6 +3175,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
     {
       ++grid_column_heights[i];
     }
+    if (grid_column_heights[i] == 0) ++grid_column_heights[i];
     if (grid_column_heights[i] > ocelot_grid_max_column_height_in_lines) grid_column_heights[i]= ocelot_grid_max_column_height_in_lines;
     if (grid_column_heights[i] > grid_actual_row_height_in_lines) grid_actual_row_height_in_lines= grid_column_heights[i];
   }
@@ -3388,24 +3385,8 @@ void scan_field_names(
 void set_alignment_and_height(int ki, int grid_col, int field_type)
 {
   TextEditWidget *cell_text_edit_widget= text_edit_widgets[ki];
-  /*
-    I'll right-align if type is number and this isn't the header.
-    But I read somewhere that might not be compatible with wrapping,
-    so I'll wrap only for non-number.
-    Do not assume it's left-aligned otherwise; there's a pool.
-  */
-  /* Todo: some other types e.g. BLOBs might also need special handling. */
-  if (field_type <= MYSQL_TYPE_DOUBLE)
-  {
-    cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignRight));
-    cell_text_edit_widget->setAlignment(Qt::AlignRight);
-  }
-  else
-  {
-    cell_text_edit_widget->document()->setDefaultTextOption(QTextOption(Qt::AlignLeft));
-    cell_text_edit_widget->setAlignment(Qt::AlignLeft);
-    cell_text_edit_widget->setWordWrapMode(QTextOption::WrapAnywhere);
-  }
+  if (field_type <= MYSQL_TYPE_DOUBLE) text_align(cell_text_edit_widget, Qt::AlignRight);
+  else text_align(cell_text_edit_widget, Qt::AlignLeft);
   /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
 //  if (xrow == 0)
 //  {
@@ -3428,10 +3409,12 @@ void set_alignment_and_height(int ki, int grid_col, int field_type)
     //else
     this_width= grid_column_widths[grid_col];
     text_edit_frames[ki]->setFixedSize(this_width, grid_column_heights[grid_col]);
+    /* Todo: test if following 2 lines are redundant since setFixedSize does the job. */
     text_edit_frames[ki]->setMaximumHeight(grid_column_heights[grid_col]);
     text_edit_frames[ki]->setMinimumHeight(grid_column_heights[grid_col]);
   }
 }
+
 
 /*
   Put lengths and pointers in text_edit_frames.
@@ -3734,6 +3717,28 @@ bool vertical_scroll_bar_event()
     return false;
   }
   return false;
+}
+
+
+/*
+  If a result grid text_edit_widget is a number + not header, call with alignment_flag == Qt::AlighRight.
+  Otherwise call with alignment_flag == Qt::AlignLeft.
+  Do not assume it's left-aligned otherwise; there's a pool.
+  Beware: if you only setAlignment, you lose wrapping, as a side effect of setDefaultTextOption (?)
+  Todo: take into account whether it's a right-to-left character set like Arabic or Hebrew.
+  Todo: check whether it's actually necessary to setAlignment for text_edit_widget too.
+  Todo: check what happens to wrapping if it's a number, I read somewhere that's a problem.
+  Todo: some other types e.g. BLOBs might also need special handling.
+  Todo: user-settable option rather than WrapAnywhere.
+  Todo: check that the effect is immediate, not deferred to the next time resultgrid comes up.
+*/
+void text_align(QTextEdit *cell_text_edit_widget, enum Qt::AlignmentFlag alignment_flag)
+{
+  QTextOption to;
+  to.setAlignment(alignment_flag);
+  to.setWrapMode(QTextOption::WrapAnywhere);
+  cell_text_edit_widget->document()->setDefaultTextOption(to);
+  cell_text_edit_widget->setAlignment(alignment_flag);
 }
 
 
