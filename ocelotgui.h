@@ -17,8 +17,18 @@
 /* The debugger is integrated now, but "ifdef DEBUGGER" directives help to delineate code that is debugger-specific. */
 #define DEBUGGER
 
-/* We accept existence of MariaDB 10.1 roles and compound statements. */
-#define MARIADB
+/*
+  The possible DBMS values.
+  DBMS_MYSQL must always be defined and --dbms='mysql' is default.
+  If DBMS_MARIADB is defined and --dbms='mariadb',
+    accept existence of MariaDB 10.1 roles and compound statements.
+  If DBMS_TARANTOOL is defined and --dbms='tarantool',
+    connection to a Tarantool server not a MySQL/MariaDB server.
+  #ifdef DBMS_TARANTOOL" was an aborted experiment, ordinarily this #define should be commented out.
+*/
+#define DBMS_MYSQL 1
+#define DBMS_MARIADB 2
+//#define DBMS_TARANTOOL 3
 
 #include <assert.h>
 
@@ -76,6 +86,56 @@
 #include <pwd.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#endif
+
+#ifdef DBMS_TARANTOOL
+#include <stdint.h>
+/*
+  Definitions of tnt_opt_type and tnt_reply are taken from tarantool-c.
+  Although there is no copyright, there is a request for an AS IS notice (which is done)
+*/
+  enum tnt_opt_type {
+          TNT_OPT_URI,
+          TNT_OPT_TMOUT_CONNECT,
+          TNT_OPT_TMOUT_RECV,
+          TNT_OPT_TMOUT_SEND,
+          TNT_OPT_SEND_CB,
+          TNT_OPT_SEND_CBV,
+          TNT_OPT_SEND_CB_ARG,
+          TNT_OPT_SEND_BUF,
+          TNT_OPT_RECV_CB,
+          TNT_OPT_RECV_CB_ARG,
+          TNT_OPT_RECV_BUF
+  };
+  struct tnt_reply {
+          int alloc;
+          uint64_t bitmap;
+          const char *buf;
+          size_t buf_size;
+          uint64_t code;
+          uint64_t sync;
+          uint64_t schema_id;
+          const char *error;
+          const char *error_end;
+          const char *data;
+          const char *data_end;
+  };
+  struct tnt_stream {
+          int alloc; /*!< Allocation mark */
+          ssize_t (*write)(struct tnt_stream *s, const char *buf, size_t size); /*!< write to buffer function */
+          ssize_t (*writev)(struct tnt_stream *s, struct iovec *iov, int count); /*!< writev function */
+          ssize_t (*read)(struct tnt_stream *s, char *buf, size_t size); /*!< read from buffer function */
+          int (*read_reply)(struct tnt_stream *s, struct tnt_reply *r); /*!< read reply from buffer */
+          void (*free)(struct tnt_stream *s); /*!< free custom buffer types (destructor) */
+          void *data; /*!< subclass data */
+          uint32_t wrcnt; /*!< count of write operations */
+          uint64_t reqid; /*!< request id of current operation */
+  };
+  enum  	mp_type {
+    MP_NIL = 0, MP_UINT, MP_INT, MP_STR,
+    MP_BIN, MP_ARRAY, MP_MAP, MP_BOOL,
+    MP_FLOAT, MP_DOUBLE, MP_EXT
+  };
 #endif
 
 /* Flags used for row_form_box. NUM_FLAG is also defined in mysql include, with same value. */
@@ -166,6 +226,7 @@ public:
   QString ocelot_statement_highlight_reserved_color, new_ocelot_statement_highlight_reserved_color;
   QString ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color;
   QString ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color;
+  QString ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker;
   QString ocelot_statement_style_string;
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
@@ -277,6 +338,131 @@ public:
   int main_window_maximum_height;
   void component_size_calc(int *character_height, int *borders_height);
   QFont get_font_from_style_sheet(QString style_string);
+
+  void hparse_f_nexttoken();
+  void hparse_f_next_nexttoken();
+  void hparse_f_error();
+  int hparse_f_accept(int,QString);
+  int hparse_f_acceptn(int,QString,int);
+  int hparse_f_expect(int,QString);
+  int hparse_f_literal();
+  int hparse_f_default(int);
+  int hparse_f_user_name();
+  int hparse_f_character_set_name();
+  int hparse_f_qualified_name();
+  int hparse_f_qualified_name_with_star();
+  int hparse_f_table_references();
+  void hparse_f_table_escaped_table_reference();
+  int hparse_f_table_reference(int);
+  int hparse_f_table_factor();
+  int hparse_f_table_join_table();
+  int hparse_f_table_join_condition();
+  void hparse_f_table_index_hint_list();
+  int hparse_f_table_index_hint();
+  int hparse_f_table_index_list();
+  void hparse_f_opr_1(),hparse_f_opr_2(),hparse_f_opr_3(),hparse_f_opr_4(),hparse_f_opr_5(),hparse_f_opr_6();
+  void hparse_f_opr_7(),hparse_f_opr_8(),hparse_f_opr_9(),hparse_f_opr_10(),hparse_f_opr_11(),hparse_f_opr_12();
+  void hparse_f_opr_13(),hparse_f_opr_14(),hparse_f_opr_15(),hparse_f_opr_16(),hparse_f_opr_17(),hparse_f_opr_18();
+  void hparse_f_function_arguments(QString);
+  void hparse_f_expression_list(int);
+  void hparse_f_parenthesized_value_list();
+  void hparse_f_parameter_list(int);
+  void hparse_f_parenthesized_expression();
+  void hparse_f_parenthesized_multi_expression(int*);
+  void hparse_f_like_or_where();
+  void hparse_f_from_or_like_or_where();
+  void hparse_f_show_columns();
+  void hparse_f_if_not_exists();
+  void hparse_f_indexes_or_keys();
+  void hparse_f_alter_or_create_clause(int,unsigned short int*,bool*);
+  int hparse_f_semicolon_and_or_delimiter(int);
+  void hparse_f_statement();
+  void hparse_f_assignment(int);
+  void hparse_f_alter_table();
+  void hparse_f_alter_database();
+  void hparse_f_alter_specification();
+  void hparse_f_characteristics();
+  int hparse_f_algorithm_or_lock();
+  void hparse_f_definer();
+  void hparse_f_character_set_or_collate();
+  void hparse_f_length(bool, bool,bool);
+  void hparse_f_enum_or_set();
+  int hparse_f_data_type();
+  void hparse_f_reference_option();
+  void hparse_f_reference_definition();
+  int hparse_f_create_definition();
+  int hparse_f_current_timestamp();
+  void hparse_f_column_definition();
+  void hparse_f_comment();
+  void hparse_f_column_list(int);
+  void hparse_f_engine();
+  void hparse_f_table_or_partition_options(int);
+  void hparse_f_partition_options();
+  void hparse_f_partition_or_subpartition(int);
+  void hparse_f_partition_or_subpartition_definition(int);
+  int hparse_f_partition_list(bool, bool);
+  void hparse_f_algorithm();
+  void hparse_f_sql();
+  void hparse_f_for_channel();
+  void hparse_f_interval_quantity(int);
+  void hparse_f_alter_or_create_event(int);
+  void hparse_f_alter_or_create_server(int);
+  void hparse_f_require(int,bool);
+  void hparse_f_user_specification_list();
+  void hparse_f_create_database();
+  void hparse_f_index_columns(int,bool,bool);
+  void hparse_f_alter_or_create_view();
+  void hparse_f_analyze_or_optimize();
+  void hparse_f_call();
+  void hparse_f_commit_or_rollback();
+  void hparse_f_explain_or_describe();
+  void hparse_f_grant_or_revoke(int);
+  void hparse_f_insert_or_replace();
+  void hparse_f_condition_information_item_name();
+  int hparse_f_signal_or_resignal();
+  int hparse_f_into();
+  int hparse_f_select(bool);
+  void hparse_f_where();
+  void hparse_f_order_by();
+  void hparse_f_limit();
+  void hparse_f_block(int);
+  void hparse_f_multi_block(QString text);
+  int hparse_f_backslash_command(bool);
+  int hparse_f_client_statement();
+
+#ifdef DBMS_TARANTOOL
+  void parse_f_nextsym();
+  void parse_f_error();
+  int parse_f_accept(QString);
+  int parse_f_expect(QString);
+  void parse_f_factor();
+  void parse_f_term();
+  void parse_f_expression();
+  void parse_f_restricted_expression();
+  void parse_f_indexed_condition();
+  void parse_f_statement();
+  void parse_f_assignment();
+  void parse_f_block();
+  void parse_f_program(QString text);
+#endif
+#ifdef DBMS_TARANTOOL
+  long unsigned int tarantool_num_rows();
+  unsigned int tarantool_num_fields();
+  int tarantool_num_fields_recursive(const char **tarantool_tnt_reply_data,
+                                     char *field_name,
+                                     int field_number_within_array,
+                                     QString *field_name_list);
+  void tarantool_scan_rows(unsigned int p_result_column_count,
+                 unsigned int p_result_row_count,
+                 MYSQL_RES *p_mysql_res,
+                 char **p_result_set_copy,
+                 char ***p_result_set_copy_rows,
+                 unsigned int **p_result_max_column_widths);
+  void tarantool_scan_field_names(
+                 const char *which_field,
+                 unsigned int p_result_column_count,
+                 char **p_result_field_names);
+#endif
 
 public slots:
   void action_connect();
@@ -410,13 +596,20 @@ private:
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
 
+  /* main_token_flags[] values. so far there are only three but we expect there will be more. */
+  #define TOKEN_FLAG_IS_RESERVED 1
+  #define TOKEN_FLAG_IS_BLOCK_END 2
+  #define TOKEN_FLAG_IS_ERROR 4
+
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
     TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE= 2, /* starts with " */
     TOKEN_TYPE_LITERAL_WITH_DIGIT= 3,        /* starts with 0-9 */
-    TOKEN_TYPE_LITERAL_WITH_BRACE= 4,        /* starts with { */
+    TOKEN_TYPE_LITERAL_WITH_BRACE= 4,        /* starts with { */ /* obsolete? */
+    TOKEN_TYPE_LITERAL= 4,
     TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK= 5,  /* starts with ` */
     TOKEN_TYPE_IDENTIFIER_WITH_AT= 6,        /* starts with @ */
+    TOKEN_TYPE_IDENTIFIER= 6,
     TOKEN_TYPE_COMMENT_WITH_SLASH = 7,        /* starts with / * or * / */
     TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE= 8,   /* starts with # */
     TOKEN_TYPE_COMMENT_WITH_MINUS= 9,        /* starts with -- */
@@ -437,8 +630,7 @@ private:
     TOKEN_KEYWORD_ASENSITIVE= TOKEN_KEYWORD_ASCII + 1,
     TOKEN_KEYWORD_BEFORE= TOKEN_KEYWORD_ASENSITIVE + 1,
     TOKEN_KEYWORD_BEGIN= TOKEN_KEYWORD_BEFORE + 1,
-    TOKEN_KEYWORD_BETWEEN= TOKEN_KEYWORD_BEGIN + 1,
-    TOKEN_KEYWORD_BIGINT= TOKEN_KEYWORD_BETWEEN + 1,
+    TOKEN_KEYWORD_BIGINT= TOKEN_KEYWORD_BEGIN + 1,
     TOKEN_KEYWORD_BINARY= TOKEN_KEYWORD_BIGINT + 1,
     TOKEN_KEYWORD_BIT= TOKEN_KEYWORD_BINARY + 1,
     TOKEN_KEYWORD_BLOB= TOKEN_KEYWORD_BIT + 1,
@@ -518,7 +710,8 @@ private:
     TOKEN_KEYWORD_FROM= TOKEN_KEYWORD_FOREIGN + 1,
     TOKEN_KEYWORD_FULLTEXT= TOKEN_KEYWORD_FROM + 1,
     TOKEN_KEYWORD_FUNCTION= TOKEN_KEYWORD_FULLTEXT + 1,
-    TOKEN_KEYWORD_GEOMETRY= TOKEN_KEYWORD_FUNCTION + 1,
+    TOKEN_KEYWORD_GENERATED= TOKEN_KEYWORD_FUNCTION + 1,
+    TOKEN_KEYWORD_GEOMETRY= TOKEN_KEYWORD_GENERATED + 1,
     TOKEN_KEYWORD_GEOMETRYCOLLECTION= TOKEN_KEYWORD_GEOMETRY + 1,
     TOKEN_KEYWORD_GET= TOKEN_KEYWORD_GEOMETRYCOLLECTION + 1,
     TOKEN_KEYWORD_GO= TOKEN_KEYWORD_GET + 1,
@@ -590,8 +783,7 @@ private:
     TOKEN_KEYWORD_MULTIPOINT= TOKEN_KEYWORD_MULTILINESTRING + 1,
     TOKEN_KEYWORD_MULTIPOLYGON= TOKEN_KEYWORD_MULTIPOINT + 1,
     TOKEN_KEYWORD_NATURAL= TOKEN_KEYWORD_MULTIPOLYGON + 1,
-    TOKEN_KEYWORD_NONBLOCKING= TOKEN_KEYWORD_NATURAL + 1,
-    TOKEN_KEYWORD_NOPAGER= TOKEN_KEYWORD_NONBLOCKING + 1,
+    TOKEN_KEYWORD_NOPAGER= TOKEN_KEYWORD_NATURAL + 1,
     TOKEN_KEYWORD_NOT= TOKEN_KEYWORD_NOPAGER + 1, /* Ocelot keyword */
     TOKEN_KEYWORD_NOTEE= TOKEN_KEYWORD_NOT + 1, /* Ocelot keyword */
     TOKEN_KEYWORD_NOWARNING= TOKEN_KEYWORD_NOTEE + 1, /* Ocelot keyword */
@@ -664,7 +856,8 @@ private:
     TOKEN_KEYWORD_SSL= TOKEN_KEYWORD_SQL_SMALL_RESULT + 1,
     TOKEN_KEYWORD_STARTING= TOKEN_KEYWORD_SSL + 1,
     TOKEN_KEYWORD_STATUS= TOKEN_KEYWORD_STARTING + 1, /* Ocelot keyword */
-    TOKEN_KEYWORD_STRAIGHT_JOIN= TOKEN_KEYWORD_STATUS + 1,
+    TOKEN_KEYWORD_STORED= TOKEN_KEYWORD_STATUS + 1,
+    TOKEN_KEYWORD_STRAIGHT_JOIN= TOKEN_KEYWORD_STORED + 1,
     TOKEN_KEYWORD_SYSTEM= TOKEN_KEYWORD_STRAIGHT_JOIN + 1, /* Ocelot keyword */
     TOKEN_KEYWORD_TABLE= TOKEN_KEYWORD_SYSTEM + 1,
     TOKEN_KEYWORD_TABLESPACE= TOKEN_KEYWORD_TABLE + 1,
@@ -680,7 +873,8 @@ private:
     TOKEN_KEYWORD_TRAILING= TOKEN_KEYWORD_TO + 1,
     TOKEN_KEYWORD_TRIGGER= TOKEN_KEYWORD_TRAILING + 1,
     TOKEN_KEYWORD_TRUE= TOKEN_KEYWORD_TRIGGER + 1,
-    TOKEN_KEYWORD_UNDO= TOKEN_KEYWORD_TRUE + 1,
+    TOKEN_KEYWORD_TRUNCATE= TOKEN_KEYWORD_TRUE + 1,
+    TOKEN_KEYWORD_UNDO= TOKEN_KEYWORD_TRUNCATE + 1,
     TOKEN_KEYWORD_UNICODE= TOKEN_KEYWORD_UNDO + 1,
     TOKEN_KEYWORD_UNION= TOKEN_KEYWORD_UNICODE + 1,
     TOKEN_KEYWORD_UNIQUE= TOKEN_KEYWORD_UNION + 1,
@@ -699,19 +893,59 @@ private:
     TOKEN_KEYWORD_VARCHARACTER= TOKEN_KEYWORD_VARCHAR + 1,
     TOKEN_KEYWORD_VARYING= TOKEN_KEYWORD_VARCHARACTER + 1,
     TOKEN_KEYWORD_VIEW= TOKEN_KEYWORD_VARYING + 1,
-    TOKEN_KEYWORD_WARNINGS= TOKEN_KEYWORD_VIEW + 1, /* Ocelot keyword */
+    TOKEN_KEYWORD_VIRTUAL= TOKEN_KEYWORD_VIEW + 1,
+    TOKEN_KEYWORD_WARNINGS= TOKEN_KEYWORD_VIRTUAL + 1, /* Ocelot keyword */
     TOKEN_KEYWORD_WHEN= TOKEN_KEYWORD_WARNINGS + 1,
     TOKEN_KEYWORD_WHERE= TOKEN_KEYWORD_WHEN + 1,
     TOKEN_KEYWORD_WHILE= TOKEN_KEYWORD_WHERE + 1,
     TOKEN_KEYWORD_WITH= TOKEN_KEYWORD_WHILE + 1,
     TOKEN_KEYWORD_WRITE= TOKEN_KEYWORD_WITH + 1,
-    TOKEN_KEYWORD_XOR= TOKEN_KEYWORD_WRITE + 1,
-    TOKEN_KEYWORD_YEAR= TOKEN_KEYWORD_XOR + 1,
+    TOKEN_KEYWORD_YEAR= TOKEN_KEYWORD_WRITE + 1,
     TOKEN_KEYWORD_YEAR_MONTH= TOKEN_KEYWORD_YEAR + 1,
-    TOKEN_KEYWORD_ZEROFILL= TOKEN_KEYWORD_YEAR_MONTH + 1
+    TOKEN_KEYWORD_ZEROFILL= TOKEN_KEYWORD_YEAR_MONTH + 1,
+    TOKEN_KEYWORD__ARMSCII8= TOKEN_KEYWORD_ZEROFILL + 1,
+    TOKEN_KEYWORD__ASCII= TOKEN_KEYWORD__ARMSCII8 + 1,
+    TOKEN_KEYWORD__BIG5= TOKEN_KEYWORD__ASCII + 1,
+    TOKEN_KEYWORD__BINARY= TOKEN_KEYWORD__BIG5 + 1,
+    TOKEN_KEYWORD__CP1250= TOKEN_KEYWORD__BINARY + 1,
+    TOKEN_KEYWORD__CP1251= TOKEN_KEYWORD__CP1250 + 1,
+    TOKEN_KEYWORD__CP1256= TOKEN_KEYWORD__CP1251 + 1,
+    TOKEN_KEYWORD__CP1257= TOKEN_KEYWORD__CP1256 + 1,
+    TOKEN_KEYWORD__CP850= TOKEN_KEYWORD__CP1257 + 1,
+    TOKEN_KEYWORD__CP852= TOKEN_KEYWORD__CP850 + 1,
+    TOKEN_KEYWORD__CP866= TOKEN_KEYWORD__CP852 + 1,
+    TOKEN_KEYWORD__CP932= TOKEN_KEYWORD__CP866 + 1,
+    TOKEN_KEYWORD__DEC8= TOKEN_KEYWORD__CP932 + 1,
+    TOKEN_KEYWORD__EUCJPMS= TOKEN_KEYWORD__DEC8 + 1,
+    TOKEN_KEYWORD__EUCKR= TOKEN_KEYWORD__EUCJPMS + 1,
+    TOKEN_KEYWORD__FILENAME= TOKEN_KEYWORD__EUCKR + 1,
+    TOKEN_KEYWORD__GB2312= TOKEN_KEYWORD__FILENAME + 1,
+    TOKEN_KEYWORD__GBK= TOKEN_KEYWORD__GB2312 + 1,
+    TOKEN_KEYWORD__GEOSTD8= TOKEN_KEYWORD__GBK + 1,
+    TOKEN_KEYWORD__GREEK= TOKEN_KEYWORD__GEOSTD8 + 1,
+    TOKEN_KEYWORD__HEBREW= TOKEN_KEYWORD__GREEK + 1,
+    TOKEN_KEYWORD__HP8= TOKEN_KEYWORD__HEBREW + 1,
+    TOKEN_KEYWORD__KEYBCS2= TOKEN_KEYWORD__HP8 + 1,
+    TOKEN_KEYWORD__KOI8R= TOKEN_KEYWORD__KEYBCS2 + 1,
+    TOKEN_KEYWORD__KOI8U= TOKEN_KEYWORD__KOI8R + 1,
+    TOKEN_KEYWORD__LATIN1= TOKEN_KEYWORD__KOI8U + 1,
+    TOKEN_KEYWORD__LATIN2= TOKEN_KEYWORD__LATIN1 + 1,
+    TOKEN_KEYWORD__LATIN5= TOKEN_KEYWORD__LATIN2 + 1,
+    TOKEN_KEYWORD__LATIN7= TOKEN_KEYWORD__LATIN5 + 1,
+    TOKEN_KEYWORD__MACCE= TOKEN_KEYWORD__LATIN7 + 1,
+    TOKEN_KEYWORD__MACROMAN= TOKEN_KEYWORD__MACCE + 1,
+    TOKEN_KEYWORD__SJIS= TOKEN_KEYWORD__MACROMAN + 1,
+    TOKEN_KEYWORD__SWE7= TOKEN_KEYWORD__SJIS + 1,
+    TOKEN_KEYWORD__TIS620= TOKEN_KEYWORD__SWE7 + 1,
+    TOKEN_KEYWORD__UCS2= TOKEN_KEYWORD__TIS620 + 1,
+    TOKEN_KEYWORD__UJIS= TOKEN_KEYWORD__UCS2 + 1,
+    TOKEN_KEYWORD__UTF16= TOKEN_KEYWORD__UJIS + 1,
+    TOKEN_KEYWORD__UTF16LE= TOKEN_KEYWORD__UTF16 + 1,
+    TOKEN_KEYWORD__UTF32= TOKEN_KEYWORD__UTF16LE + 1,
+    TOKEN_KEYWORD__UTF8= TOKEN_KEYWORD__UTF32 + 1,
+    TOKEN_KEYWORD__UTF8MB4= TOKEN_KEYWORD__UTF8 + 1,
 #ifdef DEBUGGER
-    ,
-    TOKEN_KEYWORD_DEBUG_BREAKPOINT = TOKEN_KEYWORD_ZEROFILL + 1,
+    TOKEN_KEYWORD_DEBUG_BREAKPOINT = TOKEN_KEYWORD__UTF8MB4 + 1,
     TOKEN_KEYWORD_DEBUG_CLEAR= TOKEN_KEYWORD_DEBUG_BREAKPOINT + 1,
     TOKEN_KEYWORD_DEBUG_CONTINUE= TOKEN_KEYWORD_DEBUG_CLEAR + 1,
     TOKEN_KEYWORD_DEBUG_DEBUG= TOKEN_KEYWORD_DEBUG_CONTINUE + 1,
@@ -728,9 +962,54 @@ private:
     TOKEN_KEYWORD_DEBUG_SKIP= TOKEN_KEYWORD_DEBUG_SETUP + 1,
     TOKEN_KEYWORD_DEBUG_SOURCE= TOKEN_KEYWORD_DEBUG_SKIP + 1,
     TOKEN_KEYWORD_DEBUG_STEP= TOKEN_KEYWORD_DEBUG_SOURCE + 1,
-    TOKEN_KEYWORD_DEBUG_TBREAKPOINT= TOKEN_KEYWORD_DEBUG_STEP + 1
+    TOKEN_KEYWORD_DEBUG_TBREAKPOINT= TOKEN_KEYWORD_DEBUG_STEP + 1,
 #endif
-       };
+    TOKEN_TYPE_KEYWORD= TOKEN_KEYWORD_DEBUG_TBREAKPOINT + 1,  /* generic, lots of keywords have this */
+    TOKEN_KEYWORD_BEGIN_WORK= TOKEN_TYPE_KEYWORD + 1,         /* some non-reserved keywords */
+    TOKEN_KEYWORD_BEGIN_XA= TOKEN_KEYWORD_BEGIN_WORK + 1,
+    TOKEN_KEYWORD_CLOSE= TOKEN_KEYWORD_BEGIN_XA + 1,
+    TOKEN_KEYWORD_COMMIT= TOKEN_KEYWORD_CLOSE + 1,
+    TOKEN_KEYWORD_DEALLOCATE= TOKEN_KEYWORD_COMMIT + 1,
+    TOKEN_KEYWORD_EXECUTE= TOKEN_KEYWORD_DEALLOCATE + 1,
+    TOKEN_KEYWORD_FILE= TOKEN_KEYWORD_EXECUTE + 1,
+    TOKEN_KEYWORD_FLUSH= TOKEN_KEYWORD_FILE + 1,
+    TOKEN_KEYWORD_HANDLER= TOKEN_KEYWORD_FLUSH + 1,
+    TOKEN_KEYWORD_INSTALL= TOKEN_KEYWORD_HANDLER + 1,
+    TOKEN_KEYWORD_NOW= TOKEN_KEYWORD_INSTALL + 1,
+    TOKEN_KEYWORD_OPEN= TOKEN_KEYWORD_NOW + 1,
+    TOKEN_KEYWORD_PREPARE= TOKEN_KEYWORD_OPEN + 1,
+    TOKEN_KEYWORD_PROCESS= TOKEN_KEYWORD_PREPARE + 1,
+    TOKEN_KEYWORD_PROXY= TOKEN_KEYWORD_PROCESS + 1,
+    TOKEN_KEYWORD_REPLICATION= TOKEN_KEYWORD_PROXY + 1,
+    TOKEN_KEYWORD_RELOAD= TOKEN_KEYWORD_REPLICATION + 1,
+    TOKEN_KEYWORD_REPAIR= TOKEN_KEYWORD_RELOAD + 1,
+    TOKEN_KEYWORD_RESET= TOKEN_KEYWORD_REPAIR + 1,
+    TOKEN_KEYWORD_ROLE= TOKEN_KEYWORD_RESET + 1,
+    TOKEN_KEYWORD_ROLLBACK= TOKEN_KEYWORD_ROLE + 1,
+    TOKEN_KEYWORD_SAVEPOINT= TOKEN_KEYWORD_ROLLBACK + 1,
+    TOKEN_KEYWORD_SHUTDOWN= TOKEN_KEYWORD_SAVEPOINT + 1,
+    TOKEN_KEYWORD_SONAME= TOKEN_KEYWORD_SHUTDOWN + 1,
+    TOKEN_KEYWORD_START= TOKEN_KEYWORD_SONAME + 1,
+    TOKEN_KEYWORD_STOP= TOKEN_KEYWORD_START + 1,
+    TOKEN_KEYWORD_SUPER= TOKEN_KEYWORD_STOP + 1,
+    TOKEN_KEYWORD_UNINSTALL= TOKEN_KEYWORD_SUPER + 1,
+    TOKEN_KEYWORD_USER= TOKEN_KEYWORD_UNINSTALL + 1,
+    TOKEN_KEYWORD_XA= TOKEN_KEYWORD_USER + 1
+  };
+
+/*
+  ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
+    0 = none
+    1 = use for highlights
+    2 = errors, i.e. pop up a dialog box if user tries to execute a bad-looking statement
+    4 = severe e.g. look whether declared variable is known
+    8 = severe e.g. look whether table is known (need to ask server)
+   16 = tooltip
+   32 = word-completion
+   ... although so far the only thing being checked is 2 = errors
+*/
+#define FLAG_FOR_HIGHLIGHTS 1
+#define FLAG_FOR_ERRORS     2
 
   void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
 
@@ -741,6 +1020,13 @@ private:
   int next_token(int i);
   int find_start_of_body(QString text, int *i_of_function, int *i_of_do);
   int connect_mysql(unsigned int connection_number);
+#ifdef DBMS_TARANTOOL
+  int connect_tarantool(unsigned int connection_number);
+  void tarantool_flush_and_save_reply();
+  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len);
+  unsigned int tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes);
+  const char * tarantool_seek_0();
+#endif
   QString select_1_row(const char *select_statement);
 
   QWidget *main_window;
@@ -776,8 +1062,8 @@ private:
     QAction *menu_settings_action_menu;
     QAction *menu_settings_action_history;
     QAction *menu_settings_action_grid;
-    QAction *menu_settings_action_extra_rule_1;
     QAction *menu_settings_action_statement;
+    QAction *menu_settings_action_extra_rule_1;
   QMenu *menu_options;
     QAction *menu_options_action_option_detach_history_widget;
     QAction *menu_options_action_option_detach_result_grid_widget;
@@ -823,6 +1109,7 @@ private:
   int  main_token_offsets[MAX_TOKENS];
   int  main_token_lengths[MAX_TOKENS];
   int  main_token_types[MAX_TOKENS];
+  unsigned char main_token_flags[MAX_TOKENS]; /* e.g. TOKEN_FLAG_IS_RESERVED */
   unsigned int main_token_count;
   unsigned int main_token_count_in_statement;
   unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
@@ -837,7 +1124,15 @@ private:
   /* MYSQL mysql; */
   MYSQL_RES *mysql_res;
   /* MYSQL_FIELD *fields; */
-  int is_mysql_connected;
+#ifdef DBMS_TARANTOOL
+  struct tnt_reply tarantool_tnt_reply;
+  char *tarantool_field_names;
+#endif
+
+  /* connections_... [] is not a multi-occurrence list but someday it might be */
+  int connections_is_connected[1];                    /* == 1 if is connected */
+  int connections_dbms[1];                            /* == DBMS_MYSQL or other DBMS_... value */
+
 
 };
 
@@ -1424,6 +1719,53 @@ public:
   typedef unsigned int    (*tmysql_warning_count)(MYSQL *);
   typedef int             (*tAES_set_decrypt_key)(unsigned char *, int, AES_KEY *);
   typedef void            (*tAES_decrypt)        (unsigned char *, unsigned char *, AES_KEY *);
+#ifdef DBMS_TARANTOOL
+  typedef uint32_t        (*tmp_decode_array)    (const char **data);
+  typedef const char*     (*tmp_decode_bin)      (const char **data, uint32_t *len);
+  //typedef uint32_t        (*tmp_decode_binl)     (const char **data);
+  typedef bool            (*tmp_decode_bool)     (const char **data);
+  typedef float           (*tmp_decode_float)    (const char **data);
+  typedef double          (*tmp_decode_double)   (const char **data);
+  typedef int64_t         (*tmp_decode_int)      (const char **data);
+  typedef uint32_t        (*tmp_decode_map)      (const char **data);
+  typedef void            (*tmp_decode_nil)      (const char **data);
+  typedef uint64_t        (*tmp_decode_uint)     (const char **data);
+  typedef const char*     (*tmp_decode_str)      (const char **data, uint32_t *len);
+  typedef uint32_t        (*tmp_decode_strl)     (const char **data);
+  typedef void            (*tmp_next)            (const char **data);
+  typedef enum mp_type    (*tmp_typeof)          (const char c);
+  typedef ssize_t         (*ttnt_auth)           (struct tnt_stream *, const char *, int, const char *, int);
+  typedef ssize_t         (*ttnt_call)           (struct tnt_stream *, const char *, size_t, struct tnt_stream *);
+  typedef void            (*ttnt_close)          (struct tnt_stream *);
+  typedef int             (*ttnt_connect)        (struct tnt_stream *);
+  typedef ssize_t         (*ttnt_eval)           (struct tnt_stream *, const char *, size_t, struct tnt_stream *);
+  typedef ssize_t         (*ttnt_delete)         (struct tnt_stream *, uint32_t, uint32_t, tnt_stream *);
+  typedef ssize_t         (*ttnt_flush)          (struct tnt_stream *);
+  typedef int             (*ttnt_get_indexno)    (struct tnt_stream *, int, const char *, size_t);
+  typedef int             (*ttnt_get_spaceno)    (struct tnt_stream *, const char *, size_t);
+  typedef void            (*ttnt_stream_free)    (struct tnt_stream *);
+  typedef ssize_t         (*ttnt_insert)         (struct tnt_stream *, uint32_t, struct tnt_stream *);
+  typedef tnt_stream*     (*ttnt_net)            (struct tnt_stream *);
+  typedef tnt_stream*     (*ttnt_object)         (struct tnt_stream *);
+  typedef ssize_t         (*ttnt_object_add_array)(struct tnt_stream *, uint32_t);
+  typedef ssize_t         (*ttnt_object_add_nil) (struct tnt_stream *);
+  typedef ssize_t         (*ttnt_object_add_int) (struct tnt_stream *, int64_t);
+  typedef ssize_t         (*ttnt_object_add_str) (struct tnt_stream *, const char *, uint32_t);
+  typedef ssize_t         (*ttnt_object_add_bin) (struct tnt_stream *, const void *, uint32_t);
+  typedef ssize_t         (*ttnt_object_add_bool)(struct tnt_stream *, char);
+  typedef ssize_t         (*ttnt_object_add_float)(struct tnt_stream *s, float);
+  typedef ssize_t         (*ttnt_object_add_double)(struct tnt_stream *, double);
+  typedef ssize_t         (*ttnt_object_container_close)(struct tnt_stream *);
+  typedef ssize_t         (*ttnt_object_format)  (struct tnt_stream *, const char *, int, char *);
+  typedef int             (*ttnt_reload_schema)  (struct tnt_stream *);
+  typedef ssize_t         (*ttnt_replace)        (struct tnt_stream *, uint32_t, struct tnt_stream *);
+  typedef int             (*ttnt_reply)          (struct tnt_reply *, char *, size_t, size_t *);
+  typedef tnt_reply*      (*ttnt_reply_init)     (struct tnt_reply *);
+  typedef void            (*ttnt_reply_free)     (struct tnt_reply *);
+  typedef ssize_t         (*ttnt_select)         (struct tnt_stream *, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t, struct tnt_stream *);
+  typedef int             (*ttnt_set)            (struct tnt_stream *, int, char *);
+  typedef ssize_t         (*ttnt_update)         (struct tnt_stream *, uint32_t, uint32_t, struct tnt_stream *, struct tnt_stream *);
+#endif
 
   tmysql_affected_rows t__mysql_affected_rows;   /* libmysqlclient */
   tmysql_close t__mysql_close;
@@ -1455,6 +1797,53 @@ public:
   tmysql_warning_count t__mysql_warning_count;
   tAES_set_decrypt_key t__AES_set_decrypt_key;
   tAES_decrypt t__AES_decrypt;
+#ifdef DBMS_TARANTOOL
+  tmp_decode_array t__mp_decode_array;
+  tmp_decode_bin t__mp_decode_bin;
+  //tmp_decode_binl t__mp_decode_binl;
+  tmp_decode_bool t__mp_decode_bool;
+  tmp_decode_float t__mp_decode_float;
+  tmp_decode_double t__mp_decode_double;
+  tmp_decode_int t__mp_decode_int;
+  tmp_decode_map t__mp_decode_map;
+  tmp_decode_nil t__mp_decode_nil;
+  tmp_decode_uint t__mp_decode_uint;
+  tmp_decode_str t__mp_decode_str;
+  tmp_decode_strl t__mp_decode_strl;
+  tmp_next t__mp_next;
+  tmp_typeof t__mp_typeof;
+  ttnt_auth t__tnt_auth;
+  ttnt_call t__tnt_call;
+  ttnt_close t__tnt_close;
+  ttnt_connect t__tnt_connect;
+  ttnt_delete t__tnt_delete;
+  ttnt_eval t__tnt_eval;
+  ttnt_flush t__tnt_flush;
+  ttnt_get_indexno t__tnt_get_indexno;
+  ttnt_get_spaceno t__tnt_get_spaceno;
+  ttnt_stream_free t__tnt_stream_free;
+  ttnt_insert t__tnt_insert;
+  ttnt_net t__tnt_net;
+  ttnt_object t__tnt_object;
+  ttnt_object_add_array t__tnt_object_add_array;
+  ttnt_object_add_nil t__tnt_object_add_nil;
+  ttnt_object_add_int t__tnt_object_add_int;
+  ttnt_object_add_str t__tnt_object_add_str;
+  ttnt_object_add_bin t__tnt_object_add_bin;
+  ttnt_object_add_bool t__tnt_object_add_bool;
+  ttnt_object_add_float t__tnt_object_add_float;
+  ttnt_object_add_double t__tnt_object_add_double;
+  ttnt_object_container_close t__tnt_object_container_close;
+  ttnt_object_format t__tnt_object_format;
+  ttnt_reload_schema t__tnt_reload_schema;
+  ttnt_replace t__tnt_replace;
+  ttnt_reply t__tnt_reply;
+  ttnt_reply_init t__tnt_reply_init;
+  ttnt_reply_free t__tnt_reply_free;
+  ttnt_select t__tnt_select;
+  ttnt_set t__tnt_set;
+  ttnt_update t__tnt_update;
+#endif
 
 ldbms() : QWidget()
 {
@@ -1464,6 +1853,10 @@ ldbms() : QWidget()
 #define WHICH_LIBRARY_LIBMYSQLCLIENT 0
 #define WHICH_LIBRARY_LIBCRYPTO 1
 #define WHICH_LIBRARY_LIBMYSQLCLIENT18 2
+#ifdef DBMS_TARANTOOL
+#define WHICH_LIBRARY_LIBTARANTOOL 3
+#define WHICH_LIBRARY_LIBTARANTOOLNET 4
+#endif
 
 void ldbms_get_library(QString ocelot_ld_run_path,
         int *is_library_loaded,           /* points to is_libXXX_loaded */
@@ -1504,6 +1897,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) QLibrary lib("libmysqlclient");
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) QLibrary lib("libmysqlclient");
     if (which_library == WHICH_LIBRARY_LIBCRYPTO) QLibrary lib("libcrypto");
+#ifdef DBMS_TARANTOOL
+    if (which_library == WHICH_LIBRARY_LIBTARANTOOL) QLibrary lib("libtarantool");
+    if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) QLibrary lib("libtarantoolnet");
+#endif
 #endif
     /*
       Finding libmysqlclient
@@ -1538,6 +1935,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient.so.18");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient.so");
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto.so");
+#ifdef DBMS_TARANTOOL
+          if (which_library == WHICH_LIBRARY_LIBTARANTOOL) ld_run_path_part.append("/libtarantool.so");
+          if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet.so");
+#endif
           query_len= ld_run_path_part.toUtf8().size();         /* See comment "UTF8 Conversion" */
           query= new char[query_len + 1];
           memcpy(query, ld_run_path_part.toUtf8().constData(), query_len + 1);
@@ -1551,6 +1952,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto");
+#ifdef DBMS_TARANTOOL
+          if (which_library == WHICH_LIBRARY_LIBTARANTOOL) ld_run_path_part.append("/libtarantool");
+          if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet");
+#endif
           lib.setFileName(ld_run_path_part);
           *is_library_loaded= lib.load();
           error_string= lib.errorString();
@@ -1576,6 +1981,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) dlopen_handle= dlopen("libmysqlclient.so.18",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
+#ifdef DBMS_TARANTOOL
+      if (which_library == WHICH_LIBRARY_LIBTARANTOOL) dlopen_handle= dlopen("libtarantool.so",  RTLD_DEEPBIND | RTLD_NOW);
+      if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) dlopen_handle= dlopen("libtarantoolnet.so",  RTLD_DEEPBIND | RTLD_NOW);
+#endif
       if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
       else *is_library_loaded= 1;
       *library_handle= dlopen_handle;
@@ -1583,6 +1992,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysqlclient");
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysqlclient");
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libcrypto");
+#ifdef DBMS_TARANTOOL
+      if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
+      if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
+#endif
       *is_library_loaded= lib.load();
       error_string= lib.errorString();
 #endif
@@ -1646,6 +2059,56 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__AES_set_decrypt_key= (tAES_set_decrypt_key) dlsym(dlopen_handle, "AES_set_decrypt_key"); if (dlerror() != 0) s.append("AES_set_decrypt_key ");
         t__AES_decrypt= (tAES_decrypt) dlsym(dlopen_handle, "AES_decrypt"); if (dlerror() != 0) s.append("AES_decrypt ");
       }
+#ifdef DBMS_TARANTOOL
+      if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
+      {
+        t__mp_decode_array= (tmp_decode_array) dlsym(dlopen_handle, "mp_decode_array"); if (dlerror() != 0) s.append("mp_decode_array ");
+        t__mp_decode_bin= (tmp_decode_bin) dlsym(dlopen_handle, "mp_decode_bin"); if (dlerror() != 0) s.append("mp_decode_bin ");
+        //t__mp_decode_binl= (tmp_decode_binl) dlsym(dlopen_handle, "mp_decode_binl)"); if (dlerror() != 0) s.append("mp_decode_binl ");
+        t__mp_decode_bool= (tmp_decode_bool) dlsym(dlopen_handle, "mp_decode_bool"); if (dlerror() != 0) s.append("mp_decode_bool ");
+        t__mp_decode_float= (tmp_decode_float) dlsym(dlopen_handle, "mp_decode_float"); if (dlerror() != 0) s.append("mp_decode_float ");
+        t__mp_decode_double= (tmp_decode_double) dlsym(dlopen_handle, "mp_decode_double"); if (dlerror() != 0) s.append("mp_decode_double ");
+        t__mp_decode_int= (tmp_decode_int) dlsym(dlopen_handle, "mp_decode_int"); if (dlerror() != 0) s.append("mp_decode_int ");
+        t__mp_decode_map= (tmp_decode_map) dlsym(dlopen_handle, "mp_decode_map"); if (dlerror() != 0) s.append("mp_decode_map ");
+        t__mp_decode_nil= (tmp_decode_nil) dlsym(dlopen_handle, "mp_decode_nil"); if (dlerror() != 0) s.append("mp_decode_nil ");
+        t__mp_decode_uint= (tmp_decode_uint) dlsym(dlopen_handle, "mp_decode_uint"); if (dlerror() != 0) s.append("mp_decode_uint ");
+        t__mp_decode_str= (tmp_decode_str) dlsym(dlopen_handle, "mp_decode_str"); if (dlerror() != 0) s.append("mp_decode_str ");
+        t__mp_decode_strl= (tmp_decode_strl) dlsym(dlopen_handle, "mp_decode_strl"); if (dlerror() != 0) s.append("mp_decode_strl ");
+        t__mp_next= (tmp_next) dlsym(dlopen_handle, "mp_next"); if (dlerror() != 0) s.append("mp_next ");
+        t__mp_typeof= (tmp_typeof) dlsym(dlopen_handle, "mp_typeof"); if (dlerror() != 0) s.append("mp_typeof ");
+        t__tnt_auth= (ttnt_auth) dlsym(dlopen_handle, "tnt_auth"); if (dlerror() != 0) s.append("tnt_auth ");
+        t__tnt_call= (ttnt_call) dlsym(dlopen_handle, "tnt_call"); if (dlerror() != 0) s.append("tnt_call ");
+        t__tnt_close= (ttnt_close) dlsym(dlopen_handle, "tnt_close"); if (dlerror() != 0) s.append("tnt_close ");
+        t__tnt_connect= (ttnt_connect) dlsym(dlopen_handle, "tnt_connect"); if (dlerror() != 0) s.append("tnt_connect ");
+        t__tnt_delete= (ttnt_delete) dlsym(dlopen_handle, "tnt_delete"); if (dlerror() != 0) s.append("tnt_delete");
+        t__tnt_eval= (ttnt_eval) dlsym(dlopen_handle, "tnt_eval"); if (dlerror() != 0) s.append("tnt_eval ");
+        t__tnt_flush= (ttnt_flush) dlsym(dlopen_handle, "tnt_flush"); if (dlerror() != 0) s.append("tnt_flush ");
+        t__tnt_get_indexno= (ttnt_get_indexno) dlsym(dlopen_handle, "tnt_get_indexno"); if (dlerror() != 0) s.append("tnt_get_indexno ");
+        t__tnt_get_spaceno= (ttnt_get_spaceno) dlsym(dlopen_handle, "tnt_get_spaceno"); if (dlerror() != 0) s.append("tnt_get_spaceno ");
+        t__tnt_stream_free= (ttnt_stream_free) dlsym(dlopen_handle, "tnt_stream_free"); if (dlerror() != 0) s.append("tnt_stream_Free ");
+        t__tnt_insert= (ttnt_insert) dlsym(dlopen_handle, "tnt_insert"); if (dlerror() != 0) s.append("tnt_insert ");
+        t__tnt_net= (ttnt_net) dlsym(dlopen_handle, "tnt_net"); if (dlerror() != 0) s.append("tnt_net ");
+        t__tnt_object= (ttnt_object) dlsym(dlopen_handle, "tnt_object"); if (dlerror() != 0) s.append("tnt_object ");
+        t__tnt_object_add_array= (ttnt_object_add_array) dlsym(dlopen_handle, "tnt_object_add_array"); if (dlerror() != 0) s.append("tnt_object_add_array ");
+        t__tnt_object_add_nil= (ttnt_object_add_nil) dlsym(dlopen_handle, "tnt_object_add_nil"); if (dlerror() != 0) s.append("tnt_object_add_nil ");
+        t__tnt_object_add_int= (ttnt_object_add_int) dlsym(dlopen_handle, "tnt_object_add_int"); if (dlerror() != 0) s.append("tnt_object_add_int ");
+        t__tnt_object_add_str= (ttnt_object_add_str) dlsym(dlopen_handle, "tnt_object_add_str"); if (dlerror() != 0) s.append("tnt_object_add_str ");
+        t__tnt_object_add_bin= (ttnt_object_add_bin) dlsym(dlopen_handle, "tnt_object_add_bin"); if (dlerror() != 0) s.append("tnt_object_add_bin ");
+        t__tnt_object_add_bool= (ttnt_object_add_bool) dlsym(dlopen_handle, "tnt_object_add_bool"); if (dlerror() != 0) s.append("tnt_object_add_bool ");
+        t__tnt_object_add_float= (ttnt_object_add_float) dlsym(dlopen_handle, "tnt_object_add_float"); if (dlerror() != 0) s.append("tnt_object_add_float ");
+        t__tnt_object_add_double= (ttnt_object_add_double) dlsym(dlopen_handle, "tnt_object_add_double"); if (dlerror() != 0) s.append("tnt_object_add_double ");
+        t__tnt_object_container_close= (ttnt_object_container_close) dlsym(dlopen_handle, "tnt_object_container_close"); if (dlerror() != 0) s.append("tnt_object_container_close ");
+        t__tnt_object_format= (ttnt_object_format) dlsym(dlopen_handle, "tnt_object_format"); if (dlerror() != 0) s.append("tnt_object_format ");
+        t__tnt_reload_schema= (ttnt_reload_schema) dlsym(dlopen_handle, "tnt_reload_schema"); if (dlerror() != 0) s.append("tnt_reload_schema ");
+        t__tnt_replace= (ttnt_replace) dlsym(dlopen_handle, "tnt_replace"); if (dlerror() != 0) s.append("tnt_replace ");
+        t__tnt_reply= (ttnt_reply) dlsym(dlopen_handle, "tnt_reply"); if (dlerror() != 0) s.append("tnt_reply ");
+        t__tnt_reply_free= (ttnt_reply_free) dlsym(dlopen_handle, "tnt_reply_free"); if (dlerror() != 0) s.append("tnt_reply_free ");
+        t__tnt_reply_init= (ttnt_reply_init) dlsym(dlopen_handle, "tnt_reply_init"); if (dlerror() != 0) s.append("tnt_reply_init ");
+        t__tnt_select= (ttnt_select) dlsym(dlopen_handle, "tnt_select"); if (dlerror() != 0) s.append("tnt_select ");
+        t__tnt_set= (ttnt_set) dlsym(dlopen_handle, "tnt_set"); if (dlerror() != 0) s.append("tnt_set ");
+        t__tnt_update= (ttnt_update) dlsym(dlopen_handle, "tnt_update"); if (dlerror() != 0) s.append("tnt_update ");
+      }
+#endif
 #else
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT))
       {
@@ -1683,6 +2146,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       {
         if ((t__AES_set_decrypt_key= (tAES_set_decrypt_key) lib.resolve("AES_set_decrypt_key")) == 0) s.append("AES_set_decrypt_key ");
         if ((t__AES_decrypt= (tAES_decrypt) lib.resolve("AES_decrypt")) == 0) s.append("AES_decrypt ");
+      }
+      if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
+      {
+         /* fill this in when you have Windows */
       }
 #endif
       if (s > "")
@@ -1848,6 +2315,190 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     t__AES_decrypt(a, b, c);
   }
+
+#ifdef DBMS_TARANTOOL
+  u_int32_t ldbms_mp_decode_array(const char **data)
+  {
+    return t__mp_decode_array(data);
+  }
+  const char* ldbms_mp_decode_bin(const char **data, uint32_t *len)
+  {
+    return t__mp_decode_bin(data,len);
+  }
+  //uint32_t ldbms_mp_decode_binl(const char **data)
+  //{
+  //  return t__mp_decode_binl(data);
+  //}
+  bool ldbms_mp_decode_bool(const char **data)
+  {
+    return t__mp_decode_bool(data);
+  }
+  float ldbms_mp_decode_float(const char **data)
+  {
+    return t__mp_decode_float(data);
+  }
+  double ldbms_mp_decode_double(const char **data)
+  {
+    return t__mp_decode_double(data);
+  }
+  int64_t ldbms_mp_decode_int(const char **data)
+  {
+    return t__mp_decode_int(data);
+  }
+  u_int32_t ldbms_mp_decode_map(const char **data)
+  {
+    return t__mp_decode_map(data);
+  }
+  void ldbms_mp_decode_nil(const char **data)
+  {
+    return t__mp_decode_nil(data);
+  }
+  u_int64_t ldbms_mp_decode_uint(const char **data)
+  {
+    return t__mp_decode_uint(data);
+  }
+  const char* ldbms_mp_decode_str(const char **data, uint32_t *len)
+  {
+    return t__mp_decode_str(data,len);
+  }
+  uint32_t ldbms_mp_decode_strl(const char **data)
+  {
+    return t__mp_decode_strl(data);
+  }
+  void ldbms_mp_next(const char **data)
+  {
+    return t__mp_next(data);
+  }
+  enum mp_type ldbms_mp_typeof(const char c)
+  {
+    return t__mp_typeof(c);
+  }
+
+  ssize_t ldbms_tnt_auth(struct tnt_stream *a, const char *b, int c, const char *d, int e)
+  {
+    return t__tnt_auth(a,b,c,d,e);
+  }
+  ssize_t ldbms_tnt_call(struct tnt_stream *a, const char *b, size_t c, struct tnt_stream *d)
+  {
+    return t__tnt_call(a,b,c,d);
+  }
+  void ldbms_tnt_close(struct tnt_stream *a)
+  {
+    t__tnt_close(a);
+  }
+  int ldbms_tnt_connect(struct tnt_stream *a)
+  {
+    return t__tnt_connect(a);
+  }
+  size_t ldbms_tnt_delete(struct tnt_stream *a, uint32_t b, uint32_t c, tnt_stream *d)
+  {
+    return t__tnt_delete(a,b,c,d);
+  }
+  ssize_t ldbms_tnt_eval(struct tnt_stream *a, const char *b, size_t c, struct tnt_stream *d)
+  {
+    return t__tnt_eval(a,b,c,d);
+  }
+  ssize_t ldbms_tnt_flush(struct tnt_stream *a)
+  {
+    return t__tnt_flush(a);
+  }
+  int ldbms_tnt_get_indexno(struct tnt_stream *a, int b, const char *c, size_t d)
+  {
+    return t__tnt_get_indexno(a,b,c,d);
+  }
+  int ldbms_tnt_get_spaceno(struct tnt_stream *a, const char *b, size_t c)
+  {
+    return t__tnt_get_spaceno(a,b,c);
+  }
+  void ldbms_tnt_stream_free(struct tnt_stream *a)
+  {
+    t__tnt_stream_free(a);
+  }
+  ssize_t ldbms_tnt_insert(struct tnt_stream *a, uint32_t b, struct tnt_stream *c)
+  {
+    return t__tnt_insert(a,b,c);
+  }
+  tnt_stream* ldbms_tnt_net(tnt_stream *a)
+  {
+    return t__tnt_net(a);
+  }
+  tnt_stream* ldbms_tnt_object(tnt_stream *a)
+  {
+    return t__tnt_object(a);
+  }
+  ssize_t ldbms_tnt_object_add_array(tnt_stream *a, uint32_t b)
+  {
+    return t__tnt_object_add_array(a,b);
+  }
+  ssize_t ldbms_tnt_object_add_nil(tnt_stream *a)
+  {
+    return t__tnt_object_add_nil(a);
+  }
+  ssize_t ldbms_tnt_object_add_int(tnt_stream *a, int64_t b)
+  {
+    return t__tnt_object_add_int(a,b);
+  }
+  ssize_t ldbms_tnt_object_add_str(tnt_stream *a, const char *b, uint32_t c)
+  {
+    return t__tnt_object_add_str(a,b,c);
+  }
+  ssize_t ldbms_tnt_object_add_bin(tnt_stream *a, const char *b, uint32_t c)
+  {
+    return t__tnt_object_add_bin(a,b,c);
+  }
+  ssize_t ldbms_tnt_object_add_bool(tnt_stream *a, char b)
+  {
+    return t__tnt_object_add_bool(a,b);
+  }
+  ssize_t ldbms_tnt_object_add_float(tnt_stream *a, float b)
+  {
+    return t__tnt_object_add_float(a,b);
+  }
+  ssize_t ldbms_tnt_object_add_double(tnt_stream *a, double b)
+  {
+    return t__tnt_object_add_double(a,b);
+  }
+  ssize_t ldbms_tnt_object_container_close(tnt_stream *a)
+  {
+    return t__tnt_object_container_close(a);
+  }
+  ssize_t ldbms_tnt_object_format(struct tnt_stream *a, const char *b, int c, char *d)
+  {
+    return t__tnt_object_format(a,b,c,d);
+  }
+  int ldbms_tnt_reload_schema(struct tnt_stream *a)
+  {
+    return t__tnt_reload_schema(a);
+  }
+  ssize_t ldbms_tnt_replace(struct tnt_stream *a, uint32_t b, struct tnt_stream *c)
+  {
+    return t__tnt_replace(a,b,c);
+  }
+  int ldbms_ttnt_reply(struct tnt_reply *a, char *b, size_t c, size_t *d)
+  {
+    return t__tnt_reply(a,b,c,d);
+  }
+  void ldbms_tnt_reply_free(struct tnt_reply *a)
+  {
+    t__tnt_reply_free(a);
+  }
+  struct tnt_reply* ldbms_tnt_reply_init(struct tnt_reply *a)
+  {
+    return t__tnt_reply_init(a);
+  }
+  ssize_t ldbms_tnt_select(struct tnt_stream *a, uint32_t b, uint32_t c, uint32_t d, uint32_t e, uint8_t f, struct tnt_stream *g)
+  {
+    return t__tnt_select(a,b,c,d,e,f,g);
+  }
+  int ldbms_tnt_set(struct tnt_stream *a, int b, char *c)
+  {
+    return t__tnt_set(a,b,c);
+  }
+  ssize_t ldbms_tnt_update(struct tnt_stream *a, uint32_t b, uint32_t c, struct tnt_stream *d, struct tnt_stream *e)
+  {
+    return t__tnt_update(a,b,c,d,e);
+  }
+#endif
 };
 
 #endif // LDBMS_H
@@ -2309,7 +2960,10 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 #define OCELOT_DATA_TYPE_TEXT        10003
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
-void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
+void fillup(MYSQL_RES *mysql_res,
+            //struct tnt_reply *tarantool_tnt_reply,
+            int connections_dbms,
+            MainWindow *parent,
             unsigned short ocelot_result_grid_vertical,
             unsigned short ocelot_result_grid_column_names,
             ldbms *passed_lmysql,
@@ -2330,26 +2984,60 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
 
   grid_mysql_res= mysql_res;
 
-  result_column_count= lmysql->ldbms_mysql_num_fields(grid_mysql_res);
-  result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
-
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    result_column_count= copy_of_parent->tarantool_num_fields();
+    result_row_count= copy_of_parent->tarantool_num_rows();
+  }
+  else
+#endif
+  {
+    result_column_count= lmysql->ldbms_mysql_num_fields(grid_mysql_res);
+    result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
+    mysql_fields= lmysql->ldbms_mysql_fetch_fields(grid_mysql_res);
+  }
   result_max_column_widths= new unsigned int[result_column_count];
   result_field_types= new unsigned short int[result_column_count];
 
-  mysql_fields= lmysql->ldbms_mysql_fetch_fields(grid_mysql_res);
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+    copy_of_parent->tarantool_scan_rows(result_column_count, result_row_count,
+              grid_mysql_res,
+              &result_set_copy, &result_set_copy_rows,
+              &result_max_column_widths);
+  else
+#endif
+    scan_rows(result_column_count, result_row_count,
+              grid_mysql_res,
+              &result_set_copy, &result_set_copy_rows,
+              &result_max_column_widths);
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    copy_of_parent->tarantool_scan_field_names("name", result_column_count, &result_field_names);
+    /* Next three scan_field_names calls are only needed if user will edit the result set */
+    copy_of_parent->tarantool_scan_field_names("org_name", result_column_count, &result_original_field_names);
+    copy_of_parent->tarantool_scan_field_names("org_table", result_column_count, &result_original_table_names);
+    copy_of_parent->tarantool_scan_field_names("db", result_column_count, &result_original_database_names);
+  }
+else
+#endif
+  {
+    scan_field_names("name", result_column_count, &result_field_names);
+    /* Next three scan_field_names calls are only needed if user will edit the result set */
+    scan_field_names("org_name", result_column_count, &result_original_field_names);
+    scan_field_names("org_table", result_column_count, &result_original_table_names);
+    scan_field_names("db", result_column_count, &result_original_database_names);
+  }
 
-
-
-  scan_rows(result_column_count, result_row_count,
-            grid_mysql_res, &result_set_copy, &result_set_copy_rows,
-            &result_max_column_widths);
-  scan_field_names("name", result_column_count, &result_field_names);
-
-  /* Next three scan_field_names calls are only needed if user will edit the result set */
-  scan_field_names("org_name", result_column_count, &result_original_field_names);
-  scan_field_names("org_table", result_column_count, &result_original_table_names);
-  scan_field_names("db", result_column_count, &result_original_database_names);
-
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    for (unsigned int i= 0; i < result_column_count; ++i) result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING;
+  }
+else
+#endif
   for (unsigned int i= 0; i < result_column_count; ++i) result_field_types[i]= mysql_fields[i].type;
 
   /*
@@ -2365,7 +3053,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
 
   /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
 
-  copy_result_to_gridx(ocelot_line_numbers);
+  copy_result_to_gridx(ocelot_line_numbers, connections_dbms);
 
   /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
   hide();
@@ -2468,7 +3156,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
     {
       int ki= xrow * gridx_column_count + column_number;
       text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
-      /* TEST! */
+      /* This line was replaced in December 2015 */
       //text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
       text_edit_widgets[ki]->setMinimumHeight(fm.lineSpacing());
       text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
@@ -2589,7 +3277,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
     While we're passing through, we also get max column lengths (in characters).
     Todo: Take into account: whether there were any nulls.
   */
-  fill_detail_widgets(0);                                             /* details */
+  fill_detail_widgets(0, connections_dbms);                                             /* details */
 
   /* We'll use the automatic scroll bar for small result sets, we'll use our own scroll bar for large ones. */
   if (grid_result_row_count <= result_grid_widget_max_height_in_lines)
@@ -2608,7 +3296,8 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
   if (ocelot_result_grid_vertical == 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_drag_line_size_as_int,
-                        ocelot_result_grid_column_names_copy); /* get grid_column_widths[] and grid_column_heights[] */
+                        ocelot_result_grid_column_names_copy,
+                        connections_dbms); /* get grid_column_widths[] and grid_column_heights[] */
 
   /*
     grid_actual_grid_height_in_rows = # of rows that are actually showable at a time,
@@ -2637,7 +3326,7 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
       for (xcol= 0; xcol < gridx_column_count; ++xcol)
       {
         TextEditWidget *cell_text_edit_widget= text_edit_widgets[xrow * gridx_column_count + xcol];
-        if ((xrow > 0) && (dbms_get_field_flag(xcol) & NUM_FLAG)) text_align(cell_text_edit_widget, Qt::AlignRight);
+        if ((xrow > 0) && (dbms_get_field_flag(xcol, connections_dbms) & NUM_FLAG)) text_align(cell_text_edit_widget, Qt::AlignRight);
         else text_align(cell_text_edit_widget, Qt::AlignLeft);
         if (text_edit_frames[xrow * gridx_column_count + xcol]->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
         {
@@ -2680,7 +3369,6 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
     grid_main_layout->addWidget(grid_row_widgets[xrow], 0, Qt::AlignTop | Qt::AlignLeft);
   }
 
-
 //  client->setLayout(grid_main_layout);
 
   /* This doesn't work. Done too early? */
@@ -2716,8 +3404,9 @@ void fillup(MYSQL_RES *mysql_res, MainWindow *parent,
    gridx_result_indexes                use as index for result_ lists
    gridx_column_count, gridx_row_count
 */
-void copy_result_to_gridx(int ocelot_line_numbers)
+void copy_result_to_gridx(int ocelot_line_numbers, int connections_dbms)
 {
+  (void) connections_dbms; /* suppress "unused parameter" warning */
   unsigned int i, j;
   unsigned int v_lengths;
   char *result_field_names_pointer;
@@ -2793,9 +3482,15 @@ void copy_result_to_gridx(int ocelot_line_numbers)
     gridx_result_indexes[j]= i;
     gridx_flags[j]= 0;
     gridx_field_types[j]= result_field_types[i];
-    if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_VAR_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_VARBINARY;
-    if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_BINARY;
-    if ((mysql_fields[i].charsetnr != 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_BLOB)) gridx_field_types[j]= OCELOT_DATA_TYPE_TEXT;
+    /* TODO: This shouldn't be here. It's using mysql_fields[] after we should be done with setup */
+#ifdef DBMS_TARANTOOL
+    if (connections_dbms != DBMS_TARANTOOL)
+#endif
+    {
+      if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_VAR_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_VARBINARY;
+      if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_BINARY;
+      if ((mysql_fields[i].charsetnr != 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_BLOB)) gridx_field_types[j]= OCELOT_DATA_TYPE_TEXT;
+    }
     ++j;
   }
 
@@ -3052,16 +3747,16 @@ QString copy(unsigned int ocelot_history_max_column_width,
   there's nothing more that can be squeezed.
   Re <cr>: I'm not very worried because it merely causes elider
       This assumes that every header or cell in the table has the same font.
-      I sometimes wish we could assume fixed-width font.
+      Todo: Consider using font.setStyleHint(QFont::TypeWriter); i.e. default fixed-width font
       I don't look at mysql_fields[i].max_lengths, perhaps that's a mistake.
       Todo: this might have to be re-done after a font change
-      Todo: take into account that a header is fixed, so you don't need to use 'W'.
       Todo: take into account that a number won't contain anything wider than '9'.
 */
 /* header height calculation should differ from ordinary-row height calculation */
 void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
                            int ocelot_grid_cell_drag_line_size_as_int,
-                           unsigned short int is_using_column_names)
+                           unsigned short int is_using_column_names,
+                           int connections_dbms)
 {
   unsigned int i;
   /* unsigned int tmp_column_lengths[MAX_COLUMNS]; */
@@ -3099,7 +3794,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   {
     if (is_using_column_names != 0)
     {
-      grid_column_widths[i]= dbms_get_field_name_length(i); /* this->mysql_fields[i].name_length; */
+      grid_column_widths[i]= dbms_get_field_name_length(i, connections_dbms); /* this->mysql_fields[i].name_length; */
     }
     else grid_column_widths[i]= 1;
     if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
@@ -3137,7 +3832,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
 //              + border_size * 2;
 
       /* KlUDGE. Usually we don't need "+= 3" but before removing test with Courier New */
-      min_width= mm.width(dbms_get_field_name(i))
+      min_width= mm.width(dbms_get_field_name(i, connections_dbms))
               + max_width_of_a_char
               + ocelot_grid_cell_border_size_as_int * 2
               + ocelot_grid_cell_drag_line_size_as_int
@@ -3427,7 +4122,7 @@ void set_alignment_and_height(int ki, int grid_col, int field_type)
    the hide() comes too late, i.e. a paint might occur for an invalid row.
    Maybe show() should be delayed until after hide(), or painting should be prevented for a while. */
 
-void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
+void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections_dbms)
 {
   unsigned int i;
   unsigned int text_edit_frames_index;
@@ -3536,7 +4231,8 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value)
       else gridx_max_column_widths[column_number_within_gridx]= new_content_length;
       grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                             ocelot_grid_cell_drag_line_size_as_int,
-                            0); /* get grid_column_widths[] and grid_column_heights[] */
+                            0,
+                            connections_dbms); /* get grid_column_widths[] and grid_column_heights[] */
       column_number_within_gridx= 0;
       if (ocelot_line_numbers_copy != 0)
       {
@@ -3686,7 +4382,7 @@ bool show_event()
   But vertical_scroll_bar_event() is only for the non-automatic vertical scroll bar.
   Initially grid_vertical_scroll_bar_value == -1, it's checked so that we don't paint the initial display twice.
 */
-bool vertical_scroll_bar_event()
+bool vertical_scroll_bar_event(int connections_dbms)
 {
   int new_value;
 
@@ -3709,7 +4405,7 @@ bool vertical_scroll_bar_event()
   {
     if ((is_paintable == 1) && (grid_vertical_scroll_bar_value != -1))
     {
-      fill_detail_widgets(new_value);
+      fill_detail_widgets(new_value, connections_dbms);
       this->update();      /* not sure if we need to update both this and client, but it should be harmless*/
       client->update();
     }
@@ -3895,20 +4591,63 @@ void dbms_set_grid_column_sources()
 //}
 
 
-unsigned int dbms_get_field_flag(unsigned int column_number)
+unsigned int dbms_get_field_flag(unsigned int column_number, int connections_dbms)
 {
+  (void) connections_dbms; /* suppress "unused parameter" warning */
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL) return 0;
+#endif
   return mysql_fields[column_number].flags;
 }
 
 
-QString dbms_get_field_name(unsigned int column_number)
+QString dbms_get_field_name(unsigned int column_number, int connections_dbms)
 {
+  (void) connections_dbms; /* suppress "unused parameter" warning */
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    char *result_field_names_pointer;
+    char tmp[64];
+    unsigned int v_lengths;
+    result_field_names_pointer= &result_field_names[0];
+    for (unsigned int i= 0; i < column_number; ++i)
+    {
+      memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+      result_field_names_pointer+= v_lengths + sizeof(unsigned int);
+    }
+    memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+    result_field_names_pointer+= sizeof(unsigned int);
+    strcpy(tmp, result_field_names_pointer);
+    printf("column_number=%d. tmp=%s.\n", column_number, tmp);
+    QString s;
+    s= tmp;
+    return s;
+  }
+#endif
   return mysql_fields[column_number].name;
 }
 
 
-unsigned int dbms_get_field_name_length(unsigned int column_number)
+unsigned int dbms_get_field_name_length(unsigned int column_number, int connections_dbms)
 {
+  (void) connections_dbms; /* suppress "unused parameter" warning */
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    char *result_field_names_pointer;
+    unsigned int v_lengths;
+    result_field_names_pointer= &result_field_names[0];
+    for (unsigned int i= 0; i < column_number; ++i)
+    {
+      memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+      result_field_names_pointer+= v_lengths + sizeof(unsigned int);
+    }
+    memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+    printf("v_lengths=%d.\n", v_lengths);
+    return v_lengths;
+  }
+#endif
   return mysql_fields[column_number].name_length;
 }
 
@@ -4018,7 +4757,7 @@ public:
       Font is same as main font for statement_edit_widget.
       It looks better if the font is fixed width.
       There is an assumption that prompts are latin1.
-      PROMPT client statement decides whethere there are line numbers.
+      PROMPT client statement decides whether there are line numbers.
     */
 
         QColor statement_edit_widget_left_bgcolor;                    /* suggestion = Qt::lightGray. */
@@ -4142,6 +4881,11 @@ public:
   QLabel *label_for_color[10];
   QLabel *label_for_color_rgb[10];
   QLabel *label_for_font_dialog;
+
+  QWidget *widget_for_syntax_checker;
+  QLabel *label_for_syntax_checker;
+  QComboBox *combo_box_for_syntax_checker;
+  QHBoxLayout *hbox_layout_for_syntax_checker;
 
   QWidget *widget_for_size[3];
   QHBoxLayout *hbox_layout_for_size[3];
@@ -4281,8 +5025,6 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   connect(combo_box_for_color_pick[8], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_8(int)));
   connect(combo_box_for_color_pick[9], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_9(int)));
 
-
-
   widget_font_label= new QLabel(tr("Font"));
 
   /* Hbox -- the font picker */
@@ -4298,6 +5040,21 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   hbox_layout_for_font_dialog->addWidget(button_for_font_dialog);
   widget_for_font_dialog->setLayout(hbox_layout_for_font_dialog);
   connect(button_for_font_dialog, SIGNAL(clicked()), this, SLOT(handle_button_for_font_dialog()));
+
+  if (current_widget == STATEMENT_WIDGET)
+  {
+    widget_for_syntax_checker= new QWidget(this);
+    label_for_syntax_checker= new QLabel("Syntax Checker (1=highlight,3=highlight+error dialog)");
+    combo_box_for_syntax_checker= new QComboBox();
+    combo_box_for_syntax_checker->setFixedWidth(label_for_color_width * 3);
+    for (int cj= 0; cj <= 3; ++cj) combo_box_for_syntax_checker->addItem(QString::number(cj));
+    combo_box_for_syntax_checker->setCurrentIndex(copy_of_parent->new_ocelot_statement_syntax_checker.toInt());
+    hbox_layout_for_syntax_checker= new QHBoxLayout();
+    hbox_layout_for_syntax_checker->addWidget(label_for_syntax_checker);
+    hbox_layout_for_syntax_checker->addWidget(combo_box_for_syntax_checker);
+    widget_for_syntax_checker->setLayout(hbox_layout_for_syntax_checker);
+    connect(combo_box_for_syntax_checker, SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_syntax_check(int)));
+  }
 
   if (current_widget == GRID_WIDGET)
   {
@@ -4320,6 +5077,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       hbox_layout_for_size[ci]->addWidget(combo_box_for_size[ci]);
       widget_for_size[ci]->setLayout(hbox_layout_for_size[ci]);
     }
+
     connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
     connect(combo_box_for_size[2], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_2(int)));
@@ -4413,6 +5171,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   for (int ci= 0; ci < 10; ++ci) main_layout->addWidget(widget_for_color[ci]);
   main_layout->addWidget(widget_font_label);
   main_layout->addWidget(widget_for_font_dialog);
+  if (current_widget == STATEMENT_WIDGET) main_layout->addWidget(widget_for_syntax_checker);
   if (current_widget == GRID_WIDGET) for (int ci= 0; ci < 3; ++ci) main_layout->addWidget(widget_for_size[ci]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[0]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
@@ -4979,6 +5738,12 @@ void handle_combo_box_for_color_pick_9(int item_number)
   }
 }
 
+void handle_combo_box_for_syntax_check(int i)
+{
+  if (current_widget == STATEMENT_WIDGET)
+    copy_of_parent->new_ocelot_statement_syntax_checker= QString::number(i);
+}
+
 
 void handle_combo_box_for_size_0(int i)
 {
@@ -5141,4 +5906,6 @@ public:
 };
 
 #endif // QTABWIDGET48_H
+
+
 
