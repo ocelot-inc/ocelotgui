@@ -328,9 +328,9 @@ public:
   QString history_markup_entity;             /* for markup */
 
   QString ocelot_history_tee_file_name;      /* see comment=tee+hist */
-  FILE *ocelot_history_tee_file;             /* see comment=tee+hist */
+  QFile ocelot_history_tee_file;             /* see comment=tee+hist */
   QString ocelot_history_hist_file_name;     /* see comment=tee+hist */
-  FILE *ocelot_history_hist_file;            /* see comment=tee+hist */
+  QFile ocelot_history_hist_file;            /* see comment=tee+hist */
 
   CodeEditor *statement_edit_widget;
 
@@ -562,7 +562,8 @@ private:
   void connect_mysql_options_2(int w_argc, char *argv[]);
   void connect_read_command_line(int argc, char *argv[]);
   void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
-  int connect_readmylogin(FILE *, unsigned char *);
+  int connect_readmylogin(QFile&, unsigned char *);
+  //int connect_readmylogin(FILE *, unsigned char *);
   void connect_set_variable(QString token0, QString token2);
   void connect_make_statement();
   long to_long(QString token);
@@ -4961,6 +4962,8 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_highlight_reserved_color= copy_of_parent->ocelot_statement_highlight_reserved_color;
   copy_of_parent->new_ocelot_statement_prompt_background_color= copy_of_parent->ocelot_statement_prompt_background_color;
   copy_of_parent->new_ocelot_statement_highlight_current_line_color= copy_of_parent->ocelot_statement_highlight_current_line_color;
+  copy_of_parent->new_ocelot_statement_syntax_checker= copy_of_parent->ocelot_statement_syntax_checker;
+
 
   {
     QString s= tr("Settings -- ");

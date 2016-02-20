@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: February 17 2016
+   Last modified: February 18 2016
 */
 
 /*
@@ -1386,7 +1386,7 @@ int MainWindow::history_markup_previous_or_next()
   * the options --tee=filename and --no-tee exist and are checked (I think)
   * the client statements tee filename and notee will be seen
   * there are no menu options (todo: decide whether this is a flaw)
-  * apparently the mysql client would flush, therefore we call fflush() after writing
+  * apparently the mysql client would flush, therefore we call flush() after writing
   * the mysql client would include results from queries, but we don't (todo: this is a flaw)
   * there might be html in the output (todo: decide whether this is a flaw)
   HIST
@@ -1398,11 +1398,9 @@ int MainWindow::history_markup_previous_or_next()
 */
 void MainWindow::history_file_write(QString history_type, QString text_line)  /* see comment=tee+hist */
 {
-  FILE *history_file;
   if (history_type == "TEE")
   {
     if (ocelot_history_tee_file_is_open == false) return;
-    history_file= ocelot_history_tee_file;
   }
   else
   {
@@ -1424,7 +1422,6 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
       if (rx.exactMatch(text_line) == true) return;
       qfrom= qindex + 1;
     }
-    history_file= ocelot_history_hist_file;
   }
 
   QString s= text_line;
@@ -1432,9 +1429,18 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
   char *query= new char[query_len + 1];
   memcpy(query, s.toUtf8().constData(), query_len + 1);
   query[query_len]= '\0';                            /* todo: think: is this necessary? */
-  fputs(query, history_file);
-  fputs("\n", history_file);
-  fflush(history_file);
+  if (history_type == "TEE")
+  {
+    ocelot_history_tee_file.write(query, strlen(query));
+    ocelot_history_tee_file.write("\n", strlen("\n"));
+    ocelot_history_tee_file.flush();
+  }
+  else
+  {
+    ocelot_history_hist_file.write(query, strlen(query));
+    ocelot_history_hist_file.write("\n", strlen("\n"));
+    ocelot_history_hist_file.flush();
+  }
   delete []query;
 }
 
@@ -1442,14 +1448,13 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
 int MainWindow::history_file_start(QString history_type, QString file_name) /* see comment=tee+hist */
 {
   QString file_name_to_open;
-  FILE *history_file;
 
   if (history_type == "TEE")
   {
     file_name_to_open= ocelot_history_tee_file_name;
     if (ocelot_history_tee_file_is_open == true)
     {
-      fclose(ocelot_history_tee_file);
+      ocelot_history_tee_file.close();
       ocelot_history_tee_file_is_open= false;
     }
   }
@@ -1458,7 +1463,7 @@ int MainWindow::history_file_start(QString history_type, QString file_name) /* s
     file_name_to_open= ocelot_history_hist_file_name;
     if (ocelot_history_hist_file_is_open == true)
     {
-      fclose(ocelot_history_hist_file);
+      ocelot_history_hist_file.close();
       ocelot_history_hist_file_is_open= false;
     }
     if (ocelot_batch != 0) return 1;                     /* if --batch happened, no history */
@@ -1481,22 +1486,26 @@ int MainWindow::history_file_start(QString history_type, QString file_name) /* s
   }
 #endif
 
-  history_file= fopen(query, "a");        /* Open specified file, append */
-  delete []query;
-  if (history_file != NULL)
+
+  bool open_result;
+  if (history_type == "TEE")
   {
-    if (history_type == "TEE")
-    {
-      ocelot_history_tee_file_is_open= true;
-      ocelot_history_tee_file_name= file_name_to_open;
-      ocelot_history_tee_file= history_file;
-    }
-    else
-    {
-      ocelot_history_hist_file_is_open= true;
-      ocelot_history_hist_file_name= file_name_to_open;
-      ocelot_history_hist_file= history_file;
-    }
+    ocelot_history_tee_file.setFileName(query);
+    open_result= ocelot_history_tee_file.open(QIODevice::Append | QIODevice::Text);
+    delete []query;
+    if (open_result == false) return 0;
+    ocelot_history_tee_file_is_open= true;
+    ocelot_history_tee_file_name= file_name_to_open;
+    return 1;
+  }
+  else
+  {
+    ocelot_history_hist_file.setFileName(query);
+    open_result= ocelot_history_hist_file.open(QIODevice::Append | QIODevice::Text);
+    delete []query;
+    if (open_result == false) return 0;
+    ocelot_history_hist_file_is_open= true;
+    ocelot_history_hist_file_name= file_name_to_open;
     return 1;
   }
   return 0;
@@ -1507,12 +1516,12 @@ void MainWindow::history_file_stop(QString history_type)   /* see comment=tee+hi
 {
   if (history_type == "TEE")
   {
-    fclose(ocelot_history_tee_file);
+    ocelot_history_tee_file.close();
     ocelot_history_tee_file_is_open= false;
   }
   else
   {
-    fclose(ocelot_history_hist_file);
+    ocelot_history_hist_file.close();
     ocelot_history_hist_file_is_open= false;
   }
 }
@@ -1827,7 +1836,10 @@ void MainWindow::action_statement_edit_widget_text_changed()
            &main_token_lengths[0], &main_token_offsets[0], MAX_TOKENS, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
 
   tokens_to_keywords(text);
-  hparse_f_multi_block(text); /* recognizer */
+  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) != 0)
+  {
+    hparse_f_multi_block(text); /* recognizer */
+  }
   /* This "sets" the colour, it does not "merge" it. */
   /* Do not try to set underlines, they won't go away. */
   QTextDocument *pDoc= statement_edit_widget->document();
@@ -5932,7 +5944,7 @@ void MainWindow::action_execute()
   main_token_number= 0;
   text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
   /*
-    We call hparse_f_multi_block continuously during statement edit,
+    We probably call hparse_f_multi_block continuously during statement edit,
     but this redundancy is harmless (we're not short of time, eh?).
   */
   if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_ERRORS) != 0)
@@ -6455,29 +6467,31 @@ int MainWindow::execute_client_statement(QString text)
       return 1;
     }
     s= connect_stripper(s, true);
-    int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
-    char *query= new char[query_len + 1];
-    memcpy(query, s.toUtf8().constData(), query_len + 1);
-    query[query_len]= '\0';                            /* todo: think: is this necessary? */
-    FILE *file= fopen(query, "r");                     /* Open specified file, read only */
-    delete []query;
-    if (file == NULL)
+    QFile file(s);
+    bool open_result= file.open(QIODevice::ReadOnly | QIODevice::Text);
+    if (open_result == false)
     {
-      put_message_in_result(tr("Error, fopen failed"));
+      put_message_in_result(tr("Error, file open() failed"));
       return 1;
     }
     /* Todo: this gets rid of SOURCE statement, but maybe it should be a comment in history. */
     statement_edit_widget->clear();
-    char line[2048];
-    while(fgets(line, sizeof line, file) != NULL)
+    QByteArray source_line;
+    /* TODO: BUG: This puts the final line into the history TWICE. */
+    for (;;)
     {
-      QString source_line= line;
-      statement_edit_widget->insertPlainText(source_line);
-      action_execute();
+      if (file.atEnd() == true) break;
+      source_line= "";
+      source_line= file.readLine();
+      if (source_line != "")
+      {
+        statement_edit_widget->insertPlainText(source_line);
+        action_execute();
+     }
     }
-      fclose(file);
-      return 1;
-    }
+    file.close();
+    return 1;
+  }
 
   /* PROMPT or \R: mysql equivalent. */
   /* This overrides the default setting which is made from ocelot_prompt during connect. */
@@ -9235,11 +9249,18 @@ int MainWindow::hparse_f_default(int who_is_calling)
 */
 int MainWindow::hparse_f_user_name()
 {
-  if ((hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) || (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1))
+  if ((hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+   || (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1))
   {
     if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "@") == 1)
     {
-      if ((hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) || (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1)) {;}
+      if ((hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+       || (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1)) {;}
+    }
+    else if ((hparse_token.mid(0, 1) == "@")
+          && (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1))
+    {
+      ;
     }
     return 1;
   }
@@ -10768,7 +10789,7 @@ void MainWindow::hparse_f_alter_specification()
 
 void MainWindow::hparse_f_alter_database()
 {
-  if (hparse_f_qualified_name() == 0) {;}
+  hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
   if (hparse_errno > 0) return;
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UPGRADE") == 1)
   {
@@ -10794,6 +10815,7 @@ void MainWindow::hparse_f_alter_database()
         if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "=")) {;}
         if (hparse_f_character_set_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
+        continue;
       }
       if ((collate_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE")))
       {
@@ -10801,6 +10823,7 @@ void MainWindow::hparse_f_alter_database()
         if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "=")) {;}
         hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
+        continue;
       }
       if ((character_seen == false) && (collate_seen == false))
       {
@@ -12273,14 +12296,26 @@ void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen)
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REQUIRE") == 1)
   {
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NONE") == 1) {;}
-    else do
+    else
     {
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SSL") == 1) {;}
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "X509") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CIPHER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ISSUER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SUBJECT") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-    } while (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AND"));
+      bool and_seen= false;
+      for (;;)
+      {
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SSL") == 1) {;}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "X509") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CIPHER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ISSUER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SUBJECT") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+        else
+        {
+          if (and_seen == true) hparse_f_error();
+          if (hparse_errno > 0) return;
+          break;
+        }
+        and_seen= false;
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AND") == 1) and_seen= true;
+      }
+    }
   }
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WITH") == 1)
   {
@@ -14210,6 +14245,8 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "TABLE");
       if (hparse_errno > 0) return;
+      if (hparse_f_qualified_name() == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1)
       {
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
@@ -14222,8 +14259,6 @@ void MainWindow::hparse_f_statement()
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "IDENTIFIED");
         if (hparse_errno > 0) return;
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
-        if (hparse_errno > 0) return;
-        if (hparse_f_literal() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
         if (hparse_f_literal() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
@@ -15082,14 +15117,12 @@ void MainWindow::hparse_f_statement()
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GROUP_REPLICATION") == 1) {;}
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
     {
-      for (;;)
+      /* TODO: MARIADB SYNTAX FOR START SLAVE DOES NOT LOOK LIKE THIS */
+      do
       {
-        if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "IO_THREAD") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_THREAD") == 1))
-        {
-          if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ",") == 0) continue;
-        }
-        break;
-      }
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IO_THREAD") == 1) {;}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_THREAD") == 1) {;}
+      } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNTIL") == 1)
       {
         bool expect_gtid_set= false, expect_log_name= false, expect_log_pos= false;
@@ -15615,7 +15648,11 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   {
     hparse_f_statement();
     if (hparse_errno > 0) return;
-    if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
+    /* This kludge occurs more than once. */
+    if ((hparse_prev_token != ";") && (hparse_prev_token != ocelot_delimiter_str))
+    {
+      if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
+    }
     if (hparse_errno > 0) return;
     return;
   }
@@ -18825,7 +18862,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
          if so, skip */
 void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 {
-  FILE *file;
+  //FILE *file;
   char line[2048];
   int token_offsets[MAX_TOKENS];
   int token_lengths[MAX_TOKENS];
@@ -18847,15 +18884,88 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     }
   }
 #endif
-  file= fopen(file_name, "r");                           /* Open specified file, read only */
-  if (file == NULL) return;                              /* (if file doesn't exist, ok, no error */
+  QFile file(file_name);
+  bool open_result= file.open(QIODevice::ReadOnly | QIODevice::Text);
+  if (open_result == false)
+  {
+    return;                                              /* (if file doesn't exist, ok, no error */
+  }
+  //file= fopen(file_name, "r");                           /* Open specified file, read only */
+  //if (file == NULL) return;                              /* (if file doesn't exist, ok, no error */
   if (is_mylogin_cnf == 1)
   {
-    if (connect_readmylogin(file, output_buffer) != 0)
-    {
-      fclose(file);
-      return;                                            /* (if decryption fails, ignore */
-    }
+
+      /*
+        todo: close file when return, including return for error
+      */
+      /*
+        connect_readmylogin() is a variation of readmylogin.c
+        AES_KEY and AES_BLOCK_SIZE are defined in ocelotgui.h
+        If openSSL is not available, ignore it (mysql would always read because YaSSL is bundled).
+        If .mylogin.cnf is not an encrypted file, ignore it (same as what mysql would do).
+      */
+      //int MainWindow::connect_readmylogin(QFile &file, unsigned char *output_buffer)
+      {
+        QString ldbms_return_string;
+
+        ldbms_return_string= "";
+
+        /* First find libcrypto.so */
+        if (is_libcrypto_loaded != 1)
+        {
+          lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
+        }
+        if (is_libcrypto_loaded != 1)
+        {
+          lmysql->ldbms_get_library("", &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
+        }
+        if (is_libcrypto_loaded != 1)
+        {
+          file.close(); return; /* if decryption fails, ignore */
+        }
+
+        unsigned char cipher_chunk[4096];
+        unsigned int cipher_chunk_length, output_length= 0, i;
+        unsigned char key_in_file[20];
+        unsigned char key_after_xor[AES_BLOCK_SIZE] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+        AES_KEY key_for_aes;
+
+        if (file.seek(4) == false)
+        //if (fseek(file, 4, SEEK_SET) != 0)
+        {
+          file.close(); return; /* if decryption fails, ignore */
+        }
+
+        if (file.read((char*)key_in_file, 20) != 20)
+        //if (fread(key_in_file, 1, 20, file) != 20)
+        {
+          file.close(); return; /* if decryption fails, ignore */
+        }
+
+        for (i= 0; i < 20; ++i) *(key_after_xor + (i%16))^= *(key_in_file + i);
+        lmysql->ldbms_AES_set_decrypt_key(key_after_xor, 128, &key_for_aes);
+        while (file.read((char*)&cipher_chunk_length, 4) == 4)
+        //while (fread(&cipher_chunk_length, 1, 4, file) == 4)
+        {
+          if (cipher_chunk_length > sizeof(cipher_chunk))
+          {
+            file.close(); return; /* if decryption fails, ignore */
+          }
+          if (file.read((char*)cipher_chunk, cipher_chunk_length) != cipher_chunk_length)
+          //if (fread(cipher_chunk, 1, cipher_chunk_length, file) != cipher_chunk_length)
+          {
+            file.close(); return; /* if decryption fails, ignore */
+          }
+          for (i= 0; i < cipher_chunk_length; i+= AES_BLOCK_SIZE)
+          {
+            lmysql->ldbms_AES_decrypt(cipher_chunk+i, output_buffer+output_length, &key_for_aes);
+            output_length+= AES_BLOCK_SIZE;
+            while ((output_length > 0) && (*(output_buffer+(output_length-1)) < ' ') && (*(output_buffer+(output_length-1)) != '\n')) --output_length;
+          }
+        }
+        *(output_buffer + output_length)= '\0';
+        //return 0;
+      }
   }
   options_files_read.append(file_name); options_files_read.append(" ");
   char *fgets_result;
@@ -18863,7 +18973,21 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   int line_offset= 0;
   for (;;)
   {
-    if (is_mylogin_cnf == 0) fgets_result= fgets(line, sizeof line, file);
+    if (is_mylogin_cnf == 0)
+    {
+      if (file.atEnd() == true) {fgets_result= NULL; }
+      else
+      {
+        QByteArray qbline;
+        qbline= file.readLine((sizeof line) - 1);
+        int ii;
+        for (ii= 0; ii < qbline.count(); ++ii) line[ii]= qbline[ii];
+        line[ii]= '\0';
+        //line= file.readLine(sizeof line);
+        fgets_result=&line[0];
+      }
+      //fgets_result= fgets(line, sizeof line, file);
+    }
     else
     {
       for (line_offset= 0; *(output_buffer + file_offset) != '\0'; ++line_offset, ++file_offset)
@@ -18984,75 +19108,8 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     token2= token_for_value;
     connect_set_variable(token0, token2);
   }
-  fclose(file);
-}
-
-/*
-  connect_readmylogin() is a variation of readmylogin.c
-  AES_KEY and AES_BLOCK_SIZE are defined in ocelotgui.h
-  If openSSL is not available, ignore it (mysql would always read because YaSSL is bundled).
-  If .mylogin.cnf is not an encrypted file, ignore it (same as what mysql would do).
-*/
-
-/*
-  todo: close file when return, including return for error
-*/
-int MainWindow::connect_readmylogin(FILE *file, unsigned char *output_buffer)
-{
-  QString ldbms_return_string;
-
-  ldbms_return_string= "";
-
-  /* First find libcrypto.so */
-  if (is_libcrypto_loaded != 1)
-  {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
-  }
-  if (is_libcrypto_loaded != 1)
-  {
-    lmysql->ldbms_get_library("", &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
-  }
-  if (is_libcrypto_loaded != 1)
-  {
-    return -1;
-  }
-
-  unsigned char cipher_chunk[4096];
-  unsigned int cipher_chunk_length, output_length= 0, i;
-  unsigned char key_in_file[20];
-  unsigned char key_after_xor[AES_BLOCK_SIZE] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-  AES_KEY key_for_aes;
-
-  if (fseek(file, 4, SEEK_SET) != 0)
-  {
-    return -1;
-  }
-  if (fread(key_in_file, 1, 20, file) != 20)
-  {
-    return -1;
-  }
-
-  for (i= 0; i < 20; ++i) *(key_after_xor + (i%16))^= *(key_in_file + i);
-  lmysql->ldbms_AES_set_decrypt_key(key_after_xor, 128, &key_for_aes);
-  while (fread(&cipher_chunk_length, 1, 4, file) == 4)
-  {
-    if (cipher_chunk_length > sizeof(cipher_chunk))
-    {
-      return -1;
-    }
-    if (fread(cipher_chunk, 1, cipher_chunk_length, file) != cipher_chunk_length)
-    {
-      return -1;
-    }
-    for (i= 0; i < cipher_chunk_length; i+= AES_BLOCK_SIZE)
-    {
-      lmysql->ldbms_AES_decrypt(cipher_chunk+i, output_buffer+output_length, &key_for_aes);
-      output_length+= AES_BLOCK_SIZE;
-      while ((output_length > 0) && (*(output_buffer+(output_length-1)) < ' ') && (*(output_buffer+(output_length-1)) != '\n')) --output_length;
-    }
-  }
-  *(output_buffer + output_length)= '\0';
-  return 0;
+  file.close();
+  //fclose(file);
 }
 
 
