@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: February 18 2016
+   Last modified: February 22 2016
 */
 
 /*
@@ -975,13 +975,38 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   }
 
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
-  /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
-  if ((main_statement_type >= TOKEN_KEYWORD_QUESTIONMARK) || (key->modifiers() & Qt::ControlModifier))
+  if (key->modifiers() & Qt::ControlModifier)
   {
     emit action_execute();
     return true;
   }
+
+  return execute_if_statement_end(true);
+  }
+
+
+/*
+  Called from keypress_event or from "source <file>".
+  We've seen Enter in a source statement, or equivalent.
+  We can execute it now if we have a complete statement.
+  A statement is complete if:
+  (a) it ends with ; and the number of ends matches the number of begins
+  (b) it was entered on the statement widget and then Ctrl+Enter happened
+      (this however is taken care of before we come to execute_if_statement_end)
+  (c) it ends with delimiter and delimiter is not ;
+*/
+bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
+{
+  QString text;
+
+  /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
+  if (main_statement_type >= TOKEN_KEYWORD_QUESTIONMARK)
+  {
+    emit action_execute();
+    return true;
+  }
+
   text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
   int i= 0;
   while (main_token_lengths[i] != 0) ++i;
@@ -990,8 +1015,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
     Todo: I think the following was written before there was detection of reserved words + Ocelot keywords.
     If so, token_type() doesn't need to be invoked, because main_token_types[] has the result already.
   */
-
-  while (i > 0)
+     while (i > 0)
   {
     --i;
     s= text.mid(main_token_offsets[i], main_token_lengths[i]);
@@ -1001,9 +1025,10 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
     if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
     break;
   }
-
-  if (statement_edit_widget->textCursor().position() <= main_token_offsets[i]) return false;
-
+  if (caller_is_keypress_event)
+  {
+    if (statement_edit_widget->textCursor().position() <= main_token_offsets[i]) return false;
+  }
   /* "go" or "ego", alone on the line, if --named-commands, is statement end */
   if ((ocelot_named_commands > 0)
   && ((main_token_types[i] == TOKEN_KEYWORD_GO) || (main_token_types[i] == TOKEN_KEYWORD_EGO)))
@@ -1022,13 +1047,13 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
     }
   }
 
-  /* if create-routine && count-of-ENDs == count-of-BEGINS then END is the end else ; is not the end */
+  /* if create-routine && count-of-ENDs == count-of-BEGINS then ; is the end else ; is not the end */
   int returned_begin_count;
   if (ocelot_delimiter_str != ";") returned_begin_count= 0;
   else
   {
     get_next_statement_in_string(0, &returned_begin_count);
-    if ((returned_begin_count == 0) && (QString::compare(s, "end", Qt::CaseInsensitive) == 0))
+    if ((returned_begin_count == 0) && (QString::compare(s, ";", Qt::CaseInsensitive) == 0))
     {
       emit action_execute();
       return true;
@@ -3206,6 +3231,36 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number, int *
     }
   }
   *returned_begin_count= begin_count;
+
+  /* If delimiter follows ; then it's part of the statement, to be stripped later. */
+  bool delimiter_seen= false;
+  if (text.mid(main_token_offsets[i], main_token_lengths[i]) == ocelot_delimiter_str)
+  {
+    delimiter_seen= true;
+  }
+
+  /* If comment follows ; on the same line, then it's part of the statement. */
+  bool comment_seen= false;
+  if ((i > 0) && (main_token_lengths[i] != 0) && (delimiter_seen == false)
+   && (text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]) != ocelot_delimiter_str))
+  {
+    if ((main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_MINUS))
+    {
+      comment_seen= true;
+      int j= main_token_offsets[i - 1] + main_token_lengths[i - 1];
+      while (j < main_token_offsets[i])
+      {
+        if (text.mid(j,1) == "\n")
+        {
+          comment_seen= false;
+        }
+        ++j;
+      }
+    }
+  }
+  if ((delimiter_seen == true) || (comment_seen == true)) ++i;
 
   return i - passed_main_token_number;
 }
@@ -6478,15 +6533,20 @@ int MainWindow::execute_client_statement(QString text)
     statement_edit_widget->clear();
     QByteArray source_line;
     /* TODO: BUG: This puts the final line into the history TWICE. */
+    /* TODO: Would it be good if we could abort source statements with ^C? */
+    /* TODO: Check for io error / premature eof */
+    /* TODO: This is skipping comment lines and blank lines, that's probably unnecessary. */
     for (;;)
     {
       if (file.atEnd() == true) break;
       source_line= "";
       source_line= file.readLine();
-      if (source_line != "")
+      QString s= source_line;
+      s= connect_stripper(s, false);
+      if ((s != "") && (s.mid(0,1) != "#") && (s.mid(0,2) != "--"))
       {
-        statement_edit_widget->insertPlainText(source_line);
-        action_execute();
+        statement_edit_widget->insertPlainText(s);
+        execute_if_statement_end(false);
      }
     }
     file.close();
@@ -10068,7 +10128,9 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
     if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) return;
     identifier_seen= true;
   }
-  if ((identifier_seen == true) || (hparse_f_qualified_name() == 1))
+  if ((identifier_seen == true)
+   || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
+   || (hparse_f_qualified_name() == 1))
   {
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
@@ -10188,6 +10250,19 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "USING");
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+  }
+  else if (opd == "IF")
+  {
+    hparse_f_opr_1();
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_TYPE_OPERATOR, ",");
+    if (hparse_errno > 0) return;
+    hparse_f_opr_1();
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_TYPE_OPERATOR, ",");
+    if (hparse_errno > 0) return;
+    hparse_f_opr_1();
     if (hparse_errno > 0) return;
   }
   else if (opd == "COUNT")
@@ -10531,10 +10606,8 @@ void MainWindow::hparse_f_alter_specification()
     return;
   }
   /* Todo: Following is useless code. CHARACTER SET is a table_option. Error in manual? */
-  if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1))
+  if ((hparse_f_character_set() == 1))
   {
-    hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-    if (hparse_errno > 0) return;
     hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
     if (hparse_f_character_set_name() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
@@ -10546,6 +10619,7 @@ void MainWindow::hparse_f_alter_specification()
     }
     return;
   }
+  if (hparse_errno > 0) return;
   if ((default_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHECK") == 1))
   {
     if (hparse_f_partition_list(false, true) == 0) hparse_f_error();
@@ -10565,9 +10639,7 @@ void MainWindow::hparse_f_alter_specification()
   {
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "TO");
     if (hparse_errno > 0) return;
-    hparse_f_expect(TOKEN_TYPE_KEYWORD, "CHARACTER");
-    if (hparse_errno > 0) return;
-    hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
+    hparse_f_character_set();
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 0)
     {
@@ -10787,6 +10859,22 @@ void MainWindow::hparse_f_alter_specification()
   }
 }
 
+/*
+  accept "CHARACTER SET"
+  but surprisingly often "CHARSET" can be used instead
+*/
+int MainWindow::hparse_f_character_set()
+{
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1)
+  {
+    hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARSET") == 1) return 1;
+  else return 0;
+}
+
 void MainWindow::hparse_f_alter_database()
 {
   hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -10807,16 +10895,15 @@ void MainWindow::hparse_f_alter_database()
     {
       if ((character_seen == true) && (collate_seen == true)) break;
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT")) {;}
-      if ((character_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER")))
+      if ((character_seen == false) && (hparse_f_character_set() == 1))
       {
         character_seen= true;
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-        if (hparse_errno > 0) return;
         if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "=")) {;}
         if (hparse_f_character_set_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
         continue;
       }
+      if (hparse_errno > 0) return;
       if ((collate_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE")))
       {
         collate_seen= true;
@@ -10980,18 +11067,12 @@ void MainWindow::hparse_f_character_set_or_collate()
 {
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ASCII") == 1) {;}
   else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNICODE") == 1) {;}
-  else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARSET") == 1)
+  else if (hparse_f_character_set() == 1)
   {
     if (hparse_f_character_set_name() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1)
-  {
-    hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-    if (hparse_errno > 0) return;
-    if (hparse_f_character_set_name() == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
-  }
+  else if (hparse_errno > 0) return;
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
   {
     hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -11050,6 +11131,7 @@ void MainWindow::hparse_f_enum_or_set()
   for example in CAST "UNSIGNED INT" is okay but "INT UNSIGNED" is illegal,
   while in CREATE "UNSIGNED INT" is illegal but "UNSIGNED INT" is okay.
   We allow any combination.
+  Todo: also, in CAST, only DOUBLE is okay, not DOUBLE PRECISION.
 */
 int MainWindow::hparse_f_data_type()
 {
@@ -11333,7 +11415,7 @@ void MainWindow::hparse_f_reference_definition()
   {
     if (hparse_f_qualified_name() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
-    hparse_f_column_list(1);
+    hparse_f_column_list(0);
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MATCH") == 1)
     {
@@ -11619,14 +11701,13 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return;
     }
-    else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1))
+    else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_character_set() == 1))
     {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-      if (hparse_errno > 0) return;
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       hparse_f_character_set_name();
       if (hparse_errno > 0) return;
     }
+    else if (hparse_errno > 0) return;
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHECKSUM") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
@@ -11668,14 +11749,13 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
     }
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1))
     {
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1)
+      if (hparse_f_character_set() == 1)
       {
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-        if (hparse_errno > 0) return;
         hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
         hparse_f_character_set_name();
         if (hparse_errno > 0) return;
       }
+      else if (hparse_errno > 0) return;
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
       {
         hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
@@ -12141,15 +12221,14 @@ void MainWindow::hparse_f_create_database()
   {
     bool default_seen= false;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1) default_seen= true;
-    if ((character_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1))
+    if ((character_seen == false) && (hparse_f_character_set() == 1))
     {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-      if (hparse_errno > 0) return;
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       if (hparse_f_character_set_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
       character_seen= true;
     }
+    else if (hparse_errno > 0) return;
     else if ((collate_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
@@ -12854,7 +12933,8 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
   if (hparse_errno > 0) return 0;
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FROM") == 1)         /* FROM + some subsequent clauses are optional */
   {
-    hparse_f_table_references();
+    /* DUAL is a reserved word, perhaps the only one that could ever be an identifier */
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DUAL") != 1) hparse_f_table_references();
     if (hparse_errno > 0) return 0;
     hparse_f_where();
     if (hparse_errno > 0) return 0;
@@ -13102,7 +13182,8 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
 /* ; or (; + delimiter) or delimiter */
 int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
 {
-  if (calling_statement_type == 0)
+  /* TEST!! removed next line */
+  if ((calling_statement_type == 0) || (calling_statement_type != 0))
   {
     if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ";") == 1)
     {
@@ -14127,13 +14208,12 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_partition_list(true, false);
       if (hparse_errno > 0) return;
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1)
+      if (hparse_f_character_set() == 1)
       {
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-        if (hparse_errno > 0) return;
         if (hparse_f_character_set_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
+      if (hparse_errno > 0) return;
       if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "FIELDS") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLUMNS") == 1))
       {
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TERMINATED") == 1)
@@ -14247,10 +14327,8 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1)
+      if (hparse_f_character_set() == 1)
       {
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-        if (hparse_errno > 0) return;
         if (hparse_f_character_set_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
@@ -14529,10 +14607,8 @@ void MainWindow::hparse_f_statement()
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
       return;
     }
-    if ((global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1))
+    if ((global_seen == false) && (hparse_f_character_set() == 1))
     {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-      if (hparse_errno > 0) return;
       if (hparse_f_character_set_name() == 0)
       {
         if (hparse_f_literal() == 0) hparse_f_error();
@@ -14545,6 +14621,7 @@ void MainWindow::hparse_f_statement()
       }
       return;
     }
+    if (hparse_errno > 0) return;
     if ((hparse_dbms == "mariadb") && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1))
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "ROLE");
@@ -14649,13 +14726,12 @@ void MainWindow::hparse_f_statement()
         }
       }
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHARACTER") == 1) /* show character set */
+    else if (hparse_f_character_set() == 1) /* show character set */
     {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SET");
-      if (hparse_errno > 0) return;
       hparse_f_like_or_where();
       if (hparse_errno > 0) return;
     }
+    else if (hparse_errno > 0) return;
     else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CLIENT_STATISTICS") == 1))
     {
       ;
@@ -15357,6 +15433,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   bool next_is_semicolon_or_work= false;
   hparse_f_next_nexttoken();
   if ((hparse_next_token == ";")
+   || (hparse_next_token == ocelot_delimiter_str)
    || (QString::compare(hparse_next_token, "WORK", Qt::CaseInsensitive) == true))
   {
     next_is_semicolon_or_work= true;
@@ -15699,7 +15776,10 @@ void MainWindow::hparse_f_multi_block(QString text)
     if (hparse_f_client_statement() == 1) return;
     if (hparse_errno > 0) return;
 #ifdef DBMS_MARIADB
-    if (hparse_dbms == "mariadb") hparse_f_block(0);
+    if (hparse_dbms == "mariadb")
+    {
+      hparse_f_block(0);
+    }
     else
 #endif
     {
@@ -15779,11 +15859,15 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
 }
 
 /*
-  Statements handled locally (by ocelotgui), which won't go to the server.
-  Todo: we're ignoring --binary-mode.
-  Todo: we're only parsing the first word to see if it's client-side, we could do more.
-  SET is a special problem because it can be either client or server (flaw in our design?).
-  Within client statements, reserved words don't count so we turn the reserved flag off.
+  Certain client statements -- delimiter, prompt, source -- take pretty well anything
+  as the end of the line. So we want the highlight to always be the same
+  (we picked "literal" but anything would do). Some deviations from mysql client:
+  * we allow SOURCE 'literal' etc., anything within the quote marks is the argument
+  * we allow comments, we do not consider them to be part of the argument
+  * we haven't figured out what to do with delimiters or ;
+  * it's uncertain what we'll do when it comes time to execute
+  * delimiter can end with space, but source and prompt cannot, that's not handled
+  * todo: this isn't being called for prompt
   Delimiters
   ----------
   If DELIMITER is the only or the first statement, rules are documented and comprehensible:
@@ -15794,6 +15878,49 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
     The result is in effect for the next tokenize, not for subsequent statements on the line.
   If DELIMITER is not the first statement, rules are not documented and bizarre:
     The string that follows is the new delimiter, but the rest of the line is ignored.
+  DELIMITER causes new rules! Everything following as far as " " is delimiter-string.
+*/
+void MainWindow::hparse_f_other()
+{
+  if ((main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+   || (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
+   || (main_token_types[hparse_i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
+  {
+    hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
+    if (hparse_errno > 0) return;
+  }
+  else
+  {
+    if (main_token_lengths[hparse_i] == 0)
+    {
+      hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to fail */
+      if (hparse_errno > 0) return;
+    }
+    for (;;)
+    {
+      main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
+      main_token_types[hparse_i] = hparse_token_type= TOKEN_TYPE_LITERAL;
+      if (main_token_lengths[hparse_i + 1] == 0)
+      {
+        break;
+      }
+      if (main_token_offsets[hparse_i] + main_token_lengths[hparse_i]
+         < main_token_offsets[hparse_i + 1])
+      {
+        break;
+      }
+      hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
+      if (hparse_errno > 0) return;
+    }
+  }
+}
+
+/*
+  Statements handled locally (by ocelotgui), which won't go to the server.
+  Todo: we're ignoring --binary-mode.
+  Todo: we're only parsing the first word to see if it's client-side, we could do more.
+  SET is a special problem because it can be either client or server (flaw in our design?).
+  Within client statements, reserved words don't count so we turn the reserved flag off.
   Todo: Figure out how HELP can be both client statement and server statement.
 */
 int MainWindow::hparse_f_client_statement()
@@ -15818,34 +15945,8 @@ int MainWindow::hparse_f_client_statement()
   else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(TOKEN_KEYWORD_CONNECT, "CONNECT") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
   {
-    /* DELIMITER causes new rules! Everything following as far as " " is delimiter-string. */
-    /* todo: although I change to literal, highlight color doesn't change. Maybe a bug ... */
-    if ((main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-     || (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
-     || (main_token_types[hparse_i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
-    {
-      main_token_types[hparse_i] = TOKEN_TYPE_LITERAL;
-      hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
-      if (hparse_errno > 0) return 0;
-    }
-    else
-    {
-      if (main_token_lengths[hparse_i] == 0)
-      {
-        hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to fail */
-        if (hparse_errno > 0) return 0;
-      }
-      for (;;)
-      {
-        main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
-        main_token_types[hparse_i] = TOKEN_TYPE_LITERAL;
-        if (main_token_lengths[hparse_i + 1] == 0) break;
-        if (main_token_offsets[hparse_i] + main_token_lengths[hparse_i]
-           < main_token_offsets[hparse_i + 1]) break;
-        hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
-        if (hparse_errno > 0) return 0;
-      }
-    }
+    hparse_f_other();
+    if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(TOKEN_KEYWORD_EDIT, "EDIT") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_EGO) || (hparse_f_accept(TOKEN_KEYWORD_EGO, "EGO") == 1)) {;}
@@ -15943,12 +16044,8 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
   {
-    main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
-    if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
-    {
-      hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-      if (hparse_errno > 0) return 0;
-    }
+    hparse_f_other();
+    if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(TOKEN_KEYWORD_STATUS, "STATUS") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1)) {;}
@@ -19034,32 +19131,60 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
       *(new_file_name + token2_length)= 0;
       connect_read_my_cnf(new_file_name, 0);
     }
+    ///* See if it's !includedir */
+    //if ((QString::compare(token0, "!") == 0) && (QString::compare(token1, "includedir", Qt::CaseInsensitive) == 0))
+    //{
+    //  DIR *d;
+    //  struct dirent *dir;
+    //  char new_directory_name[2048];
+    //  strcpy(new_directory_name,token2.toUtf8());
+    //  *(new_directory_name + token2_length)= 0;
+    //  d= opendir(new_directory_name);
+    //  if (d)
+    //  {
+    //    while ((dir = readdir(d)) != NULL)
+    //    {
+    //      if ((strlen(dir->d_name)>4) && (strcmp(dir->d_name + strlen(dir->d_name) - 4, ".cnf") == 0))
+    //      {
+    //        char new_file_name[2048];
+    //        strcpy(new_file_name, new_directory_name);
+    //        strcat(new_file_name, "/");
+    //        strcat(new_file_name, dir->d_name);
+    //        connect_read_my_cnf(new_file_name, 0);
+    //      }
+    //    }
+    //    closedir(d);
+    //  }
+    //}
     /* See if it's !includedir */
+    /* Todo: there are no checks for looping; not sure what to do with hidden or symlink */
     if ((QString::compare(token0, "!") == 0) && (QString::compare(token1, "includedir", Qt::CaseInsensitive) == 0))
     {
-      DIR *d;
-      struct dirent *dir;
-      char new_directory_name[2048];
-      strcpy(new_directory_name,token2.toUtf8());
-      *(new_directory_name + token2_length)= 0;
-      d= opendir(new_directory_name);
-      if (d)
+      QDir dir(token2);
+      dir.setFilter(QDir::Files | QDir::Hidden);
+      QFileInfoList list= dir.entryInfoList();
+      for (int i= 0; i < list.size(); ++i)
       {
-        while ((dir = readdir(d)) != NULL)
+        QFileInfo fileInfo= list.at(i);
+#ifdef Q_OS_LINUX
+        QString file_name= fileInfo.fileName();
+        if (file_name.right(4) == ".cnf")
+#endif
+#ifdef Q_OS_WIN32
+        QString file_name= fileInfo.fileName().upper();
+        if ((file_name.right(4) == ".CNF") || file_name.right(4) == ".INI"))
+#endif
         {
-          if ((strlen(dir->d_name)>4) && (strcmp(dir->d_name + strlen(dir->d_name) - 4, ".cnf") == 0))
-          {
-            char new_file_name[2048];
-            strcpy(new_file_name, new_directory_name);
-            strcat(new_file_name, "/");
-            strcat(new_file_name, dir->d_name);
-            connect_read_my_cnf(new_file_name, 0);
-          }
+          QString s= token2;
+          s.append("/");
+          s.append(fileInfo.fileName());
+          char new_file_name[2048];
+          strcpy(new_file_name, s.toUtf8());
+          *(new_file_name + s.length())= '\0';
+          connect_read_my_cnf(new_file_name, 0);
         }
-        closedir(d);
       }
     }
-
     /* See if it's [ group ] */
     if ((QString::compare(token0, "[") == 0) && (QString::compare(token2,"]") == 0))
     {

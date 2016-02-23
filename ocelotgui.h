@@ -44,6 +44,7 @@
 #include <QComboBox>
 #include <QDateTime>
 #include <QDialog>
+#include <QDir>
 #include <QFontDialog>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -74,15 +75,14 @@
   Linux-specific:
   We use dlopen() when opening libmysqlclient.so and libcrypto.so, therefore include dlfcn.h.
   We use readlink() when checking if histfile links to dev/null, therefore include unistd.h.
-  We use opendir() readdir() closedir() when getting options, therefore include dirent.h.
   We use getpwuid() when getting password, therefore include pwd.h.
   We use pthread_create() for debug and kill, therefore include pthread.h.
   We use stat() to see if a configuration file is world-writable, therefore include stat.h.
+  Todo: Maybe we should be looking for Qt's Q_OS_LINUX etc. not __linux etc.
 */
 #ifdef __linux
 #include <dlfcn.h>
 #include <unistd.h>
-#include <dirent.h>
 #include <pwd.h>
 #include <pthread.h>
 #include <sys/stat.h>
@@ -379,6 +379,7 @@ public:
   void hparse_f_statement();
   void hparse_f_assignment(int);
   void hparse_f_alter_table();
+  int hparse_f_character_set();
   void hparse_f_alter_database();
   void hparse_f_alter_specification();
   void hparse_f_characteristics();
@@ -428,6 +429,7 @@ public:
   void hparse_f_block(int);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
+  void hparse_f_other();
   int hparse_f_client_statement();
 
 #ifdef DBMS_TARANTOOL
@@ -593,6 +595,7 @@ private:
   void history_file_to_history_widget();           /* see comment=tee+hist */
 
   void statement_edit_widget_setstylesheet();
+  bool execute_if_statement_end(bool);
   void message_box(QString the_title, QString the_text);
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
