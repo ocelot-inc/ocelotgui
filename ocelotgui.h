@@ -582,7 +582,7 @@ private:
   void set_current_colors_and_font();
   void make_style_strings();
   //void create_the_manual_widget();
-  int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count);
+  int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
   int make_statement_ready_to_send(QString, QString, char *, int, bool);
   void action_execute_one_statement(QString text);
 
@@ -1022,6 +1022,7 @@ private:
   void tokens_to_keywords(QString text);
   void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text);
   int next_token(int i);
+  bool is_client_statement(int);
   int find_start_of_body(QString text, int *i_of_function, int *i_of_do);
   int connect_mysql(unsigned int connection_number);
 #ifdef DBMS_TARANTOOL

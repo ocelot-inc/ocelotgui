@@ -1001,7 +1001,7 @@ bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
   QString text;
 
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
-  if (main_statement_type >= TOKEN_KEYWORD_QUESTIONMARK)
+  if (is_client_statement(main_statement_type) == true)
   {
     emit action_execute();
     return true;
@@ -1052,7 +1052,7 @@ bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
   if (ocelot_delimiter_str != ";") returned_begin_count= 0;
   else
   {
-    get_next_statement_in_string(0, &returned_begin_count);
+    get_next_statement_in_string(0, &returned_begin_count, false);
     if ((returned_begin_count == 0) && (QString::compare(s, ";", Qt::CaseInsensitive) == 0))
     {
       emit action_execute();
@@ -3152,7 +3152,9 @@ QFont MainWindow::get_font_from_style_sheet(QString style_string)
   Todo: think about delimiter. Maybe delimiters don't count if you're in a delimiter statement?
   Todo: this doesn't allow for the possibility of "END comment WHILE|LOOP|REPEAT;"
 */
-int MainWindow::get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count)
+int MainWindow::get_next_statement_in_string(int passed_main_token_number,
+                                             int *returned_begin_count,
+                                             bool check_if_client)
 {
   int i;
   int begin_count;
@@ -3161,72 +3163,137 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number, int *
   int i_of_first_non_comment_seen= -1;
 
   text= statement_edit_widget->toPlainText(); /* Todo: decide whether I'm doing this too often */
-  bool is_maybe_in_compound_statement= 0;
   begin_count= 0;
+
+  /*
+    First, check for client statement, because the rules for client statement end are:
+    ; OR delimiter OR \n OR \n\r
+    but a DELIMITER statement ends with first whitespace after its argument
+    or next client statement? or next statement of any kind?
+  */
+  bool client_statement_seen= false;
   for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
   {
-    last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
-    if (QString::compare(ocelot_delimiter_str, ";") != 0)
+    int token= main_token_types[i];
+    if ((token == TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (token == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (token == TOKEN_TYPE_COMMENT_WITH_MINUS))
+      continue;
+    if (is_client_statement(token) == true) client_statement_seen= true;
+    break;
+  }
+  if ((client_statement_seen == true) && (check_if_client == true))
+  {
+    for (i= i; main_token_lengths[i] != 0; ++i)
     {
-      if (QString::compare(last_token, ocelot_delimiter_str) == 0)
+      if (main_token_lengths[i + 1] != 0)
+      {
+        int j= main_token_offsets[i] + main_token_lengths[i];
+        bool line_break_seen= false;
+        while (j < main_token_offsets[i + 1])
+        {
+          if (text.mid(j, 1) == "\n")
+          {
+            line_break_seen= true;
+            break;
+          }
+          ++j;
+        }
+        if (line_break_seen == true)
+        {
+          ++i;
+          break;
+        }
+      }
+      int token= main_token_types[i];
+      if ((token == TOKEN_TYPE_COMMENT_WITH_SLASH)
+       || (token == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+       || (token == TOKEN_TYPE_COMMENT_WITH_MINUS))
+      {
+        continue;
+      }
+      last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (QString::compare(ocelot_delimiter_str, ";") != 0)
+      {
+        if (QString::compare(last_token, ocelot_delimiter_str) == 0)
+        {
+          ++i; break;
+        }
+      }
+      if (QString::compare(last_token, ";") == 0)
       {
         ++i; break;
       }
     }
-    if ((QString::compare(last_token, ";") == 0) && (begin_count == 0))
+  }
+  else
+  {
+    bool is_maybe_in_compound_statement= 0;
+    for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
     {
-      ++i; break;
-    }
-    if (i_of_first_non_comment_seen != -1)
-    {
-      if (main_token_types[i_of_first_non_comment_seen] == TOKEN_KEYWORD_CREATE)
+      last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (QString::compare(ocelot_delimiter_str, ";") != 0)
       {
-        if ((main_token_types[i] == TOKEN_KEYWORD_PROCEDURE)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_EVENT))
+        if (QString::compare(last_token, ocelot_delimiter_str) == 0)
+        {
+          ++i; break;
+        }
+      }
+      if ((QString::compare(last_token, ";") == 0) && (begin_count == 0))
+      {
+        ++i; break;
+      }
+      if (i_of_first_non_comment_seen != -1)
+      {
+        if (main_token_types[i_of_first_non_comment_seen] == TOKEN_KEYWORD_CREATE)
+        {
+          if ((main_token_types[i] == TOKEN_KEYWORD_PROCEDURE)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_EVENT))
+          {
+            is_maybe_in_compound_statement= 1;
+          }
+        }
+      }
+
+      if (i_of_first_non_comment_seen == -1)
+      {
+#ifdef DBMS_MARIADB
+        if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+        ||  (main_token_types[i] == TOKEN_KEYWORD_CASE)
+         ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
+        ||  (main_token_types[i] == TOKEN_KEYWORD_LOOP)
+        ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
+        ||  (main_token_types[i] == TOKEN_KEYWORD_WHILE))
         {
           is_maybe_in_compound_statement= 1;
         }
-      }
-    }
-
-    if (i_of_first_non_comment_seen == -1)
-    {
-#ifdef DBMS_MARIADB
-      if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_CASE)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_LOOP)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_WHILE))
-      {
-        is_maybe_in_compound_statement= 1;
-      }
 #endif
-      if ((main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
-       && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-       && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_MINUS))
-      {
-        i_of_first_non_comment_seen= i;
+        if ((main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
+         && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+         && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_MINUS))
+        {
+          i_of_first_non_comment_seen= i;
+        }
       }
-    }
 
-    if (is_maybe_in_compound_statement == 1)
-    {
-      if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
-      ||  (main_token_types[i] == TOKEN_KEYWORD_ELSEIF)
-      ||  ((main_token_types[i] == TOKEN_KEYWORD_CASE)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-      ||  ((main_token_types[i] == TOKEN_KEYWORD_IF)     && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-      ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-      ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-      ||  ((main_token_types[i] == TOKEN_KEYWORD_WHILE)  && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END))))
+      if (is_maybe_in_compound_statement == 1)
       {
-        ++begin_count;
-      }
-      if (main_token_types[i] == TOKEN_KEYWORD_END)
-      {
-        --begin_count;
+        if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+        ||  (main_token_types[i] == TOKEN_KEYWORD_ELSEIF)
+        ||  ((main_token_types[i] == TOKEN_KEYWORD_CASE)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+        ||  ((main_token_types[i] == TOKEN_KEYWORD_IF)     && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+        ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+        ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+        ||  ((main_token_types[i] == TOKEN_KEYWORD_WHILE)  && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END))))
+        {
+          ++begin_count;
+        }
+        if (main_token_types[i] == TOKEN_KEYWORD_END)
+        {
+          --begin_count;
+        }
       }
     }
   }
@@ -6032,7 +6099,9 @@ void MainWindow::action_execute()
   is_kill_requested= false;
   for (;;)
   {
-    main_token_count_in_statement= get_next_statement_in_string(main_token_number, &returned_begin_count);
+    main_token_count_in_statement= get_next_statement_in_string(main_token_number,
+                                                                &returned_begin_count,
+                                                                true);
     if (main_token_count_in_statement == 0) break;
     action_execute_one_statement(text);
 
@@ -6412,6 +6481,7 @@ int MainWindow::execute_client_statement(QString text)
   }
 
   /* Make a copy of the first few tokens, ignoring comments. */
+  /* And ignore the first token if it is \ because second token is the same */
   for (unsigned int i= main_token_number; /* main_token_lengths[i] != 0 && */ i < main_token_number + true_token_count; ++i)
   {
     /* Todo: find out why you have to figure out type again -- isn't it already known? */
@@ -6420,6 +6490,10 @@ int MainWindow::execute_client_statement(QString text)
     if (t == TOKEN_TYPE_COMMENT_WITH_SLASH
     ||  t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE
     ||  t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
+    if ((i2 == 0) && (s == "\\"))
+    {
+      continue;
+    }
     sub_token_offsets[i2]= main_token_offsets[i];
     sub_token_lengths[i2]= main_token_lengths[i];
     sub_token_types[i2]= main_token_types[i];
@@ -7856,11 +7930,11 @@ n_byte_token_skip:
 
 /*
   token_type() should be useful for syntax highlighting and for hovering.
+  However, it's rudimentary. If parsing routines are called, they'll override.
   Pass: token, token length. we assume it's at least 1.
   Return: type
   I could have figured this out during tokenize(), but didn't.
-  Todo: distinguish between keyword, regular identifier, reserved word.
-        There is a check elsewhere for keywords though, see tokens_to_keywords().
+  See also tokens_to_keywords().
 */
 int MainWindow::token_type(QChar *token, int token_length)
 {
@@ -8354,29 +8428,7 @@ void MainWindow::tokens_to_keywords(QString text)
   }
 
   /* Todo: This has to be moved somewhere because the text might contain multi-statements. */
-  if ((main_token_types[0] == TOKEN_KEYWORD_QUESTIONMARK)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_CHARSET)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_CLEAR)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_CONNECT)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_DELIMITER)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_EDIT)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_EGO)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_GO)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_HELP)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_NOPAGER)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_NOTEE)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_NOWARNING)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_PAGER)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_PRINT)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_PROMPT)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_QUIT)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_REHASH)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_SOURCE)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_STATUS)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_SYSTEM)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_TEE)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_USE)
-  ||  (main_token_types[0] == TOKEN_KEYWORD_WARNINGS))
+  if (is_client_statement(main_token_types[0]) == true)
   {
     main_statement_type= main_token_types[0];
   }
@@ -8401,16 +8453,32 @@ void MainWindow::tokens_to_keywords(QString text)
   if (i2  >= 2)
   {
     /* Todo: what about the delimiter? */
-    if ((main_token_offsets[1] == 1) && (main_token_lengths[1] == 1)) xx= 0;
-    if ((main_token_lengths[main_token_count - 2] == 1) && (main_token_lengths[main_token_count - 1] == 1)) xx= main_token_count - 2;
+    if ((main_token_offsets[1] == 1)
+     && (main_token_lengths[1] == 1)
+     && (text.mid(main_token_offsets[0], main_token_lengths[0]) == "\\"))
+    {
+      xx= 0;
     }
+    else if ((main_token_lengths[main_token_count - 2] == 1)
+     && (main_token_lengths[main_token_count - 1] == 1)
+     && (text.mid(main_token_offsets[main_token_count - 2], main_token_lengths[main_token_count - 2]) == "\\"))
+    {
+      xx= main_token_count - 2;
+    }
+  }
   if (i2 >= 3)
   {
     s= text.mid(main_token_offsets[i2 - 1], main_token_lengths[i2 - 1]);
     /* Todo: compare with delimiter, which isn't always semicolon. */
     if (s == (QString)ocelot_delimiter_str)
     {
-      if ((main_token_lengths[main_token_count - 3] == 1) && (main_token_lengths[main_token_count - 2] == 1)) xx= main_token_count - 3;
+      if ((main_token_lengths[main_token_count - 3] == 1)
+       && (main_token_lengths[main_token_count - 2] == 1)
+       && (text.mid(main_token_offsets[main_token_count - 3], main_token_lengths[main_token_count - 3]) == "\\"))
+
+      {
+        xx= main_token_count - 3;
+      }
     }
   }
   if (xx >= 0)
@@ -8430,7 +8498,10 @@ void MainWindow::tokens_to_keywords(QString text)
     if (s == QString("\\w")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_NOWARNING;
     if (s == QString("\\P")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PAGER;
     if (s == QString("\\p")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PRINT;
-    if (s == QString("\\R")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PROMPT;
+    if (s == QString("\\R"))
+    {
+      main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PROMPT;
+    }
     if (s == QString("\\q")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_QUIT;
     if (s == QString("\\#")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_REHASH;
     if (s == QString("\\.")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_SOURCE;
@@ -8442,6 +8513,37 @@ void MainWindow::tokens_to_keywords(QString text)
   }
 }
 
+/*
+  Return true if the passed token number is for the first word of a client statement.
+*/
+bool MainWindow::is_client_statement(int token)
+{
+  if ((token == TOKEN_KEYWORD_QUESTIONMARK)
+  ||  (token == TOKEN_KEYWORD_CHARSET)
+  ||  (token == TOKEN_KEYWORD_CLEAR)
+  ||  (token == TOKEN_KEYWORD_CONNECT)
+  ||  (token == TOKEN_KEYWORD_DELIMITER)
+  ||  (token == TOKEN_KEYWORD_EDIT)
+  ||  (token == TOKEN_KEYWORD_EGO)
+  ||  (token == TOKEN_KEYWORD_GO)
+  ||  (token == TOKEN_KEYWORD_HELP)
+  ||  (token == TOKEN_KEYWORD_NOPAGER)
+  ||  (token == TOKEN_KEYWORD_NOTEE)
+  ||  (token == TOKEN_KEYWORD_NOWARNING)
+  ||  (token == TOKEN_KEYWORD_PAGER)
+  ||  (token == TOKEN_KEYWORD_PRINT)
+  ||  (token == TOKEN_KEYWORD_PROMPT)
+  ||  (token == TOKEN_KEYWORD_QUIT)
+  ||  (token == TOKEN_KEYWORD_REHASH)
+  ||  (token == TOKEN_KEYWORD_SOURCE)
+  ||  (token == TOKEN_KEYWORD_STATUS)
+  ||  (token == TOKEN_KEYWORD_SYSTEM)
+  ||  (token == TOKEN_KEYWORD_TEE)
+  ||  (token == TOKEN_KEYWORD_USE)
+  ||  (token == TOKEN_KEYWORD_WARNINGS))
+    return true;
+  return false;
+}
 
 /*
   Find start of body in CREATE ... FUNCTION|PROCEDURE|TRIGGER statement
@@ -9816,16 +9918,6 @@ void MainWindow::hparse_f_opr_6() /* Precedence = 6 */
     else hparse_f_error();
     if (hparse_errno > 0) return;
   }
-  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "BETWEEN") == 1)
-  {
-    hparse_f_opr_7();
-    if (hparse_errno > 0) return;
-    hparse_f_expect(TOKEN_TYPE_KEYWORD, "AND");
-    if (hparse_errno > 0) return;
-    hparse_f_opr_7();
-    if (hparse_errno > 0) return;
-    return;
-  }
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MATCH") == 1)
   {
     hparse_f_column_list(1);
@@ -9928,6 +10020,17 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
       hparse_f_parenthesized_multi_expression(&expression_count);
       if (hparse_errno > 0) return;
       break;
+    }
+    /* The manual says BETWEEN has a higher priority than this */
+    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "BETWEEN") == 1)
+    {
+      hparse_f_opr_8();
+      if (hparse_errno > 0) return;
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "AND");
+      if (hparse_errno > 0) return;
+      hparse_f_opr_8();
+      if (hparse_errno > 0) return;
+      return;
     }
     if (not_seen == true)
     {
@@ -11711,7 +11814,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CHECKSUM") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
-      hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
       if (hparse_errno > 0) return;
     }
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1))
@@ -11768,10 +11871,22 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DELAY_KEY_WRITE") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
+      if (hparse_errno > 0) return;
+    }
+    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTED") == 1))
+    {
+      hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "YES") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "NO");
+      if (hparse_errno > 0) return;
+    }
+    else if ((hparse_dbms == "mysql") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTION") == 1))
+    {
+      hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return;
     }
-    else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTION") == 1))
+    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTION_KEY_ID") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
@@ -11780,6 +11895,12 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
     else if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENGINE") == 1))
     {
       hparse_f_engine();
+      if (hparse_errno > 0) return;
+    }
+    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IETF_QUOTES") == 1))
+    {
+      hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "YES") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "NO");
       if (hparse_errno > 0) return;
     }
     else if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX") == 1))
@@ -11827,6 +11948,12 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1)) {;}
       else hparse_f_error();
     }
+    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PAGE_CHECKSUM") == 1))
+    {
+      hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
+      else hparse_f_error();
+    }
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PASSWORD") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
@@ -11841,7 +11968,9 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FIXED") == 1)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COMPRESSED") == 1)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REDUNDANT") == 1)
-       || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COMPACT") == 1)) {;}
+       || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COMPACT") == 1)
+       || ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PAGE") == 1)))
+        {;}
       else hparse_f_error();
     }
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STATS_AUTO_RECALC") == 1))
@@ -11866,7 +11995,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "STORAGE") == 1))
+    else if ((keyword == TOKEN_KEYWORD_PARTITION) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STORAGE") == 1))
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "ENGINE");
       if (hparse_errno > 0) return;
@@ -11877,6 +12006,12 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
+    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TRANSACTIONAL") == 1))
+    {
+      hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
       if (hparse_errno > 0) return;
     }
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNION") == 1))
@@ -13114,7 +13249,8 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
 
   if (who_is_calling == TOKEN_KEYWORD_CREATE)
   {
-    ignore_seen= true; online_seen= true;
+    ignore_seen= true;
+    if (hparse_dbms == "mysql") online_seen= true;
   }
   else
   {
@@ -13157,7 +13293,11 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
     }
     else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && (hparse_dbms == "mariadb") && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ONLINE") == 1))
     {
-      online_seen= true; (*hparse_flags) &= HPARSE_FLAG_TABLE;
+      online_seen= true; (*hparse_flags) &= (HPARSE_FLAG_INDEX | HPARSE_FLAG_TABLE);
+    }
+    else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && (hparse_dbms == "mariadb") && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OFFLINE") == 1))
+    {
+      online_seen= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
     else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FULLTEXT") == 1))
     {
@@ -13490,10 +13630,13 @@ void MainWindow::hparse_f_statement()
       /* If (parameter_list) isn't there, it might be a UDF */
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RETURNS") == 1)
       {
+        /* Manual doesn't mention INT or DEC. I wonder what else it doesn't mention. */
         if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "STRING") == 1)
          || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INTEGER") == 1)
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INT") == 1)
          || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REAL") == 1)
-         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DECIMAL") == 1)) {;}
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DECIMAL") == 1)
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEC") == 1)) {;}
         else hparse_f_error();
         if (hparse_errno > 0) return;
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "SONAME");
@@ -14571,7 +14714,9 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_SET;
     hparse_subquery_is_allowed= true;
     bool global_seen= false;
-    if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "GLOBAL") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCAL") == 1))
+    if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "GLOBAL") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SESSION") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCAL") == 1))
     {
       global_seen= true;
     }
@@ -15837,7 +15982,10 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
   else if (s == QString("w")) slash_token= TOKEN_KEYWORD_NOWARNING;
   else if (s == QString("P")) slash_token= TOKEN_KEYWORD_PAGER;
   else if (s == QString("p")) slash_token= TOKEN_KEYWORD_PRINT;
-  else if (s == QString("R")) slash_token= TOKEN_KEYWORD_PROMPT;
+  else if (s == QString("R"))
+  {
+    slash_token= TOKEN_KEYWORD_PROMPT;
+  }
   else if (s == QString("q")) slash_token= TOKEN_KEYWORD_QUIT;
   else if (s == QString("#")) slash_token= TOKEN_KEYWORD_REHASH;
   else if (s == QString(".")) slash_token= TOKEN_KEYWORD_SOURCE;
