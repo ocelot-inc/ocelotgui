@@ -470,7 +470,8 @@ public slots:
   void action_connect();
   void action_connect_once(QString);
   void action_exit();
-  void action_execute();
+  void action_execute_force();
+  int action_execute(int);
   void action_kill();
   void action_about();
   void action_the_manual();
@@ -554,7 +555,7 @@ private:
   int rehash_scan();
   void rehash_search(char *search_string);
   void widget_sizer();
-  int execute_client_statement(QString text);
+  int execute_client_statement(QString text, int *additional_result);
   void put_diagnostics_in_result();
   void put_message_in_result(QString);
   unsigned int get_ocelot_protocol_as_int(QString s);
@@ -584,6 +585,7 @@ private:
   //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
   int make_statement_ready_to_send(QString, QString, char *, int, bool);
+  void remove_statement(QString);
   void action_execute_one_statement(QString text);
 
   void history_markup_make_strings();
@@ -595,7 +597,7 @@ private:
   void history_file_to_history_widget();           /* see comment=tee+hist */
 
   void statement_edit_widget_setstylesheet();
-  bool execute_if_statement_end(bool);
+  bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */

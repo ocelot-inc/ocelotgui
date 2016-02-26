@@ -730,7 +730,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   if (ocelot_password_was_specified == 0)
   {
     statement_edit_widget->insertPlainText("CONNECT");
-    action_execute();
+    action_execute(1);
   }
   else
   {
@@ -913,7 +913,7 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   {
     if (key->key() == Qt::Key_P) { history_markup_previous(); return true; }
     if (key->key() == Qt::Key_N) { history_markup_next(); return true; }
-    if (key->key() == Qt::Key_E) { action_execute(); return true; }
+    if (key->key() == Qt::Key_E) { action_execute(1); return true; }
     if (menu_run_action_kill->isEnabled() == true)
     {
       if (key->key() == Qt::Key_C) { action_kill(); return true; }
@@ -978,36 +978,27 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
   if (key->modifiers() & Qt::ControlModifier)
   {
-    emit action_execute();
+    action_execute(1);
     return true;
   }
 
-  return execute_if_statement_end(true);
-  }
+  /* It's just Enter. If it's not at the end, don't try to execute. Anyway, don't force. */
+  if (statement_edit_widget->textCursor().atEnd() == false) return false;
+
+  if (action_execute(0) == 1) return false;
+  return true;
+}
 
 
-/*
-  Called from keypress_event or from "source <file>".
-  We've seen Enter in a source statement, or equivalent.
-  We can execute it now if we have a complete statement.
-  A statement is complete if:
-  (a) it ends with ; and the number of ends matches the number of begins
-  (b) it was entered on the statement widget and then Ctrl+Enter happened
-      (this however is taken care of before we come to execute_if_statement_end)
-  (c) it ends with delimiter and delimiter is not ;
-*/
-bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
+bool MainWindow::is_statement_complete(QString text)
 {
-  QString text;
-
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
-  if (is_client_statement(main_statement_type) == true)
+  /* Todo: Check: does this mean that a client statement cannot be spread over two lines? */
+    if (is_client_statement(main_statement_type) == true)
   {
-    emit action_execute();
     return true;
   }
 
-  text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
   int i= 0;
   while (main_token_lengths[i] != 0) ++i;
   QString s= "";
@@ -1015,7 +1006,7 @@ bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
     Todo: I think the following was written before there was detection of reserved words + Ocelot keywords.
     If so, token_type() doesn't need to be invoked, because main_token_types[] has the result already.
   */
-     while (i > 0)
+  while (i > 0)
   {
     --i;
     s= text.mid(main_token_offsets[i], main_token_lengths[i]);
@@ -1024,10 +1015,6 @@ bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
     if (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE) continue;
     if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
     break;
-  }
-  if (caller_is_keypress_event)
-  {
-    if (statement_edit_widget->textCursor().position() <= main_token_offsets[i]) return false;
   }
   /* "go" or "ego", alone on the line, if --named-commands, is statement end */
   if ((ocelot_named_commands > 0)
@@ -1040,7 +1027,6 @@ bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
       else q= text.mid(i_off, 1);
       if ((q == "\n") || (q == "\r"))
       {
-        emit action_execute();
         return true;
       }
       if (q != " ") break;
@@ -1055,7 +1041,6 @@ bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
     get_next_statement_in_string(0, &returned_begin_count, false);
     if ((returned_begin_count == 0) && (QString::compare(s, ";", Qt::CaseInsensitive) == 0))
     {
-      emit action_execute();
       return true;
     }
   }
@@ -1064,8 +1049,7 @@ bool MainWindow::execute_if_statement_end(bool caller_is_keypress_event)
 
   if (returned_begin_count > 0) return false;
 
-  /* All conditions have been met. Execute, and eat the return key. */
-  emit action_execute();
+  /* All conditions have been met. Tell caller to Execute, and eat the return key. */
   return true;
 }
 
@@ -1697,7 +1681,7 @@ void MainWindow::create_menu()
 
   menu_run= ui->menuBar->addMenu(tr("Run"));
   menu_run_action_execute= menu_run->addAction(tr("Execute"));
-  connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute()));
+  connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
   menu_run_action_execute->setShortcut(QKeySequence(tr("Ctrl+E")));
   menu_run_action_kill= menu_run->addAction(tr("Kill"));
   connect(menu_run_action_kill, SIGNAL(triggered()), this, SLOT(action_kill()));
@@ -2198,11 +2182,11 @@ void MainWindow::action_connect_once(QString message)
       /* This should ensure that a record goes to the history widget */
       /* Todo: clear statement_edit_widget first */
       statement_edit_widget->insertPlainText("CONNECT");
-      action_execute();
+      action_execute(1);
       if (ocelot_init_command > "")
       {
         statement_edit_widget->insertPlainText(ocelot_init_command);
-        action_execute();
+        action_execute(1);
       }
     }
     delete(co);
@@ -3877,7 +3861,7 @@ void* debuggee_thread(void* unused)
 //void MainWindow::action_debug_install()
 //{
 //  statement_edit_widget->setPlainText("$INSTALL");
-//  action_execute();
+//  action_execute(1);
 //}
 
 void MainWindow::debug_install_go()
@@ -3963,7 +3947,7 @@ void debug_mdbug_install()
 //  call_statement=%s\n", call_statement);
 //
 //  statement_edit_widget->setPlainText(call_statement);
-//  emit action_execute();
+//  action_execute(1);
 //}
 
 
@@ -5007,7 +4991,7 @@ void MainWindow::action_debug_breakpoint()
   strcat(command, line_number_as_string);
 
   statement_edit_widget->setPlainText(command);
-  action_execute();
+  action_execute(1);
 }
 
 
@@ -5151,7 +5135,7 @@ void MainWindow::action_debug_mousebuttonpress(QEvent *event, int which_debug_wi
   sprintf(command, "$breakpoint %s.%s %d", schema_name, routine_name, line_number);
 
   statement_edit_widget->setPlainText(command);                           /* Execute "$breakpoint ..." */
-  action_execute();
+  action_execute(1);
 }
 
 
@@ -5180,7 +5164,7 @@ void MainWindow::action_debug_clear()
   strcat(command, line_number_as_string);
 
   statement_edit_widget->setPlainText(command);
-  action_execute();
+  action_execute(1);
 }
 
 
@@ -5190,7 +5174,7 @@ void MainWindow::action_debug_clear()
 void MainWindow::action_debug_continue()
 {
   statement_edit_widget->setPlainText("$CONTINUE");
-  action_execute();
+  action_execute(1);
 }
 
 /*
@@ -5200,7 +5184,7 @@ void MainWindow::action_debug_continue()
 void MainWindow::action_debug_step()
 {
   statement_edit_widget->setPlainText("$STEP");
-  action_execute();
+  action_execute(1);
 }
 
 /*
@@ -5213,7 +5197,7 @@ void MainWindow::action_debug_step()
 //void MainWindow::action_debug_leave()
 //{
 //    statement_edit_widget->setPlainText("$LEAVE");
-//    action_execute();
+//    action_execute(1);
 //}
 
 
@@ -5318,7 +5302,7 @@ void MainWindow::debug_other_go(QString text)
 void MainWindow::action_debug_next()
 {
  statement_edit_widget->setPlainText("$NEXT");
- action_execute();
+ action_execute(1);
 }
 
 
@@ -5329,7 +5313,7 @@ void MainWindow::action_debug_next()
 //void MainWindow::action_debug_skip()
 //{
 //  statement_edit_widget->setPlainText("$SKIP");
-//  action_execute();
+//  action_execute(1);
 //}
 
 
@@ -5461,7 +5445,7 @@ void MainWindow::debug_highlight_line()
 void MainWindow::action_debug_exit()
 {
     statement_edit_widget->setPlainText("$EXIT");
-    action_execute();
+    action_execute(1);
 }
 
 
@@ -5566,7 +5550,7 @@ void MainWindow::action_debug_information()
 {
   if (debug_call_xxxmdbug_command("information status") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.information_status");
-  emit action_execute();
+  action_execute(1);
 }
 
 
@@ -5581,7 +5565,7 @@ void MainWindow::action_debug_refresh_server_variables()
   }
   if (debug_call_xxxmdbug_command("refresh server_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables");
-  emit action_execute();
+  action_execute(1);
 }
 
 
@@ -5596,7 +5580,7 @@ void MainWindow::action_debug_refresh_user_variables()
   }
   if (debug_call_xxxmdbug_command("refresh user_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.user_variables");
-  emit action_execute();
+  action_execute(1);
 }
 
 
@@ -5611,7 +5595,7 @@ void MainWindow::action_debug_refresh_variables()
   }
   if (debug_call_xxxmdbug_command("refresh variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.variables");
-  emit action_execute();
+  action_execute(1);
 }
 
 
@@ -5626,7 +5610,7 @@ void MainWindow::action_debug_refresh_call_stack()
   }
   if (debug_call_xxxmdbug_command("refresh call_stack") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.call_stack");
-  emit action_execute();
+  action_execute(1);
 }
 
 
@@ -6052,78 +6036,140 @@ void* dbms_long_next_result_thread(void* unused)
   return ((void*) NULL);
 }
 
+void MainWindow::action_execute_force()
+{
+  action_execute(1);
+}
 
 /*
-  For menu item "execute" we said (...SLOT(action_execute())));
+  For menu item "execute" we said (...SLOT(action_execute(1))));
   By default this is on and associated with File|Execute menu item.
   Execute what's in the statement widget.
   The statement widget might contain multiple statements.
 */
-void MainWindow::action_execute()
+int MainWindow::action_execute(int force)
 {
   QString text;
-  int returned_begin_count;
-  main_token_number= 0;
-  text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
-  /*
-    We probably call hparse_f_multi_block continuously during statement edit,
-    but this redundancy is harmless (we're not short of time, eh?).
-  */
-  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_ERRORS) != 0)
-  {
-    hparse_f_multi_block(text);
-    if (hparse_errno != 0)
-    {
-      QString s;
-      QMessageBox msgbox;
-      s= "The Syntax Checker thinks there might be a syntax error. ";
-      s.append(hparse_errmsg);
-      msgbox.setText(s);
-      msgbox.setInformativeText("Do you want to continue?");
-      msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-      msgbox.setDefaultButton(QMessageBox::Yes);
-      if (msgbox.exec() == QMessageBox::No) return;
-    }
-  }
-
-  /* While executing, we allow no more statements, but a few things are enabled. */
-  /* This makes the menu seem to blink. If that's not OK, turn off sub-items not main menu items. */
-  menu_file->setEnabled(false);
-  menu_edit->setEnabled(false);
-  menu_run_action_execute->setEnabled(false);
-  if (ocelot_sigint_ignore == 0) menu_run_action_kill->setEnabled(true);
-  menu_settings->setEnabled(false);
-  menu_debug->setEnabled(false);
-  menu_help->setEnabled(false);
-  statement_edit_widget->setReadOnly(true);
-  is_kill_requested= false;
   for (;;)
   {
+    int returned_begin_count;
+    main_token_number= 0;
+    text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
+
     main_token_count_in_statement= get_next_statement_in_string(main_token_number,
                                                                 &returned_begin_count,
                                                                 true);
     if (main_token_count_in_statement == 0) break;
+
+    /* If the next statement is unfinished, we usually want to ignore it. */
+    if ((force == 0) && (is_statement_complete(text) == false)) return 1;
+
+    /*
+      We probably call hparse_f_multi_block continuously during statement edit,
+      but this redundancy is harmless (we're not short of time, eh?).
+      This checks for errors in the whole string, not just the first statement.
+    */
+    if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_ERRORS) != 0)
+    {
+      hparse_f_multi_block(text);
+      if (hparse_errno != 0)
+      {
+        QString s;
+        QMessageBox msgbox;
+        s= "The Syntax Checker thinks there might be a syntax error. ";
+        s.append(hparse_errmsg);
+        msgbox.setText(s);
+        msgbox.setInformativeText("Do you want to continue?");
+        msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        msgbox.setDefaultButton(QMessageBox::Yes);
+        if (msgbox.exec() == QMessageBox::No) return 1;
+      }
+    }
+
+    /* While executing, we allow no more statements, but a few things are enabled. */
+    /* This makes the menu seem to blink. If that's not OK, turn off sub-items not main menu items. */
+    menu_file->setEnabled(false);
+    menu_edit->setEnabled(false);
+    menu_run_action_execute->setEnabled(false);
+    if (ocelot_sigint_ignore == 0) menu_run_action_kill->setEnabled(true);
+    menu_settings->setEnabled(false);
+    menu_debug->setEnabled(false);
+    menu_help->setEnabled(false);
+    statement_edit_widget->setReadOnly(true);
+    is_kill_requested= false;
+
     action_execute_one_statement(text);
 
-    main_token_number+= main_token_count_in_statement;
+    menu_file->setEnabled(true);
+    menu_edit->setEnabled(true);
+    menu_run_action_execute->setEnabled(true);
+    menu_run_action_kill->setEnabled(false);
+    menu_settings->setEnabled(true);
+    menu_debug->setEnabled(true);
+    menu_help->setEnabled(true);
+    statement_edit_widget->setReadOnly(false);
+    /*
+      In remove_statement there is a removeSelectedText() call, which
+      causes action_statement_edit_widget_text_changed() -- twice.
+      We only want it to happen once, so we'll control it ourselves.
+      Importantly, it will call tokenize() and hparse_f_multi_block()
+      so main_token_... variables will all change.
+      Todo: check again, I think the above statement might be false.
+    */
+    statement_edit_widget_text_changed_flag= 1;
+    remove_statement(text);
+    statement_edit_widget_text_changed_flag= 0;
+    action_statement_edit_widget_text_changed();
+    //widget_sizer();
+    /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
+    history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
+
+    history_edit_widget->show(); /* Todo: find out if this is really necessary */
     if (is_kill_requested == true) break;
   }
-  menu_file->setEnabled(true);
-  menu_edit->setEnabled(true);
-  menu_run_action_execute->setEnabled(true);
-  menu_run_action_kill->setEnabled(false);
-  menu_settings->setEnabled(true);
-  menu_debug->setEnabled(true);
-  menu_help->setEnabled(true);
-  statement_edit_widget->setReadOnly(false);
+  return 0;
+}
 
-  statement_edit_widget->clear(); /* ?? this is supposed to be a slot. does that matter? */
-  widget_sizer();
+/*
+  Remove the first statement in statement_edit_widget,
+  including any whitespace after the statement end.
+  This is equivalent to statement_edit_widget->clear() if there is only one statement.
+  But when a user has cut-and-pasted several statements, we execute one at a time.
+  There are other ways to do this e.g. clear() followed by insertText().
+  Unanswered question: do we want to clear undo/redo history?
+  Unanswered question: do we want to clear selection?
+  Unanswered question: do we want to move the visible cursor?
+*/
+void MainWindow::remove_statement(QString text)
+{
+  //statement_edit_widget->clear(); /* ?? this is supposed to be a slot. does that matter? */
 
-  /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
-  history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
+  QTextCursor q= statement_edit_widget->textCursor();
 
-  history_edit_widget->show(); /* Todo: find out if this is really necessary */
+  int offset_of_statement_end= 0;
+
+  if (main_token_count_in_statement > 0)
+  {
+    offset_of_statement_end= main_token_offsets[main_token_count_in_statement - 1]
+                             + main_token_lengths[main_token_count_in_statement - 1];
+  }
+
+  for (;;)
+  {
+    QString c= text.mid(offset_of_statement_end, 1);
+    if (c == "") break;
+    if (c > " ") break;\
+    ++offset_of_statement_end;
+  }
+
+  q.setPosition(0, QTextCursor::MoveAnchor);
+  q.setPosition(offset_of_statement_end, QTextCursor::KeepAnchor);
+  q.removeSelectedText();
+
+
+  //q.select(QTextCursor::LineUnderCursor);
+
+  //statement_edit_widget->textCursor().insertText(text);
 }
 
 /*
@@ -6189,7 +6235,8 @@ void MainWindow::action_execute_one_statement(QString text)
   else query_utf16_copy= query_utf16;
 
   statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch(); /* will be used for elapsed-time display */
-  int ecs= execute_client_statement(text);
+  int additional_result= 0;
+  int ecs= execute_client_statement(text, &additional_result);
 
   if (ecs != 1)
   {
@@ -6427,9 +6474,10 @@ void MainWindow::action_execute_one_statement(QString text)
   }
 
   /* statement is over */
-
-  history_markup_append("", true); /* add prompt+statement+result to history, with markup */
-
+  if (additional_result != TOKEN_KEYWORD_SOURCE)
+  {
+    history_markup_append("", true); /* add prompt+statement+result to history, with markup */
+  }
 }
 
 
@@ -6447,7 +6495,7 @@ void MainWindow::action_execute_one_statement(QString text)
         and "q| is case sensitive.
 */
 
-int MainWindow::execute_client_statement(QString text)
+int MainWindow::execute_client_statement(QString text, int *additional_result)
 {
 //  int i= 0;
   int i2= 0;
@@ -6606,7 +6654,6 @@ int MainWindow::execute_client_statement(QString text)
     /* Todo: this gets rid of SOURCE statement, but maybe it should be a comment in history. */
     statement_edit_widget->clear();
     QByteArray source_line;
-    /* TODO: BUG: This puts the final line into the history TWICE. */
     /* TODO: Would it be good if we could abort source statements with ^C? */
     /* TODO: Check for io error / premature eof */
     /* TODO: This is skipping comment lines and blank lines, that's probably unnecessary. */
@@ -6620,10 +6667,12 @@ int MainWindow::execute_client_statement(QString text)
       if ((s != "") && (s.mid(0,1) != "#") && (s.mid(0,2) != "--"))
       {
         statement_edit_widget->insertPlainText(s);
-        execute_if_statement_end(false);
+        action_execute(0);
      }
     }
     file.close();
+    /* Without the following, the final line of source would go into the history twice. */
+    *additional_result= TOKEN_KEYWORD_SOURCE;
     return 1;
   }
 
@@ -7463,7 +7512,6 @@ void MainWindow::put_diagnostics_in_result()
         if (mysql_warning_count > 1) s1.append("s");
       }
     }
-    //printf("info=%s.\n", lmysql->ldbms_mysql_info(&mysql));
     s1.append(elapsed_time_string);
     if (mysql_warning_count > 0)
     {
@@ -15841,6 +15889,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   }
   else if ((calling_statement_type == TOKEN_KEYWORD_FUNCTION) && (hparse_f_accept(TOKEN_KEYWORD_RETURN, "RETURN") == 1))
   {
+    hparse_subquery_is_allowed= true;
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
