@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: February 22 2016
+   Last modified: February 26 2016
 */
 
 /*
@@ -990,35 +990,60 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 }
 
 
+/*
+  We want to know: do we have a complete statement at the string start.
+  So we find out how many tokens are in the (first) statement.
+  We go forward to find the first non-comment token, the statement type.
+  We go backward to find the final non-comment token, the ; or delimiter -- or not.
+  Using these, and knowing what is ocelot_delimiter_str, we can decide if it's complete.
+  We also check for \G or \g.
+*/
+
 bool MainWindow::is_statement_complete(QString text)
 {
+  int number_of_tokens_in_statement= 0;
+  int returned_begin_count= 0;
+  int i= 0;
+  int first_token_type= -1;
+  //int last_token_type= -1;
+  QString first_token= "";
+  QString last_token= "";
+  QString second_last_token= "";
+  number_of_tokens_in_statement= get_next_statement_in_string(0, &returned_begin_count, false);
+  for (i= 0; i < number_of_tokens_in_statement; ++i)
+  {
+    int t= main_token_types[i];
+    if (t == TOKEN_TYPE_COMMENT_WITH_SLASH) continue;
+    if (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE) continue;
+    if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
+    first_token_type= t;
+    first_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    break;
+  }
+  for (i= number_of_tokens_in_statement - 1; i >= 0; --i)
+  {
+    int t= main_token_types[i];
+    if (t == TOKEN_TYPE_COMMENT_WITH_SLASH) continue;
+    if (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE) continue;
+    if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
+    //last_token_type= t;
+    last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    if (i > 0) second_last_token= text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]);
+    break;
+  }
+
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
   /* Todo: Check: does this mean that a client statement cannot be spread over two lines? */
-    if (is_client_statement(main_statement_type) == true)
+  if (is_client_statement(first_token_type) == true)
   {
     return true;
   }
 
-  int i= 0;
-  while (main_token_lengths[i] != 0) ++i;
-  QString s= "";
-  /*
-    Todo: I think the following was written before there was detection of reserved words + Ocelot keywords.
-    If so, token_type() doesn't need to be invoked, because main_token_types[] has the result already.
-  */
-  while (i > 0)
-  {
-    --i;
-    s= text.mid(main_token_offsets[i], main_token_lengths[i]);
-    int t= token_type(s.data(), main_token_lengths[i]);
-    if (t == TOKEN_TYPE_COMMENT_WITH_SLASH) continue;
-    if (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE) continue;
-    if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
-    break;
-  }
   /* "go" or "ego", alone on the line, if --named-commands, is statement end */
+  /* Todo: but these are client statements so we won't ever get here */
+  /* Todo: I forget why we care. */
   if ((ocelot_named_commands > 0)
-  && ((main_token_types[i] == TOKEN_KEYWORD_GO) || (main_token_types[i] == TOKEN_KEYWORD_EGO)))
+  && ((first_token_type == TOKEN_KEYWORD_GO) || (first_token_type == TOKEN_KEYWORD_EGO)))
   {
     QString q;
     for (int i_off= main_token_offsets[i] - 1;; --i_off)
@@ -1034,20 +1059,35 @@ bool MainWindow::is_statement_complete(QString text)
   }
 
   /* if create-routine && count-of-ENDs == count-of-BEGINS then ; is the end else ; is not the end */
-  int returned_begin_count;
   if (ocelot_delimiter_str != ";") returned_begin_count= 0;
   else
   {
     get_next_statement_in_string(0, &returned_begin_count, false);
-    if ((returned_begin_count == 0) && (QString::compare(s, ";", Qt::CaseInsensitive) == 0))
+    if (returned_begin_count == 0)
     {
-      return true;
+      if (QString::compare(last_token, ";", Qt::CaseInsensitive) == 0)
+      {
+        return true;
+      }
+      if (QString::compare(last_token, "G", Qt::CaseInsensitive) == 0)
+      {
+        if (QString::compare(second_last_token, "\\", Qt::CaseInsensitive) == 0)
+        {
+          return true;
+        }
+      }
     }
   }
 
-  if (s != ocelot_delimiter_str) return false;
+  if (last_token != ocelot_delimiter_str)
+  {
+    return false;
+  }
 
-  if (returned_begin_count > 0) return false;
+  if (returned_begin_count > 0)
+  {
+    return false;
+  }
 
   /* All conditions have been met. Tell caller to Execute, and eat the return key. */
   return true;
@@ -3142,7 +3182,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
 {
   int i;
   int begin_count;
-  QString last_token;
+  QString last_token, second_last_token;
   QString text;
   int i_of_first_non_comment_seen= -1;
 
@@ -3213,8 +3253,10 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   else
   {
     bool is_maybe_in_compound_statement= 0;
+    last_token= "";
     for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
     {
+      second_last_token= last_token;
       last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
       if (QString::compare(ocelot_delimiter_str, ";") != 0)
       {
@@ -3222,6 +3264,11 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
         {
           ++i; break;
         }
+      }
+      if ((QString::compare(last_token, "G", Qt::CaseInsensitive) == 0)
+       && (QString::compare(second_last_token, "\\", Qt::CaseInsensitive) == 0))
+      {
+        ++i; break;
       }
       if ((QString::compare(last_token, ";") == 0) && (begin_count == 0))
       {
@@ -6097,7 +6144,6 @@ int MainWindow::action_execute(int force)
     menu_help->setEnabled(false);
     statement_edit_widget->setReadOnly(true);
     is_kill_requested= false;
-
     action_execute_one_statement(text);
 
     menu_file->setEnabled(true);
@@ -6123,7 +6169,6 @@ int MainWindow::action_execute(int force)
     //widget_sizer();
     /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
     history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
-
     history_edit_widget->show(); /* Todo: find out if this is really necessary */
     if (is_kill_requested == true) break;
   }
@@ -15966,8 +16011,15 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_text_copy= text;
     hparse_begin_seen= false;
     hparse_like_seen= false;
+    hparse_token_type= 0;
+    hparse_next_token= "";
+    hparse_next_next_token= "";
+    hparse_next_token_type= 0;
+    hparse_next_next_token_type= 0;
+    hparse_prev_token= "";
+    hparse_subquery_is_allowed= false;
     if (hparse_i == -1) hparse_f_nexttoken();
-    if (hparse_f_client_statement() == 1) return;
+    if (hparse_f_client_statement() == 1) continue; /* ?? rather than "return"? */
     if (hparse_errno > 0) return;
 #ifdef DBMS_MARIADB
     if (hparse_dbms == "mariadb")
@@ -16093,22 +16145,41 @@ void MainWindow::hparse_f_other()
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to fail */
       if (hparse_errno > 0) return;
     }
-    for (;;)
+  }
+  for (;;)
+  {
+    if (main_token_lengths[hparse_i] == 0) break;
+    main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
+    main_token_types[hparse_i]= hparse_token_type= TOKEN_TYPE_LITERAL;
+    //if (main_token_lengths[hparse_i + 1] == 0)
+    //{
+    //  break;
+    //}
+    bool line_break_seen= false;
+    for (int i_off= main_token_offsets[hparse_i] + main_token_lengths[hparse_i];; ++i_off)
     {
-      main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
-      main_token_types[hparse_i] = hparse_token_type= TOKEN_TYPE_LITERAL;
-      if (main_token_lengths[hparse_i + 1] == 0)
+      if (i_off >= main_token_offsets[hparse_i + 1]) break;
+      QString q= hparse_text_copy.mid(i_off, 1);
+      if ((q == "\n") || (q == "\r"))
       {
+        line_break_seen= true;
         break;
       }
-      if (main_token_offsets[hparse_i] + main_token_lengths[hparse_i]
-         < main_token_offsets[hparse_i + 1])
-      {
-        break;
-      }
+    }
+    if (line_break_seen == true)
+    {
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
       if (hparse_errno > 0) return;
+      break;
     }
+
+    //if (main_token_offsets[hparse_i] + main_token_lengths[hparse_i]
+    //   < main_token_offsets[hparse_i + 1])
+    //{
+    //  break;
+    //}
+    hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
+    if (hparse_errno > 0) return;
   }
 }
 
