@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: February 26 2016
+   Last modified: February 28 2016
 */
 
 /*
@@ -13575,47 +13575,63 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_CHANGE;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER") == 1)
     {
+      if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "TO");
       if (hparse_errno > 0) return;
       do
       {
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_BIND")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_HOST")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_USER")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_PASSWORD")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_PORT")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_CONNECT_RETRY")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_RETRY_COUNT")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_DELAY")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_HEARTBEAT_PERIOD")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_FILE")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_POS")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_AUTO_POSITION")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_FILE")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_POS")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CA")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CAPATH")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CERT")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CRL")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CRLPATH")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_KEY")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CIPHER")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_VERIFY_SERVER_CERT")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_TLS_VERSION")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE_SERVER_IDS"))
+        if (((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DO_DOMAIN_IDS") == 1))
+         || ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE_DOMAIN_IDS") == 1))
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE_SERVER_IDS") == 1))
         {
           hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
           hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
           if (hparse_errno > 0) return;
           do
           {
-            if (hparse_f_literal() == 0) hparse_f_error();
+            hparse_f_literal(); /* this allows "()" */
             if (hparse_errno > 0) return;
           } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
           hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
           if (hparse_errno > 0) return;
         }
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_AUTO_POSITION")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_BIND")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_CONNECT_RETRY")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_DELAY"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_HEARTBEAT_PERIOD")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_HOST")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_FILE")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_POS")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_PASSWORD")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_PORT")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_RETRY_COUNT"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL"))
+        {
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
+          if (hparse_errno > 0) return;
+        }
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CA")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CAPATH")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CERT")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CIPHER")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CRL")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_CRLPATH")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_KEY")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL_VERIFY_SERVER_CERT"))
+        {
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
+          if (hparse_errno > 0) return;
+        }
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_USER")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_USE_GTID"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_TLS_VERSION"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_FILE")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_POS")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else hparse_f_error();
         if (hparse_errno > 0) return;
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
@@ -14737,9 +14753,26 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_RESET;
     do
     {
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER") == 1) {;}
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER") == 1)
+      {
+        if (hparse_dbms == "mariadb")
+        {
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TO") == 1)
+          {
+            hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+            if (hparse_errno > 0) return;
+          }
+        }
+      }
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY_CACHE") == 1) {;}
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1) {;}
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
+      {
+        if (hparse_dbms == "mariadb")
+        {
+          hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
+          hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL");
+        }
+      }
       else hparse_f_error();
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
@@ -15429,9 +15462,19 @@ void MainWindow::hparse_f_statement()
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GROUP_REPLICATION") == 1) {;}
+    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1))
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SLAVES");
+      if (hparse_errno > 0) return;
+      do
+      {
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IO_THREAD") == 1) {;}
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_THREAD") == 1) {;}
+      } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
+    }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
     {
-      /* TODO: MARIADB SYNTAX FOR START SLAVE DOES NOT LOOK LIKE THIS */
+      if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
       do
       {
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IO_THREAD") == 1) {;}
@@ -15439,54 +15482,78 @@ void MainWindow::hparse_f_statement()
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNTIL") == 1)
       {
-        bool expect_gtid_set= false, expect_log_name= false, expect_log_pos= false;
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_BEFORE_GTIDS") == 1) expect_gtid_set= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_AFTER_GTIDS") == 1) expect_gtid_set= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_FILE") == 1) expect_log_name= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_POS") == 1) expect_log_pos= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_FILE") == 1) expect_log_name= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_POS") == 1) expect_log_pos= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_AFTER_MTS_GAPS") == 1) {;}
-        else hparse_f_error();
-        if (hparse_errno > 0) return;
-        if ((expect_gtid_set) || (expect_log_name) || (expect_log_pos)) hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
-        if (hparse_errno > 0) return;
-        if (expect_gtid_set == true)
-        {
-          do
-          {
-            if ((hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == true)
-             || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == true)
-             || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "-") == true)
-             || (hparse_f_accept(TOKEN_TYPE_OPERATOR, ":") == true))
-              {;}
-            else hparse_f_error();
-            if (hparse_errno > 0) return;
-          } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
-        }
-        else if (expect_log_name == true) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-        else if (expect_log_pos == true) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-        if (hparse_errno > 0) return;
-      }
-      for (;;)
-      {
-        bool expect_something= false;
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER") == 1) expect_something= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PASSWORD") == 1) expect_something= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT_AUTH") == 1) expect_something= true;
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PLUGIN_DIR") == 1) expect_something= true;
-        else break;
-        if (hparse_errno > 0) return;
-        if (expect_something)
+        if ((hparse_dbms == "mysql")
+         && ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_BEFORE_GTIDS") == 1)
+          || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_AFTER_GTIDS") == 1)
+          || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_AFTER_MTS_GAPS") == 1)))
         {
           hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
           if (hparse_errno > 0) return;
           hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
           if (hparse_errno > 0) return;
         }
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_FILE") == 1)
+        {
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, ",");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "MASTER_LOG_POS");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+        }
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_FILE") == 1)
+        {
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, ",");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "RELAY_LOG_POS");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+        }
+        else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_GTID_POS") == 1))
+        {
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+        }
+        else hparse_f_error();
+        if (hparse_errno > 0) return;
       }
-      hparse_f_for_channel();
-      if (hparse_errno > 0) return;
+      if (hparse_dbms == "mysql")
+      {
+        for (;;)
+        {
+          bool expect_something= false;
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER") == 1) expect_something= true;
+          else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PASSWORD") == 1) expect_something= true;
+          else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT_AUTH") == 1) expect_something= true;
+          else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PLUGIN_DIR") == 1) expect_something= true;
+          else break;
+          if (hparse_errno > 0) return;
+          if (expect_something)
+          {
+            hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+            if (hparse_errno > 0) return;
+            hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+            if (hparse_errno > 0) return;
+          }
+        }
+        hparse_f_for_channel();
+        if (hparse_errno > 0) return;
+      }
     }
     else hparse_f_error();
   }
@@ -15494,17 +15561,24 @@ void MainWindow::hparse_f_statement()
   {
     hparse_statement_type= TOKEN_KEYWORD_STOP;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GROUP_REPLICATION") == 1) {;}
+    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SLAVES");
+      if (hparse_errno > 0) return;
+    }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
     {
+      if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1)) {;}
       do
       {
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IO_THREAD") == 1) {;}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_THREAD") == 1) {;}
-        else hparse_f_error();
-        if (hparse_errno > 0) return;
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
-      hparse_f_for_channel();
-      if (hparse_errno > 0) return;
+      if (hparse_dbms == "mysql")
+      {
+        hparse_f_for_channel();
+        if (hparse_errno > 0) return;
+      }
     }
     else hparse_f_error();
   }
