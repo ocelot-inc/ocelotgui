@@ -349,6 +349,7 @@ public:
   int hparse_f_default(int);
   int hparse_f_user_name();
   int hparse_f_character_set_name();
+  int hparse_f_collation_name();
   int hparse_f_qualified_name();
   int hparse_f_qualified_name_with_star();
   int hparse_f_table_references();
@@ -371,11 +372,13 @@ public:
   void hparse_f_parenthesized_multi_expression(int*);
   void hparse_f_like_or_where();
   void hparse_f_from_or_like_or_where();
+  void hparse_f_infile_or_outfile();
   void hparse_f_show_columns();
   void hparse_f_if_not_exists();
   void hparse_f_indexes_or_keys();
   void hparse_f_alter_or_create_clause(int,unsigned short int*,bool*);
   int hparse_f_semicolon_and_or_delimiter(int);
+  int hparse_f_explainable_statement();
   void hparse_f_statement();
   void hparse_f_assignment(int);
   void hparse_f_alter_table();
@@ -408,7 +411,7 @@ public:
   void hparse_f_interval_quantity(int);
   void hparse_f_alter_or_create_event(int);
   void hparse_f_alter_or_create_server(int);
-  void hparse_f_require(int,bool);
+  void hparse_f_require(int,bool,bool);
   void hparse_f_user_specification_list();
   void hparse_f_create_database();
   void hparse_f_index_columns(int,bool,bool);
@@ -417,7 +420,7 @@ public:
   void hparse_f_call();
   void hparse_f_commit_or_rollback();
   void hparse_f_explain_or_describe();
-  void hparse_f_grant_or_revoke(int);
+  void hparse_f_grant_or_revoke(int,bool*);
   void hparse_f_insert_or_replace();
   void hparse_f_condition_information_item_name();
   int hparse_f_signal_or_resignal();
@@ -429,7 +432,7 @@ public:
   void hparse_f_block(int);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
-  void hparse_f_other();
+  void hparse_f_other(int);
   int hparse_f_client_statement();
 
 #ifdef DBMS_TARANTOOL

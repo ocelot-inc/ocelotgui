@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: February 28 2016
+   Last modified: March 2 2016
 */
 
 /*
@@ -8302,7 +8302,7 @@ void MainWindow::tokens_to_keywords(QString text)
     "RELEASE*",
     "RENAME*",
     "REPEAT*",
-    "REPLACE",
+    "REPLACE*",
     "REQUIRE*",
     "RESIGNAL*",
     "RESTRICT*",
@@ -9267,9 +9267,10 @@ void MainWindow::hparse_f_nexttoken()
 /*
   Lookahead.
   Call this if you want to know what the next symbol is, but don't want to get it.
-  This is used in only three places, to see whether ":" follows (which could indicate a label),
+  This is used in only four places, to see whether ":" follows (which could indicate a label),
   and to see whether next is "." and next_next is "*" (as in a select-list),
-  and to see whether NOT is the beginning of NOT LIKE.
+  and to see whether NOT is the beginning of NOT LIKE,
+  and to see whether the word following GRANT ROLE is TO.
 */
 void MainWindow::hparse_f_next_nexttoken()
 {
@@ -9390,6 +9391,7 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
     if (proposed_type == TOKEN_TYPE_KEYWORD)
     {
       if (main_token_types[hparse_i] >= TOKEN_TYPE_KEYWORD) {;}
+      else if (token == "[introducer]") {;}
       else main_token_types[hparse_i]= proposed_type;
     }
     else main_token_types[hparse_i]= proposed_type;
@@ -9519,9 +9521,23 @@ int MainWindow::hparse_f_user_name()
     }
     return 1;
   }
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CURRENT_USER") == 1)
+  {
+    if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "(") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+      if (hparse_errno > 0) return 0;
+    }
+    return 1;
+  }
   return 0;
 }
 
+/*
+  It's possible for a user to define a new character set, but
+  we only check the official names. An undocumented "feature"
+  is that users can pass a string literal, we won't check it.
+*/
 int MainWindow::hparse_f_character_set_name()
 {
   if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "ARMSCII8") == 1)
@@ -9566,7 +9582,16 @@ int MainWindow::hparse_f_character_set_name()
    || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UTF8") == 1)
    || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UTF8MB4") == 1))
     return 1;
-  else return 0;
+  if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) return 1;
+  return 0;
+}
+
+/* Todo: someday check collation names the way we check character set names. */
+int MainWindow::hparse_f_collation_name()
+{
+  if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
+  if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) return 1;
+  return 0;
 }
 
 /*
@@ -9691,6 +9716,7 @@ int MainWindow::hparse_f_table_reference(int who_is_calling)
         [[AS] alias] [index_hint_list]
    | table_subquery [AS] alias
    | ( table_references ) */
+/* Undocumented detail: alias can be a literal instead of an identifier. Ugly. */
 int MainWindow::hparse_f_table_factor()
 {
   if (hparse_f_qualified_name() == 1)
@@ -9699,10 +9725,15 @@ int MainWindow::hparse_f_table_factor()
     if (hparse_errno > 0) return 0;
     if (hparse_f_accept(TOKEN_KEYWORD_AS, "AS") == 1)
     {
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+        hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return 0;
     }
-    else hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    else
+    {
+      if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+        hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
+    }
     hparse_f_table_index_hint_list();
     if (hparse_errno > 0) return 0;
     return 1;
@@ -10552,7 +10583,10 @@ void MainWindow::hparse_f_expression_list(int who_is_calling)
       hparse_f_expect(TOKEN_TYPE_OPERATOR, ".");
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "*");
     }
-    else hparse_f_opr_1();
+    else
+    {
+      hparse_f_opr_1();
+    }
     if (hparse_errno > 0) return;
     if (who_is_calling == TOKEN_KEYWORD_SELECT)
     {
@@ -10810,7 +10844,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
     return;
@@ -10844,7 +10878,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
     {
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
     return;
@@ -11104,7 +11138,7 @@ void MainWindow::hparse_f_alter_database()
       {
         collate_seen= true;
         if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "=")) {;}
-        hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
         continue;
       }
@@ -11271,7 +11305,7 @@ void MainWindow::hparse_f_character_set_or_collate()
   else if (hparse_errno > 0) return;
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
   {
-    hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_f_collation_name() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
 }
@@ -11472,7 +11506,7 @@ int MainWindow::hparse_f_data_type()
     if (hparse_errno > 0) return 0;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
     {
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return 0;
     }
     return TOKEN_KEYWORD_CHAR;
@@ -11483,7 +11517,7 @@ int MainWindow::hparse_f_data_type()
     if (hparse_errno > 0) return 0;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
     {
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return 0;
     }
     return TOKEN_KEYWORD_CHAR;
@@ -11501,7 +11535,7 @@ int MainWindow::hparse_f_data_type()
     if (hparse_errno > 0) return 0;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
     {
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return 0;
     }
     return TOKEN_KEYWORD_CHAR;
@@ -11756,6 +11790,16 @@ void MainWindow::hparse_f_column_definition()
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
+    if (hparse_dbms == "mariadb")
+    {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
+        hparse_f_accept(TOKEN_TYPE_KEYWORD, "PERSISTENT");
+    }
+    if (hparse_dbms == "mysql")
+    {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
+        hparse_f_accept(TOKEN_TYPE_KEYWORD, "STORED");
+    }
   }
   bool null_seen= false, default_seen= false, auto_increment_seen= false;
   bool unique_seen= false, primary_seen= false, comment_seen= false, column_format_seen= false;
@@ -11913,7 +11957,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
     else if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "COMMENT") == 1))
@@ -11955,7 +11999,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
       {
         hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
-        hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        if (hparse_f_collation_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
       else hparse_f_error();
@@ -12267,15 +12311,15 @@ int MainWindow::hparse_f_partition_list(bool is_parenthesized, bool is_maybe_all
       hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
       if (hparse_errno > 0) return 0;
     }
-    if (is_maybe_all)
+    if ((is_maybe_all) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1)) {;}
+    else
     {
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1) return 1;
+      do
+      {
+        if (hparse_f_qualified_name() == 0) hparse_f_error();
+        if (hparse_errno > 0) return 0;
+      } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     }
-    do
-    {
-      if (hparse_f_qualified_name() == 0) hparse_f_error();
-      if (hparse_errno > 0) return 0;
-    } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     if (is_parenthesized)
     {
       hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
@@ -12460,7 +12504,7 @@ void MainWindow::hparse_f_create_database()
     else if ((collate_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_f_collation_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
       collate_seen= true;
     }
@@ -12598,7 +12642,7 @@ void MainWindow::hparse_f_alter_or_create_server(int statement_type)
 
 /* The REQUIRE clause in GRANT and in CREATE USER after MySQL 5.7.6 */
 /* + the resource_option clause */
-void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen)
+void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen, bool role_name_seen)
 {
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REQUIRE") == 1)
   {
@@ -12628,7 +12672,16 @@ void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen)
   {
     for (;;)
     {
-      if ((who_is_calling == TOKEN_KEYWORD_GRANT) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GRANT") == 1))
+      if ((who_is_calling == TOKEN_KEYWORD_GRANT)
+       && (role_name_seen == false)
+       && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GRANT") == 1))
+      {
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "OPTION");
+        if (hparse_errno > 0) return;
+      }
+      else if ((who_is_calling == TOKEN_KEYWORD_GRANT)
+       && (role_name_seen == true)
+       && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ADMIN") == 1))
       {
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "OPTION");
         if (hparse_errno > 0) return;
@@ -12772,19 +12825,17 @@ void MainWindow::hparse_f_explain_or_describe()
          || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "%") == 1)) continue;
         break;
       }
+      return;
     }
-    return;
   }
-  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FOR") == 1)
+  if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FOR") == 1))
   {
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "CONNNECTION");
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
     return;
   }
-  /* TODO: We have to check if statement is SELECT|INSERT|DELETE|REPLACE|UPDATE. */
-  /*       That requires look-ahead! ... Or a flag of allowed statements. */
-  hparse_f_statement();
+  hparse_f_explainable_statement();
   if (hparse_errno > 0) return;
 }
 
@@ -12794,22 +12845,26 @@ void MainWindow::hparse_f_explain_or_describe()
    if they're not there then everything must not be role names.
    Todo: I'm unsure about GRANT|REVOKE PROXY
    is_maybe_all is for check of REVOKE_ALL_PRIVILEGES,GRANT OPTION
+
+   We need lookahead here to check for GRANT token TO|ON, but if token is
+   a role we don't need to worry about GRANT role [, role...] -- see
+   https://jira.mariadb.org/browse/MDEV-5772. Affect non-reserved words are:
+   event, execute, file, proxy, reload, replication, server, shutdown.
 */
-void MainWindow::hparse_f_grant_or_revoke(int who_is_calling)
+void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_seen)
 {
+  *role_name_seen= false;
   if (hparse_dbms == "mariadb")
   {
-    bool role_name_seen= false;
-    do
+    hparse_f_next_nexttoken();
+    if (hparse_next_token.toUpper() != "ON")
     {
-      if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+      if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) /* possible role name? */
       {
-        role_name_seen= true;
+        *role_name_seen= true;
+        return;
       }
-      else if (role_name_seen == true) hparse_f_error();
-      if (hparse_errno > 0) return;
-    } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
-    if (role_name_seen == true) return;
+    }
   }
   bool is_maybe_all= false;
   do
@@ -12980,6 +13035,7 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling)
       }
     }
   } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
+
   hparse_f_expect(TOKEN_TYPE_KEYWORD, "ON");
   if (hparse_errno > 0) return;
   if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE") == 1)
@@ -13094,7 +13150,9 @@ int MainWindow::hparse_f_into()
     {
       if (hparse_f_literal() == 0) hparse_f_error();
       if (hparse_errno > 0) return 0;
-      /* todo: CHARACTER SET character-set-name and export_options */
+      /* CHARACTER SET character-set-name and export_options */
+      hparse_f_infile_or_outfile();
+      if (hparse_errno > 0) return 0;
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DUMPFILE") == 1)
     {
@@ -13174,7 +13232,8 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
       {
         hparse_f_opr_1();
         if (hparse_errno > 0) return 0;
-        if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "ASC") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEC") == 1)) {;}
+        if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "ASC") == 1)
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DESC") == 1)) {;}
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WITH") == 1)
       {
@@ -13274,6 +13333,66 @@ void MainWindow::hparse_f_from_or_like_or_where()
     if (hparse_errno > 0) return;
   }
   hparse_f_like_or_where();
+}
+
+/* SELECT ... INTO OUTFILE and LOAD DATA INFILE have a similar clause. */
+void MainWindow::hparse_f_infile_or_outfile()
+{
+  if (hparse_f_character_set() == 1)
+  {
+    if (hparse_f_character_set_name() == 0) hparse_f_error();
+    if (hparse_errno > 0) return;
+  }
+  if (hparse_errno > 0) return;
+
+  if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "FIELDS") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLUMNS") == 1))
+  {
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TERMINATED") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
+      if (hparse_errno > 0) return;
+      if (hparse_f_literal() == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+    bool optionally_seen= false;
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OPTIONALLY") == 1) optionally_seen= true;
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCLOSED") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
+      if (hparse_errno > 0) return;
+      if (hparse_f_literal() == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+    else if (optionally_seen == true)
+    {
+      hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ESCAPED") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
+      if (hparse_errno > 0) return;
+      if (hparse_f_literal() == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+  }
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LINES") == 1)
+  {
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STARTING") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
+      if (hparse_errno > 0) return;
+      if (hparse_f_literal() == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TERMINATED") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
+      if (hparse_errno > 0) return;
+      if (hparse_f_literal() == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+  }
 }
 
 void MainWindow::hparse_f_show_columns()
@@ -13429,6 +13548,53 @@ int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
   else return (hparse_f_accept(TOKEN_TYPE_OPERATOR, ";"));
 }
 
+/*
+  For EXPLAIN and perhaps for ANALYZE, we want to accept only a
+  statement that would legal therein. So check if that's what follows,
+  if it is then call hparse_f_statement, if it's not then call
+  hparse_f_accept which is guaranteed to fail.
+  Return 1 if it was a statement, else return 0 (which might also mean error).
+*/
+int MainWindow::hparse_f_explainable_statement()
+{
+  QString hparse_token_upper= hparse_token.toUpper();
+  if (hparse_dbms == "mysql")
+  {
+    if ((hparse_token_upper == "DELETE")
+     || (hparse_token_upper == "INSERT")
+     || (hparse_token_upper == "REPLACE")
+     || (hparse_token_upper == "SELECT")
+     || (hparse_token_upper == "UPDATE"))
+    {
+      hparse_f_statement();
+      if (hparse_errno > 0) return 0;
+      return 1;
+    }
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "DELETE");
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "INSERT");
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "REPLACE");
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "SELECT");
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "UPDATE");
+    return 0;
+  }
+  else if (hparse_dbms == "mariadb")
+  {
+    if ((hparse_token_upper == "DELETE")
+     || (hparse_token_upper == "SELECT")
+     || (hparse_token_upper == "UPDATE"))
+    {
+      hparse_f_statement();
+      if (hparse_errno > 0) return 0;
+      return 1;
+    }
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "DELETE");
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "SELECT");
+    hparse_f_accept(TOKEN_TYPE_KEYWORD, "UPDATE");
+    return 0;
+  }
+  return 0;
+}
+
 /* TODO: I THINK I'M FORGETTING TO SAY return FOR A LOT OF MAIN STATEMENTS! */
 /*
 statement =
@@ -13472,6 +13638,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "KEY");
       if (hparse_errno > 0) return;
     }
+    /* TODO: ALTER LOGFILE GROUP is not supported */
     else if ((((hparse_flags) & HPARSE_FLAG_ROUTINE) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PROCEDURE") == 1))
     {
       if (hparse_f_qualified_name() == 0) hparse_f_error();
@@ -13507,7 +13674,7 @@ void MainWindow::hparse_f_statement()
       }
       hparse_f_user_specification_list();
       if (hparse_errno > 0) return;
-      hparse_f_require(TOKEN_KEYWORD_ALTER, false);
+      hparse_f_require(TOKEN_KEYWORD_ALTER, false, false);
       if (hparse_errno > 0) return;
     }
     else if ((((hparse_flags) & HPARSE_FLAG_VIEW) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW") == 1))
@@ -13520,6 +13687,11 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ANALYZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
+    if (hparse_dbms == "mariadb")
+    {
+      if (hparse_f_explainable_statement() == 1) return;
+      if (hparse_errno > 0) return;
+    }
     hparse_f_analyze_or_optimize();
     if (hparse_errno > 0) return;
   }
@@ -13936,7 +14108,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_user_specification_list();
       if (hparse_errno > 0) return;
-      hparse_f_require(TOKEN_KEYWORD_CREATE, false);
+      hparse_f_require(TOKEN_KEYWORD_CREATE, false, false);
       if (hparse_errno > 0) return;
     }
     else if (((hparse_flags & HPARSE_FLAG_VIEW) != 0) && (hparse_f_accept(TOKEN_KEYWORD_VIEW, "VIEW") == 1))
@@ -13998,6 +14170,14 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_limit();
       if (hparse_errno > 0) return;
+      if (hparse_dbms == "mariadb")
+      {
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RETURNING") == 1)
+        {
+          hparse_f_expression_list(TOKEN_KEYWORD_SELECT);
+          if (hparse_errno > 0) return;
+        }
+      }
       return;
     }
     if (hparse_errno > 0) return;
@@ -14038,11 +14218,18 @@ void MainWindow::hparse_f_statement()
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     return;
   }
-  else if (hparse_f_accept(TOKEN_KEYWORD_DROP, "DROP"))
+  else if (hparse_f_accept(TOKEN_KEYWORD_DROP, "DROP"))         /* drop database/event/etc. */
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_DROP;
-    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DATABASE"))
+    bool temporary_seen= false, online_seen= false;
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TEMPORARY") == 1) temporary_seen= true;
+    if ((temporary_seen == false) && (hparse_dbms == "mariadb"))
+    {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ONLINE") == 1) online_seen= true;
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OFFLINE") == 1) online_seen= true;
+    }
+    if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DATABASE")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14052,7 +14239,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EVENT"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EVENT")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14062,7 +14249,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FUNCTION"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FUNCTION")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14072,7 +14259,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX"))
+    else if ((temporary_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14087,25 +14274,13 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_algorithm_or_lock();
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OR") == 1)
-    {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "REPLACE");
-      if (hparse_errno > 0) return;
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW") == 1)
-      {
-        hparse_f_alter_or_create_view();
-        if (hparse_errno > 0) return;
-      }
-      else hparse_f_error();
-      /* TODO: Handle all the other CREATE [OR REPLACE] possibilities. */
-    }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PREPARE"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PREPARE")))
     {
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
       return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PROCEDURE"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PROCEDURE")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14115,7 +14290,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ROLE")== 1))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ROLE")== 1))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14128,7 +14303,7 @@ void MainWindow::hparse_f_statement()
         if (hparse_errno > 0) return;
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SCHEMA"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SCHEMA")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14138,7 +14313,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SERVER"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SERVER")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14148,7 +14323,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE"))
+    else if ((online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14167,7 +14342,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_accept(TOKEN_TYPE_KEYWORD, "CASCADE");
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLESPACE"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLESPACE")))
     {
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
@@ -14178,7 +14353,7 @@ void MainWindow::hparse_f_statement()
         hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
       }
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TRIGGER"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TRIGGER")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14188,7 +14363,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER"))
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER")))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14201,9 +14376,8 @@ void MainWindow::hparse_f_statement()
         if (hparse_errno > 0) return;
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     }
-    else
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW")))
     {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "VIEW");
       if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -14222,6 +14396,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_accept(TOKEN_TYPE_KEYWORD, "CASCADE");
       if (hparse_errno > 0) return;
     }
+    else hparse_f_error();
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_EXECUTE, "EXECUTE"))
   {
@@ -14247,7 +14422,40 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_FLUSH;
     if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "NO_WRITE_TO_BINLOG") == 1)
      || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCAL") == 1)) {;}
-    do
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLES") == 1)
+    {
+      bool table_name_seen= false, comma_seen= false;
+      for (;;)
+      {
+        if (hparse_f_qualified_name() == 0)
+        {
+          if (hparse_errno > 0) return;
+          if (comma_seen == true) hparse_f_error();
+          if (hparse_errno > 0) return;
+          break;
+        }
+        table_name_seen= true;
+        comma_seen= false;
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, ","))
+        {
+          comma_seen= true;
+          continue;
+        }
+      }
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WITH") == 1)
+      {
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "READ");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "LOCK");
+        if (hparse_errno > 0) return;
+      }
+      else if ((table_name_seen == true) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FOR") == 1))
+      {
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "EXPORT");
+        if (hparse_errno > 0) return;
+      }
+    }
+    else do
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "BINARY") == 1)
       {
@@ -14273,7 +14481,11 @@ void MainWindow::hparse_f_statement()
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "HOSTS") == 1) {;}
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OPTIMIZER_COSTS") == 1) {;}
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PRIVILEGES") == 1) {;}
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY_CACHE") == 1) {;}
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY") == 1)
+      {
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "CACHE");
+        if (hparse_errno > 0) return;
+      }
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY") == 1)
       {
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "LOGS");
@@ -14287,7 +14499,6 @@ void MainWindow::hparse_f_statement()
         if (hparse_errno > 0) return;
       }
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STATUS") == 1) {;}
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLES") == 1) {;}
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER_RESOURCES") == 1) {;}
       else hparse_f_error();
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
@@ -14326,6 +14537,7 @@ void MainWindow::hparse_f_statement()
   {
     hparse_statement_type= TOKEN_KEYWORD_GRANT;
     bool proxy_seen= false;
+    bool role_name_seen= false;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PROXY") == 1)
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "ON");
@@ -14336,14 +14548,14 @@ void MainWindow::hparse_f_statement()
     }
     else
     {
-      hparse_f_grant_or_revoke(TOKEN_KEYWORD_GRANT);
+      hparse_f_grant_or_revoke(TOKEN_KEYWORD_GRANT, &role_name_seen);
       if (hparse_errno > 0) return;
     }
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "TO");
     if (hparse_errno > 0) return;
     hparse_f_user_specification_list();
     if (hparse_errno > 0) return;
-    hparse_f_require(TOKEN_KEYWORD_GRANT, proxy_seen);
+    hparse_f_require(TOKEN_KEYWORD_GRANT, proxy_seen, role_name_seen);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_HANDLER, "HANDLER"))
@@ -14420,10 +14632,21 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_INSTALL, "INSTALL") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_INSTALL;
-    hparse_f_expect(TOKEN_TYPE_KEYWORD, "PLUGIN");
-    if (hparse_errno > 0) return;
-    hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
+    if (hparse_dbms == "mysql")
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "PLUGIN");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
+    else if (hparse_dbms == "mariadb")
+    {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
+      {
+        hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        if (hparse_errno > 0) return;
+      }
+    }
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "SONAME");
     if (hparse_errno > 0) return;
     if (hparse_f_literal() == 0) hparse_f_error();
@@ -14432,7 +14655,17 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_KILL, "KILL"))
   {
     hparse_statement_type= TOKEN_KEYWORD_KILL;
-    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CONNECTION") == 0) hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY");
+    if (hparse_dbms == "mariadb")
+    {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "HARD") == 0) hparse_f_accept(TOKEN_TYPE_KEYWORD, "SOFT");
+    }
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CONNECTION") == 0)
+    {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY") == 1)
+      {
+        if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_KEYWORD, "ID");
+      }
+    }
     if (hparse_f_literal() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
@@ -14460,60 +14693,8 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_partition_list(true, false);
       if (hparse_errno > 0) return;
-      if (hparse_f_character_set() == 1)
-      {
-        if (hparse_f_character_set_name() == 0) hparse_f_error();
-        if (hparse_errno > 0) return;
-      }
+      hparse_f_infile_or_outfile();
       if (hparse_errno > 0) return;
-      if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "FIELDS") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLUMNS") == 1))
-      {
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TERMINATED") == 1)
-        {
-          hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
-          if (hparse_errno > 0) return;
-          if (hparse_f_literal() == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
-        bool optionally_seen= false;
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OPTIONALLY") == 1) optionally_seen= true;
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCLOSED") == 1)
-        {
-          hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
-          if (hparse_errno > 0) return;
-          if (hparse_f_literal() == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
-        else if (optionally_seen == true)
-        {
-          hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ESCAPED") == 1)
-        {
-          hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
-          if (hparse_errno > 0) return;
-          if (hparse_f_literal() == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
-      }
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LINES") == 1)
-      {
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STARTING") == 1)
-        {
-          hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
-          if (hparse_errno > 0) return;
-          if (hparse_f_literal() == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TERMINATED") == 1)
-        {
-          hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
-          if (hparse_errno > 0) return;
-          if (hparse_f_literal() == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
-      }
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE") == 1)
       {
         if (hparse_f_literal() == 0) hparse_f_error();
@@ -14536,6 +14717,7 @@ void MainWindow::hparse_f_statement()
         hparse_f_assignment(TOKEN_KEYWORD_LOAD);
         if (hparse_errno > 0) return;
       }
+
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX") == 1)
     {
@@ -14547,22 +14729,26 @@ void MainWindow::hparse_f_statement()
       {
         if (hparse_f_qualified_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
-        if (hparse_f_partition_list(false, true) == 0) hparse_f_error();
+        hparse_f_partition_list(true, true);
         if (hparse_errno > 0) return;
-      } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
-      if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "KEY") == 1))
-      {
-        do
+        if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "KEY") == 1))
         {
-          if (hparse_f_qualified_name() == 0) hparse_f_error();
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
           if (hparse_errno > 0) return;
-        } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
-      }
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE") == 1)
-      {
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "LEAVES");
-        if (hparse_errno > 0) return;
-      }
+          do
+          {
+            if (hparse_f_qualified_name() == 0) hparse_f_error();
+            if (hparse_errno > 0) return;
+          } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+          if (hparse_errno > 0) return;
+        }
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE") == 1)
+        {
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "LEAVES");
+          if (hparse_errno > 0) return;
+        }
+      } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "XML") == 1)
     {
@@ -14787,6 +14973,7 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REVOKE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_REVOKE;
+    bool role_name_seen= false;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PROXY") == 1)
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "ON");
@@ -14796,7 +14983,7 @@ void MainWindow::hparse_f_statement()
     }
     else
     {
-      hparse_f_grant_or_revoke(TOKEN_KEYWORD_REVOKE);
+      hparse_f_grant_or_revoke(TOKEN_KEYWORD_REVOKE, &role_name_seen);
       if (hparse_errno > 0) return;
     }
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "FROM");
@@ -14887,7 +15074,7 @@ void MainWindow::hparse_f_statement()
       }
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE"))
       {
-        if (hparse_f_literal() == 0) hparse_f_error();
+        if (hparse_f_collation_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
       return;
@@ -14919,7 +15106,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE"))
       {
-        if (hparse_f_literal() == 0) hparse_f_error();
+        if (hparse_f_collation_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
       return;
@@ -14958,6 +15145,16 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       return;
     }
+    if ((hparse_dbms == "mariadb") && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STATEMENT") == 1))
+    {
+      hparse_f_assignment(TOKEN_KEYWORD_SET);
+      if (hparse_errno > 0) return;
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOR");
+      if (hparse_errno > 0) return;
+      hparse_f_statement();
+      if (hparse_errno > 0) return;
+      return;
+    }
     /* TODO: This fails to take "set autocommit = {0 | 1}" into account as special. */
     /* TODO: This fails to take "set sql_log_bin = {0 | 1}" into account as special. */
     hparse_f_assignment(TOKEN_KEYWORD_SET);
@@ -14966,7 +15163,14 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_SHOW, "SHOW") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_SHOW;
-    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AUTHORS") == 1) {;} /* removed in MySQL 5.6.8 */
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SLAVES");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "STATUS");
+      if (hparse_errno > 0) return;
+    }
+    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AUTHORS") == 1) {;} /* removed in MySQL 5.6.8 */
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "BINARY") == 1)
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "LOGS");
@@ -15050,6 +15254,13 @@ void MainWindow::hparse_f_statement()
         if (hparse_f_qualified_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
+      else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXPLAIN") == 1))
+      {
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOR");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+        if (hparse_errno > 0) return;
+      }
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FUNCTION") == 1)
       {
         if (hparse_f_qualified_name() == 0) hparse_f_error();
@@ -15128,12 +15339,18 @@ void MainWindow::hparse_f_statement()
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOR");
       if (hparse_errno > 0) return;
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "[literal]");
+      hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_errno > 0) return;
+    }
+    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FIELDS") == 1) /* show columns */
+    {
+      hparse_f_show_columns();
       if (hparse_errno > 0) return;
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FULL") == 1) /* show full [columns|tables|etc.] */
     {
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLUMNS") == 1)
+      if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLUMNS") == 1)
+       || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FIELDS") == 1))
       {
         hparse_f_show_columns();
         if (hparse_errno > 0) return;
@@ -15159,11 +15376,19 @@ void MainWindow::hparse_f_statement()
         if (hparse_errno > 0) return;
       }
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GLOBAL") == 1) /* show global [status] */
+    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GLOBAL") == 1) /* show global ... */
     {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "STATUS");
-      if (hparse_errno > 0) return;
-      hparse_f_like_or_where();
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STATUS") == 1)
+      {
+        hparse_f_like_or_where();
+        if (hparse_errno > 0) return;
+      }
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VARIABLES") == 1)
+      {
+        hparse_f_like_or_where();
+        if (hparse_errno > 0) return;
+      }
+      else hparse_f_error();
       if (hparse_errno > 0) return;
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GRANTS") == 1) /* show grants */
@@ -15302,6 +15527,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAYLOG") == 1) /* show relaylog */
     {
+      if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "EVENTS");
       if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IN") == 1)
@@ -15337,22 +15563,28 @@ void MainWindow::hparse_f_statement()
         hparse_f_like_or_where();
         if (hparse_errno > 0) return;
       }
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VARIABLES") == 1)
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VARIABLES") == 1)
       {
         hparse_f_like_or_where();
         if (hparse_errno > 0) return;
       }
+      else hparse_f_error();
+      if (hparse_errno > 0) return;
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1) /* show slave */
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "HOSTS") == 1) {;}
       else
       {
+        if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "STATUS");
         if (hparse_errno > 0) return;
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NONBLOCKING") == 1) {;}
-        hparse_f_for_channel();
-        if (hparse_errno > 0) return;
+        if (hparse_dbms == "mysql")
+        {
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NONBLOCKING") == 1) {;}
+          hparse_f_for_channel();
+          if (hparse_errno > 0) return;
+        }
       }
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STATUS") == 1) /* show status */
@@ -15408,11 +15640,11 @@ void MainWindow::hparse_f_statement()
         }
       }
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSEP_MEMBERSHIP") == 1))
+    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSREP_MEMBERSHIP") == 1))
     {
       ;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSEP_STATUS") == 1))
+    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSREP_STATUS") == 1))
     {
       ;
     }
@@ -15641,12 +15873,6 @@ void MainWindow::hparse_f_statement()
       hparse_f_limit();
       if (hparse_errno > 0) return;
     }
-  }
-  else if (hparse_f_accept(TOKEN_KEYWORD_USE, "USE"))
-  {
-    hparse_statement_type= TOKEN_KEYWORD_USE;
-    if (hparse_f_qualified_name() == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_XA, "XA"))
   {
@@ -16093,7 +16319,11 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_prev_token= "";
     hparse_subquery_is_allowed= false;
     if (hparse_i == -1) hparse_f_nexttoken();
-    if (hparse_f_client_statement() == 1) continue; /* ?? rather than "return"? */
+    if (hparse_f_client_statement() == 1)
+    {
+      if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
+      continue; /* ?? rather than "return"? */
+    }
     if (hparse_errno > 0) return;
 #ifdef DBMS_MARIADB
     if (hparse_dbms == "mariadb")
@@ -16203,7 +16433,8 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
     The string that follows is the new delimiter, but the rest of the line is ignored.
   DELIMITER causes new rules! Everything following as far as " " is delimiter-string.
 */
-void MainWindow::hparse_f_other()
+/* flag values: 1 means "; marks end" */
+void MainWindow::hparse_f_other(int flags)
 {
   if ((main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
    || (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
@@ -16223,6 +16454,14 @@ void MainWindow::hparse_f_other()
   for (;;)
   {
     if (main_token_lengths[hparse_i] == 0) break;
+    if (((flags&1) == 1) && (main_token_lengths[hparse_i] == 1))
+    {
+      if (hparse_text_copy.mid(main_token_offsets[hparse_i], 1) == ";")
+      {
+        hparse_f_accept(TOKEN_TYPE_OPERATOR, ";");
+        break;
+      }
+    }
     main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
     main_token_types[hparse_i]= hparse_token_type= TOKEN_TYPE_LITERAL;
     //if (main_token_lengths[hparse_i + 1] == 0)
@@ -16287,7 +16526,7 @@ int MainWindow::hparse_f_client_statement()
   else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(TOKEN_KEYWORD_CONNECT, "CONNECT") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
   {
-    hparse_f_other();
+    hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(TOKEN_KEYWORD_EDIT, "EDIT") == 1)) {;}
@@ -16386,13 +16625,17 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
   {
-    hparse_f_other();
+    hparse_f_other(0);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(TOKEN_KEYWORD_STATUS, "STATUS") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(TOKEN_KEYWORD_TEE, "TEE") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(TOKEN_KEYWORD_USE, "USE") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(TOKEN_KEYWORD_USE, "USE") == 1))
+  {
+    hparse_f_other(1);
+    if (hparse_errno > 0) return 0;
+  }
   else if ((slash_token == TOKEN_KEYWORD_WARNINGS) || (hparse_f_accept(TOKEN_KEYWORD_WARNINGS, "WARNINGS")) == 1) {;}
   else if (hparse_token.mid(0, 1) == "$")
   {
