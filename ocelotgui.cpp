@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: March 2 2016
+   Last modified: March 4 2016
 */
 
 /*
@@ -550,6 +550,7 @@ static const char *s_color_list[308]=
   QString hparse_prev_token;
   bool hparse_like_seen;
   bool hparse_subquery_is_allowed;
+  QString hparse_delimiter_str;
 
 int main(int argc, char *argv[])
 {
@@ -6525,6 +6526,43 @@ void MainWindow::action_execute_one_statement(QString text)
   }
 }
 
+/*
+  We see "DELIMITER".
+  If the thing that follows is 'literal' or "literal" or `identifier`: that's the delimiter.
+  Otherwise delimiter is what follows as far as next whitespace or eof or ;
+  DELIMITER ; means "go back to the default i.e. ;".
+  This is called from hparse_f_client_statement() because it affects parse of later statements.
+  This is called from execute_client_statement() because DELIMITER is a client statement.
+  One difference from mysql client:
+    If mysql client sees "DELIMITER <return>" or "DELIMITER ''" it's an error.
+    But we consider that equivalent to "DELIMITER ;"
+  We return ";" if nothing follows or quoted blank string follows; mysql client would say error.
+*/
+QString MainWindow::get_delimiter(QString token, QString text, int offset)
+{
+  QString token_to_return;
+  if ((token.mid(0, 1) == "`") || (token.mid(0, 1) == "'") || (token.mid(0, 1) == "\""))
+  {
+    token_to_return= connect_stripper(token, false);
+  }
+  else
+  {
+    token_to_return= "";
+    for (int i= offset;; ++i)
+    {
+      QString c= text.mid(i, 1);
+      if (c <= " ") break;
+      if (c == ";")
+      {
+        if (token_to_return == "") token_to_return= ";";
+        break;
+      }
+      token_to_return.append(c);
+    }
+  }
+  return token_to_return;
+}
+
 
 /*
  Handle "client statements" -- statements that the client itself executes.
@@ -6760,19 +6798,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   /* DELIMITER or \d: mysql equivalent. */
   if (statement_type == TOKEN_KEYWORD_DELIMITER)
   {
-    if (sub_token_lengths[1] == 0)
+    QString s= text.mid(sub_token_offsets[1], sub_token_lengths[1]);
+    QString s_result= get_delimiter(s, text, sub_token_offsets[1]);
+    if (s_result == "")
     {
       put_message_in_result(tr("Error, delimiter should not be blank"));
       return 1;
     }
-    /* delimiter = rest of string except lead/trail whitespace */
-    QString s;
-    unsigned statement_length= true_text_size /* text.size() */;
-    s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
-//        if (s.contains("/")) {
-//            put_message_in_result(tr("Error, delimiter should not contain slash"));
-//            return 1; }
-    ocelot_delimiter_str= s.trimmed(); /* Todo: probably trimmed() isn't necessary, but make sure */
+    ocelot_delimiter_str= s_result;
     put_message_in_result(tr("OK"));
     return 1;
     }
@@ -9323,6 +9356,16 @@ void MainWindow::hparse_f_error()
 }
 
 /*
+  Merely saying "if (hparse_token == 'x') ..." till we saw delimiter usually is not =.
+*/
+bool MainWindow::hparse_f_is_equal(QString hparse_token_copy, QString token)
+{
+  if (hparse_token_copy == hparse_delimiter_str) return false;
+  if (hparse_token_copy == token) return true;
+  return false;
+}
+
+/*
   accept means: if current == expected then clear list of what was expected, get next, and return 1,
                 else add to list of what was expected, and return 0
 */
@@ -9330,7 +9373,19 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
 {
   if (hparse_errno > 0) return 0;
   bool equality= false;
-  if (token == "[identifier]")
+  if (token == "[eof]")
+  {
+    if (hparse_token.length() == 0)
+    {
+      equality= true;
+    }
+  }
+  else if ((hparse_token == hparse_delimiter_str) && (hparse_delimiter_str != ";"))
+  {
+    if ((hparse_token == token) && (proposed_type == TOKEN_TYPE_DELIMITER)) equality= true;
+    else equality= false;
+  }
+  else if (token == "[identifier]")
   {
     if ((hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
      || (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_AT)
@@ -9360,13 +9415,6 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
       equality= true;
     }
   }
-  else if (token == "[eof]")
-  {
-    if (hparse_token.length() == 0)
-    {
-      equality= true;
-    }
-  }
   else if (token == "[column identifier]")
   {
     /* Todo: This should be a simple matter of checking whether it's really an identifier. */
@@ -9390,8 +9438,7 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
     */
     if (proposed_type == TOKEN_TYPE_KEYWORD)
     {
-      if (main_token_types[hparse_i] >= TOKEN_TYPE_KEYWORD) {;}
-      else if (token == "[introducer]") {;}
+      if (main_token_types[hparse_i] >= TOKEN_KEYWORDS_START) {;}
       else main_token_types[hparse_i]= proposed_type;
     }
     else main_token_types[hparse_i]= proposed_type;
@@ -10120,7 +10167,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
     return;
   }
   int expression_count= 0;
-  if (hparse_token == "(") hparse_f_parenthesized_multi_expression(&expression_count);
+  if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
   else hparse_f_opr_8();
   if (hparse_errno > 0) return;
   for (;;)
@@ -10134,7 +10181,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LIKE") == 1)
     {
       hparse_like_seen= true;
-      if (hparse_token == "(") hparse_f_parenthesized_multi_expression(&expression_count);
+      if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
       else hparse_f_opr_8();
       hparse_like_seen= false;
       break;
@@ -10193,7 +10240,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
           continue;
         }
       }
-      if (hparse_token == "(") hparse_f_parenthesized_multi_expression(&expression_count);
+      if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
       else hparse_f_opr_8();
       if (hparse_errno > 0) return;
       continue;
@@ -10441,13 +10488,15 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
 */
 void MainWindow::hparse_f_function_arguments(QString opd)
 {
-  if ((opd == "AVG") || (opd == "MIN") || (opd == "MAX"))
+  if ((hparse_f_is_equal(opd,"AVG"))
+   || (hparse_f_is_equal(opd, "MIN"))
+   || (hparse_f_is_equal(opd, "MAX")))
   {
     hparse_f_accept(TOKEN_TYPE_KEYWORD, "DISTINCT");
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
   }
-  else if (opd == "CAST")
+  else if (hparse_f_is_equal(opd, "CAST"))
   {
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
@@ -10456,7 +10505,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     hparse_f_data_type();
     if (hparse_errno > 0) return;
   }
-  else if (opd == "CHAR")
+  else if (hparse_f_is_equal(opd, "CHAR"))
   {
     do
     {
@@ -10470,7 +10519,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
   }
-  else if (opd == "CONVERT")
+  else if (hparse_f_is_equal(opd, "CONVERT"))
   {
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
@@ -10479,7 +10528,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
   }
-  else if (opd == "IF")
+  else if (hparse_f_is_equal(opd, "IF"))
   {
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
@@ -10492,7 +10541,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
   }
-  else if (opd == "COUNT")
+  else if (hparse_f_is_equal(opd, "COUNT"))
   {
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DISTINCT") == 1) hparse_f_opr_1();
     else
@@ -10502,7 +10551,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     }
     if (hparse_errno > 0) return;
   }
-  else if ((opd == "SUBSTR") || (opd == "SUBSTRING"))
+  else if ((hparse_f_is_equal(opd, "SUBSTR")) || (hparse_f_is_equal(opd, "SUBSTRING")))
   {
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
@@ -10517,7 +10566,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
       }
     }
   }
-  else if (opd == "TRIM")
+  else if (hparse_f_is_equal(opd, "TRIM"))
   {
     if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "BOTH") == 1)
      || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LEADING") == 1)
@@ -10530,7 +10579,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
       if (hparse_errno > 0) return;
     }
   }
-  else if (opd == "WEIGHT_STRING")
+  else if (hparse_f_is_equal(opd, "WEIGHT_STRING"))
   {
     hparse_f_opr_1();
     if (hparse_errno > 0) return;
@@ -10569,15 +10618,14 @@ void MainWindow::hparse_f_function_arguments(QString opd)
 
 void MainWindow::hparse_f_expression_list(int who_is_calling)
 {
-  do
   {
     if (who_is_calling == TOKEN_KEYWORD_SELECT) hparse_f_next_nexttoken();
     if (hparse_errno > 0) return;
     if (hparse_f_default(who_is_calling) == 1) {;}
     else if ((who_is_calling == TOKEN_KEYWORD_SELECT) && (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "*") == 1)) {;}
     else if ((who_is_calling == TOKEN_KEYWORD_SELECT)
-          && (hparse_next_token == ".")
-          && (hparse_next_next_token == "*")
+          && (hparse_f_is_equal(hparse_next_token, "."))
+          && (hparse_f_is_equal(hparse_next_next_token, "*"))
           && (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]")))
     {
       hparse_f_expect(TOKEN_TYPE_OPERATOR, ".");
@@ -13539,10 +13587,10 @@ int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
   {
     if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ";") == 1)
     {
-      hparse_f_accept(TOKEN_TYPE_OPERATOR, ocelot_delimiter_str);
+      hparse_f_accept(TOKEN_TYPE_DELIMITER, hparse_delimiter_str);
       return 1;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ocelot_delimiter_str) == 1) return 1;
+    else if (hparse_f_accept(TOKEN_TYPE_DELIMITER, hparse_delimiter_str) == 1) return 1;
     return 0;
   }
   else return (hparse_f_accept(TOKEN_TYPE_OPERATOR, ";"));
@@ -15967,11 +16015,12 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     BEGIN could be the start of a BEGIN END block, but
     "BEGIN;" or "BEGIN WORK" are start-transaction statements.
     Ugly.
+    Todo: See what happens if next is \G or delimiter.
   */
   bool next_is_semicolon_or_work= false;
   hparse_f_next_nexttoken();
   if ((hparse_next_token == ";")
-   || (hparse_next_token == ocelot_delimiter_str)
+   || (hparse_next_token == hparse_delimiter_str)
    || (QString::compare(hparse_next_token, "WORK", Qt::CaseInsensitive) == true))
   {
     next_is_semicolon_or_work= true;
@@ -16265,7 +16314,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     hparse_f_statement();
     if (hparse_errno > 0) return;
     /* This kludge occurs more than once. */
-    if ((hparse_prev_token != ";") && (hparse_prev_token != ocelot_delimiter_str))
+    if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
     {
       if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
     }
@@ -16300,6 +16349,7 @@ void MainWindow::hparse_f_multi_block(QString text)
   }
   else hparse_dbms= ocelot_dbms;
   hparse_i= -1;
+  hparse_delimiter_str= ocelot_delimiter_str;
   for (;;)
   {
     hparse_offset_of_space_name= -1;
@@ -16340,13 +16390,13 @@ void MainWindow::hparse_f_multi_block(QString text)
         The best thing would be to eat properly. Till then, we'll kludge:
         if we've just seen ";", don't ask for it again.
       */
-      if ((hparse_prev_token != ";") && (hparse_prev_token != ocelot_delimiter_str))
+      if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
       {
         if (hparse_f_semicolon_and_or_delimiter(0) != 1) hparse_f_error();
       }
       if (hparse_errno > 0) return;
     }
-    //hparse_f_expect(TOKEN_TYPE_OPERATOR, "[eof]"); /* was: hparse_expect(TOKEN_KEYWORD_PERIOD); */
+    //hparse_f_expect(TOKEN_TYPE_OPERATOR, "[eof]");
     if (hparse_errno > 0) return;
     if (hparse_i > 0) main_token_flags[hparse_i - 1]= (main_token_flags[hparse_i - 1] | TOKEN_FLAG_IS_BLOCK_END);
     if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
@@ -16437,10 +16487,14 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
 void MainWindow::hparse_f_other(int flags)
 {
   if ((main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-   || (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
-   || (main_token_types[hparse_i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
+   || (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
   {
     hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
+    if (hparse_errno > 0) return;
+  }
+  else if (main_token_types[hparse_i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+  {
+    hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]"); /* guaranteed to succeed */
     if (hparse_errno > 0) return;
   }
   else
@@ -16526,7 +16580,14 @@ int MainWindow::hparse_f_client_statement()
   else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(TOKEN_KEYWORD_CONNECT, "CONNECT") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
   {
-    hparse_f_other(1);
+    QString tmp_delimiter= get_delimiter(hparse_token, hparse_text_copy, main_token_offsets[hparse_i]);
+    if (tmp_delimiter > " ")
+    {
+      hparse_delimiter_str= ";";
+      hparse_f_other(1);
+      hparse_delimiter_str= tmp_delimiter;
+    }
+    else hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(TOKEN_KEYWORD_EDIT, "EDIT") == 1)) {;}
@@ -16546,7 +16607,7 @@ int MainWindow::hparse_f_client_statement()
     {
       if ((main_token_lengths[hparse_i] == 0)
        || (hparse_token == ";")
-       || (hparse_token == ocelot_delimiter_str)) break;
+       || (hparse_token == hparse_delimiter_str)) break;
       main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
       main_token_types[hparse_i]= TOKEN_TYPE_OTHER;
       hparse_f_nexttoken();
@@ -16744,8 +16805,12 @@ int MainWindow::hparse_f_client_statement()
       hparse_f_opr_1();
       if (hparse_errno > 0) return 0;
     }
+    else return 0;
   }
-  else return 0;
+  else
+  {
+    return 0;
+  }
   return 1;
 }
 

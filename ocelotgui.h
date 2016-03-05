@@ -342,6 +342,7 @@ public:
   void hparse_f_nexttoken();
   void hparse_f_next_nexttoken();
   void hparse_f_error();
+  bool hparse_f_is_equal(QString,QString);
   int hparse_f_accept(int,QString);
   int hparse_f_acceptn(int,QString,int);
   int hparse_f_expect(int,QString);
@@ -558,6 +559,7 @@ private:
   int rehash_scan();
   void rehash_search(char *search_string);
   void widget_sizer();
+  QString get_delimiter(QString,QString,int);
   int execute_client_statement(QString text, int *additional_result);
   void put_diagnostics_in_result();
   void put_message_in_result(QString);
@@ -1003,7 +1005,8 @@ private:
     TOKEN_KEYWORD_SUPER= TOKEN_KEYWORD_STOP + 1,
     TOKEN_KEYWORD_UNINSTALL= TOKEN_KEYWORD_SUPER + 1,
     TOKEN_KEYWORD_USER= TOKEN_KEYWORD_UNINSTALL + 1,
-    TOKEN_KEYWORD_XA= TOKEN_KEYWORD_USER + 1
+    TOKEN_KEYWORD_XA= TOKEN_KEYWORD_USER + 1,
+    TOKEN_TYPE_DELIMITER= TOKEN_KEYWORD_XA + 1
   };
 
 /*
