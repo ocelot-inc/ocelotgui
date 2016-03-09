@@ -417,19 +417,19 @@ public:
   void hparse_f_create_database();
   void hparse_f_index_columns(int,bool,bool);
   void hparse_f_alter_or_create_view();
-  void hparse_f_analyze_or_optimize();
+  void hparse_f_analyze_or_optimize(int);
   void hparse_f_call();
   void hparse_f_commit_or_rollback();
   void hparse_f_explain_or_describe();
   void hparse_f_grant_or_revoke(int,bool*);
   void hparse_f_insert_or_replace();
   void hparse_f_condition_information_item_name();
-  int hparse_f_signal_or_resignal();
+  int hparse_f_signal_or_resignal(int);
   int hparse_f_into();
   int hparse_f_select(bool);
   void hparse_f_where();
   void hparse_f_order_by();
-  void hparse_f_limit();
+  void hparse_f_limit(int);
   void hparse_f_block(int);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
@@ -978,14 +978,17 @@ private:
     TOKEN_TYPE_KEYWORD= TOKEN_KEYWORD_DEBUG_TBREAKPOINT + 1,  /* generic, lots of keywords have this */
     TOKEN_KEYWORD_BEGIN_WORK= TOKEN_TYPE_KEYWORD + 1,         /* some non-reserved keywords */
     TOKEN_KEYWORD_BEGIN_XA= TOKEN_KEYWORD_BEGIN_WORK + 1,
-    TOKEN_KEYWORD_CLOSE= TOKEN_KEYWORD_BEGIN_XA + 1,
+    TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION= TOKEN_KEYWORD_BEGIN_XA + 1,
+    TOKEN_KEYWORD_CLOSE= TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION + 1,
     TOKEN_KEYWORD_COMMIT= TOKEN_KEYWORD_CLOSE + 1,
     TOKEN_KEYWORD_DEALLOCATE= TOKEN_KEYWORD_COMMIT + 1,
-    TOKEN_KEYWORD_EXECUTE= TOKEN_KEYWORD_DEALLOCATE + 1,
+    TOKEN_KEYWORD_END_IN_CASE_EXPRESSION= TOKEN_KEYWORD_DEALLOCATE + 1,
+    TOKEN_KEYWORD_EXECUTE= TOKEN_KEYWORD_END_IN_CASE_EXPRESSION + 1,
     TOKEN_KEYWORD_FILE= TOKEN_KEYWORD_EXECUTE + 1,
     TOKEN_KEYWORD_FLUSH= TOKEN_KEYWORD_FILE + 1,
     TOKEN_KEYWORD_HANDLER= TOKEN_KEYWORD_FLUSH + 1,
-    TOKEN_KEYWORD_INSTALL= TOKEN_KEYWORD_HANDLER + 1,
+    TOKEN_KEYWORD_IF_IN_IF_EXPRESSION= TOKEN_KEYWORD_HANDLER + 1,
+    TOKEN_KEYWORD_INSTALL= TOKEN_KEYWORD_IF_IN_IF_EXPRESSION + 1,
     TOKEN_KEYWORD_NOW= TOKEN_KEYWORD_INSTALL + 1,
     TOKEN_KEYWORD_OPEN= TOKEN_KEYWORD_NOW + 1,
     TOKEN_KEYWORD_PREPARE= TOKEN_KEYWORD_OPEN + 1,
@@ -1027,7 +1030,7 @@ private:
 
   int token_type(QChar *token, int token_length);
 
-  void tokens_to_keywords(QString text);
+  void tokens_to_keywords(QString text, int start);
   void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text);
   int next_token(int i);
   bool is_client_statement(int);
