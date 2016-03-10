@@ -589,7 +589,7 @@ private:
   void make_style_strings();
   //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
-  int make_statement_ready_to_send(QString, QString, char *, int, bool);
+  int make_statement_ready_to_send(QString, char *, int);
   void remove_statement(QString);
   void action_execute_one_statement(QString text);
 

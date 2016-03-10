@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: March 8 2016
+   Last modified: March 9 2016
 */
 
 /*
@@ -1042,7 +1042,7 @@ bool MainWindow::is_statement_complete(QString text)
 
   /* "go" or "ego", alone on the line, if --named-commands, is statement end */
   /* Todo: but these are client statements so we won't ever get here */
-  /* Todo: I forget why we care. */
+  /* Todo: I forget why we care. Is it in fact because the token is \G or \g? */
   if ((ocelot_named_commands > 0)
   && ((first_token_type == TOKEN_KEYWORD_GO) || (first_token_type == TOKEN_KEYWORD_EGO)))
   {
@@ -3338,10 +3338,24 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
     delimiter_seen= true;
   }
 
-  /* If comment follows ; on the same line, then it's part of the statement. */
+  /*
+    If comment follows ; on the same line, then we'll take it as part of the statement.
+    But if it comes after delimiter other than ; then we won't take it as part of the
+    statement, because we have to strip delimiters before sending to the server,
+    and for that we expect the delimiter token to be the last token in the statement.
+    Todo: it might be better to not expect token to be the last token in the statement.
+    Todo: there might be more than one comment.
+  */
   bool comment_seen= false;
-  if ((i > 0) && (main_token_lengths[i] != 0) && (delimiter_seen == false)
-   && (text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]) != ocelot_delimiter_str))
+  if ((i > 0)
+   && (main_token_lengths[i] != 0)
+   && ((ocelot_delimiter_str == ";")
+    || (text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]) != ocelot_delimiter_str))
+   //&& ((i < 2)
+   // || (text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]).toUpper() != "G")
+   // || (text.mid(main_token_offsets[i - 2], main_token_lengths[i - 2]) != "\\"))
+          )
+
   {
     if ((main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_SLASH)
      || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
@@ -3366,11 +3380,10 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
 
 
 /*
-  Todo: This function should do something!
   Make statement ready to send to server: strip comments and delimiter, output UTF8.
   We have an SQL statement that's ready to go to the server.
   We have a guarantee that the result i.e. "char *query" is big enough.
-  Rremove comments if that's what the user requested with --skip-comments.
+  Rremove comments if that's what the user requested with --skip-comments which is default.
   Remove final token if it's delimiter but not ';'.
   Todo: there's a conversion to UTF8 but it should be to what server expects.
   Todo: um, in that case, make server expect UTF8.
@@ -3382,52 +3395,64 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
     Comments should be replaced with a single space.
     Do not strip comments that start with / * ! or / * M !
 */
-int MainWindow::make_statement_ready_to_send(QString text, QString query_utf16_copy,
-                                             char *dbms_query, int dbms_query_len,
-                                             bool strip_last_token)
+int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int dbms_query_len)
 {
-  if (ocelot_comments > 0)
-  {
-    memcpy(dbms_query, query_utf16_copy.toUtf8().constData(),dbms_query_len);
-    dbms_query[dbms_query_len]= 0;
-    return dbms_query_len;
-  }
   int token_type;
   unsigned int i;
   QString q;
   char *tmp;
   int tmp_len;
-  unsigned int token_count;
+  //unsigned int token_count;
   dbms_query[0]= '\0';
-  /* Ignore last token(s) if delimiter, \G, \g, or (sometimes) go, ego */
-  if (strip_last_token == true)
-  {
-    int last_i= main_token_number + main_token_count_in_statement - 1;
-    QString last_token= text.mid(main_token_offsets[last_i], main_token_lengths[last_i]);
-    if ((last_token == "G") || (last_token == "g"))
-    {
-      token_count= main_token_count_in_statement - 2;
-    }
-    else token_count= main_token_count_in_statement - 1;
-  }
-  else token_count= main_token_count_in_statement;
-  for (i= main_token_number; i < main_token_number + token_count; ++i)
+  ///* Ignore last token(s) if delimiter, \G, \g, or (sometimes) go, ego */
+  //if (strip_last_token == true)
+  //{
+  //  int last_i= main_token_number + main_token_count_in_statement - 1;
+  //  QString last_token= text.mid(main_token_offsets[last_i], main_token_lengths[last_i]);
+  //  if ((last_token == "G") || (last_token == "g"))
+  //  {
+  //    token_count= main_token_count_in_statement - 2;
+  //  }
+  //  else token_count= main_token_count_in_statement - 1;
+  //}
+  //else token_count= main_token_count_in_statement;
+  //token_count= main_token_count_in_statement;
+
+  for (i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
   {
     token_type= main_token_types[i];
-    if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
-     || (token_type == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-     || (token_type == TOKEN_TYPE_COMMENT_WITH_MINUS))
+    /* Don't send comments unless --comments or equivalent, or comment is / * special ... */
+    if (ocelot_comments == 0)
     {
-      if ((text.mid(main_token_offsets[i], 3) != "/*!")
-       && (text.mid(main_token_offsets[i], 4) != "/*M!"))
+      if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
+       || (token_type == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+       || (token_type == TOKEN_TYPE_COMMENT_WITH_MINUS))
       {
-        strcat(dbms_query," ");
-        continue;
+        if ((text.mid(main_token_offsets[i], 3) != "/*!")
+         && (text.mid(main_token_offsets[i], 4) != "/*M!"))
+        {
+          strcat(dbms_query," ");
+          continue;
+        }
       }
+    }
+    /* Don't send \G or \g */
+    if ((i < main_token_number - 1)
+     && (main_token_lengths[i + 1] == 1)
+     && (text.mid(main_token_offsets[i], 2).toUpper() == "\\G"))
+    {
+      ++i;
+      continue;
+    }
+    /* Don't send delimiter unless it is ; */
+    if ((ocelot_delimiter_str != ";")
+     && (text.mid(main_token_offsets[i], main_token_lengths[i]) == ocelot_delimiter_str))
+    {
+      continue;
     }
     /* Preserve whitespace after a token, unless this is the last token */
     int token_length;
-    if (i + 1 >= main_token_number + token_count) token_length= main_token_lengths[i];
+    if (i + 1 >= main_token_number + main_token_count_in_statement) token_length= main_token_lengths[i];
     else token_length= main_token_offsets[i + 1] - main_token_offsets[i];
     q= text.mid(main_token_offsets[i], token_length);
     tmp_len= q.toUtf8().size();           /* See comment "UTF8 Conversion" */
@@ -6264,6 +6289,7 @@ void MainWindow::action_execute_one_statement(QString text)
   }
 
   /* Strip last word if it's delimiter or (when --named-commands, not only token) go|ego. */
+  /* todo: this is obsolete now */
   if (last_token == ocelot_delimiter_str) strip_last_token= true;
   else if ((ocelot_named_commands > 0) && (main_token_count_in_statement > 1))
   {
@@ -6321,9 +6347,8 @@ void MainWindow::action_execute_one_statement(QString text)
           We work around it by allocating double what we need for dbms_query. */
       dbms_query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
       dbms_query= new char[(dbms_query_len + 1) * 2];
-      dbms_query_len= make_statement_ready_to_send(text, query_utf16_copy,
-                                                   dbms_query, dbms_query_len,
-                                                   strip_last_token);
+      dbms_query_len= make_statement_ready_to_send(text,
+                                                   dbms_query, dbms_query_len + 1);
 
       assert(strlen(dbms_query) < ((unsigned int) dbms_query_len + 1) * 2);
 
@@ -8624,10 +8649,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     if (s == QString("\\w")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_NOWARNING;
     if (s == QString("\\P")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PAGER;
     if (s == QString("\\p")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PRINT;
-    if (s == QString("\\R"))
-    {
-      main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PROMPT;
-    }
+    if (s == QString("\\R")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_PROMPT;
     if (s == QString("\\q")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_QUIT;
     if (s == QString("\\#")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_REHASH;
     if (s == QString("\\.")) main_statement_type= main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_SOURCE;
@@ -9386,6 +9408,20 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
     if ((hparse_token == token) && (proposed_type == TOKEN_TYPE_DELIMITER)) equality= true;
     else equality= false;
   }
+  else if (hparse_text_copy.mid(main_token_offsets[hparse_i], 2).toUpper() == "\\G")
+  {
+    /* \G and \g can act somewhat like delimiters. No change to hparse_expected list. */
+    if (proposed_type == TOKEN_TYPE_DELIMITER)
+    {
+      //main_token_types[hparse_i]= proposed_type;
+      //main_token_types[hparse_i + 1]= proposed_type;
+      hparse_expected= "";
+      hparse_f_nexttoken();
+      hparse_f_nexttoken();
+      return 1;
+    }
+    return 0;
+  }
   else if (token == "[identifier]")
   {
     if ((hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
@@ -9451,6 +9487,7 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
   hparse_expected.append(token);
   return 0;
 }
+
 
 /* A variant of hparse_f_accept for debugger keywords which can be shortened to n letters */
 /* TODO: are you checking properly for eof or ; ??? */
@@ -13657,9 +13694,13 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
   }
 }
 
-/* ; or (; + delimiter) or delimiter */
+/* ; or (; + delimiter) or delimiter or \G or \g */
 int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
 {
+  if (hparse_f_accept(TOKEN_TYPE_DELIMITER, "\\G") == 1)
+  {
+    return 1;
+  }
   /* TEST!! removed next line */
   if ((calling_statement_type == 0) || (calling_statement_type != 0))
   {
@@ -16486,7 +16527,7 @@ void MainWindow::hparse_f_multi_block(QString text)
         Even statements like "drop table e\Gdrop table y;" are supposed to be legal.
   Case sensitive.
   Checking for the first word of a client statement.
-  \? etc. are problems because (a) they're two tokens, (b) they'e case sensitive (c) they delimit.
+  \? etc. are problems because (a) they're two tokens, (b) they're case sensitive (c) they delimit.
   \ is a statement-end, and C is a statement.
   For highlighting, the \ is an operator and the C is a keyword.
   So this could actually be called from hparse_f_semicolon_or_delimiter.
@@ -16513,10 +16554,7 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
   else if (s == QString("w")) slash_token= TOKEN_KEYWORD_NOWARNING;
   else if (s == QString("P")) slash_token= TOKEN_KEYWORD_PAGER;
   else if (s == QString("p")) slash_token= TOKEN_KEYWORD_PRINT;
-  else if (s == QString("R"))
-  {
-    slash_token= TOKEN_KEYWORD_PROMPT;
-  }
+  else if (s == QString("R")) slash_token= TOKEN_KEYWORD_PROMPT;
   else if (s == QString("q")) slash_token= TOKEN_KEYWORD_QUIT;
   else if (s == QString("#")) slash_token= TOKEN_KEYWORD_REHASH;
   else if (s == QString(".")) slash_token= TOKEN_KEYWORD_SOURCE;
