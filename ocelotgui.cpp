@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: March 9 2016
+   Last modified: March 14 2016
 */
 
 /*
@@ -551,6 +551,7 @@ static const char *s_color_list[308]=
   bool hparse_like_seen;
   bool hparse_subquery_is_allowed;
   QString hparse_delimiter_str;
+  bool hparse_sql_mode_ansi_quotes= false;
 
 int main(int argc, char *argv[])
 {
@@ -638,22 +639,26 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   create_widget_debug();
 #endif
 
+  hparse_f_parse_hint_line_create();
+
   main_window= new QWidget(this);                  /* 2015-08-25 added "this" */
 
   /*
     Defaults for items that can be changed with Settings menu item.
     First we get current values, after processing of any Qt options on the command line.
     Then we make arbitrary colors for details that current values probably didn't supply.
+    The settings Red=string DarkGreen=Comment Green=object Blue=keyword DarkGray=operator
+    have been seen elsewhere, and also pink|magenta=built-in-function so keep that in reserve.
     Then we read option files.
   */
   set_current_colors_and_font(); /* set ocelot_statement_text_color, ocelot_grid_text_color, etc. */
   ocelot_statement_border_color= "black";
 
-  ocelot_statement_highlight_literal_color= "green";
-  ocelot_statement_highlight_identifier_color= "blue";
-  ocelot_statement_highlight_comment_color= "red";
-  ocelot_statement_highlight_operator_color= "lightGreen";
-  ocelot_statement_highlight_reserved_color= "magenta";
+  ocelot_statement_highlight_literal_color= "red";
+  ocelot_statement_highlight_identifier_color= "green";
+  ocelot_statement_highlight_comment_color= "limeGreen";
+  ocelot_statement_highlight_operator_color= "darkGray";
+  ocelot_statement_highlight_keyword_color= "blue";
   ocelot_statement_highlight_current_line_color= "yellow";
   ocelot_statement_syntax_checker= "1";
 
@@ -716,6 +721,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #ifdef DEBUGGER
   main_layout->addWidget(debug_top_widget);
 #endif
+  main_layout->addWidget(hparse_line_edit);
 
   main_window->setLayout(main_layout);
 
@@ -950,31 +956,37 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 
   if ((key->key() == Qt::Key_Tab) && (ocelot_auto_rehash > 0))
   {
-    int i= 0;
-    QString s;
-    char search_string[512];
-    int search_string_len;
-    while (main_token_lengths[i] != 0) ++i;
-    if (i > 1)
+    if (hparse_line_edit->isHidden() == false)
     {
-      i-= 1;
-      if ((main_token_lengths[i] < 64) && (main_token_types[i] >= TOKEN_TYPE_OTHER))
+      if (statement_edit_widget->hasFocus() == true)
       {
-        text= statement_edit_widget->toPlainText();
-        s= text.mid(main_token_offsets[i], main_token_lengths[i]);
-        search_string_len= s.toUtf8().size();
-        memcpy(search_string, s.toUtf8().constData(), search_string_len);
-        search_string[search_string_len]= '\0';
-        rehash_search(search_string);
-        if (strcmp(search_string, "") > 0)
+        QString s= hparse_line_edit->text();
+        int word_start= s.indexOf(": ", 0);
+        int word_end= s.indexOf(" ", word_start + 2);
+        if (word_end == -1) word_end= s.size();
+        QString word= s.mid(word_start + 2, (word_end - word_start) - 1);
+        int i;
+        for (i= 0; main_token_lengths[i] != 0; ++i)
         {
-          strcpy(search_string, search_string + search_string_len);
-          statement_edit_widget->insertPlainText(search_string);
+          if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) != 0) break;
+        }
+        if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) == 0) return true;
+        text= statement_edit_widget->toPlainText();
+        if (word.left(1) != "[")
+        {
+          QString new_text= text.left(main_token_offsets[i]);
+          new_text.append(word);
+          int rest_start= main_token_offsets[i] + main_token_lengths[i];
+          new_text.append(text.right(text.size() - rest_start));
+          statement_edit_widget->setPlainText(new_text);
+          QTextCursor c= statement_edit_widget->textCursor();
+          c.movePosition(QTextCursor::End);
+          statement_edit_widget->setTextCursor(c);
+          return true;
         }
       }
     }
   }
-
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
   if (key->modifiers() & Qt::ControlModifier)
@@ -1906,7 +1918,7 @@ void MainWindow::action_statement_edit_widget_text_changed()
   QTextCharFormat format_of_operator;
   format_of_operator.setForeground(QColor(qt_color(ocelot_statement_highlight_operator_color)));
   QTextCharFormat format_of_reserved_word;
-  format_of_reserved_word.setForeground(QColor(qt_color(ocelot_statement_highlight_reserved_color)));
+  format_of_reserved_word.setForeground(QColor(qt_color(ocelot_statement_highlight_keyword_color)));
   QTextCharFormat format_of_other;
   format_of_other.setForeground(QColor(qt_color(ocelot_statement_text_color)));
 
@@ -1942,6 +1954,7 @@ void MainWindow::action_statement_edit_widget_text_changed()
     if (t == TOKEN_TYPE_LITERAL_WITH_DIGIT) format_of_current_token= format_of_literal;
     if (t == TOKEN_TYPE_LITERAL_WITH_BRACE) format_of_current_token= format_of_literal; /* obsolete? */
     if (t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) format_of_current_token= format_of_identifier;
+    if (t == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_identifier;
     if (t == TOKEN_TYPE_IDENTIFIER) format_of_current_token= format_of_identifier;
     if (t == TOKEN_TYPE_IDENTIFIER_WITH_AT) format_of_current_token= format_of_identifier;
     if (t == TOKEN_TYPE_COMMENT_WITH_SLASH) format_of_current_token= format_of_comment;
@@ -2614,7 +2627,7 @@ void MainWindow::action_statement()
     action_change_one_setting(ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color,"ocelot_statement_highlight_identifier_color");
     action_change_one_setting(ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color,"ocelot_statement_highlight_comment_color");
     action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,"ocelot_statement_highlight_operator_color");
-    action_change_one_setting(ocelot_statement_highlight_reserved_color, new_ocelot_statement_highlight_reserved_color,"ocelot_statement_highlight_reserved_color");
+    action_change_one_setting(ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color,"ocelot_statement_highlight_keyword_color");
     action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,"ocelot_statement_prompt_background_color");
     action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,"ocelot_statement_highlight_current_line_color");
     action_change_one_setting(ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker,"ocelot_statement_syntax_checker");
@@ -2789,7 +2802,7 @@ void MainWindow::assign_names_for_colors()
   if (ocelot_statement_highlight_identifier_color.left(1) == "#") ocelot_statement_highlight_identifier_color= q_color_list_name(ocelot_statement_highlight_identifier_color);
   if (ocelot_statement_highlight_comment_color.left(1) == "#") ocelot_statement_highlight_comment_color= q_color_list_name(ocelot_statement_highlight_comment_color);
   if (ocelot_statement_highlight_operator_color.left(1) == "#") ocelot_statement_highlight_operator_color= q_color_list_name(ocelot_statement_highlight_operator_color);
-  if (ocelot_statement_highlight_reserved_color.left(1) == "#") ocelot_statement_highlight_reserved_color= q_color_list_name(ocelot_statement_highlight_reserved_color);
+  if (ocelot_statement_highlight_keyword_color.left(1) == "#") ocelot_statement_highlight_keyword_color= q_color_list_name(ocelot_statement_highlight_keyword_color);
   if (ocelot_statement_prompt_background_color.left(1) == "#") ocelot_statement_prompt_background_color= q_color_list_name(ocelot_statement_prompt_background_color);
   if (ocelot_statement_highlight_current_line_color.left(1) == "#") ocelot_statement_highlight_current_line_color= q_color_list_name(ocelot_statement_highlight_current_line_color);
   if (ocelot_grid_text_color.left(1) == "#") ocelot_grid_text_color= q_color_list_name(ocelot_grid_text_color);
@@ -4516,6 +4529,7 @@ int MainWindow::debug_parse_statement(QString text,
     {
       if ((token_type == TOKEN_TYPE_OTHER)
        || (token_type == TOKEN_TYPE_IDENTIFIER)
+       || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
        || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
       {
         /* It's possibly a routine name, and we're expecting a routine name. */
@@ -4528,6 +4542,7 @@ int MainWindow::debug_parse_statement(QString text,
           /* schema-name . routine_name */
           if ((main_token_types[i + 2] == TOKEN_TYPE_OTHER)
            || (main_token_types[i + 2] == TOKEN_TYPE_IDENTIFIER)
+           || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
            || (main_token_types[i + 2] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
           {
             strcpy(tmp_schema_name, token);
@@ -6407,7 +6422,7 @@ void MainWindow::action_execute_one_statement(QString text)
             Last statement did not cause a result set. We could hide the grid and shrink the
             central window with "result_grid_table_widget[0]->hide()", but we don't.
           */
-          ;
+          get_sql_mode(main_token_types[main_token_number], text);
         }
         else
         {
@@ -7120,11 +7135,11 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_highlight_operator_color= ccn;
         assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_reserved_color", Qt::CaseInsensitive) == 0)
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_keyword_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
-        ocelot_statement_highlight_reserved_color= ccn;
+        ocelot_statement_highlight_keyword_color= ccn;
         assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_prompt_background_color", Qt::CaseInsensitive) == 0)
@@ -7472,7 +7487,7 @@ int MainWindow::rehash_scan()
   Pass: search string. Return: column name matching searching string.
   Todo: We only look at column[1] column_name. We should look at column[0] table_name.
 */
-void MainWindow::rehash_search(char *search_string)
+QString MainWindow::rehash_search(char *search_string)
 {
   long unsigned int r;
   char *row_pointer;
@@ -7480,6 +7495,8 @@ void MainWindow::rehash_search(char *search_string)
   unsigned int i;
   char column_value[512];
   unsigned int search_string_length;
+  QString tmp_word= "";
+  int count_of_hits= 0;
 
   search_string_length= strlen(search_string);
   column_value[0]= '\0';
@@ -7498,20 +7515,20 @@ void MainWindow::rehash_search(char *search_string)
         {
           if (strncmp(row_pointer, search_string, search_string_length) == 0)
           {
-            if (column_value[0] != '\0')
-            {
-              strcpy(search_string, "");
-              return; /* too many matches */
-            }
             strncpy(column_value, row_pointer, column_length);
             column_value[column_length]= '\0';
+            tmp_word.append(column_value);
+            tmp_word.append(" ");
+            ++count_of_hits;
+            if (count_of_hits > 10) break;
           }
         }
       }
-    row_pointer+= column_length;
+      row_pointer+= column_length;
     }
+    if (count_of_hits > 10) break;
   }
-  strcpy(search_string, column_value);
+  return tmp_word;
 }
 
 /*
@@ -9280,8 +9297,98 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_host= s;
   lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
+  get_sql_mode(TOKEN_KEYWORD_CONNECT, "");
   connections_is_connected[0]= 1;
   return 0;
+}
+
+/*
+  We use sql_mode to decide whether "..." is an identifier or a literal.
+  So we try to get its value at connect time or if user says
+  SET SESSION SQL_MODE ... or SET @@session.sql_mode
+*/
+void MainWindow::get_sql_mode(int who_is_calling, QString text)
+{
+  QString sql_mode_string;
+  bool sql_mode_string_seen= false;
+  bool must_ask_server= false;
+  int i2= 0;
+  int  sub_token_offsets[10];
+  int  sub_token_lengths[10];
+  int  sub_token_types[10];
+
+  if (who_is_calling == TOKEN_KEYWORD_SET)
+  {
+    int i;
+    /* Make a copy of the first few tokens, ignoring comments. */
+    /* This is a duplication of code in execute_client_statement(). */
+    for (i= main_token_number; main_token_lengths[i] != 0; ++i)
+    {
+      int t= main_token_types[i];
+      if (t == TOKEN_TYPE_COMMENT_WITH_SLASH
+      ||  t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE
+      ||  t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
+      sub_token_offsets[i2]= main_token_offsets[i];
+      sub_token_lengths[i2]= main_token_lengths[i];
+      sub_token_types[i2]= main_token_types[i];
+      ++i2;
+      if (i2 > 8) break;
+    }
+    sub_token_offsets[i2]= 0;
+    sub_token_lengths[i2]= 0;
+    sub_token_types[i2]= 0;
+    if (text.mid(sub_token_offsets[1], 7).toUpper() == "SESSION")
+    {
+      i= 2;
+    }
+    else if (text.mid(sub_token_offsets[1], 9).toUpper() == "@@SESSION")
+    {
+      if (text.mid(sub_token_offsets[2], 1).toUpper() != ".") return;
+      i= 3;
+    }
+    else return;
+    if (text.mid(sub_token_offsets[i], 8).toUpper() != "SQL_MODE") return;
+    ++i;
+    if (sub_token_lengths[i] == 0) return;
+    if ((text.mid(sub_token_offsets[i], 1) != "=")
+     && (text.mid(sub_token_offsets[i], 2) != ":=")) return;
+    ++i;
+    if ((sub_token_types[i] != TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+     && (sub_token_types[i] != TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
+     && (sub_token_types[i] != TOKEN_TYPE_LITERAL))
+    {
+      /* User has said SET SESSION sql_mode = not-literal which server can interpret */
+      must_ask_server= true;
+    }
+    else
+    {
+      /* Uer has said SET SESSION sql_mode = literal which we can interpret as client */
+      sql_mode_string= text.mid(sub_token_offsets[i], sub_token_lengths[i]);
+      sql_mode_string_seen= true;
+    }
+  }
+  if ((who_is_calling == TOKEN_KEYWORD_CONNECT) || (must_ask_server == true))
+  {
+    QString s= select_1_row("select @@session.sql_mode");
+    if (s == "")
+    {
+      sql_mode_string= select_1_row_result_1;
+      sql_mode_string_seen= true;
+    }
+  }
+  if (sql_mode_string_seen == true)
+  {
+    if ((sql_mode_string.contains("ANSI", Qt::CaseInsensitive) == true)
+     || (sql_mode_string.contains("DB2", Qt::CaseInsensitive) == true)
+     || (sql_mode_string.contains("MAXDB", Qt::CaseInsensitive) == true)
+     || (sql_mode_string.contains("MSSQL", Qt::CaseInsensitive) == true)
+     || (sql_mode_string.contains("ORACLE", Qt::CaseInsensitive) == true)
+     || (sql_mode_string.contains("POSTGRESQL", Qt::CaseInsensitive) == true))
+    {
+      hparse_sql_mode_ansi_quotes= true;
+    }
+    else hparse_sql_mode_ansi_quotes= false;
+  }
 }
 
 /*
@@ -9310,6 +9417,11 @@ void MainWindow::hparse_f_nexttoken()
   {
     ++hparse_i;
     hparse_token_type= main_token_types[hparse_i];
+    if ((hparse_token_type == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
+     && (hparse_sql_mode_ansi_quotes == true))
+    {
+      hparse_token_type= main_token_types[hparse_i]= TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE;
+    }
     if ((hparse_token_type != TOKEN_TYPE_COMMENT_WITH_SLASH)
      && (hparse_token_type != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
      && (hparse_token_type != TOKEN_TYPE_COMMENT_WITH_MINUS))
@@ -9424,7 +9536,26 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
   }
   else if (token == "[identifier]")
   {
+    if (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+    {
+      if ((hparse_token.size() == 1) || (hparse_token.right(1) != "`"))
+      {
+        /* Starts with ` but doesn't end with ` so identifier required but not there yet. */
+        hparse_expected= token;
+        return 0;
+      }
+    }
+    if (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
+    {
+      if ((hparse_token.size() == 1) || (hparse_token.right(1) != "\""))
+      {
+        /* Starts with " but doesn't end with " so identifier required but not there yet. */
+        hparse_expected= token;
+        return 0;
+      }
+    }
     if ((hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+     || (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
      || (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_AT)
      || ((hparse_token_type >= TOKEN_TYPE_OTHER)
       && ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_RESERVED) == 0)))
@@ -9435,6 +9566,24 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
   }
   else if (token == "[literal]")
   {
+    if (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+    {
+      if ((hparse_token.size() == 1) || (hparse_token.right(1) != "'"))
+      {
+        /* Starts with ' but doesn't end with ' so literal required but not there yet. */
+        hparse_expected= token;
+        return 0;
+      }
+    }
+    if (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
+    {
+      if ((hparse_token.size() == 1) || (hparse_token.right(1) != "\""))
+      {
+        /* Starts with ' but doesn't end with " so literal required but not there yet. */
+        hparse_expected= token;
+        return 0;
+      }
+    }
     if ((hparse_token_type == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
      || (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
      || (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
@@ -9756,11 +9905,13 @@ int MainWindow::hparse_f_qualified_name_with_star() /* like hparse_f_qualified_n
 /* escaped_table_reference [, escaped_table_reference] ... */
 int MainWindow::hparse_f_table_references()
 {
+  int saved_hparse_i= hparse_i;
   do
   {
     hparse_f_table_escaped_table_reference();
     if (hparse_errno > 0) return 0;
   } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
+  if (hparse_i == saved_hparse_i) return 0;
   return 1;
 }
 
@@ -13367,7 +13518,10 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FROM") == 1)         /* FROM + some subsequent clauses are optional */
   {
     /* DUAL is a reserved word, perhaps the only one that could ever be an identifier */
-    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DUAL") != 1) hparse_f_table_references();
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DUAL") != 1)
+    {
+      if (hparse_f_table_references() == 0) hparse_f_error();
+    }
     if (hparse_errno > 0) return 0;
     hparse_f_where();
     if (hparse_errno > 0) return 0;
@@ -16456,6 +16610,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
 */
 void MainWindow::hparse_f_multi_block(QString text)
 {
+  hparse_line_edit->hide();
   if (connections_is_connected[0] == 1)
   {
     if (statement_edit_widget->dbms_version.contains("mariadb", Qt::CaseInsensitive) == true)
@@ -16491,7 +16646,7 @@ void MainWindow::hparse_f_multi_block(QString text)
       if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
       continue; /* ?? rather than "return"? */
     }
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) goto error;
 #ifdef DBMS_MARIADB
     if (hparse_dbms == "mariadb")
     {
@@ -16501,7 +16656,7 @@ void MainWindow::hparse_f_multi_block(QString text)
 #endif
     {
       hparse_f_statement();
-      if (hparse_errno > 0) return;
+      if (hparse_errno > 0) goto error;
       /*
         Todo: we had trouble because some functions eat the final semicolon.
         The best thing would be to eat properly. Till then, we'll kludge:
@@ -16511,13 +16666,110 @@ void MainWindow::hparse_f_multi_block(QString text)
       {
         if (hparse_f_semicolon_and_or_delimiter(0) != 1) hparse_f_error();
       }
-      if (hparse_errno > 0) return;
+      if (hparse_errno > 0) goto error;
     }
     //hparse_f_expect(TOKEN_TYPE_OPERATOR, "[eof]");
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) goto error;
     if (hparse_i > 0) main_token_flags[hparse_i - 1]= (main_token_flags[hparse_i - 1] | TOKEN_FLAG_IS_BLOCK_END);
     if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
   }
+  return;
+error:
+  QString expected_list;
+  bool unfinished_comment_seen= false;
+  bool unfinished_identifier_seen= false;
+  if ((hparse_i == 0) && (main_token_lengths[0] == 0)) return;
+  /* Do not add to expecteds if we're still inside a comment */
+  if ((hparse_i > 0) && (main_token_lengths[hparse_i] == 0))
+  {
+    int j= hparse_i - 1;
+    if (main_token_types[j] == TOKEN_TYPE_COMMENT_WITH_SLASH)
+    {
+      QString token= hparse_text_copy.mid(main_token_offsets[j], main_token_lengths[j]);
+      if (token.right(2) != "*/")
+      {
+        unfinished_comment_seen= true;
+        if ((token.right(1) == "*") && (token != "/*")) expected_list= "Expecting: /";
+        else expected_list= "Expecting: */";
+      }
+    }
+    if ((main_token_types[j] == TOKEN_TYPE_COMMENT_WITH_MINUS)
+     || (main_token_types[j] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE))
+    {
+      QString rest= hparse_text_copy.mid(main_token_offsets[j]);
+      if (rest.contains("\n") == false) return;
+    }
+  }
+  /* Add different set of expecteds if we're still inside a quoted identifier */
+  if ((main_token_types[hparse_i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+   || (main_token_types[hparse_i] == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE))
+  {
+    QString token= hparse_text_copy.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
+    bool missing_termination= false;
+    if (token.size() == 1) missing_termination= true;
+    else if ((token.left(1) == "\"") && (token.right(1) != "\"")) missing_termination= true;
+    else if ((token.left(1) == "`") && (token.right(1) != "`")) missing_termination= true;
+    if (missing_termination == true)
+    {
+      if (ocelot_auto_rehash > 0)
+      {
+        QString errmsg= hparse_errmsg;
+        if (errmsg.contains("[identifier]") == true)
+        {
+          QString s;
+          char search_string[512];
+          int search_string_len;
+
+          s= text.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
+          if (s.left(1) == "`") s= s.right(s.size() - 1);
+          else if (s.left(1) == "\"") s= s.right(s.size() - 1);
+
+          search_string_len= s.toUtf8().size();
+          memcpy(search_string, s.toUtf8().constData(), search_string_len);
+          search_string[search_string_len]= '\0';
+          QString rehash_search_result= rehash_search(search_string);
+          if (rehash_search_result > "")
+          {
+            expected_list= "Expected: ";
+            expected_list.append(rehash_search_result);
+            unfinished_identifier_seen= true;
+          }
+        }
+      }
+    }
+  }
+  if ((unfinished_comment_seen == false) && (unfinished_identifier_seen == false))
+  {
+    expected_list= "Expecting: ";
+    QString s_token;
+    QString errmsg= hparse_errmsg;
+    int word_start= errmsg.indexOf("tokens is: ") + 11;
+    int word_end;
+    for (;;)
+    {
+      word_end= errmsg.indexOf(" ", word_start);
+      if (word_end == -1) word_end= errmsg.size();
+      s_token= errmsg.mid(word_start, word_end - word_start);
+      s_token= connect_stripper(s_token, false);
+      if (s_token != "or")
+      {
+        if ((s_token.left(1) == "[")
+         || (QString::compare(hparse_token, s_token.left(hparse_token.size()), Qt::CaseInsensitive) == 0))
+        {
+          if (expected_list.contains(s_token, Qt::CaseInsensitive) == false)
+          {
+            expected_list.append(s_token);
+            expected_list.append(" ");
+          }
+        }
+      }
+      word_start= word_end + 1;
+      if (word_start >= errmsg.size()) break;
+    }
+  }
+  hparse_line_edit->setText(expected_list);
+  hparse_line_edit->setCursorPosition(0);
+  hparse_line_edit->show();
 }
 
 /*
@@ -16773,7 +17025,7 @@ int MainWindow::hparse_f_client_statement()
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR") == 1)
-     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_RESERVED_COLOR") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_highlight_keyword_color") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_PROMPT_BACKGROUND_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_SYNTAX_CHECKER") == 1)
@@ -16947,6 +17199,17 @@ int MainWindow::hparse_f_client_statement()
   return 1;
 }
 
+/*
+  The hint line that appears underneath the statement widget if syntax error,
+  which probably means that the user is typing and hasn't finished a word.
+  This is somewhat like a popup but using "Qt::Popup" caused trouble.
+*/
+void MainWindow::hparse_f_parse_hint_line_create()
+{
+  hparse_line_edit= new QLineEdit(this);
+  hparse_line_edit->setReadOnly(true);
+  hparse_line_edit->hide();
+}
 
 #ifdef DBMS_TARANTOOL
 /*
@@ -20416,8 +20679,8 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_comment_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_highlight_operator_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_operator_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_reserved_color") == 0)
-  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_reserved_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_keyword_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_keyword_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_prompt_background_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_prompt_background_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_highlight_current_line_color") == 0)

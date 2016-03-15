@@ -223,7 +223,7 @@ public:
   QString ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color;
   QString ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color;
   QString ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color;
-  QString ocelot_statement_highlight_reserved_color, new_ocelot_statement_highlight_reserved_color;
+  QString ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color;
   QString ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color;
   QString ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color;
   QString ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker;
@@ -338,6 +338,7 @@ public:
   int main_window_maximum_height;
   void component_size_calc(int *character_height, int *borders_height);
   QFont get_font_from_style_sheet(QString style_string);
+  void get_sql_mode(int who_is_calling, QString text);
 
   void hparse_f_nexttoken();
   void hparse_f_next_nexttoken();
@@ -431,10 +432,12 @@ public:
   void hparse_f_order_by();
   void hparse_f_limit(int);
   void hparse_f_block(int);
+  void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
   int hparse_f_client_statement();
+  void hparse_f_parse_hint_line_create();
 
 #ifdef DBMS_TARANTOOL
   void parse_f_nextsym();
@@ -557,7 +560,7 @@ private:
 
   void create_menu();
   int rehash_scan();
-  void rehash_search(char *search_string);
+  QString rehash_search(char *search_string);
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
   int execute_client_statement(QString text, int *additional_result);
@@ -619,13 +622,14 @@ private:
     TOKEN_TYPE_LITERAL_WITH_BRACE= 4,        /* starts with { */ /* obsolete? */
     TOKEN_TYPE_LITERAL= 4,
     TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK= 5,  /* starts with ` */
-    TOKEN_TYPE_IDENTIFIER_WITH_AT= 6,        /* starts with @ */
-    TOKEN_TYPE_IDENTIFIER= 6,
-    TOKEN_TYPE_COMMENT_WITH_SLASH = 7,        /* starts with / * or * / */
-    TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE= 8,   /* starts with # */
-    TOKEN_TYPE_COMMENT_WITH_MINUS= 9,        /* starts with -- */
-    TOKEN_TYPE_OPERATOR= 10,                 /* starts with < > = ! etc. */
-    TOKEN_TYPE_OTHER= 11,                    /* identifier? keyword? */
+    TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE= 6, /* starts with " and hparse_ansi_quote=true */
+    TOKEN_TYPE_IDENTIFIER_WITH_AT= 7,        /* starts with @ */
+    TOKEN_TYPE_IDENTIFIER= 7,
+    TOKEN_TYPE_COMMENT_WITH_SLASH = 8,        /* starts with / * or * / */
+    TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE= 9,   /* starts with # */
+    TOKEN_TYPE_COMMENT_WITH_MINUS= 10,        /* starts with -- */
+    TOKEN_TYPE_OPERATOR= 11,                 /* starts with < > = ! etc. */
+    TOKEN_TYPE_OTHER= 12,                    /* identifier? keyword? */
     /* The TOKEN_KEYWORD_... numbers must match the list in tokens_to_keywords(). */
     TOKEN_KEYWORDS_START= TOKEN_TYPE_OTHER + 1,
     TOKEN_KEYWORD_QUESTIONMARK= TOKEN_KEYWORDS_START, /* Ocelot keyword */
@@ -1001,7 +1005,8 @@ private:
     TOKEN_KEYWORD_ROLE= TOKEN_KEYWORD_RESET + 1,
     TOKEN_KEYWORD_ROLLBACK= TOKEN_KEYWORD_ROLE + 1,
     TOKEN_KEYWORD_SAVEPOINT= TOKEN_KEYWORD_ROLLBACK + 1,
-    TOKEN_KEYWORD_SHUTDOWN= TOKEN_KEYWORD_SAVEPOINT + 1,
+    TOKEN_KEYWORD_SESSION= TOKEN_KEYWORD_SAVEPOINT + 1,
+    TOKEN_KEYWORD_SHUTDOWN= TOKEN_KEYWORD_SESSION + 1,
     TOKEN_KEYWORD_SONAME= TOKEN_KEYWORD_SHUTDOWN + 1,
     TOKEN_KEYWORD_START= TOKEN_KEYWORD_SONAME + 1,
     TOKEN_KEYWORD_STOP= TOKEN_KEYWORD_START + 1,
@@ -1049,6 +1054,7 @@ private:
   QVBoxLayout *main_layout;
 
   QTextEdit *history_edit_widget;
+  QLineEdit *hparse_line_edit;
 #ifdef DEBUGGER
 #define DEBUG_TAB_WIDGET_MAX 10
   QWidget *debug_top_widget;
@@ -4974,7 +4980,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_highlight_identifier_color= copy_of_parent->ocelot_statement_highlight_identifier_color;
   copy_of_parent->new_ocelot_statement_highlight_comment_color= copy_of_parent->ocelot_statement_highlight_comment_color;
   copy_of_parent->new_ocelot_statement_highlight_operator_color= copy_of_parent->ocelot_statement_highlight_operator_color;
-  copy_of_parent->new_ocelot_statement_highlight_reserved_color= copy_of_parent->ocelot_statement_highlight_reserved_color;
+  copy_of_parent->new_ocelot_statement_highlight_keyword_color= copy_of_parent->ocelot_statement_highlight_keyword_color;
   copy_of_parent->new_ocelot_statement_prompt_background_color= copy_of_parent->ocelot_statement_prompt_background_color;
   copy_of_parent->new_ocelot_statement_highlight_current_line_color= copy_of_parent->ocelot_statement_highlight_current_line_color;
   copy_of_parent->new_ocelot_statement_syntax_checker= copy_of_parent->ocelot_statement_syntax_checker;
@@ -5241,7 +5247,7 @@ void set_widget_values(int ci)
     case 3: { color_type= tr("Statement Highlight Identifier Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_identifier_color; break; }
     case 4: { color_type= tr("Statement Highlight Comment Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_comment_color; break; }
     case 5: { color_type= tr("Statement Highlight Operator Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_operator_color; break; }
-    case 6: { color_type= tr("Statement Highlight Reserved Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_reserved_color; break; }
+    case 6: { color_type= tr("Statement Highlight Keyword Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_keyword_color; break; }
     case 7: { color_type= tr("Statement Prompt Background Color"); color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
     case 8: { color_type= tr("Statement Border Color"); color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
     case 9: { color_type= tr("Statement Highlight Current Line Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_current_line_color; break; }
@@ -5670,7 +5676,7 @@ void handle_combo_box_for_color_pick_6(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[6]->itemText(item_number);
-    copy_of_parent->new_ocelot_statement_highlight_reserved_color= new_color;
+    copy_of_parent->new_ocelot_statement_highlight_keyword_color= new_color;
     label_for_color_rgb[6]->setText(new_color);
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
@@ -5925,5 +5931,28 @@ public:
 
 #endif // QTABWIDGET48_H
 
+/* THE PARSEPOP WIDGET */
+
+//#ifndef QPARSEPOP_H
+//#define QPARSEPOP_H
+//class QPopper : public QTextEdit
+//{
+//
+//public:
+//  int settings_width, settings_height;
+//
+//QParsePop(int width, int height)
+//{
+//  settings_width= width;
+//  settings_height= height;
+//}
+//
+//virtual QSize sizeHint() const
+//{
+//  return QSize(settings_width, settings_height);
+//}
+//
+//};
+//#endif // QPARSEPOP_H
 
 
