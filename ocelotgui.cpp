@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: March 14 2016
+   Last modified: March 15 2016
 */
 
 /*
@@ -547,6 +547,7 @@ static const char *s_color_list[308]=
   QString hparse_next_token, hparse_next_next_token;
   int hparse_next_token_type, hparse_next_next_token_type;
   bool hparse_begin_seen;
+  int hparse_count_of_accepts;
   QString hparse_prev_token;
   bool hparse_like_seen;
   bool hparse_subquery_is_allowed;
@@ -995,8 +996,20 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
     return true;
   }
 
-  /* It's just Enter. If it's not at the end, don't try to execute. Anyway, don't force. */
-  if (statement_edit_widget->textCursor().atEnd() == false) return false;
+  /*
+    It's just Enter.
+    If it's not at the end, not counting white space, don't try to execute.
+    Anyway, don't force.
+  */
+  if (statement_edit_widget->textCursor().atEnd() == false)
+  {
+    int cursor_position= statement_edit_widget->textCursor().position();
+    QString plain_text= statement_edit_widget->toPlainText();
+    for (int i= cursor_position; i < plain_text.size(); ++i)
+    {
+      if (plain_text.mid(i, 1) > " ") return false;
+    }
+  }
 
   if (action_execute(0) == 1) return false;
   return true;
@@ -2761,8 +2774,8 @@ void MainWindow::action_change_one_setting(QString old_setting,
       text.append(c);
       if (c == "'") text.append(c);
     }
-    text.append("'");
-    main_token_count_in_statement= 4;
+    text.append("';");
+    main_token_count_in_statement= 5;
     tokenize(text.data(),
              text.size(),
              &main_token_lengths[0], &main_token_offsets[0], MAX_TOKENS, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
@@ -3189,6 +3202,8 @@ QFont MainWindow::get_font_from_style_sheet(QString style_string)
   Beware: input might be a file dump, and statements might be long.
   Todo: think about delimiter. Maybe delimiters don't count if you're in a delimiter statement?
   Todo: this doesn't allow for the possibility of "END comment WHILE|LOOP|REPEAT;"
+  Todo: although label:begin declare v1 int; end; is illegal, it's confusing to miss the begin.
+        we end up splitting the "end;" into a separate statement.
 */
 int MainWindow::get_next_statement_in_string(int passed_main_token_number,
                                              int *returned_begin_count,
@@ -6974,6 +6989,28 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     return 1;
   }
 #ifdef DEBUGGER
+  if ((statement_type >= TOKEN_KEYWORD_DEBUG_BREAKPOINT) && (statement_type <= TOKEN_KEYWORD_DEBUG_TBREAKPOINT))
+  {
+    /* Todo: we have to get off depending on show_compatibility_56. */
+    if (statement_edit_widget->dbms_version.contains("5.7") == true)
+    {
+      QString s= select_1_row("select @@global.show_compatibility_56;");
+      if (s == "")
+      {
+        if (select_1_row_result_1.toInt() == 0)
+        {
+          QString s= "To use $DEBUG statements with a MySQL 5.7 server, ";
+          s.append("you must first execute: ");
+          s.append("SET GLOBAL SHOW_COMPATIBILITY_56 = ON;" );
+          QMessageBox msgbox;
+          msgbox.setText(s);
+          msgbox.exec();
+          return 1;
+        }
+      }
+    }
+  }
+
   if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG)
   {
     debug_debug_go(text);
@@ -9530,6 +9567,7 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
       hparse_expected= "";
       hparse_f_nexttoken();
       hparse_f_nexttoken();
+      ++hparse_count_of_accepts;
       return 1;
     }
     return 0;
@@ -9630,6 +9668,7 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
     else main_token_types[hparse_i]= proposed_type;
     hparse_expected= "";
     hparse_f_nexttoken();
+    ++hparse_count_of_accepts;
     return 1;
   }
   if (hparse_expected > "") hparse_expected.append(" or ");
@@ -10631,7 +10670,6 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
     identifier_seen= true;
   }
   if ((identifier_seen == true)
-   || (hparse_f_accept(TOKEN_KEYWORD_IF_IN_IF_EXPRESSION, "IF") == 1)
    || (hparse_f_qualified_name() == 1))
   {
     if (hparse_errno > 0) return;
@@ -10644,6 +10682,32 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
         hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
         if (hparse_errno > 0) return;
       }
+    }
+    return;
+  }
+
+  /* Watching for built-in functions that happen to be reserved words */
+  if ((hparse_f_accept(TOKEN_KEYWORD_CHAR, "CHAR") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_CONVERT, "CONVERT") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_IF_IN_IF_EXPRESSION, "IF") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_INSERT, "INSERT") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_LEFT, "LEFT") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_LOCALTIME, "LOCALTIME") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_LOCALTIMESTAMP, "LOCALTIMESTAMP") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_MOD, "MOD") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_REPEAT_IN_REPEAT_EXPRESSION, "REPEAT") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_REPLACE, "REPLACE") == 1)
+   || (hparse_f_accept(TOKEN_KEYWORD_RIGHT, "RIGHT") == 1))
+  {
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
+    if (hparse_errno > 0) return;
+    if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ")") == 0)
+    {
+      hparse_f_function_arguments(opd);
+      if (hparse_errno > 0) return;
+      hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+      if (hparse_errno > 0) return;
     }
     return;
   }
@@ -14010,6 +14074,13 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
     if (hparse_dbms == "mariadb")
     {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FORMAT") == 1)
+      {
+        hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_errno > 0) return;
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TRADITIONAL") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "JSON");
+        if (hparse_errno > 0) return;
+      }
       if (hparse_f_explainable_statement() == 1) return;
       if (hparse_errno > 0) return;
     }
@@ -16256,17 +16327,20 @@ void MainWindow::hparse_f_block(int calling_statement_type)
       ... but currently we're saying any identifier will be okay
   */
 
+  QString label= "";
   /* Label check. */
   /* Todo: most checks are illegal if preceded by a label. Check for that. */
-  QString label= "";
-  hparse_f_next_nexttoken();
-  if (hparse_next_token == ":")
+  if (hparse_count_of_accepts != 0)
   {
-    label= hparse_token;
-    hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
-    hparse_f_expect(TOKEN_TYPE_OPERATOR, ":");
-    if (hparse_errno > 0) return;
+    hparse_f_next_nexttoken();
+    if (hparse_next_token == ":")
+    {
+      label= hparse_token;
+      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(TOKEN_TYPE_OPERATOR, ":");
+      if (hparse_errno > 0) return;
+    }
   }
 
   /*
@@ -16292,6 +16366,17 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "ATOMIC");
       if (hparse_errno > 0) return;
+    }
+    else
+    {
+      /* The MariaDB parser cannot handle top-level BEGIN without NOT, so we don't either. */
+      if (hparse_count_of_accepts < 2)
+      {
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "WORK"); /* impossible but enhances expected_list */
+        hparse_f_expect(TOKEN_TYPE_OPERATOR, ";");   /* impossible but enhances expected_list */
+        hparse_f_error();
+        return;
+      }
     }
     for (;;)                                                            /* DECLARE statements */
     {
@@ -16640,10 +16725,17 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_next_next_token_type= 0;
     hparse_prev_token= "";
     hparse_subquery_is_allowed= false;
+    hparse_count_of_accepts= 0;
     if (hparse_i == -1) hparse_f_nexttoken();
     if (hparse_f_client_statement() == 1)
     {
       if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
+      if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
+      {
+        hparse_f_semicolon_and_or_delimiter(0);
+        if (hparse_errno > 0) goto error;
+        if (main_token_lengths[hparse_i] == 0) return;
+      }
       continue; /* ?? rather than "return"? */
     }
     if (hparse_errno > 0) goto error;
@@ -17079,7 +17171,11 @@ int MainWindow::hparse_f_client_statement()
   else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(TOKEN_KEYWORD_TEE, "TEE") == 1)) {;}
   else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(TOKEN_KEYWORD_USE, "USE") == 1))
   {
-    hparse_f_other(1);
+    if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    {
+      hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+    }
+    /* In mysql client, garbage can follow. It's not documented so don't call hparse_f_other(). */
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_WARNINGS) || (hparse_f_accept(TOKEN_KEYWORD_WARNINGS, "WARNINGS")) == 1) {;}
@@ -17117,13 +17213,14 @@ int MainWindow::hparse_f_client_statement()
         {
           do
           {
-            if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 0) hparse_f_error();
+            if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 0)
+            {
+              hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+            }
             if (hparse_errno > 0) return 0;
           } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
         }
       }
-      hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
-      if (hparse_errno > 0) return 0;
     }
      //|| (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_DELETE, "$DELETE") == 1)
      //|| (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_EXECUTE, "$EXECUTE") == 1)
@@ -17148,7 +17245,7 @@ int MainWindow::hparse_f_client_statement()
     {
       ;
     }
-    else if (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_REFRESH, "$REFRESH", 7) == 1)
+    else if (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_REFRESH, "$REFRESH", 8) == 1)
     {
       if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "BREAKPOINTS") == 1)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CALL_STACK") == 1)
@@ -17156,6 +17253,8 @@ int MainWindow::hparse_f_client_statement()
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER_VARIABLES") == 1)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VARIABLES") == 1))
         {;}
+      else hparse_f_error();
+      if (hparse_errno > 0) return 0;
     }
     else if (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_SET, "$SET", 4) == 1)
     {
