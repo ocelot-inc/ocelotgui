@@ -1965,6 +1965,7 @@ void MainWindow::action_statement_edit_widget_text_changed()
     if (t == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) format_of_current_token= format_of_literal;
     if (t == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_literal;
     if (t == TOKEN_TYPE_LITERAL_WITH_DIGIT) format_of_current_token= format_of_literal;
+    /* literal_with_brace == literal */
     if (t == TOKEN_TYPE_LITERAL_WITH_BRACE) format_of_current_token= format_of_literal; /* obsolete? */
     if (t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) format_of_current_token= format_of_identifier;
     if (t == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_identifier;
@@ -4068,7 +4069,6 @@ void MainWindow::debug_setup_go(QString text)
     strcpy(command_string, qstring_error_message.toUtf8());
     if (debug_error(command_string) != 0) return; /* setup wouldn't be able to operate so fail */
   }
-
   if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
   {
     if (debug_error(command_string) != 0) return;
@@ -4076,12 +4076,10 @@ void MainWindow::debug_setup_go(QString text)
 
   q_routine_schema= debug_q_schema_name_in_statement;
   q_routine_name= debug_q_routine_name_in_statement;
-
   if ((q_routine_schema == "") || (q_routine_name == ""))
   {
     if (debug_error((char*)"Missing routine name(s). Expected syntax is: $setup routine-name [, routine-name ...]") != 0) return;
   }
-
   /* Todo: since yes there is a bug, but we want to get this out, just release the lock instead of doing the right thing. */
   {
     QString result_string= select_1_row("SELECT is_free_lock('xxxmdbug_lock')");
@@ -4091,7 +4089,6 @@ void MainWindow::debug_setup_go(QString text)
       result_string= select_1_row("SELECT release_lock('xxxmdbug_lock')");
     }
   }
-
   /* Throw away the first word i.e. "$setup" and execute "call xxxmdbug.setup('...')". */
   char call_statement[512 + 128];
   strcpy(call_statement, "call xxxmdbug.setup('");
@@ -4127,6 +4124,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
   unsigned int num_rows;
   QString definition_of_surrogate_routine;
   int it_is_ok_if_proc_is_already_there;
+  QString list_of_drop_statements= "";
 
   lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from xxxmdbug.routines");
   res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
@@ -4134,6 +4132,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
   {
     num_rows= lmysql->ldbms_mysql_num_rows(res);
     lmysql->ldbms_mysql_free_result(res);
+    res= NULL;
     if (num_rows - 3 >= DEBUG_TAB_WIDGET_MAX)
     {
       sprintf(command, "$setup generated %d surrogates but the current maximum is %d'", num_rows - 3, DEBUG_TAB_WIDGET_MAX - 1);
@@ -4141,23 +4140,26 @@ void MainWindow::debug_setup_mysql_proc_insert()
       return;
     }
   }
-
   lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "SET @xxxmdbug_saved_sql_mode=@@sql_mode");
   /*
-    Go through all the rows of mysql.proc twice.
-    In the first iteration, we try to drop and create. If a create fails, we need a second iteration.
-    In the second iteration, we try to drop but not create (this is to get rid of earlier successful creates)..
+    Go through all the rows of mysql.proc, doing DROP IF EXISTS and CREATE.
+    If a create fails, we will later have a cleanup which should drop what we created.
   */
   int index_of_semicolon, index_of_set, index_of_create;
   QString first_query, second_query, third_query;
-  int second_iteration_is_necessary= 0;
-  for (int iteration=0; iteration <= 1; ++iteration)
+  //int second_iteration_is_necessary= 0;
+  res= NULL;
+  //for (int iteration=0; iteration <= 1; ++iteration)
   {
-    if ((iteration == 1) && (second_iteration_is_necessary == 0))
+    //if ((iteration == 1) && (second_iteration_is_necessary == 0))
+    //{
+    //  break;
+    //}
+    if (res != NULL)
     {
-      break;
+      lmysql->ldbms_mysql_free_result(res);
+      res= NULL;
     }
-    res= NULL;
     row= NULL;
 
     strcpy(command,
@@ -4185,6 +4187,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
 
     if (unexpected_error == NULL)
     {
+      MYSQL_RES *res_2= NULL;
       for (;;)
       {
         row= lmysql->ldbms_mysql_fetch_row(res);
@@ -4205,7 +4208,6 @@ void MainWindow::debug_setup_mysql_proc_insert()
         {
           /* MDBug might not care if the routine definition was blank, but we do. */
           char tmp[512];
-          MYSQL_RES *res_2= NULL;
           MYSQL_ROW row_2= NULL;
           unsigned int num_rows_2= 0;
           strcpy(tmp, "select routine_definition from information_schema.routines where routine_schema='");
@@ -4228,6 +4230,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
             if ((row_2 == NULL) || (row_2[0] == NULL) || (strcmp(row_2[0],"") == 0))
             {
               lmysql->ldbms_mysql_free_result(res_2);
+              res_2= NULL;
               strcpy(tmp, "Could not get a routine definition for ");
               strcat(tmp, row[0]);
               strcat(tmp, ".");
@@ -4236,11 +4239,15 @@ void MainWindow::debug_setup_mysql_proc_insert()
               /* Todo: merge this sort of stuff into debug_error() */
               unexpected_error= "create failed";
               put_message_in_result(tmp);
-              second_iteration_is_necessary= 1;
+              //second_iteration_is_necessary= 1;
               break;
             }
           }
-          if (res_2 != NULL) lmysql->ldbms_mysql_free_result(res_2);
+          if (res_2 != NULL)
+          {
+            lmysql->ldbms_mysql_free_result(res_2);
+            res_2= NULL;
+          }
         }
         definition_of_surrogate_routine= QString::fromUtf8(row[3]);
         index_of_semicolon= definition_of_surrogate_routine.indexOf(";");
@@ -4271,8 +4278,24 @@ void MainWindow::debug_setup_mysql_proc_insert()
           }
           if (unexpected_error == NULL)
           {
-            if (iteration == 0)
+            //if (iteration == 0)
             {
+              /* Kludge. If we have DEFINER=@ we have to change to DEFINER=''@''. */
+              {
+                int i;
+                i= third_query.indexOf("DEFINER=@");
+                if (i > 0)
+                {
+                  third_query.insert(i + 8, "''");
+                }
+                i=third_query.indexOf("@ PROCEDURE `");
+                if (i < 0) i=third_query.indexOf("@ FUNCTION `");
+                if (i < 0) i=third_query.indexOf("@ TRIGGER `");
+                if (i > 0)
+                {
+                  third_query.insert(i + 1, "''");
+                }
+              }
               if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], third_query.toUtf8(), strlen(third_query.toUtf8())))
               {
                 /* If there's an error, the diagnostics here should go all the way back up to the user. */
@@ -4280,22 +4303,58 @@ void MainWindow::debug_setup_mysql_proc_insert()
                 {
                   unexpected_error= "create failed";
                   put_diagnostics_in_result();
-                  second_iteration_is_necessary= 1;
+                  //second_iteration_is_necessary= 1;
+                  if (res != NULL)
+                  {
+                    lmysql->ldbms_mysql_free_result(res);
+                    res= NULL;
+                  }
                   break;
                 }
               }
+              list_of_drop_statements.append(first_query);
             }
           }
         }
       }
+      if (res != NULL)
+      {
+        lmysql->ldbms_mysql_free_result(res);
+        res= NULL;
+      }
+      if (res_2 != NULL)
+      {
+        lmysql->ldbms_mysql_free_result(res_2);
+        res_2= NULL;
+      }
     }
-  if (res != NULL) lmysql->ldbms_mysql_free_result(res);
+    if (res != NULL)
+    {
+      lmysql->ldbms_mysql_free_result(res);
+      res= NULL;
+    }
+  }
+  if (res != NULL)
+  {
+    lmysql->ldbms_mysql_free_result(res);
+    res= NULL;
   }
 
   lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "set session sql_mode=@xxxmdbug_saved_sql_mode");
 
   if (unexpected_error != NULL)
   {
+    while (list_of_drop_statements > " ")
+    {
+      int i= list_of_drop_statements.indexOf(";") + 1;
+      if (i <= 0) break;
+      QString first_query= list_of_drop_statements.left(i);
+      if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], first_query.toUtf8(), strlen(first_query.toUtf8())))
+      {
+        ; /* create failed, cleanup failed, but what can I do? */
+      }
+      list_of_drop_statements= list_of_drop_statements.right(list_of_drop_statements.size() - i);
+    }
     if (strcmp(unexpected_error, "create failed") ==0) return; /* we already have the diagnostics */
     put_message_in_result(unexpected_error);
     return;
@@ -4623,7 +4682,8 @@ int MainWindow::debug_parse_statement(QString text,
     }
     if ((token[0] == ',') && (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)) name_is_expected= true;
 
-    if (token_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
+    if ((token_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
+     || (token_type == TOKEN_TYPE_LITERAL))
     {
       if (*index_of_number_1 == -1) *index_of_number_1= i;
       else if (*index_of_number_2 == -1) *index_of_number_2= i;
@@ -5172,6 +5232,12 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
     q_line_number= text.mid(main_token_offsets[index_of_number_2], main_token_lengths[index_of_number_2]);
     line_number_2= q_line_number.toInt();
   }
+
+  printf("in debug_or_clear_go\n");
+  printf("  line_number_1=%d\n", line_number_1);
+  printf("  line_number_2=%d\n", line_number_2);
+  printf("  statement_type=%d\n", statement_type);
+  printf("  TOKEN_KEYWORD_DEBUG_BREAKPOINT=%d\n", TOKEN_KEYWORD_DEBUG_BREAKPOINT);
 
   for (int i= line_number_1; i <= line_number_2; ++i)
   {
@@ -7680,15 +7746,20 @@ void MainWindow::put_diagnostics_in_result()
         QString s;
         // unsigned long connect_lengths[0];
         mysql_res_for_warnings= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
-        for (unsigned int wi= 0; wi <= lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]); ++wi)
+        assert(mysql_res_for_warnings != NULL);
+        //for (unsigned int wi= 0; wi <= lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]); ++wi)
+        int count_of_fields= lmysql->ldbms_mysql_num_fields(mysql_res_for_warnings);
+        assert(count_of_fields == 3);
+        for (;;)
         {
           warnings_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_warnings);
-          if (warnings_row != NULL)
-          {
-            /* lengths= lmysql->ldbms_mysql_fetch_lengths(connect_res); */
-            sprintf(mysql_error_and_state, "\n%s (%s) %s.", warnings_row[0], warnings_row[1], warnings_row[2]);
-            s1.append(mysql_error_and_state);
-          }
+          if (warnings_row == NULL) break;
+          unsigned long *lengths= lmysql->ldbms_mysql_fetch_lengths(mysql_res_for_warnings);
+          unsigned long required_size= lengths[0] + lengths[1] + lengths[2] + 16;
+          char *long_warning= new char[required_size];
+          sprintf(long_warning, "\n%s (%s) %s.", warnings_row[0], warnings_row[1], warnings_row[2]);
+          s1.append(long_warning);
+          delete []long_warning;
         }
         lmysql->ldbms_mysql_free_result(mysql_res_for_warnings);
       }
@@ -8744,6 +8815,9 @@ bool MainWindow::is_client_statement(int token)
   ||  (token == TOKEN_KEYWORD_USE)
   ||  (token == TOKEN_KEYWORD_WARNINGS))
     return true;
+  if ((token >= TOKEN_KEYWORD_DEBUG_BREAKPOINT)
+   && (token <= TOKEN_KEYWORD_DEBUG_TBREAKPOINT))
+    return true;
   return false;
 }
 
@@ -9005,7 +9079,8 @@ int MainWindow::find_start_of_body(QString text, int *i_of_function, int *i_of_d
        || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "DEFINER")
        || (text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper() == "INVOKER")
        || (main_token_types[i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-       || (main_token_types[i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
+       || (main_token_types[i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
+       || (main_token_types[i] == TOKEN_TYPE_LITERAL))
       {
         characteristic_seen= 1;
         continue;
@@ -9625,6 +9700,7 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
     if ((hparse_token_type == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
      || (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
      || (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
+     /* literal_with_brace == literal */
      || (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_BRACE)) /* obsolete? */
     {
       equality= true;
@@ -17290,6 +17366,7 @@ int MainWindow::hparse_f_client_statement()
       if (hparse_errno > 0) return 0;
     }
     else return 0;
+    return 1;
   }
   else
   {
@@ -18957,6 +19034,7 @@ int CodeEditor::prompt_translate_k(QString s, int i)
   int i2;
 
   i_left_parenthesis= i_first_comma= i_second_comma= i_right_parenthesis= -1;
+
   for (i2= i; i2 < s.size(); ++i2)
   {
     s_char= s.mid(i2, 1);
@@ -18970,7 +19048,6 @@ int CodeEditor::prompt_translate_k(QString s, int i)
   if (i_first_comma == -1) return 0; /* bad first comma */
   if (i_second_comma == -1) return 0; /* bad second comma */
   if (i_right_parenthesis == -1) return 0; /* bad right parenthesis */
-
   string_for_line_number= s.mid(i_left_parenthesis + 1, (i_first_comma - i_left_parenthesis) - 1);
   string_for_color= s.mid(i_first_comma + 1, (i_second_comma - i_first_comma) - 1);
   string_for_string= s.mid(i_second_comma + 1, (i_right_parenthesis - i_second_comma) - 1);
