@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.8.0 Alpha
-   Last modified: March 15 2016
+   Last modified: March 16 2016
 */
 
 /*
@@ -6710,7 +6710,19 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   //QString text;                      /* Todo: see if text should be a global */
   unsigned int statement_type;
 
-  statement_type= main_token_types[main_token_number];     /* We used to use main_statement_type */
+  for (int i= main_token_number;; ++i)
+  {
+    if (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_SLASH
+    ||  main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE
+    ||  main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
+    if (main_token_lengths[i] == 0)
+    {
+      statement_type= 0;
+      break;
+    }
+    statement_type= main_token_types[i];
+    break;
+  }
 
   //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
 
@@ -8998,6 +9010,7 @@ int MainWindow::find_start_of_body(QString text, int *i_of_function, int *i_of_d
          || (main_token_types[i] == TOKEN_KEYWORD_GEOMETRYCOLLECTION)
          || (main_token_types[i] == TOKEN_KEYWORD_INT)
          || (main_token_types[i] == TOKEN_KEYWORD_INTEGER)
+         // todo: || (main_token_types[i] == TOKEN_KEYWORD_JSON)
          || (main_token_types[i] == TOKEN_KEYWORD_LINESTRING)
          || (main_token_types[i] == TOKEN_KEYWORD_LONGBLOB)
          || (main_token_types[i] == TOKEN_KEYWORD_LONGTEXT)
@@ -11695,7 +11708,7 @@ void MainWindow::hparse_f_if_not_exists()
   }
 }
 
-void MainWindow::hparse_f_analyze_or_optimize(int who_is_calling)
+int MainWindow::hparse_f_analyze_or_optimize(int who_is_calling)
 {
   if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "NO_WRITE_TO_BINLOG") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCAL") == 1)) {;}
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE") == 1) {;}
@@ -11703,13 +11716,13 @@ void MainWindow::hparse_f_analyze_or_optimize(int who_is_calling)
         && (hparse_dbms == "mariadb")
         && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW") == 1))
     {;}
-  else hparse_f_error();
-  if (hparse_errno > 0) return;
+  else return 0;
   do
   {
     if (hparse_f_qualified_name() == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
   } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
+  return 1;
 }
 
 void MainWindow::hparse_f_character_set_or_collate()
@@ -14148,6 +14161,47 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ANALYZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
+    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_ANALYZE) == 1)
+    {
+      if (hparse_dbms == "mariadb")
+      {
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PERSISTENT") == 1)
+        {
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOR");
+          if (hparse_errno > 0) return;
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1) return;
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "COLUMNS");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
+          if (hparse_errno > 0) return;
+          for (;;)
+          {
+            if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+            {
+              if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ",") == 1) continue;
+            }
+            break;
+          }
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "INDEXES");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
+          if (hparse_errno > 0) return;
+          for (;;)
+          {
+            if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+            {
+              if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ",") == 1) continue;
+            }
+            break;
+          }
+          hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+          if (hparse_errno > 0) return;
+        }
+      }
+      return;
+    }
     if (hparse_dbms == "mariadb")
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FORMAT") == 1)
@@ -14160,7 +14214,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_explainable_statement() == 1) return;
       if (hparse_errno > 0) return;
     }
-    hparse_f_analyze_or_optimize(TOKEN_KEYWORD_ANALYZE);
+    hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_BEGIN_WORK, "BEGIN") == 1)
@@ -15319,7 +15373,7 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_OPTIMIZE, "OPTIMIZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_OPTIMIZE;
-    hparse_f_analyze_or_optimize(TOKEN_KEYWORD_OPTIMIZE);
+    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_OPTIMIZE) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_PREPARE, "PREPARE") == 1)
@@ -15398,24 +15452,15 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_REPAIR, "REPAIR") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_REPAIR;
-    if (hparse_token == "TABLE")
+    /* todo: somewhere I got the idea that "FROM MYSQL" is allowed in this vicinity. */
+    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_REPAIR) == 1)
     {
-      hparse_f_analyze_or_optimize(TOKEN_KEYWORD_REPAIR);
-      if (hparse_errno > 0) return;
       hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUICK");
       hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXTENDED");
       hparse_f_accept(TOKEN_TYPE_KEYWORD, "USE_FRM");
     }
-    else
-    {
-      hparse_f_analyze_or_optimize(TOKEN_KEYWORD_REPAIR);
-      if (hparse_errno > 0) return;
-      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FROM") == 1)
-      {
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "MYSQL");
-        if (hparse_errno > 0) return;
-      }
-    }
+    else hparse_f_error();
+    if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_REPLACE, "REPLACE"))
   {
@@ -15494,8 +15539,8 @@ void MainWindow::hparse_f_statement()
     hparse_f_accept(TOKEN_TYPE_KEYWORD, "WORK");
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TO") == 1)
     {
-      hparse_f_expect(TOKEN_TYPE_KEYWORD, "SAVEPOINT");
-      if (hparse_errno > 0) return;
+      /* it's not documented, but the word SAVEPOINT is optional */
+      hparse_f_accept(TOKEN_TYPE_KEYWORD, "SAVEPOINT");
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
       return;
