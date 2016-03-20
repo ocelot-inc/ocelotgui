@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 0.8.0</P>
+<P>Version 0.9.0</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -75,7 +75,7 @@ In that case, be up and running in 15 seconds with:</P>
 <PRE>
  mkdir ~/ocelotgui-test
  cd ~/ocelotgui-test
- wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
  tar -zxvf ocelotgui.tar.gz
  cd ocelotgui
  ./ocelotgui-qt4 #or ./ocelotgui-qt5
@@ -130,12 +130,12 @@ and also two binary (executable) files.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, the existence of the executables
 might be convenient. A release file is highlighted in green
-by github and is named ocelotgui.tar.gz. Thus release 0.8.0 is at
-https://github.com/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
-or https://github.com/pgulutzan/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz.
+by github and is named ocelotgui.tar.gz. Thus release 0.9.0 is at
+https://github.com/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
+or https://github.com/pgulutzan/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
 and click ocelotgui.tar.gz.</P>
@@ -254,7 +254,7 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <H3 id="an-installation-with-suse-411-from-source-in-release-tar">An installation with SUSE 42.1, from source in release tar</H3><HR>
 <P>
 <PRE>
- #This builds using the source files in the 0.8.0 "release"
+ #This builds using the source files in the 0.9.0 "release"
  #To produce an executable named ~/ocelotgui-test/ocelotgui/ocelotgui
  sudo zypper install libqt4-devel
  sudo zypper install libmysqlclient-devel
@@ -264,7 +264,7 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
  sudo zypper install make
  mkdir ~/ocelotgui-test
  cd ~/ocelotgui-test
- wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.8.0/ocelotgui.tar.gz
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
  tar -zxvf ocelotgui.tar.gz
  cd ocelotgui
  qmake -config release
@@ -397,7 +397,7 @@ read an ocelotgui.cpp comment that begins with the words
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 0.8.0, November 12 2015</P>
+<P>Version 0.9.0, March 18 2016</P>
 
 <P>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.</P>
   
@@ -427,7 +427,7 @@ with multi-line rows and resizable columns, and a debugger.</P>
 
 <P>Ocelot Computer Services is a Canadian company
 which has specialized in database products for thirty years.
-Its two employees both worked for MySQL AB and
+Its main employees worked for MySQL AB and
 Sun Microsystems and Oracle between 2003 and 2011.</P>
   
 <P>The ocelotgui program is a front end which connects to MySQL (tm) or MariaDB (tm).
@@ -438,11 +438,11 @@ It differs from some other front-end GUI products because
 it is open source (GPL), it is written in C++, and it makes use
 of the Qt multi-platform widget library.</P>
   
-<P>The product status is: alpha. It has been known to work as described in
-this manual on several Linux distros but it would be premature
-to recommend use with critical production systems. We are making only
-one guarantee, that we will try to address any bug reports
-and answer questions from people examining the source code.</P>
+<P>The product status is: beta. It has been known to work as described in
+this manual on several Linux distros. It is stable, in the sense that
+there are no known severe errors and the features are frozen until the
+version 1.0 release, which is planned for April 2016.
+Ocelot will address any bug reports and will answer any questions.</P>
  
 <H3 id="downloading-installing-and-building">Downloading, installing, and building</H3><HR>
 
@@ -513,10 +513,11 @@ scroll off the top after they are executed, with results in the middle.
 The usual control keys that work on other text editors will work
 here too; see the later description of Menu Item: Edit.</P>
   
-<P>The program includes a tokenizer and can recognize the parts of
-speech in typical MySQL grammar. It will do syntax highlighting
-by changing the color, for example comments will appear in red,
-identifiers in blue, operators in green, and so on.  
+<P>The program includes a syntax checker and can recognize the parts of
+speech in MySQL grammar.
+It will do syntax highlighting
+by changing the color, for example comments will appear in light green,
+identifiers in green, operators in dark gray, and so on.  
 The colors can be
 customized, see the later description of Menu Item: Settings.</P>
 <P>
@@ -528,13 +529,23 @@ Client Statements: Prompt.
 <P>
 <A href="statement-widget-example"><img src="statement-widget-example.png" alt="statement-widget-example.png" align="right" height="82"></A>
 For example, this screenshot shows the statement widget
- after the user has changed the default prompt and
+after the user has changed the default prompt and
 entered an SQL statement.
 The statement has keywords in magenta, literals in dark green,
 operators in light green, and comments in red.
 The prompt on the left has a gray background.
 <BR clear="all"> 
 </P>
+
+<P>Major Feature Alert: this is not merely a GUI that only will
+highlight words that are in a list of keywords.
+This GUI will parse the complete MySQL or MariaDB grammar,
+without needing to ask the server. So the highlighting
+will be correct, syntax errors will be underlined in red,
+and -- since the parsing method is predictive -- there will be
+continuous hints about what word is expected next, and
+optionally an error message explaining suspected syntax problems
+before they to to the server.</P>
 
 <P>Once a statement has been entered and is ready to be executed,
 the user can hit control-E, choose menu item Run|Execute, or
@@ -768,7 +779,7 @@ which can be moved or resized.
 </P>
 <P>
 <A href="special-settings"><img src="special-settings.png" alt="special-settings.png" align="right" height="512"></A>
-Colors: The Colors and fonts dialog boxes have a simpler way to choose
+Colors: The Colors and fonts dialog boxes have a simple way to choose
 colors, by selecting from a choice of 148 color names / color icons. Users can also
 change colors by saying SET object_name_color = color-name | hex-rgb-value.  
 In fact ocelotgui mixes the modes: for example if a user chooses Settings | Grid Text Color,
@@ -777,6 +788,52 @@ statement "SET ocelot_grid_text_color = 'Red'". This makes the instruction
 easy to repeat or put in a script.
 <BR clear="all">
 </P>
+
+<P>RE: SQL_MODE. To distinguish between literals and identifiers enclosed
+in double quotes, ocelotgui needs to know the value of sql_mode (ansi_quotes).
+It calculates this automatically; however, in rare circumstances it can
+fail to detect changes on the server. If that appears to be the case, say
+SET SESSION SQL_MODE = @@SESSION.SQL_MODE; to update it.</P>
+
+<P>RE: TAB COMPLETION. While a user is entering an SQL statement,
+ocelotgui will display a list of possible words that may follow.
+Hitting the Tab key will cause the first word in the list to be
+displayed and accepted.</P>
+
+<P>RE: HINTING FOR COLUMN NAMES. Although hints for syntax appear by
+default, hints for table / column identifiers do not. In order to
+make identifiers appear on the hint list: (1) ensure the setting
+for auto_rehash has not been turned off; (2) enter the statement
+"REHASH;" to make the client ask the server for a list of identifiers
+in the current database; (3) when entering an SQL statement, type `
+(backtick) at the point where an identifier is expected.</P>
+
+<P>RE: FONT. By default, ocelotgui uses whatever font was in use
+at the time it started. This may be a bad choice. We strongly
+recommend switching to a fixed-pitch (mono) font, especially for
+the result-set displays, otherwise screen space is wasted.</P>
+
+<P>RE: PERMANENT CUSTOMIZING. Changes to settings can be done
+with the Settings menu items, but such changes are not permanent.
+So note the commands that ocelotgui performs when settings are
+changed, and paste them into a file. Later this file can be
+executed (for example with SOURCE file-name), whenever ocelotgui
+is started again. Alternatively, settings can be placed in my.cnf.</P>
+
+<P>RE: DEBUGGING WITH MYSQL 5.7. Oracle has made a significant
+incompatible behavior change in version 5.7, which affects the
+debugger. The current workaround is to say
+"set global show_compatibility_56=on;". We expect to have a
+more permanent fix for this problem in a forthcoming ocelotgui
+version.</P>
+
+<P>RE: CONNECTION DIALOG. As stated earlier, if a password is necessary
+to connect, it is sufficient to start ocelotgui with "--password=<i>password</i>"
+or by choosing File|Connect and typing a password in the Password
+field (the sixth field in the Connection Dialog Box). Also on the
+Connection Dialog Box, if the server is running on the same computer
+as the ocelotgui client, it is sometimes a good idea to enter
+'127.0.0.1' in the host field, instead of 'localhost'.</P>
 
 <H3 id="contact">Contact</H3><HR>
 

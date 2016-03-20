@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.8.0 Alpha
-   Last modified: March 16 2016
+   Version: 0.9.0 Beta
+   Last modified: March 18 2016
 */
 
 /*
@@ -502,7 +502,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="0.8 Alpha"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="0.9 Beta"; /* For --version. Make sure it's in manual too. */
 
 
 /* Global mysql definitions */
@@ -2432,7 +2432,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 0.8.0, November 18 2015  \
+  <BR>Version 0.9.0, March 18 2016  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -8306,6 +8306,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     "ASENSITIVE*",
     "BEFORE*",
     "BEGIN",
+"BETWEEN*",
     "BIGINT*",
     "BINARY*",
     "BIT",
@@ -8386,6 +8387,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     "FROM*",
     "FULLTEXT*",
     "FUNCTION",
+"GENERAL",
     "GENERATED*",
     "GEOMETRY",
     "GEOMETRYCOLLECTION",
@@ -8444,6 +8446,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     "LOOP*",
     "LOW_PRIORITY*",
     "MASTER_BIND*",
+"MASTER_HEARTBEAT_PERIOD",
     "MASTER_SSL_VERIFY_SERVER_CERT*",
     "MATCH*",
     "MAXVALUE*",
@@ -8467,7 +8470,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     "NULL*",
     "NUMERIC*",
     "ON*",
-    "OPTIMIZE",
+    "OPTIMIZE*",
     "OPTION*",
     "OPTIONALLY*",
     "OR*",
@@ -8491,7 +8494,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     "READS*",
     "READ_WRITE*",
     "REAL*",
-    "REFERENCES",
+    "REFERENCES*",
     "REGEXP*",
     "REHASH", /* Ocelot keyword */
     "RELEASE*",
@@ -8518,6 +8521,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     "SET*",
     "SHOW*",
     "SIGNAL*",
+"SLOW",
     "SMALLINT*",
     "SOURCE", /* Ocelot keyword */
     "SPATIAL*",
@@ -8576,6 +8580,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     "WHILE*",
     "WITH*",
     "WRITE*",
+"XOR*",
     "YEAR",
     "YEAR_MONTH*",
     "ZEROFILL*",
@@ -8644,15 +8649,15 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "327" */
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + 326);
+      /* If the following assert happens, you inserted/removed something without changing "332" */
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (332 - 1));
 
-      /* Search it with library binary-search. Assume 327 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch (key2, strvalues, 327, MAX_KEYWORD_LENGTH, (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 332 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch (key2, strvalues, 332, MAX_KEYWORD_LENGTH, (int(*)(const void*, const void*)) strcmp);
       if (p_item == NULL)
       {
         strcat(key2, "*");
-        p_item= (char*) bsearch (key2, strvalues, 327, MAX_KEYWORD_LENGTH, (int(*)(const void*, const void*)) strcmp);
+        p_item= (char*) bsearch (key2, strvalues, 332, MAX_KEYWORD_LENGTH, (int(*)(const void*, const void*)) strcmp);
         if (p_item != NULL)
         {
           main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_RESERVED);
@@ -8662,7 +8667,29 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
         index= ((((unsigned long)p_item - (unsigned long)strvalues)) / MAX_KEYWORD_LENGTH) + TOKEN_KEYWORDS_START;
-         main_token_types[i2]= index;
+        main_token_types[i2]= index;
+        if (connections_is_connected[0] == 1)
+        {
+          if ((index == TOKEN_KEYWORD_GET)
+           || (index == TOKEN_KEYWORD_IO_AFTER_GTIDS)
+           || (index == TOKEN_KEYWORD_IO_BEFORE_GTIDS)
+           || (index == TOKEN_KEYWORD_MASTER_BIND))
+          {
+            if (statement_edit_widget->dbms_version.contains("mariadb", Qt::CaseInsensitive) == true)
+            {
+              main_token_flags[i2]= (main_token_flags[i2] & (~TOKEN_FLAG_IS_RESERVED));
+            }
+          }
+          if ((index == TOKEN_KEYWORD_GENERATED)
+           || (index == TOKEN_KEYWORD_STORED)
+           || (index == TOKEN_KEYWORD_VIRTUAL))
+          {
+            if (statement_edit_widget->dbms_version.contains("5.7") == false)
+            {
+              main_token_flags[i2]= (main_token_flags[i2] & (~TOKEN_FLAG_IS_RESERVED));
+            }
+          }
+        }
       }
 #ifdef DEBUGGER
       else
@@ -19610,6 +19637,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
     dbs_pointer= result_grid->result_original_database_names;
     unsigned int column_number;
     unsigned int tefi= text_edit_frame_index_of_first_cell;
+
     for (column_number= 0; column_number < result_grid->result_column_count; )
     {
       text_edit_frame= result_grid->text_edit_frames[tefi];
@@ -19630,11 +19658,26 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       table_pointer= org_tables_pointer;
       org_tables_pointer+= table_length;
 
+      if (table_length == 0)
+      {
+        ++column_number;
+        ++tefi;
+        continue;
+      }
+
       memcpy(&db_length, dbs_pointer, sizeof(unsigned int));
       dbs_pointer+= sizeof(unsigned int);
       db_pointer= dbs_pointer;
       dbs_pointer+= db_length;
-      if (name_length == 0) continue; /* if in UNION or column-expression, skip it */
+
+      /* if in UNION or column-expression, skip it */
+      if ((name_length == 0) || (db_length == 0))
+      {
+        ++column_number;
+        ++tefi;
+        continue;
+      }
+
 
       char *p= text_edit_frame->content_pointer;
       int l;
@@ -19689,6 +19732,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       ++column_number;
       ++tefi;
     }
+
     /* We've got a string. If it's not blank, put it in the statement widget, overwriting. */
     /* It might be blank because user returned to the original values, if so wipe out. */
     MainWindow *m= result_grid->copy_of_parent;

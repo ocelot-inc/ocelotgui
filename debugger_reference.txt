@@ -3,7 +3,8 @@ Reference for the Ocelot GUI debugger (ocelotgui)
 
 Before trying to read this reference, it is a good idea to
 become familiar with the ocelotgui client and try out the
-simple demonstration on the ocelot.ca blog [here].
+simple demonstration on the ocelot.ca blog
+http://ocelot.ca/blog/blog/2015/03/02/the-ocelotgui-debugger/.
 
 Statements
 ----------
