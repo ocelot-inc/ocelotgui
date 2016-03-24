@@ -311,7 +311,7 @@ and will have different names for the Qt packages.</P>
 <H3 id="installing-by-rebuilding-source-on-ubuntu-1504">Installing by rebuilding source, on Ubuntu 15.04</H3><HR>
 <P>
 <PRE>
- #These steps have been known to work for an experiment.
+ #These steps also work with Ubuntu 15.10.
 
  #Get Qt libraries. The message "already installed" might appear.
  sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools
@@ -325,15 +325,15 @@ and will have different names for the Qt packages.</P>
  cd ~/ocelotgui
  #Following might have to be /usr/lib/x86_64-linux-gnu/qt5/bin/qmake
  qmake
+ #If this is not the first time, say "make clean" before saying "make"
  make
  #Start the program to make sure it starts (stop again with File|Exit or ^Q).
  ./ocelotgui</PRE></P>
 
 <H3 id="installing-by-rebuilding-source-with-qt-creator">Installing by rebuilding source, with Qt Creator</H3><HR>
 <P>
-For any version or common distro, one can download Qt Creator
-from the Qt download site <A HREF="http://qt-project.org/downloads">http://qt-project.org/downloads</A>.
-When confronted with the "License Agreement" dialog box,
+For any version or common distro, one can download Qt Creator.
+If confronted with a "License Agreement" dialog box,
 remember that ocelotgui is licensed under GPL version 2,
 so we recommend picking LGPL and re-conveying as GPL.</P>
 

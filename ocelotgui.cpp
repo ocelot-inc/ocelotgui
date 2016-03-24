@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: March 18 2016
+   Last modified: March 24 2016
 */
 
 /*
@@ -975,9 +975,16 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
         text= statement_edit_widget->toPlainText();
         if (word.left(1) != "[")
         {
-          QString new_text= text.left(main_token_offsets[i]);
+          int offset;
+          if (main_token_lengths[i] == 0)
+          {
+            offset= text.size();
+            word= " " + word;
+          }
+          else offset= main_token_offsets[i];
+          QString new_text= text.left(offset);
           new_text.append(word);
-          int rest_start= main_token_offsets[i] + main_token_lengths[i];
+          int rest_start= offset + main_token_lengths[i];
           new_text.append(text.right(text.size() - rest_start));
           statement_edit_widget->setPlainText(new_text);
           QTextCursor c= statement_edit_widget->textCursor();
@@ -13307,25 +13314,27 @@ void MainWindow::hparse_f_explain_or_describe()
 
    We need lookahead here to check for GRANT token TO|ON, but if token is
    a role we don't need to worry about GRANT role [, role...] -- see
-   https://jira.mariadb.org/browse/MDEV-5772. Affect non-reserved words are:
-   event, execute, file, proxy, reload, replication, server, shutdown.
+   https://jira.mariadb.org/browse/MDEV-5772. Affected non-reserved words are:
+   event, execute, file, proxy, reload, replication, shutdown, super.
 */
 void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_seen)
 {
   *role_name_seen= false;
+  bool next_must_be_id= false;
   if (hparse_dbms == "mariadb")
   {
     hparse_f_next_nexttoken();
-    if (hparse_next_token.toUpper() != "ON")
+    if ((hparse_next_token.toUpper() == "TO") && (who_is_calling == TOKEN_KEYWORD_GRANT))
     {
-      if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) /* possible role name? */
-      {
-        *role_name_seen= true;
-        return;
-      }
+      next_must_be_id= true;
+    }
+    else if ((hparse_next_token.toUpper() == "FROM") && (who_is_calling == TOKEN_KEYWORD_REVOKE))
+    {
+      next_must_be_id= true;
     }
   }
   bool is_maybe_all= false;
+  int count_of_grants= 0;
   do
   {
     int priv_type= 0;
@@ -13365,17 +13374,17 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
       priv_type= TOKEN_KEYWORD_DROP;
       is_maybe_all= false;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EVENT") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EVENT") == 1))
     {
       priv_type= TOKEN_KEYWORD_EVENT;
       is_maybe_all= false;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXECUTE") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXECUTE") == 1))
     {
       priv_type= TOKEN_KEYWORD_EXECUTE;
       is_maybe_all= false;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FILE") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FILE") == 1))
     {
       priv_type= TOKEN_KEYWORD_FILE;
       is_maybe_all= false;
@@ -13409,7 +13418,7 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
       priv_type= TOKEN_KEYWORD_PROCESS;
       is_maybe_all= false;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PROXY") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PROXY") == 1))
     {
       priv_type= TOKEN_KEYWORD_PROXY;
       is_maybe_all= false;
@@ -13419,12 +13428,12 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
       priv_type= TOKEN_KEYWORD_REFERENCES;
       is_maybe_all= false;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELOAD") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELOAD") == 1))
     {
       priv_type= TOKEN_KEYWORD_RELOAD;
       is_maybe_all= false;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REPLICATION") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REPLICATION") == 1))
     {
       priv_type= TOKEN_KEYWORD_REPLICATION;
       is_maybe_all= false;
@@ -13447,12 +13456,12 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
       else hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SHUTDOWN") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SHUTDOWN") == 1))
     {
       priv_type= TOKEN_KEYWORD_SHUTDOWN;
       is_maybe_all= false;
     }
-    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SUPER") == 1)
+    else if ((next_must_be_id == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SUPER") == 1))
     {
       priv_type= TOKEN_KEYWORD_SUPER;
       is_maybe_all= false;
@@ -13474,10 +13483,21 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
     }
     else
     {
+      if ((hparse_dbms == "mariadb")
+       && (hparse_next_token.toUpper() != "ON")
+       && (hparse_next_token != ",")
+       && (hparse_next_token != "(")
+       && (count_of_grants == 0)
+       && (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)) /* possible role name? */
+      {
+        *role_name_seen= true;
+        return;
+      }
       hparse_f_error();
       is_maybe_all= false;
     }
     if (hparse_errno > 0) return;
+    ++count_of_grants;
     if ((priv_type == TOKEN_KEYWORD_SELECT)
      || (priv_type == TOKEN_KEYWORD_INSERT)
      || (priv_type == TOKEN_KEYWORD_UPDATE))
