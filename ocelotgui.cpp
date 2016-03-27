@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: March 24 2016
+   Last modified: March 27 2016
 */
 
 /*
@@ -10103,13 +10103,13 @@ void MainWindow::hparse_f_table_escaped_table_reference()
 int MainWindow::hparse_f_table_reference(int who_is_calling)
 {
   {
-
     int saved_hparse_i= hparse_i;
     int saved_hparse_token_type= hparse_token_type;
     QString saved_hparse_token= hparse_token;
 
     if (hparse_f_table_factor() == 1)
     {
+      /* todo: figure out whether the word OUTER is on this list correctly */
       if (who_is_calling == TOKEN_KEYWORD_JOIN) return 1;
       if ((hparse_f_accept(TOKEN_KEYWORD_INNER, "INNER") == 1)
        || (hparse_f_accept(TOKEN_KEYWORD_CROSS, "CROSS") == 1)
@@ -10125,6 +10125,19 @@ int MainWindow::hparse_f_table_reference(int who_is_calling)
         hparse_token= saved_hparse_token;
         if (hparse_f_table_join_table() == 1)
         {
+          /* Despite the BNF MySQL accepts a series of LEFTs and RIGHTs */
+          /* todo: check for other cases where MySQL accepts a series */
+          for (;;)
+          {
+            if ((QString::compare(hparse_token, "LEFT", Qt::CaseInsensitive) == 0)
+             || (QString::compare(hparse_token, "RIGHT", Qt::CaseInsensitive) == 0)
+             || (QString::compare(hparse_token, "NATURAL", Qt::CaseInsensitive) == 0))
+            {
+              if (hparse_f_table_join_table() == 0) break;
+              if (hparse_errno > 0) return 0;
+            }
+            else break;
+          }
           return 1;
         }
         hparse_f_error();
@@ -17335,8 +17348,16 @@ int MainWindow::hparse_f_client_statement()
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(TOKEN_KEYWORD_STATUS, "STATUS") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(TOKEN_KEYWORD_TEE, "TEE") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1))
+  {
+    hparse_f_other(1);
+    if (hparse_errno > 0) return 0;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(TOKEN_KEYWORD_TEE, "TEE") == 1))
+  {
+    hparse_f_other(1);
+    if (hparse_errno > 0) return 0;
+  }
   else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(TOKEN_KEYWORD_USE, "USE") == 1))
   {
     if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
