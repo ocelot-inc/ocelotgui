@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: March 27 2016
+   Last modified: April 1 2016
 */
 
 /*
@@ -109,7 +109,7 @@
   General comments
 
   These are comments about the code.
-  The user manual and blog comments are elsewhere; look at manual.htm
+  The user manual and blog comments are elsewhere; look at README.md or manual.htm
   or README.txt or ocelot.ca or ocelot.ca/blog or the repository that
   this program was downloaded from, probably github.com/ocelot-inc/ocelotgui.
 
@@ -423,6 +423,7 @@ static const char *s_color_list[308]=
   static char* ocelot_plugin_dir_as_utf8= 0;        /* --plugin_dir=s for MYSQL_PLUGIN_DIR */
   static unsigned short ocelot_print_defaults= 0;   /* --print_defaults */
   /* QString ocelot_prompt */                       /* --prompt=s */
+  static bool ocelot_prompt_is_default= true;
   static unsigned short ocelot_quick= 0;            /* --quick */
   static unsigned short ocelot_raw= 0;              /* --raw */
   static unsigned int ocelot_opt_reconnect= 0;      /* --reconnect for MYSQL_OPT_RECONNECT */                                           /* --reconnect */
@@ -463,8 +464,10 @@ static const char *s_color_list[308]=
   static unsigned int ocelot_opt_read_timeout= 0;          /* for MYSQL_OPT_READ_TIMEOUT */
   static unsigned short int ocelot_report_data_truncation= 0; /* for MYSQL_REPORT_DATA_TRUNCATION */
   static unsigned short int ocelot_opt_use_result= 0; /* for MYSQL_OPT_USE_RESULT */
-  /* It's easy to increase ocelot_grid_tabs so more multi results are seen but then start time is longer. */
-  static unsigned short int ocelot_grid_tabs= 2;
+  /* It's easy to increase ocelot_grid_tabs so more multi results are seen but don't make it ridiculous. */
+  static unsigned short int ocelot_grid_tabs= 16;
+  static unsigned short int ocelot_grid_actual_tabs= 0; /* Todo: move this, it's not an option. */
+  static unsigned short int ocelot_client_side_functions= 1;
 
   /* Items affecting history which cannot be changed except by modifying + rebuilding */
   //static unsigned int ocelot_history_max_column_width= 10;
@@ -692,29 +695,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ui->menuBar->setStyleSheet(ocelot_menu_style_string);
   initialize_widget_history();
 
-  initialize_widget_statement();
-  {
-    ResultGrid *r;
-    int i_r;
-    for (i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
-    {
-      r= new ResultGrid(lmysql, this);
-      result_grid_tab_widget->addTab(r, QString::number(i_r + 1));
-      r->hide(); /* Maybe this isn't necessary */
-    }
-    for (i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
-    {
-      r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-      assert(r != 0);
-      r->installEventFilter(this); /* must catch fontChange, show, etc. */
-      r->grid_vertical_scroll_bar->installEventFilter(this);
-    }
-    for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
-    {
-      r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-      r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
-    }
-  }
+  initialize_widget_statement();  
+  result_grid_add_tab();
 
   main_layout->addWidget(history_edit_widget);
   main_layout->addWidget(result_grid_tab_widget);
@@ -771,6 +753,44 @@ void MainWindow::resizeEvent(QResizeEvent *ev)
     main_window_maximum_height= main_window_size.height();
 }
 
+/*
+  Normally there is only one result set, and therefore only one tab,
+  and we hide the tabbing if there is only one tab. Abnormally there
+  is more than one because a stored procedure does more than one SELECT.
+  We call this at start, and we call this when we need a new tab.
+  We never delete. That might be bad because Settings changes will be slower.
+  We have:
+  ocelot_grid_tabs. The maximum. Default 16. Settable with --ocelot_grid_tabs=n.
+  result_grid_tab_widget. What we add the tabs to.
+  ocelot_grid_actual_tabs. When we successfully add a tab, this goes up.
+  Return 0 for success, 1 for failure (failure is probably because we hit maximum).
+*/
+int MainWindow::result_grid_add_tab()
+{
+  ResultGrid *r;
+  int i_r= ocelot_grid_actual_tabs;
+  if ((ocelot_grid_actual_tabs >= ocelot_grid_tabs)
+  && (ocelot_grid_tabs != 0))
+    return 1;
+  {
+    r= new ResultGrid(lmysql, this);
+    int new_tab_index= result_grid_tab_widget->addTab(r, QString::number(i_r + 1));
+    assert(new_tab_index == i_r);
+    r->hide(); /* Maybe this isn't necessary */
+  }
+  {
+    r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+    assert(r != 0);
+    r->installEventFilter(this); /* must catch fontChange, show, etc. */
+    r->grid_vertical_scroll_bar->installEventFilter(this);
+  }
+  {
+    r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+    r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
+  }
+  ++ocelot_grid_actual_tabs;
+  return 0;
+}
 
 /*
   Initialize statement_edit_widget. Assume "statement_edit_widget= new CodeEditor();" already done.
@@ -861,7 +881,6 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 
 //  if (obj == result_grid_table_widget[0]->grid_vertical_scroll_bar)
 //  {
-//    /* BING */
 //    /*
 //      Probably some of these events don't cause scroll bar value to change,
 //      I've only seen that happen for MouseMove and MouseButtonRelease.
@@ -876,10 +895,9 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 //    ||  (event->type() == QEvent::MouseTrackingChange)) return (result_grid_table_widget->scroll_event());
 //  }
 
-
   {
     ResultGrid* r;
-    for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
+    for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
     {
       r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
       if (obj == r)
@@ -6542,7 +6560,7 @@ void MainWindow::action_execute_one_statement(QString text)
 
           {
             ResultGrid *r;
-            for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
+            for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
             {
               r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
               r->garbage_collect();
@@ -6555,7 +6573,7 @@ void MainWindow::action_execute_one_statement(QString text)
                       connections_dbms[0],
                       this,
                       is_vertical, ocelot_result_grid_column_names,
-                      lmysql, ocelot_line_numbers);
+                      lmysql, ocelot_client_side_functions);
             result_grid_tab_widget->setCurrentWidget(r);
             result_grid_tab_widget->tabBar()->hide();
             r->show();
@@ -6593,7 +6611,6 @@ void MainWindow::action_execute_one_statement(QString text)
             int result_grid_table_widget_index= 1;
             for (;;)
             {
-
               dbms_long_query_state= LONG_QUERY_STATE_STARTED;
               pthread_create(&thread_id, NULL, &dbms_long_next_result_thread, NULL);
 
@@ -6605,14 +6622,28 @@ void MainWindow::action_execute_one_statement(QString text)
               }
               pthread_join(thread_id, NULL);
 
-              if (dbms_long_query_result != 0) break;
+              if (dbms_long_query_result != 0)
+              {
+                /* If mysql_next_result) == 1 means error, -1 means no more. */
+                /* TODO: don't do this for SOURCE. Check for beep. */
+                if (dbms_long_query_result == 1)
+                {
+                  put_diagnostics_in_result();
+                  history_markup_append("", true);
+                }
+                break;
+              }
 
               mysql_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
 
               /* I think the following will help us avoid the "status" return. */
               if (mysql_res == NULL) continue;
+              if (result_grid_table_widget_index == ocelot_grid_actual_tabs)
+              {
+                result_grid_add_tab();
+              }
 
-              if (result_grid_table_widget_index < ocelot_grid_tabs)
+              if (result_grid_table_widget_index < ocelot_grid_actual_tabs)
               {
                 ResultGrid* r;
                 r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(result_grid_table_widget_index));
@@ -6625,7 +6656,7 @@ void MainWindow::action_execute_one_statement(QString text)
                           is_vertical,
                           ocelot_result_grid_column_names,
                           lmysql,
-                          ocelot_line_numbers);
+                          ocelot_client_side_functions);
                 r->show();
 
                 //Put in something based on this if you want extra results to go to history:
@@ -6911,10 +6942,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else
     {
       statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
+      ocelot_prompt= statement_edit_widget->prompt_default;
+      ocelot_prompt_is_default= false;
       /* Todo: output a message */
       return 1;
     }
     statement_edit_widget->prompt_as_input_by_user= s;
+    ocelot_prompt= s;
+    ocelot_prompt_is_default= false;
     put_message_in_result(tr("OK"));
     return 1;
   }
@@ -7375,7 +7410,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       {
         ResultGrid* r;
         make_style_strings();
-        for (int i_r= 0; i_r < ocelot_grid_tabs; ++i_r)
+        for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
         {
           r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
           r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
@@ -9394,10 +9429,24 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   statement_edit_widget->result= tr("OK");
 
   /*
-    Todo: This overrides any earlier PROMPT statements by user.
-    Probably what we want is a flag: "if user did PROMPT, don't override it."
-    Or we want PROMPT statement to change ocelot_prompt.
+    Initially ocelot_prompt == "mysql>" and ocelot_prompt_is_default == true.
+    It might have changed if getenv("MYSQL_PS1") returned something.
+    It might have changed if --prompt = prompt-format was specified.
+    We can override it with "mariadb>" if the client library comes from MariaDB.
+    That is, we depend on mysql_get_client_info() not mysql_get_host_info().
+    That is, we say "mariadb>" although mariadb's client would probably say "\N [\d]>".
+    For example mysql_get_client_info() might return "10.0.4-MariaDB".
+    We'll set ocelot_prompt_is_default= false to ensure this only happens once.
+    We are hoping that following statements don't override eaerlier PROMPT statements by user.
   */
+  if (ocelot_prompt_is_default == true)
+  {
+    QString s;
+    s= lmysql->ldbms_mysql_get_client_info();
+    if (s.contains("MariaDB", Qt::CaseInsensitive) == true) ocelot_prompt= "mariadb>";
+    ocelot_prompt_is_default= false;
+  }
+
   statement_edit_widget->prompt_default= ocelot_prompt;
   statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
 
@@ -19522,8 +19571,7 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
           {
             if (content_pointer == 0)
             {
-              if (is_row_number_flag == true) text_edit->setText(QString::number(ancestor_grid_result_row_number + 1));
-              else text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
+              text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
             }
             else text_edit->setText(QString::fromUtf8(content_pointer, content_length));
           }
@@ -19641,8 +19689,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
   int xrow;
   if ((content_in_cell_before_keypress != content_in_cell_after_keypress)
    && (text_edit_frame_of_cell->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
-   && (text_edit_frame_of_cell->is_image_flag == false)
-   && (text_edit_frame_of_cell->is_row_number_flag == false))
+   && (text_edit_frame_of_cell->is_image_flag == false))
   {
     xrow= text_edit_frame_of_cell->ancestor_grid_result_row_number;
 
@@ -19682,8 +19729,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
     for (column_number= 0; column_number < result_grid->result_column_count; )
     {
       text_edit_frame= result_grid->text_edit_frames[tefi];
-      if ((text_edit_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
-       || (text_edit_frame->is_row_number_flag == true))
+      if (text_edit_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
       {
         ++tefi;
         continue;
@@ -20132,6 +20178,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     char *tmp_ocelot_prompt;
     tmp_ocelot_prompt= getenv("MYSQL_PS1");
     ocelot_prompt= tmp_ocelot_prompt;
+    ocelot_prompt_is_default= false;
   }
 
   if (getenv("MYSQL_PWD") != 0)
@@ -20993,6 +21040,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_current_line_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_syntax_checker") == 0)
   { ocelot_statement_syntax_checker= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_client_side_functions") == 0) { ocelot_client_side_functions= is_enable; return; }
 
   if (strcmp(token0_as_utf8, "one_database") == 0) { ocelot_one_database= is_enable; return; }
   if (strcmp(token0_as_utf8, "pager") == 0) { ocelot_pager= is_enable; return; }
@@ -21018,7 +21066,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
   if (strcmp(token0_as_utf8, "print_defaults") == 0) { ocelot_print_defaults= is_enable; return; }
-  if (strcmp(token0_as_utf8, "prompt") == 0) { ocelot_prompt= token2; return; }
+  if (strcmp(token0_as_utf8, "prompt") == 0) { ocelot_prompt= token2; ocelot_prompt_is_default= false; return; }
   if ((token0_length >= sizeof("prot") - 1) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
   {
     ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */

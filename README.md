@@ -335,7 +335,10 @@ and will have different names for the Qt packages.</P>
 For any version or common distro, one can download Qt Creator.
 If confronted with a "License Agreement" dialog box,
 remember that ocelotgui is licensed under GPL version 2,
-so we recommend picking LGPL and re-conveying as GPL.</P>
+so we recommend picking LGPL and re-conveying as GPL.
+Do not accept any request to grant any additional rights
+to Qt's manufacturer.
+</P>
 
 <P>Make sure a C++ compiler such as g++ is installed first.</P>
 
@@ -371,10 +374,6 @@ If you get a message "cannot find -lGL" when you
 try to run the project, try to install GL.
 With Ubuntu: sudo apt-get install libgl1-mesa-dev.
 With Fedora: sudo yum install mesa-libGL-devel.</P>
-
-<P>Ocelot itself uses Qt Creator regularly,
-and it is simple to install for most Linux distros. However,
-it requires a large amount of disk space.</P>
 
 <P>For more commentary about compiling and building,
 read an ocelotgui.cpp comment that begins with the words
@@ -834,6 +833,11 @@ field (the sixth field in the Connection Dialog Box). Also on the
 Connection Dialog Box, if the server is running on the same computer
 as the ocelotgui client, it is sometimes a good idea to enter
 '127.0.0.1' in the host field, instead of 'localhost'.</P>
+
+<P>RE: ROW NUMBERS. Ocelot will replace the value 'ocelot_row_number()'
+with the row number within the result set. For example, try<br>
+SELECT 'ocelot_row_number()', table_name.* FROM table_name;<br>
+To disable this feature, start ocelotgui with --ocelot_client_side_functions=0.</P>
 
 <H3 id="contact">Contact</H3><HR>
 

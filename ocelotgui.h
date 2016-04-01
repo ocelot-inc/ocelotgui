@@ -547,6 +547,7 @@ private:
 
   int history_markup_previous_or_next();
   void initialize_widget_history();
+  int result_grid_add_tab();
   void initialize_widget_statement();
 #ifdef DEBUGGER
   void debug_menu_enable_or_disable(int statement_type);
@@ -1198,8 +1199,6 @@ public:
   bool is_retrieved_flag;
   bool is_style_sheet_set_flag;
   bool is_image_flag;                    /* true if data type = blob and appropriate flag is on */
-  bool is_row_number_flag; /* true if row number. also consider "SELECT ocelot_row_number() ..." */
-
 
 protected:
   void mousePressEvent(QMouseEvent *event);
@@ -1727,6 +1726,7 @@ public:
   typedef unsigned long*  (*tmysql_fetch_lengths)(MYSQL_RES *);
   typedef MYSQL_ROW       (*tmysql_fetch_row)    (MYSQL_RES *);
   typedef void            (*tmysql_free_result)  (MYSQL_RES *);
+  typedef const char*     (*tmysql_get_client_info) (void);
   typedef const char*     (*tmysql_get_host_info)(MYSQL *);
   typedef const char*     (*tmysql_info)         (MYSQL *);
   typedef MYSQL*          (*tmysql_init)         (MYSQL *);
@@ -1815,6 +1815,7 @@ public:
   tmysql_fetch_lengths t__mysql_fetch_lengths;
   tmysql_fetch_row t__mysql_fetch_row;
   tmysql_free_result t__mysql_free_result;
+  tmysql_get_client_info t__mysql_get_client_info;
   tmysql_get_host_info t__mysql_get_host_info;
   tmysql_info t__mysql_info;
   tmysql_init t__mysql_init;
@@ -2059,6 +2060,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__mysql_fetch_lengths= (tmysql_fetch_lengths) dlsym(dlopen_handle, "mysql_fetch_lengths"); if (dlerror() != 0) s.append("mysql_fetch_lengths ");
         t__mysql_fetch_row= (tmysql_fetch_row) dlsym(dlopen_handle, "mysql_fetch_row"); if (dlerror() != 0) s.append("mysql_fetch_rows ");
         t__mysql_free_result= (tmysql_free_result) dlsym(dlopen_handle, "mysql_free_result"); if (dlerror() != 0) s.append("mysql_free_result ");
+        t__mysql_get_client_info= (tmysql_get_client_info) dlsym(dlopen_handle, "mysql_get_client_info"); if (dlerror() != 0) s.append("mysql_get_client_info ");
         t__mysql_get_host_info= (tmysql_get_host_info) dlsym(dlopen_handle, "mysql_get_host_info"); if (dlerror() != 0) s.append("mysql_get_host_info ");
         t__mysql_info= (tmysql_info) dlsym(dlopen_handle, "mysql_info"); if (dlerror() != 0) s.append("mysql_info ");
         t__mysql_init= (tmysql_init) dlsym(dlopen_handle, "mysql_init"); if (dlerror() != 0) s.append("mysql_init ");
@@ -2160,6 +2162,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_fetch_lengths= (tmysql_fetch_lengths) lib.resolve("mysql_fetch_lengths")) == 0) s.append("mysql_fetch_lengths ");
         if ((t__mysql_fetch_row= (tmysql_fetch_row) lib.resolve("mysql_fetch_row")) == 0) s.append("mysql_fetch_row ");
         if ((t__mysql_free_result= (tmysql_free_result) lib.resolve("mysql_free_result")) == 0) s.append("mysql_free_result ");
+        if ((t__mysql_get_client_info= (tmysql_get_client_info) lib.resolve("mysql_get_client_info")) == 0) s.append("mysql_get_client_info ");
         if ((t__mysql_get_host_info= (tmysql_get_host_info) lib.resolve("mysql_get_host_info")) == 0) s.append("mysql_get_host_info ");
         if ((t__mysql_info= (tmysql_info) lib.resolve("mysql_info")) == 0) s.append("mysql_info ");
         if ((t__mysql_init= (tmysql_init) lib.resolve("mysql_init")) == 0) s.append("mysql_init ");
@@ -2246,6 +2249,11 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   void ldbms_mysql_free_result(MYSQL_RES *result)
   {
     t__mysql_free_result(result);
+  }
+
+  const char *ldbms_mysql_get_client_info(void)
+  {
+    return t__mysql_get_client_info();
   }
 
   const char *ldbms_mysql_get_host_info(MYSQL *mysql)
@@ -2677,7 +2685,7 @@ public:
   MYSQL_RES *grid_mysql_res;
   unsigned short ocelot_result_grid_vertical_copy;
   unsigned short ocelot_result_grid_column_names_copy;
-  unsigned short ocelot_line_numbers_copy;
+  unsigned short ocelot_client_side_functions_copy;
   char *result_set_copy;                                     /* gets a copy of mysql_res contents, if necessary */
   char **result_set_copy_rows;                               /* dynamic-sized list of result_set_copy row offsets, if necessary */
   char *result_field_names;                                  /* gets a copy of mysql_fields[].name */
@@ -3006,7 +3014,7 @@ void fillup(MYSQL_RES *mysql_res,
             unsigned short ocelot_result_grid_vertical,
             unsigned short ocelot_result_grid_column_names,
             ldbms *passed_lmysql,
-            int ocelot_line_numbers)
+            int ocelot_client_side_functions)
 {
   long unsigned int xrow;
   unsigned int xcol;
@@ -3019,7 +3027,7 @@ void fillup(MYSQL_RES *mysql_res,
 
   ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
   ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
-  ocelot_line_numbers_copy= ocelot_line_numbers;
+  ocelot_client_side_functions_copy= ocelot_client_side_functions;
 
   grid_mysql_res= mysql_res;
 
@@ -3092,7 +3100,7 @@ else
 
   /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
 
-  copy_result_to_gridx(ocelot_line_numbers, connections_dbms);
+  copy_result_to_gridx(connections_dbms);
 
   /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
   hide();
@@ -3112,7 +3120,6 @@ else
     gridx_row_count= result_row_count * result_column_count;
     gridx_column_count= 1;
     if (ocelot_result_grid_column_names != 0) ++gridx_column_count;
-    if (ocelot_line_numbers != 0) ++gridx_column_count;
   }
 
   {
@@ -3237,8 +3244,7 @@ else
       {
         if (ocelot_result_grid_column_names != 0)
         {
-          if ((ocelot_line_numbers == 0) && (column_number == 0)) is_header= true;
-          if ((ocelot_line_numbers != 0) && (column_number == 1)) is_header= true;
+          if (column_number == 0) is_header= true;
         }
       }
       if ((ocelot_result_grid_vertical == 0) && (xrow == 0)) is_header= true;
@@ -3257,7 +3263,6 @@ else
           text_edit_frames[ki]->is_style_sheet_set_flag= false;
         }
         text_edit_frames[ki]->is_image_flag= false;
-        text_edit_frames[ki]->is_row_number_flag= false;
       }
       else
       {
@@ -3277,8 +3282,6 @@ else
             text_edit_frames[ki]->is_style_sheet_set_flag= false;
           }
         }
-        if (gridx_flags[column_number] == 1) text_edit_frames[ki]->is_row_number_flag= true;
-        else text_edit_frames[ki]->is_row_number_flag= false;
       }
     }
   }
@@ -3438,12 +3441,12 @@ else
    gridx_original_table_names
    gridx_original_database_names
    gridx_max_column_widths
-   gridx_flags                         row count | header | refer to result _ lists
+   gridx_flags                         header | refer to result _ lists
    gridx_field_types
    gridx_result_indexes                use as index for result_ lists
    gridx_column_count, gridx_row_count
 */
-void copy_result_to_gridx(int ocelot_line_numbers, int connections_dbms)
+void copy_result_to_gridx(int connections_dbms)
 {
   (void) connections_dbms; /* suppress "unused parameter" warning */
   unsigned int i, j;
@@ -3458,7 +3461,6 @@ void copy_result_to_gridx(int ocelot_line_numbers, int connections_dbms)
   if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
 
   gridx_column_count= result_column_count;
-  if (ocelot_line_numbers == 1) ++gridx_column_count;
   gridx_row_count= result_row_count;
   /* result_set_copy, result_set_copy_rows are left alone */
 
@@ -3468,10 +3470,6 @@ void copy_result_to_gridx(int ocelot_line_numbers, int connections_dbms)
 
   result_field_names_pointer= &result_field_names[0];
   unsigned int total_size= 0;
-  if (ocelot_line_numbers == 1)
-  {
-    total_size+= sizeof("row_count") + sizeof(unsigned int); /* arbitrary */
-  }
   for (i= 0; i < result_column_count; ++i)
   {
     memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
@@ -3483,14 +3481,6 @@ void copy_result_to_gridx(int ocelot_line_numbers, int connections_dbms)
 
   result_field_names_pointer= &result_field_names[0];
   gridx_field_names_pointer= &gridx_field_names[0];
-  if (ocelot_line_numbers)
-  {
-    v_lengths= sizeof("row_count");
-    memcpy(gridx_field_names_pointer, &v_lengths, sizeof(unsigned int));
-    gridx_field_names_pointer+= sizeof(unsigned int);
-    memcpy(gridx_field_names_pointer, "row_count", v_lengths);
-    gridx_field_names_pointer+= v_lengths;
-  }
   for (i= 0; i < result_column_count; ++i)
   {
     memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
@@ -3507,14 +3497,6 @@ void copy_result_to_gridx(int ocelot_line_numbers, int connections_dbms)
   gridx_flags= new unsigned char[gridx_column_count];
   gridx_field_types= new short unsigned int[gridx_column_count];
   j= 0;
-  if (ocelot_line_numbers == 1)
-  {
-    gridx_max_column_widths[0]= sizeof("row_count");
-    gridx_result_indexes[0]= 0;
-    gridx_flags[0]= 1;
-    gridx_field_types[0]= MYSQL_TYPE_LONG;
-    ++j;
-  }
   for (i= 0; i < result_column_count; ++i)
   {
     gridx_max_column_widths[j]= result_max_column_widths[i];
@@ -4018,8 +4000,20 @@ void scan_rows(unsigned int p_result_column_count,
       }
       else
       {
-        total_size+= sizeof(unsigned int) + sizeof(char);
-        total_size+= v_lengths[i];
+        if ((ocelot_client_side_functions_copy == 1)
+         && (v_lengths[i] == sizeof("ocelot_row_number()") - 1)
+         && (strncasecmp(v_row[i], "ocelot_row_number()", v_lengths[i]) == 0))
+        {
+          total_size+= sizeof(unsigned int) + sizeof(char);
+          char tmp[16];
+          sprintf(tmp, "%ld", v_r + 1);
+          total_size+= strlen(tmp);
+        }
+        else
+        {
+          total_size+= sizeof(unsigned int) + sizeof(char);
+          total_size+= v_lengths[i];
+        }
       }
     }
   }
@@ -4044,12 +4038,30 @@ void scan_rows(unsigned int p_result_column_count,
       }
       else
       {
-        if (v_lengths[i] > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_lengths[i];
-        memcpy(result_set_copy_pointer, &v_lengths[i], sizeof(unsigned int));
-        *(result_set_copy_pointer + sizeof(unsigned int))= 0;
-        result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
-        memcpy(result_set_copy_pointer, v_row[i], v_lengths[i]);
-        result_set_copy_pointer+= v_lengths[i];
+
+        if ((ocelot_client_side_functions_copy == 1)
+         && (v_lengths[i] == sizeof("ocelot_row_number()") - 1)
+         && (strncasecmp(v_row[i], "ocelot_row_number()", v_lengths[i]) == 0))
+        {
+          char tmp[16];
+          sprintf(tmp, "%ld", v_r + 1);
+          unsigned int v_length= strlen(tmp);
+          if (v_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_length;
+          memcpy(result_set_copy_pointer, &v_length, sizeof(unsigned int));
+          *(result_set_copy_pointer + sizeof(unsigned int))= 0;
+          result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
+          memcpy(result_set_copy_pointer, tmp, v_length);
+          result_set_copy_pointer+= v_length;
+        }
+        else
+        {
+          if (v_lengths[i] > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_lengths[i];
+          memcpy(result_set_copy_pointer, &v_lengths[i], sizeof(unsigned int));
+          *(result_set_copy_pointer + sizeof(unsigned int))= 0;
+          result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
+          memcpy(result_set_copy_pointer, v_row[i], v_lengths[i]);
+          result_set_copy_pointer+= v_lengths[i];
+        }
       }
     }
   }
@@ -4200,16 +4212,16 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       unsigned int o_text_edit_frames_index= text_edit_frames_index;
 
       /* result_column_number is still known */
-      if (ocelot_line_numbers_copy != 0)                         /* include row#? */
-      {
-        text_edit_frames[text_edit_frames_index]->content_length= 0;
-        text_edit_frames[text_edit_frames_index]->content_pointer= 0;
-        text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
-        text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
-        text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
-        text_edit_frames[text_edit_frames_index]->is_image_flag= false;
-        ++text_edit_frames_index;
-      }
+      //if (ocelot_client_side_functions_copy != 0)                         /* include row#? */
+      //{
+      //  text_edit_frames[text_edit_frames_index]->content_length= 0;
+      //  text_edit_frames[text_edit_frames_index]->content_pointer= 0;
+      //  text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
+      //  text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
+      //  text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
+      //  text_edit_frames[text_edit_frames_index]->is_image_flag= false;
+      //  ++text_edit_frames_index;
+      //}
       if (ocelot_result_grid_column_names_copy != 0)               /* include column header? */
       {
         char *result_field_names_pointer= &result_field_names[0];
@@ -4260,7 +4272,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       else text_edit_frames[text_edit_frames_index]->is_image_flag= false;
 
       int column_number_within_gridx= 0;
-      if (ocelot_line_numbers_copy != 0) gridx_max_column_widths[column_number_within_gridx++]= sizeof("row_number");
+
       if (ocelot_result_grid_column_names_copy != 0) gridx_max_column_widths[column_number_within_gridx++]= v_lengths;
 
       if (*(row_pointer - 1) == 1)
@@ -4273,14 +4285,14 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
                             0,
                             connections_dbms); /* get grid_column_widths[] and grid_column_heights[] */
       column_number_within_gridx= 0;
-      if (ocelot_line_numbers_copy != 0)
-      {
-        set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
-                                 column_number_within_gridx,
-                                 MYSQL_TYPE_SHORT);
-        text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
-        ++column_number_within_gridx;
-      }
+      //if (ocelot_client_side_functions_copy != 0)
+      //{
+      //  set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
+      //                           column_number_within_gridx,
+      //                           MYSQL_TYPE_SHORT);
+      //  text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
+      //  ++column_number_within_gridx;
+      //}
       if (ocelot_result_grid_column_names_copy != 0)
       {
         set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
