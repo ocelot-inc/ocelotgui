@@ -3321,16 +3321,25 @@ else
   */
   fill_detail_widgets(0, connections_dbms);                                             /* details */
 
-  /* We'll use the automatic scroll bar for small result sets, we'll use our own scroll bar for large ones. */
+  grid_vertical_scroll_bar_value= 0;
+  /*
+    We'll use the automatic scroll bar for small result sets,
+    we'll use our own scroll bar for large ones.
+    setValue() will cause eventfilter to call vertical_scroll_bar_event().
+    But grid_vertical_scroll_bar_value == 0 so nothing will happen except slider movement.
+    This section was changed on 2016-04-01.
+  */
   if (grid_result_row_count <= result_grid_widget_max_height_in_lines)
   {
     grid_scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
     grid_vertical_scroll_bar->setVisible(false);
+    grid_scroll_area->verticalScrollBar()->setValue(0);
   }
   else
   {
     grid_scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
     grid_vertical_scroll_bar->setVisible(true);
+    grid_vertical_scroll_bar->setValue(0);
   }
 
   is_paintable= 1;
