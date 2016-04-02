@@ -1,4 +1,4 @@
-Some details about ocelotgui options. Subject to change.
+Some details about ocelotgui options.
 
 An option is a named value which affects connecting and behavior.
 Most Ocelot options are very similar to options of the mysql client.
@@ -172,7 +172,7 @@ ignore_spaces. Ignored.
 ld_run_path. Where to look for libmysqlclient.so. Click help|libmysqlclient
 for details.
 
-line_numbers. If 1 (true), statement line numbers appear in the prompt.
+line_numbers. Ignored.
 
 local_infile. If 1 (true), passed to the server.
 
@@ -191,6 +191,35 @@ no_beep. Ignored, ocelotgui does not usually beep when errors occur.
 no_defaults. If 1 (true), options in environment variables and option
 files are read but not used.
 
+ocelot_* ... Options that begin with "ocelot_" are only recognized
+by the ocelotgui client. Everything on the Settings menu has an
+associated option name. The intuitively-named settings options are:
+ocelot_extra_rule_1_text_color ocelot_extra_rule_1_background_color
+ocelot_extra_rule_1_condition ocelot_extra_rule_1_display_as
+ocelot_grid_text_color ocelot_grid_background_color
+ocelot_grid_border_color ocelot_grid_header_background_color
+ocelot_grid_font_size ocelot_grid_font_style
+ocelot_grid_font_weight ocelot_grid_cell_border_color
+ocelot_grid_cell_drag_line_color ocelot_grid_border_size
+ocelot_grid_cell_border_size ocelot_grid_cell_drag_line_size
+ocelot_grid_tabs ocelot_history_text_color ocelot_history_background_color
+ocelot_history_border_color ocelot_history_font_family
+ocelot_history_font_size ocelot_history_font_style
+ocelot_history_font_weight ocelot_menu_text_color
+ocelot_menu_background_color ocelot_menu_border_color
+ocelot_menu_font_family ocelot_menu_font_size
+ocelot_menu_font_style ocelot_menu_font_weight
+ocelot_statement_text_color ocelot_statement_background_color
+ocelot_statement_border_color ocelot_statement_font_family
+ocelot_statement_font_size ocelot_statement_font_style
+ocelot_statement_font_weight ocelot_statement_highlight_literal_color
+ocelot_statement_highlight_identifier_color ocelot_statement_highlight_comment_color
+ocelot_statement_highlight_operator_color ocelot_statement_highlight_keyword_color
+ocelot_statement_prompt_background_color ocelot_statement_highlight_current_line_color
+Additionally, ocelot_statement_syntax_checker=1 turns on the
+syntax checker, and ocelot_client_side_functions=0 turns off
+the client-side functions.
+
 one_database. Ignored.
 
 pager. Ignored.
@@ -201,8 +230,11 @@ plugin_dir. Ignored.
 
 print_defaults. If 1 (true), ocelotgui displays defaults and exits.
 
-prompt. What to display on left of statement lines. Default is "mysql>"
-but there are several options that affect format.
+prompt. What to display on left of statement lines.
+Default is "mysql>" if libmysqlclient comes from Oracle,
+or "mariadb>" is libmysqlclient comes from MariaDB.
+The prompt can include special character sequences
+for date, time, and line number.
 
 quick. Ignored.
 
@@ -231,8 +263,7 @@ silent. Ignored.
 
 ssl, ssl_ca, ssl_capath, ssl_cert, ssl_cipher, ssl_crl,
 ssl_crlpath, ssl_key, ssl_verify_server_cert. SSL options
-are accepted and passed to the server; however, the effects
-have not been thoroughly tested.
+are accepted and passed to the server.
 
 syslog. Ignored.
 
@@ -252,13 +283,3 @@ per line.
 wait. Ignored.
 
 xml. Ignored.
-
-
-
-
-
-
-
-
-
-
