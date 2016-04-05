@@ -3802,15 +3802,28 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   /* Translate from char width+height to pixel width+height */
   QFontMetrics mm= QFontMetrics(*pointer_to_font);
   /* This was a bug: "this" might not have been updated by setStyleSheet() yet ... QFontMetrics mm(this->fontMetrics()); */
-  unsigned int max_width_of_a_char= mm.width("W");    /* not really a maximum unless fixed-width font */
-  max_height_of_a_char= mm.lineSpacing();             /* Actually this is mm.height() + mm.leading(). */
+  unsigned int max_width_of_a_char= mm.width("WWWW") / 4;/* not really a maximum unless fixed-width font */
 
-  /* KLUDGE. Small fonts don't work, we have to pretend they're wider. No, I don't know why. */
-  if (max_width_of_a_char <= 5) max_width_of_a_char+= 2;
-  if (max_height_of_a_char <= 11) max_height_of_a_char+= 3;
-
-  /* KlUDGE. Usually we don't need "+= 5" but before removing test with Courier New */
-  max_height_of_a_char+= 4;
+  /*
+     KLUDGE.
+     Small fonts don't work, we have to pretend they're wider. No, I don't know why.
+     Mono fonts seem to be more susceptible. Perhaps outline-versus-bitmap is a hint too.
+     Courier New is particularly awful, and we don't seem to be the only ones who've noticed, see
+     https://bitbucket.org/equalsraf/vim-qt/issues/59/undercurl-underline-or-even-underscore-not
+     One suggestion has been to set up the painter and get boundingrect.
+     One suggestion was to use more modern fonts like DejaVu sans mono.
+     Our earlier attempt for height was: if <=11 add 7, else add 4.
+     Incomprehensibly, sometimes leading and descent can be negative.
+     Anyway, the bizarre calculation for height is instead of
+     max_height_of_a_char= mm.lineSpacing()
+     and the bizarre calculation for width is just something that usually seems to work.
+     Todo: if you ever do Windows or Mac OS, you'll have to revisit this.
+  */
+  max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
+  if (max_width_of_a_char <= 6) max_width_of_a_char+= 3;
+  else if (max_width_of_a_char <= 7) max_width_of_a_char+= 2;
+  else if (max_width_of_a_char <= 11) max_width_of_a_char+= 2;
+  else if (max_width_of_a_char <= 14) max_width_of_a_char+= 1;
 
   sum_tmp_column_lengths= 0;
 
@@ -3830,8 +3843,8 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
     if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
     /* For explanation of next line, see comment "Extra size". Removed temporarily. */
     if ((grid_column_widths[i] < 2) && (ocelot_grid_cell_drag_line_size_as_int > 0)) grid_column_widths[i]= 2;
-    grid_column_widths[i]= (grid_column_widths[i] * max_width_of_a_char)
-                            + ocelot_grid_cell_border_size_as_int * 2
+    grid_column_widths[i]= grid_column_widths[i] * max_width_of_a_char;
+    grid_column_widths[i]+= ocelot_grid_cell_border_size_as_int * 2
                             + ocelot_grid_cell_drag_line_size_as_int;
     grid_column_widths[i]+= max_width_of_a_char; /* ?? something to do with border width, I suppose */
     sum_tmp_column_lengths+= grid_column_widths[i];

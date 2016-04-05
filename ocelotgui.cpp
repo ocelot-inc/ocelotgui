@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: April 1 2016
+   Last modified: April 4 2016
 */
 
 /*
@@ -5258,12 +5258,6 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
     line_number_2= q_line_number.toInt();
   }
 
-  printf("in debug_or_clear_go\n");
-  printf("  line_number_1=%d\n", line_number_1);
-  printf("  line_number_2=%d\n", line_number_2);
-  printf("  statement_type=%d\n", statement_type);
-  printf("  TOKEN_KEYWORD_DEBUG_BREAKPOINT=%d\n", TOKEN_KEYWORD_DEBUG_BREAKPOINT);
-
   for (int i= line_number_1; i <= line_number_2; ++i)
   {
     if (i > debug_widget[debug_widget_index]->blockCount())
@@ -6943,12 +6937,18 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     {
       statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
       ocelot_prompt= statement_edit_widget->prompt_default;
-      ocelot_prompt_is_default= false;
+#if QT_VERSION < 0x050000
+    emit statement_edit_widget->update_prompt_width(0);
+#endif
+      ocelot_prompt_is_default= false; /* todo: check: shouldn't this be true? */
       /* Todo: output a message */
       return 1;
     }
     statement_edit_widget->prompt_as_input_by_user= s;
     ocelot_prompt= s;
+#if QT_VERSION < 0x050000
+    emit statement_edit_widget->update_prompt_width(0);
+#endif
     ocelot_prompt_is_default= false;
     put_message_in_result(tr("OK"));
     return 1;
@@ -7241,7 +7241,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_statement_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        ocelot_statement_font_size= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
         put_message_in_result(tr("OK")); return 1;
@@ -7360,7 +7362,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        ocelot_grid_font_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_style", Qt::CaseInsensitive) == 0)
@@ -7393,17 +7397,23 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { put_message_in_result(tr("Unknown border size")); return 1; }
+        ocelot_grid_border_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_cell_border_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { put_message_in_result(tr("Unknown cell border size")); return 1; }
+        ocelot_grid_cell_border_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_grid_cell_drag_line_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { put_message_in_result(tr("Unknown cell drag line size")); return 1; }
+        ocelot_grid_cell_drag_line_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (is_result_grid_style_changed == true)
@@ -7484,7 +7494,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_history_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        ocelot_history_font_size= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         put_message_in_result(tr("OK")); return 1;
@@ -7544,7 +7556,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_size", Qt::CaseInsensitive) == 0)
       {
-        ocelot_menu_font_size= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        ocelot_menu_font_size= ccn;
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
@@ -9439,14 +9453,18 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     We'll set ocelot_prompt_is_default= false to ensure this only happens once.
     We are hoping that following statements don't override eaerlier PROMPT statements by user.
   */
+#if QT_VERSION >= 0x050000
   if (ocelot_prompt_is_default == true)
   {
     QString s;
     s= lmysql->ldbms_mysql_get_client_info();
-    if (s.contains("MariaDB", Qt::CaseInsensitive) == true) ocelot_prompt= "mariadb>";
-    ocelot_prompt_is_default= false;
+    if (s.contains("MariaDB", Qt::CaseInsensitive) == true)
+    {
+      ocelot_prompt= "mariadb>";
+      ocelot_prompt_is_default= false;
+    }
   }
-
+#endif
   statement_edit_widget->prompt_default= ocelot_prompt;
   statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
 
@@ -19003,7 +19021,6 @@ CodeEditor::CodeEditor(MainWindow *parent) : QPlainTextEdit(parent)
   */
   /* I decided "update_prompt_width(0);" here would be unnecessary since I redo prompt width after making a default etc. */
   highlightCurrentLine();
-
 }
 
 
@@ -19745,26 +19762,18 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       table_pointer= org_tables_pointer;
       org_tables_pointer+= table_length;
 
-      if (table_length == 0)
-      {
-        ++column_number;
-        ++tefi;
-        continue;
-      }
-
       memcpy(&db_length, dbs_pointer, sizeof(unsigned int));
       dbs_pointer+= sizeof(unsigned int);
       db_pointer= dbs_pointer;
       dbs_pointer+= db_length;
 
-      /* if in UNION or column-expression, skip it */
-      if ((name_length == 0) || (db_length == 0))
+      /* if in UNION or column-expression, or literal, skip it */
+      if ((name_length == 0) || (table_length == 0) || (db_length == 0))
       {
         ++column_number;
         ++tefi;
         continue;
       }
-
 
       char *p= text_edit_frame->content_pointer;
       int l;
