@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: April 4 2016
+   Last modified: April 5 2016
 */
 
 /*
@@ -6937,18 +6937,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     {
       statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
       ocelot_prompt= statement_edit_widget->prompt_default;
-#if QT_VERSION < 0x050000
-    emit statement_edit_widget->update_prompt_width(0);
-#endif
+    emit statement_edit_widget->update_prompt_width(0); /* not necessary with Qt 5.2 */
       ocelot_prompt_is_default= false; /* todo: check: shouldn't this be true? */
       /* Todo: output a message */
       return 1;
     }
     statement_edit_widget->prompt_as_input_by_user= s;
     ocelot_prompt= s;
-#if QT_VERSION < 0x050000
-    emit statement_edit_widget->update_prompt_width(0);
-#endif
+    emit statement_edit_widget->update_prompt_width(0); /* not necessary with Qt 5.2 */
     ocelot_prompt_is_default= false;
     put_message_in_result(tr("OK"));
     return 1;
@@ -9451,20 +9447,24 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     That is, we say "mariadb>" although mariadb's client would probably say "\N [\d]>".
     For example mysql_get_client_info() might return "10.0.4-MariaDB".
     We'll set ocelot_prompt_is_default= false to ensure this only happens once.
-    We are hoping that following statements don't override eaerlier PROMPT statements by user.
+    We are hoping that following statements don't override earlier PROMPT statements by user.
+    TODO: This had to be abandoned because it didn't work properly with Qt4.
+          Since I didn't know what the true problem was, or exactly which versions
+          will work, I cancelled it. The todo is: revive it.
   */
-#if QT_VERSION >= 0x050000
-  if (ocelot_prompt_is_default == true)
-  {
-    QString s;
-    s= lmysql->ldbms_mysql_get_client_info();
-    if (s.contains("MariaDB", Qt::CaseInsensitive) == true)
-    {
-      ocelot_prompt= "mariadb>";
-      ocelot_prompt_is_default= false;
-    }
-  }
-#endif
+  //{
+  //  if (ocelot_prompt_is_default == true)
+  //  {
+  //    QString s;
+  //    s= lmysql->ldbms_mysql_get_client_info();
+  //    if (s.contains("MariaDB", Qt::CaseInsensitive) == true)
+  //    {
+  //      ocelot_prompt= "mariadb>";
+  //    }
+  //    ocelot_prompt_is_default= false;
+  //  }
+  //}
+
   statement_edit_widget->prompt_default= ocelot_prompt;
   statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
 

@@ -522,7 +522,7 @@ customized, see the later description of Menu Item: Settings.</P>
 <P>
 The left side of the statement widget is reserved for the prompt,
 and cannot be typed over. Initially the prompt will be 'mysql&gt;'
-or 'mariadb&gt;', but this can be changed, see the later description of
+but this can be changed, see the later description of
 Client Statements: Prompt.  
 </P>
 <P>

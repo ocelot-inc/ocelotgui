@@ -231,8 +231,7 @@ plugin_dir. Ignored.
 print_defaults. If 1 (true), ocelotgui displays defaults and exits.
 
 prompt. What to display on left of statement lines.
-Default is "mysql>" if libmysqlclient comes from Oracle,
-or "mariadb>" is libmysqlclient comes from MariaDB.
+Default is "mysql>".
 The prompt can include special character sequences
 for date, time, and line number.
 
