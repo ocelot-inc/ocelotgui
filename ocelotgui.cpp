@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: April 5 2016
+   Last modified: April 6 2016
 */
 
 /*
@@ -534,6 +534,8 @@ static const char *s_color_list[308]=
   static ldbms *lmysql= 0;
 
   static bool is_mysql_library_init_done= false;
+
+  unsigned int mysql_errno_result= 0;
 
   QString hparse_dbms;
   QString hparse_text_copy;
@@ -6447,6 +6449,17 @@ void MainWindow::action_execute_one_statement(QString text)
 
     if (do_something == true)
     {
+
+      /*
+        If the last error was CR_SERVER_LOST 2013 or CR_SERVER_GONE_ERROR 2006,
+        and it might be possible to reconnect, try.
+        But if mysql_ping() fails, I don't see much that we can do.
+      */
+      if ((mysql_errno_result == 2006) || (mysql_errno_result == 2013))
+      {
+        if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_ping(&mysql[MYSQL_MAIN_CONNECTION]);
+      }
+
       /* todo: figure out why you used global dbms_query for this */
       /* TODO: BUG. This statement caused a crash when ocelot_comments == 0:
                create procedure p27 ()
@@ -7745,7 +7758,6 @@ void MainWindow::widget_sizer()
 */
 void MainWindow::put_diagnostics_in_result()
 {
-  unsigned int mysql_errno_result;
   unsigned int mysql_warning_count;
   char mysql_error_and_state[50]; /* actually we should need less than 50 */
   char elapsed_time_string[50];   /* actually we should need less than 50 */

@@ -1737,6 +1737,7 @@ public:
   typedef unsigned int    (*tmysql_num_fields)   (MYSQL_RES *);
   typedef my_ulonglong    (*tmysql_num_rows)     (MYSQL_RES *);
   typedef int             (*tmysql_options)      (MYSQL *, enum ocelot_option, const char *);
+  typedef int             (*tmysql_ping)         (MYSQL *);
   typedef int             (*tmysql_query)        (MYSQL *, const char *);
   typedef MYSQL*          (*tmysql_real_connect) (MYSQL *, const char *,
                                                   const char *,
@@ -1826,6 +1827,7 @@ public:
   tmysql_num_fields t__mysql_num_fields;
   tmysql_num_rows t__mysql_num_rows;
   tmysql_options t__mysql_options;
+  tmysql_ping t__mysql_ping;
   tmysql_query t__mysql_query;
   tmysql_real_connect t__mysql_real_connect;
   tmysql_real_query t__mysql_real_query;
@@ -2085,6 +2087,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__mysql_num_fields= (tmysql_num_fields) dlsym(dlopen_handle, "mysql_num_fields"); if (dlerror() != 0) s.append("mysql_num_fields ");
         t__mysql_num_rows= (tmysql_num_rows) dlsym(dlopen_handle, "mysql_num_rows"); if (dlerror() != 0) s.append("mysql_num_rows ");
         t__mysql_options= (tmysql_options) dlsym(dlopen_handle, "mysql_options"); if (dlerror() != 0) s.append("mysql_options ");
+        t__mysql_ping= (tmysql_ping) dlsym(dlopen_handle, "mysql_ping"); if (dlerror() != 0) s.append("mysql_ping ");
         t__mysql_query= (tmysql_query) dlsym(dlopen_handle, "mysql_query"); if (dlerror() != 0) s.append("mysql_query ");
         t__mysql_real_connect= (tmysql_real_connect) dlsym(dlopen_handle, "mysql_real_connect"); if (dlerror() != 0) s.append("mysql_real_connect ");
         t__mysql_real_query= (tmysql_real_query) dlsym(dlopen_handle, "mysql_real_query"); if (dlerror() != 0) s.append("mysql_real_query ");
@@ -2174,6 +2177,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_num_fields= (tmysql_num_fields) lib.resolve("mysql_num_fields")) == 0) s.append("mysql_num_fields ");
         if ((t__mysql_num_rows= (tmysql_num_rows) lib.resolve("mysql_num_rows")) == 0) s.append("mysql_num_rows ");
         if ((t__mysql_options= (tmysql_options) lib.resolve("mysql_options")) == 0) s.append("mysql_options ");
+        if ((t__mysql_ping= (tmysql_ping) lib.resolve("mysql_ping")) == 0) s.append("mysql_ping ");
         if ((t__mysql_query= (tmysql_query) lib.resolve("mysql_query")) == 0) s.append("mysql_query ");
         if ((t__mysql_real_connect= (tmysql_real_connect) lib.resolve("mysql_real_connect")) == 0) s.append("mysql_real_connect ");
         if ((t__mysql_real_query= (tmysql_real_query) lib.resolve("mysql_real_query")) == 0) s.append("mysql_real_query ");
@@ -2304,6 +2308,11 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   int ldbms_mysql_options(MYSQL *mysql, enum ocelot_option option, const char *arg)
   {
     return t__mysql_options(mysql, option, arg);
+  }
+
+  int ldbms_mysql_ping(MYSQL *mysql)
+  {
+    return t__mysql_ping(mysql);
   }
 
   int ldbms_mysql_query(MYSQL *mysql, const char *stmt_str)
