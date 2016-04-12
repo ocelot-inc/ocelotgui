@@ -226,6 +226,7 @@ public:
   QString ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color;
   QString ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color;
   QString ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color;
+  QString ocelot_statement_highlight_function_color, new_ocelot_statement_highlight_function_color;
   QString ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker;
   QString ocelot_statement_style_string;
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
@@ -611,10 +612,11 @@ private:
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
 
-  /* main_token_flags[] values. so far there are only three but we expect there will be more. */
+  /* main_token_flags[] values. so far there are only four but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
   #define TOKEN_FLAG_IS_BLOCK_END 2
   #define TOKEN_FLAG_IS_ERROR 4
+  #define TOKEN_FLAG_IS_FUNCTION 8
 
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
@@ -5397,6 +5399,7 @@ private slots:
   void handle_combo_box_for_color_pick_7();
   void handle_combo_box_for_color_pick_8();
   void handle_combo_box_for_color_pick_9();
+  void handle_combo_box_for_color_pick_10();
 */
 
 public:
@@ -5405,12 +5408,12 @@ public:
   QWidget *widget_3, *widget_for_font_dialog;
   QHBoxLayout *hbox_layout_3, *hbox_layout_for_font_dialog;
   QPushButton *button_for_cancel, *button_for_ok, *button_for_font_dialog;
-  QLabel *widget_colors_label, *widget_font_label;
+  QLabel *widget_font_label;
 
-  QWidget *widget_for_color[10];
-  QHBoxLayout *hbox_layout_for_color[10];
-  QLabel *label_for_color[10];
-  QLabel *label_for_color_rgb[10];
+  QWidget *widget_for_color[11];
+  QHBoxLayout *hbox_layout_for_color[11];
+  QLabel *label_for_color[11];
+  QLabel *label_for_color_rgb[11];
   QLabel *label_for_font_dialog;
 
   QWidget *widget_for_syntax_checker;
@@ -5423,8 +5426,8 @@ public:
   QLabel *label_for_size[3];
   QComboBox *combo_box_for_size[3];
 
-  QComboBox *combo_box_for_color_pick[10];
-  QLabel *label_for_color_show[10];
+  QComboBox *combo_box_for_color_pick[11];
+  QLabel *label_for_color_show[11];
   MainWindow *copy_of_parent;
 
   /* current_widget = MAIN_WIDGET | HISTORY_WIDGET | GRID_WIDGET | STATEMENT_WIDGET | etc. */
@@ -5492,8 +5495,8 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_highlight_keyword_color= copy_of_parent->ocelot_statement_highlight_keyword_color;
   copy_of_parent->new_ocelot_statement_prompt_background_color= copy_of_parent->ocelot_statement_prompt_background_color;
   copy_of_parent->new_ocelot_statement_highlight_current_line_color= copy_of_parent->ocelot_statement_highlight_current_line_color;
+  copy_of_parent->new_ocelot_statement_highlight_function_color= copy_of_parent->ocelot_statement_highlight_function_color;
   copy_of_parent->new_ocelot_statement_syntax_checker= copy_of_parent->ocelot_statement_syntax_checker;
-
 
   {
     QString s= tr("Settings -- ");
@@ -5504,12 +5507,11 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     if (current_widget == EXTRA_RULE_1) s.append(" -- for Extra Rule 1");
     setWindowTitle(s);                                                /* affects "this"] */
   }
-  widget_colors_label= new QLabel(tr("Colors"));
 
   /* Hboxes for foreground, background, and highlights */
   /* Todo: following calculation should actually be width of largest tr(label) + approximately 5. */
   int label_for_color_width= this->fontMetrics().boundingRect("W").width();
-  for (int ci= 0; ci < 10; ++ci)
+  for (int ci= 0; ci < 11; ++ci)
   {
     widget_for_color[ci]= new QWidget(this);
     label_for_color[ci]= new QLabel();
@@ -5557,8 +5559,9 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   connect(combo_box_for_color_pick[7], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_7(int)));
   connect(combo_box_for_color_pick[8], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_8(int)));
   connect(combo_box_for_color_pick[9], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_9(int)));
+  connect(combo_box_for_color_pick[10],SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_color_pick_10(int)));
 
-  widget_font_label= new QLabel(tr("Font"));
+  widget_font_label= new QLabel("");
 
   /* Hbox -- the font picker */
 
@@ -5600,7 +5603,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       if (ci == 2) label_for_size[ci]= new QLabel(tr("Grid Cell Drag Line Size"));
       combo_box_for_size[ci]= new QComboBox();
       combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 3);
-      for (int cj= 0; cj < 10; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
+      for (int cj= 0; cj < 11; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
       label_for_size[ci]->setFixedWidth(label_for_color_width * 20);
       if (ci == 0) combo_box_for_size[0]->setCurrentIndex(copy_of_parent->new_ocelot_grid_border_size.toInt());
       if (ci == 1) combo_box_for_size[1]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_border_size.toInt());
@@ -5700,8 +5703,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 
   /* Put the HBoxes in a VBox */
   main_layout= new QVBoxLayout();
-  main_layout->addWidget(widget_colors_label);
-  for (int ci= 0; ci < 10; ++ci) main_layout->addWidget(widget_for_color[ci]);
+  for (int ci= 0; ci < 11; ++ci) main_layout->addWidget(widget_for_color[ci]);
   main_layout->addWidget(widget_font_label);
   main_layout->addWidget(widget_for_font_dialog);
   if (current_widget == STATEMENT_WIDGET) main_layout->addWidget(widget_for_syntax_checker);
@@ -5760,6 +5762,7 @@ void set_widget_values(int ci)
     case 7: { color_type= tr("Statement Prompt Background Color"); color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
     case 8: { color_type= tr("Statement Border Color"); color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
     case 9: { color_type= tr("Statement Highlight Current Line Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_current_line_color; break; }
+    case 10:{ color_type= tr("Statement Highlight Function Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_function_color; break; }
     }
   }
   if (current_widget == GRID_WIDGET)
@@ -5827,12 +5830,12 @@ void handle_combo_box_1(int i)
 
   current_widget= i;
 
-  for (ci= 0; ci < 10; ++ci) set_widget_values(ci);
+  for (ci= 0; ci < 11; ++ci) set_widget_values(ci);
   if (i == STATEMENT_WIDGET)
   {
     color_type= "Prompt background";               /* ?? unnecessary now that set_widget_values() does it, eh? */
     label_for_color[7]->setText(color_type);
-    for (ci= 2; ci < 10 ; ++ci)
+    for (ci= 2; ci < 11 ; ++ci)
     {
       label_for_color[ci]->show();
       label_for_color_rgb[ci]->show();
@@ -5863,10 +5866,14 @@ void handle_combo_box_1(int i)
     label_for_color_rgb[9]->hide();
     label_for_color_show[9]->hide();
     combo_box_for_color_pick[9]->hide();
+    label_for_color[10]->hide();
+    label_for_color_rgb[10]->hide();
+    label_for_color_show[10]->hide();
+    combo_box_for_color_pick[10]->hide();
   }
   if (i == EXTRA_RULE_1)
   {
-    for (ci= 2; ci < 10; ++ci)
+    for (ci= 2; ci < 11; ++ci)
     {
       label_for_color[ci]->hide();
       label_for_color_rgb[ci]->hide();
@@ -5890,6 +5897,10 @@ void handle_combo_box_1(int i)
     label_for_color_rgb[9]->hide();
     label_for_color_show[9]->hide();
     combo_box_for_color_pick[9]->hide();
+    label_for_color[10]->hide();
+    label_for_color_rgb[10]->hide();
+    label_for_color_show[10]->hide();
+    combo_box_for_color_pick[10]->hide();
   }
 }
 
@@ -6270,6 +6281,21 @@ void handle_combo_box_for_color_pick_9(int item_number)
     label_for_color_show[9]->setStyleSheet(s);
   }
 }
+
+
+void handle_combo_box_for_color_pick_10(int item_number)
+{
+  if (current_widget == STATEMENT_WIDGET)
+  {
+    QString new_color= combo_box_for_color_pick[10]->itemText(item_number);
+    copy_of_parent->new_ocelot_statement_highlight_function_color= new_color;
+    label_for_color_rgb[10]->setText(new_color);
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[10]->setStyleSheet(s);
+  }
+}
+
 
 void handle_combo_box_for_syntax_check(int i)
 {

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: April 10 2016
+   Last modified: April 11 2016
 */
 
 /*
@@ -666,6 +666,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_highlight_operator_color= "darkGray";
   ocelot_statement_highlight_keyword_color= "blue";
   ocelot_statement_highlight_current_line_color= "yellow";
+  ocelot_statement_highlight_function_color= "magenta";
   ocelot_statement_syntax_checker= "1";
 
   ocelot_history_border_color= "black";
@@ -1959,6 +1960,8 @@ void MainWindow::action_statement_edit_widget_text_changed()
   format_of_operator.setForeground(QColor(qt_color(ocelot_statement_highlight_operator_color)));
   QTextCharFormat format_of_reserved_word;
   format_of_reserved_word.setForeground(QColor(qt_color(ocelot_statement_highlight_keyword_color)));
+  QTextCharFormat format_of_function;
+  format_of_function.setForeground(QColor(qt_color(ocelot_statement_highlight_function_color)));
   QTextCharFormat format_of_other;
   format_of_other.setForeground(QColor(qt_color(ocelot_statement_text_color)));
 
@@ -2002,7 +2005,16 @@ void MainWindow::action_statement_edit_widget_text_changed()
     if (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE) format_of_current_token= format_of_comment;
     if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) format_of_current_token= format_of_comment;
     if (t == TOKEN_TYPE_OPERATOR) format_of_current_token= format_of_operator;
-    if (t >= TOKEN_KEYWORDS_START) format_of_current_token= format_of_reserved_word;
+    if (t >= TOKEN_KEYWORDS_START)
+    {
+      if (((main_token_flags[i] & TOKEN_FLAG_IS_FUNCTION) != 0)
+       && (main_token_lengths[i + 1] == 1)
+       && (text.mid(main_token_offsets[i + 1], 1) == "("))
+      {
+        format_of_current_token= format_of_function;
+      }
+      else format_of_current_token= format_of_reserved_word;
+    }
     if (t == TOKEN_TYPE_OTHER) format_of_current_token= format_of_other;
 
     /* Todo: consider using SpellCheckUnderline instead of WaveUnderline. */
@@ -2671,6 +2683,7 @@ void MainWindow::action_statement()
     action_change_one_setting(ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color,"ocelot_statement_highlight_keyword_color");
     action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,"ocelot_statement_prompt_background_color");
     action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,"ocelot_statement_highlight_current_line_color");
+    action_change_one_setting(ocelot_statement_highlight_function_color, new_ocelot_statement_highlight_function_color,"ocelot_statement_highlight_function_color");
     action_change_one_setting(ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker,"ocelot_statement_syntax_checker");
 
     /* Todo: consider: maybe you have to do a restore like this */
@@ -2846,6 +2859,7 @@ void MainWindow::assign_names_for_colors()
   if (ocelot_statement_highlight_keyword_color.left(1) == "#") ocelot_statement_highlight_keyword_color= q_color_list_name(ocelot_statement_highlight_keyword_color);
   if (ocelot_statement_prompt_background_color.left(1) == "#") ocelot_statement_prompt_background_color= q_color_list_name(ocelot_statement_prompt_background_color);
   if (ocelot_statement_highlight_current_line_color.left(1) == "#") ocelot_statement_highlight_current_line_color= q_color_list_name(ocelot_statement_highlight_current_line_color);
+  if (ocelot_statement_highlight_function_color.left(1) == "#") ocelot_statement_highlight_function_color= q_color_list_name(ocelot_statement_highlight_function_color);
   if (ocelot_grid_text_color.left(1) == "#") ocelot_grid_text_color= q_color_list_name(ocelot_grid_text_color);
   if (ocelot_grid_border_color.left(1) == "#") ocelot_grid_border_color= q_color_list_name(ocelot_grid_border_color);
   if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
@@ -7326,6 +7340,13 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget->highlightCurrentLine();
         assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
       }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_function_color", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
+        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        ocelot_statement_highlight_function_color= ccn;
+        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+      }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_syntax_checker", Qt::CaseInsensitive) == 0)
       {
         QString syntax_checker= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
@@ -9216,6 +9237,10 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
         if ((strvalues[index].flags[0] & FLAG_RESERVED_IN_ALL) != 0)
           main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_RESERVED);
+        if ((strvalues[index].flags[0] & FLAG_BUILT_IN_FUNCTION) != 0)
+        {
+          main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_FUNCTION);
+        }
         index+= TOKEN_KEYWORDS_START;
         main_token_types[i2]= index;
         if (connections_is_connected[0] == 1)
@@ -11370,6 +11395,20 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
     if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) return;
     identifier_seen= true;
   }
+
+  hparse_f_next_nexttoken();
+  if (hparse_next_token == "(")
+  {
+    if ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0)
+    {
+      int saved_hparse_i= hparse_i;
+      int saved_token= main_token_types[hparse_i];
+      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      identifier_seen= true;
+      main_token_types[saved_hparse_i]= saved_token;
+    }
+  }
+
   if ((identifier_seen == true)
    || (hparse_f_qualified_name() == 1))
   {
@@ -17863,9 +17902,10 @@ int MainWindow::hparse_f_client_statement()
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR") == 1)
-     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_highlight_keyword_color") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_PROMPT_BACKGROUND_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_SYNTAX_CHECKER") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BACKGROUND_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_HEADER_BACKGROUND_COLOR") == 1)
@@ -21545,6 +21585,8 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_prompt_background_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_highlight_current_line_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_current_line_color= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_function_color") == 0)
+  { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_function_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_syntax_checker") == 0)
   { ocelot_statement_syntax_checker= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_client_side_functions") == 0) { ocelot_client_side_functions= is_enable; return; }
