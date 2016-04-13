@@ -30,6 +30,17 @@
 #define DBMS_MARIADB 2
 //#define DBMS_TARANTOOL 3
 
+#define FLAG_VERSION_MYSQL_5_5      1
+#define FLAG_VERSION_MYSQL_5_6      2
+#define FLAG_VERSION_MYSQL_5_7      4
+#define FLAG_VERSION_MYSQL_ALL      (1 | 2 | 4)
+#define FLAG_VERSION_MARIADB_5_5    8
+#define FLAG_VERSION_MARIADB_10_0   16
+#define FLAG_VERSION_MARIADB_10_1   32
+#define FLAG_VERSION_MARIADB_10_2   64
+#define FLAG_VERSION_MARIADB_ALL    (8 | 16 | 32 | 64)
+#define FLAG_VERSION_ALL            (1 | 2 | 4 | 8 | 16 | 32 | 64)
+
 #include <assert.h>
 
 #ifndef MAINWINDOW_H
@@ -364,9 +375,14 @@ public:
   void hparse_f_table_index_hint_list();
   int hparse_f_table_index_hint();
   int hparse_f_table_index_list();
-  void hparse_f_opr_1(),hparse_f_opr_2(),hparse_f_opr_3(),hparse_f_opr_4(),hparse_f_opr_5(),hparse_f_opr_6();
-  void hparse_f_opr_7(),hparse_f_opr_8(),hparse_f_opr_9(),hparse_f_opr_10(),hparse_f_opr_11(),hparse_f_opr_12();
-  void hparse_f_opr_13(),hparse_f_opr_14(),hparse_f_opr_15(),hparse_f_opr_16(),hparse_f_opr_17(),hparse_f_opr_18();
+  void hparse_f_opr_1(int),hparse_f_opr_2(int),hparse_f_opr_3(int),hparse_f_opr_4(int);
+  void hparse_f_opr_5(int),hparse_f_opr_6(int),hparse_f_opr_7(int),hparse_f_opr_8(int);
+  void hparse_f_opr_9(int),hparse_f_opr_10(int),hparse_f_opr_11(int),hparse_f_opr_12(int);
+  void hparse_f_opr_13(int),hparse_f_opr_14(int),hparse_f_opr_15(int),hparse_f_opr_16(int);
+  void hparse_f_opr_17(int),hparse_f_opr_18(int);
+  void hparse_f_over(int,int);
+  int hparse_f_over_start(int);
+  int hparse_f_over_end();
   void hparse_f_function_arguments(QString);
   void hparse_f_expression_list(int);
   void hparse_f_parenthesized_value_list();
@@ -430,7 +446,7 @@ public:
   int hparse_f_into();
   int hparse_f_select(bool);
   void hparse_f_where();
-  void hparse_f_order_by();
+  int hparse_f_order_by(int);
   void hparse_f_limit(int);
   void hparse_f_block(int);
   void msgBoxClosed(QAbstractButton*);
@@ -751,9 +767,9 @@ private:
       TOKEN_KEYWORD_CROSSES,
       TOKEN_KEYWORD_CUME_DIST,
       TOKEN_KEYWORD_CURDATE,
+      TOKEN_KEYWORD_CURRENT,
       TOKEN_KEYWORD_CURRENT_DATE,
       TOKEN_KEYWORD_CURRENT_ROLE,
-      TOKEN_KEYWORD_CURRENT_ROW,
       TOKEN_KEYWORD_CURRENT_TIME,
       TOKEN_KEYWORD_CURRENT_TIMESTAMP,
       TOKEN_KEYWORD_CURRENT_USER,
@@ -787,6 +803,7 @@ private:
       TOKEN_KEYWORD_DELAYED,
       TOKEN_KEYWORD_DELETE,
       TOKEN_KEYWORD_DELIMITER,
+      TOKEN_KEYWORD_DENSE_RANK,
       TOKEN_KEYWORD_DESC,
       TOKEN_KEYWORD_DESCRIBE,
       TOKEN_KEYWORD_DES_DECRYPT,
@@ -1082,6 +1099,7 @@ private:
       TOKEN_KEYWORD_ON,
       TOKEN_KEYWORD_OPEN,
       TOKEN_KEYWORD_OPTIMIZE,
+      TOKEN_KEYWORD_OPTIMIZER_COSTS,
       TOKEN_KEYWORD_OPTION,
       TOKEN_KEYWORD_OPTIONALLY,
       TOKEN_KEYWORD_OR,
@@ -1345,6 +1363,7 @@ private:
       TOKEN_KEYWORD_TRUE,
       TOKEN_KEYWORD_TRUNCATE,
       TOKEN_KEYWORD_UCASE,
+      TOKEN_KEYWORD_UNBOUNDED,
       TOKEN_KEYWORD_UNCOMPRESS,
       TOKEN_KEYWORD_UNCOMPRESSED_LENGTH,
       TOKEN_KEYWORD_UNDO,

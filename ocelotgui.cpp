@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: April 11 2016
+   Last modified: April 14 2016
 */
 
 /*
@@ -507,6 +507,7 @@ static const char *s_color_list[308]=
   /* This should correspond to the version number in the comment at the start of this program. */
   static const char ocelotgui_version[]="0.9 Beta"; /* For --version. Make sure it's in manual too. */
 
+  static unsigned char dbms_version_mask;
 
 /* Global mysql definitions */
 #define MYSQL_MAIN_CONNECTION 0
@@ -537,7 +538,7 @@ static const char *s_color_list[308]=
 
   unsigned int mysql_errno_result= 0;
 
-  QString hparse_dbms;
+
   QString hparse_text_copy;
   QString hparse_token;
   int hparse_i;
@@ -558,6 +559,7 @@ static const char *s_color_list[308]=
   bool hparse_subquery_is_allowed;
   QString hparse_delimiter_str;
   bool hparse_sql_mode_ansi_quotes= false;
+  unsigned char hparse_dbms_mask= FLAG_VERSION_ALL;
 
 int main(int argc, char *argv[])
 {
@@ -6517,6 +6519,7 @@ void MainWindow::action_execute_one_statement(QString text)
         //     dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
         //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
       }
+
       if (dbms_long_query_result)
       {
 
@@ -8379,828 +8382,825 @@ void MainWindow::tokens_to_keywords(QString text, int start)
 
     struct keywords {
        char  chars[MAX_KEYWORD_LENGTH];
-       char  flags[1];
+       unsigned char reserved_flags;
+       unsigned char built_in_function_flags;
     };
-#define FLAG_RESERVED_IN_ALL                  1
-#define FLAG_RESERVED_IN_MYSQL_5_6            2
-#define FLAG_RESERVED_IN_MYSQL_5_7            4
-#define FLAG_RESERVED_IN_MARIADB_10_0         8
-#define FLAG_RESERVED_IN_MARIADB__10_1        16
-#define FLAG_RESERVED_IN_MARIADB_10_2         32
-#define FLAG_BUILT_IN_FUNCTION                64
 
     const keywords strvalues[]=
     {
-        {"?", {0}}, /* Ocelot keyword, although tokenize() regards it as an operator */
-        {"ABS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ACCESSIBLE", {FLAG_RESERVED_IN_ALL}},
-        {"ACOS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ADD", {FLAG_RESERVED_IN_ALL}},
-        {"ADDDATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ADDTIME", {FLAG_BUILT_IN_FUNCTION}},
-        {"AES_DECRYPT", {FLAG_BUILT_IN_FUNCTION}},
-        {"AES_ENCRYPT", {FLAG_BUILT_IN_FUNCTION}},
-        {"AGAINST", {0}},
-        {"ALGORITHM", {0}},
-        {"ALL", {FLAG_RESERVED_IN_ALL}},
-        {"ALTER", {FLAG_RESERVED_IN_ALL}},
-        {"ALWAYS", {0}},
-        {"ANALYZE", {FLAG_RESERVED_IN_ALL}},
-        {"AND", {FLAG_RESERVED_IN_ALL}},
-        {"ANY_VALUE", {FLAG_BUILT_IN_FUNCTION}},
-        {"AREA", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"AS", {FLAG_RESERVED_IN_ALL}},
-        {"ASBINARY", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ASC", {FLAG_RESERVED_IN_ALL}},
-        {"ASCII", {FLAG_BUILT_IN_FUNCTION}},
-        {"ASENSITIVE", {FLAG_RESERVED_IN_ALL}},
-        {"ASIN", {FLAG_BUILT_IN_FUNCTION}},
-        {"ASTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ASWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ASWKT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ASYMMETRIC_DECRYPT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ASYMMETRIC_DERIVE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ASYMMETRIC_ENCRYPT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ASYMMETRIC_SIGN", {FLAG_BUILT_IN_FUNCTION}},
-        {"ASYMMETRIC_VERIFY", {FLAG_BUILT_IN_FUNCTION}},
-        {"ATAN", {FLAG_BUILT_IN_FUNCTION}},
-        {"ATAN2", {FLAG_BUILT_IN_FUNCTION}},
-        {"AVG", {FLAG_BUILT_IN_FUNCTION}},
-        {"BEFORE", {FLAG_RESERVED_IN_ALL}},
-        {"BEGIN", {0}},
-        {"BENCHMARK", {FLAG_BUILT_IN_FUNCTION}},
-        {"BETWEEN", {FLAG_RESERVED_IN_ALL}},
-        {"BIGINT", {FLAG_RESERVED_IN_ALL}},
-        {"BIN", {FLAG_BUILT_IN_FUNCTION}},
-        {"BINARY", {FLAG_RESERVED_IN_ALL}},
-        {"BINLOG", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"BINLOG_GTID_POS", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"BIT", {0}},
-        {"BIT_AND", {FLAG_BUILT_IN_FUNCTION}},
-        {"BIT_COUNT", {FLAG_BUILT_IN_FUNCTION}},
-        {"BIT_LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"BIT_OR", {FLAG_BUILT_IN_FUNCTION}},
-        {"BIT_XOR", {FLAG_BUILT_IN_FUNCTION}},
-        {"BLOB", {FLAG_RESERVED_IN_ALL}},
-        {"BOOL", {0}},
-        {"BOOLEAN", {0}},
-        {"BOTH", {FLAG_RESERVED_IN_ALL}},
-        {"BUFFER", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"BY", {FLAG_RESERVED_IN_ALL}},
-        {"CALL", {FLAG_RESERVED_IN_ALL}},
-        {"CASCADE", {FLAG_RESERVED_IN_ALL}},
-        {"CASE", {FLAG_RESERVED_IN_ALL}},
-        {"CAST", {FLAG_BUILT_IN_FUNCTION}},
-        {"CEIL", {FLAG_BUILT_IN_FUNCTION}},
-        {"CEILING", {FLAG_BUILT_IN_FUNCTION}},
-        {"CENTROID", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"CHANGE", {FLAG_RESERVED_IN_ALL}},
-        {"CHAR", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"CHARACTER", {FLAG_RESERVED_IN_ALL}},
-        {"CHARACTER_LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"CHARSET", {FLAG_BUILT_IN_FUNCTION}},  /* + Ocelot keyword */
-        {"CHAR_LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"CHECK", {FLAG_RESERVED_IN_ALL}},
-        {"CLEAR", {0}}, /* Ocelot keyword */
-        {"CLOSE", {0}},
-        {"COALESCE", {FLAG_BUILT_IN_FUNCTION}},
-        {"COERCIBILITY", {FLAG_BUILT_IN_FUNCTION}},
-        {"COLLATE", {FLAG_RESERVED_IN_ALL}},
-        {"COLLATION", {FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN", {FLAG_RESERVED_IN_ALL}},
-        {"COLUMN_ADD", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN_CHECK", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN_CREATE", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN_DELETE", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN_EXISTS", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN_GET", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN_JSON", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COLUMN_LIST", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"COMMENT", {0}},
-        {"COMMIT", {0}},
-        {"COMPACT", {0}},
-        {"COMPRESS", {FLAG_BUILT_IN_FUNCTION}},
-        {"COMPRESSED", {0}},
-        {"COMPRESSION", {0}},
-        {"CONCAT", {FLAG_BUILT_IN_FUNCTION}},
-        {"CONCAT_WS", {FLAG_BUILT_IN_FUNCTION}},
-        {"CONDITION", {FLAG_RESERVED_IN_ALL}},
-        {"CONNECT", {0}}, /* Ocelot keyword */
-        {"CONNECTION_ID", {FLAG_BUILT_IN_FUNCTION}},
-        {"CONSTRAINT", {FLAG_RESERVED_IN_ALL}},
-        {"CONTAINS", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"CONTINUE", {FLAG_RESERVED_IN_ALL}},
-        {"CONV", {FLAG_BUILT_IN_FUNCTION}},
-        {"CONVERT", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"CONVERT_TZ", {FLAG_BUILT_IN_FUNCTION}},
-        {"CONVEXHULL", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"COS", {FLAG_BUILT_IN_FUNCTION}},
-        {"COT", {FLAG_BUILT_IN_FUNCTION}},
-        {"COUNT", {FLAG_BUILT_IN_FUNCTION}},
-        {"CRC32", {FLAG_BUILT_IN_FUNCTION}},
-        {"CREATE", {FLAG_RESERVED_IN_ALL}},
-        {"CREATE_ASYMMETRIC_PRIV_KEY", {FLAG_BUILT_IN_FUNCTION}},
-        {"CREATE_ASYMMETRIC_PUB_KEY", {FLAG_BUILT_IN_FUNCTION}},
-        {"CREATE_DH_PARAMETERS", {FLAG_BUILT_IN_FUNCTION}},
-        {"CREATE_DIGEST", {FLAG_BUILT_IN_FUNCTION}},
-        {"CROSS", {FLAG_RESERVED_IN_ALL}},
-        {"CROSSES", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"CUME_DIST", {0}}, /* MariaDB 10.2? */
-        {"CURDATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"CURRENT_DATE", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"CURRENT_ROLE", {0}}, /* MariaDB 10.2? */
-        {"CURRENT_ROW", {0}}, /* MariaDB 10.2? */
-        {"CURRENT_TIME", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"CURRENT_TIMESTAMP", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"CURRENT_USER", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"CURSOR", {FLAG_RESERVED_IN_ALL}},
-        {"CURTIME", {FLAG_BUILT_IN_FUNCTION}},
-        {"DATABASE", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"DATABASES", {FLAG_RESERVED_IN_ALL}},
-        {"DATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"DATEDIFF", {FLAG_BUILT_IN_FUNCTION}},
-        {"DATETIME", {0}},
-        {"DATE_ADD", {FLAG_BUILT_IN_FUNCTION}},
-        {"DATE_FORMAT", {FLAG_BUILT_IN_FUNCTION}},
-        {"DATE_SUB", {FLAG_BUILT_IN_FUNCTION}},
-        {"DAY", {FLAG_BUILT_IN_FUNCTION}},
-        {"DAYNAME", {FLAG_BUILT_IN_FUNCTION}},
-        {"DAYOFMONTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"DAYOFWEEK", {FLAG_BUILT_IN_FUNCTION}},
-        {"DAYOFYEAR", {FLAG_BUILT_IN_FUNCTION}},
-        {"DAY_HOUR", {FLAG_RESERVED_IN_ALL}},
-        {"DAY_MICROSECOND", {FLAG_RESERVED_IN_ALL}},
-        {"DAY_MINUTE", {FLAG_RESERVED_IN_ALL}},
-        {"DAY_SECOND", {FLAG_RESERVED_IN_ALL}},
-        {"DEALLOCATE", {0}},
-        {"DEC", {FLAG_RESERVED_IN_ALL}},
-        {"DECIMAL", {FLAG_RESERVED_IN_ALL}},
-        {"DECLARE", {FLAG_RESERVED_IN_ALL}},
-        {"DECODE", {FLAG_BUILT_IN_FUNCTION}},
-        {"DECODE_HISTOGRAM", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"DEFAULT", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"DEGREES", {FLAG_BUILT_IN_FUNCTION}},
-        {"DELAYED", {FLAG_RESERVED_IN_ALL}},
-        {"DELETE", {FLAG_RESERVED_IN_ALL}},
-        {"DELIMITER", {0}}, /* Ocelot keyword */
-        {"DESC", {FLAG_RESERVED_IN_ALL}},
-        {"DESCRIBE", {FLAG_RESERVED_IN_ALL}},
-        {"DES_DECRYPT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"DES_ENCRYPT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"DETERMINISTIC", {FLAG_RESERVED_IN_ALL}},
-        {"DIMENSION", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"DIRECTORY", {0}},
-        {"DISJOINT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"DISTANCE", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"DISTINCT", {FLAG_RESERVED_IN_ALL}},
-        {"DISTINCTROW", {FLAG_RESERVED_IN_ALL}},
-        {"DIV", {FLAG_RESERVED_IN_ALL}},
-        {"DO", {0}},
-        {"DOUBLE", {FLAG_RESERVED_IN_ALL}},
-        {"DROP", {FLAG_RESERVED_IN_ALL}},
-        {"DUAL", {FLAG_RESERVED_IN_ALL}},
-        {"DUPLICATE", {0}},
-        {"DYNAMIC", {0}},
-        {"EACH", {FLAG_RESERVED_IN_ALL}},
-        {"EDIT", {0}}, /* Ocelot keyword */
-        {"EGO", {0}}, /* Ocelot keyword */
-        {"ELSE", {FLAG_RESERVED_IN_ALL}},
-        {"ELSEIF", {FLAG_RESERVED_IN_ALL}},
-        {"ELT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ENABLE", {0}},
-        {"ENCLOSED", {FLAG_RESERVED_IN_ALL}},
-        {"ENCODE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ENCRYPT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"END", {0}},
-        {"ENDPOINT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ENUM", {0}},
-        {"ENVELOPE", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"EQUALS", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ESCAPE", {0}},
-        {"ESCAPED", {FLAG_RESERVED_IN_ALL}},
-        {"EVENT", {0}},
-        {"EXCHANGE", {0}},
-        {"EXCLUSIVE", {0}},
-        {"EXECUTE", {0}},
-        {"EXISTS", {FLAG_RESERVED_IN_ALL}},
-        {"EXIT", {FLAG_RESERVED_IN_ALL}},
-        {"EXP", {FLAG_BUILT_IN_FUNCTION}},
-        {"EXPANSION", {0}},
-        {"EXPLAIN", {FLAG_RESERVED_IN_ALL}},
-        {"EXPORT", {0}},
-        {"EXPORT_SET", {FLAG_BUILT_IN_FUNCTION}},
-        {"EXTERIORRING", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"EXTRACT", {FLAG_BUILT_IN_FUNCTION}},
-        {"EXTRACTVALUE", {FLAG_BUILT_IN_FUNCTION}},
-        {"FALSE", {FLAG_RESERVED_IN_ALL}},
-        {"FETCH", {FLAG_RESERVED_IN_ALL}},
-        {"FIELD", {FLAG_BUILT_IN_FUNCTION}},
-        {"FILE", {0}},
-        {"FIND_IN_SET", {FLAG_BUILT_IN_FUNCTION}},
-        {"FIRST", {0}}, /* MariaDB 10.2? */
-        {"FIRST_VALUE", {0}}, /* MariaDB 10.2? */
-        {"FIXED", {0}},
-        {"FLOAT", {FLAG_RESERVED_IN_ALL}},
-        {"FLOAT4", {FLAG_RESERVED_IN_ALL}},
-        {"FLOAT8", {FLAG_RESERVED_IN_ALL}},
-        {"FLOOR", {FLAG_BUILT_IN_FUNCTION}},
-        {"FLUSH", {0}},
-        {"FOLLOWING", {0}}, /* MariaDB 10.2? */
-        {"FOR", {FLAG_RESERVED_IN_ALL}},
-        {"FORCE", {FLAG_RESERVED_IN_ALL}},
-        {"FOREIGN", {FLAG_RESERVED_IN_ALL}},
-        {"FORMAT", {FLAG_BUILT_IN_FUNCTION}},
-        {"FOUND_ROWS", {FLAG_BUILT_IN_FUNCTION}},
-        {"FROM", {FLAG_RESERVED_IN_ALL}},
-        {"FROM_BASE64", {FLAG_BUILT_IN_FUNCTION}},
-        {"FROM_DAYS", {FLAG_BUILT_IN_FUNCTION}},
-        {"FROM_UNIXTIME", {FLAG_BUILT_IN_FUNCTION}},
-        {"FULL", {0}},
-        {"FULLTEXT", {FLAG_RESERVED_IN_ALL}},
-        {"FUNCTION", {0}},
-        {"GENERAL", {0}},
-        {"GENERATED", {FLAG_RESERVED_IN_ALL}},
-        {"GEOMCOLLFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMCOLLFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMETRY", {0}},
-        {"GEOMETRYCOLLECTION", {FLAG_BUILT_IN_FUNCTION}},
-        {"GEOMETRYCOLLECTIONFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMETRYCOLLECTIONFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMETRYFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMETRYFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMETRYN", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMETRYTYPE", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GEOMFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},/* deprecated in MySQL 5.7.6 */
-        {"GEOMFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GET", {FLAG_RESERVED_IN_ALL}},
-        {"GET_FORMAT", {FLAG_BUILT_IN_FUNCTION}},
-        {"GET_LOCK", {FLAG_BUILT_IN_FUNCTION}},
-        {"GLENGTH", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"GO", {0}}, /* Ocelot keyword */
-        {"GRANT", {FLAG_RESERVED_IN_ALL}},
-        {"GREATEST", {FLAG_BUILT_IN_FUNCTION}},
-        {"GROUP", {FLAG_RESERVED_IN_ALL}},
-        {"GROUP_CONCAT", {FLAG_BUILT_IN_FUNCTION}},
-        {"GTID_SUBSET", {FLAG_BUILT_IN_FUNCTION}},
-        {"GTID_SUBTRACT", {FLAG_BUILT_IN_FUNCTION}},
-        {"HANDLER", {0}},
-        {"HAVING", {FLAG_RESERVED_IN_ALL}},
-        {"HELP", {0}}, /* Ocelot keyword */
-        {"HEX", {FLAG_BUILT_IN_FUNCTION}},
-        {"HIGH_PRIORITY", {FLAG_RESERVED_IN_ALL}},
-        {"HOUR", {FLAG_BUILT_IN_FUNCTION}},
-        {"HOUR_MICROSECOND", {FLAG_RESERVED_IN_ALL}},
-        {"HOUR_MINUTE", {FLAG_RESERVED_IN_ALL}},
-        {"HOUR_SECOND", {FLAG_RESERVED_IN_ALL}},
-        {"IF", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"IFNULL", {FLAG_BUILT_IN_FUNCTION}},
-        {"IGNORE", {FLAG_RESERVED_IN_ALL}},
-        {"IMPORT", {0}},
-        {"IN", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"INDEX", {FLAG_RESERVED_IN_ALL}},
-        {"INET6_ATON", {FLAG_BUILT_IN_FUNCTION}},
-        {"INET6_NTOA", {FLAG_BUILT_IN_FUNCTION}},
-        {"INET_ATON", {FLAG_BUILT_IN_FUNCTION}},
-        {"INET_NTOA", {FLAG_BUILT_IN_FUNCTION}},
-        {"INFILE", {FLAG_RESERVED_IN_ALL}},
-        {"INNER", {FLAG_RESERVED_IN_ALL}},
-        {"INOUT", {FLAG_RESERVED_IN_ALL}},
-        {"INSENSITIVE", {FLAG_RESERVED_IN_ALL}},
-        {"INSERT", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"INSTALL", {0}},
-        {"INSTR", {FLAG_BUILT_IN_FUNCTION}},
-        {"INT", {FLAG_RESERVED_IN_ALL}},
-        {"INT1", {FLAG_RESERVED_IN_ALL}},
-        {"INT2", {FLAG_RESERVED_IN_ALL}},
-        {"INT3", {FLAG_RESERVED_IN_ALL}},
-        {"INT4", {FLAG_RESERVED_IN_ALL}},
-        {"INT8", {FLAG_RESERVED_IN_ALL}},
-        {"INTEGER", {FLAG_RESERVED_IN_ALL}},
-        {"INTERIORRINGN", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"INTERSECTS", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"INTERVAL", {FLAG_BUILT_IN_FUNCTION}},
-        {"INTO", {FLAG_RESERVED_IN_ALL}},
-        {"IO_AFTER_GTIDS", {FLAG_RESERVED_IN_ALL}},
-        {"IO_BEFORE_GTIDS", {FLAG_RESERVED_IN_ALL}},
-        {"IS", {FLAG_RESERVED_IN_ALL}},
-        {"ISCLOSED", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ISEMPTY", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"ISNULL", {FLAG_BUILT_IN_FUNCTION}},
-        {"ISSIMPLE", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"IS_FREE_LOCK", {FLAG_BUILT_IN_FUNCTION}},
-        {"IS_IPV4", {FLAG_BUILT_IN_FUNCTION}},
-        {"IS_IPV4_COMPAT", {FLAG_BUILT_IN_FUNCTION}},
-        {"IS_IPV4_MAPPED", {FLAG_BUILT_IN_FUNCTION}},
-        {"IS_IPV6", {FLAG_BUILT_IN_FUNCTION}},
-        {"IS_USED_LOCK", {FLAG_BUILT_IN_FUNCTION}},
-        {"ITERATE", {FLAG_RESERVED_IN_ALL}},
-        {"JOIN", {FLAG_RESERVED_IN_ALL}},
-        {"JSON_APPEND", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_ARRAY", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_ARRAY_APPEND", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_ARRAY_INSERT", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_CONTAINS", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_CONTAINS_PATH", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_DEPTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_EXTRACT", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_INSERT", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_KEYS", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_MERGE", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_OBJECT", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_QUOTE", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_REMOVE", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_REPLACE", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_SEARCH", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_SET", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_TYPE", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_UNQUOTE", {FLAG_BUILT_IN_FUNCTION}},
-        {"JSON_VALID", {FLAG_BUILT_IN_FUNCTION}},
-        {"KEY", {FLAG_RESERVED_IN_ALL}},
-        {"KEYS", {FLAG_RESERVED_IN_ALL}},
-        {"KILL", {FLAG_RESERVED_IN_ALL}},
-        {"LAG", {0}}, /* MariaDB 10.2? */
-        {"LANGUAGE", {0}},
-        {"LAST", {0}}, /* MariaDB 10.2? */
-        {"LAST_DAY", {FLAG_RESERVED_IN_MARIADB_10_0 | FLAG_BUILT_IN_FUNCTION}},
-        {"LAST_INSERT_ID", {FLAG_BUILT_IN_FUNCTION}},
-        {"LAST_VALUE", {0}}, /* MariaDB 10.2? */
-        {"LCASE", {FLAG_BUILT_IN_FUNCTION}},
-        {"LEAD", {0}}, /* MariaDB 10.2? */
-        {"LEADING", {FLAG_RESERVED_IN_ALL}},
-        {"LEAST", {FLAG_BUILT_IN_FUNCTION}},
-        {"LEAVE", {FLAG_RESERVED_IN_ALL}},
-        {"LEFT", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"LEVEL", {0}},
-        {"LIKE", {FLAG_RESERVED_IN_ALL}},
-        {"LIMIT", {FLAG_RESERVED_IN_ALL}},
-        {"LINEAR", {FLAG_RESERVED_IN_ALL}},
-        {"LINEFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"LINEFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"LINES", {FLAG_RESERVED_IN_ALL}},
-        {"LINESTRING", {FLAG_BUILT_IN_FUNCTION}},
-        {"LINESTRINGFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"LINESTRINGFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"LN", {FLAG_BUILT_IN_FUNCTION}},
-        {"LOAD", {FLAG_RESERVED_IN_ALL}},
-        {"LOAD_FILE", {FLAG_BUILT_IN_FUNCTION}},
-        {"LOCALTIME", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"LOCALTIMESTAMP", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"LOCATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"LOCK", {FLAG_RESERVED_IN_ALL}},
-        {"LOG", {FLAG_BUILT_IN_FUNCTION}},
-        {"LOG10", {FLAG_BUILT_IN_FUNCTION}},
-        {"LOG2", {FLAG_BUILT_IN_FUNCTION}},
-        {"LOGFILE", {0}},
-        {"LONG", {FLAG_RESERVED_IN_ALL}},
-        {"LONGBLOB", {FLAG_RESERVED_IN_ALL}},
-        {"LONGTEXT", {FLAG_RESERVED_IN_ALL}},
-        {"LOOP", {FLAG_RESERVED_IN_ALL}},
-        {"LOWER", {FLAG_BUILT_IN_FUNCTION}},
-        {"LOW_PRIORITY", {FLAG_RESERVED_IN_ALL}},
-        {"LPAD", {FLAG_BUILT_IN_FUNCTION}},
-        {"LTRIM", {FLAG_BUILT_IN_FUNCTION}},
-        {"MAKEDATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"MAKETIME", {FLAG_BUILT_IN_FUNCTION}},
-        {"MAKE_SET", {FLAG_BUILT_IN_FUNCTION}},
-        {"MASTER_BIND", {FLAG_RESERVED_IN_ALL}},
-        {"MASTER_HEARTBEAT_PERIOD", {0}},
-        {"MASTER_POS_WAIT", {FLAG_BUILT_IN_FUNCTION}},
-        {"MASTER_SSL_VERIFY_SERVER_CERT", {FLAG_RESERVED_IN_ALL}},
-        {"MATCH", {FLAG_RESERVED_IN_ALL}},
-        {"MAX", {FLAG_BUILT_IN_FUNCTION}},
-        {"MAXVALUE", {FLAG_RESERVED_IN_ALL}},
-        {"MBRCONTAINS", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBRCOVEREDBY", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBRCOVERS", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBRDISJOINT", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBREQUAL", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MBREQUALS", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBRINTERSECTS", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBROVERLAPS", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBRTOUCHES", {FLAG_BUILT_IN_FUNCTION}},
-        {"MBRWITHIN", {FLAG_BUILT_IN_FUNCTION}},
-        {"MD5", {FLAG_BUILT_IN_FUNCTION}},
-        {"MEDIUMBLOB", {FLAG_RESERVED_IN_ALL}},
-        {"MEDIUMINT", {FLAG_RESERVED_IN_ALL}},
-        {"MEDIUMTEXT", {FLAG_RESERVED_IN_ALL}},
-        {"MICROSECOND", {FLAG_BUILT_IN_FUNCTION}},
-        {"MID", {FLAG_BUILT_IN_FUNCTION}},
-        {"MIDDLEINT", {FLAG_RESERVED_IN_ALL}},
-        {"MIN", {FLAG_BUILT_IN_FUNCTION}},
-        {"MINUTE", {FLAG_BUILT_IN_FUNCTION}},
-        {"MINUTE_MICROSECOND", {FLAG_RESERVED_IN_ALL}},
-        {"MINUTE_SECOND", {FLAG_RESERVED_IN_ALL}},
-        {"MLINEFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},  /* deprecated in MySQL 5.7.6 */
-        {"MLINEFROMWKB", {FLAG_BUILT_IN_FUNCTION}},  /* deprecated in MySQL 5.7.6 */
-        {"MOD", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"MODE", {0}},
-        {"MODIFIES", {FLAG_RESERVED_IN_ALL}},
-        {"MONTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"MONTHNAME", {FLAG_BUILT_IN_FUNCTION}},
-        {"MPOINTFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},  /* deprecated in MySQL 5.7.6 */
-        {"MPOINTFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MPOLYFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MPOLYFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MULTILINESTRING", {FLAG_BUILT_IN_FUNCTION}},
-        {"MULTILINESTRINGFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MULTILINESTRINGFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MULTIPOINT", {FLAG_BUILT_IN_FUNCTION}},
-        {"MULTIPOINTFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},  /* deprecated in MySQL 5.7.6 */
-        {"MULTIPOINTFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MULTIPOLYGON", {FLAG_BUILT_IN_FUNCTION}},
-        {"MULTIPOLYGONFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"MULTIPOLYGONFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"NAME_CONST", {FLAG_BUILT_IN_FUNCTION}},
-        {"NATURAL", {FLAG_RESERVED_IN_ALL}},
-        {"NO", {0}},
-        {"NOPAGER", {0}}, /* Ocelot keyword */
-        {"NOT", {0}},
-        {"NOTEE", {0}}, /* Ocelot keyword */
-        {"NOW", {FLAG_BUILT_IN_FUNCTION}},
-        {"NOWARNING", {0}}, /* Ocelot keyword */
-        {"NO_WRITE_TO_BINLOG", {FLAG_RESERVED_IN_ALL}},
-        {"NTH_VALUE", {0}}, /* MariaDB 10.2? */
-        {"NTILE", {0}}, /* MariaDB 10.2? */
-        {"NULL", {FLAG_RESERVED_IN_ALL}},
-        {"NULLIF", {FLAG_BUILT_IN_FUNCTION}},
-        {"NULLS", {0}}, /* MariaDB 10.2? */
-        {"NUMERIC", {FLAG_RESERVED_IN_ALL}},
-        {"NUMGEOMETRIES", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"NUMINTERIORRINGS", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"NUMPOINTS", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"OCT", {FLAG_BUILT_IN_FUNCTION}},
-        {"OCTET_LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"OFF", {0}},
-        {"OJ", {0}},
-        {"OLD_PASSWORD", {FLAG_BUILT_IN_FUNCTION}},
-        {"ON", {FLAG_RESERVED_IN_ALL}},
-        {"OPEN", {0}},
-        {"OPTIMIZE", {FLAG_RESERVED_IN_ALL}},
-        {"OPTION", {FLAG_RESERVED_IN_ALL}},
-        {"OPTIONALLY", {FLAG_RESERVED_IN_ALL}},
-        {"OR", {FLAG_RESERVED_IN_ALL}},
-        {"ORD", {FLAG_BUILT_IN_FUNCTION}},
-        {"ORDER", {FLAG_RESERVED_IN_ALL}},
-        {"OUT", {FLAG_RESERVED_IN_ALL}},
-        {"OUTER", {FLAG_RESERVED_IN_ALL}},
-        {"OUTFILE", {FLAG_RESERVED_IN_ALL}},
-        {"OVER", {0}}, /* MariaDB 10.2? */
-        {"OVERLAPS", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"PAGER", {0}}, /* Ocelot keyword */
-        {"PARTIAL", {0}},
-        {"PARTITION", {FLAG_RESERVED_IN_ALL}},
-        {"PASSWORD", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"PERCENT_RANK", {0}}, /* MariaDB 10.2? */
-        {"PERIOD_ADD", {FLAG_BUILT_IN_FUNCTION}},
-        {"PERIOD_DIFF", {FLAG_BUILT_IN_FUNCTION}},
-        {"PI", {FLAG_BUILT_IN_FUNCTION}},
-        {"POINT", {FLAG_BUILT_IN_FUNCTION}},
-        {"POINTFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"POINTFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"POINTN", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"POLYFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"POLYFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7 */
-        {"POLYGON", {0}},
-        {"POLYGONFROMTEXT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"POLYGONFROMWKB", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"POSITION", {FLAG_BUILT_IN_FUNCTION}},
-        {"POW", {FLAG_BUILT_IN_FUNCTION}},
-        {"POWER", {FLAG_BUILT_IN_FUNCTION}},
-        {"PRECISION", {FLAG_RESERVED_IN_ALL}},
-        {"PREPARE", {0}},
-        {"PRIMARY", {FLAG_RESERVED_IN_ALL}},
-        {"PRINT", {0}}, /* Ocelot keyword */
-        {"PROCEDURE", {FLAG_RESERVED_IN_ALL}},
-        {"PROCESS", {0}},
-        {"PROMPT", {0}}, /* Ocelot keyword */
-        {"PROXY", {0}},
-        {"PURGE", {FLAG_RESERVED_IN_ALL}},
-        {"QUARTER", {FLAG_BUILT_IN_FUNCTION}},
-        {"QUERY", {0}},
-        {"QUIT", {0}}, /* Ocelot keyword */
-        {"QUOTE", {FLAG_BUILT_IN_FUNCTION}},
-        {"RADIANS", {FLAG_BUILT_IN_FUNCTION}},
-        {"RAND", {FLAG_BUILT_IN_FUNCTION}},
-        {"RANDOM_BYTES", {FLAG_BUILT_IN_FUNCTION}},
-        {"RANGE", {FLAG_RESERVED_IN_ALL}},
-        {"RANK", {0}}, /* MariaDB 10.2? */
-        {"READ", {FLAG_RESERVED_IN_ALL}},
-        {"READS", {FLAG_RESERVED_IN_ALL}},
-        {"READ_WRITE", {FLAG_RESERVED_IN_ALL}},
-        {"REAL", {FLAG_RESERVED_IN_ALL}},
-        {"REBUILD", {0}},
-        {"REDUNDANT", {0}},
-        {"REFERENCES", {FLAG_RESERVED_IN_ALL}},
-        {"REGEXP", {FLAG_RESERVED_IN_ALL}},
-        {"REHASH", {0}}, /* Ocelot keyword */
-        {"RELEASE", {FLAG_RESERVED_IN_ALL}},
-        {"RELEASE_ALL_LOCKS", {FLAG_BUILT_IN_FUNCTION}},
-        {"RELEASE_LOCK", {FLAG_BUILT_IN_FUNCTION}},
-        {"RELOAD", {0}},
-        {"RENAME", {FLAG_RESERVED_IN_ALL}},
-        {"REORGANIZE", {0}},
-        {"REPAIR", {0}},
-        {"REPEAT", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"REPLACE", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"REPLICATION", {0}},
-        {"REQUIRE", {FLAG_RESERVED_IN_ALL}},
-        {"RESET", {0}},
-        {"RESIGNAL", {FLAG_RESERVED_IN_ALL}},
-        {"RESTRICT", {FLAG_RESERVED_IN_ALL}},
-        {"RETURN", {FLAG_RESERVED_IN_ALL}},
-        {"RETURNS", {0}},
-        {"REVERSE", {FLAG_BUILT_IN_FUNCTION}},
-        {"REVOKE", {FLAG_RESERVED_IN_ALL}},
-        {"RIGHT", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"RLIKE", {FLAG_RESERVED_IN_ALL}},
-        {"ROLE", {0}},
-        {"ROLLBACK", {0}},
-        {"ROUND", {FLAG_BUILT_IN_FUNCTION}},
-        {"ROW", {0}},
-        {"ROW_COUNT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ROW_NUMBER", {0}}, /* MariaDB 10.2? */
-        {"RPAD", {FLAG_BUILT_IN_FUNCTION}},
-        {"RTRIM", {FLAG_BUILT_IN_FUNCTION}},
-        {"SAVEPOINT", {0}},
-        {"SCHEMA", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"SCHEMAS", {FLAG_RESERVED_IN_ALL}},
-        {"SECOND", {FLAG_BUILT_IN_FUNCTION}},
-        {"SECOND_MICROSECOND", {FLAG_RESERVED_IN_ALL}},
-        {"SECURITY", {0}},
-        {"SEC_TO_TIME", {FLAG_BUILT_IN_FUNCTION}},
-        {"SELECT", {FLAG_RESERVED_IN_ALL}},
-        {"SENSITIVE", {FLAG_RESERVED_IN_ALL}},
-        {"SEPARATOR", {FLAG_RESERVED_IN_ALL}},
-        {"SERIAL", {0}},
-        {"SERVER", {0}},
-        {"SESSION", {0}},
-        {"SESSION_USER", {FLAG_BUILT_IN_FUNCTION}},
-        {"SET", {FLAG_RESERVED_IN_ALL}},
-        {"SHA", {FLAG_BUILT_IN_FUNCTION}},
-        {"SHA1", {FLAG_BUILT_IN_FUNCTION}},
-        {"SHA2", {FLAG_BUILT_IN_FUNCTION}},
-        {"SHARED", {0}},
-        {"SHOW", {FLAG_RESERVED_IN_ALL}},
-        {"SHUTDOWN", {0}},
-        {"SIGN", {FLAG_BUILT_IN_FUNCTION}},
-        {"SIGNAL", {FLAG_RESERVED_IN_ALL}},
-        {"SIMPLE", {0}},
-        {"SIN", {FLAG_BUILT_IN_FUNCTION}},
-        {"SLEEP", {FLAG_BUILT_IN_FUNCTION}},
-        {"SLOW", {0}},
-        {"SMALLINT", {FLAG_RESERVED_IN_ALL}},
-        {"SONAME", {0}},
-        {"SOUNDEX", {FLAG_BUILT_IN_FUNCTION}},
-        {"SOURCE", {0}}, /* Ocelot keyword */
-        {"SPACE", {FLAG_BUILT_IN_FUNCTION}},
-        {"SPATIAL", {FLAG_RESERVED_IN_ALL}},
-        {"SPECIFIC", {FLAG_RESERVED_IN_ALL}},
-        {"SQL", {FLAG_RESERVED_IN_ALL}},
-        {"SQLEXCEPTION", {FLAG_RESERVED_IN_ALL}},
-        {"SQLSTATE", {FLAG_RESERVED_IN_ALL}},
-        {"SQLWARNING", {FLAG_RESERVED_IN_ALL}},
-        {"SQL_BIG_RESULT", {FLAG_RESERVED_IN_ALL}},
-        {"SQL_CALC_FOUND_ROWS", {FLAG_RESERVED_IN_ALL}},
-        {"SQL_SMALL_RESULT", {FLAG_RESERVED_IN_ALL}},
-        {"SQRT", {FLAG_BUILT_IN_FUNCTION}},
-        {"SRID", {FLAG_BUILT_IN_FUNCTION}},
-        {"SSL", {FLAG_RESERVED_IN_ALL}},
-        {"START", {0}},
-        {"STARTING", {FLAG_RESERVED_IN_ALL}},
-        {"STARTPOINT", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"STATUS", {0}}, /* Ocelot keyword */
-        {"STD", {FLAG_BUILT_IN_FUNCTION}},
-        {"STDDEV", {FLAG_BUILT_IN_FUNCTION}},
-        {"STDDEV_POP", {FLAG_BUILT_IN_FUNCTION}},
-        {"STDDEV_SAMP", {FLAG_BUILT_IN_FUNCTION}},
-        {"STOP", {0}},
-        {"STORED", {FLAG_RESERVED_IN_ALL}},
-        {"STRAIGHT_JOIN", {FLAG_RESERVED_IN_ALL}},
-        {"STRCMP", {FLAG_BUILT_IN_FUNCTION}},
-        {"STR_TO_DATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_AREA", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ASBINARY", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ASGEOJSON", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ASTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ASWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ASWKT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_BUFFER", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_BUFFER_STRATEGY", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_CENTROID", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_CONTAINS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_CONVEXHULL", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_CROSSES", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_DIFFERENCE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_DIMENSION", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_DISJOINT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_DISTANCE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_DISTANCE_SPHERE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ENDPOINT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ENVELOPE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_EQUALS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_EXTERIORRING", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOHASH", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMCOLLFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMCOLLFROMTXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMCOLLFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMETRYCOLLECTIONFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMETRYCOLLECTIONFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMETRYFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMETRYFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMETRYN", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMETRYTYPE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMFROMGEOJSON", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_GEOMFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_INTERIORRINGN", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_INTERSECTION", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_INTERSECTS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ISCLOSED", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ISEMPTY", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ISSIMPLE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_ISVALID", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_LATFROMGEOHASH", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_LINEFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_LINEFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_LINESTRINGFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_LINESTRINGFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_LONGFROMGEOHASH", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MAKEENVELOPE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MLINEFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MLINEFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MPOINTFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MPOINTFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MPOLYFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MPOLYFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MULTILINESTRINGFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MULTILINESTRINGFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MULTIPOINTFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MULTIPOINTFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MULTIPOLYGONFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_MULTIPOLYGONFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_NUMGEOMETRIES", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_NUMINTERIORRING", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_NUMINTERIORRINGS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_NUMPOINTS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_OVERLAPS", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POINTFROMGEOHASH", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POINTFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POINTFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POINTN", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POLYFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POLYFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POLYGONFROMTEXT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_POLYGONFROMWKB", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_SIMPLIFY", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_SRID", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_STARTPOINT", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_SYMDIFFERENCE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_TOUCHES", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_UNION", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_VALIDATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_WITHIN", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_X", {FLAG_BUILT_IN_FUNCTION}},
-        {"ST_Y", {FLAG_BUILT_IN_FUNCTION}},
-        {"SUBDATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"SUBSTR", {FLAG_BUILT_IN_FUNCTION}},
-        {"SUBSTRING", {FLAG_BUILT_IN_FUNCTION}},
-        {"SUBSTRING_INDEX", {FLAG_BUILT_IN_FUNCTION}},
-        {"SUBTIME", {FLAG_BUILT_IN_FUNCTION}},
-        {"SUM", {FLAG_BUILT_IN_FUNCTION}},
-        {"SUPER", {0}},
-        {"SYSDATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"SYSTEM", {0}}, /* Ocelot keyword */
-        {"SYSTEM_USER", {FLAG_BUILT_IN_FUNCTION}},
-        {"TABLE", {FLAG_RESERVED_IN_ALL}},
-        {"TABLESPACE", {0}},
-        {"TAN", {FLAG_BUILT_IN_FUNCTION}},
-        {"TEE", {0}}, /* Ocelot keyword */
-        {"TERMINATED", {FLAG_RESERVED_IN_ALL}},
-        {"THEN", {FLAG_RESERVED_IN_ALL}},
-        {"TIME", {FLAG_BUILT_IN_FUNCTION}},
-        {"TIMEDIFF", {FLAG_BUILT_IN_FUNCTION}},
-        {"TIMESTAMP", {FLAG_BUILT_IN_FUNCTION}},
-        {"TIMESTAMPADD", {FLAG_BUILT_IN_FUNCTION}},
-        {"TIMESTAMPDIFF", {FLAG_BUILT_IN_FUNCTION}},
-        {"TIME_FORMAT", {FLAG_BUILT_IN_FUNCTION}},
-        {"TIME_TO_SEC", {FLAG_BUILT_IN_FUNCTION}},
-        {"TINYBLOB", {FLAG_RESERVED_IN_ALL}},
-        {"TINYINT", {FLAG_RESERVED_IN_ALL}},
-        {"TINYTEXT", {FLAG_RESERVED_IN_ALL}},
-        {"TO", {FLAG_RESERVED_IN_ALL}},
-        {"TOUCHES", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"TO_BASE64", {FLAG_BUILT_IN_FUNCTION}},
-        {"TO_DAYS", {FLAG_BUILT_IN_FUNCTION}},
-        {"TO_SECONDS", {FLAG_BUILT_IN_FUNCTION}},
-        {"TRAILING", {FLAG_RESERVED_IN_ALL}},
-        {"TRIGGER", {FLAG_RESERVED_IN_ALL}},
-        {"TRIM", {FLAG_BUILT_IN_FUNCTION}},
-        {"TRUE", {FLAG_RESERVED_IN_ALL}},
-        {"TRUNCATE", {FLAG_BUILT_IN_FUNCTION}},
-        {"UCASE", {FLAG_BUILT_IN_FUNCTION}},
-        {"UNCOMPRESS", {FLAG_BUILT_IN_FUNCTION}},
-        {"UNCOMPRESSED_LENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"UNDO", {FLAG_RESERVED_IN_ALL}},
-        {"UNHEX", {FLAG_BUILT_IN_FUNCTION}},
-        {"UNICODE", {0}},
-        {"UNINSTALL", {0}},
-        {"UNION", {FLAG_RESERVED_IN_ALL}},
-        {"UNIQUE", {FLAG_RESERVED_IN_ALL}},
-        {"UNIX_TIMESTAMP", {FLAG_BUILT_IN_FUNCTION}},
-        {"UNKNOWN", {0}},
-        {"UNLOCK", {FLAG_RESERVED_IN_ALL}},
-        {"UNSIGNED", {FLAG_RESERVED_IN_ALL}},
-        {"UPDATE", {FLAG_RESERVED_IN_ALL}},
-        {"UPDATEXML", {FLAG_BUILT_IN_FUNCTION}},
-        {"UPPER", {FLAG_BUILT_IN_FUNCTION}},
-        {"USAGE", {FLAG_RESERVED_IN_ALL}},
-        {"USE", {FLAG_RESERVED_IN_ALL}}, /* Ocelot keyword, also reserved word */
-        {"USER", {FLAG_BUILT_IN_FUNCTION}},
-        {"USING", {FLAG_RESERVED_IN_ALL}},
-        {"UTC_DATE", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"UTC_TIME", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"UTC_TIMESTAMP", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"UUID", {FLAG_BUILT_IN_FUNCTION}},
-        {"UUID_SHORT", {FLAG_BUILT_IN_FUNCTION}},
-        {"VALIDATE_PASSWORD_STRENGTH", {FLAG_BUILT_IN_FUNCTION}},
-        {"VALIDATION", {0}},
-        {"VALUES", {FLAG_RESERVED_IN_ALL | FLAG_BUILT_IN_FUNCTION}},
-        {"VARBINARY", {FLAG_RESERVED_IN_ALL}},
-        {"VARCHAR", {FLAG_RESERVED_IN_ALL}},
-        {"VARCHARACTER", {FLAG_RESERVED_IN_ALL}},
-        {"VARIANCE", {FLAG_BUILT_IN_FUNCTION}},
-        {"VARYING", {FLAG_RESERVED_IN_ALL}},
-        {"VAR_POP", {FLAG_BUILT_IN_FUNCTION}},
-        {"VAR_SAMP", {FLAG_BUILT_IN_FUNCTION}},
-        {"VERSION", {FLAG_BUILT_IN_FUNCTION}},
-        {"VIEW", {0}},
-        {"VIRTUAL", {FLAG_RESERVED_IN_ALL}},
-        {"WAIT_FOR_EXECUTED_GTID_SET", {FLAG_BUILT_IN_FUNCTION}},
-        {"WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS", {FLAG_BUILT_IN_FUNCTION}},
-        {"WARNINGS", {0}}, /* Ocelot keyword */
-        {"WEEK", {FLAG_BUILT_IN_FUNCTION}},
-        {"WEEKDAY", {FLAG_BUILT_IN_FUNCTION}},
-        {"WEEKOFYEAR", {FLAG_BUILT_IN_FUNCTION}},
-        {"WEIGHT_STRING", {FLAG_BUILT_IN_FUNCTION}},
-        {"WHEN", {FLAG_RESERVED_IN_ALL}},
-        {"WHERE", {FLAG_RESERVED_IN_ALL}},
-        {"WHILE", {FLAG_RESERVED_IN_ALL}},
-        {"WITH", {FLAG_RESERVED_IN_ALL}},
-        {"WITHIN", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"WITHOUT", {0}},
-        {"WRITE", {FLAG_RESERVED_IN_ALL}},
-        {"X", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"XA", {0}},
-        {"XOR", {FLAG_RESERVED_IN_ALL}},
-        {"Y", {FLAG_BUILT_IN_FUNCTION}}, /* deprecated in MySQL 5.7.6 */
-        {"YEAR", {FLAG_BUILT_IN_FUNCTION}},
-        {"YEARWEEK", {FLAG_BUILT_IN_FUNCTION}},
-        {"YEAR_MONTH", {FLAG_RESERVED_IN_ALL}},
-        {"ZEROFILL", {FLAG_RESERVED_IN_ALL}},
-        {"_ARMSCII8", {FLAG_RESERVED_IN_ALL}},
-        {"_ASCII", {FLAG_RESERVED_IN_ALL}},
-        {"_BIG5", {FLAG_RESERVED_IN_ALL}},
-        {"_BINARY", {FLAG_RESERVED_IN_ALL}},
-        {"_CP1250", {FLAG_RESERVED_IN_ALL}},
-        {"_CP1251", {FLAG_RESERVED_IN_ALL}},
-        {"_CP1256", {FLAG_RESERVED_IN_ALL}},
-        {"_CP1257", {FLAG_RESERVED_IN_ALL}},
-        {"_CP850", {FLAG_RESERVED_IN_ALL}},
-        {"_CP852", {FLAG_RESERVED_IN_ALL}},
-        {"_CP866", {FLAG_RESERVED_IN_ALL}},
-        {"_CP932", {FLAG_RESERVED_IN_ALL}},
-        {"_DEC8", {FLAG_RESERVED_IN_ALL}},
-        {"_EUCJPMS", {FLAG_RESERVED_IN_ALL}},
-        {"_EUCKR", {FLAG_RESERVED_IN_ALL}},
-        {"_FILENAME", {FLAG_RESERVED_IN_ALL}},
-        {"_GB2312", {FLAG_RESERVED_IN_ALL}},
-        {"_GBK", {FLAG_RESERVED_IN_ALL}},
-        {"_GEOSTD8", {FLAG_RESERVED_IN_ALL}},
-        {"_GREEK", {FLAG_RESERVED_IN_ALL}},
-        {"_HEBREW", {FLAG_RESERVED_IN_ALL}},
-        {"_HP8", {FLAG_RESERVED_IN_ALL}},
-        {"_KEYBCS2", {FLAG_RESERVED_IN_ALL}},
-        {"_KOI8R", {FLAG_RESERVED_IN_ALL}},
-        {"_KOI8U", {FLAG_RESERVED_IN_ALL}},
-        {"_LATIN1", {FLAG_RESERVED_IN_ALL}},
-        {"_LATIN2", {FLAG_RESERVED_IN_ALL}},
-        {"_LATIN5", {FLAG_RESERVED_IN_ALL}},
-        {"_LATIN7", {FLAG_RESERVED_IN_ALL}},
-        {"_MACCE", {FLAG_RESERVED_IN_ALL}},
-        {"_MACROMAN", {FLAG_RESERVED_IN_ALL}},
-        {"_SJIS", {FLAG_RESERVED_IN_ALL}},
-        {"_SWE7", {FLAG_RESERVED_IN_ALL}},
-        {"_TIS620", {FLAG_RESERVED_IN_ALL}},
-        {"_UCS2", {FLAG_RESERVED_IN_ALL}},
-        {"_UJIS", {FLAG_RESERVED_IN_ALL}},
-        {"_UTF16", {FLAG_RESERVED_IN_ALL}},
-        {"_UTF16LE", {FLAG_RESERVED_IN_ALL}},
-        {"_UTF32", {FLAG_RESERVED_IN_ALL}},
-        {"_UTF8", {FLAG_RESERVED_IN_ALL}},
-        {"_UTF8MB4", {FLAG_RESERVED_IN_ALL}}
+        {"?", 0, 0}, /* Ocelot keyword, although tokenize() regards it as an operator */
+        {"ABS", 0, FLAG_VERSION_ALL},
+        {"ACCESSIBLE", FLAG_VERSION_ALL, 0},
+        {"ACOS", 0, FLAG_VERSION_ALL},
+        {"ADD", FLAG_VERSION_ALL, 0},
+        {"ADDDATE", 0, FLAG_VERSION_ALL},
+        {"ADDTIME", 0, FLAG_VERSION_ALL},
+        {"AES_DECRYPT", 0, FLAG_VERSION_ALL},
+        {"AES_ENCRYPT", 0, FLAG_VERSION_ALL},
+        {"AGAINST", 0, 0},
+        {"ALGORITHM", 0, 0},
+        {"ALL", FLAG_VERSION_ALL, 0},
+        {"ALTER", FLAG_VERSION_ALL, 0},
+        {"ALWAYS", 0, 0},
+        {"ANALYZE", FLAG_VERSION_ALL, 0},
+        {"AND", FLAG_VERSION_ALL, 0},
+        {"ANY_VALUE", 0, FLAG_VERSION_ALL},
+        {"AREA", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"AS", FLAG_VERSION_ALL, 0},
+        {"ASBINARY", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ASC", FLAG_VERSION_ALL, 0},
+        {"ASCII", 0, FLAG_VERSION_ALL},
+        {"ASENSITIVE", FLAG_VERSION_ALL, 0},
+        {"ASIN", 0, FLAG_VERSION_ALL},
+        {"ASTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ASWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ASWKT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ASYMMETRIC_DECRYPT", 0, FLAG_VERSION_ALL},
+        {"ASYMMETRIC_DERIVE", 0, FLAG_VERSION_ALL},
+        {"ASYMMETRIC_ENCRYPT", 0, FLAG_VERSION_ALL},
+        {"ASYMMETRIC_SIGN", 0, FLAG_VERSION_ALL},
+        {"ASYMMETRIC_VERIFY", 0, FLAG_VERSION_ALL},
+        {"ATAN", 0, FLAG_VERSION_ALL},
+        {"ATAN2", 0, FLAG_VERSION_ALL},
+        {"AVG", 0, FLAG_VERSION_ALL},
+        {"BEFORE", FLAG_VERSION_ALL, 0},
+        {"BEGIN", 0, 0},
+        {"BENCHMARK", 0, FLAG_VERSION_ALL},
+        {"BETWEEN", FLAG_VERSION_ALL, 0},
+        {"BIGINT", FLAG_VERSION_ALL, 0},
+        {"BIN", 0, FLAG_VERSION_ALL},
+        {"BINARY", FLAG_VERSION_ALL, 0},
+        {"BINLOG", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"BINLOG_GTID_POS", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"BIT", 0, 0},
+        {"BIT_AND", 0, FLAG_VERSION_ALL},
+        {"BIT_COUNT", 0, FLAG_VERSION_ALL},
+        {"BIT_LENGTH", 0, FLAG_VERSION_ALL},
+        {"BIT_OR", 0, FLAG_VERSION_ALL},
+        {"BIT_XOR", 0, FLAG_VERSION_ALL},
+        {"BLOB", FLAG_VERSION_ALL, 0},
+        {"BOOL", 0, 0},
+        {"BOOLEAN", 0, 0},
+        {"BOTH", FLAG_VERSION_ALL, 0},
+        {"BUFFER", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"BY", FLAG_VERSION_ALL, 0},
+        {"CALL", FLAG_VERSION_ALL, 0},
+        {"CASCADE", FLAG_VERSION_ALL, 0},
+        {"CASE", FLAG_VERSION_ALL, 0},
+        {"CAST", 0, FLAG_VERSION_ALL},
+        {"CEIL", 0, FLAG_VERSION_ALL},
+        {"CEILING", 0, FLAG_VERSION_ALL},
+        {"CENTROID", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"CHANGE", FLAG_VERSION_ALL, 0},
+        {"CHAR", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"CHARACTER", FLAG_VERSION_ALL, 0},
+        {"CHARACTER_LENGTH", 0, FLAG_VERSION_ALL},
+        {"CHARSET", 0, FLAG_VERSION_ALL},  /* + Ocelot keyword */
+        {"CHAR_LENGTH", 0, FLAG_VERSION_ALL},
+        {"CHECK", FLAG_VERSION_ALL, 0},
+        {"CLEAR", 0, 0}, /* Ocelot keyword */
+        {"CLOSE", 0, 0},
+        {"COALESCE", 0, FLAG_VERSION_ALL},
+        {"COERCIBILITY", 0, FLAG_VERSION_ALL},
+        {"COLLATE", FLAG_VERSION_ALL, 0},
+        {"COLLATION", 0, FLAG_VERSION_ALL},
+        {"COLUMN", FLAG_VERSION_ALL, 0},
+        {"COLUMN_ADD", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_CHECK", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_CREATE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_DELETE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_EXISTS", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_GET", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_JSON", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_LIST", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COMMENT", 0, 0},
+        {"COMMIT", 0, 0},
+        {"COMPACT", 0, 0},
+        {"COMPRESS", 0, FLAG_VERSION_ALL},
+        {"COMPRESSED", 0, 0},
+        {"COMPRESSION", 0, 0},
+        {"CONCAT", 0, FLAG_VERSION_ALL},
+        {"CONCAT_WS", 0, FLAG_VERSION_ALL},
+        {"CONDITION", FLAG_VERSION_ALL, 0},
+        {"CONNECT", 0, 0}, /* Ocelot keyword */
+        {"CONNECTION_ID", 0, FLAG_VERSION_ALL},
+        {"CONSTRAINT", FLAG_VERSION_ALL, 0},
+        {"CONTAINS", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"CONTINUE", FLAG_VERSION_ALL, 0},
+        {"CONV", 0, FLAG_VERSION_ALL},
+        {"CONVERT", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"CONVERT_TZ", 0, FLAG_VERSION_ALL},
+        {"CONVEXHULL", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"COS", 0, FLAG_VERSION_ALL},
+        {"COT", 0, FLAG_VERSION_ALL},
+        {"COUNT", 0, FLAG_VERSION_ALL},
+        {"CRC32", 0, FLAG_VERSION_ALL},
+        {"CREATE", FLAG_VERSION_ALL, 0},
+        {"CREATE_ASYMMETRIC_PRIV_KEY", 0, FLAG_VERSION_ALL},
+        {"CREATE_ASYMMETRIC_PUB_KEY", 0, FLAG_VERSION_ALL},
+        {"CREATE_DH_PARAMETERS", 0, FLAG_VERSION_ALL},
+        {"CREATE_DIGEST", 0, FLAG_VERSION_ALL},
+        {"CROSS", FLAG_VERSION_ALL, 0},
+        {"CROSSES", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"CUME_DIST", 0, FLAG_VERSION_MARIADB_10_2},
+        {"CURDATE", 0, FLAG_VERSION_ALL},
+        {"CURRENT", 0, 0},
+        {"CURRENT_DATE", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"CURRENT_ROLE", FLAG_VERSION_MARIADB_10_0, 0},
+        {"CURRENT_TIME", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"CURRENT_TIMESTAMP", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"CURRENT_USER", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"CURSOR", FLAG_VERSION_ALL, 0},
+        {"CURTIME", 0, FLAG_VERSION_ALL},
+        {"DATABASE", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"DATABASES", FLAG_VERSION_ALL, 0},
+        {"DATE", 0, FLAG_VERSION_ALL},
+        {"DATEDIFF", 0, FLAG_VERSION_ALL},
+        {"DATETIME", 0, 0},
+        {"DATE_ADD", 0, FLAG_VERSION_ALL},
+        {"DATE_FORMAT", 0, FLAG_VERSION_ALL},
+        {"DATE_SUB", 0, FLAG_VERSION_ALL},
+        {"DAY", 0, FLAG_VERSION_ALL},
+        {"DAYNAME", 0, FLAG_VERSION_ALL},
+        {"DAYOFMONTH", 0, FLAG_VERSION_ALL},
+        {"DAYOFWEEK", 0, FLAG_VERSION_ALL},
+        {"DAYOFYEAR", 0, FLAG_VERSION_ALL},
+        {"DAY_HOUR", FLAG_VERSION_ALL, 0},
+        {"DAY_MICROSECOND", FLAG_VERSION_ALL, 0},
+        {"DAY_MINUTE", FLAG_VERSION_ALL, 0},
+        {"DAY_SECOND", FLAG_VERSION_ALL, 0},
+        {"DEALLOCATE", 0, 0},
+        {"DEC", FLAG_VERSION_ALL, 0},
+        {"DECIMAL", FLAG_VERSION_ALL, 0},
+        {"DECLARE", FLAG_VERSION_ALL, 0},
+        {"DECODE", 0, FLAG_VERSION_ALL},
+        {"DECODE_HISTOGRAM", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"DEFAULT", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"DEGREES", 0, FLAG_VERSION_ALL},
+        {"DELAYED", FLAG_VERSION_ALL, 0},
+        {"DELETE", FLAG_VERSION_ALL, 0},
+        {"DELIMITER", 0, 0}, /* Ocelot keyword */
+        {"DENSE_RANK", 0, FLAG_VERSION_MARIADB_10_2},
+        {"DESC", FLAG_VERSION_ALL, 0},
+        {"DESCRIBE", FLAG_VERSION_ALL, 0},
+        {"DES_DECRYPT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"DES_ENCRYPT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"DETERMINISTIC", FLAG_VERSION_ALL, 0},
+        {"DIMENSION", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"DIRECTORY", 0, 0},
+        {"DISJOINT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"DISTANCE", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"DISTINCT", FLAG_VERSION_ALL, 0},
+        {"DISTINCTROW", FLAG_VERSION_ALL, 0},
+        {"DIV", FLAG_VERSION_ALL, 0},
+        {"DO", 0, 0},
+        {"DOUBLE", FLAG_VERSION_ALL, 0},
+        {"DROP", FLAG_VERSION_ALL, 0},
+        {"DUAL", FLAG_VERSION_ALL, 0},
+        {"DUPLICATE", 0, 0},
+        {"DYNAMIC", 0, 0},
+        {"EACH", FLAG_VERSION_ALL, 0},
+        {"EDIT", 0, 0}, /* Ocelot keyword */
+        {"EGO", 0, 0}, /* Ocelot keyword */
+        {"ELSE", FLAG_VERSION_ALL, 0},
+        {"ELSEIF", FLAG_VERSION_ALL, 0},
+        {"ELT", 0, FLAG_VERSION_ALL},
+        {"ENABLE", 0, 0},
+        {"ENCLOSED", FLAG_VERSION_ALL, 0},
+        {"ENCODE", 0, FLAG_VERSION_ALL},
+        {"ENCRYPT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"END", 0, 0},
+        {"ENDPOINT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ENUM", 0, 0},
+        {"ENVELOPE", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"EQUALS", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ESCAPE", 0, 0},
+        {"ESCAPED", FLAG_VERSION_ALL, 0},
+        {"EVENT", 0, 0},
+        {"EXCHANGE", 0, 0},
+        {"EXCLUSIVE", 0, 0},
+        {"EXECUTE", 0, 0},
+        {"EXISTS", FLAG_VERSION_ALL, 0},
+        {"EXIT", FLAG_VERSION_ALL, 0},
+        {"EXP", 0, FLAG_VERSION_ALL},
+        {"EXPANSION", 0, 0},
+        {"EXPLAIN", FLAG_VERSION_ALL, 0},
+        {"EXPORT", 0, 0},
+        {"EXPORT_SET", 0, FLAG_VERSION_ALL},
+        {"EXTERIORRING", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"EXTRACT", 0, FLAG_VERSION_ALL},
+        {"EXTRACTVALUE", 0, FLAG_VERSION_ALL},
+        {"FALSE", FLAG_VERSION_ALL, 0},
+        {"FETCH", FLAG_VERSION_ALL, 0},
+        {"FIELD", 0, FLAG_VERSION_ALL},
+        {"FILE", 0, 0},
+        {"FIND_IN_SET", 0, FLAG_VERSION_ALL},
+        {"FIRST", 0, 0}, /* MariaDB 10.2 nonreserved */
+        {"FIRST_VALUE", 0, 0}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2*/
+        {"FIXED", 0, 0},
+        {"FLOAT", FLAG_VERSION_ALL, 0},
+        {"FLOAT4", FLAG_VERSION_ALL, 0},
+        {"FLOAT8", FLAG_VERSION_ALL, 0},
+        {"FLOOR", 0, FLAG_VERSION_ALL},
+        {"FLUSH", 0, 0},
+        {"FOLLOWING", FLAG_VERSION_MARIADB_10_2, 0},
+        {"FOR", FLAG_VERSION_ALL, 0},
+        {"FORCE", FLAG_VERSION_ALL, 0},
+        {"FOREIGN", FLAG_VERSION_ALL, 0},
+        {"FORMAT", 0, FLAG_VERSION_ALL},
+        {"FOUND_ROWS", 0, FLAG_VERSION_ALL},
+        {"FROM", FLAG_VERSION_ALL, 0},
+        {"FROM_BASE64", 0, FLAG_VERSION_ALL},
+        {"FROM_DAYS", 0, FLAG_VERSION_ALL},
+        {"FROM_UNIXTIME", 0, FLAG_VERSION_ALL},
+        {"FULL", 0, 0},
+        {"FULLTEXT", FLAG_VERSION_ALL, 0},
+        {"FUNCTION", 0, 0},
+        {"GENERAL", 0, 0},
+        {"GENERATED", FLAG_VERSION_MYSQL_5_7, 0},
+        {"GEOMCOLLFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMCOLLFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMETRY", 0, 0},
+        {"GEOMETRYCOLLECTION", 0, FLAG_VERSION_ALL},
+        {"GEOMETRYCOLLECTIONFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMETRYCOLLECTIONFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMETRYFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMETRYFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMETRYN", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMETRYTYPE", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GEOMFROMTEXT", 0, FLAG_VERSION_ALL},/* deprecated in MySQL 5.7.6 */
+        {"GEOMFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GET", FLAG_VERSION_MYSQL_5_6, 0},
+        {"GET_FORMAT", 0, FLAG_VERSION_ALL},
+        {"GET_LOCK", 0, FLAG_VERSION_ALL},
+        {"GLENGTH", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"GO", 0, 0}, /* Ocelot keyword */
+        {"GRANT", FLAG_VERSION_ALL, 0},
+        {"GREATEST", 0, FLAG_VERSION_ALL},
+        {"GROUP", FLAG_VERSION_ALL, 0},
+        {"GROUP_CONCAT", 0, FLAG_VERSION_ALL},
+        {"GTID_SUBSET", 0, FLAG_VERSION_ALL},
+        {"GTID_SUBTRACT", 0, FLAG_VERSION_ALL},
+        {"HANDLER", 0, 0},
+        {"HAVING", FLAG_VERSION_ALL, 0},
+        {"HELP", 0, 0}, /* Ocelot keyword */
+        {"HEX", 0, FLAG_VERSION_ALL},
+        {"HIGH_PRIORITY", FLAG_VERSION_ALL, 0},
+        {"HOUR", 0, FLAG_VERSION_ALL},
+        {"HOUR_MICROSECOND", FLAG_VERSION_ALL, 0},
+        {"HOUR_MINUTE", FLAG_VERSION_ALL, 0},
+        {"HOUR_SECOND", FLAG_VERSION_ALL, 0},
+        {"IF", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"IFNULL", 0, FLAG_VERSION_ALL},
+        {"IGNORE", FLAG_VERSION_ALL, 0},
+        {"IMPORT", 0, 0},
+        {"IN", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"INDEX", FLAG_VERSION_ALL, 0},
+        {"INET6_ATON", 0, FLAG_VERSION_ALL},
+        {"INET6_NTOA", 0, FLAG_VERSION_ALL},
+        {"INET_ATON", 0, FLAG_VERSION_ALL},
+        {"INET_NTOA", 0, FLAG_VERSION_ALL},
+        {"INFILE", FLAG_VERSION_ALL, 0},
+        {"INNER", FLAG_VERSION_ALL, 0},
+        {"INOUT", FLAG_VERSION_ALL, 0},
+        {"INSENSITIVE", FLAG_VERSION_ALL, 0},
+        {"INSERT", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"INSTALL", 0, 0},
+        {"INSTR", 0, FLAG_VERSION_ALL},
+        {"INT", FLAG_VERSION_ALL, 0},
+        {"INT1", FLAG_VERSION_ALL, 0},
+        {"INT2", FLAG_VERSION_ALL, 0},
+        {"INT3", FLAG_VERSION_ALL, 0},
+        {"INT4", FLAG_VERSION_ALL, 0},
+        {"INT8", FLAG_VERSION_ALL, 0},
+        {"INTEGER", FLAG_VERSION_ALL, 0},
+        {"INTERIORRINGN", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"INTERSECTS", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"INTERVAL", 0, FLAG_VERSION_ALL},
+        {"INTO", FLAG_VERSION_ALL, 0},
+        {"IO_AFTER_GTIDS", FLAG_VERSION_MYSQL_5_6, 0},
+        {"IO_BEFORE_GTIDS", FLAG_VERSION_MYSQL_5_6, 0},
+        {"IS", FLAG_VERSION_ALL, 0},
+        {"ISCLOSED", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ISEMPTY", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"ISNULL", 0, FLAG_VERSION_ALL},
+        {"ISSIMPLE", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"IS_FREE_LOCK", 0, FLAG_VERSION_ALL},
+        {"IS_IPV4", 0, FLAG_VERSION_ALL},
+        {"IS_IPV4_COMPAT", 0, FLAG_VERSION_ALL},
+        {"IS_IPV4_MAPPED", 0, FLAG_VERSION_ALL},
+        {"IS_IPV6", 0, FLAG_VERSION_ALL},
+        {"IS_USED_LOCK", 0, FLAG_VERSION_ALL},
+        {"ITERATE", FLAG_VERSION_ALL, 0},
+        {"JOIN", FLAG_VERSION_ALL, 0},
+        {"JSON_APPEND", 0, FLAG_VERSION_ALL},
+        {"JSON_ARRAY", 0, FLAG_VERSION_ALL},
+        {"JSON_ARRAY_APPEND", 0, FLAG_VERSION_ALL},
+        {"JSON_ARRAY_INSERT", 0, FLAG_VERSION_ALL},
+        {"JSON_CONTAINS", 0, FLAG_VERSION_ALL},
+        {"JSON_CONTAINS_PATH", 0, FLAG_VERSION_ALL},
+        {"JSON_DEPTH", 0, FLAG_VERSION_ALL},
+        {"JSON_EXTRACT", 0, FLAG_VERSION_ALL},
+        {"JSON_INSERT", 0, FLAG_VERSION_ALL},
+        {"JSON_KEYS", 0, FLAG_VERSION_ALL},
+        {"JSON_LENGTH", 0, FLAG_VERSION_ALL},
+        {"JSON_MERGE", 0, FLAG_VERSION_ALL},
+        {"JSON_OBJECT", 0, FLAG_VERSION_ALL},
+        {"JSON_QUOTE", 0, FLAG_VERSION_ALL},
+        {"JSON_REMOVE", 0, FLAG_VERSION_ALL},
+        {"JSON_REPLACE", 0, FLAG_VERSION_ALL},
+        {"JSON_SEARCH", 0, FLAG_VERSION_ALL},
+        {"JSON_SET", 0, FLAG_VERSION_ALL},
+        {"JSON_TYPE", 0, FLAG_VERSION_ALL},
+        {"JSON_UNQUOTE", 0, FLAG_VERSION_ALL},
+        {"JSON_VALID", 0, FLAG_VERSION_ALL},
+        {"KEY", FLAG_VERSION_ALL, 0},
+        {"KEYS", FLAG_VERSION_ALL, 0},
+        {"KILL", FLAG_VERSION_ALL, 0},
+        {"LAG", 0, 0}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
+        {"LANGUAGE", 0, 0},
+        {"LAST", 0, 0}, /* MariaDB 10.2 nonreserved */
+        {"LAST_DAY", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"LAST_INSERT_ID", 0, FLAG_VERSION_ALL},
+        {"LAST_VALUE", 0, 0}, /* MariaDB 10.2 nonreserved */
+        {"LCASE", 0, FLAG_VERSION_ALL},
+        {"LEAD", 0, 0}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
+        {"LEADING", FLAG_VERSION_ALL, 0},
+        {"LEAST", 0, FLAG_VERSION_ALL},
+        {"LEAVE", FLAG_VERSION_ALL, 0},
+        {"LEFT", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"LENGTH", 0, FLAG_VERSION_ALL},
+        {"LEVEL", 0, 0},
+        {"LIKE", FLAG_VERSION_ALL, 0},
+        {"LIMIT", FLAG_VERSION_ALL, 0},
+        {"LINEAR", FLAG_VERSION_ALL, 0},
+        {"LINEFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"LINEFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"LINES", FLAG_VERSION_ALL, 0},
+        {"LINESTRING", 0, FLAG_VERSION_ALL},
+        {"LINESTRINGFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"LINESTRINGFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"LN", 0, FLAG_VERSION_ALL},
+        {"LOAD", FLAG_VERSION_ALL, 0},
+        {"LOAD_FILE", 0, FLAG_VERSION_ALL},
+        {"LOCALTIME", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"LOCALTIMESTAMP", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"LOCATE", 0, FLAG_VERSION_ALL},
+        {"LOCK", FLAG_VERSION_ALL, 0},
+        {"LOG", 0, FLAG_VERSION_ALL},
+        {"LOG10", 0, FLAG_VERSION_ALL},
+        {"LOG2", 0, FLAG_VERSION_ALL},
+        {"LOGFILE", 0, 0},
+        {"LONG", FLAG_VERSION_ALL, 0},
+        {"LONGBLOB", FLAG_VERSION_ALL, 0},
+        {"LONGTEXT", FLAG_VERSION_ALL, 0},
+        {"LOOP", FLAG_VERSION_ALL, 0},
+        {"LOWER", 0, FLAG_VERSION_ALL},
+        {"LOW_PRIORITY", FLAG_VERSION_ALL, 0},
+        {"LPAD", 0, FLAG_VERSION_ALL},
+        {"LTRIM", 0, FLAG_VERSION_ALL},
+        {"MAKEDATE", 0, FLAG_VERSION_ALL},
+        {"MAKETIME", 0, FLAG_VERSION_ALL},
+        {"MAKE_SET", 0, FLAG_VERSION_ALL},
+        {"MASTER_BIND", FLAG_VERSION_MYSQL_5_6, 0},
+        {"MASTER_HEARTBEAT_PERIOD", 0, 0},
+        {"MASTER_POS_WAIT", 0, FLAG_VERSION_ALL},
+        {"MASTER_SSL_VERIFY_SERVER_CERT", FLAG_VERSION_ALL, 0},
+        {"MATCH", FLAG_VERSION_ALL, 0},
+        {"MAX", 0, FLAG_VERSION_ALL},
+        {"MAXVALUE", FLAG_VERSION_ALL, 0},
+        {"MBRCONTAINS", 0, FLAG_VERSION_ALL},
+        {"MBRCOVEREDBY", 0, FLAG_VERSION_ALL},
+        {"MBRCOVERS", 0, FLAG_VERSION_ALL},
+        {"MBRDISJOINT", 0, FLAG_VERSION_ALL},
+        {"MBREQUAL", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MBREQUALS", 0, FLAG_VERSION_ALL},
+        {"MBRINTERSECTS", 0, FLAG_VERSION_ALL},
+        {"MBROVERLAPS", 0, FLAG_VERSION_ALL},
+        {"MBRTOUCHES", 0, FLAG_VERSION_ALL},
+        {"MBRWITHIN", 0, FLAG_VERSION_ALL},
+        {"MD5", 0, FLAG_VERSION_ALL},
+        {"MEDIUMBLOB", FLAG_VERSION_ALL, 0},
+        {"MEDIUMINT", FLAG_VERSION_ALL, 0},
+        {"MEDIUMTEXT", FLAG_VERSION_ALL, 0},
+        {"MICROSECOND", 0, FLAG_VERSION_ALL},
+        {"MID", 0, FLAG_VERSION_ALL},
+        {"MIDDLEINT", FLAG_VERSION_ALL, 0},
+        {"MIN", 0, FLAG_VERSION_ALL},
+        {"MINUTE", 0, FLAG_VERSION_ALL},
+        {"MINUTE_MICROSECOND", FLAG_VERSION_ALL, 0},
+        {"MINUTE_SECOND", FLAG_VERSION_ALL, 0},
+        {"MLINEFROMTEXT", 0, FLAG_VERSION_ALL},  /* deprecated in MySQL 5.7.6 */
+        {"MLINEFROMWKB", 0, FLAG_VERSION_ALL},  /* deprecated in MySQL 5.7.6 */
+        {"MOD", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"MODE", 0, 0},
+        {"MODIFIES", FLAG_VERSION_ALL, 0},
+        {"MONTH", 0, FLAG_VERSION_ALL},
+        {"MONTHNAME", 0, FLAG_VERSION_ALL},
+        {"MPOINTFROMTEXT", 0, FLAG_VERSION_ALL},  /* deprecated in MySQL 5.7.6 */
+        {"MPOINTFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MPOLYFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MPOLYFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MULTILINESTRING", 0, FLAG_VERSION_ALL},
+        {"MULTILINESTRINGFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MULTILINESTRINGFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MULTIPOINT", 0, FLAG_VERSION_ALL},
+        {"MULTIPOINTFROMTEXT", 0, FLAG_VERSION_ALL},  /* deprecated in MySQL 5.7.6 */
+        {"MULTIPOINTFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MULTIPOLYGON", 0, FLAG_VERSION_ALL},
+        {"MULTIPOLYGONFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"MULTIPOLYGONFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"NAME_CONST", 0, FLAG_VERSION_ALL},
+        {"NATURAL", FLAG_VERSION_ALL, 0},
+        {"NO", 0, 0},
+        {"NOPAGER", 0, 0}, /* Ocelot keyword */
+        {"NOT", 0, 0},
+        {"NOTEE", 0, 0}, /* Ocelot keyword */
+        {"NOW", 0, FLAG_VERSION_ALL},
+        {"NOWARNING", 0, 0}, /* Ocelot keyword */
+        {"NO_WRITE_TO_BINLOG", FLAG_VERSION_ALL, 0},
+        {"NTH_VALUE", 0, 0}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
+        {"NTILE", 0, FLAG_VERSION_MARIADB_10_2},
+        {"NULL", FLAG_VERSION_ALL, 0},
+        {"NULLIF", 0, FLAG_VERSION_ALL},
+        {"NULLS", 0, 0}, /* MariaDB 10.2 nonreserved  -- or, maybe not in MariaDB 10.2 */
+        {"NUMERIC", FLAG_VERSION_ALL, 0},
+        {"NUMGEOMETRIES", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"NUMINTERIORRINGS", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"NUMPOINTS", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"OCT", 0, FLAG_VERSION_ALL},
+        {"OCTET_LENGTH", 0, FLAG_VERSION_ALL},
+        {"OFF", 0, 0},
+        {"OJ", 0, 0},
+        {"OLD_PASSWORD", 0, FLAG_VERSION_ALL},
+        {"ON", FLAG_VERSION_ALL, 0},
+        {"OPEN", 0, 0},
+        {"OPTIMIZE", FLAG_VERSION_ALL, 0},
+        {"OPTIMIZER_COSTS", FLAG_VERSION_MYSQL_5_7, 0},
+        {"OPTION", FLAG_VERSION_ALL, 0},
+        {"OPTIONALLY", FLAG_VERSION_ALL, 0},
+        {"OR", FLAG_VERSION_ALL, 0},
+        {"ORD", 0, FLAG_VERSION_ALL},
+        {"ORDER", FLAG_VERSION_ALL, 0},
+        {"OUT", FLAG_VERSION_ALL, 0},
+        {"OUTER", FLAG_VERSION_ALL, 0},
+        {"OUTFILE", FLAG_VERSION_ALL, 0},
+        {"OVER", FLAG_VERSION_MARIADB_10_2, 0},
+        {"OVERLAPS", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"PAGER", 0, 0}, /* Ocelot keyword */
+        {"PARTIAL", 0, 0},
+        {"PARTITION", FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MARIADB_10_0, 0},
+        {"PASSWORD", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"PERCENT_RANK", 0, FLAG_VERSION_MARIADB_10_2},
+        {"PERIOD_ADD", 0, FLAG_VERSION_ALL},
+        {"PERIOD_DIFF", 0, FLAG_VERSION_ALL},
+        {"PI", 0, FLAG_VERSION_ALL},
+        {"POINT", 0, FLAG_VERSION_ALL},
+        {"POINTFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"POINTFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"POINTN", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"POLYFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"POLYFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7 */
+        {"POLYGON", 0, 0},
+        {"POLYGONFROMTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"POLYGONFROMWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"POSITION", 0, FLAG_VERSION_ALL},
+        {"POW", 0, FLAG_VERSION_ALL},
+        {"POWER", 0, FLAG_VERSION_ALL},
+        {"PRECISION", FLAG_VERSION_ALL, 0},
+        {"PREPARE", 0, 0},
+        {"PRIMARY", FLAG_VERSION_ALL, 0},
+        {"PRINT", 0, 0}, /* Ocelot keyword */
+        {"PROCEDURE", FLAG_VERSION_ALL, 0},
+        {"PROCESS", 0, 0},
+        {"PROMPT", 0, 0}, /* Ocelot keyword */
+        {"PROXY", 0, 0},
+        {"PURGE", FLAG_VERSION_ALL, 0},
+        {"QUARTER", 0, FLAG_VERSION_ALL},
+        {"QUERY", 0, 0},
+        {"QUIT", 0, 0}, /* Ocelot keyword */
+        {"QUOTE", 0, FLAG_VERSION_ALL},
+        {"RADIANS", 0, FLAG_VERSION_ALL},
+        {"RAND", 0, FLAG_VERSION_ALL},
+        {"RANDOM_BYTES", 0, FLAG_VERSION_ALL},
+        {"RANGE", FLAG_VERSION_ALL, 0},
+        {"RANK", 0, FLAG_VERSION_MARIADB_10_2},
+        {"READ", FLAG_VERSION_ALL, 0},
+        {"READS", FLAG_VERSION_ALL, 0},
+        {"READ_WRITE", FLAG_VERSION_ALL, 0},
+        {"REAL", FLAG_VERSION_ALL, 0},
+        {"REBUILD", 0, 0},
+        {"REDUNDANT", 0, 0},
+        {"REFERENCES", FLAG_VERSION_ALL, 0},
+        {"REGEXP", FLAG_VERSION_ALL, 0},
+        {"REHASH", 0, 0}, /* Ocelot keyword */
+        {"RELEASE", FLAG_VERSION_ALL, 0},
+        {"RELEASE_ALL_LOCKS", 0, FLAG_VERSION_ALL},
+        {"RELEASE_LOCK", 0, FLAG_VERSION_ALL},
+        {"RELOAD", 0, 0},
+        {"RENAME", FLAG_VERSION_ALL, 0},
+        {"REORGANIZE", 0, 0},
+        {"REPAIR", 0, 0},
+        {"REPEAT", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"REPLACE", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"REPLICATION", 0, 0},
+        {"REQUIRE", FLAG_VERSION_ALL, 0},
+        {"RESET", 0, 0},
+        {"RESIGNAL", FLAG_VERSION_ALL, 0},
+        {"RESTRICT", FLAG_VERSION_ALL, 0},
+        {"RETURN", FLAG_VERSION_ALL, 0},
+        {"RETURNS", 0, 0},
+        {"REVERSE", 0, FLAG_VERSION_ALL},
+        {"REVOKE", FLAG_VERSION_ALL, 0},
+        {"RIGHT", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"RLIKE", FLAG_VERSION_ALL, 0},
+        {"ROLE", 0, 0},
+        {"ROLLBACK", 0, 0},
+        {"ROUND", 0, FLAG_VERSION_ALL},
+        {"ROW", 0, 0},
+        {"ROW_COUNT", 0, FLAG_VERSION_ALL},
+        {"ROW_NUMBER", 0, FLAG_VERSION_MARIADB_10_2},
+        {"RPAD", 0, FLAG_VERSION_ALL},
+        {"RTRIM", 0, FLAG_VERSION_ALL},
+        {"SAVEPOINT", 0, 0},
+        {"SCHEMA", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"SCHEMAS", FLAG_VERSION_ALL, 0},
+        {"SECOND", 0, FLAG_VERSION_ALL},
+        {"SECOND_MICROSECOND", FLAG_VERSION_ALL, 0},
+        {"SECURITY", 0, 0},
+        {"SEC_TO_TIME", 0, FLAG_VERSION_ALL},
+        {"SELECT", FLAG_VERSION_ALL, 0},
+        {"SENSITIVE", FLAG_VERSION_ALL, 0},
+        {"SEPARATOR", FLAG_VERSION_ALL, 0},
+        {"SERIAL", 0, 0},
+        {"SERVER", 0, 0},
+        {"SESSION", 0, 0},
+        {"SESSION_USER", 0, FLAG_VERSION_ALL},
+        {"SET", FLAG_VERSION_ALL, 0},
+        {"SHA", 0, FLAG_VERSION_ALL},
+        {"SHA1", 0, FLAG_VERSION_ALL},
+        {"SHA2", 0, FLAG_VERSION_ALL},
+        {"SHARED", 0, 0},
+        {"SHOW", FLAG_VERSION_ALL, 0},
+        {"SHUTDOWN", 0, 0},
+        {"SIGN", 0, FLAG_VERSION_ALL},
+        {"SIGNAL", FLAG_VERSION_ALL, 0},
+        {"SIMPLE", 0, 0},
+        {"SIN", 0, FLAG_VERSION_ALL},
+        {"SLEEP", 0, FLAG_VERSION_ALL},
+        {"SLOW", 0, 0},
+        {"SMALLINT", FLAG_VERSION_ALL, 0},
+        {"SONAME", 0, 0},
+        {"SOUNDEX", 0, FLAG_VERSION_ALL},
+        {"SOURCE", 0, 0}, /* Ocelot keyword */
+        {"SPACE", 0, FLAG_VERSION_ALL},
+        {"SPATIAL", FLAG_VERSION_ALL, 0},
+        {"SPECIFIC", FLAG_VERSION_ALL, 0},
+        {"SQL", FLAG_VERSION_ALL, 0},
+        {"SQLEXCEPTION", FLAG_VERSION_ALL, 0},
+        {"SQLSTATE", FLAG_VERSION_ALL, 0},
+        {"SQLWARNING", FLAG_VERSION_ALL, 0},
+        {"SQL_BIG_RESULT", FLAG_VERSION_ALL, 0},
+        {"SQL_CALC_FOUND_ROWS", FLAG_VERSION_ALL, 0},
+        {"SQL_SMALL_RESULT", FLAG_VERSION_ALL, 0},
+        {"SQRT", 0, FLAG_VERSION_ALL},
+        {"SRID", 0, FLAG_VERSION_ALL},
+        {"SSL", FLAG_VERSION_ALL, 0},
+        {"START", 0, 0},
+        {"STARTING", FLAG_VERSION_ALL, 0},
+        {"STARTPOINT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"STATUS", 0, 0}, /* Ocelot keyword */
+        {"STD", 0, FLAG_VERSION_ALL},
+        {"STDDEV", 0, FLAG_VERSION_ALL},
+        {"STDDEV_POP", 0, FLAG_VERSION_ALL},
+        {"STDDEV_SAMP", 0, FLAG_VERSION_ALL},
+        {"STOP", 0, 0},
+        {"STORED", FLAG_VERSION_MYSQL_5_7, 0},
+        {"STRAIGHT_JOIN", FLAG_VERSION_ALL, 0},
+        {"STRCMP", 0, FLAG_VERSION_ALL},
+        {"STR_TO_DATE", 0, FLAG_VERSION_ALL},
+        {"ST_AREA", 0, FLAG_VERSION_ALL},
+        {"ST_ASBINARY", 0, FLAG_VERSION_ALL},
+        {"ST_ASGEOJSON", 0, FLAG_VERSION_ALL},
+        {"ST_ASTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_ASWKB", 0, FLAG_VERSION_ALL},
+        {"ST_ASWKT", 0, FLAG_VERSION_ALL},
+        {"ST_BUFFER", 0, FLAG_VERSION_ALL},
+        {"ST_BUFFER_STRATEGY", 0, FLAG_VERSION_ALL},
+        {"ST_CENTROID", 0, FLAG_VERSION_ALL},
+        {"ST_CONTAINS", 0, FLAG_VERSION_ALL},
+        {"ST_CONVEXHULL", 0, FLAG_VERSION_ALL},
+        {"ST_CROSSES", 0, FLAG_VERSION_ALL},
+        {"ST_DIFFERENCE", 0, FLAG_VERSION_ALL},
+        {"ST_DIMENSION", 0, FLAG_VERSION_ALL},
+        {"ST_DISJOINT", 0, FLAG_VERSION_ALL},
+        {"ST_DISTANCE", 0, FLAG_VERSION_ALL},
+        {"ST_DISTANCE_SPHERE", 0, FLAG_VERSION_ALL},
+        {"ST_ENDPOINT", 0, FLAG_VERSION_ALL},
+        {"ST_ENVELOPE", 0, FLAG_VERSION_ALL},
+        {"ST_EQUALS", 0, FLAG_VERSION_ALL},
+        {"ST_EXTERIORRING", 0, FLAG_VERSION_ALL},
+        {"ST_GEOHASH", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMCOLLFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMCOLLFROMTXT", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMCOLLFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMETRYCOLLECTIONFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMETRYCOLLECTIONFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMETRYFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMETRYFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMETRYN", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMETRYTYPE", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMFROMGEOJSON", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_GEOMFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_INTERIORRINGN", 0, FLAG_VERSION_ALL},
+        {"ST_INTERSECTION", 0, FLAG_VERSION_ALL},
+        {"ST_INTERSECTS", 0, FLAG_VERSION_ALL},
+        {"ST_ISCLOSED", 0, FLAG_VERSION_ALL},
+        {"ST_ISEMPTY", 0, FLAG_VERSION_ALL},
+        {"ST_ISSIMPLE", 0, FLAG_VERSION_ALL},
+        {"ST_ISVALID", 0, FLAG_VERSION_ALL},
+        {"ST_LATFROMGEOHASH", 0, FLAG_VERSION_ALL},
+        {"ST_LENGTH", 0, FLAG_VERSION_ALL},
+        {"ST_LINEFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_LINEFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_LINESTRINGFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_LINESTRINGFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_LONGFROMGEOHASH", 0, FLAG_VERSION_ALL},
+        {"ST_MAKEENVELOPE", 0, FLAG_VERSION_ALL},
+        {"ST_MLINEFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_MLINEFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_MPOINTFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_MPOINTFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_MPOLYFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_MPOLYFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_MULTILINESTRINGFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_MULTILINESTRINGFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_MULTIPOINTFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_MULTIPOINTFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_MULTIPOLYGONFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_MULTIPOLYGONFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_NUMGEOMETRIES", 0, FLAG_VERSION_ALL},
+        {"ST_NUMINTERIORRING", 0, FLAG_VERSION_ALL},
+        {"ST_NUMINTERIORRINGS", 0, FLAG_VERSION_ALL},
+        {"ST_NUMPOINTS", 0, FLAG_VERSION_ALL},
+        {"ST_OVERLAPS", 0, FLAG_VERSION_ALL},
+        {"ST_POINTFROMGEOHASH", 0, FLAG_VERSION_ALL},
+        {"ST_POINTFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_POINTFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_POINTN", 0, FLAG_VERSION_ALL},
+        {"ST_POLYFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_POLYFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_POLYGONFROMTEXT", 0, FLAG_VERSION_ALL},
+        {"ST_POLYGONFROMWKB", 0, FLAG_VERSION_ALL},
+        {"ST_SIMPLIFY", 0, FLAG_VERSION_ALL},
+        {"ST_SRID", 0, FLAG_VERSION_ALL},
+        {"ST_STARTPOINT", 0, FLAG_VERSION_ALL},
+        {"ST_SYMDIFFERENCE", 0, FLAG_VERSION_ALL},
+        {"ST_TOUCHES", 0, FLAG_VERSION_ALL},
+        {"ST_UNION", 0, FLAG_VERSION_ALL},
+        {"ST_VALIDATE", 0, FLAG_VERSION_ALL},
+        {"ST_WITHIN", 0, FLAG_VERSION_ALL},
+        {"ST_X", 0, FLAG_VERSION_ALL},
+        {"ST_Y", 0, FLAG_VERSION_ALL},
+        {"SUBDATE", 0, FLAG_VERSION_ALL},
+        {"SUBSTR", 0, FLAG_VERSION_ALL},
+        {"SUBSTRING", 0, FLAG_VERSION_ALL},
+        {"SUBSTRING_INDEX", 0, FLAG_VERSION_ALL},
+        {"SUBTIME", 0, FLAG_VERSION_ALL},
+        {"SUM", 0, FLAG_VERSION_ALL},
+        {"SUPER", 0, 0},
+        {"SYSDATE", 0, FLAG_VERSION_ALL},
+        {"SYSTEM", 0, 0}, /* Ocelot keyword */
+        {"SYSTEM_USER", 0, FLAG_VERSION_ALL},
+        {"TABLE", FLAG_VERSION_ALL, 0},
+        {"TABLESPACE", 0, 0},
+        {"TAN", 0, FLAG_VERSION_ALL},
+        {"TEE", 0, 0}, /* Ocelot keyword */
+        {"TERMINATED", FLAG_VERSION_ALL, 0},
+        {"THEN", FLAG_VERSION_ALL, 0},
+        {"TIME", 0, FLAG_VERSION_ALL},
+        {"TIMEDIFF", 0, FLAG_VERSION_ALL},
+        {"TIMESTAMP", 0, FLAG_VERSION_ALL},
+        {"TIMESTAMPADD", 0, FLAG_VERSION_ALL},
+        {"TIMESTAMPDIFF", 0, FLAG_VERSION_ALL},
+        {"TIME_FORMAT", 0, FLAG_VERSION_ALL},
+        {"TIME_TO_SEC", 0, FLAG_VERSION_ALL},
+        {"TINYBLOB", FLAG_VERSION_ALL, 0},
+        {"TINYINT", FLAG_VERSION_ALL, 0},
+        {"TINYTEXT", FLAG_VERSION_ALL, 0},
+        {"TO", FLAG_VERSION_ALL, 0},
+        {"TOUCHES", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"TO_BASE64", 0, FLAG_VERSION_ALL},
+        {"TO_DAYS", 0, FLAG_VERSION_ALL},
+        {"TO_SECONDS", 0, FLAG_VERSION_ALL},
+        {"TRAILING", FLAG_VERSION_ALL, 0},
+        {"TRIGGER", FLAG_VERSION_ALL, 0},
+        {"TRIM", 0, FLAG_VERSION_ALL},
+        {"TRUE", FLAG_VERSION_ALL, 0},
+        {"TRUNCATE", 0, FLAG_VERSION_ALL},
+        {"UCASE", 0, FLAG_VERSION_ALL},
+        {"UNBOUNDED", 0, 0},
+        {"UNCOMPRESS", 0, FLAG_VERSION_ALL},
+        {"UNCOMPRESSED_LENGTH", 0, FLAG_VERSION_ALL},
+        {"UNDO", FLAG_VERSION_ALL, 0},
+        {"UNHEX", 0, FLAG_VERSION_ALL},
+        {"UNICODE", 0, 0},
+        {"UNINSTALL", 0, 0},
+        {"UNION", FLAG_VERSION_ALL, 0},
+        {"UNIQUE", FLAG_VERSION_ALL, 0},
+        {"UNIX_TIMESTAMP", 0, FLAG_VERSION_ALL},
+        {"UNKNOWN", 0, 0},
+        {"UNLOCK", FLAG_VERSION_ALL, 0},
+        {"UNSIGNED", FLAG_VERSION_ALL, 0},
+        {"UPDATE", FLAG_VERSION_ALL, 0},
+        {"UPDATEXML", 0, FLAG_VERSION_ALL},
+        {"UPPER", 0, FLAG_VERSION_ALL},
+        {"USAGE", FLAG_VERSION_ALL, 0},
+        {"USE", FLAG_VERSION_ALL, 0}, /* Ocelot keyword, also reserved word */
+        {"USER", 0, FLAG_VERSION_ALL},
+        {"USING", FLAG_VERSION_ALL, 0},
+        {"UTC_DATE", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"UTC_TIME", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"UTC_TIMESTAMP", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"UUID", 0, FLAG_VERSION_ALL},
+        {"UUID_SHORT", 0, FLAG_VERSION_ALL},
+        {"VALIDATE_PASSWORD_STRENGTH", 0, FLAG_VERSION_ALL},
+        {"VALIDATION", 0, 0},
+        {"VALUES", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
+        {"VARBINARY", FLAG_VERSION_ALL, 0},
+        {"VARCHAR", FLAG_VERSION_ALL, 0},
+        {"VARCHARACTER", FLAG_VERSION_ALL, 0},
+        {"VARIANCE", 0, FLAG_VERSION_ALL},
+        {"VARYING", FLAG_VERSION_ALL, 0},
+        {"VAR_POP", 0, FLAG_VERSION_ALL},
+        {"VAR_SAMP", 0, FLAG_VERSION_ALL},
+        {"VERSION", 0, FLAG_VERSION_ALL},
+        {"VIEW", 0, 0},
+        {"VIRTUAL", FLAG_VERSION_MYSQL_5_7, 0},
+        {"WAIT_FOR_EXECUTED_GTID_SET", 0, FLAG_VERSION_ALL},
+        {"WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS", 0, FLAG_VERSION_ALL},
+        {"WARNINGS", 0, 0}, /* Ocelot keyword */
+        {"WEEK", 0, FLAG_VERSION_ALL},
+        {"WEEKDAY", 0, FLAG_VERSION_ALL},
+        {"WEEKOFYEAR", 0, FLAG_VERSION_ALL},
+        {"WEIGHT_STRING", 0, FLAG_VERSION_ALL},
+        {"WHEN", FLAG_VERSION_ALL, 0},
+        {"WHERE", FLAG_VERSION_ALL, 0},
+        {"WHILE", FLAG_VERSION_ALL, 0},
+        {"WITH", FLAG_VERSION_ALL, 0},
+        {"WITHIN", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"WITHOUT", 0, 0},
+        {"WRITE", FLAG_VERSION_ALL, 0},
+        {"X", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"XA", 0, 0},
+        {"XOR", FLAG_VERSION_ALL, 0},
+        {"Y", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
+        {"YEAR", 0, FLAG_VERSION_ALL},
+        {"YEARWEEK", 0, FLAG_VERSION_ALL},
+        {"YEAR_MONTH", FLAG_VERSION_ALL, 0},
+        {"ZEROFILL", FLAG_VERSION_ALL, 0},
+        {"_ARMSCII8", FLAG_VERSION_ALL, 0},
+        {"_ASCII", FLAG_VERSION_ALL, 0},
+        {"_BIG5", FLAG_VERSION_ALL, 0},
+        {"_BINARY", FLAG_VERSION_ALL, 0},
+        {"_CP1250", FLAG_VERSION_ALL, 0},
+        {"_CP1251", FLAG_VERSION_ALL, 0},
+        {"_CP1256", FLAG_VERSION_ALL, 0},
+        {"_CP1257", FLAG_VERSION_ALL, 0},
+        {"_CP850", FLAG_VERSION_ALL, 0},
+        {"_CP852", FLAG_VERSION_ALL, 0},
+        {"_CP866", FLAG_VERSION_ALL, 0},
+        {"_CP932", FLAG_VERSION_ALL, 0},
+        {"_DEC8", FLAG_VERSION_ALL, 0},
+        {"_EUCJPMS", FLAG_VERSION_ALL, 0},
+        {"_EUCKR", FLAG_VERSION_ALL, 0},
+        {"_FILENAME", FLAG_VERSION_ALL, 0},
+        {"_GB2312", FLAG_VERSION_ALL, 0},
+        {"_GBK", FLAG_VERSION_ALL, 0},
+        {"_GEOSTD8", FLAG_VERSION_ALL, 0},
+        {"_GREEK", FLAG_VERSION_ALL, 0},
+        {"_HEBREW", FLAG_VERSION_ALL, 0},
+        {"_HP8", FLAG_VERSION_ALL, 0},
+        {"_KEYBCS2", FLAG_VERSION_ALL, 0},
+        {"_KOI8R", FLAG_VERSION_ALL, 0},
+        {"_KOI8U", FLAG_VERSION_ALL, 0},
+        {"_LATIN1", FLAG_VERSION_ALL, 0},
+        {"_LATIN2", FLAG_VERSION_ALL, 0},
+        {"_LATIN5", FLAG_VERSION_ALL, 0},
+        {"_LATIN7", FLAG_VERSION_ALL, 0},
+        {"_MACCE", FLAG_VERSION_ALL, 0},
+        {"_MACROMAN", FLAG_VERSION_ALL, 0},
+        {"_SJIS", FLAG_VERSION_ALL, 0},
+        {"_SWE7", FLAG_VERSION_ALL, 0},
+        {"_TIS620", FLAG_VERSION_ALL, 0},
+        {"_UCS2", FLAG_VERSION_ALL, 0},
+        {"_UJIS", FLAG_VERSION_ALL, 0},
+        {"_UTF16", FLAG_VERSION_ALL, 0},
+        {"_UTF16LE", FLAG_VERSION_ALL, 0},
+        {"_UTF32", FLAG_VERSION_ALL, 0},
+        {"_UTF8", FLAG_VERSION_ALL, 0},
+        {"_UTF8MB4", FLAG_VERSION_ALL, 0}
         };
   //QString text;
   QString s= "";
@@ -9225,46 +9225,24 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "810" */
+      /* If the following assert happens, you inserted/removed something without changing "813" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (810 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (813 - 1));
 
-      /* Search it with library binary-search. Assume 810 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch (key2, strvalues, 810, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 813 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch (key2, strvalues, 813, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
         index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
-        if ((strvalues[index].flags[0] & FLAG_RESERVED_IN_ALL) != 0)
+        if ((strvalues[index].reserved_flags & dbms_version_mask) != 0)
           main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_RESERVED);
-        if ((strvalues[index].flags[0] & FLAG_BUILT_IN_FUNCTION) != 0)
+        if ((strvalues[index].built_in_function_flags & dbms_version_mask) != 0)
         {
           main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_FUNCTION);
         }
         index+= TOKEN_KEYWORDS_START;
         main_token_types[i2]= index;
-        if (connections_is_connected[0] == 1)
-        {
-          if ((index == TOKEN_KEYWORD_GET)
-           || (index == TOKEN_KEYWORD_IO_AFTER_GTIDS)
-           || (index == TOKEN_KEYWORD_IO_BEFORE_GTIDS)
-           || (index == TOKEN_KEYWORD_MASTER_BIND))
-          {
-            if (statement_edit_widget->dbms_version.contains("mariadb", Qt::CaseInsensitive) == true)
-            {
-              main_token_flags[i2]= (main_token_flags[i2] & (~TOKEN_FLAG_IS_RESERVED));
-            }
-          }
-          if ((index == TOKEN_KEYWORD_GENERATED)
-           || (index == TOKEN_KEYWORD_STORED)
-           || (index == TOKEN_KEYWORD_VIRTUAL))
-          {
-            if (statement_edit_widget->dbms_version.contains("5.7") == false)
-            {
-              main_token_flags[i2]= (main_token_flags[i2] & (~TOKEN_FLAG_IS_RESERVED));
-            }
-          }
-        }
       }
 #ifdef DEBUGGER
       else
@@ -10048,6 +10026,45 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
   get_sql_mode(TOKEN_KEYWORD_CONNECT, "");
   connections_is_connected[0]= 1;
+
+  dbms_version_mask= FLAG_VERSION_ALL;
+  {
+    if (statement_edit_widget->dbms_version.contains("mariadb", Qt::CaseInsensitive) == true)
+    {
+      if (statement_edit_widget->dbms_version.contains("10.0.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0);
+      }
+      else if (statement_edit_widget->dbms_version.contains("10.1.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1);
+      }
+      else if (statement_edit_widget->dbms_version.contains("10.2.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2);
+      }
+      else
+      {
+        dbms_version_mask= FLAG_VERSION_MARIADB_ALL;
+      }
+    }
+    else
+    {
+      if (statement_edit_widget->dbms_version.contains("5.6.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6);
+      }
+      else if (statement_edit_widget->dbms_version.contains("5.7.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7);
+      }
+      else
+      {
+        dbms_version_mask= FLAG_VERSION_MYSQL_ALL;
+     }
+    }
+  }
+
   return 0;
 }
 
@@ -10831,7 +10848,7 @@ int MainWindow::hparse_f_table_join_table()
       }
       if (hparse_f_accept(TOKEN_KEYWORD_ON, "ON") == 1)
       {
-        hparse_f_opr_1();
+        hparse_f_opr_1(0);
         if (hparse_errno > 0) return 0;
       }
       return 1;
@@ -10878,7 +10895,7 @@ int MainWindow::hparse_f_table_join_condition()
 {
   if (hparse_f_accept(TOKEN_KEYWORD_ON, "ON") == 1)
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return 0;
     return 1;
   }
@@ -10975,54 +10992,54 @@ int MainWindow::hparse_f_table_index_list()
 /*
   TODO: I'm not sure about this, it seems to allow a := b := c
 */
-void MainWindow::hparse_f_opr_1() /* Precedence = 1 (bottom) */
+void MainWindow::hparse_f_opr_1(int who_is_calling) /* Precedence = 1 (bottom) */
 {
-  hparse_f_opr_2();
+  hparse_f_opr_2(who_is_calling);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(TOKEN_TYPE_OPERATOR, ":=") == 1) || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "=") == 1))
   {
-    hparse_f_opr_2();
+    hparse_f_opr_2(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_2() /* Precedence = 2 */
+void MainWindow::hparse_f_opr_2(int who_is_calling) /* Precedence = 2 */
 {
-  hparse_f_opr_3();
+  hparse_f_opr_3(who_is_calling);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "OR") == 1) || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "||") == 1))
   {
-    hparse_f_opr_3();
+    hparse_f_opr_3(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_3() /* Precedence = 3 */
+void MainWindow::hparse_f_opr_3(int who_is_calling) /* Precedence = 3 */
 {
-  hparse_f_opr_4();
+  hparse_f_opr_4(who_is_calling);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(TOKEN_TYPE_KEYWORD, "XOR") == 1)
   {
-    hparse_f_opr_4();
+    hparse_f_opr_4(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_4() /* Precedence = 4 */
+void MainWindow::hparse_f_opr_4(int who_is_calling) /* Precedence = 4 */
 {
-  hparse_f_opr_5();
+  hparse_f_opr_5(who_is_calling);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "AND") == 1) || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "&&") == 1))
   {
-    hparse_f_opr_5();
+    hparse_f_opr_5(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_5() /* Precedence = 5 */
+void MainWindow::hparse_f_opr_5(int who_is_calling) /* Precedence = 5 */
 {
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NOT") == 1) {;}
-  hparse_f_opr_6();
+  hparse_f_opr_6(who_is_calling);
   if (hparse_errno > 0) return;
 }
 
@@ -11032,14 +11049,14 @@ void MainWindow::hparse_f_opr_5() /* Precedence = 5 */
   override and set hparse_errno back to zero and carry on.
   Re CASE ... END: we change the token types, trying to avoid confusion with CASE statement.
 */
-void MainWindow::hparse_f_opr_6() /* Precedence = 6 */
+void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
 {
   if (hparse_f_accept(TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION, "CASE") == 1)
   {
     int when_count= 0;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHEN") == 0)
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(who_is_calling);
       if (hparse_errno > 0) return;
     }
     else when_count= 1;
@@ -11048,11 +11065,11 @@ void MainWindow::hparse_f_opr_6() /* Precedence = 6 */
       if ((when_count == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHEN") == 1))
       {
         ++when_count;
-        hparse_f_opr_1();
+        hparse_f_opr_1(who_is_calling);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "THEN") == 1)
         {
-          hparse_f_opr_1();
+          hparse_f_opr_1(who_is_calling);
           if (hparse_errno > 0) return;
         }
         else hparse_f_error();
@@ -11067,7 +11084,7 @@ void MainWindow::hparse_f_opr_6() /* Precedence = 6 */
     }
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ELSE") == 1)
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(who_is_calling);
       if (hparse_errno > 0) return;
     }
     if (hparse_f_accept(TOKEN_KEYWORD_END_IN_CASE_EXPRESSION, "END") == 1)
@@ -11085,7 +11102,7 @@ void MainWindow::hparse_f_opr_6() /* Precedence = 6 */
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
     if (hparse_errno > 0) return;
-    hparse_f_opr_1();
+    hparse_f_opr_1(who_is_calling);
     bool in_seen= false;
     if (hparse_errno > 0)
     {
@@ -11137,12 +11154,12 @@ void MainWindow::hparse_f_opr_6() /* Precedence = 6 */
 //   || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ELSE") == 1)
 //          )
 //    {;}
-  hparse_f_opr_7();
+  hparse_f_opr_7(who_is_calling);
   if (hparse_errno > 0) return;
 }
 
 /* Most comp-ops can be chained e.g. "a <> b <> c", but not LIKE or IN. */
-void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
+void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
 {
   if ((hparse_subquery_is_allowed == true) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXISTS") == 1))
   {
@@ -11156,7 +11173,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
   }
   int expression_count= 0;
   if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
-  else hparse_f_opr_8();
+  else hparse_f_opr_8(who_is_calling);
   if (hparse_errno > 0) return;
   for (;;)
   {
@@ -11170,7 +11187,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
     {
       hparse_like_seen= true;
       if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
-      else hparse_f_opr_8();
+      else hparse_f_opr_8(who_is_calling);
       hparse_like_seen= false;
       break;
     }
@@ -11183,11 +11200,11 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
     /* The manual says BETWEEN has a higher priority than this */
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "BETWEEN") == 1)
     {
-      hparse_f_opr_8();
+      hparse_f_opr_8(who_is_calling);
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "AND");
       if (hparse_errno > 0) return;
-      hparse_f_opr_8();
+      hparse_f_opr_8(who_is_calling);
       if (hparse_errno > 0) return;
       return;
     }
@@ -11200,7 +11217,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
      || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "<=>") == 1)
      || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REGEXP") == 1))
     {
-      hparse_f_opr_8();
+      hparse_f_opr_8(who_is_calling);
       if (hparse_errno > 0) return;
       continue;
     }
@@ -11229,7 +11246,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
         }
       }
       if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
-      else hparse_f_opr_8();
+      else hparse_f_opr_8(who_is_calling);
       if (hparse_errno > 0) return;
       continue;
     }
@@ -11249,7 +11266,7 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "LIKE");
       if (hparse_errno > 0) return;
-      hparse_f_opr_8();
+      hparse_f_opr_8(who_is_calling);
       if (hparse_errno > 0) return;
       continue;
     }
@@ -11257,53 +11274,53 @@ void MainWindow::hparse_f_opr_7() /* Precedence = 7 */
   }
 }
 
-void MainWindow::hparse_f_opr_8() /* Precedence = 8 */
+void MainWindow::hparse_f_opr_8(int who_is_calling) /* Precedence = 8 */
 {
-  hparse_f_opr_9();
+  hparse_f_opr_9(who_is_calling);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(TOKEN_TYPE_OPERATOR, "|") == 1)
   {
-    hparse_f_opr_9();
+    hparse_f_opr_9(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_9() /* Precedence = 9 */
+void MainWindow::hparse_f_opr_9(int who_is_calling) /* Precedence = 9 */
 {
-  hparse_f_opr_10();
+  hparse_f_opr_10(who_is_calling);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(TOKEN_TYPE_OPERATOR, "&") == 1)
   {
-    hparse_f_opr_10();
+    hparse_f_opr_10(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_10() /* Precedence = 10 */
+void MainWindow::hparse_f_opr_10(int who_is_calling) /* Precedence = 10 */
 {
-  hparse_f_opr_11();
+  hparse_f_opr_11(who_is_calling);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(TOKEN_TYPE_OPERATOR, "<<") == 1) || (hparse_f_accept(TOKEN_TYPE_OPERATOR, ">>") == 1))
   {
-    hparse_f_opr_11();
+    hparse_f_opr_11(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_11() /* Precedence = 11 */
+void MainWindow::hparse_f_opr_11(int who_is_calling) /* Precedence = 11 */
 {
-  hparse_f_opr_12();
+  hparse_f_opr_12(who_is_calling);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(TOKEN_TYPE_OPERATOR, "-") == 1) || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "+") == 1))
   {
-    hparse_f_opr_12();
+    hparse_f_opr_12(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_12() /* Precedence = 12 */
+void MainWindow::hparse_f_opr_12(int who_is_calling) /* Precedence = 12 */
 {
-  hparse_f_opr_13();
+  hparse_f_opr_13(who_is_calling);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(TOKEN_TYPE_OPERATOR, "*") == 1)
    || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "/") == 1)
@@ -11311,61 +11328,61 @@ void MainWindow::hparse_f_opr_12() /* Precedence = 12 */
    || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "%") == 1)
    || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "MOD") == 1))
   {
-    hparse_f_opr_13();
+    hparse_f_opr_13(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_13() /* Precedence = 13 */
+void MainWindow::hparse_f_opr_13(int who_is_calling) /* Precedence = 13 */
 {
-  hparse_f_opr_14();
+  hparse_f_opr_14(who_is_calling);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(TOKEN_TYPE_OPERATOR, "^") == 1)
   {
-    hparse_f_opr_14();
+    hparse_f_opr_14(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_14() /* Precedence = 14 */
+void MainWindow::hparse_f_opr_14(int who_is_calling) /* Precedence = 14 */
 {
   if ((hparse_f_accept(TOKEN_TYPE_OPERATOR, "-") == 1) || (hparse_f_accept(TOKEN_TYPE_OPERATOR, "~") == 1)) {;}
-  hparse_f_opr_15();
+  hparse_f_opr_15(who_is_calling);
   if (hparse_errno > 0) return;
 }
 
-void MainWindow::hparse_f_opr_15() /* Precedence = 15 */
+void MainWindow::hparse_f_opr_15(int who_is_calling) /* Precedence = 15 */
 {
   if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "!") == 1) {;}
-  hparse_f_opr_16();
+  hparse_f_opr_16(who_is_calling);
   if (hparse_errno > 0) return;
 }
 
 /* Actually I'm not sure what ESCAPE precedence is, as long as it's higher than LIKE. */
-void MainWindow::hparse_f_opr_16() /* Precedence = 16 */
+void MainWindow::hparse_f_opr_16(int who_is_calling) /* Precedence = 16 */
 {
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "BINARY") == 1) {;}
-  hparse_f_opr_17();
+  hparse_f_opr_17(who_is_calling);
   if (hparse_errno > 0) return;
   if (hparse_like_seen == true)
   {
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ESCAPE") == 1)
     {
       hparse_like_seen= false;
-      hparse_f_opr_17();
+      hparse_f_opr_17(who_is_calling);
       if (hparse_errno > 0) return;
       return;
     }
   }
   while (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
   {
-    hparse_f_opr_17();
+    hparse_f_opr_17(who_is_calling);
     if (hparse_errno > 0) return;
   }
 }
 
 /* todo: disallow INTERVAL unless we've seen + or - */
-void MainWindow::hparse_f_opr_17() /* Precedence = 17 */
+void MainWindow::hparse_f_opr_17(int who_is_calling) /* Precedence = 17 */
 {
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INTERVAL") == 1)
   {
@@ -11375,7 +11392,7 @@ void MainWindow::hparse_f_opr_17() /* Precedence = 17 */
     if (hparse_errno > 0) return;
     return;
   }
-  hparse_f_opr_18();
+  hparse_f_opr_18(who_is_calling);
   if (hparse_errno > 0) return;
 }
 
@@ -11383,7 +11400,7 @@ void MainWindow::hparse_f_opr_17() /* Precedence = 17 */
   Final level is operand.
   factor = identifier | number | "(" expression ")" .
 */
-void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
+void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
 {
   if (hparse_errno > 0) return;
   QString opd= hparse_token.toUpper();
@@ -11395,13 +11412,12 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
     if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) return;
     identifier_seen= true;
   }
-
+  int saved_hparse_i= hparse_i;
   hparse_f_next_nexttoken();
   if (hparse_next_token == "(")
   {
     if ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0)
     {
-      int saved_hparse_i= hparse_i;
       int saved_token= main_token_types[hparse_i];
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
       identifier_seen= true;
@@ -11422,6 +11438,8 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
         hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
         if (hparse_errno > 0) return;
       }
+      hparse_f_over(saved_hparse_i, who_is_calling);
+      if (hparse_errno > 0) return;
     }
     return;
   }
@@ -11511,7 +11529,7 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
       hparse_f_select(true);
       if (hparse_errno > 0) return;
     }
-    else hparse_f_opr_1();
+    else hparse_f_opr_1(who_is_calling);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
@@ -11520,6 +11538,146 @@ void MainWindow::hparse_f_opr_18() /* Precedence = 18, top */
   hparse_f_error();
   return;
 }
+
+/*
+  Check for OVER () if MariaDB 10.2, and in select-list or in order-by list.
+  After ROW_NUMBER() it is compulsory. After AVG() it is optional.
+  TODO: this will have to be checked again when MariaDB 10.2 is released.
+*/
+void MainWindow::hparse_f_over(int saved_hparse_i, int who_is_calling)
+{
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2) == 0) return;
+  if (who_is_calling != TOKEN_KEYWORD_SELECT) return;
+  bool function_is_aggregate= false;
+  if ((main_token_types[saved_hparse_i] == TOKEN_KEYWORD_CUME_DIST)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_DENSE_RANK)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_NTILE)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_PERCENT_RANK)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_RANK)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_ROW_NUMBER))
+  {
+    hparse_f_expect(TOKEN_KEYWORD_OVER, "OVER");
+    if (hparse_errno > 0) return;
+  }
+  else if ((main_token_types[saved_hparse_i] == TOKEN_KEYWORD_AVG)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_BIT_AND)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_BIT_OR)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_BIT_XOR)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_COUNT)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_SUM))
+  {
+    if (hparse_f_accept(TOKEN_KEYWORD_OVER, "OVER") == 0) return;
+    function_is_aggregate= true;
+  }
+  else return;
+  {
+    hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
+    if (hparse_errno > 0) return;
+    if (hparse_f_accept(TOKEN_KEYWORD_PARTITION, "PARTITION") == 1)
+    {
+      hparse_f_expect(TOKEN_KEYWORD_OVER, "BY");
+      if (hparse_errno > 0) return;
+      if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "("))
+      {
+        if (hparse_f_qualified_name() == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+        if (hparse_errno > 0) return;
+      }
+      else
+      {
+        if (hparse_f_qualified_name() == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+      }
+    }
+    if ((function_is_aggregate == false)
+     && (QString::compare(hparse_token, "ORDER", Qt::CaseInsensitive) != 0))
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "ORDER");
+      if (hparse_errno > 0) return;
+    }
+    if ((hparse_f_order_by(0) == 1)
+     && (function_is_aggregate == true))
+    {
+      /* window frame */
+      if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "RANGE") == 1)
+       || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ROWS") == 1))
+      {
+        if (hparse_f_over_start(0) == 1) {;}
+        else if (hparse_errno > 0) return;
+        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "BETWEEN") == 1)
+        {
+          if (hparse_f_over_start(TOKEN_KEYWORD_BETWEEN) == 0) hparse_f_error();
+          if (hparse_errno > 0) return;
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "AND");
+          if (hparse_errno > 0) return;
+          if (hparse_f_over_end() == 0) hparse_f_error();
+          if (hparse_errno > 0) return;
+        }
+        else hparse_f_error();
+        if (hparse_errno > 0) return;
+      }
+    }
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+    if (hparse_errno > 0) return;
+  }
+  return;
+}
+
+int MainWindow::hparse_f_over_start(int who_is_calling)
+{
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNBOUNDED") == 1)
+  {
+    hparse_f_expect(TOKEN_TYPE_KEYWORD, "PRECEDING");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CURRENT") == 1)
+  {
+    hparse_f_expect(TOKEN_TYPE_KEYWORD, "ROW");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if (who_is_calling != TOKEN_KEYWORD_BETWEEN) return 0;
+  if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1)
+  {
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PRECEDING") == 0)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOLLOWING");
+    }
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  return 0;
+}
+
+int MainWindow::hparse_f_over_end()
+{
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNBOUNDED") == 1)
+  {
+    hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOLLOWING");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CURRENT") == 1)
+  {
+    hparse_f_expect(TOKEN_TYPE_KEYWORD, "ROW");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1)
+  {
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PRECEDING") == 0)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOLLOWING");
+    }
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  return 0;
+}
+
 
 /*
   TODO: Recognize all 400+ built-in functions.
@@ -11533,12 +11691,12 @@ void MainWindow::hparse_f_function_arguments(QString opd)
    || (hparse_f_is_equal(opd, "MAX")))
   {
     hparse_f_accept(TOKEN_TYPE_KEYWORD, "DISTINCT");
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_is_equal(opd, "CAST"))
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "AS");
     if (hparse_errno > 0) return;
@@ -11555,13 +11713,13 @@ void MainWindow::hparse_f_function_arguments(QString opd)
         if (hparse_errno > 0) return;
         break;
       }
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
   }
   else if (hparse_f_is_equal(opd, "CONVERT"))
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "USING");
     if (hparse_errno > 0) return;
@@ -11570,38 +11728,38 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   }
   else if (hparse_f_is_equal(opd, "IF"))
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_OPERATOR, ",");
     if (hparse_errno > 0) return;
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_OPERATOR, ",");
     if (hparse_errno > 0) return;
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_is_equal(opd, "COUNT"))
   {
-    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DISTINCT") == 1) hparse_f_opr_1();
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DISTINCT") == 1) hparse_f_opr_1(0);
     else
     {
       if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "*") == 1) {;}
-      else hparse_f_opr_1();
+      else hparse_f_opr_1(0);
     }
     if (hparse_errno > 0) return;
   }
   else if ((hparse_f_is_equal(opd, "SUBSTR")) || (hparse_f_is_equal(opd, "SUBSTRING")))
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     if ((hparse_f_accept(TOKEN_TYPE_OPERATOR, ",") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FROM") == 1))
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
       if ((hparse_f_accept(TOKEN_TYPE_OPERATOR, ",") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FOR") == 1))
       {
-        hparse_f_opr_1();
+        hparse_f_opr_1(0);
         if (hparse_errno > 0) return;
       }
     }
@@ -11611,17 +11769,17 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "BOTH") == 1)
      || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LEADING") == 1)
      || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TRAILING") == 1)) {;}
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FROM") == 1)
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
     }
   }
   else if (hparse_f_is_equal(opd, "WEIGHT_STRING"))
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AS") == 1)
     {
@@ -11651,7 +11809,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   }
   else do
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
   } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
 }
@@ -11674,7 +11832,7 @@ void MainWindow::hparse_f_expression_list(int who_is_calling)
     }
     else
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(who_is_calling);
     }
     if (hparse_errno > 0) return;
     if (who_is_calling == TOKEN_KEYWORD_SELECT)
@@ -11748,7 +11906,7 @@ void MainWindow::hparse_f_parenthesized_expression()
 {
   hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
   if (hparse_errno > 0) return;
-  hparse_f_opr_1();
+  hparse_f_opr_1(0);
   if (hparse_errno > 0) return;
   hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
@@ -11776,7 +11934,7 @@ void MainWindow::hparse_f_parenthesized_multi_expression(int *expression_count)
   {
     do
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
       ++(*expression_count);
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
@@ -11807,7 +11965,7 @@ void MainWindow::hparse_f_assignment(int statement_type)
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ON") == 1) continue;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OFF") == 1) continue;
     /* TODO: VALUES should only be legal for INSERT ... ON DUPLICATE KEY */
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
   } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
 }
@@ -12364,7 +12522,7 @@ int MainWindow::hparse_f_analyze_or_optimize(int who_is_calling)
   if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "NO_WRITE_TO_BINLOG") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCAL") == 1)) {;}
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE") == 1) {;}
   else if ((who_is_calling == TOKEN_KEYWORD_REPAIR)
-        && (hparse_dbms == "mariadb")
+        && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
         && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW") == 1))
     {;}
   else return 0;
@@ -12869,16 +13027,16 @@ void MainWindow::hparse_f_column_definition()
   {
     hparse_f_expect(TOKEN_TYPE_OPERATOR, "(");
     if (hparse_errno > 0) return;
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
-    if (hparse_dbms == "mariadb")
+    if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
         hparse_f_accept(TOKEN_TYPE_KEYWORD, "PERSISTENT");
     }
-    if (hparse_dbms == "mysql")
+    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
         hparse_f_accept(TOKEN_TYPE_KEYWORD, "STORED");
@@ -13094,19 +13252,19 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTED") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTED") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "YES") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "NO");
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mysql") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTION") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTION") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTION_KEY_ID") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENCRYPTION_KEY_ID") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
@@ -13117,7 +13275,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
       hparse_f_engine();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IETF_QUOTES") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IETF_QUOTES") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "YES") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "NO");
@@ -13168,7 +13326,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1)) {;}
       else hparse_f_error();
     }
-    else if ((hparse_dbms == "mariadb") && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PAGE_CHECKSUM") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PAGE_CHECKSUM") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
@@ -13189,7 +13347,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COMPRESSED") == 1)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REDUNDANT") == 1)
        || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "COMPACT") == 1)
-       || ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PAGE") == 1)))
+       || (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PAGE") == 1)))
         {;}
       else hparse_f_error();
     }
@@ -13228,7 +13386,7 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TRANSACTIONAL") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TRANSACTIONAL") == 1))
     {
       hparse_f_accept(TOKEN_TYPE_OPERATOR, "=");
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "0") == 0) hparse_f_expect(TOKEN_TYPE_KEYWORD, "1");
@@ -13361,7 +13519,7 @@ void MainWindow::hparse_f_partition_or_subpartition_definition(int keyword)
         do
         {
           if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAXVALUE") == 1) {;}
-          else hparse_f_opr_1();
+          else hparse_f_opr_1(0);
           if (hparse_errno > 0) return;
         } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
       }
@@ -13500,7 +13658,7 @@ void MainWindow::hparse_f_alter_or_create_event(int statement_type)
   {
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AT") == 1)
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EVERY") == 1)
@@ -13514,12 +13672,12 @@ void MainWindow::hparse_f_alter_or_create_event(int statement_type)
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STARTS") == 1)
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
     }
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ENDS") == 1)
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
     }
     on_seen= on_schedule_seen= false;
@@ -13849,7 +14007,7 @@ void MainWindow::hparse_f_call()
     if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ")") == 1) return;
     do
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
@@ -13911,7 +14069,7 @@ void MainWindow::hparse_f_explain_or_describe()
       return;
     }
   }
-  if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FOR") == 1))
+  if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FOR") == 1))
   {
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "CONNNECTION");
     if (hparse_errno > 0) return;
@@ -13938,7 +14096,7 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
 {
   *role_name_seen= false;
   bool next_must_be_id= false;
-  if (hparse_dbms == "mariadb")
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
   {
     hparse_f_next_nexttoken();
     if ((hparse_next_token.toUpper() == "TO") && (who_is_calling == TOKEN_KEYWORD_GRANT))
@@ -14100,7 +14258,7 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
     }
     else
     {
-      if ((hparse_dbms == "mariadb")
+      if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
        && (hparse_next_token.toUpper() != "ON")
        && (hparse_next_token != ",")
        && (hparse_next_token != "(")
@@ -14302,7 +14460,7 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
           return 0;
         }
       }
-      hparse_f_order_by();
+      hparse_f_order_by(0);
       if (hparse_errno > 0) return 0;
       hparse_f_limit(TOKEN_KEYWORD_SELECT);
       if (hparse_errno > 0) return 0;
@@ -14348,7 +14506,7 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
       if (hparse_errno > 0) return 0;
       do
       {
-        hparse_f_opr_1();
+        hparse_f_opr_1(0);
         if (hparse_errno > 0) return 0;
         if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "ASC") == 1)
          || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DESC") == 1)) {;}
@@ -14361,11 +14519,11 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
     }
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "HAVING"))
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return 0;
     }
   }
-  hparse_f_order_by();
+  hparse_f_order_by(TOKEN_KEYWORD_SELECT);
   if (hparse_errno > 0) return 0;
   hparse_f_limit(TOKEN_KEYWORD_SELECT);
   if (hparse_errno > 0) return 0;
@@ -14404,22 +14562,25 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
 
 void MainWindow::hparse_f_where()
 {
-  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHERE")) hparse_f_opr_1();
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHERE")) hparse_f_opr_1(0);
   if (hparse_errno > 0) return;
 }
 
-void MainWindow::hparse_f_order_by()
+int MainWindow::hparse_f_order_by(int who_is_calling)
 {
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ORDER") == 1)
   {
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "BY");
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
     do
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(who_is_calling);
+      if (hparse_errno > 0) return 0;
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ASC") == 0) hparse_f_accept(TOKEN_TYPE_KEYWORD, "DESC");
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
+    return 1;
   }
+  else return 0;
 }
 
 /* LIMIT 1 or LIMIT 1,0 or LIMIT 1 OFFSET 0 from SELECT, DELETE, UPDATE, or SHOW */
@@ -14454,7 +14615,7 @@ void MainWindow::hparse_f_like_or_where()
   }
   else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHERE") == 1)
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
   }
 }
@@ -14556,7 +14717,7 @@ void MainWindow::hparse_f_indexes_or_keys() /* for SHOW {INDEX | INDEXES | KEYS}
   }
   if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHERE") == 1)
   {
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
   }
 }
@@ -14590,13 +14751,13 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
 
   /* in MySQL OR REPLACE is only for views, in MariaDB OR REPLACE is for all creates */
   int or_replace_flags;
-  if (hparse_dbms == "mariadb") or_replace_flags= HPARSE_FLAG_ANY;
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) or_replace_flags= HPARSE_FLAG_ANY;
   else or_replace_flags= HPARSE_FLAG_VIEW;
 
   if (who_is_calling == TOKEN_KEYWORD_CREATE)
   {
     ignore_seen= true;
-    if (hparse_dbms == "mysql") online_seen= true;
+    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) online_seen= true;
   }
   else
   {
@@ -14637,11 +14798,11 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
     {
       temporary_seen= true; (*hparse_flags) &= HPARSE_FLAG_TABLE;
     }
-    else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && (hparse_dbms == "mariadb") && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ONLINE") == 1))
+    else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ONLINE") == 1))
     {
       online_seen= true; (*hparse_flags) &= (HPARSE_FLAG_INDEX | HPARSE_FLAG_TABLE);
     }
-    else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && (hparse_dbms == "mariadb") && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OFFLINE") == 1))
+    else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (online_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OFFLINE") == 1))
     {
       online_seen= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
@@ -14696,7 +14857,7 @@ int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
 int MainWindow::hparse_f_explainable_statement()
 {
   QString hparse_token_upper= hparse_token.toUpper();
-  if (hparse_dbms == "mysql")
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
   {
     if ((hparse_token_upper == "DELETE")
      || (hparse_token_upper == "INSERT")
@@ -14715,7 +14876,7 @@ int MainWindow::hparse_f_explainable_statement()
     hparse_f_accept(TOKEN_TYPE_KEYWORD, "UPDATE");
     return 0;
   }
-  else if (hparse_dbms == "mariadb")
+  else if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
   {
     if ((hparse_token_upper == "DELETE")
      || (hparse_token_upper == "SELECT")
@@ -14827,7 +14988,7 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
     if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_ANALYZE) == 1)
     {
-      if (hparse_dbms == "mariadb")
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
       {
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PERSISTENT") == 1)
         {
@@ -14866,7 +15027,7 @@ void MainWindow::hparse_f_statement()
       }
       return;
     }
-    if (hparse_dbms == "mariadb")
+    if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FORMAT") == 1)
       {
@@ -14933,13 +15094,13 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_CHANGE;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER") == 1)
     {
-      if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "TO");
       if (hparse_errno > 0) return;
       do
       {
-        if (((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DO_DOMAIN_IDS") == 1))
-         || ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE_DOMAIN_IDS") == 1))
+        if ((((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DO_DOMAIN_IDS") == 1))
+         || (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE_DOMAIN_IDS") == 1))
          || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IGNORE_SERVER_IDS") == 1))
         {
           hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
@@ -14956,14 +15117,14 @@ void MainWindow::hparse_f_statement()
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_AUTO_POSITION")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_BIND")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_CONNECT_RETRY")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_DELAY"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_DELAY"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_HEARTBEAT_PERIOD")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_HOST")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_FILE")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_LOG_POS")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_PASSWORD")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_PORT")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_RETRY_COUNT"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_RETRY_COUNT"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_SSL"))
         {
           hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
@@ -14986,8 +15147,8 @@ void MainWindow::hparse_f_statement()
           if (hparse_errno > 0) return;
         }
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_USER")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_USE_GTID"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
-        else if ((hparse_dbms == "mysql") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_TLS_VERSION"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_USE_GTID"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
+        else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_TLS_VERSION"))) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_FILE")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAY_LOG_POS")) {hparse_f_expect(TOKEN_TYPE_OPERATOR, "="); hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");}
         else hparse_f_error();
@@ -15044,7 +15205,7 @@ void MainWindow::hparse_f_statement()
         else break;
       }
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW") == 1))
     {
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
@@ -15099,7 +15260,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (((hparse_flags & HPARSE_FLAG_ROUTINE) != 0) && (hparse_f_accept(TOKEN_KEYWORD_FUNCTION, "FUNCTION") == 1))
     {
-      if (hparse_dbms == "mariadb") hparse_f_if_not_exists();
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
@@ -15136,7 +15297,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (((hparse_flags & HPARSE_FLAG_INDEX) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX") == 1))
     {
-      if (hparse_dbms == "mariadb") hparse_f_if_not_exists();
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
@@ -15146,7 +15307,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (((hparse_flags & HPARSE_FLAG_ROUTINE) != 0) && (hparse_f_accept(TOKEN_KEYWORD_PROCEDURE, "PROCEDURE") == 1))
     {
-      if (hparse_dbms == "mariadb") hparse_f_if_not_exists();
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
@@ -15157,9 +15318,9 @@ void MainWindow::hparse_f_statement()
       hparse_f_block(TOKEN_KEYWORD_PROCEDURE);
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && ((hparse_flags & HPARSE_FLAG_USER) != 0) && (hparse_f_accept(TOKEN_KEYWORD_ROLE, "ROLE") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && ((hparse_flags & HPARSE_FLAG_USER) != 0) && (hparse_f_accept(TOKEN_KEYWORD_ROLE, "ROLE") == 1))
     {
-      if (hparse_dbms == "mariadb") hparse_f_if_not_exists();
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if  (QString::compare(hparse_token, "NONE", Qt::CaseInsensitive) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
@@ -15265,7 +15426,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (((hparse_flags & HPARSE_FLAG_ROUTINE) != 0) && (hparse_f_accept(TOKEN_KEYWORD_TRIGGER, "TRIGGER") == 1))
     {
-      if (hparse_dbms == "mariadb") hparse_f_if_not_exists();
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
@@ -15308,7 +15469,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (((hparse_flags & HPARSE_FLAG_VIEW) != 0) && (hparse_f_accept(TOKEN_KEYWORD_VIEW, "VIEW") == 1))
     {
-      if (hparse_dbms == "mariadb") hparse_f_if_not_exists();
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       hparse_f_alter_or_create_view();
       if (hparse_errno > 0) return;
@@ -15361,11 +15522,11 @@ void MainWindow::hparse_f_statement()
       /* DELETE ... FROM tbl_name [WHERE] [ORDER BY] LIMIT] */
       hparse_f_where();
       if (hparse_errno > 0) return;
-      hparse_f_order_by();
+      hparse_f_order_by(0);
       if (hparse_errno > 0) return;
       hparse_f_limit(TOKEN_KEYWORD_DELETE);
       if (hparse_errno > 0) return;
-      if (hparse_dbms == "mariadb")
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
       {
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RETURNING") == 1)
         {
@@ -15408,7 +15569,7 @@ void MainWindow::hparse_f_statement()
     hparse_subquery_is_allowed= true;
     do
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     return;
@@ -15419,7 +15580,7 @@ void MainWindow::hparse_f_statement()
     hparse_statement_type= TOKEN_KEYWORD_DROP;
     bool temporary_seen= false, online_seen= false;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TEMPORARY") == 1) temporary_seen= true;
-    if ((temporary_seen == false) && (hparse_dbms == "mariadb"))
+    if ((temporary_seen == false) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ONLINE") == 1) online_seen= true;
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "OFFLINE") == 1) online_seen= true;
@@ -15485,7 +15646,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_qualified_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    else if ((temporary_seen == false) && (online_seen == false) && (hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ROLE")== 1))
+    else if ((temporary_seen == false) && (online_seen == false) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ROLE")== 1))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IF") == 1)
       {
@@ -15827,14 +15988,14 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_INSTALL, "INSTALL") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_INSTALL;
-    if (hparse_dbms == "mysql")
+    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "PLUGIN");
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     }
-    else if (hparse_dbms == "mariadb")
+    else if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
       {
@@ -15850,7 +16011,7 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_KILL, "KILL"))
   {
     hparse_statement_type= TOKEN_KEYWORD_KILL;
-    if (hparse_dbms == "mariadb")
+    if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "HARD") == 0) hparse_f_accept(TOKEN_TYPE_KEYWORD, "SOFT");
     }
@@ -15858,7 +16019,7 @@ void MainWindow::hparse_f_statement()
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY") == 1)
       {
-        if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_KEYWORD, "ID");
+        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_accept(TOKEN_TYPE_KEYWORD, "ID");
       }
     }
     if (hparse_f_literal() == 0) hparse_f_error();
@@ -16027,7 +16188,7 @@ void MainWindow::hparse_f_statement()
       }
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WRITE") == 1)
       {
-        if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_KEYWORD, "CONCURRENT");
+        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_accept(TOKEN_TYPE_KEYWORD, "CONCURRENT");
       }
       else hparse_f_error();
       if (hparse_errno > 0) return;
@@ -16047,7 +16208,7 @@ void MainWindow::hparse_f_statement()
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "FROM");
     if (hparse_errno > 0) return;
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     return;
   }
@@ -16067,7 +16228,7 @@ void MainWindow::hparse_f_statement()
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "BEFORE");
       if (hparse_errno > 0) return;
-      hparse_f_opr_1(); /* actually, should be "datetime expression" */
+      hparse_f_opr_1(0); /* actually, should be "datetime expression" */
       if (hparse_errno > 0) return;
     }
     return;
@@ -16144,7 +16305,7 @@ void MainWindow::hparse_f_statement()
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER") == 1)
       {
-        if (hparse_dbms == "mariadb")
+        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
         {
           if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TO") == 1)
           {
@@ -16156,7 +16317,7 @@ void MainWindow::hparse_f_statement()
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY_CACHE") == 1) {;}
       else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
       {
-        if (hparse_dbms == "mariadb")
+        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
         {
           hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
           hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL");
@@ -16281,7 +16442,7 @@ void MainWindow::hparse_f_statement()
       return;
     }
     if (hparse_errno > 0) return;
-    if ((hparse_dbms == "mariadb") && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1))
+    if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1))
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "ROLE");
       if (hparse_errno > 0) return;
@@ -16337,7 +16498,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       return;
     }
-    if ((hparse_dbms == "mariadb") && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ROLE") == 1))
+    if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ROLE") == 1))
     {
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NONE") == 0)
       {
@@ -16346,7 +16507,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       return;
     }
-    if ((hparse_dbms == "mariadb") && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STATEMENT") == 1))
+    if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (global_seen == false) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "STATEMENT") == 1))
     {
       hparse_f_assignment(TOKEN_KEYWORD_SET);
       if (hparse_errno > 0) return;
@@ -16400,7 +16561,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
     }
     else if (hparse_errno > 0) return;
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CLIENT_STATISTICS") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CLIENT_STATISTICS") == 1))
     {
       ;
     }
@@ -16414,7 +16575,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_show_columns();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CONTRIBUTORS") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CONTRIBUTORS") == 1))
     {
       ;
     }
@@ -16447,7 +16608,7 @@ void MainWindow::hparse_f_statement()
         if (hparse_f_qualified_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXPLAIN") == 1))
+      else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXPLAIN") == 1))
       {
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOR");
         if (hparse_errno > 0) return;
@@ -16521,7 +16682,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_from_or_like_or_where();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXPLAIN") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXPLAIN") == 1))
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "FOR");
       if (hparse_errno > 0) return;
@@ -16595,7 +16756,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_indexes_or_keys();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX_STATISTICS") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INDEX_STATISTICS") == 1))
     {
       ;
     }
@@ -16604,7 +16765,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_indexes_or_keys();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCALES") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCALES") == 1))
     {
       ;
     }
@@ -16625,7 +16786,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PLUGINS") == 1) /* show plugins */
     {
-      if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SONAME") == 1))
+      if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SONAME") == 1))
       {
         if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) {;}
         else hparse_f_from_or_like_or_where();
@@ -16699,13 +16860,13 @@ void MainWindow::hparse_f_statement()
     {
       ;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY_RESPONSE_TIME") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUERY_RESPONSE_TIME") == 1))
     {
       ;
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "RELAYLOG") == 1) /* show relaylog */
     {
-      if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "EVENTS");
       if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IN") == 1)
@@ -16746,10 +16907,10 @@ void MainWindow::hparse_f_statement()
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "HOSTS") == 1) {;}
       else
       {
-        if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
+        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
         hparse_f_expect(TOKEN_TYPE_KEYWORD, "STATUS");
         if (hparse_errno > 0) return;
-        if (hparse_dbms == "mysql")
+        if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
         {
           if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NONBLOCKING") == 1) {;}
           hparse_f_for_channel();
@@ -16779,7 +16940,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_from_or_like_or_where();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE_STATISTICS") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE_STATISTICS") == 1))
     {
       ;
     }
@@ -16788,7 +16949,7 @@ void MainWindow::hparse_f_statement()
       hparse_f_from_or_like_or_where();
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER_STATISTICS") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER_STATISTICS") == 1))
     {
       ;
     }
@@ -16802,11 +16963,11 @@ void MainWindow::hparse_f_statement()
       hparse_f_limit(TOKEN_KEYWORD_SHOW);
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSREP_MEMBERSHIP") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSREP_MEMBERSHIP") == 1))
     {
       ;
     }
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSREP_STATUS") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WSREP_STATUS") == 1))
     {
       ;
     }
@@ -16823,7 +16984,7 @@ void MainWindow::hparse_f_statement()
     if (hparse_f_signal_or_resignal(TOKEN_KEYWORD_SIGNAL) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
-  else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_KEYWORD_SONAME, "SONAME") == 1))
+  else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_KEYWORD_SONAME, "SONAME") == 1))
   {
     hparse_statement_type= TOKEN_KEYWORD_SONAME;
     if (hparse_f_literal() == 0) hparse_f_error();
@@ -16856,7 +17017,7 @@ void MainWindow::hparse_f_statement()
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GROUP_REPLICATION") == 1) {;}
-    else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1))
+    else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ALL") == 1))
     {
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "SLAVES");
       if (hparse_errno > 0) return;
@@ -16868,7 +17029,7 @@ void MainWindow::hparse_f_statement()
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
     {
-      if (hparse_dbms == "mariadb") hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]");
       do
       {
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IO_THREAD") == 1) {;}
@@ -16876,7 +17037,7 @@ void MainWindow::hparse_f_statement()
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNTIL") == 1)
       {
-        if ((hparse_dbms == "mysql")
+        if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
          && ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_BEFORE_GTIDS") == 1)
           || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_AFTER_GTIDS") == 1)
           || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_AFTER_MTS_GAPS") == 1)))
@@ -16916,7 +17077,7 @@ void MainWindow::hparse_f_statement()
           hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
           if (hparse_errno > 0) return;
         }
-        else if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_GTID_POS") == 1))
+        else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MASTER_GTID_POS") == 1))
         {
           hparse_f_expect(TOKEN_TYPE_OPERATOR, "=");
           if (hparse_errno > 0) return;
@@ -16926,7 +17087,7 @@ void MainWindow::hparse_f_statement()
         else hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      if (hparse_dbms == "mysql")
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
       {
         for (;;)
         {
@@ -16962,13 +17123,13 @@ void MainWindow::hparse_f_statement()
     }
     else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
     {
-      if ((hparse_dbms == "mariadb") && (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1)) {;}
+      if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1)) {;}
       do
       {
         if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "IO_THREAD") == 1) {;}
         else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SQL_THREAD") == 1) {;}
       } while (hparse_f_accept(TOKEN_TYPE_OPERATOR, ","));
-      if (hparse_dbms == "mysql")
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
       {
         hparse_f_for_channel();
         if (hparse_errno > 0) return;
@@ -17025,12 +17186,12 @@ void MainWindow::hparse_f_statement()
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHERE") == 1)
     {
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
     }
     if (multi_seen == false)
     {
-      hparse_f_order_by();
+      hparse_f_order_by(0);
       if (hparse_errno > 0) return;
       hparse_f_limit(TOKEN_KEYWORD_UPDATE);
       if (hparse_errno > 0) return;
@@ -17268,7 +17429,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     int when_count= 0;
     if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WHEN") == 0)
      {
-      hparse_f_opr_1(); /* not compulsory */
+      hparse_f_opr_1(0); /* not compulsory */
       if (hparse_errno > 0) return;
     }
     else when_count= 1;
@@ -17280,7 +17441,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     for (;;)
     {
       hparse_subquery_is_allowed= true;
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       hparse_subquery_is_allowed= false;
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "THEN");
@@ -17316,7 +17477,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     for (;;)
     {
       hparse_subquery_is_allowed= true;
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       hparse_subquery_is_allowed= false;
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_TYPE_KEYWORD, "THEN");
@@ -17370,7 +17531,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
       if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNTIL") == 1) break;
     }
     hparse_subquery_is_allowed= true;
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     hparse_subquery_is_allowed= false;
     hparse_f_expect(TOKEN_KEYWORD_END, "END");
     if (hparse_errno > 0) return;
@@ -17425,7 +17586,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   else if ((calling_statement_type == TOKEN_KEYWORD_FUNCTION) && (hparse_f_accept(TOKEN_KEYWORD_RETURN, "RETURN") == 1))
   {
     hparse_subquery_is_allowed= true;
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
@@ -17433,7 +17594,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   else if (hparse_f_accept(TOKEN_KEYWORD_WHILE, "WHILE") == 1)
   {
     hparse_subquery_is_allowed= true;
-    hparse_f_opr_1();
+    hparse_f_opr_1(0);
     hparse_subquery_is_allowed= false;
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_TYPE_KEYWORD, "DO");
@@ -17468,10 +17629,10 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   This is the top. This should be the main entry for parsing.
   A user might put more than one statement, or block of statements,
   on the statement widget before asking for execution.
-  Re hparse_dbms:
+  Re hparse_dbms_mask:
     We do check (though not always and not reliably) whether
-    hparse_dbms == "mysql" | "mariadb" before accepting | expecting,
-    for example "role" will only be recognized if hparse_dbms == "mariadb".
+    (hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) before accepting | expecting,
+    for example "role" will only be recognized if (hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0.
     Todo: we should check version number too, someday.
     If we are connected, then the SELECT VERSION() result, which we stored in
     statement_edit_widget->dbms_version, will include the string "MariaDB".
@@ -17481,15 +17642,10 @@ void MainWindow::hparse_f_block(int calling_statement_type)
 void MainWindow::hparse_f_multi_block(QString text)
 {
   hparse_line_edit->hide();
-  if (connections_is_connected[0] == 1)
-  {
-    if (statement_edit_widget->dbms_version.contains("mariadb", Qt::CaseInsensitive) == true)
-    {
-      hparse_dbms= "mariadb";
-    }
-    else hparse_dbms= "mysql";
-  }
-  else hparse_dbms= ocelot_dbms;
+  if (connections_is_connected[0] == 1) hparse_dbms_mask= dbms_version_mask;
+  else if (ocelot_dbms == "mariadb") hparse_dbms_mask= FLAG_VERSION_MARIADB_ALL;
+  else if (ocelot_dbms == "mysql") hparse_dbms_mask= FLAG_VERSION_MYSQL_ALL;
+  else hparse_dbms_mask= FLAG_VERSION_ALL;
   hparse_i= -1;
   hparse_delimiter_str= ocelot_delimiter_str;
   for (;;)
@@ -17525,7 +17681,7 @@ void MainWindow::hparse_f_multi_block(QString text)
     }
     if (hparse_errno > 0) goto error;
 #ifdef DBMS_MARIADB
-    if (hparse_dbms == "mariadb")
+    if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
       hparse_f_block(0);
     }
@@ -17983,7 +18139,7 @@ int MainWindow::hparse_f_client_statement()
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return 0;
       if ((hparse_token.length() == 0) || (hparse_token == ";")) return 1;
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return 0;
     }
     else if (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_CLEAR, "$CLEAR", 3) == 1)
@@ -18080,7 +18236,7 @@ int MainWindow::hparse_f_client_statement()
       hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return 0;
       if ((hparse_token.length() == 0) || (hparse_token == ";")) return 1;
-      hparse_f_opr_1();
+      hparse_f_opr_1(0);
       if (hparse_errno > 0) return 0;
     }
     else return 0;
