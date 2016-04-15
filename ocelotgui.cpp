@@ -611,14 +611,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   /* client variable defaults */
   /* Most settings done here might be overridden when connect_mysql_options_2 reads options. */
-  /* TEST! */
-#ifdef DBMS_TARANTOOL
-  ocelot_dbms= "tarantool";
-  connections_dbms[0]= DBMS_TARANTOOL;
-#else
   ocelot_dbms= "mysql";
   connections_dbms[0]= DBMS_MYSQL;
-#endif
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
   ocelot_statement_prompt_background_color= "lightGray"; /* set early because initialize_widget_statement() depends on this */
   ocelot_grid_border_color= "black";
@@ -691,6 +685,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     print_help();
     exit(0);
   }
+
+  set_dbms_version_mask(ocelot_dbms);
 
   for (int q_i= 0; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
@@ -1061,6 +1057,7 @@ bool MainWindow::is_statement_complete(QString text)
   int returned_begin_count= 0;
   int i= 0;
   int first_token_type= -1;
+  int first_token_i= 0;
   //int last_token_type= -1;
   QString first_token= "";
   QString last_token= "";
@@ -1074,6 +1071,7 @@ bool MainWindow::is_statement_complete(QString text)
     if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
     first_token_type= t;
     first_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    first_token_i= i;
     break;
   }
   for (i= number_of_tokens_in_statement - 1; i >= 0; --i)
@@ -1090,7 +1088,7 @@ bool MainWindow::is_statement_complete(QString text)
 
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
   /* Todo: Check: does this mean that a client statement cannot be spread over two lines? */
-  if (is_client_statement(first_token_type) == true)
+  if (is_client_statement(first_token_type, first_token_i, text) == true)
   {
     return true;
   }
@@ -2824,6 +2822,7 @@ void MainWindow::action_change_one_setting(QString old_setting,
              &main_token_lengths[0], &main_token_offsets[0], MAX_TOKENS, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
    tokens_to_keywords(text, 0);
    action_execute_one_statement(text);
+   history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
   }
 }
 
@@ -3261,7 +3260,6 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
 
   text= statement_edit_widget->toPlainText(); /* Todo: decide whether I'm doing this too often */
   begin_count= 0;
-
   /*
     First, check for client statement, because the rules for client statement end are:
     ; OR delimiter OR \n OR \n\r
@@ -3276,7 +3274,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
      || (token == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
      || (token == TOKEN_TYPE_COMMENT_WITH_MINUS))
       continue;
-    if (is_client_statement(token) == true) client_statement_seen= true;
+    if (is_client_statement(token, i, text) == true) client_statement_seen= true;
     break;
   }
   if ((client_statement_seen == true) && (check_if_client == true))
@@ -8404,7 +8402,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {"ALWAYS", 0, 0},
         {"ANALYZE", FLAG_VERSION_ALL, 0},
         {"AND", FLAG_VERSION_ALL, 0},
-        {"ANY_VALUE", 0, FLAG_VERSION_ALL},
+        {"ANY_VALUE", 0, FLAG_VERSION_MYSQL_ALL},
         {"AREA", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
         {"AS", FLAG_VERSION_ALL, 0},
         {"ASBINARY", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
@@ -8415,11 +8413,11 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {"ASTEXT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
         {"ASWKB", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
         {"ASWKT", 0, FLAG_VERSION_ALL}, /* deprecated in MySQL 5.7.6 */
-        {"ASYMMETRIC_DECRYPT", 0, FLAG_VERSION_ALL},
-        {"ASYMMETRIC_DERIVE", 0, FLAG_VERSION_ALL},
-        {"ASYMMETRIC_ENCRYPT", 0, FLAG_VERSION_ALL},
-        {"ASYMMETRIC_SIGN", 0, FLAG_VERSION_ALL},
-        {"ASYMMETRIC_VERIFY", 0, FLAG_VERSION_ALL},
+        {"ASYMMETRIC_DECRYPT", 0, FLAG_VERSION_MYSQL_ALL},
+        {"ASYMMETRIC_DERIVE", 0, FLAG_VERSION_MYSQL_ALL},
+        {"ASYMMETRIC_ENCRYPT", 0, FLAG_VERSION_MYSQL_ALL},
+        {"ASYMMETRIC_SIGN", 0, FLAG_VERSION_MYSQL_ALL},
+        {"ASYMMETRIC_VERIFY", 0, FLAG_VERSION_MYSQL_ALL},
         {"ATAN", 0, FLAG_VERSION_ALL},
         {"ATAN2", 0, FLAG_VERSION_ALL},
         {"AVG", 0, FLAG_VERSION_ALL},
@@ -8465,14 +8463,14 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {"COLLATE", FLAG_VERSION_ALL, 0},
         {"COLLATION", 0, FLAG_VERSION_ALL},
         {"COLUMN", FLAG_VERSION_ALL, 0},
-        {"COLUMN_ADD", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
-        {"COLUMN_CHECK", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
-        {"COLUMN_CREATE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
-        {"COLUMN_DELETE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
-        {"COLUMN_EXISTS", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
-        {"COLUMN_GET", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
-        {"COLUMN_JSON", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
-        {"COLUMN_LIST", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"COLUMN_ADD", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
+        {"COLUMN_CHECK", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
+        {"COLUMN_CREATE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
+        {"COLUMN_DELETE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
+        {"COLUMN_EXISTS", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
+        {"COLUMN_GET", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
+        {"COLUMN_JSON", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
+        {"COLUMN_LIST", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
         {"COMMENT", 0, 0},
         {"COMMIT", 0, 0},
         {"COMPACT", 0, 0},
@@ -8496,8 +8494,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {"COUNT", 0, FLAG_VERSION_ALL},
         {"CRC32", 0, FLAG_VERSION_ALL},
         {"CREATE", FLAG_VERSION_ALL, 0},
-        {"CREATE_ASYMMETRIC_PRIV_KEY", 0, FLAG_VERSION_ALL},
-        {"CREATE_ASYMMETRIC_PUB_KEY", 0, FLAG_VERSION_ALL},
+        {"CREATE_ASYMMETRIC_PRIV_KEY", 0, FLAG_VERSION_MYSQL_ALL},
+        {"CREATE_ASYMMETRIC_PUB_KEY", 0, FLAG_VERSION_MYSQL_ALL},
         {"CREATE_DH_PARAMETERS", 0, FLAG_VERSION_ALL},
         {"CREATE_DIGEST", 0, FLAG_VERSION_ALL},
         {"CROSS", FLAG_VERSION_ALL, 0},
@@ -8534,7 +8532,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {"DECIMAL", FLAG_VERSION_ALL, 0},
         {"DECLARE", FLAG_VERSION_ALL, 0},
         {"DECODE", 0, FLAG_VERSION_ALL},
-        {"DECODE_HISTOGRAM", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"DECODE_HISTOGRAM", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
         {"DEFAULT", FLAG_VERSION_ALL, FLAG_VERSION_ALL},
         {"DEGREES", 0, FLAG_VERSION_ALL},
         {"DELAYED", FLAG_VERSION_ALL, 0},
@@ -8693,34 +8691,34 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {"IS_USED_LOCK", 0, FLAG_VERSION_ALL},
         {"ITERATE", FLAG_VERSION_ALL, 0},
         {"JOIN", FLAG_VERSION_ALL, 0},
-        {"JSON_APPEND", 0, FLAG_VERSION_ALL},
-        {"JSON_ARRAY", 0, FLAG_VERSION_ALL},
-        {"JSON_ARRAY_APPEND", 0, FLAG_VERSION_ALL},
-        {"JSON_ARRAY_INSERT", 0, FLAG_VERSION_ALL},
-        {"JSON_CONTAINS", 0, FLAG_VERSION_ALL},
-        {"JSON_CONTAINS_PATH", 0, FLAG_VERSION_ALL},
-        {"JSON_DEPTH", 0, FLAG_VERSION_ALL},
-        {"JSON_EXTRACT", 0, FLAG_VERSION_ALL},
-        {"JSON_INSERT", 0, FLAG_VERSION_ALL},
-        {"JSON_KEYS", 0, FLAG_VERSION_ALL},
-        {"JSON_LENGTH", 0, FLAG_VERSION_ALL},
-        {"JSON_MERGE", 0, FLAG_VERSION_ALL},
-        {"JSON_OBJECT", 0, FLAG_VERSION_ALL},
-        {"JSON_QUOTE", 0, FLAG_VERSION_ALL},
-        {"JSON_REMOVE", 0, FLAG_VERSION_ALL},
-        {"JSON_REPLACE", 0, FLAG_VERSION_ALL},
-        {"JSON_SEARCH", 0, FLAG_VERSION_ALL},
-        {"JSON_SET", 0, FLAG_VERSION_ALL},
-        {"JSON_TYPE", 0, FLAG_VERSION_ALL},
-        {"JSON_UNQUOTE", 0, FLAG_VERSION_ALL},
-        {"JSON_VALID", 0, FLAG_VERSION_ALL},
+        {"JSON_APPEND", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_ARRAY", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_ARRAY_APPEND", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_ARRAY_INSERT", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_CONTAINS", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_CONTAINS_PATH", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_DEPTH", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_EXTRACT", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_INSERT", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_KEYS", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_LENGTH", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_MERGE", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_OBJECT", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_QUOTE", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_REMOVE", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_REPLACE", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_SEARCH", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_SET", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_TYPE", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_UNQUOTE", 0, FLAG_VERSION_MYSQL_ALL},
+        {"JSON_VALID", 0, FLAG_VERSION_MYSQL_ALL},
         {"KEY", FLAG_VERSION_ALL, 0},
         {"KEYS", FLAG_VERSION_ALL, 0},
         {"KILL", FLAG_VERSION_ALL, 0},
         {"LAG", 0, 0}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
         {"LANGUAGE", 0, 0},
         {"LAST", 0, 0}, /* MariaDB 10.2 nonreserved */
-        {"LAST_DAY", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_ALL},
+        {"LAST_DAY", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0},
         {"LAST_INSERT_ID", 0, FLAG_VERSION_ALL},
         {"LAST_VALUE", 0, 0}, /* MariaDB 10.2 nonreserved */
         {"LCASE", 0, FLAG_VERSION_ALL},
@@ -9138,8 +9136,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {"VERSION", 0, FLAG_VERSION_ALL},
         {"VIEW", 0, 0},
         {"VIRTUAL", FLAG_VERSION_MYSQL_5_7, 0},
-        {"WAIT_FOR_EXECUTED_GTID_SET", 0, FLAG_VERSION_ALL},
-        {"WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS", 0, FLAG_VERSION_ALL},
+        {"WAIT_FOR_EXECUTED_GTID_SET", 0, FLAG_VERSION_MYSQL_ALL},
+        {"WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS", 0, FLAG_VERSION_MYSQL_ALL},
         {"WARNINGS", 0, 0}, /* Ocelot keyword */
         {"WEEK", 0, FLAG_VERSION_ALL},
         {"WEEKDAY", 0, FLAG_VERSION_ALL},
@@ -9296,7 +9294,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
   }
 
   /* Todo: This has to be moved somewhere because the text might contain multi-statements. */
-  if (is_client_statement(main_token_types[0]) == true)
+  if (is_client_statement(main_token_types[0], 0, text) == true)
   {
     main_statement_type= main_token_types[0];
   }
@@ -9381,7 +9379,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
 /*
   Return true if the passed token number is for the first word of a client statement.
 */
-bool MainWindow::is_client_statement(int token)
+bool MainWindow::is_client_statement(int token, int i,QString text)
 {
   if ((token == TOKEN_KEYWORD_QUESTIONMARK)
   ||  (token == TOKEN_KEYWORD_CHARSET)
@@ -9390,6 +9388,7 @@ bool MainWindow::is_client_statement(int token)
   ||  (token == TOKEN_KEYWORD_DELIMITER)
   ||  (token == TOKEN_KEYWORD_EDIT)
   ||  (token == TOKEN_KEYWORD_EGO)
+  ||  (token == TOKEN_KEYWORD_EXIT)
   ||  (token == TOKEN_KEYWORD_GO)
   ||  (token == TOKEN_KEYWORD_HELP)
   ||  (token == TOKEN_KEYWORD_NOPAGER)
@@ -9407,6 +9406,17 @@ bool MainWindow::is_client_statement(int token)
   ||  (token == TOKEN_KEYWORD_USE)
   ||  (token == TOKEN_KEYWORD_WARNINGS))
     return true;
+  if (token == TOKEN_KEYWORD_SET)
+  {
+    if (main_token_lengths[i + 1] > 7)
+    {
+      QString s= text.mid(main_token_offsets[i + 1], 7);
+      if (QString::compare(s, "OCELOT_", Qt::CaseInsensitive) == 0)
+      {
+        return true;
+      }
+    }
+  }
   if ((token >= TOKEN_KEYWORD_DEBUG_BREAKPOINT)
    && (token <= TOKEN_KEYWORD_DEBUG_TBREAKPOINT))
     return true;
@@ -10026,46 +10036,58 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
   get_sql_mode(TOKEN_KEYWORD_CONNECT, "");
   connections_is_connected[0]= 1;
+  set_dbms_version_mask(statement_edit_widget->dbms_version);
+  return 0;
+}
 
-  dbms_version_mask= FLAG_VERSION_ALL;
+/*
+ We call set_dbms_version_mask(ocelot_dbms) from MainWindow() after calling mysql_options_2(),
+ in which case the pass should be the original default ("mysql") or something the user
+ specified with --ocelot_dbms (probably "mysql" or "mariadb" but could contain version
+ before or after and we don't check validity).
+ We call set_dbms_version_mask(statement_edit_widget->dbms_version) from connect_mysql()
+ after connection succeeds, in which case the pass would be what "select version()"
+ returns, such as 10.2.0-MariaDB.
+*/
+void MainWindow::set_dbms_version_mask(QString version)
+{
+  if (version.contains("mariadb", Qt::CaseInsensitive) == true)
   {
-    if (statement_edit_widget->dbms_version.contains("mariadb", Qt::CaseInsensitive) == true)
+    if (version.contains("10.0.") == true)
     {
-      if (statement_edit_widget->dbms_version.contains("10.0.") == true)
-      {
-        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0);
-      }
-      else if (statement_edit_widget->dbms_version.contains("10.1.") == true)
-      {
-        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1);
-      }
-      else if (statement_edit_widget->dbms_version.contains("10.2.") == true)
-      {
-        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2);
-      }
-      else
-      {
-        dbms_version_mask= FLAG_VERSION_MARIADB_ALL;
-      }
+      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0);
+    }
+    else if (version.contains("10.1.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1);
+    }
+    else if (version.contains("10.2.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2);
     }
     else
     {
-      if (statement_edit_widget->dbms_version.contains("5.6.") == true)
-      {
-        dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6);
-      }
-      else if (statement_edit_widget->dbms_version.contains("5.7.") == true)
-      {
-        dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7);
-      }
-      else
-      {
-        dbms_version_mask= FLAG_VERSION_MYSQL_ALL;
-     }
+      dbms_version_mask= FLAG_VERSION_MARIADB_ALL;
     }
   }
-
-  return 0;
+  else if (version.contains("mysql", Qt::CaseInsensitive) == true)
+  {
+    if ((version.contains("5.6") == true)
+     && (version.contains("5.5.6") == false))
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6);
+    }
+    else if ((version.contains("5.7") == true)
+          && (version.contains("5.5.7") == false))
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7);
+    }
+    else
+    {
+      dbms_version_mask= FLAG_VERSION_MYSQL_ALL;
+    }
+  }
+  else dbms_version_mask= FLAG_VERSION_ALL;
 }
 
 /*
@@ -15334,7 +15356,7 @@ void MainWindow::hparse_f_statement()
     {
       if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
-      if  (QString::compare(hparse_token, "NONE", Qt::CaseInsensitive) == 0) hparse_f_error();
+      if (QString::compare(hparse_token, "NONE", Qt::CaseInsensitive) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
@@ -17649,7 +17671,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     If we are connected, then the SELECT VERSION() result, which we stored in
     statement_edit_widget->dbms_version, will include the string "MariaDB".
     If we are not connected, the default is "mysql" but the user can start with
-    ocelotgui --dbms=mariadb, and we store that in ocelot_dbms.
+    ocelotgui --ocelot_dbms=mariadb, and we store that in ocelot_dbms.
 */
 void MainWindow::hparse_f_multi_block(QString text)
 {
@@ -18051,7 +18073,7 @@ int MainWindow::hparse_f_client_statement()
     if (main_token_lengths[hparse_i] != 0)
     {
       QString s= hparse_token.mid(0, 7);
-      if  (QString::compare(s, "OCELOT_", Qt::CaseInsensitive) != 0)
+      if (QString::compare(s, "OCELOT_", Qt::CaseInsensitive) != 0)
       {
         hparse_i= saved_hparse_i;
         hparse_token_type= saved_hparse_token_type;
@@ -21677,6 +21699,28 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   QString ccn;
   /* Changes to ocelot_* settings. But we don't check that they're in the [ocelot] group. */
   /* Todo: validity checks */
+
+  if (strcmp(token0_as_utf8, "ocelot_dbms") == 0)
+  {
+    ocelot_dbms= token2;
+    if (ocelot_dbms.contains("mysql", Qt::CaseInsensitive) == true)
+    {
+      connections_dbms[0]= DBMS_MYSQL;
+    }
+    else if (ocelot_dbms.contains("mariadb", Qt::CaseInsensitive) == true)
+    {
+      connections_dbms[0]= DBMS_MARIADB;
+    }
+#ifdef DBMS_TARANTOOL
+    else if (ocelot_dbms.contains("tarantool", Qt::CaseInsensitive) == true)
+    {
+      connections_dbms[0]= DBMS_TARANTOOL;
+    }
+#endif
+    else connections_dbms[0]= DBMS_MYSQL; /* default */
+    return;
+  }
+
   if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_extra_rule_1_text_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_background_color") == 0)
@@ -21840,116 +21884,101 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
 
-   if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
-   {
-     ocelot_shared_memory_base_name= token2;
-     return;
-     }
-   if ((token0_length >= sizeof("sh") - 1) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
-   {
-     ocelot_history_includes_warnings= is_enable;
-     return;
-     }
-   if (strcmp(token0_as_utf8, "sigint_ignore") == 0) { ocelot_sigint_ignore= is_enable; return; }
-   if ((token0_length >= sizeof("sil") - 1) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
-   {
-     ocelot_silent= is_enable;
-     return;
-   }
-   if ((token0_length >= sizeof("so") - 1) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
-   {
-     ocelot_unix_socket= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl") == 0)
-   {
-     ocelot_opt_ssl= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl_ca") == 0)
-   {
-     ocelot_opt_ssl_ca= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl_capath") == 0)
-   {
-     ocelot_opt_ssl_capath= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl_cert") == 0)
-   {
-     ocelot_opt_ssl_cert= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
-   {
-     ocelot_opt_ssl_cipher= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl_crl") == 0)
-   {
-     ocelot_opt_ssl_crl= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
-   {
-     ocelot_opt_ssl_crlpath= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "ssl_key") == 0)
-   {
-     ocelot_opt_ssl_key= token2;
-     return;
-   }
-   if ((token0_length >= sizeof("ssl_verify") - 1) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
-   {
-     ocelot_opt_ssl_verify_server_cert= to_long(token2);
-     return;
-   }
-   if (strcmp(token0_as_utf8, "syslog") == 0) { ocelot_syslog= is_enable; return; }
-   if (strcmp(token0_as_utf8, "table") == 0) { ocelot_table= is_enable; return; }
-   if (strcmp(token0_as_utf8, "tee") == 0) { history_file_start("TEE", token2); /* todo: check whether history_file_start returned NULL which is an error */ return; }/* see comment=tee+hist */
-   if (strcmp(token0_as_utf8, "unbuffered") == 0) { ocelot_unbuffered= is_enable; return; }
-   if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
-   {
-     ocelot_opt_use_result= to_long(token2);
-     return;
-   }
-   if ((token0_length >= sizeof("us") - 1) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
-   {
-     ocelot_user= token2;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "verbose") == 0) { ocelot_verbose= is_enable; return; }
-   if (strcmp(token0_as_utf8, "version") == 0) { ocelot_version= is_enable; return; }
-   /* todo: check that this finds both --vertical and -E */ /* for vertical */
-   if (strcmp(token0_as_utf8, "vertical") == 0) { ocelot_result_grid_vertical= is_enable; return; }
-   if ((token0_length >= sizeof("wa") - 1) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
-   {
-     ocelot_wait= is_enable;
-     return;
-   }
-   if (strcmp(token0_as_utf8, "write_timeout") == 0)
-   {
-     ocelot_opt_write_timeout= to_long(token2);
-     return;
-   }
-   if (strcmp(token0_as_utf8, "xml") == 0) { ocelot_xml= is_enable; return; }
-#ifdef DBMS_TARANTOOL
-   if (strcmp(token0_as_utf8, "dbms") == 0)
-   {
-     ocelot_dbms= "mysql"; connections_dbms[0]= DBMS_MYSQL; /* default */
-#ifdef DBMS_MARIADB
-     if (QString::compare(token2, "mariadb", Qt::CaseInsensitive) == 0)
-     { ocelot_dbms= "mariadb"; connections_dbms[0]= DBMS_MARIADB; }
-#endif
-#ifdef DBMS_TARANTOOL
-     if (QString::compare(token2, "tarantool", Qt::CaseInsensitive) == 0)
-     { ocelot_dbms= "tarantool"; connections_dbms[0]= DBMS_TARANTOOL; }
-#endif
-     return;
-   }
-#endif
+  if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
+  {
+    ocelot_shared_memory_base_name= token2;
+    return;
+    }
+  if ((token0_length >= sizeof("sh") - 1) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
+  {
+    ocelot_history_includes_warnings= is_enable;
+    return;
+    }
+  if (strcmp(token0_as_utf8, "sigint_ignore") == 0) { ocelot_sigint_ignore= is_enable; return; }
+  if ((token0_length >= sizeof("sil") - 1) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
+  {
+    ocelot_silent= is_enable;
+    return;
+  }
+  if ((token0_length >= sizeof("so") - 1) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
+  {
+    ocelot_unix_socket= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl") == 0)
+  {
+    ocelot_opt_ssl= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
+  {
+    ocelot_opt_ssl_ca= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
+  {
+    ocelot_opt_ssl_capath= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
+  {
+    ocelot_opt_ssl_cert= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
+  {
+    ocelot_opt_ssl_cipher= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
+  {
+    ocelot_opt_ssl_crl= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
+  {
+    ocelot_opt_ssl_crlpath= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "ssl_key") == 0)
+  {
+    ocelot_opt_ssl_key= token2;
+    return;
+  }
+  if ((token0_length >= sizeof("ssl_verify") - 1) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
+  {
+    ocelot_opt_ssl_verify_server_cert= to_long(token2);
+    return;
+  }
+  if (strcmp(token0_as_utf8, "syslog") == 0) { ocelot_syslog= is_enable; return; }
+  if (strcmp(token0_as_utf8, "table") == 0) { ocelot_table= is_enable; return; }
+  if (strcmp(token0_as_utf8, "tee") == 0) { history_file_start("TEE", token2); /* todo: check whether history_file_start returned NULL which is an error */ return; }/* see comment=tee+hist */
+  if (strcmp(token0_as_utf8, "unbuffered") == 0) { ocelot_unbuffered= is_enable; return; }
+  if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
+  {
+    ocelot_opt_use_result= to_long(token2);
+    return;
+  }
+  if ((token0_length >= sizeof("us") - 1) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
+  {
+    ocelot_user= token2;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "verbose") == 0) { ocelot_verbose= is_enable; return; }
+  if (strcmp(token0_as_utf8, "version") == 0) { ocelot_version= is_enable; return; }
+  /* todo: check that this finds both --vertical and -E */ /* for vertical */
+  if (strcmp(token0_as_utf8, "vertical") == 0) { ocelot_result_grid_vertical= is_enable; return; }
+  if ((token0_length >= sizeof("wa") - 1) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
+  {
+    ocelot_wait= is_enable;
+    return;
+  }
+  if (strcmp(token0_as_utf8, "write_timeout") == 0)
+  {
+    ocelot_opt_write_timeout= to_long(token2);
+    return;
+  }
+  if (strcmp(token0_as_utf8, "xml") == 0) { ocelot_xml= is_enable; return; }
 }
 
 

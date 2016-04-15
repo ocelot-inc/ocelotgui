@@ -20,9 +20,9 @@
 /*
   The possible DBMS values.
   DBMS_MYSQL must always be defined and --dbms='mysql' is default.
-  If DBMS_MARIADB is defined and --dbms='mariadb',
+  If DBMS_MARIADB is defined and --ocelot_dbms='mariadb',
     accept existence of MariaDB 10.1 roles and compound statements.
-  If DBMS_TARANTOOL is defined and --dbms='tarantool',
+  If DBMS_TARANTOOL is defined and --ocelot_dbms='tarantool',
     connection to a Tarantool server not a MySQL/MariaDB server.
   #ifdef DBMS_TARANTOOL" was an aborted experiment, ordinarily this #define should be commented out.
 */
@@ -350,6 +350,7 @@ public:
   int main_window_maximum_height;
   void component_size_calc(int *character_height, int *borders_height);
   QFont get_font_from_style_sheet(QString style_string);
+  void set_dbms_version_mask(QString);
   void get_sql_mode(int who_is_calling, QString text);
 
   void hparse_f_nexttoken();
@@ -1515,7 +1516,7 @@ private:
   void tokens_to_keywords(QString text, int start);
   void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text);
   int next_token(int i);
-  bool is_client_statement(int);
+  bool is_client_statement(int, int, QString);
   int find_start_of_body(QString text, int *i_of_function, int *i_of_do);
   int connect_mysql(unsigned int connection_number);
 #ifdef DBMS_TARANTOOL
@@ -4502,8 +4503,8 @@ void scan_rows(unsigned int p_result_column_count,
       else
       {
         if ((ocelot_client_side_functions_copy == 1)
-         && (v_lengths[i] == sizeof("ocelot_row_number()") - 1)
-         && (strncasecmp(v_row[i], "ocelot_row_number()", v_lengths[i]) == 0))
+         && (v_lengths[i] == sizeof("row_number() over ()") - 1)
+         && (strncasecmp(v_row[i], "row_number() over ()", v_lengths[i]) == 0))
         {
           total_size+= sizeof(unsigned int) + sizeof(char);
           char tmp[16];
@@ -4541,8 +4542,8 @@ void scan_rows(unsigned int p_result_column_count,
       {
 
         if ((ocelot_client_side_functions_copy == 1)
-         && (v_lengths[i] == sizeof("ocelot_row_number()") - 1)
-         && (strncasecmp(v_row[i], "ocelot_row_number()", v_lengths[i]) == 0))
+         && (v_lengths[i] == sizeof("row_number() over ()") - 1)
+         && (strncasecmp(v_row[i], "row_number() over ()", v_lengths[i]) == 0))
         {
           char tmp[16];
           sprintf(tmp, "%ld", v_r + 1);
@@ -5926,10 +5927,10 @@ void handle_combo_box_1(int i)
 
 void label_for_font_dialog_set_text()
 {
-  QString s_for_label_for_font_dialog;
+  QString s_for_label_for_font_dialog= "Font       ";
   if (current_widget == STATEMENT_WIDGET)
   {
-    s_for_label_for_font_dialog= copy_of_parent->new_ocelot_statement_font_family;
+    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_statement_font_family);
     s_for_label_for_font_dialog.append(" ");
     s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_statement_font_size);
     s_for_label_for_font_dialog.append("pt");
@@ -5947,7 +5948,7 @@ void label_for_font_dialog_set_text()
 
   if (current_widget == GRID_WIDGET)
   {
-    s_for_label_for_font_dialog= copy_of_parent->new_ocelot_grid_font_family;
+    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_grid_font_family);
     s_for_label_for_font_dialog.append(" ");
     s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_grid_font_size);
     s_for_label_for_font_dialog.append("pt");
@@ -5965,7 +5966,7 @@ void label_for_font_dialog_set_text()
 
   if (current_widget == HISTORY_WIDGET)
   {
-    s_for_label_for_font_dialog= copy_of_parent->new_ocelot_history_font_family;
+    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_history_font_family);
     s_for_label_for_font_dialog.append(" ");
     s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_history_font_size);
     s_for_label_for_font_dialog.append("pt");
@@ -5983,7 +5984,7 @@ void label_for_font_dialog_set_text()
 
   if (current_widget == MAIN_WIDGET)
   {
-    s_for_label_for_font_dialog= copy_of_parent->new_ocelot_menu_font_family;
+    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_menu_font_family);
     s_for_label_for_font_dialog.append(" ");
     s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_menu_font_size);
     s_for_label_for_font_dialog.append("pt");
