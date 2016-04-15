@@ -6350,6 +6350,7 @@ void handle_combo_box_for_size_2(int i)
 /* Some of the code in handle_button_for_font_dialog() is a near-duplicate of code in set_colors_and_fonts(). */
 /* This doesn't look for font_weight=light|demibold|black since QFontDialog ignores them anyway. */
 /* This passes italic==true but QFontDialog ignores that if it's expecting an oblique font. */
+/* Possible bug: with Qt4, even when font style="normal", dialog box appears showing italic. */
 void handle_button_for_font_dialog()
 {
   bool ok;

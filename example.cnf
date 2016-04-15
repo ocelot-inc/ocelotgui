@@ -17,7 +17,7 @@ ocelot_grid_border_size=5
 ocelot_grid_cell_border_size=4
 ocelot_grid_cell_drag_line_size=5
 
-ocelot_history_color='coral'
+ocelot_history_text_color='coral'
 ocelot_history_background_color='tan'
 ocelot_history_border_color='cadetblue'
 ocelot_history_font_family='Ubuntu'
@@ -27,7 +27,7 @@ ocelot_history_font_weight='normal'
 
 ocelot_menu_text_color= 'skyblue'
 ocelot_menu_background_color='tomato'
-ocelot_main_border_color='red'
+ocelot_menu_border_color='red'
 ocelot_menu_font_family='Times New Roman'
 ocelot_menu_font_size=32
 ocelot_menu_font_style='italic'
@@ -44,12 +44,19 @@ ocelot_statement_highlight_literal_color='SeaGreen'
 ocelot_statement_highlight_identifier_color='brown'
 ocelot_statement_highlight_comment_color='chartreuse'
 ocelot_statement_highlight_operator_color='#7F007F'
-ocelot_statement_highlight_reserved_color='purple'
+ocelot_statement_highlight_keyword_color='purple'
 ocelot_statement_prompt_background_color='#0DF8F3'
 ocelot_statement_highlight_current_line_color='yellow'
+ocelot_statement_highlight_function_color='magenta'
+ocelot_statement_syntax_checker= '1'
 
 ocelot_extra_rule_1_text_color='WebGreen'
 ocelot_extra_rule_1_background_color='MistyRose'
 ocelot_extra_rule_1_condition='data_type LIKE ''%BINARY'''
 ocelot_extra_rule_1_display_as='image'
+
+ocelot_dbms='mysql'
+ocelot_client_side_functions=1
+ocelot_grid_tabs=10
+
 

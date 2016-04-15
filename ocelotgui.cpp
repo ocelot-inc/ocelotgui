@@ -10378,6 +10378,12 @@ int MainWindow::hparse_f_accept(int proposed_type, QString token)
       equality= true;
     }
   }
+  else if (token == "[reserved function]")
+  {
+    if (((main_token_flags[hparse_i] & TOKEN_FLAG_IS_RESERVED) != 0)
+     && ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0))
+      equality= true;
+  }
   else if (QString::compare(hparse_token, token, Qt::CaseInsensitive) == 0)
   {
     equality= true;
@@ -11405,46 +11411,8 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
   if (hparse_errno > 0) return;
   QString opd= hparse_token.toUpper();
   bool identifier_seen= false;
-  if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "DATE") == 1) /* DATE 'x', else DATE is not reserved so might be an id */
-   || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TIME") == 1)
-   || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TIMESTAMP") == 1))
-  {
-    if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) return;
-    identifier_seen= true;
-  }
-  int saved_hparse_i= hparse_i;
-  hparse_f_next_nexttoken();
-  if (hparse_next_token == "(")
-  {
-    if ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0)
-    {
-      int saved_token= main_token_types[hparse_i];
-      hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      identifier_seen= true;
-      main_token_types[saved_hparse_i]= saved_token;
-    }
-  }
 
-  if ((identifier_seen == true)
-   || (hparse_f_qualified_name() == 1))
-  {
-    if (hparse_errno > 0) return;
-    if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
-    {
-      if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ")") == 0)
-      {
-        hparse_f_function_arguments(opd);
-        if (hparse_errno > 0) return;
-        hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
-        if (hparse_errno > 0) return;
-      }
-      hparse_f_over(saved_hparse_i, who_is_calling);
-      if (hparse_errno > 0) return;
-    }
-    return;
-  }
-
-  /* Watching for built-in functions that happen to be reserved words */
+  /* Check near the start for all built-in functions that happen to be reserved words */
   if ((hparse_f_accept(TOKEN_KEYWORD_CHAR, "CHAR") == 1)
    || (hparse_f_accept(TOKEN_KEYWORD_CONVERT, "CONVERT") == 1)
    || (hparse_f_accept(TOKEN_KEYWORD_IF_IN_IF_EXPRESSION, "IF") == 1)
@@ -11483,17 +11451,6 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     return;
   }
 
-  if (hparse_f_literal() == 1)
-  {
-    if (hparse_errno > 0) return;
-    return;
-  }
-  else if (hparse_errno > 0) return;
-  if (hparse_f_default(TOKEN_KEYWORD_SELECT) == 1)
-  {
-    return;
-  }
-  else if (hparse_errno > 0) return;
   if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "DATABASE") == 1)
         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SCHEMA") == 1))
   {
@@ -11519,6 +11476,61 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     }
     return;
   }
+
+  if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "DATE") == 1) /* DATE 'x', else DATE is not reserved so might be an id */
+   || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TIME") == 1)
+   || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TIMESTAMP") == 1))
+  {
+    if (hparse_f_accept(TOKEN_TYPE_LITERAL, "[literal]") == 1) return;
+    identifier_seen= true;
+  }
+  int saved_hparse_i= hparse_i;
+  hparse_f_next_nexttoken();
+  if (hparse_next_token == "(")
+  {
+    if ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0)
+    {
+      int saved_token= main_token_types[hparse_i];
+      if (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+      {
+        hparse_f_expect(TOKEN_TYPE_IDENTIFIER, "[reserved function]");
+        if (hparse_errno > 0) return;
+      }
+      identifier_seen= true;
+      main_token_types[saved_hparse_i]= saved_token;
+    }
+  }
+
+  if ((identifier_seen == true)
+   || (hparse_f_qualified_name() == 1))
+  {
+    if (hparse_errno > 0) return;
+    if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
+    {
+      if (hparse_f_accept(TOKEN_TYPE_OPERATOR, ")") == 0)
+      {
+        hparse_f_function_arguments(opd);
+        if (hparse_errno > 0) return;
+        hparse_f_expect(TOKEN_TYPE_OPERATOR, ")");
+        if (hparse_errno > 0) return;
+      }
+      hparse_f_over(saved_hparse_i, who_is_calling);
+      if (hparse_errno > 0) return;
+    }
+    return;
+  }
+
+  if (hparse_f_literal() == 1)
+  {
+    if (hparse_errno > 0) return;
+    return;
+  }
+  else if (hparse_errno > 0) return;
+  if (hparse_f_default(TOKEN_KEYWORD_SELECT) == 1)
+  {
+    return;
+  }
+  else if (hparse_errno > 0) return;
   if (hparse_f_accept(TOKEN_TYPE_OPERATOR, "("))
   {
     if (hparse_errno > 0) return;
@@ -18059,12 +18071,14 @@ int MainWindow::hparse_f_client_statement()
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR") == 1)
-     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_PROMPT_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_SYNTAX_CHECKER") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_TEXT_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BACKGROUND_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_HEADER_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BORDER_COLOR") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_FAMILY") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_SIZE") == 1)
      || (hparse_f_accept(TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_STYLE") == 1)
