@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: April 14 2016
+   Last modified: April 20 2016
 */
 
 /*
@@ -9944,7 +9944,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (the_connect(connection_number))
   {
     put_diagnostics_in_result();
-    statement_edit_widget->result.append(tr("Failed to connect. Use menu item File|Connect to try again"));
+    statement_edit_widget->result.append(tr(" Failed to connect. Use menu item File|Connect to try again"));
     return 1;
   }
   statement_edit_widget->result= tr("OK");
@@ -12551,14 +12551,15 @@ void MainWindow::hparse_f_if_not_exists()
   }
 }
 
-int MainWindow::hparse_f_analyze_or_optimize(int who_is_calling)
+int MainWindow::hparse_f_analyze_or_optimize(int who_is_calling,int *table_or_view)
 {
+  *table_or_view= 0;
   if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "NO_WRITE_TO_BINLOG") == 1) || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCAL") == 1)) {;}
-  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE") == 1) {;}
+  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "TABLE") == 1) *table_or_view= TOKEN_KEYWORD_TABLE;
   else if ((who_is_calling == TOKEN_KEYWORD_REPAIR)
         && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
         && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIEW") == 1))
-    {;}
+    *table_or_view= TOKEN_KEYWORD_VIEW;
   else return 0;
   do
   {
@@ -13915,62 +13916,101 @@ void MainWindow::hparse_f_alter_or_create_server(int statement_type)
   if (hparse_errno > 0) return;
 }
 
-/* The REQUIRE clause in GRANT and in CREATE USER after MySQL 5.7.6 */
-/* + the resource_option clause */
+/*
+  REQUIRE tsl_option is allowed in GRANT, and in CREATE USER (+ALTER?) after MySQL 5.7.6 | MariaDB 10.2.
+  WITH resource_option is allowed in GRANT, and in CREATE USER (+ALTER?) after MySQL 5.7.6 | MariaDB 10.2.
+  password_option and lock_option are allowed in CREATE or ALTER after MySQL 5.7.6
+*/
 void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen, bool role_name_seen)
 {
-  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REQUIRE") == 1)
+  if ((who_is_calling == TOKEN_KEYWORD_GRANT)
+   || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2) != 0)
+   || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_5_7) != 0))
   {
-    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NONE") == 1) {;}
-    else
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "REQUIRE") == 1)
     {
-      bool and_seen= false;
-      for (;;)
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NONE") == 1) {;}
+      else
       {
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SSL") == 1) {;}
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "X509") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CIPHER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ISSUER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-        else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SUBJECT") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
-        else
+        bool and_seen= false;
+        for (;;)
         {
-          if (and_seen == true) hparse_f_error();
-          if (hparse_errno > 0) return;
-          break;
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SSL") == 1) {;}
+          else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "X509") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "CIPHER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ISSUER") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "SUBJECT") == 1) hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          else
+          {
+            if (and_seen == true) hparse_f_error();
+            if (hparse_errno > 0) return;
+            break;
+          }
+          and_seen= false;
+          if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AND") == 1) and_seen= true;
         }
-        and_seen= false;
-        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "AND") == 1) and_seen= true;
       }
     }
   }
-  if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "WITH") == 1)
+
+  if ((who_is_calling == TOKEN_KEYWORD_GRANT)
+   || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2) != 0)
+   || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_5_7) != 0))
   {
-    for (;;)
+    if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "WITH") == 1)
+     || (((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "VIA") == 1)))
     {
-      if ((who_is_calling == TOKEN_KEYWORD_GRANT)
-       && (role_name_seen == false)
-       && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GRANT") == 1))
+      for (;;)
       {
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "OPTION");
-        if (hparse_errno > 0) return;
+        if ((who_is_calling == TOKEN_KEYWORD_GRANT)
+         && (role_name_seen == false)
+         && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "GRANT") == 1))
+        {
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "OPTION");
+          if (hparse_errno > 0) return;
+        }
+        else if ((who_is_calling == TOKEN_KEYWORD_GRANT)
+         && (role_name_seen == true)
+         && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ADMIN") == 1))
+        {
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "OPTION");
+          if (hparse_errno > 0) return;
+        }
+        else if (proxy_seen == true) {;}
+        else if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_QUERIES_PER_HOUR") == 1)
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_UPDATES_PER_HOUR") == 1)
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_CONNECTIONS_PER_HOUR") == 1)
+         || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_USER_CONNECTIONS") == 1))
+        {
+          hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+        }
+        else break;
       }
-      else if ((who_is_calling == TOKEN_KEYWORD_GRANT)
-       && (role_name_seen == true)
-       && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ADMIN") == 1))
-      {
-        hparse_f_expect(TOKEN_TYPE_KEYWORD, "OPTION");
-        if (hparse_errno > 0) return;
-      }
-      else if (proxy_seen == true) {;}
-      else if ((hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_QUERIES_PER_HOUR") == 1)
-       || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_UPDATES_PER_HOUR") == 1)
-       || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_CONNECTIONS_PER_HOUR") == 1)
-       || (hparse_f_accept(TOKEN_TYPE_KEYWORD, "MAX_USER_CONNECTIONS") == 1))
+    }
+  }
+
+  if (((who_is_calling == TOKEN_KEYWORD_CREATE) || (who_is_calling == TOKEN_KEYWORD_ALTER))
+   && ((hparse_dbms_mask & FLAG_VERSION_MYSQL_5_7) != 0))
+  {
+    if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "PASSWORD") == 1)
+    {
+      hparse_f_expect(TOKEN_TYPE_KEYWORD, "EXPIRE");
+      if (hparse_errno > 0) return;
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "DEFAULT") == 1) {;}
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "NEVER") == 1) {;}
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "INTERVAL") == 1)
       {
         hparse_f_expect(TOKEN_TYPE_LITERAL, "[literal]");
         if (hparse_errno > 0) return;
+        hparse_f_expect(TOKEN_TYPE_KEYWORD, "DAY");
+        if (hparse_errno > 0) return;
       }
-      else break;
+    }
+    else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ACCOUNT") == 1)
+    {
+      if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "LOCK") == 1) {;}
+      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "UNLOCK") == 1) {;}
     }
   }
 }
@@ -15020,7 +15060,8 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "ANALYZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
-    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_ANALYZE) == 1)
+    int table_or_view;
+    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_ANALYZE, &table_or_view) == 1)
     {
       if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
       {
@@ -16232,7 +16273,8 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_OPTIMIZE, "OPTIMIZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_OPTIMIZE;
-    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_OPTIMIZE) == 0) hparse_f_error();
+    int table_or_view;
+    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_OPTIMIZE, &table_or_view) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_PREPARE, "PREPARE") == 1)
@@ -16311,12 +16353,23 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_KEYWORD_REPAIR, "REPAIR") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_REPAIR;
-    /* todo: somewhere I got the idea that "FROM MYSQL" is allowed in this vicinity. */
-    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_REPAIR) == 1)
+    int table_or_view;
+    if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_REPAIR, &table_or_view) == 1)
     {
-      hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUICK");
-      hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXTENDED");
-      hparse_f_accept(TOKEN_TYPE_KEYWORD, "USE_FRM");
+      if (table_or_view == TOKEN_KEYWORD_TABLE)
+      {
+        hparse_f_accept(TOKEN_TYPE_KEYWORD, "QUICK");
+        hparse_f_accept(TOKEN_TYPE_KEYWORD, "EXTENDED");
+        hparse_f_accept(TOKEN_TYPE_KEYWORD, "USE_FRM");
+      }
+      if (table_or_view == TOKEN_KEYWORD_VIEW)
+      {
+        if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "FROM") == 1)
+        {
+          hparse_f_expect(TOKEN_TYPE_KEYWORD, "MYSQL");
+          if (hparse_errno > 0) return;
+        }
+      }
     }
     else hparse_f_error();
     if (hparse_errno > 0) return;
@@ -16676,7 +16729,7 @@ void MainWindow::hparse_f_statement()
         if (hparse_f_qualified_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      else if (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER") == 1)
+      else if (((hparse_dbms_mask & (FLAG_VERSION_MYSQL_5_7|FLAG_VERSION_MARIADB_10_2)) != 0) && (hparse_f_accept(TOKEN_TYPE_KEYWORD, "USER") == 1))
       {
         if (hparse_f_user_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
@@ -18937,7 +18990,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number)
   if (tarantool_errno != 0)
   {
     put_diagnostics_in_result();
-    statement_edit_widget->result.append(tr("Failed to connect to Tarantool server. Use menu item File|Connect to try again"));
+    statement_edit_widget->result.append(tr(" Failed to connect to Tarantool server. Use menu item File|Connect to try again"));
     return 1;
   }
   statement_edit_widget->result= tr("OK");
@@ -21095,6 +21148,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
          maybe we should use main_token_offsets and main_token_lengths? */
 /* todo: check if we've already looked at the file (this is possible if !include or !includedir happens)
          if so, skip */
+/* todo: this might be okay for a Linux file that ends lines with \n, but what about Windows? */
 void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 {
   //FILE *file;
@@ -21120,7 +21174,8 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   }
 #endif
   QFile file(file_name);
-  bool open_result= file.open(QIODevice::ReadOnly | QIODevice::Text);
+  /* 2016-04-20 removed QIODevice::Text */
+  bool open_result= file.open(QIODevice::ReadOnly);
   if (open_result == false)
   {
     return;                                              /* (if file doesn't exist, ok, no error */
@@ -21129,7 +21184,6 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   //if (file == NULL) return;                              /* (if file doesn't exist, ok, no error */
   if (is_mylogin_cnf == 1)
   {
-
       /*
         todo: close file when return, including return for error
       */
@@ -21158,7 +21212,6 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         {
           file.close(); return; /* if decryption fails, ignore */
         }
-
         unsigned char cipher_chunk[4096];
         unsigned int cipher_chunk_length, output_length= 0, i;
         unsigned char key_in_file[20];
@@ -21170,7 +21223,6 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         {
           file.close(); return; /* if decryption fails, ignore */
         }
-
         if (file.read((char*)key_in_file, 20) != 20)
         //if (fread(key_in_file, 1, 20, file) != 20)
         {
@@ -21179,6 +21231,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 
         for (i= 0; i < 20; ++i) *(key_after_xor + (i%16))^= *(key_in_file + i);
         lmysql->ldbms_AES_set_decrypt_key(key_after_xor, 128, &key_for_aes);
+
         while (file.read((char*)&cipher_chunk_length, 4) == 4)
         //while (fread(&cipher_chunk_length, 1, 4, file) == 4)
         {
@@ -21329,7 +21382,6 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
       group= token1;
       continue;
     }
-
     if ((is_mylogin_cnf == 1) && (QString::compare(group, ocelot_login_path, Qt::CaseInsensitive) == 0))
     {
       /* it's in .mylogin.cnf and the group matches the specified login path */

@@ -123,8 +123,7 @@ git clone https://github.com/ocelot-inc/ocelotgui
 <P>A clone has the latest source, but not executables.</P>
 
 <P>The releases for ocelot-inc/ocelotgui are also on github:
-<A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-or <A HREF="https://github.com/pgulutzan/ocelotgui/releases">https://github.com/pgulutzan/ocelotgui/releases</A>.
+<A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>.
 A release includes the source files as of the release time,
 and also two binary (executable) files.
 Although the release does not have the "latest" source which is
@@ -834,9 +833,9 @@ Connection Dialog Box, if the server is running on the same computer
 as the ocelotgui client, it is sometimes a good idea to enter
 '127.0.0.1' in the host field, instead of 'localhost'.</P>
 
-<P>RE: ROW NUMBERS. Ocelot will replace the value 'ocelot_row_number()'
+<P>RE: ROW NUMBERS. Ocelot will replace the value 'row_number() over ()'
 with the row number within the result set. For example, try<br>
-SELECT 'ocelot_row_number()', table_name.* FROM table_name;<br>
+SELECT 'row_number() over ()' as r, table_name.* FROM table_name;<br>
 To disable this feature, start ocelotgui with --ocelot_client_side_functions=0.</P>
 
 <H3 id="contact">Contact</H3><HR>

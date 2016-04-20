@@ -123,8 +123,7 @@ git clone https://github.com/ocelot-inc/ocelotgui
 <P>A clone has the latest source, but not executables.</P>
 
 <P>The releases for ocelot-inc/ocelotgui are also on github:
-<A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-or <A HREF="https://github.com/pgulutzan/ocelotgui/releases">https://github.com/pgulutzan/ocelotgui/releases</A>.
+<A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>.
 A release includes the source files as of the release time,
 and also two binary (executable) files.
 Although the release does not have the "latest" source which is

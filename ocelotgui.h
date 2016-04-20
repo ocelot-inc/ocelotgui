@@ -436,7 +436,7 @@ public:
   void hparse_f_create_database();
   void hparse_f_index_columns(int,bool,bool);
   void hparse_f_alter_or_create_view();
-  int hparse_f_analyze_or_optimize(int);
+  int hparse_f_analyze_or_optimize(int,int*);
   void hparse_f_call();
   void hparse_f_commit_or_rollback();
   void hparse_f_explain_or_describe();
