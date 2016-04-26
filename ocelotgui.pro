@@ -24,7 +24,7 @@ CONFIG += warn_on
 QMAKE_CFLAGS_WARN_ON    = -Wall -Wextra
 QMAKE_CXXFLAGS_WARN_ON  = -Wall -Wextra
 
-SOURCES += ocelotgui.cpp 
+SOURCES += ocelotgui.cpp
 HEADERS += ocelotgui.h
 
 FORMS    += ocelotgui.ui

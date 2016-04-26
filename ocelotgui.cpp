@@ -9910,7 +9910,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     error_message.append(". For tips about making sure ocelotgui finds the right libmysqlclient, click Help|libmysqlclient");
     msgbox.setText(error_message);
     msgbox.exec();
-    delete lmysql;
+    //delete lmysql;
     return 1;
   }
 
@@ -9923,7 +9923,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     error_message.append(". For tips about making sure ocelotgui finds libmysqlclient, click Help|libmysqlclient");
     msgbox.setText(error_message);
     msgbox.exec();
-    delete lmysql;
+    //delete lmysql;
     return 1;
   }
 
@@ -20691,9 +20691,11 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
 
 /*
    MySQL options
-   MySQL's client library has routines for a consistent way to see what
+   Any mysql/mariadb client should have a consistent way to see what
    options the user has put in a configuration file such as my.cnf, or added
    on the command line with phrases such as --port=x.
+   MySQL's own clients can do it with an include of getopt.h and calls to my_long_options etc.
+   but that would introduce some unwanted dependencies, so we do all the option retrievals directly.
    Todo: meld that with whatever a user might say in a CONNECT command line
          or maybe even a dialog box.
    Assume lmysql->ldbms_mysql_init() has not already happened.
@@ -20708,9 +20710,6 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
             then port=3306 and current_host=127.0.0.1 and that will get passed to the connect routine.
    Read: http://dev.mysql.com/doc/refman/5.6/en/connecting.html
          See also http://dev.mysql.com/doc/refman/5.6/en/mysql-command-options.html
-
-   At one time there was an include of getopt.h and calls to my_long_options etc.
-   That introduced some unwanted dependencies and so now we do all the option retrievals directly.
  */
 
 /*
@@ -20733,7 +20732,7 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
   * Read these files:
   /etc/my.cnf
   /etc/mysql/my.cnf
-  SYSCONFDIR/my.cnf                          ?? i.e. [installation-directory]/etc/my.cnf but this should be changeable
+  SYSCONFDIR/my.cnf       ?? i.e. [installation-directory]/etc/my.cnf but this should be changeable
   $MYSQL_HOME/my.cnf
   file specified with --defaults-extra-file
   $HOME/.my.cnf             MySQL manual says ~/.my.cnf which isn't necessarily the same thing, but I don't believe that
@@ -20822,7 +20821,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
           and http://dev.mysql.com/doc/refman/5.6/en/connecting.html mentions a few others:
           host = 'localhost' (which means protocol=SOCKET if mysql client, but we ignore that)
           user = Unix login name on Linux, although on Windows it would be 'ODBC'
-          and there seem to be some getenv() calls in mysqlcc that I didn't take into account.
+          and there seem to be some getenv() calls in other clients that I didn't take into account.
   */
   ocelot_no_defaults= 0;
   ocelot_defaults_file= "";
@@ -21042,11 +21041,11 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   For example progname --a=b --c=d gives us argv[1]="--a=b" and argv[2]="--c=d".
   For example progname -a b -c d gives us argv[1]="-a" argv[2]="b" argv[3]="-c" argv[4]="d".
   If something is enclosed in single or double quotes, then it has already been stripped of quotes and lead/trail spaces.
+  We do command line arguments TWICE! first time is just to find out what my.cnf files should be read, etc.
+  second time is to override whatever happened during getenv and option-file processing
   todo: parse so -p x and --port=x etc. are known
   todo: check: is it okay still to abbreviate e.g. us rather than user?
   todo: strip the arguments so Qt doesn't see them, or maybe don't
-  todo: do command line arguments TWICE! first time is just to find out what my.cnf files should be read, etc.
-        second time is to override whatever happened during getenv and option-file processing
   todo: you seem to be forgetting that Qt can also expect command-line options
 */
 void MainWindow::connect_read_command_line(int argc, char *argv[])
@@ -21145,7 +21144,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
 
 
 /* Todo: unfortunately MAX_TOKENS == 10000, when we only need 10, so there's temporary space waste
-         maybe we should use main_token_offsets and main_token_lengths? */
+         it would be easy to change but there's a code freeze, no unnecessary changes */
 /* todo: check if we've already looked at the file (this is possible if !include or !includedir happens)
          if so, skip */
 /* todo: this might be okay for a Linux file that ends lines with \n, but what about Windows? */
@@ -22217,6 +22216,7 @@ int options_and_connect(
   if (lmysql->ldbms_mysql_query(&mysql[connection_number], "set character_set_results = utf8")) printf("SET character_set_results failed\n");
 
   connected[connection_number]= 1;
+
   return 0;
 }
 
