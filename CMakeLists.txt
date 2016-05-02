@@ -208,6 +208,7 @@ install(FILES options.txt DESTINATION bin)
 install(FILES debugger_reference.txt DESTINATION bin)
 install(FILES LICENSE.GPL DESTINATION bin)
 install(FILES example.cnf DESTINATION bin)
+install(FILES ocelotgui.1 DESTINATION man/man1)
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
