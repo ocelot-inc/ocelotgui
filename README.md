@@ -40,6 +40,7 @@ All rights reserved.</P>
 ... <A href="#installing-by-rebuilding-source-on-ubuntu-1204-without-qt-creator">Installing by rebuilding source, on Ubuntu 12.04, without Qt Creator</A>
 ... <A href="#installing-by-rebuilding-source-on-ubuntu-1504">Installing by rebuilding source, on Ubuntu 15.04</A>
 ... <A href="#installing-by-rebuilding-source-with-qt-creator">Installing by rebuilding source, with Qt Creator</A>
+... <A href="#installing-from-source-with-cmake">Installing from source, with cmake</A>
 <H4>Illustrating</H4>
 ... <A href="#some-screenshots">Some screenshots</A>
 <H4>Using</H4>
@@ -373,6 +374,26 @@ If you get a message "cannot find -lGL" when you
 try to run the project, try to install GL.
 With Ubuntu: sudo apt-get install libgl1-mesa-dev.
 With Fedora: sudo yum install mesa-libGL-devel.</P>
+
+<H3 id="installing-from-source-with-cmake">Installing from source, with cmake</H3><HR>
+<P>
+Although many of the above examples use qmake,
+it is equally common and equally easy to use cmake.
+Ocelot supplies the necessary file CMakeLists.txt.
+Then the instructions are:
+<PRE>
+  make clean        # unnecessary the first time
+  rm CMakeCache.txt # unnecessary the first time
+  cmake .
+  make
+  make install</PRE></P>
+<P>
+Additional flags may be passed to cmake:
+CMAKE_PREFIX_PATH CMAKE_INSTALL_PREFIX
+MYSQL_INCLUDE_DIR WITH_QT4.
+For explanation of these flags, read the comments
+in the CMakeLists.txt file.</P>
+
 
 <P>For more commentary about compiling and building,
 read an ocelotgui.cpp comment that begins with the words
