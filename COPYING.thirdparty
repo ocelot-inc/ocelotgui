@@ -1,0 +1,82 @@
+/*
+   The class named CodeEditor inside this program is taken and modified from
+   http://qt-project.org/doc/qt-4.8/widgets-codeeditor.html
+   and therefore CodeEditor's maker's copyright and BSD license provisions
+   are reproduced below. These provisions apply only for the
+   part of the CodeEditor class which is marked within the program.
+   The program as a whole is copyrighted by Ocelot and
+   licensed under GPL version 2 as stated above.
+ **
+ ** Copyright (C) 2014 Digia Plc and/or its subsidiary(-ies).
+ ** Contact: http://www.qt-project.org/legal
+ **
+ ** $QT_BEGIN_LICENSE:BSD$
+ **
+ ** "Redistribution and use in source and binary forms, with or without
+ ** modification, are permitted provided that the following conditions are
+ ** met:
+ **   * Redistributions of source code must retain the above copyright
+ **     notice, this list of conditions and the following disclaimer.
+ **   * Redistributions in binary form must reproduce the above copyright
+ **     notice, this list of conditions and the following disclaimer in
+ **     the documentation and/or other materials provided with the
+ **     distribution.
+ **   * Neither the name of Digia Plc and its Subsidiary(-ies) nor the names
+ **     of its contributors may be used to endorse or promote products derived
+ **     from this software without specific prior written permission.
+ **
+ **
+ ** THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ ** "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ ** LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ ** A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ ** OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ ** SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ ** LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ ** DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ ** THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ ** OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE."
+ **
+ ** $QT_END_LICENSE$
+*/
+
+#ifdef DEBUGGER
+/*
+  The routine named debug_mdbug_install inside this program is taken and modified from
+  https://launchpad.net/mdbug, specifically http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/install.sql,
+  and therefore MDBug's maker's copyright and GPL version 2 license provisions
+  are reproduced below. These provisions apply only for the
+  part of the debug_mdbug_install routine which is marked within the program.
+  The program as a whole is copyrighted by Ocelot and
+  licensed under GPL version 2 as stated above.
+
+  This file is part of MDBug.
+
+  (c) Copyright 2012 Hewlett-Packard Development Company, L.P.
+
+  This program is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License
+  as published by the Free Software Foundation; version 2 of the License.
+
+  This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty
+  of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License along with this program; if not, see
+  <http://www.gnu.org/licenses>.
+
+  Linking MDBug statically or dynamically with other modules is making a combined work based on MDBug. Thus, the terms and
+  conditions of the GNU General Public License cover the whole combination.
+
+  In addition, as a special exception, the copyright holders of MDBug give you permission to combine MDBug with free
+  software programs or libraries that are released under the GNU LGPL and with code included in the standard release
+  of Eclipse under the Eclipse Public License version 1.0 (or modified versions of such code, with unchanged license).
+  You may copy and distribute such a system following the terms of the GNU GPL for MDBug and the licenses of the other
+  code concerned, provided that you include the source code of that other code when and as the GNU GPL requires
+  distribution of source code.
+
+  Note that people who make modified versions of MDBug are not obligated to grant this special exception for their
+  modified versions; it is their choice whether to do so. The GNU General Public License gives permission to release a
+  modified version without this exception; this exception also makes it possible to release a modified version which
+  carries forward this exception.
+*/
+#endif
