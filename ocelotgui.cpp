@@ -2494,7 +2494,12 @@ void MainWindow::action_the_manual()
   <BR>https://github.com/ocelot-inc/ocelotgui#user-manual \
     ";
 
+#ifdef OCELOTGUI_DOCDIR
+  QString application_dir_path= OCELOTGUI_DOCDIR;
+#else
   QString application_dir_path= QCoreApplication::applicationDirPath();
+#endif
+
   QString readme_path= application_dir_path;
   readme_path.append("/");
   readme_path.append("README.md");

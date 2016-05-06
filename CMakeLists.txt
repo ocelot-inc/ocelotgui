@@ -131,6 +131,15 @@ include_directories(${MYSQL_INCLUDE_DIR_RESULT})
 # -fPIE, but nobody has checked whether other flags are better
 set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 
+#Typically this says [/usr/local] bin, share/doc/ocelotgui, man
+include(GNUInstallDirs)
+message("-- bin will go to ${CMAKE_INSTALL_FULL_BINDIR}")
+message("-- doc will go to ${CMAKE_INSTALL_FULL_DOCDIR}")
+message("-- man will go to ${CMAKE_INSTALL_FULL_MANDIR}")
+
+#Help|Manual will look at this path
+add_definitions(-DOCELOTGUI_DOCDIR="${CMAKE_INSTALL_FULL_DOCDIR}")
+
 if (NOT WITH_QT4)
   # QUIET suppresses the following warning because we'll look for Qt4 instead:
   # CMake Warning at CMakeLists.txt:n (find_package):
@@ -198,20 +207,22 @@ endif (Qt5Widgets_FOUND)
 FILE(GLOB png_files "${CMAKE_CURRENT_SOURCE_DIR}/*.png")
 FILE(GLOB jpg_files "${CMAKE_CURRENT_SOURCE_DIR}/*.jpg")
 FILE(GLOB htm_files "${CMAKE_CURRENT_SOURCE_DIR}/*.htm")
-install(TARGETS ocelotgui RUNTIME DESTINATION bin)
-install(FILES ${png_files} DESTINATION bin)
-install(FILES ${jpg_files} DESTINATION bin)
-install(FILES ${htm_files} DESTINATION bin)
-install(FILES README.txt DESTINATION bin)
-install(FILES README.md DESTINATION bin)
-install(FILES options.txt DESTINATION bin)
-install(FILES debugger_reference.txt DESTINATION bin)
-install(FILES LICENSE.GPL DESTINATION bin)
-install(FILES example.cnf DESTINATION bin)
-install(FILES ocelotgui.1 DESTINATION man/man1)
+install(TARGETS ocelotgui RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ${png_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES ${jpg_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES ${htm_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES README.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES options.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES debugger_reference.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES LICENSE.GPL DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
+
+
 
 # To clean up:
 # make clean

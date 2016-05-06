@@ -20,8 +20,8 @@ cd ocelotgui                                                 # FLAW!! We wanted 
 
 # We already have ocelotgui executables ocelotgui-qt4 + ocelotgui-qt5
 # but we don't want to depend on them, they were made with qmake 64-bit.
-rm ocelotgui-qt4
-rm ocelotgui-qt5
+# rm ocelotgui-qt4
+# rm ocelotgui-qt5
 
 mkdir debian
 
@@ -41,13 +41,13 @@ Source: ocelotgui
 Maintainer: Peter Gulutzan <pgulutzan@ocelot.ca>
 Section: database
 Priority: optional
-Standards-Version: 3.9.2
+Standards-Version: 3.9.3
 Build-Depends: debhelper (>= 9)
 
 Package: ocelotgui
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: The Ocelot GUI (ocelotgui), a database client, allows users to connect to
+Description: Ocelot GUI (ocelotgui), a database client, allows users to connect to
  a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
  Some of its features are: syntax highlighting, user-settable colors
  and fonts for each part of the screen, result-set displays
