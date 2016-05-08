@@ -131,6 +131,14 @@ include_directories(${MYSQL_INCLUDE_DIR_RESULT})
 # -fPIE, but nobody has checked whether other flags are better
 set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
 
+#lintian complained about "unstripped-binary-or-object"
+# set(CPACK_STRIP_FILES TRUE) was useless
+# SET(CMAKE_BUILD_TYPE "Release" was useless
+# Todo: check: does this override a user who wants CMAKE_BUILD_TYPE debug?
+if(CMAKE_COMPILER_IS_GNUCXX)
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s")
+endif(CMAKE_COMPILER_IS_GNUCXX)
+
 #Typically this says [/usr/local] bin, share/doc/ocelotgui, man
 include(GNUInstallDirs)
 message("-- bin will go to ${CMAKE_INSTALL_FULL_BINDIR}")
@@ -216,16 +224,84 @@ install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES options.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES debugger_reference.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES LICENSE.GPL DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES COPYING DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES copyright DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
-install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
 
+#lintian complains changelog-file-missing-in-native-package, this fixes it,
+#but lintian will still complain new-package-should-close-itp-bug
+#which we cannot fix until version = 1.0.0 and we post an ITP bug
+execute_process(COMMAND cp changelog changelog.bak)
+execute_process(COMMAND rm -f changelog.gz)
+execute_process(COMMAND gzip -9 changelog)
+install(FILES changelog.gz DESTINATION ${CMAKE_INSTALL_DOCDIR})
+execute_process(COMMAND mv changelog.bak changelog)
+
+#lintian complains manpage-not-compressed, this fixes it.
+execute_process(COMMAND cp ocelotgui.1 ocelotgui.1.bak)
+execute_process(COMMAND rm -f ocelotgui.1.gz)
+execute_process(COMMAND gzip -9 ocelotgui.1)
+install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+execute_process(COMMAND mv ocelotgui.1.bak ocelotgui.1)
 
 
-# To clean up:
-# make clean
-# rm CMakeCache.txt
-# rm -r CMakeFiles
-# rm cmake_install.cmake
+# version = 0.9.0
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "GUI client for MySQL or MariaDB")
+set(CPACK_PACKAGE_VENDOR "Ocelot Computer Services Inc.")
+set(CPACK_PACKAGE_VERSION_MAJOR "0")
+set(CPACK_PACKAGE_VERSION_MINOR "9")
+set(CPACK_PACKAGE_VERSION_PATCH "0")
+# Todo: set(CPACK_PACKAGE_DESCRIPTION_FILE first-lines-of-README)
+# CPACK_PACKAGE_FILE_NAME = default
+# CPACK_PACKAGE_INSTALL_DIRECTORY = default
+set(CPACK_PACKAGE_ICON ocelotgui_logo.png)
+# CPACK_PROJECT_CONFIG_FILE = nonexistent
+
+# Todo: You should have both COPYING and COPYING.thirdparty, no?
+set(CPACK_RESOURCE_FILE_LICENSE "COPYING")
+set(CPACK_RESOURCE_FILE_README "README.htm")
+# CPACK_RESOURCE_FILE_WELCOME = nonexistent
+# CPACK_GENERATOR = not used, we expect cpack -D CPACK_GENERATOR="DEB" etc.
+
+# CPACK_DEBIAN_PACKAGE_NAME = default = CPACK_PACKAGE_NAME = project name
+# CPACK_DEBIAN_PACKAGE_VERSION = default = CPACK_PACKAGE_VERSION = 0.9.0
+# CPACK_DEBIAN_PACKAGE_ARCHITECTURE = default
+# CPACK_DEBIAN_PACKAGE_DEPENDS = todo?
+set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Peter Gulutzan <pgulutzan@ocelot.ca>")
+set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Ocelot GUI (ocelotgui), a database client, allows users to connect to
+ a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
+ Some of its features are: syntax highlighting, user-settable colors
+ and fonts for each part of the screen, result-set displays
+ with multi-line rows and resizable columns, and a debugger.")
+set(CPACK_DEBIAN_PACKAGE_SECTION "database")
+set(CPACK_DEBIAN_PACKAGE_PRIORITY "optional")
+set(CPACK_DEBIAN_PACKAGE_HOMEPAGE "http://ocelot.ca")
+set(CPACK_DEBIAN_ARCHITECTURE ${CMAKE_SYSTEM_PROCESSOR})
+#lintian complains "missing-depends-line" if this is not on
+set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
+# CPACK_DEBIAN_PACKAGE_RECOMMENDS = todo: should recommend libmysqlclient
+
+#CPACK_RPM_PACKAGE_SUMMARY = default = CPACK_PACKAGE_DESCRIPTION_SUMMARY
+#CPACK_RPM_PACKAGE_NAME = default = CPACK_PACKAGE_NAME
+#CPACK_RPM_PACKAGE_VERSION = DEFAULT = CPACK_PACKAGE_VERSION = 0.9.0
+set(CPACK_RPM_PACKAGE_RELEASE 1)
+set(CPACK_RPM_PACKAGE_LICENSE GPLv2)
+set(CPACK_RPM_PACKAGE_GROUP "Applications/Databases")
+set(CPACK_RPM_PACKAGE_VENDOR "Ocelot")
+set(CPACK_RPM_PACKAGE_DESCRIPTION "Ocelot GUI (ocelotgui), a database client, allows users to connect to
+ a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
+ Some of its features are: syntax highlighting, user-settable colors
+ and fonts for each part of the screen, result-set displays
+ with multi-line rows and resizable columns, and a debugger.")
+
+include(CPack)
+
+# How to generate .deb file if "cmake .; make; make install" succeeds (not tested)
+# cpack -D CPACK_GENERATOR="DEB"
+# lintian ocelotgui-0.9.0-Linux.deb
+# How to generate .rpm file if "cmake .; make; make install" succeeds (not tested)
+# cpack -D CPACK_RPM_PACKAGE_DEBUG=1 -D CPACK_RPM_SPEC_INSTALL_POST="/bin/true" -G RPM
+
