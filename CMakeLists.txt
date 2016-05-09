@@ -1,4 +1,4 @@
-#  Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.
+#  Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -235,17 +235,30 @@ install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
 #but lintian will still complain new-package-should-close-itp-bug
 #which we cannot fix until version = 1.0.0 and we post an ITP bug
 execute_process(COMMAND cp changelog changelog.bak)
-execute_process(COMMAND rm -f changelog.gz)
-execute_process(COMMAND gzip -9 changelog)
-install(FILES changelog.gz DESTINATION ${CMAKE_INSTALL_DOCDIR})
+execute_process(COMMAND gzip -9 -f changelog)
 execute_process(COMMAND mv changelog.bak changelog)
+install(FILES changelog.gz DESTINATION ${CMAKE_INSTALL_DOCDIR})
 
 #lintian complains manpage-not-compressed, this fixes it.
 execute_process(COMMAND cp ocelotgui.1 ocelotgui.1.bak)
-execute_process(COMMAND rm -f ocelotgui.1.gz)
-execute_process(COMMAND gzip -9 ocelotgui.1)
-install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+execute_process(COMMAND gzip -9 -f ocelotgui.1)
 execute_process(COMMAND mv ocelotgui.1.bak ocelotgui.1)
+#install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+
+# I assume nobody wants package names like ocelotgui-0.9.0-Linux.deb
+# but that's what I get if CMAKE_SYSTEM_NAME = "Linux".
+# I'd prefer Linux-i386 or Linux-amd64.
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+  find_program(DPKG_CMD dpkg)
+  if(NOT DPKG_CMD)
+    set(PLATFORM_NAME "i386")
+  else(NOT DPKG_CMD)
+    execute_process(COMMAND "${DPKG_CMD}" --print-architecture
+      OUTPUT_VARIABLE PLATFORM_NAME
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif(NOT DPKG_CMD)
+  set(CMAKE_SYSTEM_NAME "Linux-${PLATFORM_NAME}")
+endif (CMAKE_SYSTEM_NAME MATCHES "Linux")
 
 # version = 0.9.0
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "GUI client for MySQL or MariaDB")
@@ -267,7 +280,6 @@ set(CPACK_RESOURCE_FILE_README "README.htm")
 
 # CPACK_DEBIAN_PACKAGE_NAME = default = CPACK_PACKAGE_NAME = project name
 # CPACK_DEBIAN_PACKAGE_VERSION = default = CPACK_PACKAGE_VERSION = 0.9.0
-# CPACK_DEBIAN_PACKAGE_ARCHITECTURE = default
 # CPACK_DEBIAN_PACKAGE_DEPENDS = todo?
 set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Peter Gulutzan <pgulutzan@ocelot.ca>")
 set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Ocelot GUI (ocelotgui), a database client, allows users to connect to
@@ -295,7 +307,7 @@ set(CPACK_RPM_PACKAGE_DESCRIPTION "Ocelot GUI (ocelotgui), a database client, al
  Some of its features are: syntax highlighting, user-settable colors
  and fonts for each part of the screen, result-set displays
  with multi-line rows and resizable columns, and a debugger.")
-set(CPACK_RPM_CHANGELOG_FILE changelog)
+set(CPACK_RPM_CHANGELOG_FILE "${PROJECT_SOURCE_DIR}/rpmchangelog")
 
 include(CPack)
 
@@ -304,4 +316,3 @@ include(CPack)
 # lintian ocelotgui-0.9.0-Linux.deb
 # How to generate .rpm file if "cmake .; make; make install" succeeds (not tested)
 # cpack -D CPACK_RPM_PACKAGE_DEBUG=1 -D CPACK_RPM_SPEC_INSTALL_POST="/bin/true" -G RPM
-

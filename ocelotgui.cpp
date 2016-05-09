@@ -2,11 +2,11 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: April 20 2016
+   Last modified: May 9 2016
 */
 
 /*
-  Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.
+  Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -2432,7 +2432,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\":/ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014 by Ocelot Computer Services Inc.<br>\
+<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2016 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -2472,10 +2472,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 0.9.0, March 18 2016  \
+  <BR>Version 0.9.0, May 9 2016  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.  \
+  <BR>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -21975,7 +21975,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2014 by Ocelot Computer Services Inc. and others\n");
+  printf("Copyright (c) 2014-2016 by Ocelot Computer Services Inc. and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");

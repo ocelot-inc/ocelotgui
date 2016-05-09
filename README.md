@@ -9,7 +9,7 @@ Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, result-set displays
 with multi-line rows and resizable columns, and a debugger.</P>
 
-<P>Copyright (c) 2014, Ocelot Computer Services Inc.
+<P>Copyright (c) 2014-2016, Ocelot Computer Services Inc.
 All rights reserved.</P>
 
 <P>For the GPL license terms see <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL">https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL</A>.</P>
@@ -416,9 +416,9 @@ read an ocelotgui.cpp comment that begins with the words
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 0.9.0, March 18 2016</P>
+<P>Version 0.9.0, May 9 2016</P>
 
-<P>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.</P>
+<P>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.</P>
   
 <P>This program is free software; you can redistribute it and/or modify  
 it under the terms of the GNU General Public License as published by  
