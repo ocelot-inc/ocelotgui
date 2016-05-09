@@ -3,9 +3,10 @@
    http://qt-project.org/doc/qt-4.8/widgets-codeeditor.html
    and therefore CodeEditor's maker's copyright and BSD license provisions
    are reproduced below. These provisions apply only for the
-   part of the CodeEditor class which is marked within the program.
+   part of the CodeEditor class which is included by #include "codeeditor.h".
    The program as a whole is copyrighted by Ocelot and
-   licensed under GPL version 2 as stated above.
+   licensed under GPL version 2 as stated above
+   and in COPYING file.
  **
  ** Copyright (C) 2014 Digia Plc and/or its subsidiary(-ies).
  ** Contact: http://www.qt-project.org/legal

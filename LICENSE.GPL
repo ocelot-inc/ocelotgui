@@ -6,11 +6,11 @@ Ocelotgui (Ocelot Graphical User Interface) is
 distributed according to GPL version 2.
 The text of the license is in file COPYING.
 
-One of the ocelotgui source files, installsql.cpp, is
+One of the ocelotgui source files, install_sql.cpp, is
 distributed according to GPL version 2.
 The text of the license is in file COPYING.thirdparty.
 
-One of the classes inside one of the source files, CodeEditor, is
+One of the ocelotgui source files, codeeditor.h, is
 distributed according to BSD.
 The text of the license is in file COPYING.thirdparty.
 

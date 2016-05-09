@@ -26,7 +26,7 @@ License: GPL-2
  License version 2 can be found in the file
  '/usr/share/common-licenses/GPL-2'.
 
-Files: installsql.cpp
+Files: install_sql.cpp
 Copyright: 2012, Hewlett-Packard Development Company, L.P.
 License: GPL-2
   The routine named debug_mdbug_install inside ocelotgui.cpp is taken and modified from
@@ -65,14 +65,14 @@ License: GPL-2
   modified version without this exception; this exception also makes it possible to release a modified version which
   carries forward this exception.
 
-Files: other
+Files: codeeditor.h
 Copyright: 2014 Digia Plc and/or its subsidiary(-ies).
 License: BSD
    The class named CodeEditor inside this program is taken and modified from
-   http://qt-project.org/doc/qt-4.8/widgets-codeeditor.html
+   http://doc.qt.io/qt-4.8/qt-widgets-codeeditor-example.html
    and therefore CodeEditor's maker's copyright and BSD license provisions
    are reproduced below. These provisions apply only for the
-   part of the CodeEditor class which is marked within the program.
+   part of the CodeEditor class which is included by #include "codeeditor.h".
    The program as a whole is copyrighted by Ocelot and
    licensed under GPL version 2 as stated above.
  **

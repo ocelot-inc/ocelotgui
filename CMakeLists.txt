@@ -228,7 +228,7 @@ install(FILES COPYING DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES copyright DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
 # So the only original files not copied are the source files:
-# CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h
+# CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
 
 #lintian complains changelog-file-missing-in-native-package, this fixes it,
@@ -246,7 +246,6 @@ execute_process(COMMAND rm -f ocelotgui.1.gz)
 execute_process(COMMAND gzip -9 ocelotgui.1)
 install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 execute_process(COMMAND mv ocelotgui.1.bak ocelotgui.1)
-
 
 # version = 0.9.0
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "GUI client for MySQL or MariaDB")
@@ -296,6 +295,7 @@ set(CPACK_RPM_PACKAGE_DESCRIPTION "Ocelot GUI (ocelotgui), a database client, al
  Some of its features are: syntax highlighting, user-settable colors
  and fonts for each part of the screen, result-set displays
  with multi-line rows and resizable columns, and a debugger.")
+set(CPACK_RPM_CHANGELOG_FILE changelog)
 
 include(CPack)
 

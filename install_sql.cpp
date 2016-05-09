@@ -16,6 +16,8 @@
   In insert_into_statements two lines were changed because a statement within an ELSE wasn't generated.
 */
 
+#ifndef INSTALL_SQL_CPP
+
 /* todo: ensure this doesn't waste space by including things in ocelotgui.h that are unnecessary */
 //TEST!! #include "ocelotgui.h"
 //#include "ui_ocelotgui.h"
@@ -7789,3 +7791,5 @@ if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
 }
 /* End of debug_mdbug_install_sql(). End of effect of licence of install_sql function contents. */
 #endif
+#endif
+

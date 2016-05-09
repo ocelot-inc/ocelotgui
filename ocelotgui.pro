@@ -26,6 +26,8 @@ QMAKE_CXXFLAGS_WARN_ON  = -Wall -Wextra
 
 SOURCES += ocelotgui.cpp
 HEADERS += ocelotgui.h
+HEADERS += codeeditor.h
+HEADERS += install_sql.cpp
 
 FORMS    += ocelotgui.ui
 
