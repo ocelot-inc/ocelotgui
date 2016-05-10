@@ -247,7 +247,7 @@ execute_process(COMMAND mv ocelotgui.1.bak ocelotgui.1)
 
 # I assume nobody wants package names like ocelotgui-0.9.0-Linux.deb
 # but that's what I get if CMAKE_SYSTEM_NAME = "Linux".
-# I'd prefer Linux-i386 or Linux-amd64.
+# I'd prefer ocelotgui-0.9.0-1_amd64.deb
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
   find_program(DPKG_CMD dpkg)
   if(NOT DPKG_CMD)
@@ -257,7 +257,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
       OUTPUT_VARIABLE PLATFORM_NAME
       OUTPUT_STRIP_TRAILING_WHITESPACE)
   endif(NOT DPKG_CMD)
-  set(CMAKE_SYSTEM_NAME "Linux-${PLATFORM_NAME}")
+  set(CMAKE_SYSTEM_NAME "1_${PLATFORM_NAME}")
 endif (CMAKE_SYSTEM_NAME MATCHES "Linux")
 
 # version = 0.9.0
@@ -311,8 +311,8 @@ set(CPACK_RPM_CHANGELOG_FILE "${PROJECT_SOURCE_DIR}/rpmchangelog")
 
 include(CPack)
 
-# How to generate .deb file if "cmake .; make; make install" succeeds (not tested)
+# How to generate .deb file if "cmake .; make; make install" succeeds
 # cpack -D CPACK_GENERATOR="DEB"
 # lintian ocelotgui-0.9.0-Linux.deb
-# How to generate .rpm file if "cmake .; make; make install" succeeds (not tested)
+# How to generate .rpm file if "cmake .; make; make install" succeeds
 # cpack -D CPACK_RPM_PACKAGE_DEBUG=1 -D CPACK_RPM_SPEC_INSTALL_POST="/bin/true" -G RPM
