@@ -78,6 +78,7 @@
 #include <QTimer>
 //#include <QWidget>
 #include <QTextStream>
+#include <QDesktopWidget>
 
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>

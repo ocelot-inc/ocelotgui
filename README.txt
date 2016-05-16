@@ -9,7 +9,7 @@ Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, result-set displays
 with multi-line rows and resizable columns, and a debugger.</P>
 
-<P>Copyright (c) 2014, Ocelot Computer Services Inc.
+<P>Copyright (c) 2014-2016, Ocelot Computer Services Inc.
 All rights reserved.</P>
 
 <P>For the GPL license terms see <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL">https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL</A>.</P>
@@ -76,8 +76,8 @@ In that case, be up and running in 15 seconds with:</P>
 <PRE>
  mkdir ~/ocelotgui-test
  cd ~/ocelotgui-test
- wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
- tar -zxvf ocelotgui.tar.gz
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui-0.9.0.tar.gz
+ tar -zxvf ocelotgui-0.9.0.tar.gz
  cd ocelotgui
  ./ocelotgui-qt4 #or ./ocelotgui-qt5
 </PRE>
@@ -130,15 +130,15 @@ and also two binary (executable) files.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, the existence of the executables
 might be convenient. A release file is highlighted in green
-by github and is named ocelotgui.tar.gz. Thus release 0.9.0 is at
-https://github.com/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
-or https://github.com/pgulutzan/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz.
+by github and is named ocelotgui-[version].tar.gz. Thus release 0.9.0 is at
+https://github.com/ocelotgui/releases/download/0.9.0/ocelotgui-0.9.0.tar.gz
+or https://github.com/pgulutzan/ocelotgui/releases/download/0.9.0/ocelotgui-0.9.0.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui-0.9.0.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui.tar.gz.</P>
+and click ocelotgui-0.9.0.tar.gz.</P>
 
 <P>Most of the installation examples that follow assume that download is
 of a release.</P>
@@ -146,11 +146,11 @@ of a release.</P>
 <H3 id="an-installation-with-ubuntu-1204-64-bit">An installation with Ubuntu 12.04, 64-bit</H3><HR>
 
 <P>These steps worked after a fresh installation of Ubuntu 12.04,
-a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+a GNOME-based Linux distro, after downloading ocelotgui-0.9.0.tar.gz to ~/Downloads.
 <PRE>
  cd ~/Downloads
- #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
- tar -zxvf ocelotgui.tar.gz
+ #Unpack ocelotgui-0.9.0.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui-0.9.0.tar.gz
  cd ocelotgui
  #Install a package containing libmysqlclient.so and/or libmysqlclient.so.18
  #Maybe mysql-common would have sufficed.
@@ -163,11 +163,11 @@ a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <H3 id="an-installation-with-ubuntu-1404-64-bit">An installation with Ubuntu 14.04, 64-bit</H3><HR>
 
 <P>These steps worked after a fresh installation of Ubuntu 14.04,
-a GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+a GNOME-based Linux distro, after downloading ocelotgui-0.9.0.tar.gz to ~/Downloads.
 <PRE>
  cd ~/Downloads
- #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
- tar -zxvf ocelotgui.tar.gz
+ #Unpack ocelotgui-0.9.0.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui-0.9.0.tar.gz
  cd ocelotgui
  #Install a package containing libmysqlclient.so
  #Maybe mysql-common would have sufficed.
@@ -183,11 +183,11 @@ Warning: Some menu shortcut keys may not work properly with this distro.</P>
 <H3 id="an-installation-with-mageia-41-64-bit">An installation with Mageia 4.1, 64-bit</H3><HR>
 
 <P>These steps worked after a fresh installation of Mageia 4.1,
-a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+a KDE-based Linux distro, after downloading ocelotgui-0.9.0.tar.gz to ~/Downloads.
 <PRE>
  cd ~/Downloads
- #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
- tar -zxvf ocelotgui.tar.gz
+ #Unpack ocelotgui-0.9.0.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui-0.9.0.tar.gz
  cd ocelotgui
  #Install a package containing libmysqlclient.so
  #You can use "urpmf <library name>" to find
@@ -203,11 +203,11 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <H3 id="an-installation-with-fedora-20-64-bit">An installation with Fedora 20, 64-bit</H3><HR>
 
 <P>These steps worked after a fresh installation of Fedora 20, a
-GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+GNOME-based Linux distro, after downloading ocelotgui-0.9.0.tar.gz to ~/Downloads.
 <PRE>
  cd ~/Downloads
- #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
- tar -zxvf ocelotgui.tar.gz
+ #Unpack ocelotgui-0.9.0.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui-0.9.0.tar.gz
  cd ocelotgui
  #Install a package containing libmysqlclient.so
  #This actually brings in the package supplied by MariaDB
@@ -223,11 +223,11 @@ GNOME-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
 <H3 id="an-installation-with-suse-131-32-bit-from-source">An installation with SUSE 13.1, 32-bit, from source</H3><HR>
 
 <P>These steps worked after a non-fresh installation of openSUSE 13.1,
-a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
+a KDE-based Linux distro, after downloading ocelotgui-0.9.0.tar.gz to ~/Downloads.
 <PRE>
  cd ~/Downloads
- #Unpack ocelotgui.tar.gz to a new subdirectory named ocelotgui
- tar -zxvf ocelotgui.tar.gz
+ #Unpack ocelotgui-0.9.0.tar.gz to a new subdirectory named ocelotgui
+ tar -zxvf ocelotgui-0.9.0.tar.gz
  #Use "cnf qmake" to confirm that these package names are correct.
  sudo zypper install libqt4-devel
  sudo zypper install mariadb-client
@@ -264,8 +264,8 @@ a KDE-based Linux distro, after downloading ocelotgui.tar.gz to ~/Downloads.
  sudo zypper install make
  mkdir ~/ocelotgui-test
  cd ~/ocelotgui-test
- wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui.tar.gz
- tar -zxvf ocelotgui.tar.gz
+ wget http://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui-0.9.0.tar.gz
+ tar -zxvf ocelotgui-0.9.0.tar.gz
  cd ocelotgui
  qmake -config release
  make
@@ -416,9 +416,9 @@ read an ocelotgui.cpp comment that begins with the words
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 0.9.0, March 18 2016</P>
+<P>Version 0.9.0, May 9 2016</P>
 
-<P>Copyright (c) 2014 by Ocelot Computer Services Inc. All rights reserved.</P>
+<P>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.</P>
   
 <P>This program is free software; you can redistribute it and/or modify  
 it under the terms of the GNU General Public License as published by  

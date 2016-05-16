@@ -506,7 +506,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="0.9 Beta"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="0.9.0 Beta"; /* For --version. Make sure it's in manual too. */
 
   static unsigned char dbms_version_mask;
 
@@ -2505,11 +2505,28 @@ void MainWindow::action_the_manual()
   readme_path.append("/");
   readme_path.append("README.md");
   QFile file(readme_path);
-  if(!file.open(QIODevice::ReadOnly | QIODevice::Text))
+  bool file_found= false;
+  if (file.open(QIODevice::ReadOnly | QIODevice::Text)) file_found= true;
+  else
   {
     /* README.md file not found. Not an error but we'll end up using default the_text. */
+    /* First: Maybe cmake said it would go to /usr/local/share but in fact it went to /usr/share. */
+ #ifdef OCELOTGUI_DOCDIR
+    int index_of_local= application_dir_path.indexOf("/local/");
+    if (index_of_local != -1)
+    {
+      QString left_path= application_dir_path.left(index_of_local);
+      QString right_path= application_dir_path.right(application_dir_path.length() - (index_of_local + strlen("/local")));
+      application_dir_path= left_path + right_path;
+      readme_path= application_dir_path;
+      readme_path.append("/");
+      readme_path.append("README.md");
+      file.setFileName(readme_path);
+      if (file.open(QIODevice::ReadOnly | QIODevice::Text)) file_found= true;
+    }
+#endif
   }
-  else
+  if (file_found == true)
   {
     QString line;
     QTextStream in(&file);
@@ -2527,7 +2544,11 @@ void MainWindow::action_the_manual()
     the_text.replace("img src=\"", img_path);
   }
   Message_box *message_box;
-  message_box= new Message_box("Help|The Manual", the_text, 960, this);
+  /* Don't use width=960 if screen width is smaller, e.g. on a VGA screen. */
+  QDesktopWidget desktop;
+  int desktop_width= desktop.availableGeometry().width();
+  if (desktop_width > (960 + 50)) message_box= new Message_box("Help|The Manual", the_text, 960, this);
+  else message_box= new Message_box("Help|The Manual", the_text, desktop_width - 50, this);
   message_box->exec();
   delete message_box;
 }
