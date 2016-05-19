@@ -264,6 +264,8 @@ install(FILES COPYING DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif (NOT CPACK_GENERATOR MATCHES "DEB")
 install(FILES copyright DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES ocelotgui.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
+install(FILES ocelotgui_logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps)
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h
 # readmylogin.c ocelotgui.ui install_sql.cpp

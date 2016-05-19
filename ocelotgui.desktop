@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Encoding=UTF-8
+Name=ocelotgui
+Comment=GUI client for MySQL or MariaDB
+Exec=ocelotgui
+Icon=ocelotgui_logo.png
+Terminal=false
+Categories=Utility;Database
+
