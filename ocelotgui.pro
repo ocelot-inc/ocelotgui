@@ -69,3 +69,48 @@ contains(QMAKE_HOST.arch, x86_64) {
   } else {
   QMAKE_RPATHDIR += /usr/lib/i386-linux-gnu
   }
+
+# Installing by rebuilding source, with Qt Creator
+# Ocelot makes all packages with cmake as described in the README,
+# and recommends that others do so.
+# However, here are additional notes for users who are
+# particularly interested in using Qt Creator instead.
+# </P>
+# <P>
+# Important license notice: when downloading Qt Creator,
+# you may be confronted with a "License Agreement" dialog box,
+# remember that ocelotgui is licensed under GPL version 2,
+# so we recommend picking LGPL and re-conveying as GPL.
+# Do not accept any request to grant any additional rights
+# to Qt's manufacturer.
+# </P>
+# <P>Make sure a C++ compiler such as g++ is installed first.</P>
+# <P>Edit [path]/ocelotgui.pro: change INCLUDEPATH to a path
+# that includes the file "mysql.h". It comes with MySQL or
+# MariaDB developer packages, for example "sudo apt-get
+# libmysqlclient-dev" will put it in directory /usr/include/mysql.<PRE>
+#  #Edit [path]/ocelotgui.pro.
+#  #Make sure that any of the lines that begins with "QMAKE_RPATHDIR + ..."
+#  #points to where libmysqlclient.so really is now.
+#  #It comes with MySQL or MariaDB,
+#  #for example "sudo apt-get mysqlclient" will put it
+#  #in file/usr/lib/x86_64-linux-gnu/libmysqlclient.so.
+#  #Example:
+#  #"QMAKE_RPATHDIR += /usr/local/mysql/lib/mysql"
+#  #Make sure that any of the lines that begins with "INCLUDEPATH+ ..."
+#  #points to where mysql.h really is now. Example:
+#  #"INCLUDEPATH += /usr/local/mysql/include/mysql"
+#  #(mysql.h comes with MySQL or MariaDB developer packages.
+#  # For example "sudo apt-get libmysqlclient-dev" will
+#  # put it in directory /usr/include/mysql).</PRE></P>
+# <P>You will need to state a compiler for the kit.
+# Steps for Qt Creator use are:<PRE>
+#  Click File | Open File or Project ...
+#  In "Open File" dialog box, in field "File name:", enter [path]/ocelotgui.pro
+#  Click Next
+#  Click Configure Project</PRE></P>
+# <P>If you get a message "cannot find -lGL" when you
+# try to run the project, try to install GL.
+# With Ubuntu: sudo apt-get install libgl1-mesa-dev.
+# With Fedora: sudo yum install mesa-libGL-devel.</P>
+# 

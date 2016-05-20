@@ -2431,7 +2431,7 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
 void MainWindow::action_about()
 {
   QString the_text= "\
-<img src=\":/ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
+<img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
 <b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2016 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \

@@ -6,5 +6,5 @@ Comment=GUI client for MySQL or MariaDB
 Exec=ocelotgui
 Icon=ocelotgui_logo.png
 Terminal=false
-Categories=Utility;Database
+Categories=Utility;Database;
 
