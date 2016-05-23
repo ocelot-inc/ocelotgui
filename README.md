@@ -102,6 +102,9 @@ are preferred.
 If one of the following ocelotgui binary packages is compatible with your platform,
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
+For 32-bit, Debian-like, Qt4<PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui_0.9.0qt4-1_i386.deb
+sudo dpkg -i ocelotgui_0.9.0qt4-1_i386.deb</PRE>
 For 32-bit, Debian-like, Qt5<PRE>
 wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui_0.9.0-1_i386.deb
 sudo dpkg -i ocelotgui_0.9.0-1_i386.deb</PRE>
