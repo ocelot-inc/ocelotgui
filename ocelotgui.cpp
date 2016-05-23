@@ -1727,7 +1727,8 @@ void MainWindow::create_menu()
 
   menu_file_action_exit= menu_file->addAction(tr("Exit"));
   connect(menu_file_action_exit, SIGNAL(triggered()), this, SLOT(action_exit()));
-  menu_file_action_exit->setShortcut(QKeySequence::Quit);
+  /* With Puppy Linux --non-KDE non-Gnome -- QKeySequence::Quit fails. */
+  menu_file_action_exit->setShortcut(QKeySequence("Ctrl+Q"));
 
   /*
     Most Edit menu actions don't require slots from me -- cut() etc. already exist for class QTextEdit.
