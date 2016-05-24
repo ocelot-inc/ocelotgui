@@ -50,8 +50,8 @@ All rights reserved.</P>
 
 <H3 id="prerequisites">Prerequisites</H3><HR>
 
-<P>The basic prerequisites for installation are Linux, the Qt library,
-and the libmysqlclient library.</P>
+<P>The basic prerequisites for installation are Linux, and the Qt library.
+The libmysqlclient library will also be necessary, at runtime.</P>
 
 <H3 id="getting-the-qt-library">Getting the Qt library</H3><HR>
 
@@ -62,7 +62,7 @@ For example, on some platforms you can say
 "sudo apt-get install libqt5core5a" to install Qt5.</P>
 
 <P>You will need to know the version of the Qt library.
-It can be found with find /usr/lib -name "libQt*Gui.so*".
+It can be found with find /usr/lib -name "libQt*Gui.so*", or find /usr/lib64 -name "libQt*Gui.so*".
 If the response starts with libQtGui.so.4 then you have Qt4,
 if the response starts with libQt5Gui.so.5 then you have Qt5.
 Alternatively it sometimes can be found with qmake -v.</P>
@@ -114,6 +114,9 @@ sudo dpkg -i ocelotgui_0.9.0qt4-1_amd64.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
 wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui_0.9.0-1_amd64.deb
 sudo dpkg -i ocelotgui_0.9.0-1_amd64.deb</PRE>
+For 64-bit, RPM-like, Qt4<PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui-0.9.0qt4-1.x86_64.rpm
+sudo rpm -i ocelotgui-0.9.0qt4-1.x86_64.rpm</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
 wget https://github.com/ocelot-inc/ocelotgui/releases/download/0.9.0/ocelotgui-0.9.0-1.x86_64.rpm
 sudo rpm -i ocelotgui-0.9.0-1.x86_64.rpm</PRE>

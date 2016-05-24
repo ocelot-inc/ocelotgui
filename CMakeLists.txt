@@ -41,6 +41,8 @@
 # or look in /usr/lib/pkgconfig files.
 # For more instructions see "Qt for Linux/X11"
 # http://doc.qt.io/qt-5/linux.html.
+# If you have qt4, but findQt4() fails, a symbolic link might work, e.g.:
+# sudo ln -s  /usr/lib64/qt4/bin/qmake /usr/bin/qmake-qt4
 
 # CMAKE_PREFIX_PATH=<string>
 # This must be the path where the Qt development files were installed.
