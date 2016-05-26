@@ -353,7 +353,7 @@ public:
   QFont get_font_from_style_sheet(QString style_string);
   void set_dbms_version_mask(QString);
   void get_sql_mode(int who_is_calling, QString text);
-
+  QString get_doc_path(QString);
   void hparse_f_nexttoken();
   void hparse_f_next_nexttoken();
   void hparse_f_error();

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 0.9.0 Beta
-   Last modified: May 9 2016
+   Last modified: May 25 2016
 */
 
 /*
@@ -2427,6 +2427,57 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
   if (is_visible) debug_tab_widget->show();
 }
 
+/*
+  Called from action_about("ocelotgui_logo.png") and action_the_manual("README.htm").
+  We might assume that the docs including .png or .jpg files are on application_dir_path
+  -- applicationDirPath() ""Returns the directory that contains the application executable" --
+  but at build time one can pass -DOCELOTGUI_DOCDIR=x, indeed this is what happens with
+  an install via cmake+cpack because they want the docs on /usr/share/doc not /usr/bin.
+  But maybe cmake said it would go to /usr/local/share/doc but in fact it went to /usr/share/doc.
+  So if we fail once, we try again after stripping /local from the path.
+  Todo: have more choice where to look for README.md
+        we could try: according to an option = "documentation" directory
+                      ld_run_path, ocelot_login_path, ocelot_plugin_dir
+                      some other path used by Qt or MySQL or Linux
+                      (prefer the path that has everything)
+*/
+QString MainWindow::get_doc_path(QString file_name)
+{
+#ifdef OCELOTGUI_DOCDIR
+  QString application_dir_path= OCELOTGUI_DOCDIR;
+#else
+  QString application_dir_path= QCoreApplication::applicationDirPath();
+#endif
+  QString readme_path= application_dir_path;
+  readme_path.append("/");
+  readme_path.append(file_name);
+  QFile file(readme_path);
+  if (file.open(QIODevice::ReadOnly | QIODevice::Text))
+  {
+    file.close();
+    return application_dir_path;
+  }
+ #ifdef OCELOTGUI_DOCDIR
+  int index_of_local= application_dir_path.indexOf("/local/");
+  if (index_of_local != -1)
+  {
+    QString left_path= application_dir_path.left(index_of_local);
+    QString right_path= application_dir_path.right(application_dir_path.length() - (index_of_local + strlen("/local")));
+    application_dir_path= left_path + right_path;
+    readme_path= application_dir_path;
+    readme_path.append("/");
+    readme_path.append(file_name);
+    file.setFileName(readme_path);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+      file.close();
+      return application_dir_path;
+    }
+  }
+#endif
+  return "";
+}
+
 
 /* Todo: consider adding   //printf(qVersion()); */
 void MainWindow::action_about()
@@ -2446,10 +2497,18 @@ GNU General Public License for more details.<br>\
 You should have received a copy of the GNU General Public License \
 along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 
-    Message_box *message_box;
-    message_box= new Message_box("Help|About", the_text, 500, this);
-    message_box->exec();
-    delete message_box;
+  QString application_dir_path= get_doc_path("ocelotgui_logo.png");
+  if (application_dir_path != "")
+  {
+    QString img_path= "img src=\"";
+    img_path.append(application_dir_path);
+    img_path.append("/");
+    the_text.replace("img src=\"", img_path);
+  }
+  Message_box *message_box;
+  message_box= new Message_box("Help|About", the_text, 500, this);
+  message_box->exec();
+  delete message_box;
 }
 
 
@@ -2459,13 +2518,6 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
   It reads the manual from README.md.
   It uses HTML.
   README.md refers to img src="...png|jpg" files, we expect them on the same directory as README.md.
-  Todo: have more choice where to look for README.md
-        currently we only look on the directory that the executable (this program) is on, i.e.
-        applicationDirPath() ""Returns the directory that contains the application executable."
-        we could try: according to an option = "documentation" directory
-                      ld_run_path, ocelot_login_path, ocelot_plugin_dir
-                      some other path used by Qt or MySQL or Linux
-                      (prefer the path that has everything)
    Todo: Help | X should find X in the manual and display only X.
 */
 void MainWindow::action_the_manual()
@@ -2495,54 +2547,30 @@ void MainWindow::action_the_manual()
   <BR>For the most recent version of the manual, see \
   <BR>https://github.com/ocelot-inc/ocelotgui#user-manual \
     ";
-
-#ifdef OCELOTGUI_DOCDIR
-  QString application_dir_path= OCELOTGUI_DOCDIR;
-#else
-  QString application_dir_path= QCoreApplication::applicationDirPath();
-#endif
-
-  QString readme_path= application_dir_path;
-  readme_path.append("/");
-  readme_path.append("README.md");
-  QFile file(readme_path);
-  bool file_found= false;
-  if (file.open(QIODevice::ReadOnly | QIODevice::Text)) file_found= true;
-  else
+  QString application_dir_path= get_doc_path("README.md");
+  if (application_dir_path != "")
   {
-    /* README.md file not found. Not an error but we'll end up using default the_text. */
-    /* First: Maybe cmake said it would go to /usr/local/share but in fact it went to /usr/share. */
- #ifdef OCELOTGUI_DOCDIR
-    int index_of_local= application_dir_path.indexOf("/local/");
-    if (index_of_local != -1)
+    QString readme_path= application_dir_path;
+    readme_path.append("/");
+    readme_path.append("README.md");
+    QFile file(readme_path);
+    if (file.open(QIODevice::ReadOnly | QIODevice::Text))
     {
-      QString left_path= application_dir_path.left(index_of_local);
-      QString right_path= application_dir_path.right(application_dir_path.length() - (index_of_local + strlen("/local")));
-      application_dir_path= left_path + right_path;
-      readme_path= application_dir_path;
-      readme_path.append("/");
-      readme_path.append("README.md");
-      file.setFileName(readme_path);
-      if (file.open(QIODevice::ReadOnly | QIODevice::Text)) file_found= true;
+      QString line;
+      QTextStream in(&file);
+      the_text= "";
+      while(!in.atEnd())
+      {
+        line= in.readLine();
+        the_text.append(line);
+        the_text.append(" ");
+      }
+      file.close();
+      QString img_path= "img src=\"";
+      img_path.append(application_dir_path);
+      img_path.append("/");
+      the_text.replace("img src=\"", img_path);
     }
-#endif
-  }
-  if (file_found == true)
-  {
-    QString line;
-    QTextStream in(&file);
-    the_text= "";
-    while(!in.atEnd())
-    {
-      line= in.readLine();
-      the_text.append(line);
-      the_text.append(" ");
-    }
-    file.close();
-    QString img_path= "img src=\"";
-    img_path.append(application_dir_path);
-    img_path.append("/");
-    the_text.replace("img src=\"", img_path);
   }
   Message_box *message_box;
   /* Don't use width=960 if screen width is smaller, e.g. on a VGA screen. */
