@@ -237,7 +237,7 @@ read an ocelotgui.cpp comment that begins with the words
 path, start it with<PRE>
 ocelotgui</PRE>
 or use options, for example<PRE>
-/ocelotgui-qt4 --host=127.0.0.1 --user=joe --password=secret</PRE>
+ocelotgui --host=127.0.0.1 --user=joe --password=secret</PRE>
 -- if the program starts, and menu items such as Help|Manual
 work, then installation is successful.
 Stop again with File|Exit or control-Q.
