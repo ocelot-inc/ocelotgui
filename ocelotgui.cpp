@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 0.9.0 Beta
-   Last modified: May 25 2016
+   Version: 1.0.0
+   Last modified: May 27 2016
 */
 
 /*
@@ -506,7 +506,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="0.9.0 Beta"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.0"; /* For --version. Make sure it's in manual too. */
 
   static unsigned char dbms_version_mask;
 
@@ -2525,7 +2525,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 0.9.0, May 9 2016  \
+  <BR>Version 1.0.0, May 27 2016  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.  \

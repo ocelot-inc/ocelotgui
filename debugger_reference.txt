@@ -387,9 +387,7 @@ Also, one needs the SUPER privilege.
 Security
 --------
 
-At this moment ocelotgui is alpha so of course it is not recommended
-to use it on production systems. But eventually it will be.
-Before allowing it in production systems, administrators should know:
+Before allowing ocelotgui in production systems, administrators should know:
 
 The SUPER privilege https://dev.mysql.com/doc/refman/5.1/en/privileges-provided.html#priv_super
 allows ordinary users to do a few things which ordinarily they can't.
