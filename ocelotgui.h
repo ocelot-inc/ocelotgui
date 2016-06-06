@@ -48,9 +48,9 @@
 
 /* All Qt includes go here. Most of them could be handled by just saying "#include <QtWidgets>". */
 #include <QAbstractItemView>
-#ifndef __linux
+//#ifndef __linux
 #include <QApplication>
-#endif
+//#endif
 #include <QClipboard>
 #include <QComboBox>
 #include <QDateTime>
@@ -66,6 +66,7 @@
 //#include <QLibraryInfo>
 #include <QLineEdit>
 #include <QMainWindow>
+#include <QMenuBar>
 #include <QMessageBox>
 #include <QPainter>
 #include <QPlainTextEdit>
@@ -99,6 +100,12 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #endif
+
+/* main_token_flags[] values. so far there are only four but we expect there will be more. */
+#define TOKEN_FLAG_IS_RESERVED 1
+#define TOKEN_FLAG_IS_BLOCK_END 2
+#define TOKEN_FLAG_IS_ERROR 4
+#define TOKEN_FLAG_IS_FUNCTION 8
 
 #ifdef DBMS_TARANTOOL
 #include <stdint.h>
@@ -184,6 +191,7 @@ class TextEditWidget;
 class QScrollAreaWithSize;
 class QThread48;
 class QTabWidget48;
+class TextEditHistory;
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -556,6 +564,12 @@ public slots:
   void action_debug_refresh_call_stack();
   void action_debug_timer_status();
 #endif
+  void menu_edit_undo();
+  void menu_edit_redo();
+  void menu_edit_cut();
+  void menu_edit_copy();
+  void menu_edit_paste();
+  void menu_edit_select_all();
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
@@ -629,12 +643,6 @@ private:
   void message_box(QString the_title, QString the_text);
 
   enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
-
-  /* main_token_flags[] values. so far there are only four but we expect there will be more. */
-  #define TOKEN_FLAG_IS_RESERVED 1
-  #define TOKEN_FLAG_IS_BLOCK_END 2
-  #define TOKEN_FLAG_IS_ERROR 4
-  #define TOKEN_FLAG_IS_FUNCTION 8
 
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
@@ -1532,7 +1540,7 @@ private:
   QWidget *main_window;
   QVBoxLayout *main_layout;
 
-  QTextEdit *history_edit_widget;
+  TextEditHistory *history_edit_widget;
   QLineEdit *hparse_line_edit;
 #ifdef DEBUGGER
 #define DEBUG_TAB_WIDGET_MAX 10
@@ -1543,57 +1551,58 @@ private:
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
 
-  QMenuBar *menuBar;
-  QMenu *menu_file;
-    QAction *menu_file_action_connect;
-    QAction *menu_file_action_exit;
-  QMenu *menu_edit;
-    QAction *menu_edit_action_cut;
-    QAction *menu_edit_action_copy;
-    QAction *menu_edit_action_paste;
-    QAction *menu_edit_action_undo;
-    QAction *menu_edit_action_redo;
-    QAction *menu_edit_action_select_all;
-    QAction *menu_edit_action_history_markup_previous;
-    QAction *menu_edit_action_history_markup_next;
-  QMenu *menu_run;
-    QAction *menu_run_action_execute;
-    QAction *menu_run_action_kill;
-  QMenu *menu_settings;
-    QAction *menu_settings_action_menu;
-    QAction *menu_settings_action_history;
-    QAction *menu_settings_action_grid;
-    QAction *menu_settings_action_statement;
-    QAction *menu_settings_action_extra_rule_1;
-  QMenu *menu_options;
-    QAction *menu_options_action_option_detach_history_widget;
-    QAction *menu_options_action_option_detach_result_grid_widget;
-    QAction *menu_options_action_option_detach_debug_widget;
-#ifdef DEBUGGER
-  QMenu *menu_debug;
-//    QAction *menu_debug_action_install;
-//    QAction *menu_debug_action_setup;
-//    QAction *menu_debug_action_debug;
-    QAction *menu_debug_action_breakpoint;
-    QAction *menu_debug_action_continue;
-    QAction *menu_debug_action_leave;
-    QAction *menu_debug_action_next;
-//    QAction *menu_debug_action_skip;
-    QAction *menu_debug_action_step;
-    QAction *menu_debug_action_clear;
-//    QAction *menu_debug_action_delete;
-    QAction *menu_debug_action_exit;
-    QAction *menu_debug_action_information;
-    QAction *menu_debug_action_refresh_server_variables;
-    QAction *menu_debug_action_refresh_user_variables;
-    QAction *menu_debug_action_refresh_variables;
-    QAction *menu_debug_action_refresh_call_stack;
-#endif
-  QMenu *menu_help;
-    QAction *menu_help_action_about;
-    QAction *menu_help_action_the_manual;
-    QAction *menu_help_action_libmysqlclient;
+/* We use the same menu-item names for mainwindow and detached widgets */
+#define MACRO_FOR_MENU_ITEMS \
+  QMenu *menu_file; \
+    QAction *menu_file_action_connect; \
+    QAction *menu_file_action_exit; \
+    QMenu *menu_edit; \
+    QAction *menu_edit_action_cut; \
+    QAction *menu_edit_action_copy; \
+    QAction *menu_edit_action_paste; \
+    QAction *menu_edit_action_undo; \
+    QAction *menu_edit_action_redo; \
+    QAction *menu_edit_action_select_all; \
+    QAction *menu_edit_action_history_markup_previous; \
+    QAction *menu_edit_action_history_markup_next; \
+  QMenu *menu_run; \
+    QAction *menu_run_action_execute; \
+    QAction *menu_run_action_kill; \
+  QMenu *menu_settings; \
+    QAction *menu_settings_action_menu; \
+    QAction *menu_settings_action_history; \
+    QAction *menu_settings_action_grid; \
+    QAction *menu_settings_action_statement; \
+    QAction *menu_settings_action_extra_rule_1; \
+  QMenu *menu_options; \
+    QAction *menu_options_action_option_detach_history_widget; \
+    QAction *menu_options_action_option_detach_result_grid_widget; \
+    QAction *menu_options_action_option_detach_debug_widget; \
+  QMenu *menu_debug; \
+  /*  QAction *menu_debug_action_install; */ \
+  /*  QAction *menu_debug_action_setup; */ \
+  /*  QAction *menu_debug_action_debug; */ \
+    QAction *menu_debug_action_breakpoint; \
+    QAction *menu_debug_action_continue; \
+    QAction *menu_debug_action_leave; \
+    QAction *menu_debug_action_next; \
+  /*   QAction *menu_debug_action_skip; */ \
+    QAction *menu_debug_action_step; \
+    QAction *menu_debug_action_clear; \
+  /*   QAction *menu_debug_action_delete; */ \
+    QAction *menu_debug_action_exit; \
+    QAction *menu_debug_action_information; \
+    QAction *menu_debug_action_refresh_server_variables; \
+    QAction *menu_debug_action_refresh_user_variables; \
+    QAction *menu_debug_action_refresh_variables; \
+    QAction *menu_debug_action_refresh_call_stack; \
+  QMenu *menu_help; \
+    QAction *menu_help_action_about; \
+    QAction *menu_help_action_the_manual; \
+    QAction *menu_help_action_libmysqlclient; \
     QAction *menu_help_action_settings;
+
+  MACRO_FOR_MENU_ITEMS
 
   //QWidget *the_manual_widget;
   //  QVBoxLayout *the_manual_layout;
@@ -1702,10 +1711,11 @@ public:
 
   TextEditFrame *text_edit_frame_of_cell;
 
+  void copy();
+
 protected:
   void paintEvent(QPaintEvent *event);
   void keyPressEvent(QKeyEvent *event);
-  void copy();
 
   QString unstripper(QString value_to_unstrip);
 
@@ -6512,4 +6522,238 @@ public:
 //};
 //#endif // QPARSEPOP_H
 
+/*****************************************************************************************************************************/
+/* THE TEXTEDITHISTORY WIDGET */
+/* Subclass of QTextEditWidget used for history_edit_widget */
 
+#ifndef TEXTEDITHISTORY_H
+#define TEXTEDITHISTORY_H
+
+class TextEditHistory : public QTextEdit
+{
+  Q_OBJECT
+
+public:
+  TextEditHistory(QWidget *w = 0) : QTextEdit(w){}
+
+  /* Following line caused an incomprehensible error. Removed temporarily. */
+  //~TextEditHistory();
+
+/* Copying the menu items used in MainWindow's menu */
+MACRO_FOR_MENU_ITEMS
+
+MainWindow *main_window;
+
+bool ocelot_detach_history_widget;
+bool ocelot_detach_result_grid_widget;
+bool ocelot_detach_debug_widget;
+
+public:
+void create_menu(MainWindow *parent)
+{
+  main_window= parent;
+
+  /* TODO: these should be passed */
+  ocelot_detach_history_widget= false;
+  ocelot_detach_result_grid_widget= false;
+  ocelot_detach_debug_widget= false;
+
+  QMenuBar *menuBar= new QMenuBar(this);
+
+  /* We use the same menu-item instructions for mainwindow and detached widgets */
+    menu_file= menuBar->addMenu(tr("File"));
+    /* Todo: consider adding fileMenu = new QMenu(tr("&File"), this); -*/
+    menu_file_action_connect= menu_file->addAction(tr("Connect"));
+    connect(menu_file_action_connect, SIGNAL(triggered()), this, SLOT(action_connect()));
+    menu_file_action_connect->setShortcut(QKeySequence::Open); /* Todo: think of a better key sequence than ctrl-o */
+    menu_file_action_exit= menu_file->addAction(tr("Exit"));
+    connect(menu_file_action_exit, SIGNAL(triggered()), this, SLOT(action_exit()));
+    /* With Puppy Linux --non-KDE non-Gnome -- QKeySequence::Quit fails. */
+    menu_file_action_exit->setShortcut(QKeySequence("Ctrl+Q"));
+    menu_edit= menuBar->addMenu(tr("Edit"));
+    menu_edit_action_undo= menu_edit->addAction(tr("Undo"));
+    connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
+    menu_edit_action_undo->setShortcut(QKeySequence::Undo);
+    menu_edit_action_redo= menu_edit->addAction(tr("Redo"));
+    connect(menu_edit_action_redo, SIGNAL(triggered()), this, SLOT(menu_edit_redo()));
+    menu_edit_action_redo->setShortcut(QKeySequence::Redo);
+    menu_edit->addSeparator();
+    menu_edit_action_cut= menu_edit->addAction(tr("Cut"));
+    connect(menu_edit_action_cut, SIGNAL(triggered()), this, SLOT(menu_edit_cut()));
+    menu_edit_action_cut->setShortcut(QKeySequence::Cut);
+    menu_edit_action_copy= menu_edit->addAction(tr("Copy"));
+    connect(menu_edit_action_copy, SIGNAL(triggered()), this, SLOT(menu_edit_copy()));
+    menu_edit_action_copy->setShortcut(QKeySequence::Copy);
+    menu_edit_action_paste= menu_edit->addAction(tr("Paste"));
+    connect(menu_edit_action_paste, SIGNAL(triggered()), this, SLOT(menu_edit_paste()));
+    menu_edit_action_paste->setShortcut(QKeySequence::Paste);
+    menu_edit->addSeparator();
+    menu_edit_action_select_all= menu_edit->addAction(tr("Select All"));
+    connect(menu_edit_action_select_all, SIGNAL(triggered()), this, SLOT(menu_edit_select_all()));
+    menu_edit_action_select_all->setShortcut(QKeySequence::SelectAll);
+    menu_edit_action_history_markup_previous= menu_edit->addAction(tr("Previous statement"));
+    connect(menu_edit_action_history_markup_previous, SIGNAL(triggered()), this, SLOT(history_markup_previous()));
+    menu_edit_action_history_markup_previous->setShortcut(QKeySequence(tr("Ctrl+P")));
+    menu_edit_action_history_markup_next= menu_edit->addAction(tr("Next statement"));
+    connect(menu_edit_action_history_markup_next, SIGNAL(triggered()), this, SLOT(history_markup_next()));
+    menu_edit_action_history_markup_next->setShortcut(QKeySequence(tr("Ctrl+N")));
+    menu_run= menuBar->addMenu(tr("Run"));
+    menu_run_action_execute= menu_run->addAction(tr("Execute"));
+    connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
+    menu_run_action_execute->setShortcut(QKeySequence(tr("Ctrl+E")));
+    menu_run_action_kill= menu_run->addAction(tr("Kill"));
+    connect(menu_run_action_kill, SIGNAL(triggered()), this, SLOT(action_kill()));
+    menu_run_action_kill->setShortcut(QKeySequence(tr("Ctrl+C")));
+    menu_run_action_kill->setEnabled(false);
+    menu_settings= menuBar->addMenu(tr("Settings"));
+    menu_settings_action_menu= menu_settings->addAction(tr("Menu"));
+    menu_settings_action_history= menu_settings->addAction(tr("History Widget"));
+    menu_settings_action_grid= menu_settings->addAction(tr("Grid Widget"));
+    menu_settings_action_statement= menu_settings->addAction(tr("Statement Widget"));
+    menu_settings_action_extra_rule_1= menu_settings->addAction(tr("Extra Rule 1"));
+    connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
+    connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
+    connect(menu_settings_action_grid, SIGNAL(triggered()), this, SLOT(action_grid()));
+    connect(menu_settings_action_statement, SIGNAL(triggered()), this, SLOT(action_statement()));
+    connect(menu_settings_action_extra_rule_1, SIGNAL(triggered()), this, SLOT(action_extra_rule_1()));
+//    menu_options= menuBar->addMenu(tr("Options"));
+//    menu_options_action_option_detach_history_widget= menu_options->addAction(tr("detach history widget"));
+//    menu_options_action_option_detach_history_widget->setCheckable(true);
+//    menu_options_action_option_detach_history_widget->setChecked(ocelot_detach_history_widget);
+//    connect(menu_options_action_option_detach_history_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_history_widget(bool)));
+//    menu_options_action_option_detach_result_grid_widget= menu_options->addAction(tr("detach result grid widget"));
+//    menu_options_action_option_detach_result_grid_widget->setCheckable(true);
+//    menu_options_action_option_detach_result_grid_widget->setChecked(ocelot_detach_result_grid_widget);
+//    connect(menu_options_action_option_detach_result_grid_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_result_grid_widget(bool)));
+//    menu_options_action_option_detach_debug_widget= menu_options->addAction(tr("detach debug widget"));
+//    menu_options_action_option_detach_debug_widget->setCheckable(true);
+//    menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
+//    connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
+    menu_debug= menuBar->addMenu(tr("Debug"));
+    /* menu_debug_action_install= menu_debug->addAction(tr("Install")); */
+    /* connect(menu_debug_action_install, SIGNAL(triggered()), this, SLOT(action_debug_install())); */
+    /* menu_debug_action_install->setShortcut(QKeySequence(tr("Alt+A"))); */
+    /* menu_debug_action_setup= menu_debug->addAction(tr("Setup")); */
+    /* connect(menu_debug_action_setup, SIGNAL(triggered()), this, SLOT(action_debug_setup())); */
+    /* menu_debug_action_setup->setShortcut(QKeySequence(tr("Alt+5"))); */
+    /* menu_debug_action_debug= menu_debug->addAction(tr("Debug")); */
+    /* connect(menu_debug_action_debug, SIGNAL(triggered()), this, SLOT(action_debug_debug())); */
+    /* menu_debug_action_debug->setShortcut(QKeySequence(tr("Alt+3"))); */
+    menu_debug_action_breakpoint= menu_debug->addAction(tr("Breakpoint"));
+    connect(menu_debug_action_breakpoint, SIGNAL(triggered()), this, SLOT(action_debug_breakpoint()));
+    menu_debug_action_breakpoint->setShortcut(QKeySequence(tr("Alt+1")));
+    menu_debug_action_continue= menu_debug->addAction(tr("Continue"));
+    connect(menu_debug_action_continue, SIGNAL(triggered()), this, SLOT(action_debug_continue()));
+    menu_debug_action_continue->setShortcut(QKeySequence(tr("Alt+2")));
+    /* menu_debug_action_leave= menu_debug->addAction(tr("Leave")); */
+    /* connect(menu_debug_action_leave, SIGNAL(triggered()), this, SLOT(action_debug_leave())); */
+    /* menu_debug_action_leave->setShortcut(QKeySequence(tr("Alt+B"))); */
+    menu_debug_action_next= menu_debug->addAction(tr("Next"));
+    connect(menu_debug_action_next, SIGNAL(triggered()), this, SLOT(action_debug_next()));
+    menu_debug_action_next->setShortcut(QKeySequence(tr("Alt+3")));
+    /* menu_debug_action_skip= menu_debug->addAction(tr("Skip")); */
+    /* connect(menu_debug_action_skip, SIGNAL(triggered()), this, SLOT(action_debug_skip())); */
+    /* menu_debug_action_skip->setShortcut(QKeySequence(tr("Alt+4"))); */
+    menu_debug_action_step= menu_debug->addAction(tr("Step"));
+    connect(menu_debug_action_step, SIGNAL(triggered()), this, SLOT(action_debug_step()));
+    menu_debug_action_step->setShortcut(QKeySequence(tr("Alt+5")));
+    menu_debug_action_clear= menu_debug->addAction(tr("Clear"));
+    connect(menu_debug_action_clear, SIGNAL(triggered()), this, SLOT(action_debug_clear()));
+    menu_debug_action_clear->setShortcut(QKeySequence(tr("Alt+6")));
+    /* menu_debug_action_delete= menu_debug->addAction(tr("Delete")); */
+    /* connect(menu_debug_action_delete, SIGNAL(triggered()), this, SLOT(action_debug_delete())); */
+    /* menu_debug_action_delete->setShortcut(QKeySequence(tr("Alt+G"))); */
+    menu_debug_action_exit= menu_debug->addAction(tr("Exit"));
+    connect(menu_debug_action_exit, SIGNAL(triggered()), this, SLOT(action_debug_exit()));
+    menu_debug_action_exit->setShortcut(QKeySequence(tr("Alt+7")));
+    menu_debug_action_information= menu_debug->addAction(tr("Information"));
+    connect(menu_debug_action_information, SIGNAL(triggered()), this, SLOT(action_debug_information()));
+    menu_debug_action_information->setShortcut(QKeySequence(tr("Alt+8")));
+    menu_debug_action_refresh_server_variables= menu_debug->addAction(tr("Refresh server_variables"));
+    connect(menu_debug_action_refresh_server_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_server_variables()));
+    menu_debug_action_refresh_server_variables->setShortcut(QKeySequence(tr("Alt+9")));
+    menu_debug_action_refresh_user_variables= menu_debug->addAction(tr("Refresh user_variables"));
+    connect(menu_debug_action_refresh_user_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_user_variables()));
+    menu_debug_action_refresh_user_variables->setShortcut(QKeySequence(tr("Alt+0")));
+    menu_debug_action_refresh_variables= menu_debug->addAction(tr("Refresh variables"));
+    connect(menu_debug_action_refresh_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_variables()));
+    menu_debug_action_refresh_variables->setShortcut(QKeySequence(tr("Alt+A")));
+    menu_debug_action_refresh_call_stack= menu_debug->addAction(tr("Refresh call_stack"));
+    connect(menu_debug_action_refresh_call_stack, SIGNAL(triggered()), this, SLOT(action_debug_refresh_call_stack()));
+    menu_debug_action_refresh_call_stack->setShortcut(QKeySequence(tr("Alt+B")));
+/* TODO: this should be done */
+    //debug_menu_enable_or_disable(TOKEN_KEYWORD_BEGIN); /* Disable most of debug menu */
+    menu_help= menuBar->addMenu(tr("Help"));
+    menu_help_action_about= menu_help->addAction(tr("About"));
+    connect(menu_help_action_about, SIGNAL(triggered()), this, SLOT(action_about()));
+    menu_help_action_the_manual= menu_help->addAction(tr("The Manual"));
+    connect(menu_help_action_the_manual, SIGNAL(triggered()), this, SLOT(action_the_manual()));
+    /* Qt says I should also do "addSeparator" if Motif style. Harmless. */
+    menuBar->addSeparator();
+    /* exitAction->setPriority(QAction::LowPriority); */
+    menu_help_action_libmysqlclient= menu_help->addAction(tr("libmysqlclient"));
+    connect(menu_help_action_libmysqlclient, SIGNAL(triggered()), this, SLOT(action_libmysqlclient()));
+    menu_help_action_settings= menu_help->addAction(tr("settings"));
+    connect(menu_help_action_settings, SIGNAL(triggered()), this, SLOT(action_settings()));
+
+  installEventFilter(this);
+
+}
+void drop_menu()
+{
+  ; /* TODO */
+}
+
+/* Duplicating code in MainWindow::eventFilter */
+/* TODO: FIGURE OUT A WAY TO PASS THE EVENT TO MAINWINDOW!! */
+bool eventFilter(QObject *obj, QEvent *event)
+{
+  if (event->type() != QEvent::KeyPress) return false;
+  QKeyEvent *key= static_cast<QKeyEvent *>(event);
+  /* See comment with label "Shortcut Duplication" */
+  if (key->matches(QKeySequence::Open)) { action_connect(); return true; }
+  if (key->matches(QKeySequence::Quit)) { action_exit(); return true; }
+  if (key->matches(QKeySequence::Undo)) { menu_edit_undo(); return true; }
+  return false;
+}
+
+public slots:
+void action_connect() { main_window->action_connect(); }
+void action_exit() { main_window->action_exit(); }
+void menu_edit_undo() { main_window->menu_edit_undo(); }
+void menu_edit_redo() { main_window->menu_edit_redo(); }
+void menu_edit_cut() { main_window->menu_edit_cut(); }
+void menu_edit_copy() { main_window->menu_edit_copy(); }
+void menu_edit_paste() { main_window->menu_edit_paste(); }
+void menu_edit_select_all() { main_window->menu_edit_select_all(); }
+void history_markup_previous() { main_window->history_markup_previous(); }
+void history_markup_next() { main_window->history_markup_next(); }
+void action_execute_force() { main_window->action_execute_force(); }
+void action_kill() { main_window->action_kill(); }
+void action_menu() { main_window->action_menu(); }
+void action_history() { main_window->action_history(); }
+void action_grid() { main_window->action_grid(); }
+void action_statement() { main_window->action_statement(); }
+void action_extra_rule_1() { main_window->action_extra_rule_1(); }
+void action_option_detach_history_widget(bool checked){  main_window->action_option_detach_history_widget(checked); }
+void action_option_detach_result_grid_widget(bool checked) { main_window->action_option_detach_result_grid_widget(checked); }
+void action_option_detach_debug_widget(bool checked) { main_window->action_option_detach_debug_widget(checked); }
+void action_debug_breakpoint() { main_window->action_debug_breakpoint(); }
+void action_debug_continue() { main_window->action_debug_continue(); }
+void action_debug_next() { main_window->action_debug_next(); }
+void action_debug_step() { main_window->action_debug_step(); }
+void action_debug_clear() { main_window->action_debug_clear(); }
+void action_debug_exit() { main_window->action_debug_exit(); }
+void action_debug_information() { main_window->action_debug_information(); }
+void action_debug_refresh_server_variables() { main_window->action_debug_refresh_server_variables(); }
+void action_debug_refresh_user_variables() { main_window->action_debug_refresh_user_variables(); }
+void action_debug_refresh_variables() { main_window->action_debug_refresh_variables(); }
+void action_debug_refresh_call_stack() { main_window->action_debug_refresh_call_stack(); }
+void action_about() { main_window->action_about(); }
+void action_the_manual() { main_window->action_the_manual(); }
+void action_libmysqlclient() { main_window->action_libmysqlclient(); }
+void action_settings() { main_window->action_settings(); }
+
+
+};
+#endif // TEXTEDITHISTORY_H
