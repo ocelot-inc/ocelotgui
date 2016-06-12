@@ -16,6 +16,11 @@
   In insert_into_statements two lines were changed because a statement within an ELSE wasn't generated.
 */
 
+/*
+  Several lines have been added in xxxmdbug.generate().
+  This was a fix for github bug#1. If hostname=% is must be inside backticks.
+*/
+
 #ifndef INSTALL_SQL_CPP
 
 /* todo: ensure this doesn't waste space by including things in ocelotgui.h that are unnecessary */
@@ -6277,6 +6282,7 @@ strcpy(x,
 "  DECLARE v_is_leave_possible INT;" 
 "  DECLARE v_value_of_first_token,v_value_of_second_token,v_value_of_third_token,v_value_of_fourth_token VARCHAR(16) CHARACTER SET utf8;" 
 "  DECLARE v_offset_of_begin INT;" 
+"  DECLARE ipos INT;"
 "  DECLARE c CURSOR FOR SELECT *" 
 "                       FROM xxxmdbug.statements" 
 "                       WHERE schema_identifier=mysql_proc_db AND routine_identifier=mysql_proc_name" 
@@ -6296,11 +6302,22 @@ strcpy(x,
 "  SET v_g = CONCAT(v_g,'CREATE ');" 
 "" 
 "  /* The definer clause, as in \"CREATE definer=root@localhost PROCEDURE p\"." 
-"     Todo: SHOW CREATE PROCEDURE would change root@localhost to `root`@`localhost`. Find out if that's necessary." 
-"     Todo: check privileges. If you don't have the right to do this CREATE later, you should" 
+"     SHOW CREATE PROCEDURE would change root@localhost to `root`@`localhost`. It was necessary."
+"     The IF ... ENDIF statement here is a fix for github bug#1."
+"     Todo: check privileges. If you don't have the right to do this CREATE later, you should"
 "           generate 'DEFINER=CURRENT_USER' and put a note in the setup_log." 
 "           It might not matter much if SQL SECURITY INVOKER anyway. */" 
-"  SET v_g = CONCAT(v_g,'DEFINER=',mysql_proc_definer,' ');" 
+"  SET v_g = CONCAT(v_g,'DEFINER=');"
+"  SET ipos = INSTR(mysql_proc_definer,'@');"
+"  IF ipos > 0 AND INSTR(mysql_proc_definer,'`') = 0 THEN "
+"    SET v_g = CONCAT(v_g,'`');"
+"    SET v_g = CONCAT(v_g,LEFT(mysql_proc_definer,ipos-1));"
+"    SET v_g = CONCAT(v_g,'`@`');"
+"    SET v_g = CONCAT(v_g,RIGHT(mysql_proc_definer,LENGTH(mysql_proc_definer)-ipos));"
+"    SET v_g = CONCAT(v_g,'` ');"
+"  ELSE "
+"    SET v_g = CONCAT(v_g,mysql_proc_definer,' ');"
+"  END IF;"
 "" 
 "  SET v_g = CONCAT(v_g," 
 "                   mysql_proc_type," 
