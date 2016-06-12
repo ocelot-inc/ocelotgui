@@ -584,7 +584,7 @@ private:
   void debug_maintain_prompt(int action, int debug_widget_index, int line_number);
   QString debug_privilege_check(int statement_type);
 #endif
-
+  void main_token_new(int);
   void create_menu();
   int rehash_scan();
   QString rehash_search(char *search_string);
@@ -634,8 +634,6 @@ private:
   void statement_edit_widget_setstylesheet();
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
-
-  enum {MAX_TOKENS= 10000 };                  /* Todo: shouldn't be fixed */
 
   /* main_token_flags[] values. so far there are only four but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
@@ -1613,10 +1611,12 @@ private:
 
   int history_markup_counter; /* 0 when execute, +1 when "previous statement", -1 for "next statement" */
 
-  int  main_token_offsets[MAX_TOKENS];
-  int  main_token_lengths[MAX_TOKENS];
-  int  main_token_types[MAX_TOKENS];
-  unsigned char main_token_flags[MAX_TOKENS]; /* e.g. TOKEN_FLAG_IS_RESERVED */
+  /* main_token_offsets|lengths|types|flags are alloc'd in main_token_new() */
+  int  *main_token_offsets;
+  int  *main_token_lengths;
+  int  *main_token_types;
+  unsigned char *main_token_flags; /* e.g. TOKEN_FLAG_IS_RESERVED */
+  unsigned int main_token_max_count;
   unsigned int main_token_count;
   unsigned int main_token_count_in_statement;
   unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
