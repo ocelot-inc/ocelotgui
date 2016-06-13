@@ -17,8 +17,14 @@
 */
 
 /*
-  Several lines have been added in xxxmdbug.generate().
+  2016-06-12 Several lines have been added in xxxmdbug.generate().
   This was a fix for github bug#1. If hostname=% is must be inside backticks.
+*/
+
+/*
+  2016-06-13 A begin...end block has been added in xxxmdbug.generate_icc_process_user_command_set_server_variables
+  and generate_icc_process_user_command_set_server_variables.
+  This was a fix for the MySQL 5.7 switch to performance_schema use.
 */
 
 #ifndef INSTALL_SQL_CPP
@@ -5405,9 +5411,14 @@ strcpy(x,
 "                   ORDER BY variable_identifier;" 
 "  DECLARE CONTINUE HANDLER FOR NOT FOUND SET eof = 1;" 
 "" 
-"  CALL xxxmdbug.create_tmp_user_variables_table();" 
-"  INSERT INTO xxxmdbug.tmp_user_variables" 
-"  SELECT CONCAT('@@',variable_name) FROM information_schema.session_variables;" 
+"  CALL xxxmdbug.create_tmp_user_variables_table();"
+"  BEGIN"
+"    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION"
+"    INSERT INTO xxxmdbug.tmp_user_variables"
+"    SELECT CONCAT('@@',variable_name) FROM information_schema.session_variables;"
+"    INSERT INTO xxxmdbug.tmp_user_variables"
+"    SELECT CONCAT('@@',variable_name) FROM performance_schema.session_variables;"
+"  END;"
 "" 
 "  SET mysql_proc_name='icc_process_user_command_r_user_variables'; /* todo: this is a lie. the original is for server_variables. */" 
 "  SET @xxxmdbug_surrogate_routine_identifier='icc_process_user_command_r_server_variables';" 
@@ -5519,8 +5530,13 @@ strcpy(x,
 "  DECLARE CONTINUE HANDLER FOR NOT FOUND SET eof = 1;" 
 "" 
 "  CALL xxxmdbug.create_tmp_user_variables_table();" 
-"  INSERT INTO xxxmdbug.tmp_user_variables" 
-"  SELECT CONCAT('@@',variable_name) FROM information_schema.session_variables;" 
+"  BEGIN"
+"    DECLARE CONTINUE HANDLER FOR SQLEXCEPTION"
+"    INSERT INTO xxxmdbug.tmp_user_variables"
+"    SELECT CONCAT('@@',variable_name) FROM information_schema.session_variables;"
+"    INSERT INTO xxxmdbug.tmp_user_variables"
+"    SELECT CONCAT('@@',variable_name) FROM performance_schema.session_variables;"
+"  END;"
 "  SET mysql_proc_name='icc_process_user_command_r_user_variables'; /* todo: this is a lie. the original is for server_variables. */" 
 "  SET @xxxmdbug_surrogate_routine_identifier='icc_process_user_command_set_server_variables';" 
 "" 

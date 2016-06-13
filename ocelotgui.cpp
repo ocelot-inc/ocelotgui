@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.0
-   Last modified: June 11 2016
+   Last modified: June 13 2016
 */
 
 /*
@@ -5896,7 +5896,7 @@ void MainWindow::debug_delete_tab_widgets()
 void MainWindow::action_debug_information()
 {
   if (debug_call_xxxmdbug_command("information status") != 0) return;
-  statement_edit_widget->insertPlainText("select * from xxxmdbug.information_status");
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.information_status;");
   action_execute(1);
 }
 
@@ -5911,7 +5911,7 @@ void MainWindow::action_debug_refresh_server_variables()
     if (debug_error((char*)"No debug session in progress") != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh server_variables") != 0) return;
-  statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables");
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables;");
   action_execute(1);
 }
 
@@ -5926,7 +5926,7 @@ void MainWindow::action_debug_refresh_user_variables()
     if (debug_error((char*)"No debug session in progress") != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh user_variables") != 0) return;
-  statement_edit_widget->insertPlainText("select * from xxxmdbug.user_variables");
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.user_variables;");
   action_execute(1);
 }
 
@@ -5941,7 +5941,7 @@ void MainWindow::action_debug_refresh_variables()
     if (debug_error((char*)"No debug session in progress") != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh variables") != 0) return;
-  statement_edit_widget->insertPlainText("select * from xxxmdbug.variables");
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.variables;");
   action_execute(1);
 }
 
@@ -5956,7 +5956,7 @@ void MainWindow::action_debug_refresh_call_stack()
     if (debug_error((char*)"No debug session in progress") != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh call_stack") != 0) return;
-  statement_edit_widget->insertPlainText("select * from xxxmdbug.call_stack");
+  statement_edit_widget->insertPlainText("select * from xxxmdbug.call_stack;");
   action_execute(1);
 }
 
@@ -7276,28 +7276,6 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     return 1;
   }
 #ifdef DEBUGGER
-  if ((statement_type >= TOKEN_KEYWORD_DEBUG_BREAKPOINT) && (statement_type <= TOKEN_KEYWORD_DEBUG_TBREAKPOINT))
-  {
-    /* Todo: we have to get off depending on show_compatibility_56. */
-    if (statement_edit_widget->dbms_version.contains("5.7") == true)
-    {
-      QString s= select_1_row("select @@global.show_compatibility_56;");
-      if (s == "")
-      {
-        if (select_1_row_result_1.toInt() == 0)
-        {
-          QString s= "To use $DEBUG statements with a MySQL 5.7 server, ";
-          s.append("you must first execute: ");
-          s.append("SET GLOBAL SHOW_COMPATIBILITY_56 = ON;" );
-          QMessageBox msgbox;
-          msgbox.setText(s);
-          msgbox.exec();
-          return 1;
-        }
-      }
-    }
-  }
-
   if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG)
   {
     debug_debug_go(text);
