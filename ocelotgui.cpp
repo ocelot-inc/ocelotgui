@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.0
-   Last modified: June 13 2016
+   Last modified: June 14 2016
 */
 
 /*
@@ -2426,8 +2426,10 @@ void MainWindow::action_exit()
   }
   /* Some code added 2015-08-25 due to valgrind */
   if (lmysql != 0) { delete lmysql; lmysql= 0; }
+#ifdef __linux
   if (is_libmysqlclient_loaded == 1) { dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
   if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
+#endif
   delete_utf8_copies();
   close();
 }
@@ -20486,8 +20488,7 @@ void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
 void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 {
   char *mysql_pwd;
-  char *home;
-  char tmp_my_cnf[1024];                         /* file name = $HOME/.my.cnf or $HOME/.mylogin.cnf or defaults_extra_file */
+  const char *home;
   char *ld_run_path;
 
   /*
@@ -20567,7 +20568,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
 
   options_files_read= "";
-
+#ifdef __linux
   {
     struct passwd *pw;
     uid_t u;
@@ -20575,7 +20576,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     pw= getpwuid(u);
     if (pw != NULL) ocelot_user= pw->pw_name;
   }
-
+#endif
   connect_read_command_line(argc, argv);               /* We're doing this twice, the first time won't count. */
 
   /*
@@ -20601,7 +20602,11 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 
   /* Environment variables */
 
-  home= getenv("HOME");
+  if (getenv("HOME") != 0)
+  {
+    home= getenv("HOME");
+  }
+  else home= "";
 
   if (getenv("LD_RUN_PATH") != 0)
   {
@@ -20669,9 +20674,11 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     Options files i.e. Configuration files i.e. my_cnf files
     Don't read option files if ocelot_no_defaults==1 (which is true if --no-defaults was specified on command line).
     Todo: check: does MariaDB read mylogin.cnf even if ocelot_no_defaults==1?
+    Todo: put mycnf_file list somewhere where ocelotgui --help can see
   */
   if (QString::compare(ocelot_defaults_file, " ") > 0)
   {
+    char tmp_my_cnf[1024];                         /* file name = $HOME/.my.cnf or $HOME/.mylogin.cnf or defaults_extra_file */
     strcpy(tmp_my_cnf, ocelot_defaults_file.toUtf8());
     connect_read_my_cnf(tmp_my_cnf, 0);
   }
@@ -20679,32 +20686,58 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   {
     if (ocelot_no_defaults == 0)
     {
-      connect_read_my_cnf("/etc/my.cnf", 0);
-      connect_read_my_cnf("/etc/mysql/my.cnf", 0);
+      char my_cnf_file[10][1024];
+      int i= 0;
+#ifdef __linux
+      strcpy(my_cnf_file[i++], "/etc/my.cnf");
+      strcpy(my_cnf_file[i++], "/etc/mysql/my.cnf");
       /* todo: think: is argv[0] what you want for SYSCONFDIR? not exact, but it's where the program is now. no, it might be a copy. */
       // connect_read_my_cnf("SYSCONFDIR/etc/my.cnf", 0) /* ?? i.e. [installation-directory]/etc/my.cnf but this should be changeable */
       /* skip $MYSQL_HOME/my.cnf, only server stuff should be in it */
       // connect_read_my_cnf("file specified with --defaults-extra-file", 0);
       if (QString::compare(ocelot_defaults_extra_file, " ") > 0)
       {
-        strcpy(tmp_my_cnf, ocelot_defaults_extra_file.toUtf8());
-        connect_read_my_cnf(tmp_my_cnf, 0);
+        strcpy(my_cnf_file[i++], ocelot_defaults_extra_file.toUtf8());
       }
-      strcpy(tmp_my_cnf, home);                              /* $HOME/.my.cnf */
-      strcat(tmp_my_cnf, "/.my.cnf");
-      connect_read_my_cnf(tmp_my_cnf, 0);
+      strcpy(my_cnf_file[i], home);
+      strcat(my_cnf_file[i++], "/.my.cnf");
+      if (getenv("MYSQL_TEST_LOGIN_FILE") != NULL)
+      {
+        strcpy(my_cnf_file[i++], getenv("MYSQL_TEST_LOGIN_FILE"));
+      }
+      else
+      {
+        strcpy(my_cnf_file[i], home);          /* $HOME/.mylogin.cnf */
+        strcat(my_cnf_file[i++], "/.mylogin.cnf");
+      }
+#else
+      if (getenv("WINDIR") != 0)
+      {
+        strcpy(my_cnf_file[i], getenv("WINDIR")); /* e.g. c:\windows */
+        strcat(my_cnf_file[i++], "\\my.ini");
+        strcpy(my_cnf_file[i], getenv("WINDIR"));
+        strcat(my_cnf_file[i++], "\\my.cnf");
+      }
+      strcpy(my_cnf_file[i++], "c:\\my.ini");
+      strcpy(my_cnf_file[i++], "c:\\my.cnf");
+      /* Todo: INSTALLDIR\my.ini, INSTALLDIR\my.cnf */
+      if (QString::compare(ocelot_defaults_extra_file, " ") > 0)
+      {
+        strcpy(my_cnf_file[i++], ocelot_defaults_extra_file.toUtf8());
+      }
+      if (getenv("APPDATA") != 0)
+      {
+        strcpy(my_cnf_file[i], getenv("APPDATA"));
+        strcat(my_cnf_file[i++], "\\.mylogin.cnf");
+      }
+#endif
+      for (int j= 0; j < i; ++j)
+      {
+        if (strstr(my_cnf_file[j], ".mylogin.cnf") != 0)
+          connect_read_my_cnf(my_cnf_file[j], 1);
+        else connect_read_my_cnf(my_cnf_file[j], 0);
+      }
     }
-
-    if (getenv("MYSQL_TEST_LOGIN_FILE") != NULL)
-    {
-      strcpy(tmp_my_cnf, getenv("MYSQL_TEST_LOGIN_FILE"));
-    }
-    else
-    {
-      strcpy(tmp_my_cnf, home);                             /* $HOME/.mylogin.cnf */
-      strcat(tmp_my_cnf, "/.mylogin.cnf");
-    }
-    connect_read_my_cnf(tmp_my_cnf, 1);
   }
   connect_read_command_line(argc, argv);
   //connect_make_statement();
@@ -21035,8 +21068,8 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         if (file_name.right(4) == ".cnf")
 #endif
 #ifdef Q_OS_WIN32
-        QString file_name= fileInfo.fileName().upper();
-        if ((file_name.right(4) == ".CNF") || file_name.right(4) == ".INI"))
+        QString file_name= fileInfo.fileName().toUpper();
+        if ((file_name.right(4) == ".CNF") || (file_name.right(4) == ".INI"))
 #endif
         {
           QString s= token2;

@@ -235,8 +235,10 @@ endif (NOT UI_OCELOTGUI)
 
 add_executable(ocelotgui ${UI_OCELOTGUI} ocelotgui.cpp)
 
+if (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 # ocelotgui uses dlopen + dlsym. Some linkers might demand this.
 target_link_libraries(ocelotgui dl)
+endif (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
 # ocelotgui uses pthread. Some linkers might demand this.
 target_link_libraries(ocelotgui pthread)

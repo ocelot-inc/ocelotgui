@@ -1,0 +1,36 @@
+New Feature: ocelotgui will run on Microsoft Windows (32-bit)
+
+Although Ocelot does not supply a package for Windows,
+it can be built from source files as of 2016-06-14.
+You will need Qt, CMake, MySQL, and ocelotgui source.
+
+For Qt: Go to www.qt.io/download-open-source
+    Avoid/skip any suggestion to login -- there can be no special license
+    After installation is complete, you should have Qt in
+    something like C:\Qt\Qt5.6.1 and MinGW compiler gcc.exe in
+    c:\Qt\Qt5.6.1\Tools\mingw492_32\bin\gcc.
+
+For MySQL: it's simplest to install the whole package,
+    although the only things necessary here are the
+    client shared library and the usual include files.
+    After installation is complete, you should have mysql.h in
+    C:\Program Files\MySQL\MySQL Server 5.7\include\mysql.h
+
+For CMake: go to cmake.org/download
+    When asked whether to add Cmake to the system path, say yes.
+
+For ocelotgui: go to github.com/ocelot-inc/ocelotgui
+    You need to make sure you are getting recent source
+    with the patches done on or after June 14 2016,
+    the version 1.0.0 "release" files will not work. An
+    easy choice is git clone (to install git, see git-scm.com/downloads).
+    git clone https://github.com/ocelot-inc/ocelotgui.git c:\ocelotgui
+
+cd c:\ocelotgui
+SET PATH=C:\Qt\qt5.6.1\Tools\mingw492_32\bin;C:\Qt\qt5.6.1\Tools\mingw492_32\lib;C:\Qt\qt5.6.1\5.6\mingw49_32\bin;%path%
+cmake . -G "MinGW Makefiles" -DMYSQL_INCLUDE_DIR="C:/Program Files/MySQL/MySQL Server 5.7/include"
+mingw32-make
+And now there should be a file named c:\ocelotgui\ocelotgui.exe.
+This has the same functionality as the Linux ocelotgui program,
+but has not been tested on all major Windows versions.
+When connecting, use protocol=tcp.

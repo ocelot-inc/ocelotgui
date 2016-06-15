@@ -2377,6 +2377,7 @@ ldbms() : QWidget()
 #define WHICH_LIBRARY_LIBTARANTOOLNET 4
 #endif
 
+
 void ldbms_get_library(QString ocelot_ld_run_path,
         int *is_library_loaded,           /* points to is_libXXX_loaded */
         void **library_handle,            /* points to libXXX_handle */
@@ -2397,6 +2398,11 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 
       There is a description re finding libmysqlclient if one types Help | libmysqlclient.
     */
+
+#ifndef __linux
+  QLibrary lib;
+#endif
+
     if (*is_library_loaded == 1)
     {
       /*
@@ -2413,12 +2419,12 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     }
 #ifndef __linux
     /* I don't know how Windows handles shared-library version numbers */
-    if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) QLibrary lib("libmysqlclient");
-    if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) QLibrary lib("libmysqlclient");
-    if (which_library == WHICH_LIBRARY_LIBCRYPTO) QLibrary lib("libcrypto");
+    if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileNameAndVersion("libmysql", 18);
+    if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysql");
+    if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libeay32");
 #ifdef DBMS_TARANTOOL
-    if (which_library == WHICH_LIBRARY_LIBTARANTOOL) QLibrary lib("libtarantool");
-    if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) QLibrary lib("libtarantoolnet");
+    if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
+    if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
 #endif
 #endif
     /*
@@ -2508,9 +2514,9 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       else *is_library_loaded= 1;
       *library_handle= dlopen_handle;
 #else
-      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysqlclient");
-      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysqlclient");
-      if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libcrypto");
+      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysql");
+      if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysql");
+      if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libeay32");
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
       if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
@@ -2646,9 +2652,22 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_get_host_info= (tmysql_get_host_info) lib.resolve("mysql_get_host_info")) == 0) s.append("mysql_get_host_info ");
         if ((t__mysql_info= (tmysql_info) lib.resolve("mysql_info")) == 0) s.append("mysql_info ");
         if ((t__mysql_init= (tmysql_init) lib.resolve("mysql_init")) == 0) s.append("mysql_init ");
-        (do not forget to allow for mysql_server_end + mysql_server_init as in Linux, above)
-        if ((t__mysql_library_end= (tmysql_library_end) lib.resolve("mysql_library_end")) == 0) s.append("mysql_library_end ");
-        if ((t__mysql_library_init= (tmysql_library_init) lib.resolve("mysql_library_init")) == 0) s.append("mysql_library_init ");
+        {
+          t__mysql_library_end= (tmysql_library_end) lib.resolve("mysql_library_end");
+          if (t__mysql_library_end == 0)
+          {
+            t__mysql_library_end= (tmysql_library_end) lib.resolve("mysql_server_end");
+            if (t__mysql_library_end == 0) s.append("mysql_library_end ");
+          }
+        }
+        {
+          t__mysql_library_init= (tmysql_library_init) lib.resolve("mysql_library_init");
+          if (t__mysql_library_init == 0)
+          {
+            t__mysql_library_init= (tmysql_library_init) lib.resolve("mysql_server_init");
+            if (t__mysql_library_init == 0) s.append("mysql_library_init ");
+          }
+        }
         if ((t__mysql_more_results= (tmysql_more_results) lib.resolve("mysql_more_results")) == 0) s.append("mysql_more_results ");
         if ((t__mysql_next_result= (tmysql_next_result) lib.resolve("mysql_next_result")) == 0) s.append("mysql_next_result ");
         if ((t__mysql_num_fields= (tmysql_num_fields) lib.resolve("mysql_num_fields")) == 0) s.append("mysql_num_fields ");
@@ -2670,10 +2689,12 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__AES_set_decrypt_key= (tAES_set_decrypt_key) lib.resolve("AES_set_decrypt_key")) == 0) s.append("AES_set_decrypt_key ");
         if ((t__AES_decrypt= (tAES_decrypt) lib.resolve("AES_decrypt")) == 0) s.append("AES_decrypt ");
       }
+#ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
       {
          /* fill this in when you have Windows */
       }
+#endif
 #endif
       if (s > "")
       {
