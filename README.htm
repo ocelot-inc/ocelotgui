@@ -228,6 +228,8 @@ these instructions have been known to work:
 For more commentary about compiling and building,
 read an ocelotgui.cpp comment that begins with the words
 "General comments".
+For instructions to build from source on Microsoft Windows,
+see the file windows.txt.
 </P>
 
 
