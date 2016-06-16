@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.0
-   Last modified: June 14 2016
+   Last modified: June 16 2016
 */
 
 /*
@@ -18523,7 +18523,7 @@ void MainWindow::hparse_f_parse_hint_line_create()
 #define TARANTOOL_BOX_INDEX_GE 5
 #define TARANTOOL_BOX_INDEX_GT 6
 
-/* TODO: THESE MUST BE INITIALIZED IN parse_f_program! */
+/* These items are permanent and are initialized in parse_f_program */
 QString text_copy;
 QString parse_symbol;
 int parse_i;
@@ -18619,8 +18619,6 @@ int MainWindow::parse_f_accept(QString token)
     int field_integer= 0;
     int field_integer_length= parse_symbol.length() - (base_size + 1);
     if (field_integer_length > 0) field_integer= parse_symbol.right(field_integer_length).toInt(&ok);
-    printf("base_size=%d. field_integer_length=%d. field_integer=%d.\n",
-           base_size, field_integer_length, field_integer);
     if ((parse_symbol.left(base_size) == TARANTOOL_FIELD_NAME_BASE)
      && (parse_symbol.mid(base_size, 1) == "_")
      && (field_integer > 0)
@@ -18775,7 +18773,6 @@ void MainWindow::parse_f_indexed_condition()
       else if ((parse_symbol == ">=")
             && (iterator_type == TARANTOOL_BOX_INDEX_GE)
             && (parse_f_accept(">=") == 1)) ++ok;
-      printf("iterator_type= %d, ok=%d.\n", iterator_type, ok);
       if (ok == 0)
       {
         parse_expected= "A conditional operator compatible with previous ones. ";
@@ -18988,10 +18985,19 @@ void MainWindow::parse_f_block()
 void MainWindow::parse_f_program(QString text)
 {
   tarantool_errno= 0;
-  parse_errno= 0;
-  parse_expected= "";
+
   text_copy= text;
+  parse_symbol= "";
   parse_i= -1;
+  parse_expected= "";
+  parse_errno= 0;
+  parse_symbol_type= 0;
+  offset_of_space_name= -1;
+  statement_type= -1;
+  number_of_literals= 0;
+  iterator_type= TARANTOOL_BOX_INDEX_EQ;
+  parse_indexed_condition_count= 0;
+
   parse_f_nextsym();
   parse_f_block();
   if (parse_errno > 0) return;
@@ -19149,7 +19155,6 @@ void MainWindow::tarantool_flush_and_save_reply()
   lmysql->ldbms_tnt_reply_init(&tarantool_tnt_reply);
   tnt->read_reply(tnt, &tarantool_tnt_reply);
   tarantool_errno= tarantool_tnt_reply.code;
-
   if (tarantool_tnt_reply.code != 0)
   {
     char *x1= (char*)tarantool_tnt_reply.error;
@@ -19210,9 +19215,19 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
   {
     tuple= lmysql->ldbms_tnt_object(NULL);
     lmysql->ldbms_tnt_object_add_array(tuple, number_of_literals);
+    int number_of_adds= 0;
     for (i= 0; main_token_types[i] != 0; ++i)
     {
       token_type= main_token_types[i];
+      if (token_type == TOKEN_TYPE_LITERAL)
+      {
+        /* Todo: figure out literal's exact type, and be sure. */
+        assert(main_token_lengths[i] > 0);
+        QString first_char= text.mid(main_token_offsets[i], 1);
+        if (first_char == "'") token_type= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
+        else if (first_char < "#") token_type= TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE;
+        else token_type= TOKEN_TYPE_LITERAL_WITH_DIGIT;
+      }
       if ((token_type == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
        || (token_type == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
       {
@@ -19221,6 +19236,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
         s= s.left(s.length() - 1);
         s= s.right(s.length() - 1);
         lmysql->ldbms_tnt_object_add_str(tuple, s.toUtf8(), s.length());
+        ++number_of_adds;
       }
       if (token_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
       {
@@ -19228,12 +19244,15 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
         QString s;
         s= text.mid(main_token_offsets[i], main_token_lengths[i]);
         lmysql->ldbms_tnt_object_add_int(tuple, s.toInt());
+        ++number_of_adds;
       }
       if (token_type == TOKEN_KEYWORD_NULL)
       {
         lmysql->ldbms_tnt_object_add_nil(tuple);
+        ++number_of_adds;
       }
     }
+    assert(number_of_literals == number_of_adds);
     /* Todo: check whether we really need to say object_container_close. */
     lmysql->ldbms_tnt_object_container_close(tuple);
   }
@@ -19303,6 +19322,9 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
 long unsigned int MainWindow::tarantool_num_rows()
 {
   const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
+
+  assert(tarantool_tnt_reply.data != NULL);
+
   char field_type;
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   if (field_type != MP_ARRAY)
@@ -19312,7 +19334,6 @@ long unsigned int MainWindow::tarantool_num_rows()
     return tarantool_errno;
   }
   result_row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  printf("number_of_rows=%ld\n", result_row_count);
   return result_row_count;
 }
 
@@ -19350,19 +19371,11 @@ unsigned int MainWindow::tarantool_num_fields()
   /* TODO: THIS IS NEVER FREED! LEAK! */
   tarantool_field_names= new char[max_field_count * TARANTOOL_MAX_FIELD_NAME_LENGTH];
 
-  {
-    QMessageBox msgbox;
-    msgbox.setText("tarantool_num_fields B");
-    msgbox.exec();
-  }
-
-
   unsigned int mid_index= 0;
   for (unsigned int i= 0; i < max_field_count; ++i)
   {
     char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
     int j= field_name_list.indexOf(" ", mid_index);
-    printf("mid_index=%d, j=%d.\n", mid_index, j);
     assert((j != -1) && ((j-mid_index) < TARANTOOL_MAX_FIELD_NAME_LENGTH));
     QString sv;
     sv= field_name_list.mid(mid_index, j-mid_index);
@@ -19468,11 +19481,9 @@ const char * MainWindow::tarantool_seek_0()
   tarantool_tnt_reply_data= tarantool_tnt_reply.data;
 
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  printf("    tarantool_seek_0. field_type=%d\n", field_type);
   assert(field_type == MP_ARRAY);
   row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   assert(row_count == result_row_count);
-  printf("    tarantool_seek_0. row_count=%d\n", row_count);
   assert(tarantool_tnt_reply_data != tarantool_tnt_reply.data);
   return tarantool_tnt_reply_data;
 }
@@ -19499,7 +19510,6 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
   for (uint32_t field_number= 0; field_number < field_count; ++field_number)
   {
     field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-    printf("tarantool_fetch_row. field_number=%d, field_type=%d.\n", field_number, field_type);
     assert(field_type <= MP_EXT);
     uint32_t value_length;
     const char *value;
@@ -19513,7 +19523,6 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
     {
       uint64_t uint_value= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data);
       value_length= sprintf(value_as_string, "%lu", uint_value);
-      printf("... value_length=%d\n", value_length);
     }
     if (field_type == MP_INT)
     {
@@ -19524,7 +19533,6 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
     {
       /* todo: allow for the library routine that only gets length */
       value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data, &value_length);
-      printf("... value_length=%d\n", value_length);
     }
     if (field_type == MP_BIN)
     {
@@ -19536,7 +19544,6 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
       uint32_t array_size;
       array_size= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
       field_count+= array_size;
-      printf("       mp_array, adding %d to field_count\n", array_size);
       value_length= 0;
     }
     if (field_type == MP_MAP)
@@ -19544,7 +19551,6 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
       uint32_t array_size;
       array_size= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_data) * 2;
       field_count+= array_size;
-      printf("       mp_map, adding %d to field_count\n", array_size);
       value_length= 0;
     }
     if (field_type == MP_BOOL)
@@ -19572,7 +19578,6 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
   }
   *bytes=   tarantool_tnt_reply_data - original_tarantool_tnt_reply_data;
   assert(bytes != 0);
-  printf("  exit tarantool_fetch_row. field_count=%d.\n", field_count);
   return total_length;
 }
 
@@ -19596,12 +19601,6 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   //unsigned long *v_lengths;
 //  unsigned int ki;
 
-  {
-    QMessageBox msgbox;
-    msgbox.setText("scan_rows");
-    msgbox.exec();
-  }
-
   const char *tarantool_tnt_reply_data_copy;
 
   for (i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;
@@ -19611,9 +19610,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   */
   unsigned int total_size= 0;
   char *result_set_copy_pointer;
-  printf("seek 1\n");
   tarantool_tnt_reply_data_copy= tarantool_seek_0(); /* "seek to row 0" */
-  printf("after seek 1. p_result_row_count=%d\n", p_result_row_count);
 
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                /* first loop */
   {
@@ -19624,13 +19621,11 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     /* per-field overhead includes overhead for missing fields; they are null */
     int row_size_2= p_result_column_count * (sizeof(unsigned int) + sizeof(char));
     total_size+= row_size_2;
-    printf("        v_r=%lu. row_size_1=%d, row_size_2=%d\n", v_r, row_size_1, row_size_2);
   }
   *p_result_set_copy= new char[total_size];                                         /* allocate */
   assert(total_size < 1000000000);
   *p_result_set_copy_rows= new char*[p_result_row_count];
   result_set_copy_pointer= *p_result_set_copy;
-  printf("seek 2\n");
   tarantool_tnt_reply_data_copy= tarantool_seek_0(); /* "seek to row 0" */
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
   {
@@ -19665,7 +19660,6 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       then add NULLs for the missing fields until the main list catches up.
     */
     field_count= field_name_list.count(" ");
-    printf("field_count= %d\n", field_count);
     unsigned int mid_index= 0;
     int field_number_in_main_list= 0;
     for (uint32_t field_number= 0; field_number < field_count; ++field_number)
@@ -19694,7 +19688,6 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       {
         char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
         int j= field_name_list.indexOf(" ", mid_index);
-        printf("        before the assert. j = %d, field_number=%d, field_count=%d\n", j, field_number, field_count);
         assert((j != -1) && ((j-mid_index) < TARANTOOL_MAX_FIELD_NAME_LENGTH));
         QString sv;
         sv= field_name_list.mid(mid_index, j-mid_index);
@@ -19702,11 +19695,9 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         *(tmp+sv.length())='\0';
         for (;;)
         {
-          printf("compare: %s, %s.\n", &tarantool_field_names[field_number_in_main_list*TARANTOOL_MAX_FIELD_NAME_LENGTH], tmp);
           int strcmp_result= strcmp(&tarantool_field_names[field_number_in_main_list*TARANTOOL_MAX_FIELD_NAME_LENGTH], tmp);
           assert(strcmp_result <= 0);
           if (strcmp_result == 0) break;
-          printf("dump null. field_number_in_main_list=%d\n", field_number_in_main_list);
           /* Dump null. Todo: similar code appears 3 times. */
           if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
           memset(result_set_copy_pointer, 0, sizeof(unsigned int));
@@ -19717,7 +19708,6 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         mid_index= j + 1;
         ++field_number_in_main_list;
       }
-      printf(" (no more compares)\n");
       if ((field_type == MP_NIL) || (field_type == MP_ARRAY) || (field_type == MP_MAP))
       {
         if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
@@ -19782,7 +19772,6 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     }
     while (field_number_in_main_list < p_result_column_count)
     {
-      printf("dump null. field_number_in_main_list=%d\n", field_number_in_main_list);
       /* Dump null. Todo: similar code appears 3 times. */
       if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
       memset(result_set_copy_pointer, 0, sizeof(unsigned int));
@@ -19790,13 +19779,8 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
       ++field_number_in_main_list;
     }
-    printf("    loop 2 row_size = %d\n", result_set_copy_pointer - tmp_copy_pointer);
   }
-  {
-    QMessageBox msgbox;
-    msgbox.setText("  scan_rows end");
-    msgbox.exec();
-  }
+
   /* Now that names are sorted, we can shorten them e.g. f_0001_0007_0001_0001 becomes f_7_1_1. */
   for (unsigned int i= 0; i < p_result_column_count; ++i)
   {
@@ -19846,8 +19830,6 @@ void MainWindow::tarantool_scan_field_names(
     else /* if (strcmp(which_field, "db") == 0) */ total_size+= sizeof(TARANTOOL_FIELD_NAME_BASE);
   }
   *p_result_field_names= new char[total_size];                               /* allocate */
-
-  printf("      scan_field_names. total_size=%d\n", total_size);
 
   result_field_names_pointer= *p_result_field_names;
   for (i= 0; i < p_result_column_count; ++i)                                 /* second loop */

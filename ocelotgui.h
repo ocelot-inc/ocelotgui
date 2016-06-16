@@ -5199,7 +5199,6 @@ QString dbms_get_field_name(unsigned int column_number, int connections_dbms)
     memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
     result_field_names_pointer+= sizeof(unsigned int);
     strcpy(tmp, result_field_names_pointer);
-    printf("column_number=%d. tmp=%s.\n", column_number, tmp);
     QString s;
     s= tmp;
     return s;
@@ -5224,7 +5223,6 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
       result_field_names_pointer+= v_lengths + sizeof(unsigned int);
     }
     memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
-    printf("v_lengths=%d.\n", v_lengths);
     return v_lengths;
   }
 #endif
