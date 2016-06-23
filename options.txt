@@ -124,7 +124,8 @@ batch. Mostly ignored, but if 1 (true), history is not written.
 
 compress. If 1 (true), value is passed to the server.
 
-connect_expired_password. Ignored.
+connect_expired_password. If 1 (true), ocelotgui goes into
+sandbox mode if a password has expired at connect time.
 
 connect_timeout. Ignored.
 

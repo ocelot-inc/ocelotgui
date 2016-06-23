@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.0
-   Last modified: June 16 2016
+   Last modified: June 23 2016
 */
 
 /*
@@ -377,6 +377,7 @@ static const char *s_color_list[308]=
   static unsigned int ocelot_protocol_as_int= 0;        /* --protocol=s for MYSQL_OPT_PROTOCOL */
   static char* ocelot_init_command_as_utf8= 0;          /* --init_command=s for MYSQL_INIT_COMMAND */
   /* Connect arguments below this point are minor and many are unsupported. */
+  static unsigned short ocelot_abort_source_on_error= 0;   /* --abort_source_on_error (MariaDB) */
   static unsigned short ocelot_auto_rehash= 1;             /* --auto_rehash */
   static unsigned short ocelot_auto_vertical_output= 0;    /* --auto_vertical_output */
   static unsigned short ocelot_batch= 0;                   /* --batch */
@@ -387,7 +388,6 @@ static const char *s_color_list[308]=
   static unsigned short ocelot_column_type_info= 0;        /* --column_type_info */
   static unsigned short ocelot_comments= 0;               /* --comments */
   static unsigned short ocelot_opt_compress= 0;           /* --compress for MYSQL_OPT_COMPRESS */
-  static unsigned short ocelot_connect_expired_password= 0;/* --connect_expired_password */
   static unsigned long int ocelot_opt_connect_timeout= 0;  /* --connect_timeout = n for MYSQL_OPT_CONNECT_TIMEOUT */
   /* QString ocelot_debug */                               /* --debug[=s] */
   static unsigned short ocelot_debug_check= 0;             /* --debug_check */
@@ -455,9 +455,15 @@ static const char *s_color_list[308]=
   static unsigned short ocelot_wait= 0;                   /* --wait ... actually this does nothing */
   static unsigned short ocelot_xml= 0;                    /* --xml */
 
+  /*
+    For MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS + --connect-expired-password.
+    mysql client has this off by default, but ocelotgui has it on by default
+    so to turn it off say ocelotgui --skip_connect_expired_password
+  */
+  static unsigned short ocelot_opt_can_handle_expired_passwords= 1;
+
   /* Some items we allow, which are not available in mysql client */
   static char* ocelot_opt_bind_as_utf8= 0;              /* for MYSQL_OPT_BIND */
-  static unsigned short ocelot_opt_can_handle_expired_passwords= 0;/* for MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS */
   static char* ocelot_opt_connect_attr_delete_as_utf8= 0;  /* for MYSQL_OPT_CONNECT_ATTR_DELETE */
   static unsigned short int ocelot_opt_connect_attr_reset= 0; /* for MYSQL_OPT_CONNECT_ATTR_RESET */
   static char* ocelot_read_default_file_as_utf8= 0; /* for MYSQL_READ_DEFAULT_FILE */
@@ -2161,19 +2167,17 @@ void MainWindow::action_connect_once(QString message)
   QString row_form_message;
   int i;
   Row_form_box *co;
-
   row_form_label= 0;
   row_form_type= 0;
   row_form_is_password= 0;
   row_form_data= 0;
   row_form_width= 0;
-  column_count= 82; /* If you add or remove items, you have to change this */
+  column_count= 83; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
   row_form_is_password= new int[column_count];
   row_form_data= new QString[column_count];
   row_form_width= new QString[column_count];
-
   row_form_label[i=0]= "host"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_host; row_form_width[i]= 80;
   row_form_label[++i]= "port"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_port); row_form_width[i]= 4;
   row_form_label[++i]= "user"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_user; row_form_width[i]= 80;
@@ -2182,6 +2186,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "password"; row_form_type[i]= 0; row_form_is_password[i]= 1; row_form_data[i]= ocelot_password; row_form_width[i]= 80;
   row_form_label[++i]= "protocol"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_protocol; row_form_width[i]= 80;
   row_form_label[++i]= "init_command"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_init_command; row_form_width[i]= 80;
+  row_form_label[++i]= "abort_source_on_error"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_abort_source_on_error); row_form_width[i]= 5;
   row_form_label[++i]= "auto_rehash"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_rehash); row_form_width[i]= 5;
   row_form_label[++i]= "auto_vertical_output"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_vertical_output); row_form_width[i]= 5;
   row_form_label[++i]= "batch"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_batch); row_form_width[i]= 5;
@@ -2192,8 +2197,8 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "column_type_info"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_column_type_info); row_form_width[i]= 5;
   row_form_label[++i]= "comments"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_comments); row_form_width[i]= 5;
   row_form_label[++i]= "compress"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_compress); row_form_width[i]= 5;
-  row_form_label[++i]= "connect_expired_password"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_connect_expired_password); row_form_width[i]= 5;
-  row_form_label[++i]= "connect_tmeout"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_connect_timeout); row_form_width[i]= 5;
+  row_form_label[++i]= "connect_expired_password"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_can_handle_expired_passwords); row_form_width[i]= 5;
+  row_form_label[++i]= "connect_timeout"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_connect_timeout); row_form_width[i]= 5;
   row_form_label[++i]= "debug"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_debug; row_form_width[i]= 5;
   row_form_label[++i]= "debug_check"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_check); row_form_width[i]= 5;
   row_form_label[++i]= "debug_info"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_info); row_form_width[i]= 5;
@@ -2258,7 +2263,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "vertical"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_vertical); row_form_width[i]= 5;
   row_form_label[++i]= "wait"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_wait); row_form_width[i]= 5;
   row_form_label[++i]= "xml"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_xml); row_form_width[i]= 5;
-
+  assert(i == column_count - 1);
   if (message == "Print")
   {
     char output_string[5120];
@@ -2295,9 +2300,10 @@ void MainWindow::action_connect_once(QString message)
       ocelot_password= row_form_data[5].trimmed();
       ocelot_protocol= row_form_data[6].trimmed(); ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
       ocelot_init_command= row_form_data[7].trimmed();
-      ocelot_auto_rehash= to_long(row_form_data[8].trimmed());
+      ocelot_abort_source_on_error= to_long(row_form_data[8].trimmed());
+      ocelot_auto_rehash= to_long(row_form_data[9].trimmed());
 
-      i= 9;
+      i= 10;
       ocelot_auto_vertical_output= to_long(row_form_data[i++].trimmed());
       ocelot_batch= to_long(row_form_data[i++].trimmed());
       ocelot_binary_mode= to_long(row_form_data[i++].trimmed());
@@ -2307,7 +2313,7 @@ void MainWindow::action_connect_once(QString message)
       ocelot_column_type_info= to_long(row_form_data[i++].trimmed());
       ocelot_comments= to_long(row_form_data[i++].trimmed());
       ocelot_opt_compress= to_long(row_form_data[i++].trimmed());
-      ocelot_connect_expired_password= to_long(row_form_data[i++].trimmed());
+      ocelot_opt_can_handle_expired_passwords= to_long(row_form_data[i++].trimmed());
       ocelot_opt_connect_timeout= to_long(row_form_data[i++].trimmed());
       ocelot_debug= row_form_data[i++].trimmed();
       ocelot_debug_check= to_long(row_form_data[i++].trimmed());
@@ -2371,7 +2377,7 @@ void MainWindow::action_connect_once(QString message)
       ocelot_result_grid_vertical= to_long(row_form_data[i++].trimmed());
       ocelot_wait= to_long(row_form_data[i++].trimmed());
       ocelot_xml= to_long(row_form_data[i++].trimmed());
-
+      assert(i == column_count);
       /* This should ensure that a record goes to the history widget */
       /* Todo: clear statement_edit_widget first */
       statement_edit_widget->insertPlainText("CONNECT");
@@ -6395,10 +6401,12 @@ void MainWindow::action_execute_force()
   By default this is on and associated with File|Execute menu item.
   Execute what's in the statement widget.
   The statement widget might contain multiple statements.
+  Return: 0 = ok, 1 = syntax checker failed with "No"; 2 = DBMS error
 */
 int MainWindow::action_execute(int force)
 {
   QString text;
+  int return_value= 0;
   for (;;)
   {
     int returned_begin_count;
@@ -6446,7 +6454,7 @@ int MainWindow::action_execute(int force)
     menu_help->setEnabled(false);
     statement_edit_widget->setReadOnly(true);
     is_kill_requested= false;
-    action_execute_one_statement(text);
+    return_value= action_execute_one_statement(text);
 
     menu_file->setEnabled(true);
     menu_edit->setEnabled(true);
@@ -6474,6 +6482,7 @@ int MainWindow::action_execute(int force)
     history_edit_widget->show(); /* Todo: find out if this is really necessary */
     if (is_kill_requested == true) break;
   }
+  if (return_value != 0) return 2;
   return 0;
 }
 
@@ -6527,12 +6536,12 @@ void MainWindow::remove_statement(QString text)
      Should I be saying "delete later" somehow?
      Does memory leak?
 */
-void MainWindow::action_execute_one_statement(QString text)
+int MainWindow::action_execute_one_statement(QString text)
 {
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set;
   unsigned short int is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
-
+  unsigned return_value= 0;
   ++statement_edit_widget->statement_count;
 
   /*
@@ -6669,6 +6678,7 @@ void MainWindow::action_execute_one_statement(QString text)
         /* beep() hasn't been tested because getting sound to work on my computer is so hard */
         if (ocelot_no_beep == 0) QApplication::beep();
         delete []dbms_query;
+        return_value= 1;
       }
       else {
         delete []dbms_query;
@@ -6791,6 +6801,7 @@ void MainWindow::action_execute_one_statement(QString text)
 
               if (dbms_long_query_result != 0)
               {
+                return_value= 1;
                 /* If mysql_next_result) == 1 means error, -1 means no more. */
                 /* TODO: don't do this for SOURCE. Check for beep. */
                 if (dbms_long_query_result == 1)
@@ -6837,8 +6848,6 @@ void MainWindow::action_execute_one_statement(QString text)
             }
             mysql_res= 0;
           }
-
-          return;
         }
       }
       put_diagnostics_in_result();
@@ -6850,6 +6859,7 @@ void MainWindow::action_execute_one_statement(QString text)
   {
     history_markup_append("", true); /* add prompt+statement+result to history, with markup */
   }
+  return return_value;
 }
 
 /*
@@ -7088,7 +7098,16 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if ((s != "") && (s.mid(0,1) != "#") && (s.mid(0,2) != "--"))
       {
         statement_edit_widget->insertPlainText(s);
-        action_execute(0);
+        if (action_execute(0) == 2)
+        {
+          /*
+            A DBMS-calling statement failed.
+            This doesn't operate exactly as --abort-source-on-error
+            would for MariaDB client, because we only return 2 for
+            statements that call the server and are not multiple.
+          */
+          if (ocelot_abort_source_on_error > 0) break;
+        }
      }
     }
     file.close();
@@ -10106,13 +10125,13 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     Collect some variables in case they're needed for "prompt".
     Todo: handle errors better after mysql_ calls here.
     A possible error is: Error 1226 (42000) User ... has exceeded the 'max_queries_per_hour' resource
+    A possible error is: Error 1820 (HY000) You must reset your password using ALTER USER statement before executing this statement.
     Not using the mysql_res global, since this is not for user to see.
   */
   int query_result= lmysql->ldbms_mysql_query(&mysql[connection_number], "select version(), database(), @@port, current_user(), connection_id()");
-  if (query_result != 0 ){
-    QMessageBox msgbox;
-    msgbox.setText("'mysql_query() failed");
-    msgbox.exec();
+  if (query_result != 0 )
+  {
+    connect_mysql_error_box("(mysql_query failure)", connection_number);
     connections_is_connected[0]= 1;
     return 0;
   }
@@ -10125,18 +10144,14 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   mysql_res_for_connect= lmysql->ldbms_mysql_store_result(&mysql[connection_number]);
   if (mysql_res_for_connect == NULL)
   {
-    QMessageBox msgbox;
-    msgbox.setText("mysql_store_result failed");
-    msgbox.exec();
+    connect_mysql_error_box("(mysql_store_result failure)", connection_number);
     connections_is_connected[0]= 1;
     return 0;
   }
   connect_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_connect);
   if (connect_row == NULL)
   {
-    QMessageBox msgbox;
-    msgbox.setText("mysql_fetch_row failed");
-    msgbox.exec();
+    connect_mysql_error_box("(mysql_fetch_row failure)", connection_number);
     connections_is_connected[0]= 1;
     return 0;
   }
@@ -10161,6 +10176,21 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   connections_is_connected[0]= 1;
   set_dbms_version_mask(statement_edit_widget->dbms_version);
   return 0;
+}
+
+void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_number)
+{
+  QString s2;
+  char i_mysql_error_and_state[1024];
+  int i_mysql_errno_result= lmysql->ldbms_mysql_errno(&mysql[connection_number]);
+  s1.append(tr(" Warning: Connection succeeded, but server refused to provide some non-essential information due to Error "));
+  sprintf(i_mysql_error_and_state, "%d (%s) ", i_mysql_errno_result, lmysql->ldbms_mysql_sqlstate(&mysql[connection_number]));
+  s1.append(i_mysql_error_and_state);
+  s2= lmysql->ldbms_mysql_error(&mysql[connection_number]);
+  s1.append(s2);
+  QMessageBox msgbox;
+  msgbox.setText(s1);
+  msgbox.exec();
 }
 
 /*
@@ -21291,6 +21321,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     else /* error */ is_enable= 0;
   }
 
+  if (strcmp(token0_as_utf8, "abort_source_on_error") == 0) { ocelot_abort_source_on_error= is_enable; return; }
   if (strcmp(token0_as_utf8, "auto_rehash") == 0) { ocelot_auto_rehash= is_enable; return; }
   if (strcmp(token0_as_utf8, "auto_vertical_output") == 0) { ocelot_auto_vertical_output= is_enable; return; }
   if (strcmp(token0_as_utf8, "batch") == 0)
@@ -21307,7 +21338,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (strcmp(token0_as_utf8, "bind_address") == 0) { ocelot_bind_address= is_enable; return; }
 
-  if (strcmp(token0_as_utf8, "can_handle_expired_passwords") == 0) /* not available in mysql client */
+  if (strcmp(token0_as_utf8, "connect_expired_password") == 0) /* not available in mysql client before version 5.7 */
   {
     ocelot_opt_can_handle_expired_passwords= is_enable;
     return;
@@ -21788,6 +21819,14 @@ unsigned int MainWindow::get_ocelot_protocol_as_int(QString ocelot_protocol)
 }
 
 
+/*
+  Todo: this routine calls mysql_options() iff option value != 0,
+  forgetting that 0 might be non-default, or a change from non-0.
+  Also it doesn't check whether mysql_options() failed, but okay.
+  Note: we don't pass ocelot_opt_can_handle_expired_passwords because
+  it does nothing (maybe due to an old libmysqlclient?), instead we
+  pass client_can_handle_expired_passwords to mysql_real_connect().
+*/
 int options_and_connect(
     unsigned int connection_number)
 {
@@ -21801,7 +21840,6 @@ int options_and_connect(
   if (ocelot_enable_cleartext_plugin == true) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_36, (char *) &ocelot_enable_cleartext_plugin);
   if (ocelot_init_command_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_3, ocelot_init_command_as_utf8);
   if (ocelot_opt_bind_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_24, ocelot_opt_bind_as_utf8);
-  if (ocelot_opt_can_handle_expired_passwords != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_37, (char *) &ocelot_opt_can_handle_expired_passwords);
   if (ocelot_opt_compress > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_1, NULL);
   if (ocelot_opt_connect_attr_delete_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_34, ocelot_opt_connect_attr_delete_as_utf8);
   if (ocelot_opt_connect_attr_reset != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_32, (char*) &ocelot_opt_connect_attr_reset);
@@ -21858,6 +21896,9 @@ int options_and_connect(
   }
 
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
+  unsigned long real_connect_flags= CLIENT_MULTI_RESULTS;
+  if (ocelot_opt_can_handle_expired_passwords != 0)
+    real_connect_flags|= (1UL << 22); /* CLIENT_CAN_HANDLE_EXPIRED_PASSWORDS */
 
   MYSQL *connect_result;
   char *socket_parameter= ocelot_unix_socket_as_utf8;
@@ -21870,7 +21911,7 @@ int options_and_connect(
                                                      ocelot_database_as_utf8,
                                                      ocelot_port,
                                                      socket_parameter,
-                                                     CLIENT_MULTI_RESULTS);
+                                                     real_connect_flags);
      if (connect_result != 0) break;
      /* See ocelot.ca blog post = Connecting to MySQL or MariaDB with sockets on Linux */
      /* Todo: you should provide info somewhere how the connection was actually done. */
@@ -22088,7 +22129,11 @@ int MainWindow::the_connect(unsigned int connection_number)
 void MainWindow::print_version()
 {
   printf("ocelotgui version %s", ocelotgui_version);
+#ifdef __linux
   printf(", for Linux");
+#else
+  printf(", for Windows");
+#endif
   #if __x86_64__
   printf(" (x86_64)");
   #endif

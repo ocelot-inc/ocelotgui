@@ -621,7 +621,7 @@ private:
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
   int make_statement_ready_to_send(QString, char *, int);
   void remove_statement(QString);
-  void action_execute_one_statement(QString text);
+  int action_execute_one_statement(QString text);
 
   void history_markup_make_strings();
   void history_markup_append(QString result_set_for_history, bool is_interactive);
@@ -1525,6 +1525,7 @@ private:
   bool is_client_statement(int, int, QString);
   int find_start_of_body(QString text, int *i_of_function, int *i_of_do);
   int connect_mysql(unsigned int connection_number);
+  void connect_mysql_error_box(QString, unsigned int);
 #ifdef DBMS_TARANTOOL
   int connect_tarantool(unsigned int connection_number);
   void tarantool_flush_and_save_reply();
