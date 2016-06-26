@@ -17544,6 +17544,8 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     next_is_semicolon_or_work= true;
   }
 
+  int hparse_i_of_start= hparse_i;
+
   if ((next_is_semicolon_or_work == false) && (hparse_f_accept(TOKEN_KEYWORD_BEGIN, "BEGIN") == 1))
   {
     hparse_statement_type= TOKEN_KEYWORD_BEGIN;
@@ -17714,6 +17716,10 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   }
   else if (hparse_f_accept(TOKEN_KEYWORD_IF, "IF") == 1)
   {
+    if (((main_token_flags[hparse_i_of_start] & TOKEN_FLAG_IS_FUNCTION)) != 0)
+    {
+      main_token_flags[hparse_i_of_start]= (main_token_flags[hparse_i_of_start] ^ TOKEN_FLAG_IS_FUNCTION);
+    }
     for (;;)
     {
       hparse_subquery_is_allowed= true;
