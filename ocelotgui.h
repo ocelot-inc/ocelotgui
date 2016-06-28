@@ -359,9 +359,9 @@ public:
   void hparse_f_next_nexttoken();
   void hparse_f_error();
   bool hparse_f_is_equal(QString,QString);
-  int hparse_f_accept(int,QString);
+  int hparse_f_accept(unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
-  int hparse_f_expect(int,QString);
+  int hparse_f_expect(unsigned char,int,QString);
   int hparse_f_literal();
   int hparse_f_default(int);
   int hparse_f_user_name();
@@ -369,6 +369,7 @@ public:
   int hparse_f_collation_name();
   int hparse_f_qualified_name();
   int hparse_f_qualified_name_with_star();
+  int hparse_f_qualified_name_of_object(int,int);
   int hparse_f_table_references();
   void hparse_f_table_escaped_table_reference();
   int hparse_f_table_reference(int);
@@ -1500,6 +1501,80 @@ private:
     TOKEN_KEYWORD_REPEAT_IN_REPEAT_EXPRESSION,
     TOKEN_TYPE_DELIMITER
   };
+
+/*
+  TOKEN_TYPE_... shows "what kind of token is it?" e.g. TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK.
+  TOKEN_REFTYPE_... shows "what kind of object does the token refer to?"
+  e.g. if it's identifier, is it a database identifier?
+  We only pass something specific if we are sure that is what must follow.
+  Beware: A "user" might be qualified within 'user'@'host' I guess that's a form of qualifier.
+  Beware: there are enum values for "x or y" e.g. "user or role", "database or table", etc.
+  Todo: store these in main_token_reftypes[] to help hovering.
+  Todo: knowing it's "column" doesn't help us yet with knowing: column of what?
+        but eventually we can bring in lists of objects, and refer to them by number-within-the-list
+  Todo: eventually we can be sure, after qualification is done, for a column (e.g. we've seen FROM)
+  Todo: "The syntax .tbl_name means the table tbl_name in the default database."
+  Todo: Get rid of enums that aren't actually used.
+... And my plan is:
+* Always pass reftype for hparse_f_accept and hparse_f_acceptn and hparse_f_expect
+* If the pass is "[identifier]" then the expected list gets "[table identifier]", etc.
+* Eventually, use this so we can auto-complete any object names
+  (We'll have a local list of object names so we can store numbers.)
+* Eventually, have reftypes for literals too -- again, meaning "what they refer to", not format
+* Check: sometimes TOKEN_TYPE_IDENTIFIER_WITH_AT is not appropriate
+* For LIMIT and OFFSET, the only possibilities are @variable and declared variable and parameter
+* I'd also like to restrict what FETCH variable can be
+* Whenever it is specific, IDENTIFIER_WITH_AT is not appropriate,
+  and a maximum length is applicable such as MYSQL_MAX_IDENTIFIER_LENGTH.
+* There is one case where we pass "[reserved function]" instead of "[identifier]".
+*/
+enum {
+    TOKEN_REFTYPE_ANY,                 /* any kind, or it's irrelevant, or we don't care */
+    TOKEN_REFTYPE_ALIAS, /* or correlation */
+    TOKEN_REFTYPE_CHANNEL,
+    TOKEN_REFTYPE_CHARACTER_SET,
+    TOKEN_REFTYPE_COLLATION,
+    TOKEN_REFTYPE_COLUMN,
+    TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE,
+    TOKEN_REFTYPE_CONDITION,
+    TOKEN_REFTYPE_CONDITION_OR_CURSOR,
+    TOKEN_REFTYPE_CONSTRAINT,
+    TOKEN_REFTYPE_CURSOR,
+    TOKEN_REFTYPE_DATABASE, /* or schema */
+    TOKEN_REFTYPE_DATABASE_OR_EVENT,
+    TOKEN_REFTYPE_DATABASE_OR_FUNCTION,
+    TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE,
+    TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
+    TOKEN_REFTYPE_DATABASE_OR_VIEW,
+    TOKEN_REFTYPE_ENGINE,
+    TOKEN_REFTYPE_EVENT,
+    TOKEN_REFTYPE_FUNCTION,
+    TOKEN_REFTYPE_HANDLER_ALIAS,
+    TOKEN_REFTYPE_HOST,
+    TOKEN_REFTYPE_INDEX,
+    TOKEN_REFTYPE_KEY_CACHE,
+    TOKEN_REFTYPE_LABEL,
+    TOKEN_REFTYPE_PARAMETER,
+    TOKEN_REFTYPE_PARSER,
+    TOKEN_REFTYPE_PLUGIN,
+    TOKEN_REFTYPE_PROCEDURE,
+    /* plus TOKEN_REFTYPE_RESERVED_FUNCTION */
+    TOKEN_REFTYPE_PARTITION,
+    TOKEN_REFTYPE_ROLE,
+    TOKEN_REFTYPE_SAVEPOINT,
+    TOKEN_REFTYPE_SERVER,
+    TOKEN_REFTYPE_STATEMENT,
+    TOKEN_REFTYPE_SUBPARTITION,
+    TOKEN_REFTYPE_TABLE,
+    TOKEN_REFTYPE_TABLESPACE,
+    TOKEN_REFTYPE_TRIGGER,
+    TOKEN_REFTYPE_USER,
+    TOKEN_REFTYPE_USER_VARIABLE,
+    TOKEN_REFTYPE_VARIABLE,         /* i.e. either USER_VARIABLE or DECLARED VARIABLE */
+    TOKEN_REFTYPE_VIEW,
+    TOKEN_REFTYPE_WRAPPER
+};
 
 /*
   ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
