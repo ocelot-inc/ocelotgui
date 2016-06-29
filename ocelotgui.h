@@ -368,6 +368,7 @@ public:
   int hparse_f_character_set_name();
   int hparse_f_collation_name();
   int hparse_f_qualified_name();
+  int hparse_f_qualified_name_of_column();
   int hparse_f_qualified_name_with_star();
   int hparse_f_qualified_name_of_object(int,int);
   int hparse_f_table_references();
@@ -421,7 +422,7 @@ public:
   int hparse_f_current_timestamp();
   void hparse_f_column_definition();
   void hparse_f_comment();
-  void hparse_f_column_list(int);
+  void hparse_f_column_list(int,int);
   void hparse_f_engine();
   void hparse_f_table_or_partition_options(int);
   void hparse_f_partition_options();
@@ -1541,15 +1542,19 @@ enum {
     TOKEN_REFTYPE_CONSTRAINT,
     TOKEN_REFTYPE_CURSOR,
     TOKEN_REFTYPE_DATABASE, /* or schema */
+    TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT,
     TOKEN_REFTYPE_DATABASE_OR_EVENT,
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION,
+    TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,
     TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
     TOKEN_REFTYPE_DATABASE_OR_VIEW,
     TOKEN_REFTYPE_ENGINE,
     TOKEN_REFTYPE_EVENT,
     TOKEN_REFTYPE_FUNCTION,
+    TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE,
     TOKEN_REFTYPE_HANDLER_ALIAS,
     TOKEN_REFTYPE_HOST,
     TOKEN_REFTYPE_INDEX,
@@ -1567,6 +1572,7 @@ enum {
     TOKEN_REFTYPE_STATEMENT,
     TOKEN_REFTYPE_SUBPARTITION,
     TOKEN_REFTYPE_TABLE,
+    TOKEN_REFTYPE_TABLE_OR_COLUMN,
     TOKEN_REFTYPE_TABLESPACE,
     TOKEN_REFTYPE_TRIGGER,
     TOKEN_REFTYPE_USER,
