@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.0
-   Last modified: June 28 2016
+   Last modified: June 29 2016
 */
 
 /*
@@ -559,6 +559,8 @@ static const char *s_color_list[308]=
   char hparse_errmsg[1024];
   QString hparse_next_token, hparse_next_next_token;
   int hparse_next_token_type, hparse_next_next_token_type;
+  QString hparse_next_next_next_token, hparse_next_next_next_next_token;
+  int hparse_next_next_next_token_type, hparse_next_next_next_next_token_type;
   bool hparse_begin_seen;
   int hparse_count_of_accepts;
   QString hparse_prev_token;
@@ -7824,6 +7826,19 @@ int MainWindow::rehash_scan()
 
   delete [] result_max_column_widths;
 
+///* TEST! start */
+//{
+//  printf("TEST!\n");
+//  long unsigned int r;
+//  char *row_pointer;
+//  unsigned long column_length;
+//  for (r= 0; r < rehash_result_row_count; ++r)
+//  {
+//    row_pointer= rehash_result_set_copy_rows[r];  printf("TEST! end\n");
+//  }
+//}
+/* TEST! end */
+
   return rehash_result_row_count;
 }
 
@@ -7835,7 +7850,7 @@ QString MainWindow::rehash_search(char *search_string)
 {
   long unsigned int r;
   char *row_pointer;
-  unsigned long column_length;
+  unsigned int column_length;
   unsigned int i;
   char column_value[512];
   unsigned int search_string_length;
@@ -10384,6 +10399,8 @@ void MainWindow::hparse_f_nexttoken()
 void MainWindow::hparse_f_next_nexttoken()
 {
   hparse_next_token= hparse_next_next_token= "";
+  hparse_next_next_next_token= "";
+  hparse_next_next_next_next_token= "";
   int saved_hparse_i= hparse_i;
   int saved_hparse_token_type= hparse_token_type;
   QString saved_hparse_token= hparse_token;
@@ -10398,6 +10415,18 @@ void MainWindow::hparse_f_next_nexttoken()
       hparse_f_nexttoken();
       hparse_next_next_token= hparse_token;
       hparse_next_next_token_type= hparse_token_type;
+    }
+    if (main_token_lengths[hparse_i] != 0)
+    {
+      hparse_f_nexttoken();
+      hparse_next_next_next_token= hparse_token;
+      hparse_next_next_next_token_type= hparse_token_type;
+    }
+    if (main_token_lengths[hparse_i] != 0)
+    {
+      hparse_f_nexttoken();
+      hparse_next_next_next_next_token= hparse_token;
+      hparse_next_next_next_next_token_type= hparse_token_type;
     }
   }
   hparse_i= saved_hparse_i;
@@ -10485,7 +10514,7 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
       {
         /* Starts with ` but doesn't end with ` so identifier required but not there yet. */
         /* TODO: hparse_expected= ""; equality stays false; fall though */
-        hparse_expected= token;
+        hparse_expected= hparse_f_token_to_appendee(token, reftype);
         return 0;
       }
     }
@@ -10495,7 +10524,7 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
       {
         /* Starts with " but doesn't end with " so identifier required but not there yet. */
           /* TODO: hparse_expected= ""; equality stays false; fall though */
-          hparse_expected= token;
+          hparse_expected= hparse_f_token_to_appendee(token, reftype);
         return 0;
       }
     }
@@ -10587,7 +10616,12 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
     return 1;
   }
   if (hparse_expected > "") hparse_expected.append(" or ");
+  hparse_expected.append(hparse_f_token_to_appendee(token, reftype));
+  return 0;
+}
 
+QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
+{
   QString appendee= token;
   if (token == "[identifier]")
   {
@@ -10610,6 +10644,7 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
     else if (reftype == TOKEN_REFTYPE_DATABASE_OR_PROCEDURE) appendee= "[database|procedure identifier]";
     else if (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE) appendee= "[database|table identifier]";
     else if (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN) appendee= "[database|table|column identifier]";
+    else if (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE) appendee= "[database|table|column|function|variable identifier]";
     else if (reftype == TOKEN_REFTYPE_DATABASE_OR_TRIGGER) appendee= "[database|trigger identifier]";
     else if (reftype == TOKEN_REFTYPE_DATABASE_OR_VIEW) appendee= "[database|view identifier]";
     else if (reftype == TOKEN_REFTYPE_ENGINE) appendee= "[engine identifier]";
@@ -10633,6 +10668,7 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
     else if (reftype == TOKEN_REFTYPE_SUBPARTITION) appendee= "[subpartition identifier]";
     else if (reftype == TOKEN_REFTYPE_TABLE) appendee= "[table identifier]";
     else if (reftype == TOKEN_REFTYPE_TABLE_OR_COLUMN) appendee= "[table|column identifier]";
+    else if (reftype == TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION) appendee= "[table|column|function identifier]";
     else if (reftype == TOKEN_REFTYPE_TABLESPACE) appendee= "[tablespace identifier]";
     else if (reftype == TOKEN_REFTYPE_TRIGGER) appendee= "[trigger identifier]";
     else if (reftype == TOKEN_REFTYPE_USER) appendee= "[user identifier]";
@@ -10641,10 +10677,8 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
     else if (reftype == TOKEN_REFTYPE_VARIABLE) appendee= "[variable identifier]";
     else if (reftype == TOKEN_REFTYPE_WRAPPER) appendee= "[wrapper identifier]";
   }
-  hparse_expected.append(appendee);
-  return 0;
+  return appendee;
 }
-
 
 /* A variant of hparse_f_accept for debugger keywords which can be shortened to n letters */
 /* TODO: are you checking properly for eof or ; ??? */
@@ -10777,7 +10811,7 @@ int MainWindow::hparse_f_user_name()
        || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 1)) {;}
     }
     else if ((hparse_token.mid(0, 1) == "@")
-          && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1))
+          && (hparse_f_accept(TOKEN_REFTYPE_HOST,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1))
     {
       ;
     }
@@ -10862,34 +10896,26 @@ int MainWindow::hparse_f_collation_name()
 */
 
 /*
-  Most database objects can be qualifed e.g. "a.b.c.d".
-  Todo: be more exact about the maximum number of qualification levels depending on object type.
-  Todo: Currently no object is quadruple-qualified, that's for future.
+  In the following explanatory lists, ID means IDENTIFIER,
+  BLANK means end-of-input, OTHER means non-blank-non-dot.
+  qualified_name_of_object:
+    ID "." ID             database . object
+    ID "." BLANK          database . expected-object
+    ID BLANK              database|object
+    ID OTHER              object
+  qualified_name_of_column:
+    ID "." ID "." ID      database . table . column
+    ID "." ID "." BLANK   database . table . expected-column
+    ID "." ID BLANK       database|table . table|column
+    ID "." ID OTHER       table . column
+    ID "." BLANK          database|table . expected-table-column
+    ID BLANK              database|table|column
+    ID OTHER              column
+  qualified_name_of_star:
+    "*"                   column
+    ID "." "*"            table . column
+    ID "." ID "." "*"     database . table . column
 */
-int MainWindow::hparse_f_qualified_name()
-{
-  if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
-  {
-    if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 1)
-    {
-      hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 1)
-      {
-        hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-        if (hparse_errno > 0) return 0;
-        if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 1)
-        {
-          hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-          if (hparse_errno > 0) return 0;
-        }
-      }
-    }
-    return 1;
-  }
-  return 0;
-}
-
 
 /*
   For names which might be qualified by [database_name]." namely:
@@ -10909,6 +10935,40 @@ int MainWindow::hparse_f_qualified_name_of_object(int database_or_object_identif
     if (hparse_errno > 0) return 0;
     return 1;
   }
+  if (hparse_next_next_token == "")
+  {
+    if (hparse_f_accept(database_or_object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+    {
+      return 1;
+    }
+    return 0;
+  }
+  if (hparse_f_accept(object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+  {
+    return 1;
+  }
+  return 0;
+}
+
+/*
+  Variant of hparse_f_qualified_name_of_object,"*" is acceptable.
+  For GRANT and REVOKE.
+*/
+int MainWindow::hparse_f_qualified_name_of_object_with_star(int database_or_object_identifier, int object_identifier)
+{
+  hparse_f_next_nexttoken();
+  if (hparse_next_token == ".")
+  {
+    if (hparse_f_accept(TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "*") == 0)
+      hparse_f_expect(TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+    if (hparse_errno > 0) return 0;
+    if (hparse_f_accept(object_identifier,TOKEN_TYPE_IDENTIFIER, "*") == 0)
+      hparse_f_expect(object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
   if (hparse_f_accept(database_or_object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
   {
     return 1;
@@ -10916,7 +10976,85 @@ int MainWindow::hparse_f_qualified_name_of_object(int database_or_object_identif
   return 0;
 }
 
+
 int MainWindow::hparse_f_qualified_name_of_column()
+{
+  hparse_f_next_nexttoken();
+
+  if ((hparse_token != "")
+   && (hparse_next_token == ".")
+   && (hparse_next_next_token != "")
+   && (hparse_next_next_next_token == "."))
+  {
+    hparse_f_expect(TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if ((hparse_token != "")
+   && (hparse_next_token == ".")
+   && (hparse_next_next_token != "")
+   && (hparse_next_next_next_token == ""))
+  {
+    hparse_f_expect(TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE_OR_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if ((hparse_token != "")
+   && (hparse_next_token == ".")
+   && (hparse_next_next_token != "")
+   && (hparse_next_next_next_token != ""))
+  {
+    hparse_f_expect(TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if ((hparse_token != "")
+   && (hparse_next_token == ".")
+   && (hparse_next_next_token == ""))
+  {
+    hparse_f_expect(TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE_OR_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if ((hparse_token != "")
+   && (hparse_next_token == ""))
+  {
+    if (hparse_f_accept(TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+    {
+      return 1;
+    }
+    if (hparse_errno > 0) return 0;
+    return 0;
+  }
+  if (hparse_f_accept(TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+  {
+      return 1;
+  }
+  if (hparse_errno > 0) return 0;
+  return 0;
+}
+
+int MainWindow::hparse_f_qualified_name_of_operand()
 {
   hparse_f_next_nexttoken();
   if (hparse_next_token == ".")
@@ -10928,7 +11066,7 @@ int MainWindow::hparse_f_qualified_name_of_column()
     hparse_f_next_nexttoken();
     if (hparse_next_token == ".")
     {
-      hparse_f_expect(TOKEN_REFTYPE_TABLE_OR_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return 0;
       hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
       if (hparse_errno > 0) return 0;
@@ -10937,12 +11075,12 @@ int MainWindow::hparse_f_qualified_name_of_column()
     }
     else
     {
-      hparse_f_expect(TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return 0;
     }
     return 1;
   }
-  if (hparse_f_accept(TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+  if (hparse_f_accept(TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
   {
     return 1;
   }
@@ -11737,7 +11875,7 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
   {
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
     if (hparse_errno > 0) return;
-    hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
@@ -11795,7 +11933,7 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
   }
 
   if ((identifier_seen == true)
-   || (hparse_f_qualified_name() == 1))
+   || (hparse_f_qualified_name_of_operand() == 1))
   {
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
@@ -12378,7 +12516,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FIRST") == 1) {;}
     else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AFTER") == 1)
     {
-      hparse_f_expect(TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[IDENTIFIER]");
+      hparse_f_expect(TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     }
     return;
@@ -14672,19 +14810,23 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
 
   hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON");
   if (hparse_errno > 0) return;
-  if ((hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") == 1)
-   || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FUNCTION") == 1)
-   || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PROCEDURE") == 1))
-    {;}
-  if ((hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)) /* priv_level */
+
+  if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PROCEDURE") == 1)
   {
-    if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 1)
-    {
-      if ((hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)) {;}
-      else hparse_f_error();
-    }
+    if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_PROCEDURE, TOKEN_REFTYPE_PROCEDURE) == 0)
+      hparse_f_error();
+    return;
   }
-  else hparse_f_error();
+  if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FUNCTION") == 1)
+  {
+    if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_FUNCTION, TOKEN_REFTYPE_FUNCTION) == 0)
+      hparse_f_error();
+    return;
+  }
+  if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") == 1)
+    {;}
+  if (hparse_f_qualified_name_of_object_with_star(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0)
+    hparse_f_error();
   if (hparse_errno > 0) return;
 }
 
@@ -14758,7 +14900,7 @@ int MainWindow::hparse_f_signal_or_resignal(int who_is_calling)
     if (hparse_f_literal() == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
   }
-  else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+  else if (hparse_f_accept(TOKEN_REFTYPE_CONDITION,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
   else if (who_is_calling == TOKEN_KEYWORD_SIGNAL) return 0;
   if (hparse_errno > 0) return 0;
   if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
@@ -14771,7 +14913,7 @@ int MainWindow::hparse_f_signal_or_resignal(int who_is_calling)
       if (hparse_errno > 0) return 0;
       if (hparse_f_literal() == 0)
       {
-        hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        hparse_f_expect(TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       }
       if (hparse_errno > 0) return 0;
     } while (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
@@ -16028,7 +16170,7 @@ void MainWindow::hparse_f_statement()
     }
     else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PREPARE")))
     {
-      hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(TOKEN_REFTYPE_STATEMENT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
       return;
     }
@@ -16395,7 +16537,7 @@ void MainWindow::hparse_f_statement()
     {
       if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
       {
-        hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        hparse_f_expect(TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
       }
     }
@@ -17983,11 +18125,11 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     else hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
     hparse_f_expect(TOKEN_REFTYPE_CURSOR,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-    hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
+    hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
     if (hparse_errno > 0) return;
     do
     {
-      hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
@@ -18164,12 +18306,11 @@ error:
       if (ocelot_auto_rehash > 0)
       {
         QString errmsg= hparse_errmsg;
-        if (errmsg.contains("[identifier]") == true)
+        if (errmsg.contains("identifier]") == true)
         {
           QString s;
           char search_string[512];
           int search_string_len;
-
           s= text.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
           if (s.left(1) == "`") s= s.right(s.size() - 1);
           else if (s.left(1) == "\"") s= s.right(s.size() - 1);
@@ -18180,7 +18321,7 @@ error:
           QString rehash_search_result= rehash_search(search_string);
           if (rehash_search_result > "")
           {
-            expected_list= "Expected: ";
+            expected_list= "Expecting: ";
             expected_list.append(rehash_search_result);
             unfinished_identifier_seen= true;
           }
@@ -18188,6 +18329,7 @@ error:
       }
     }
   }
+
   if ((unfinished_comment_seen == false) && (unfinished_identifier_seen == false))
   {
     expected_list= "Expecting: ";
@@ -18217,6 +18359,7 @@ error:
       if (word_start >= errmsg.size()) break;
     }
   }
+
   hparse_line_edit->setText(expected_list);
   hparse_line_edit->setCursorPosition(0);
   hparse_line_edit->show();
@@ -18540,7 +18683,7 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
   {
-    if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    if (hparse_f_accept(TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
       hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
     }

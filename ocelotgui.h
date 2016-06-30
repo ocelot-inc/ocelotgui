@@ -361,16 +361,18 @@ public:
   bool hparse_f_is_equal(QString,QString);
   int hparse_f_accept(unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
+  QString hparse_f_token_to_appendee(QString,int);
   int hparse_f_expect(unsigned char,int,QString);
   int hparse_f_literal();
   int hparse_f_default(int);
   int hparse_f_user_name();
   int hparse_f_character_set_name();
   int hparse_f_collation_name();
-  int hparse_f_qualified_name();
   int hparse_f_qualified_name_of_column();
   int hparse_f_qualified_name_with_star();
   int hparse_f_qualified_name_of_object(int,int);
+  int hparse_f_qualified_name_of_object_with_star(int,int);
+  int hparse_f_qualified_name_of_operand();
   int hparse_f_table_references();
   void hparse_f_table_escaped_table_reference();
   int hparse_f_table_reference(int);
@@ -1549,6 +1551,7 @@ enum {
     TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
     TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
     TOKEN_REFTYPE_DATABASE_OR_VIEW,
     TOKEN_REFTYPE_ENGINE,
@@ -1573,6 +1576,7 @@ enum {
     TOKEN_REFTYPE_SUBPARTITION,
     TOKEN_REFTYPE_TABLE,
     TOKEN_REFTYPE_TABLE_OR_COLUMN,
+    TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,
     TOKEN_REFTYPE_TABLESPACE,
     TOKEN_REFTYPE_TRIGGER,
     TOKEN_REFTYPE_USER,
