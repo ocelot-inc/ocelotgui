@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.0
-   Last modified: June 29 2016
+   Version: 1.0.1
+   Last modified: July 1 2016
 */
 
 /*
@@ -512,7 +512,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.1"; /* For --version. Make sure it's in manual too. */
 
   static unsigned char dbms_version_mask;
 
@@ -2621,7 +2621,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.0, May 27 2016  \
+  <BR>Version 1.0.1, July 1 2016  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -6541,7 +6541,7 @@ void MainWindow::remove_statement(QString text)
 int MainWindow::action_execute_one_statement(QString text)
 {
   //QString text;
-  MYSQL_RES *mysql_res_for_new_result_set;
+  MYSQL_RES *mysql_res_for_new_result_set= NULL;
   unsigned short int is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
   unsigned return_value= 0;
   ++statement_edit_widget->statement_count;
@@ -6698,6 +6698,12 @@ int MainWindow::action_execute_one_statement(QString text)
           statement is SELECT SHOW etc.), that would be better.
         */
 #ifdef DBMS_TARANTOOL
+        /* Yes mysql_res_for_new_result_set will be invalid. Fix, eh? */
+        if (connections_dbms[0] == DBMS_TARANTOOL)
+        {
+          MYSQL_RES r;
+          mysql_res_for_new_result_set= &r;
+        }
         if (connections_dbms[0] != DBMS_TARANTOOL)
 #endif
         mysql_res_for_new_result_set= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
@@ -10350,8 +10356,8 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
 /*
   The routines that start with "hparse_*" are a predictive recursive-descent
   recognizer for MySQL, generally assuming LL(1) grammar but allowing for a few quirks.
-  (A recognizer does all the recursive-descent parser stuff except that it generates nothing.)
-  Generally recrsive-descent parsers or recognizers are reputed to be good
+  (A recognizer does all the recursive-descent parser stuff except that it generates no tree.)
+  Generally recursive-descent parsers or recognizers are reputed to be good
   because they're simple and can produce good -- often predictive -- error messages,
   but bad because they're huge and slow, and that's certainly the case here.
   The intent is to make highlight and hover look good.
@@ -10404,7 +10410,6 @@ void MainWindow::hparse_f_next_nexttoken()
   int saved_hparse_i= hparse_i;
   int saved_hparse_token_type= hparse_token_type;
   QString saved_hparse_token= hparse_token;
-  /* todo: check this in h_parse_f_nextsym too? */
   if (main_token_lengths[hparse_i] != 0)
   {
     hparse_f_nexttoken();
@@ -10576,16 +10581,6 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
       equality= true;
     }
   }
-  //Following lines were removed on 2016-06-27
-  //else if (token == "[column identifier]")
-  //{
-  //  /* Todo: This should be a simple matter of checking whether it's really an identifier. */
-  //  /* Nah, column identifiers might be qualified. */
-  //  if (hparse_token.length() < MYSQL_MAX_IDENTIFIER_LENGTH)
-  //  {
-  //    equality= true;
-  //  }
-  //}
   else if (token == "[reserved function]")
   {
     if (((main_token_flags[hparse_i] & TOKEN_FLAG_IS_RESERVED) != 0)
@@ -15371,7 +15366,7 @@ int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
 
 /*
   For EXPLAIN and perhaps for ANALYZE, we want to accept only a
-  statement that would legal therein. So check if that's what follows,
+  statement that would be legal therein. So check if that's what follows,
   if it is then call hparse_f_statement, if it's not then call
   hparse_f_accept which is guaranteed to fail.
   Return 1 if it was a statement, else return 0 (which might also mean error).
@@ -18221,8 +18216,12 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_token_type= 0;
     hparse_next_token= "";
     hparse_next_next_token= "";
+    hparse_next_next_next_token= "";
+    hparse_next_next_next_next_token= "";
     hparse_next_token_type= 0;
     hparse_next_next_token_type= 0;
+    hparse_next_next_next_token_type= 0;
+    hparse_next_next_next_next_token_type= 0;
     hparse_prev_token= "";
     hparse_subquery_is_allowed= false;
     hparse_count_of_accepts= 0;
@@ -18520,6 +18519,7 @@ void MainWindow::hparse_f_other(int flags)
 int MainWindow::hparse_f_client_statement()
 {
   hparse_next_token= hparse_next_next_token= "";
+  hparse_next_next_next_token= hparse_next_next_next_next_token= "";
   int saved_hparse_i= hparse_i;
   int saved_hparse_token_type= hparse_token_type;
   QString saved_hparse_token= hparse_token;
@@ -19369,6 +19369,7 @@ void MainWindow::parse_f_program(QString text)
 */
 int MainWindow::connect_tarantool(unsigned int connection_number)
 {
+  (void) connection_number; /* suppress "unused parameter" warning */
   QString ldbms_return_string;
 
   ldbms_return_string= "";
@@ -19518,6 +19519,8 @@ void MainWindow::tarantool_flush_and_save_reply()
 /* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
 int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len)
 {
+  (void) dbms_query; /* suppress "unused parameter" warning */
+  (void) dbms_query_len; /* suppress "unused parameter" warning */
   tarantool_errno= 10001;
   strcpy(tarantool_errmsg, "Unknown Tarantool Error");
 
@@ -19560,7 +19563,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
   }
 
   /* DELETE + INSERT + REPLACE + (maybe?) SELECT require a tuple of values to insert or search */
-  struct tnt_stream *tuple;
+  struct tnt_stream *tuple= NULL;
   if (number_of_literals > 0)
   {
     tuple= lmysql->ldbms_tnt_object(NULL);
@@ -19863,6 +19866,7 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
     assert(field_type <= MP_EXT);
     uint32_t value_length;
     const char *value;
+    (void) value; /* suppress 'variable set but not used' warning */
     char value_as_string[64]; /* must be big enough for any sprintf() result */
     if (field_type == MP_NIL)
     {
@@ -19872,12 +19876,14 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
     if (field_type == MP_UINT)
     {
       uint64_t uint_value= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data);
-      value_length= sprintf(value_as_string, "%lu", uint_value);
+      long long unsigned int llu= uint_value;
+      value_length= sprintf(value_as_string, "%llu", llu);
     }
     if (field_type == MP_INT)
     {
       int64_t int_value= lmysql->ldbms_mp_decode_int(&tarantool_tnt_reply_data);
-      value_length= sprintf(value_as_string, "%ld", int_value);
+      long long int lli= int_value;
+      value_length= sprintf(value_as_string, "%lld", lli);
     }
     if (field_type == MP_STR)
     {
@@ -19923,7 +19929,7 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
       lmysql->ldbms_mp_next(&tarantool_tnt_reply_data);
       value_length= sizeof("EXT");
     }
-    assert(value_length >= 0);
+
     total_length+= value_length;
   }
   *bytes=   tarantool_tnt_reply_data - original_tarantool_tnt_reply_data;
@@ -19945,6 +19951,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
                char ***p_result_set_copy_rows,
                unsigned int **p_result_max_column_widths)
 {
+  (void) p_mysql_res; /* suppress "unused parameter" warning */
   unsigned long int v_r;
   unsigned int i;
   //char **v_row;
@@ -19980,7 +19987,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
   {
     (*p_result_set_copy_rows)[v_r]= result_set_copy_pointer;
-    char *tmp_copy_pointer= result_set_copy_pointer;
+    //char *tmp_copy_pointer= result_set_copy_pointer;
     /* Form a field name list the same way you did in tarantool_num_fields */
     QString field_name_list= "";
     {
@@ -20071,13 +20078,15 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         if (field_type == MP_UINT)
         {
           uint64_t uint_value= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data_copy);
-          value_length= sprintf(value_as_string, "%lu", uint_value);
+          long long unsigned int llu= uint_value;
+          value_length= sprintf(value_as_string, "%llu", llu);
           value= value_as_string;
         }
         if (field_type == MP_INT)
         {
           int64_t int_value= lmysql->ldbms_mp_decode_int(&tarantool_tnt_reply_data_copy);
-          value_length= sprintf(value_as_string, "%ld", int_value);
+          long long int lli= int_value;
+          value_length= sprintf(value_as_string, "%lld", lli);
           value= value_as_string;
         }
         if (field_type == MP_STR)
@@ -20120,7 +20129,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         result_set_copy_pointer+= value_length;
       }
     }
-    while (field_number_in_main_list < p_result_column_count)
+    while ((unsigned int) field_number_in_main_list < p_result_column_count)
     {
       /* Dump null. Todo: similar code appears 3 times. */
       if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;

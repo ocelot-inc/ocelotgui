@@ -22,7 +22,8 @@ For CMake: go to cmake.org/download
 For ocelotgui: go to github.com/ocelot-inc/ocelotgui
     You need to make sure you are getting recent source
     with the patches done on or after June 14 2016,
-    the version 1.0.0 "release" files will not work. An
+    so use the version 1.0.1 "release" files,
+    earlier "release" files will not work. An
     easy choice is git clone (to install git, see git-scm.com/downloads).
     git clone https://github.com/ocelot-inc/ocelotgui.git c:\ocelotgui
 
@@ -34,3 +35,4 @@ And now there should be a file named c:\ocelotgui\ocelotgui.exe.
 This has the same functionality as the Linux ocelotgui program,
 but has not been tested on all major Windows versions.
 When connecting, use protocol=tcp.
+Connection should work to any modern MySQL or MariaDB server.

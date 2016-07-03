@@ -23,12 +23,14 @@
   If DBMS_MARIADB is defined and --ocelot_dbms='mariadb',
     accept existence of MariaDB 10.1 roles and compound statements.
   If DBMS_TARANTOOL is defined and --ocelot_dbms='tarantool',
-    connection to a Tarantool server not a MySQL/MariaDB server.
-  #ifdef DBMS_TARANTOOL" was an aborted experiment, ordinarily this #define should be commented out.
+    connection is to a Tarantool server not a MySQL/MariaDB server, but
+    won't work on Windows because Tarantool library is not available.
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
-//#define DBMS_TARANTOOL 3
+#ifdef __linux
+#define DBMS_TARANTOOL 3
+#endif
 
 #define FLAG_VERSION_MYSQL_5_5      1
 #define FLAG_VERSION_MYSQL_5_6      2
@@ -3661,7 +3663,7 @@ void fillup(MYSQL_RES *mysql_res,
     copy_of_parent->tarantool_scan_field_names("org_table", result_column_count, &result_original_table_names);
     copy_of_parent->tarantool_scan_field_names("db", result_column_count, &result_original_database_names);
   }
-else
+  else
 #endif
   {
     scan_field_names("name", result_column_count, &result_field_names);
@@ -3676,7 +3678,7 @@ else
   {
     for (unsigned int i= 0; i < result_column_count; ++i) result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING;
   }
-else
+  else
 #endif
   for (unsigned int i= 0; i < result_column_count; ++i) result_field_types[i]= mysql_fields[i].type;
 

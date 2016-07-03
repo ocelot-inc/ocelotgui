@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 1.0.0</P>
+<P>Version 1.0.1</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -51,6 +51,7 @@ All rights reserved.</P>
 <H3 id="prerequisites">Prerequisites</H3><HR>
 
 <P>The basic prerequisites for installation are Linux, and the Qt library.
+(Read the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A> if it is absolutely necessary to run on Windows.)
 The libmysqlclient library will also be necessary, at runtime.</P>
 
 <H3 id="getting-the-qt-library">Getting the Qt library</H3><HR>
@@ -103,26 +104,26 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui_1.0.0qt4-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.0qt4-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui_1.0.1qt4-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.1qt4-1_i386.deb</PRE>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui_1.0.0-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.0-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui_1.0.1-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.1-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui_1.0.0qt4-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.0qt4-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui_1.0.1qt4-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.1qt4-1_amd64.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui_1.0.0-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.0-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui_1.0.1-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.1-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui-1.0.0qt4-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.0qt4-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui-1.0.1qt4-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.1qt4-1.x86_64.rpm</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui-1.0.0-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.0-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui-1.0.1-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.1-1.x86_64.rpm</PRE>
 For 32-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui-1.0.0qt4-1.i686.rpm
-sudo rpm -i ocelotgui-1.0.0qt4-1.i686.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui-1.0.1qt4-1.i686.rpm
+sudo rpm -i ocelotgui-1.0.1qt4-1.i686.rpm</PRE>
 </P>
 
 <H3 id="getting-and-using-the-ocelotgui-source">Getting and using the ocelotgui source</H3><HR>
@@ -150,14 +151,14 @@ A release includes the source files as of the release time.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, it usually is more stable.
 A release file is highlighted in green
-by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.0 is at
-https://github.com/ocelotgui/releases/download/1.0.0/ocelotgui-1.0.0.tar.gz.
+by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.1 is at
+https://github.com/ocelotgui/releases/download/1.0.1/ocelotgui-1.0.1.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.0/ocelotgui-1.0.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.1/ocelotgui-1.0.1.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui-1.0.0.tar.gz.</P>
+and click ocelotgui-1.0.1.tar.gz.</P>
 
 <P>A tip for SUSE 42.1: do the following install instructions in advance.
 If the packages alread exist, then there will be harmless error messages.<BR>
@@ -172,7 +173,7 @@ If the packages alread exist, then there will be harmless error messages.<BR>
  sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui-1.0.0.tar.gz
+ tar -zxvf ocelotgui-1.0.1.tar.gz
  cd ocelotgui</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
@@ -190,21 +191,24 @@ the typical build process is:<PRE>
 The above instructions will usually put the ocelotgui program and
 directories in subdirectories of /usr/local, so if /usr/local/bin
 is on your PATH then after this saying ocelotgui will start the program.
-However, it is often better to make and install a package,
+However, it is sometimes better to make and install a package,
 which will cause a few additional steps to be performed, such as
-registering so that the ocelotgui can be started from the launcher.
+registering so that ocelotgui can be started from the launcher.
 For Debian-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="DEB"
  make
  cpack
- sudo dpkg -i ocelotgui_1.0.0-1_i386.deb</PRE>
+ sudo dpkg -i ocelotgui_1.0.1-1_i386.deb
+ #or sudo dpkg -i ocelotgui_1.0.1-1_amd64.deb</PRE>
 For RPM-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="RPM"
  make
  cpack
- sudo rpm -i ocelotgui-1.0.0-1.x86_64.rpm</PRE>
+ sudo rpm -i ocelotgui-1.0.1-1.x86_64.rpm
+ #or sudo rpm -i ocelotgui-1.0.1-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
+For additional cmake options see the comments in CMakeLists.txt.
 </P>
 
 <P>Some other facts about the source package, for users who
@@ -232,7 +236,7 @@ For more commentary about compiling and building,
 read an ocelotgui.cpp comment that begins with the words
 "General comments".
 For instructions to build from source on Microsoft Windows,
-see the file windows.txt.
+see the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A>.
 </P>
 
 
@@ -266,7 +270,7 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.0.0, May 27 2016</P>
+<P>Version 1.0.1, July 1 2016</P>
 
 <P>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.</P>
   

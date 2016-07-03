@@ -1,5 +1,11 @@
-ocelotgui (1.0.0-1) UNRELEASED; urgency=low
+ocelotgui (1.0.1) UNRELEASED; urgency=low
+
+  * Some bug fixes.
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Fri, 01 Jul 2016 17:37:35 -0600
+
+ocelotgui (1.0.0) UNRELEASED; urgency=low
 
   * Initial release.
 
- -- Peter Gulutzan <pgulutzan@ocelot.ca>  Fri, 27 May 2016 12:00:00 -0600
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Thu, 27 May 2016 12:00:00 -0600
