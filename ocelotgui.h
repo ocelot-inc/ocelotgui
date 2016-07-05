@@ -3261,6 +3261,8 @@ public:
   unsigned int *grid_column_heights;                         /* dynamic-sized list of heights */
   unsigned char *grid_column_dbms_sources;                   /* dynamic-sized list of sources */
   unsigned short int *result_field_types;          /* dynamic-sized list of types */
+  unsigned int *result_field_charsetnrs;           /* dynamic-sized list of character set numbers */
+  unsigned int *result_field_flags;                /* dynamic-sized list of flags */
   unsigned long result_row_number;                    /* row number in result set */
   MYSQL_ROW row;
   int is_paintable;
@@ -3332,6 +3334,13 @@ public:
 /* Use NULL_STRING when displaying a column value which is null. Length is sizeof(NULL_STRING) - 1. */
 #define NULL_STRING "NULL"
 
+/* During scan_rows we might set a flag e.g. if a column value is null */
+#define FIELD_VALUE_FLAG_IS_ZERO 0
+#define FIELD_VALUE_FLAG_IS_NULL 1
+#define FIELD_VALUE_FLAG_IS_NUMBER 2
+#define FIELD_VALUE_FLAG_IS_STRING 4
+#define FIELD_VALUE_FLAG_IS_OTHER 8
+
 ResultGrid(
 //        MYSQL_RES *mysql_res,
         ldbms *passed_lmysql,
@@ -3352,7 +3361,9 @@ ResultGrid(
   result_max_column_widths= 0;
   grid_column_heights= 0;
   grid_column_dbms_sources= 0;
-  result_field_types= 0;  
+  result_field_types= 0;
+  result_field_charsetnrs= 0;
+  result_field_flags= 0;
   result_set_copy= 0;
   result_set_copy_rows= 0;
   result_field_names= 0;
@@ -3641,6 +3652,8 @@ void fillup(MYSQL_RES *mysql_res,
   }
   result_max_column_widths= new unsigned int[result_column_count];
   result_field_types= new unsigned short int[result_column_count];
+  result_field_charsetnrs= new unsigned int[result_column_count];
+  result_field_flags= new unsigned int[result_column_count];
 
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
@@ -3674,13 +3687,51 @@ void fillup(MYSQL_RES *mysql_res,
   }
 
 #ifdef DBMS_TARANTOOL
+  /* Scan entire result set to determine if NUM_FLAG should go on. */
   if (connections_dbms == DBMS_TARANTOOL)
   {
-    for (unsigned int i= 0; i < result_column_count; ++i) result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING;
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING;
+      result_field_charsetnrs[i]= 83; /* utf8, utf8_bin */
+      result_field_flags[i]= 0; /* todo: decide if it's numeric */
+    }
+    long unsigned int tmp_xrow;
+    char *pointer= result_set_copy_rows[0];
+    unsigned int v_length;
+    for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+    {
+      for (unsigned int i= 0; i < result_column_count; ++i)
+      {
+        memcpy(&v_length, pointer, sizeof(unsigned int));
+        char tmp_flag= *(pointer + sizeof(unsigned int));
+        if ((tmp_flag == FIELD_VALUE_FLAG_IS_NUMBER) || (tmp_flag == FIELD_VALUE_FLAG_IS_STRING))
+        {
+          if (result_field_flags[i] != FIELD_VALUE_FLAG_IS_STRING)
+          {
+            result_field_flags[i]= tmp_flag;
+          }
+        }
+        pointer+= v_length + sizeof(unsigned int) + sizeof(char);
+      }
+    }
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if (result_field_flags[i] == FIELD_VALUE_FLAG_IS_NUMBER)
+        result_field_flags[i]= NUM_FLAG;
+      else result_field_flags[i]= 0;
+    }
   }
   else
 #endif
-  for (unsigned int i= 0; i < result_column_count; ++i) result_field_types[i]= mysql_fields[i].type;
+  {
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      result_field_types[i]= mysql_fields[i].type;
+      result_field_charsetnrs[i]= mysql_fields[i].charsetnr;
+      result_field_flags[i]= mysql_fields[i].flags;
+    }
+  }
 
   /*
     At this point, we have:
@@ -4107,15 +4158,10 @@ void copy_result_to_gridx(int connections_dbms)
     gridx_result_indexes[j]= i;
     gridx_flags[j]= 0;
     gridx_field_types[j]= result_field_types[i];
-    /* TODO: This shouldn't be here. It's using mysql_fields[] after we should be done with setup */
-#ifdef DBMS_TARANTOOL
-    if (connections_dbms != DBMS_TARANTOOL)
-#endif
-    {
-      if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_VAR_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_VARBINARY;
-      if ((mysql_fields[i].charsetnr == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_BINARY;
-      if ((mysql_fields[i].charsetnr != 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_BLOB)) gridx_field_types[j]= OCELOT_DATA_TYPE_TEXT;
-    }
+    /* todo: following depends on MySQL quirks, should be done earlier */
+    if ((result_field_charsetnrs[i] == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_VAR_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_VARBINARY;
+    if ((result_field_charsetnrs[i] == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_BINARY;
+    if ((result_field_charsetnrs[i] != 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_BLOB)) gridx_field_types[j]= OCELOT_DATA_TYPE_TEXT;
     ++j;
   }
 
@@ -4650,7 +4696,7 @@ void scan_rows(unsigned int p_result_column_count,
       {
         if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
         memset(result_set_copy_pointer, 0, sizeof(unsigned int));
-        *(result_set_copy_pointer + sizeof(unsigned int))= 1;
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
         result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
       }
       else
@@ -4665,7 +4711,7 @@ void scan_rows(unsigned int p_result_column_count,
           unsigned int v_length= strlen(tmp);
           if (v_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_length;
           memcpy(result_set_copy_pointer, &v_length, sizeof(unsigned int));
-          *(result_set_copy_pointer + sizeof(unsigned int))= 0;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_ZERO;
           result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
           memcpy(result_set_copy_pointer, tmp, v_length);
           result_set_copy_pointer+= v_length;
@@ -4674,7 +4720,7 @@ void scan_rows(unsigned int p_result_column_count,
         {
           if (v_lengths[i] > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_lengths[i];
           memcpy(result_set_copy_pointer, &v_lengths[i], sizeof(unsigned int));
-          *(result_set_copy_pointer + sizeof(unsigned int))= 0;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_ZERO;
           result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
           memcpy(result_set_copy_pointer, v_row[i], v_lengths[i]);
           result_set_copy_pointer+= v_lengths[i];
@@ -4688,8 +4734,9 @@ void scan_rows(unsigned int p_result_column_count,
 /*
   Using the same technique as in scan_rows, make a copy of field names.
 
-  Todo: Wherever there is a reference to mysql_fields[...].name or mysql_fields[...].name_length,
-  replace with a reference to the appropriate spot in result_field_names.
+  Todo: This (length,data,length,data,length,data...) is a bad way to
+  store because we have to scan X entries in order to find field X name.
+  This would be better: (pointer,pointer,pointer,...data,data,data...).
 
   MYSQL_FIELD has: name, org_name, org_table, db. We only need name for result set
   display, but we need the others if user edits the result set (see TextEditWidget::keyPressEvent).
@@ -4858,7 +4905,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         ++text_edit_frames_index;
       }
       text_edit_frames[text_edit_frames_index]->content_length= new_content_length; /* include value. */
-      if (*(row_pointer - 1) == 1)
+      if (*(row_pointer - 1) == FIELD_VALUE_FLAG_IS_NULL)
       {
         text_edit_frames[text_edit_frames_index]->content_pointer= 0;
       }
@@ -4892,7 +4939,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 
       if (ocelot_result_grid_column_names_copy != 0) gridx_max_column_widths[column_number_within_gridx++]= v_lengths;
 
-      if (*(row_pointer - 1) == 1)
+      if (*(row_pointer - 1) == FIELD_VALUE_FLAG_IS_NULL)
       {
         gridx_max_column_widths[column_number_within_gridx]= sizeof(NULL_STRING) - 1;
       }
@@ -4958,7 +5005,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         {
           memcpy(&(text_edit_frames[text_edit_frames_index]->content_length), row_pointer, sizeof(unsigned int));
           row_pointer+= sizeof(unsigned int) + sizeof(char);
-          if (*(row_pointer - 1) == 1)
+          if (*(row_pointer - 1) == FIELD_VALUE_FLAG_IS_NULL)
           {
             text_edit_frames[text_edit_frames_index]->content_pointer= 0;
           }
@@ -5160,6 +5207,8 @@ void garbage_collect()
   if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
   if (grid_column_dbms_sources != 0) { delete [] grid_column_dbms_sources; grid_column_dbms_sources= 0; }
   if (result_field_types != 0) { delete [] result_field_types; result_field_types= 0; }
+  if (result_field_charsetnrs != 0) { delete [] result_field_charsetnrs; result_field_charsetnrs= 0; }
+  if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
   if (result_set_copy != 0) { delete [] result_set_copy; result_set_copy= 0; }
   if (result_set_copy_rows != 0) { delete [] result_set_copy_rows; result_set_copy_rows= 0; }
   if (result_field_names != 0) { delete [] result_field_names; result_field_names= 0; }
@@ -5262,59 +5311,40 @@ void dbms_set_grid_column_sources()
 unsigned int dbms_get_field_flag(unsigned int column_number, int connections_dbms)
 {
   (void) connections_dbms; /* suppress "unused parameter" warning */
-#ifdef DBMS_TARANTOOL
-  if (connections_dbms == DBMS_TARANTOOL) return 0;
-#endif
-  return mysql_fields[column_number].flags;
+  return result_field_flags[column_number];
 }
 
 
 QString dbms_get_field_name(unsigned int column_number, int connections_dbms)
 {
   (void) connections_dbms; /* suppress "unused parameter" warning */
-#ifdef DBMS_TARANTOOL
-  if (connections_dbms == DBMS_TARANTOOL)
+  char *result_field_names_pointer;
+  unsigned int v_lengths;
+  result_field_names_pointer= &result_field_names[0];
+  for (unsigned int i= 0; i < column_number; ++i)
   {
-    char *result_field_names_pointer;
-    char tmp[64];
-    unsigned int v_lengths;
-    result_field_names_pointer= &result_field_names[0];
-    for (unsigned int i= 0; i < column_number; ++i)
-    {
-      memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
-      result_field_names_pointer+= v_lengths + sizeof(unsigned int);
-    }
     memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
-    result_field_names_pointer+= sizeof(unsigned int);
-    strcpy(tmp, result_field_names_pointer);
-    QString s;
-    s= tmp;
-    return s;
+    result_field_names_pointer+= v_lengths + sizeof(unsigned int);
   }
-#endif
-  return mysql_fields[column_number].name;
+  memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+  result_field_names_pointer+= sizeof(unsigned int);
+  return result_field_names_pointer;
 }
 
 
 unsigned int dbms_get_field_name_length(unsigned int column_number, int connections_dbms)
 {
   (void) connections_dbms; /* suppress "unused parameter" warning */
-#ifdef DBMS_TARANTOOL
-  if (connections_dbms == DBMS_TARANTOOL)
+  char *result_field_names_pointer;
+  unsigned int v_lengths;
+  result_field_names_pointer= &result_field_names[0];
+  for (unsigned int i= 0; i < column_number; ++i)
   {
-    char *result_field_names_pointer;
-    unsigned int v_lengths;
-    result_field_names_pointer= &result_field_names[0];
-    for (unsigned int i= 0; i < column_number; ++i)
-    {
-      memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
-      result_field_names_pointer+= v_lengths + sizeof(unsigned int);
-    }
     memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
-    return v_lengths;
+    result_field_names_pointer+= v_lengths + sizeof(unsigned int);
   }
-#endif
-  return mysql_fields[column_number].name_length;
+  memcpy(&v_lengths, result_field_names_pointer, sizeof(unsigned int));
+  return v_lengths;
 }
 
 

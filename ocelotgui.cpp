@@ -6698,11 +6698,18 @@ int MainWindow::action_execute_one_statement(QString text)
           statement is SELECT SHOW etc.), that would be better.
         */
 #ifdef DBMS_TARANTOOL
-        /* Yes mysql_res_for_new_result_set will be invalid. Fix, eh? */
         if (connections_dbms[0] == DBMS_TARANTOOL)
         {
-          MYSQL_RES r;
-          mysql_res_for_new_result_set= &r;
+          /* todo: failing to check if statement started with comment */
+          if (main_token_types[0] == TOKEN_KEYWORD_SELECT)
+          {
+            /* Yes mysql_res_for_new_result_set will be invalid. Fix, eh? */
+            {
+              MYSQL_RES r;
+              mysql_res_for_new_result_set= &r;
+            }
+          }
+          else mysql_res_for_new_result_set= 0;
         }
         if (connections_dbms[0] != DBMS_TARANTOOL)
 #endif
@@ -6748,6 +6755,7 @@ int MainWindow::action_execute_one_statement(QString text)
             for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
             {
               r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+              r->is_paintable= 0;
               r->garbage_collect();
             }
             r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
@@ -19292,10 +19300,13 @@ void MainWindow::parse_f_statement()
     if (parse_errno > 0) return;
     parse_f_expect("[identifier]");
     if (parse_errno > 0) return;
-    parse_f_expect("WHERE");
-    if (parse_errno > 0) return;
-    parse_f_indexed_condition();
-    if (parse_errno > 0) return;
+    if (parse_f_accept("WHERE"))
+    {
+      parse_f_expect("WHERE");
+      if (parse_errno > 0) return;
+      parse_f_indexed_condition();
+      if (parse_errno > 0) return;
+    }
   }
   else if (parse_f_accept("UPDATE"))
   {
@@ -19564,7 +19575,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
 
   /* DELETE + INSERT + REPLACE + (maybe?) SELECT require a tuple of values to insert or search */
   struct tnt_stream *tuple= NULL;
-  if (number_of_literals > 0)
+  //if (number_of_literals > 0)
   {
     tuple= lmysql->ldbms_tnt_object(NULL);
     lmysql->ldbms_tnt_object_add_array(tuple, number_of_literals);
@@ -20058,7 +20069,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
           /* Dump null. Todo: similar code appears 3 times. */
           if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
           memset(result_set_copy_pointer, 0, sizeof(unsigned int));
-          *(result_set_copy_pointer + sizeof(unsigned int))= 1;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
           result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
           ++field_number_in_main_list;
         }
@@ -20070,7 +20081,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
         if (field_type == MP_NIL) lmysql->ldbms_mp_decode_nil(&tarantool_tnt_reply_data_copy);
         memset(result_set_copy_pointer, 0, sizeof(unsigned int));
-        *(result_set_copy_pointer + sizeof(unsigned int))= 1;
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
         result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
       }
       else
@@ -20081,6 +20092,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
           long long unsigned int llu= uint_value;
           value_length= sprintf(value_as_string, "%llu", llu);
           value= value_as_string;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
         if (field_type == MP_INT)
         {
@@ -20088,42 +20100,48 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
           long long int lli= int_value;
           value_length= sprintf(value_as_string, "%lld", lli);
           value= value_as_string;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
         if (field_type == MP_STR)
         {
           value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
         }
         if (field_type == MP_BIN)
         {
           value= lmysql->ldbms_mp_decode_bin(&tarantool_tnt_reply_data_copy, &value_length);
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
         }
         if (field_type == MP_BOOL)
         {
           bool bool_value= lmysql->ldbms_mp_decode_bool(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%d", bool_value);
           value= value_as_string;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
         }
         if (field_type == MP_FLOAT)
         {
           float float_value= lmysql->ldbms_mp_decode_float(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%f", float_value);
           value= value_as_string;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
         if (field_type == MP_DOUBLE)
         {
           double double_value= lmysql->ldbms_mp_decode_double(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%f", double_value);
           value= value_as_string;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
         if (field_type == MP_EXT)
         {
           lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%s", "EXT");
           value= value_as_string;
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
         }
         if (value_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= value_length;
         memcpy(result_set_copy_pointer, &value_length, sizeof(unsigned int));
-        *(result_set_copy_pointer + sizeof(unsigned int))= 0;
         result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
         memcpy(result_set_copy_pointer, value, value_length);
         result_set_copy_pointer+= value_length;
@@ -20134,7 +20152,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       /* Dump null. Todo: similar code appears 3 times. */
       if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
       memset(result_set_copy_pointer, 0, sizeof(unsigned int));
-      *(result_set_copy_pointer + sizeof(unsigned int))= 1;
+      *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
       result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
       ++field_number_in_main_list;
     }
