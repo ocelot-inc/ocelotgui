@@ -42,6 +42,7 @@
 #define FLAG_VERSION_MARIADB_10_2   64
 #define FLAG_VERSION_MARIADB_ALL    (8 | 16 | 32 | 64)
 #define FLAG_VERSION_ALL            (1 | 2 | 4 | 8 | 16 | 32 | 64)
+#define FLAG_VERSION_TARANTOOL      128
 
 #include <assert.h>
 
@@ -466,19 +467,15 @@ public:
   void hparse_f_parse_hint_line_create();
 
 #ifdef DBMS_TARANTOOL
-  void parse_f_nextsym();
-  void parse_f_error();
-  int parse_f_accept(QString);
-  int parse_f_expect(QString);
-  void parse_f_factor();
-  void parse_f_term();
-  void parse_f_expression();
-  void parse_f_restricted_expression();
-  void parse_f_indexed_condition();
-  void parse_f_statement();
-  void parse_f_assignment();
-  void parse_f_block();
-  void parse_f_program(QString text);
+  void tparse_f_factor();
+  void tparse_f_term();
+  void tparse_f_expression();
+  void tparse_f_restricted_expression();
+  void tparse_f_indexed_condition();
+  void tparse_f_statement();
+  void tparse_f_assignment();
+  void tparse_f_block(int);
+  void tparse_f_program(QString text);
 #endif
 #ifdef DBMS_TARANTOOL
   long unsigned int tarantool_num_rows();
@@ -1731,6 +1728,36 @@ enum {
 };
 
 #endif // MAINWINDOW_H
+
+#ifdef DBMS_TARANTOOL
+/*
+  Tarantool comments
+  ------------------
+
+  Automatic field names. Every tuple is an array with possible sub-arrays.
+  In standard SQL we'd designate with f[1] f[1][1] f[1][1][1].
+  But we will prefer f_1 f_1_1 f_1_1 so it's compatible with MySQL.
+  The letter "f" is arbitrary, it's #define TARANTOOL_FIELD_NAME_BASE.
+
+  Todo: probable bug: a map of arrays will probably cause a crash.
+  Todo: consider whether hparse_sql_mode_ansi_quotes should be true.
+*/
+
+/* If you want field names to start with "foo" instead of "f", change TARANTOOL_FIELD_NAME_BASE. */
+#define TARANTOOL_FIELD_NAME_BASE "f"
+
+/* Names like f_1_1 are shorter than 64 characters, but we might have user-defined names. */
+
+
+#define TARANTOOL_MAX_FIELD_NAME_LENGTH 64
+#define TARANTOOL_BOX_INDEX_EQ 0
+#define TARANTOOL_BOX_INDEX_ALL 2
+#define TARANTOOL_BOX_INDEX_LT 3
+#define TARANTOOL_BOX_INDEX_LE 4
+#define TARANTOOL_BOX_INDEX_GE 5
+#define TARANTOOL_BOX_INDEX_GT 6
+
+#endif
 
 /*****************************************************************************************************************************/
 /* THE TEXTEDITFRAME WIDGET */

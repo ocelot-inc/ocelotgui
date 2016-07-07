@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.1
-   Last modified: July 1 2016
+   Last modified: July 7 2016
 */
 
 /*
@@ -536,7 +536,7 @@ static const char *s_color_list[308]=
 /* Global Tarantool definitions */
   static struct tnt_stream *tnt;
   static int tarantool_errno;
-  static char tarantool_errmsg[1024];
+  static char tarantool_errmsg[1024]; /* same size as hparse_errmsg? */
 #endif
 
   static ldbms *lmysql= 0;
@@ -552,11 +552,8 @@ static const char *s_color_list[308]=
   QString hparse_expected;
   int hparse_errno;
   int hparse_token_type;
-  int hparse_offset_of_space_name= -1;
   int hparse_statement_type= -1;
-  int hparse_number_of_literals= 0;
-  int hparse_indexed_condition_count= 0;
-  char hparse_errmsg[1024];
+  char hparse_errmsg[1024]; /* same size as tarantool_errmsg? */
   QString hparse_next_token, hparse_next_next_token;
   int hparse_next_token_type, hparse_next_next_token_type;
   QString hparse_next_next_next_token, hparse_next_next_next_next_token;
@@ -8545,7 +8542,6 @@ void MainWindow::tokens_to_keywords(QString text, int start)
   /*
     Sorted list of keywords.
     If you change this, you must also change bsearch parameters and change TOKEN_KEYWORD list.
-    A * at the end of a word means it's reserved.
     We consider introducers e.g. _UTF8 to be equivalent to reserved words.
   */
 
@@ -10269,6 +10265,12 @@ void MainWindow::set_dbms_version_mask(QString version)
       dbms_version_mask= FLAG_VERSION_MYSQL_ALL;
     }
   }
+#ifdef DBMS_TARANTOOL
+  else if (version.contains("tarantool", Qt::CaseInsensitive) == true)
+  {
+    dbms_version_mask= FLAG_VERSION_TARANTOOL;
+  }
+#endif
   else dbms_version_mask= FLAG_VERSION_ALL;
 }
 
@@ -10548,7 +10550,6 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
       && ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_RESERVED) == 0)))
     {
       equality= true;
-      if (hparse_offset_of_space_name == -1) hparse_offset_of_space_name= hparse_i;
     }
   }
   else if (token == "[literal]")
@@ -10578,7 +10579,6 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
      || (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_BRACE)) /* obsolete? */
     {
       equality= true;
-      ++hparse_number_of_literals;
     }
   }
   else if (token == "[introducer]")
@@ -10595,6 +10595,24 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
      && ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0))
       equality= true;
   }
+#ifdef DBMS_TARANTOOL
+  else if (token == "[field identifier]")
+  {
+    int base_size= strlen(TARANTOOL_FIELD_NAME_BASE);
+    bool ok= false;
+    int field_integer= 0;
+    int field_integer_length= hparse_token.length() - (base_size + 1);
+    if (field_integer_length > 0) field_integer= hparse_token.right(field_integer_length).toInt(&ok);
+    if ((hparse_token.left(base_size) == TARANTOOL_FIELD_NAME_BASE)
+     && (hparse_token.mid(base_size, 1) == "_")
+     && (field_integer > 0)
+     && (ok == true)
+     && (hparse_token.length() < TARANTOOL_MAX_FIELD_NAME_LENGTH))
+    {
+      equality= true;
+    }
+  }
+#endif
   else if (QString::compare(hparse_token, token, Qt::CaseInsensitive) == 0)
   {
     equality= true;
@@ -18207,15 +18225,15 @@ void MainWindow::hparse_f_multi_block(QString text)
   if (connections_is_connected[0] == 1) hparse_dbms_mask= dbms_version_mask;
   else if (ocelot_dbms == "mariadb") hparse_dbms_mask= FLAG_VERSION_MARIADB_ALL;
   else if (ocelot_dbms == "mysql") hparse_dbms_mask= FLAG_VERSION_MYSQL_ALL;
+#ifdef DBMS_TARANTOOL
+  else if (ocelot_dbms == "tarantool") hparse_dbms_mask= FLAG_VERSION_TARANTOOL;
+#endif
   else hparse_dbms_mask= FLAG_VERSION_ALL;
   hparse_i= -1;
   hparse_delimiter_str= ocelot_delimiter_str;
   for (;;)
   {
-    hparse_offset_of_space_name= -1;
     hparse_statement_type= -1;
-    hparse_number_of_literals= 0;
-    hparse_indexed_condition_count= 0;
     hparse_errno= 0;
     hparse_expected= "";
     hparse_text_copy= text;
@@ -18254,6 +18272,13 @@ void MainWindow::hparse_f_multi_block(QString text)
     else
 #endif
     {
+#ifdef DBMS_TARANTOOL
+      if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+      {
+        tparse_f_block(0);
+      }
+      else
+#endif
       hparse_f_statement();
       if (hparse_errno > 0) goto error;
       /*
@@ -18833,16 +18858,10 @@ void MainWindow::hparse_f_parse_hint_line_create()
 
 #ifdef DBMS_TARANTOOL
 /*
-  Although this is currently within "#ifdef DBMS_TARANTOOL",
-  it probably is useful elsewhere too.
-*/
+  See ocelotgui.h comments under heading "Tarantool comments".
 
-/*
   Syntax check (!! THIS COMMENT MAY BE OBSOLETE!)
-  Go through all the tokens, comparing what we expect to what we got.
-  If any comparison fails, the error message will say:
-  what we expected, token number + offset + value for the token where comparison failed.
-  Allowed syntaxes are:
+  Use the recognizer for a small subset of MySQL/MariaDB syntax ...
   DELETE FROM identifier WHERE identifier = literal [AND identifier = literal ...];
   INSERT INTO identifier VALUES (literal [, literal...]);
   REPLACE INTO identifier VALUES (literal [, literal...]);
@@ -18852,190 +18871,38 @@ void MainWindow::hparse_f_parse_hint_line_create()
   SET identifier = expression [, identifier = expression ...]
   Legal comparison-operators within SELECT are = > < >= <=
   Comments are legal anywhere.
-  Keywords are usually not reserved, for example DELETE FROM INTO WHERE SELECT=5; is legal.
+  Todo: Keywords should not be reserved, for example DELETE FROM INTO WHERE SELECT=5; is legal.
 */
-
-/*
-  Tarantool comments
-  ------------------
-
-  Automatic field names. Every tuple is an array with possible sub-arrays.
-  In standard SQL we'd designate with f[1] f[1][1] f[1][1][1].
-  But we will prefer f_1 f_1_1 f_1_1 so it's compatible with MySQL.
-  The letter "f" is arbitrary, it's #define TARANTOOL_FIELD_NAME_BASE.
-
-  Todo: probable bug: a map of arrays will probably cause a crash.
-*/
-
-/* If you want field names to start with "foo" instead of "f", change TARANTOOL_FIELD_NAME_BASE. */
-#define TARANTOOL_FIELD_NAME_BASE "f"
-
-/* Names like f_1_1 are shorter than 64 characters, but we might have user-defined names. */
-
-
-#define TARANTOOL_MAX_FIELD_NAME_LENGTH 64
-#define TARANTOOL_BOX_INDEX_EQ 0
-#define TARANTOOL_BOX_INDEX_ALL 2
-#define TARANTOOL_BOX_INDEX_LT 3
-#define TARANTOOL_BOX_INDEX_LE 4
-#define TARANTOOL_BOX_INDEX_GE 5
-#define TARANTOOL_BOX_INDEX_GT 6
 
 /* These items are permanent and are initialized in parse_f_program */
-QString text_copy;
-QString parse_symbol;
-int parse_i;
-QString parse_expected;
-int parse_errno;
-int parse_symbol_type;
-int offset_of_space_name= -1;
-int statement_type= -1;
-int number_of_literals= 0;
-int iterator_type= TARANTOOL_BOX_INDEX_EQ;
-int parse_indexed_condition_count= 0;
-
-void MainWindow::parse_f_nextsym()
-{
-  if (parse_errno > 0) return;
-  for (;;)
-  {
-    ++parse_i;
-    parse_symbol_type= main_token_types[parse_i];
-    if ((parse_symbol_type != TOKEN_TYPE_COMMENT_WITH_SLASH)
-     && (parse_symbol_type != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-     && (parse_symbol_type != TOKEN_TYPE_COMMENT_WITH_MINUS))
-      break;
-  }
-  parse_symbol= text_copy.mid(main_token_offsets[parse_i], main_token_lengths[parse_i]);
-}
-
-void MainWindow::parse_f_error()
-{
-  if (parse_errno > 0) return;
-  QString q_errormsg= "Parse error. Got: ";
-  if (parse_symbol.length() > 10)
-  {
-    q_errormsg.append(parse_symbol.left(10));
-    q_errormsg.append("...");
-  }
-  else q_errormsg.append(parse_symbol);
-  q_errormsg.append("  (token #");
-  q_errormsg.append(QString::number(parse_i + 1));
-  q_errormsg.append(", offset ");
-  q_errormsg.append(QString::number(main_token_offsets[parse_i] + 1));
-  q_errormsg.append(") ");
-  q_errormsg.append(". Expected: ");
-  q_errormsg.append(parse_expected);
-  while ((unsigned) q_errormsg.toUtf8().length() >= (unsigned int) sizeof(tarantool_errmsg))
-    q_errormsg= q_errormsg.left(q_errormsg.length() - 1);
-  strcpy(tarantool_errmsg, q_errormsg.toUtf8());
-  parse_errno= 10400;
-  tarantool_errno= 10400;
-}
-
-/*
-  accept means: if current == expected then clear list of what was expected, get next, and return 1,
-                else add to list of what was expected, and return 0
-*/
-int MainWindow::parse_f_accept(QString token)
-{
-  if (parse_errno > 0) return 0;
-  bool equality= false;
-  if (token == "[identifier]")
-  {
-    if ((parse_symbol_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
-     || (parse_symbol_type == TOKEN_TYPE_IDENTIFIER_WITH_AT)
-     || (parse_symbol_type == TOKEN_TYPE_OTHER)
-     || (parse_symbol_type >= TOKEN_KEYWORDS_START))
-    {
-      equality= true;
-      if (offset_of_space_name == -1) offset_of_space_name= parse_i;
-    }
-  }
-  else if (token == "[literal]")
-  {
-    if ((parse_symbol_type == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-     || (parse_symbol_type == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
-     || (parse_symbol_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
-     || (parse_symbol_type == TOKEN_TYPE_LITERAL_WITH_BRACE))
-    {
-      equality= true;
-      ++number_of_literals;
-    }
-  }
-  else if (token == "[eof]")
-  {
-    if (parse_symbol.length() == 0)
-    {
-      equality=true;
-    }
-  }
-  else if (token == "[field identifier]")
-  {
-    int base_size= strlen(TARANTOOL_FIELD_NAME_BASE);
-    bool ok= false;
-    int field_integer= 0;
-    int field_integer_length= parse_symbol.length() - (base_size + 1);
-    if (field_integer_length > 0) field_integer= parse_symbol.right(field_integer_length).toInt(&ok);
-    if ((parse_symbol.left(base_size) == TARANTOOL_FIELD_NAME_BASE)
-     && (parse_symbol.mid(base_size, 1) == "_")
-     && (field_integer > 0)
-     && (ok == true)
-     && (parse_symbol.length() < TARANTOOL_MAX_FIELD_NAME_LENGTH))
-    {
-      equality= true;
-    }
-  }
-  else if (QString::compare(parse_symbol, token, Qt::CaseInsensitive) == 0)
-  {
-    equality= true;
-  }
-
-  if (equality == true)
-  {
-    parse_expected= "";
-    parse_f_nextsym();
-    return 1;
-  }
-  if (parse_expected > "") parse_expected.append(" or ");
-  parse_expected.append(token);
-  return 0;
-}
-
-/* expect means: if current == expected then get next and return 1; else error */
-int MainWindow::parse_f_expect(QString token)
-{
-  if (parse_errno > 0) return 0;
-  if (parse_f_accept(token)) return 1;
-  parse_f_error();
-  return 0;
-}
+int tparse_iterator_type= TARANTOOL_BOX_INDEX_EQ;
+int tparse_indexed_condition_count= 0;
 
 /*
  factor = identifier | literal | "(" expression ")" .
 */
-void MainWindow::parse_f_factor()
+void MainWindow::tparse_f_factor()
 {
-  if (parse_errno > 0) return;
-  if (parse_f_accept("[identifier]"))
+  if (hparse_errno > 0) return;
+  if (hparse_f_accept(TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[identifier]"))
   {
-    if (parse_errno > 0) return;
+    if (hparse_errno > 0) return;
   }
-  else if (parse_f_accept("[literal]"))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]"))
   {
-    if (parse_errno > 0) return;
+    if (hparse_errno > 0) return;
   }
-  else if (parse_f_accept("("))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "("))
   {
-    if (parse_errno > 0) return;
-    parse_f_expression();
-    if (parse_errno > 0) return;
-    parse_f_expect(")");
-    if (parse_errno > 0) return;
+    if (hparse_errno > 0) return;
+    tparse_f_expression();
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
+    if (hparse_errno > 0) return;
   }
   else
   {
-    parse_f_error();
+    hparse_f_error();
     return;
   }
 }
@@ -19043,42 +18910,42 @@ void MainWindow::parse_f_factor()
 /*
   term = factor {("*"|"/") factor}
 */
-void MainWindow::parse_f_term()
+void MainWindow::tparse_f_term()
 {
-  if (parse_errno > 0) return;
-  parse_f_factor();
-  if (parse_errno > 0) return;
-  while ((parse_f_accept("*") == 1) || (parse_f_accept("/") == 1))
+  if (hparse_errno > 0) return;
+  tparse_f_factor();
+  if (hparse_errno > 0) return;
+  while ((hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "*") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "/") == 1))
   {
-    parse_f_factor();
-    if (parse_errno > 0) return;
+    tparse_f_factor();
+    if (hparse_errno > 0) return;
   }
 }
 
 /*
    expression = ["+"|"-"] term {("+"|"-") term}
 */
-void MainWindow::parse_f_expression()
+void MainWindow::tparse_f_expression()
 {
-  if (parse_errno > 0) return;
-  if ((parse_f_accept("+") == 1) || (parse_f_accept("-") == 1)) {;}
-  parse_f_term();
-  if (parse_errno > 0) return;
-  while ((parse_f_accept("+") == 1) || (parse_f_accept("-") == 1))
+  if (hparse_errno > 0) return;
+  if ((hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1)) {;}
+  tparse_f_term();
+  if (hparse_errno > 0) return;
+  while ((hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1))
   {
-    parse_f_term();
-    if (parse_errno > 0) return;
+    tparse_f_term();
+    if (hparse_errno > 0) return;
   }
 }
 
 /*
   restricted expression = ["+"|"-"] literal
 */
-void MainWindow::parse_f_restricted_expression()
+void MainWindow::tparse_f_restricted_expression()
 {
-  if (parse_errno > 0) return;
-  if ((parse_f_accept("+") == 1) || (parse_f_accept("-") == 1)) {;}
-  parse_f_expect("[literal]");
+  if (hparse_errno > 0) return;
+  if ((hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1)) {;}
+  hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[literal]");
 }
 
 /*
@@ -19086,76 +18953,76 @@ void MainWindow::parse_f_restricted_expression()
      identifier ("="|"<"|"<="|">"|">=") literal
      [AND condition ...]
 */
-void MainWindow::parse_f_indexed_condition()
+void MainWindow::tparse_f_indexed_condition()
 {
-  if (parse_errno > 0) return;
+  if (hparse_errno > 0) return;
   do
   {
-    if (parse_indexed_condition_count >= 255)
+    if (tparse_indexed_condition_count >= 255)
     {
-      parse_expected= "no more conditions. The maximum is 255 (box.schema.INDEX_PART_MAX).";
-      parse_f_error();
+      hparse_expected= "no more conditions. The maximum is 255 (box.schema.INDEX_PART_MAX).";
+      hparse_f_error();
       return;
     }
     int comp_op= -1;
-    if (parse_errno > 0) return;
-    if (parse_f_accept("[field identifier]") == 0)
+    if (hparse_errno > 0) return;
+    if (hparse_f_accept(TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[field identifier]") == 0)
     {
-      parse_expected= "field identifier with the format: ";
-      parse_expected.append(TARANTOOL_FIELD_NAME_BASE);
-      parse_expected.append("_ followed by an integer greater than zero. ");
-      parse_expected.append("Maximum length = 64. ");
-      parse_expected.append(QString::number(TARANTOOL_MAX_FIELD_NAME_LENGTH));
-      parse_expected.append(". For example: ");
-      parse_expected.append(TARANTOOL_FIELD_NAME_BASE);
-      parse_expected.append("_1");
-      parse_f_error();
+      hparse_expected= "field identifier with the format: ";
+      hparse_expected.append(TARANTOOL_FIELD_NAME_BASE);
+      hparse_expected.append("_ followed by an integer greater than zero. ");
+      hparse_expected.append("Maximum length = 64. ");
+      hparse_expected.append(QString::number(TARANTOOL_MAX_FIELD_NAME_LENGTH));
+      hparse_expected.append(". For example: ");
+      hparse_expected.append(TARANTOOL_FIELD_NAME_BASE);
+      hparse_expected.append("_1");
+      hparse_f_error();
       return;
     }
 
-    if (parse_indexed_condition_count > 0)
+    if (tparse_indexed_condition_count > 0)
     {
       int ok= 0;
-      if ((parse_symbol == "<")
-       && (iterator_type == TARANTOOL_BOX_INDEX_LE)
-       && (parse_f_accept("<") == 1)) {;}
-      else if ((parse_symbol == ">")
-            && (iterator_type == TARANTOOL_BOX_INDEX_GE)
-            && (parse_f_accept(">") == 1)) ++ok;
-      else if ((parse_symbol == "=")
-            && (iterator_type == TARANTOOL_BOX_INDEX_EQ)
-            && (parse_f_accept("=") == 1)) ++ok;
-      else if ((parse_symbol == "<=")
-            && (iterator_type == TARANTOOL_BOX_INDEX_LE)
-            && (parse_f_accept("<=") == 1)) ++ok;
-      else if ((parse_symbol == ">=")
-            && (iterator_type == TARANTOOL_BOX_INDEX_GE)
-            && (parse_f_accept(">=") == 1)) ++ok;
+      if ((hparse_token == "<")
+       && (tparse_iterator_type == TARANTOOL_BOX_INDEX_LE)
+       && (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1)) {;}
+      else if ((hparse_token == ">")
+            && (tparse_iterator_type == TARANTOOL_BOX_INDEX_GE)
+            && (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1)) ++ok;
+      else if ((hparse_token == "=")
+            && (tparse_iterator_type == TARANTOOL_BOX_INDEX_EQ)
+            && (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1)) ++ok;
+      else if ((hparse_token == "<=")
+            && (tparse_iterator_type == TARANTOOL_BOX_INDEX_LE)
+            && (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1)) ++ok;
+      else if ((hparse_token == ">=")
+            && (tparse_iterator_type == TARANTOOL_BOX_INDEX_GE)
+            && (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1)) ++ok;
       if (ok == 0)
       {
-        parse_expected= "A conditional operator compatible with previous ones. ";
-        parse_expected.append("When there is more than one ANDed condition, ");
-        parse_expected.append("allowed combinations are: > after a series of >=s, ");
-        parse_expected.append("or < after a series of <=s, or all =s, or all >=s, or all <=s.");
-        parse_f_error();
+        hparse_expected= "A conditional operator compatible with previous ones. ";
+        hparse_expected.append("When there is more than one ANDed condition, ");
+        hparse_expected.append("allowed combinations are: > after a series of >=s, ");
+        hparse_expected.append("or < after a series of <=s, or all =s, or all >=s, or all <=s.");
+        hparse_f_error();
         return;
       }
     }
     else
     {
-      if (parse_f_accept("=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
-      else if (parse_f_accept("<") == 1) comp_op= TARANTOOL_BOX_INDEX_LT;
-      else if (parse_f_accept("<=") == 1) comp_op= TARANTOOL_BOX_INDEX_LE;
-      else if (parse_f_accept(">") == 1) comp_op= TARANTOOL_BOX_INDEX_GT;
-      else if (parse_f_accept(">=") == 1) comp_op= TARANTOOL_BOX_INDEX_GE;
-      else parse_f_error();
-      if (parse_errno > 0) return;
+      if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
+      else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1) comp_op= TARANTOOL_BOX_INDEX_LT;
+      else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1) comp_op= TARANTOOL_BOX_INDEX_LE;
+      else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1) comp_op= TARANTOOL_BOX_INDEX_GT;
+      else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1) comp_op= TARANTOOL_BOX_INDEX_GE;
+      else hparse_f_error();
+      if (hparse_errno > 0) return;
     }
-    iterator_type= comp_op;
-    ++parse_indexed_condition_count;
-    parse_f_expect("[literal]");
-    if (parse_errno > 0) return;
-  } while (parse_f_accept("AND"));
+    tparse_iterator_type= comp_op;
+    ++tparse_indexed_condition_count;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
+    if (hparse_errno > 0) return;
+  } while (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "AND"));
 }
 
 
@@ -19169,50 +19036,50 @@ void MainWindow::parse_f_indexed_condition()
   and <> as well as other comp-ops.
   May implement for a HAVING clause somday.
 */
-//void MainWindow::parse_f_unindexed_condition()
+//void MainWindow::tparse_f_unindexed_condition()
 //{
-//  if (parse_errno >0) return;
+//  if (hparse_errno >0) return;
 //  do
 //  {
-//    if (parse_errno > 0) return;
-//    parse_f_expression();
-//    if (parse_errno > 0) return;
+//    if (hparse_errno > 0) return;
+//    tparse_f_expression();
+//    if (hparse_errno > 0) return;
 //    /* TODO: THIS IS NOWHERE NEAR CORRECT! THERE MIGHT BE MORE THAN ONE OPERAND! */
 //    {
-//      if ((parse_symbol == "=")
-//      || (parse_symbol == "<>")
-//      || (parse_symbol == "<")
-//      || (parse_symbol == "<=")
-//      || (parse_symbol == ">")
-//      || (parse_symbol == ">="))
+//      if ((hparse_token == "=")
+//      || (hparse_token == "<>")
+//      || (hparse_token == "<")
+//      || (hparse_token == "<=")
+//      || (hparse_token == ">")
+//      || (hparse_token == ">="))
 //      {
-//        if (parse_symbol == "=") iterator_type= TARANTOOL_BOX_INDEX_EQ;
-//        if (parse_symbol == "<>") iterator_type= TARANTOOL_BOX_INDEX_ALL; /* TODO: NO SUPPORT */
-//        if (parse_symbol == "<") iterator_type= TARANTOOL_BOX_INDEX_LT;
-//        if (parse_symbol == "<=") iterator_type= TARANTOOL_BOX_INDEX_LE;
-//        if (parse_symbol == ">") iterator_type= TARANTOOL_BOX_INDEX_GT;
-//        if (parse_symbol == ">=") iterator_type= TARANTOOL_BOX_INDEX_GE;
-//        parse_f_nextsym();
+//        if (hparse_token == "=") tparse_iterator_type= TARANTOOL_BOX_INDEX_EQ;
+//        if (hparse_token == "<>") tparse_iterator_type= TARANTOOL_BOX_INDEX_ALL; /* TODO: NO SUPPORT */
+//        if (hparse_token == "<") tparse_iterator_type= TARANTOOL_BOX_INDEX_LT;
+//        if (hparse_token == "<=") tparse_iterator_type= TARANTOOL_BOX_INDEX_LE;
+//        if (hparse_token == ">") tparse_iterator_type= TARANTOOL_BOX_INDEX_GT;
+//        if (hparse_token == ">=") tparse_iterator_type= TARANTOOL_BOX_INDEX_GE;
+//        hparse_f_nexttoken();
 //        parse_f_expression();
 //      }
-//      else parse_f_error();
+//      else hparse_f_error();
 //    }
-//  } while (parse_f_accept("AND"));
+//  } while (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_IDENTIFIER, "AND"));
 //}
 
 
-void MainWindow::parse_f_assignment()
+void MainWindow::tparse_f_assignment()
 {
   do
   {
-    if (parse_errno > 0) return;
-    parse_f_expect("[identifier]");
-    if (parse_errno > 0) return;
-    parse_f_expect("=");
-    if (parse_errno > 0) return;
-    parse_f_expression();
-    if (parse_errno > 0) return;
-    } while (parse_f_accept(","));
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_VARIABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
+    if (hparse_errno > 0) return;
+    tparse_f_expression();
+    if (hparse_errno > 0) return;
+    } while (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
 }
 
 /*
@@ -19220,152 +19087,148 @@ statement =
     "insert" [into] ident "values" (literal {"," literal} )
     | "replace" [into] ident "values" (number {"," literal} )
     | "delete" "from" ident "where" condition [AND condition ...]
-    | "select" * "from" ident "where" condition [AND condition ...]
+    | "select" * "from" ident ["where" condition [AND condition ...]]
     | "set" ident = number [, ident = expression ...]
     | "truncate" "table" ident
     | "update" ident "set" ident=literal {"," ident=literal} WHERE condition [AND condition ...]
 */
-void MainWindow::parse_f_statement()
+void MainWindow::tparse_f_statement()
 {
-  if (parse_errno > 0) return;
-  if (parse_f_accept("INSERT"))
+  if (hparse_errno > 0) return;
+  if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INSERT"))
   {
-    if (parse_errno > 0) return;
-    statement_type= TOKEN_KEYWORD_INSERT;
-    parse_f_accept("INTO");
-    if (parse_errno > 0) return;
-    parse_f_expect("[identifier]");
-    if (parse_errno > 0) return;
-    parse_f_expect("VALUES");
-    if (parse_errno > 0) return;
-    parse_f_expect("(");
+    if (hparse_errno > 0) return;
+    hparse_statement_type= TOKEN_KEYWORD_INSERT;
+    hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "VALUES");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
     do
     {
-      if (parse_errno > 0) return;
-      parse_f_restricted_expression();
-      if (parse_errno > 0) return;
-    } while (parse_f_accept(","));
-    parse_f_expect(")");
-    if (parse_errno > 0) return;
+      if (hparse_errno > 0) return;
+      tparse_f_restricted_expression();
+      if (hparse_errno > 0) return;
+    } while (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
+    if (hparse_errno > 0) return;
   }
-  else if (parse_f_accept("REPLACE"))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "REPLACE"))
   {
-    if (parse_errno > 0) return;
-    statement_type= TOKEN_KEYWORD_REPLACE;
-    parse_f_accept("INTO");
-    if (parse_errno > 0) return;
-    parse_f_expect("INTO");
-    if (parse_errno > 0) return;
-    parse_f_expect("VALUES");
-    if (parse_errno > 0) return;
-    parse_f_expect("(");
+    if (hparse_errno > 0) return;
+    hparse_statement_type= TOKEN_KEYWORD_REPLACE;
+    hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
     do
     {
-      if (parse_errno > 0) return;
-      parse_f_expect("[literal]");
-      if (parse_errno > 0) return;
-    } while (parse_f_accept(","));
-    parse_f_expect("(");
-    if (parse_errno > 0) return;
+      if (hparse_errno > 0) return;
+      hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_errno > 0) return;
+    } while (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
+    if (hparse_errno > 0) return;
   }
-  else if (parse_f_accept("DELETE"))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "DELETE"))
   {
-    if (parse_errno > 0) return;
-    statement_type= TOKEN_KEYWORD_DELETE;
-    parse_f_expect("FROM");
-    if (parse_errno > 0) return;
-    parse_f_expect("[identifier]");
-    if (parse_errno > 0) return;
-    parse_f_expect("WHERE");
-    if (parse_errno > 0) return;
-    parse_f_indexed_condition();
-    if (parse_errno > 0) return;
+    if (hparse_errno > 0) return;
+    hparse_statement_type= TOKEN_KEYWORD_DELETE;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "FROM");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
+    if (hparse_errno > 0) return;
+    tparse_f_indexed_condition();
+    if (hparse_errno > 0) return;
   }
-  else if (parse_f_accept("TRUNCATE"))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TRUNCATE"))
   {
-    if (parse_errno > 0) return;
-    statement_type= TOKEN_KEYWORD_TRUNCATE;
-    parse_f_expect("TABLE");
-    if (parse_errno > 0) return;
-    parse_f_expect("[identifier]");
-    if (parse_errno > 0) return;
+    if (hparse_errno > 0) return;
+    hparse_statement_type= TOKEN_KEYWORD_TRUNCATE;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TABLE");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
   }
-  else if (parse_f_accept("SELECT"))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SELECT"))
   {
-    if (parse_errno > 0) return;
-    statement_type= TOKEN_KEYWORD_SELECT;
-    parse_f_expect("*");
-    if (parse_errno > 0) return;
-    parse_f_expect("FROM");
-    if (parse_errno > 0) return;
-    parse_f_expect("[identifier]");
-    if (parse_errno > 0) return;
-    if (parse_f_accept("WHERE"))
+    if (hparse_errno > 0) return;
+    hparse_statement_type= TOKEN_KEYWORD_SELECT;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "*");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "FROM");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+    if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE"))
     {
-      parse_f_expect("WHERE");
-      if (parse_errno > 0) return;
-      parse_f_indexed_condition();
-      if (parse_errno > 0) return;
+      tparse_f_indexed_condition();
+      if (hparse_errno > 0) return;
     }
   }
-  else if (parse_f_accept("UPDATE"))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "UPDATE"))
   {
-    statement_type= TOKEN_KEYWORD_UPDATE;
-    parse_f_expect("[identifier]");
-    if (parse_errno > 0) return;
-    parse_f_expect("SET");
-    if (parse_errno > 0) return;
-    parse_f_assignment();
-    if (parse_errno > 0) return;
-    parse_f_expect("WHERE");
-    if (parse_errno > 0) return;
-    parse_f_indexed_condition();
-    if (parse_errno > 0) return;
+    hparse_statement_type= TOKEN_KEYWORD_UPDATE;
+    hparse_f_expect(TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SET");
+    if (hparse_errno > 0) return;
+    tparse_f_assignment();
+    if (hparse_errno > 0) return;
+    hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
+    if (hparse_errno > 0) return;
+    tparse_f_indexed_condition();
+    if (hparse_errno > 0) return;
   }
-  else if (parse_f_accept("SET"))
+  else if (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SET"))
   {
-    statement_type= TOKEN_KEYWORD_SET;
-    parse_f_assignment();
-    if (parse_errno > 0) return;
+    hparse_statement_type= TOKEN_KEYWORD_SET;
+    tparse_f_assignment();
+    if (hparse_errno > 0) return;
   }
   else
   {
-    parse_f_error();
+    hparse_f_error();
   }
 }
 
 /*
   statement
 */
-void MainWindow::parse_f_block()
+void MainWindow::tparse_f_block(int calling_type)
 {
-  if (parse_errno > 0) return;
-  parse_f_statement();
+  (void) calling_type; /* to avoid "unused parameter" warning */
+  if (hparse_errno > 0) return;
+  tparse_iterator_type= TARANTOOL_BOX_INDEX_EQ;
+  tparse_indexed_condition_count= 0;
+  tparse_f_statement();
 }
 
-void MainWindow::parse_f_program(QString text)
+void MainWindow::tparse_f_program(QString text)
 {
-  tarantool_errno= 0;
+  tarantool_errno= 0; /* unnecessary, I think */
 
-  text_copy= text;
-  parse_symbol= "";
-  parse_i= -1;
-  parse_expected= "";
-  parse_errno= 0;
-  parse_symbol_type= 0;
-  offset_of_space_name= -1;
-  statement_type= -1;
-  number_of_literals= 0;
-  iterator_type= TARANTOOL_BOX_INDEX_EQ;
-  parse_indexed_condition_count= 0;
-
-  parse_f_nextsym();
-  parse_f_block();
-  if (parse_errno > 0) return;
+  hparse_text_copy= text;
+  hparse_token= "";
+  hparse_i= -1;
+  hparse_expected= "";
+  hparse_errno= 0;
+  hparse_token_type= 0;
+  hparse_statement_type= -1;
+  hparse_f_nexttoken();
+  tparse_f_block(0);
+  if (hparse_errno > 0) return;
   /* If you've got a bloody semicolon that's okay too */
-  if (parse_f_expect(";")) return;
-  parse_f_expect("[eof]"); /* was: parse_expect(TOKEN_KEYWORD_PERIOD); */
-  if (parse_errno > 0) return;
+  if (hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ";")) return;
+  hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[eof]"); /* was: parse_expect(TOKEN_KEYWORD_PERIOD); */
+  if (hparse_errno > 0) return;
 }
 #endif
 
@@ -19528,6 +19391,11 @@ void MainWindow::tarantool_flush_and_save_reply()
 }
 
 /* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
+/*
+   TODO: We must not rely on tparse_iterator_type.
+   We must recalculate it within this function.
+   Otherwise, we won't be able to do multiple queries on a line.
+*/
 int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len)
 {
   (void) dbms_query; /* suppress "unused parameter" warning */
@@ -19536,21 +19404,57 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
   strcpy(tarantool_errmsg, "Unknown Tarantool Error");
 
   QString text= statement_edit_widget->toPlainText();
-  int i;
   int token_type=-1;
-  //int statement_type=-1, clause_type=-1;
+  //int hparse_statement_type=-1, clause_type=-1;
   //QString current_token, what_we_expect, what_we_got;
 
-  parse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
+  tparse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
 
-  if (parse_errno > 0)
+  if (hparse_errno > 0)
   {
-    tarantool_errno= parse_errno;
+    strcpy(tarantool_errmsg, hparse_errmsg);
+    tarantool_errno= hparse_errno;
     return tarantool_errno;
   }
 
+  /* The first non-comment in a statement must be the statement type. */
+  int statement_type= -1;
+  for (unsigned int i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
+  {
+    int token_type= main_token_types[i];
+    if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (token_type == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (token_type == TOKEN_TYPE_COMMENT_WITH_MINUS))
+    {
+      continue;
+    }
+    statement_type= main_token_types[i];
+    break;
+  }
+
+  /* The number of literals in a statement must be what we'd insert etc. */
+  int number_of_literals= 0;
+  for (unsigned int i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
+  {
+    if (main_token_types[i] == TOKEN_TYPE_LITERAL)
+    {
+      ++number_of_literals;
+    }
+  }
+
   /* The first identifier in any of the statements must be the space name. */
-  /* TODO: UNLESS statement_type == TOKEN_KEYWORD_SET! */
+  /* TODO: UNLESS hparse_statement_type == TOKEN_KEYWORD_SET! */
+  /* TODO: This is another reason for having a table of reftypes, eh? */
+  int offset_of_space_name= -1;
+  for (unsigned int i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
+  {
+    if (main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+    {
+      offset_of_space_name= (int) i;
+      break;
+    }
+  }
+
   int spaceno= -1;
   {
     int i= offset_of_space_name;
@@ -19580,7 +19484,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
     tuple= lmysql->ldbms_tnt_object(NULL);
     lmysql->ldbms_tnt_object_add_array(tuple, number_of_literals);
     int number_of_adds= 0;
-    for (i= 0; main_token_types[i] != 0; ++i)
+    for (unsigned int i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
     {
       token_type= main_token_types[i];
       if (token_type == TOKEN_TYPE_LITERAL)
@@ -19659,7 +19563,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
 
   if (statement_type == TOKEN_KEYWORD_SELECT)
   {
-    lmysql->ldbms_tnt_select(tnt, spaceno, 0, (2^32) - 1, 0, iterator_type, tuple);
+    lmysql->ldbms_tnt_select(tnt, spaceno, 0, (2^32) - 1, 0, tparse_iterator_type, tuple);
     tarantool_flush_and_save_reply();
     if (tarantool_errno != 0) return tarantool_errno;
     /* The return should be an array of arrays of scalars. */
