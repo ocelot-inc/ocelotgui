@@ -19392,9 +19392,7 @@ void MainWindow::tarantool_flush_and_save_reply()
 
 /* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
 /*
-   TODO: We must not rely on tparse_iterator_type.
-   We must recalculate it within this function.
-   Otherwise, we won't be able to do multiple queries on a line.
+   Todo: we shouldn't be calling tparse_f_program() yet again!
 */
 int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len)
 {
@@ -19408,7 +19406,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
   //int hparse_statement_type=-1, clause_type=-1;
   //QString current_token, what_we_expect, what_we_got;
 
-  tparse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
+//  tparse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
 
   if (hparse_errno > 0)
   {
@@ -19474,6 +19472,25 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
         strcpy(tarantool_errmsg, s.toUtf8());
         return tarantool_errno;
       }
+    }
+  }
+
+  /*
+    The iterator type, if there is one, is the first comp-op
+    in the statement. If there are more comp-ops, we've already
+    checked that they're valid, during tparse_f_indexed_condition().
+  */
+  int iterator_type= TARANTOOL_BOX_INDEX_EQ;;
+  for (unsigned int i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
+  {
+    if (main_token_types[i] == TOKEN_TYPE_OPERATOR)
+    {
+      QString token= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (token == "=") { iterator_type= TARANTOOL_BOX_INDEX_EQ; break; }
+      if (token == "<") { iterator_type= TARANTOOL_BOX_INDEX_LT; break; }
+      if (token == "<=") {iterator_type= TARANTOOL_BOX_INDEX_LE; break; }
+      if (token == ">") { iterator_type= TARANTOOL_BOX_INDEX_GT; break; }
+      if (token == ">=") { iterator_type= TARANTOOL_BOX_INDEX_GE; break; }
     }
   }
 
@@ -19563,7 +19580,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
 
   if (statement_type == TOKEN_KEYWORD_SELECT)
   {
-    lmysql->ldbms_tnt_select(tnt, spaceno, 0, (2^32) - 1, 0, tparse_iterator_type, tuple);
+    lmysql->ldbms_tnt_select(tnt, spaceno, 0, (2^32) - 1, 0, iterator_type, tuple);
     tarantool_flush_and_save_reply();
     if (tarantool_errno != 0) return tarantool_errno;
     /* The return should be an array of arrays of scalars. */
