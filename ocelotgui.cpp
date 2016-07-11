@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.1
-   Last modified: July 7 2016
+   Last modified: July 12 2016
 */
 
 /*
@@ -1299,7 +1299,6 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
   QStringList statement_lines;
   int statement_line_index;
   QString history_statement;
-
   plainTextEditContents= query_utf16; /* Todo: consider: why bother copying rather than using query_uitf16? */
   statement_lines= plainTextEditContents.split("\n");
   //statement_line_index= 0;                                                          /* Todo throw this useless line away */
@@ -6542,7 +6541,6 @@ int MainWindow::action_execute_one_statement(QString text)
   unsigned short int is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
   unsigned return_value= 0;
   ++statement_edit_widget->statement_count;
-
   /*
     Todo: There should be an indication that something is being executed.
     Possibly, on the title bar, setPlainText(tr("Executing ...")
@@ -6678,6 +6676,7 @@ int MainWindow::action_execute_one_statement(QString text)
         if (ocelot_no_beep == 0) QApplication::beep();
         delete []dbms_query;
         return_value= 1;
+        put_diagnostics_in_result();
       }
       else {
         delete []dbms_query;
@@ -6718,6 +6717,7 @@ int MainWindow::action_execute_one_statement(QString text)
             central window with "result_grid_table_widget[0]->hide()", but we don't.
           */
           get_sql_mode(main_token_types[main_token_number], text);
+          put_diagnostics_in_result();
         }
         else
         {
@@ -6779,7 +6779,7 @@ int MainWindow::action_execute_one_statement(QString text)
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(); /* Do this while we still have number of rows */
-          history_markup_append(result_set_for_history, true);
+          //history_markup_append(result_set_for_history, true);
 
 #ifdef DBMS_TARANTOOL
           if ((connections_dbms[0] != DBMS_TARANTOOL)
@@ -6820,11 +6820,11 @@ int MainWindow::action_execute_one_statement(QString text)
                 if (dbms_long_query_result == 1)
                 {
                   put_diagnostics_in_result();
-                  history_markup_append("", true);
+                  //history_markup_append("", true);
                 }
                 break;
               }
-
+              /* todo: consider appending row count to result message */
               mysql_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
 
               /* I think the following will help us avoid the "status" return. */
@@ -6863,7 +6863,7 @@ int MainWindow::action_execute_one_statement(QString text)
           }
         }
       }
-      put_diagnostics_in_result();
+      //put_diagnostics_in_result();
     }
   }
 
@@ -18945,7 +18945,7 @@ void MainWindow::tparse_f_restricted_expression()
 {
   if (hparse_errno > 0) return;
   if ((hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1)) {;}
-  hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[literal]");
+  hparse_f_expect(TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
 }
 
 /*
