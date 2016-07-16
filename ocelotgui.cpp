@@ -11532,6 +11532,7 @@ void MainWindow::hparse_f_opr_5(int who_is_calling) /* Precedence = 5 */
 */
 void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
 {
+  if (hparse_errno > 0) return;
   if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION, "CASE") == 1)
   {
     int when_count= 0;
@@ -11757,6 +11758,7 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
 
 void MainWindow::hparse_f_opr_8(int who_is_calling) /* Precedence = 8 */
 {
+  if (hparse_errno > 0) return;
   hparse_f_opr_9(who_is_calling);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "|") == 1)
@@ -11801,6 +11803,7 @@ void MainWindow::hparse_f_opr_11(int who_is_calling) /* Precedence = 11 */
 
 void MainWindow::hparse_f_opr_12(int who_is_calling) /* Precedence = 12 */
 {
+  if (hparse_errno > 0) return;
   hparse_f_opr_13(who_is_calling);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "*") == 1)
@@ -12270,10 +12273,15 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)
     {
+      int hparse_i_of_char= hparse_i;
       if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHAR") == 0)
       {
         hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY");
         if (hparse_errno > 0) return;
+      }
+      if (((main_token_flags[hparse_i_of_char] & TOKEN_FLAG_IS_FUNCTION)) != 0)
+      {
+        main_token_flags[hparse_i_of_char]= (main_token_flags[hparse_i_of_char] ^ TOKEN_FLAG_IS_FUNCTION);
       }
       if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
       {
@@ -12315,6 +12323,7 @@ void MainWindow::hparse_f_expression_list(int who_is_calling)
           && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]")))
     {
       hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
+      if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*");
     }
     else
@@ -13225,8 +13234,13 @@ int MainWindow::hparse_f_data_type()
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_YEAR;
   }
+  int hparse_i_of_char= hparse_i;
   if ((hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHAR") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHARACTER") == 1))
   {
+    if (((main_token_flags[hparse_i_of_char] & TOKEN_FLAG_IS_FUNCTION)) != 0)
+    {
+      main_token_flags[hparse_i_of_char]= (main_token_flags[hparse_i_of_char] ^ TOKEN_FLAG_IS_FUNCTION);
+    }
     bool byte_seen= false, varying_seen= false;
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BYTE") == 1) byte_seen= true;
     else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARYING") == 1) varying_seen= true;
@@ -13273,7 +13287,14 @@ int MainWindow::hparse_f_data_type()
   if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NATIONAL") == 1)
   {
     bool varchar_seen= false;
-    if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHAR") == 1) {;}
+    hparse_i_of_char= hparse_i;
+    if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHAR") == 1)
+    {
+      if (((main_token_flags[hparse_i_of_char] & TOKEN_FLAG_IS_FUNCTION)) != 0)
+      {
+        main_token_flags[hparse_i_of_char]= (main_token_flags[hparse_i_of_char] ^ TOKEN_FLAG_IS_FUNCTION);
+      }
+    }
     else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHARACTER") == 1) {;}
     else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1) varchar_seen= true;
     else hparse_f_error();
@@ -13648,6 +13669,7 @@ void MainWindow::hparse_f_column_list(int is_compulsory, int is_maybe_qualified)
     if (is_maybe_qualified == 0)
     {
       hparse_f_expect(TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
     }
     else
     {
@@ -14164,6 +14186,7 @@ void MainWindow::hparse_f_alter_or_create_event(int statement_type)
     if (hparse_errno > 0) return;
     on_seen= true;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCHEDULE");
+    if (hparse_errno > 0) return;
     on_schedule_seen= true;
   }
   else /* if statement_type == TOKEN_KEYWORD_ALTER */
@@ -14890,6 +14913,7 @@ void MainWindow::hparse_f_insert_or_replace()
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+    if (hparse_errno > 0) return;
     col_name_list_seen= true;
   }
   if ((col_name_list_seen == false) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1))
@@ -16289,6 +16313,7 @@ void MainWindow::hparse_f_statement()
         hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
         if (hparse_errno > 0) return;
         hparse_f_expect(TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
       }
     }
     else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRIGGER")))
@@ -16340,6 +16365,7 @@ void MainWindow::hparse_f_statement()
   {
     hparse_statement_type= TOKEN_KEYWORD_EXECUTE;
     hparse_f_expect(TOKEN_REFTYPE_STATEMENT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USING"))
     {
       do
