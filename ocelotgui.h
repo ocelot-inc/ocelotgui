@@ -459,7 +459,8 @@ public:
   void hparse_f_where();
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
-  void hparse_f_block(int);
+  void hparse_f_block(int, int);
+  int hparse_f_labels(int);
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
@@ -1726,11 +1727,13 @@ enum {
 
   int history_markup_counter; /* 0 when execute, +1 when "previous statement", -1 for "next statement" */
 
-  /* main_token_offsets|lengths|types|flags are alloc'd in main_token_new() */
+  /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
   int  *main_token_offsets;
   int  *main_token_lengths;
   int  *main_token_types;
   unsigned char *main_token_flags; /* e.g. TOKEN_FLAG_IS_RESERVED */
+  int  *main_token_pointers;
+  unsigned char *main_token_reftypes;
   unsigned int main_token_max_count;
   unsigned int main_token_count;
   unsigned int main_token_count_in_statement;

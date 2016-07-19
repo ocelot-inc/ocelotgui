@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.1
-   Last modified: July 15 2016
+   Last modified: July 18 2016
 */
 
 /*
@@ -363,7 +363,6 @@ static const char *s_color_list[308]=
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
 
-
 /* Whenever you see STRING_LENGTH_512, think: here's a fixed arbitrary allocation, which should be be fixed up. */
 #define STRING_LENGTH_512 512
 
@@ -546,26 +545,27 @@ static const char *s_color_list[308]=
   unsigned int mysql_errno_result= 0;
 
 
-  QString hparse_text_copy;
-  QString hparse_token;
-  int hparse_i;
-  QString hparse_expected;
-  int hparse_errno;
-  int hparse_token_type;
-  int hparse_statement_type= -1;
-  char hparse_errmsg[1024]; /* same size as tarantool_errmsg? */
-  QString hparse_next_token, hparse_next_next_token;
-  int hparse_next_token_type, hparse_next_next_token_type;
-  QString hparse_next_next_next_token, hparse_next_next_next_next_token;
-  int hparse_next_next_next_token_type, hparse_next_next_next_next_token_type;
-  bool hparse_begin_seen;
-  int hparse_count_of_accepts;
-  QString hparse_prev_token;
-  bool hparse_like_seen;
-  bool hparse_subquery_is_allowed;
-  QString hparse_delimiter_str;
-  bool hparse_sql_mode_ansi_quotes= false;
-  unsigned char hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
+  static QString hparse_text_copy;
+  static QString hparse_token;
+  static int hparse_i;
+  static QString hparse_expected;
+  static int hparse_errno;
+  static int hparse_token_type;
+  static int hparse_statement_type= -1;
+  static char hparse_errmsg[1024]; /* same size as tarantool_errmsg? */
+  static QString hparse_next_token, hparse_next_next_token;
+  static int hparse_next_token_type, hparse_next_next_token_type;
+  static QString hparse_next_next_next_token, hparse_next_next_next_next_token;
+  static int hparse_next_next_next_token_type, hparse_next_next_next_next_token_type;
+  static bool hparse_begin_seen;
+  static int hparse_count_of_accepts;
+  static int hparse_i_of_last_accepted;
+  static QString hparse_prev_token;
+  static bool hparse_like_seen;
+  static bool hparse_subquery_is_allowed;
+  static QString hparse_delimiter_str;
+  static bool hparse_sql_mode_ansi_quotes= false;
+  static unsigned char hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
 
 int main(int argc, char *argv[])
 {
@@ -1982,12 +1982,16 @@ void MainWindow::main_token_new(int text_size)
       delete [] main_token_lengths;
       delete [] main_token_types;
       delete [] main_token_flags;
+      delete [] main_token_pointers;
+      delete [] main_token_reftypes;
     }
     desired_count= (desired_count - (desired_count % 1000)) + 1000;
     main_token_offsets= new int[desired_count];
     main_token_lengths= new int[desired_count];
     main_token_types= new int[desired_count];
     main_token_flags= new unsigned char[desired_count];
+    main_token_pointers= new int[desired_count];
+    main_token_reftypes= new unsigned char[desired_count];
     main_token_max_count= desired_count;
   }
 }
@@ -10537,6 +10541,7 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
       //main_token_types[hparse_i + 1]= proposed_type;
       hparse_expected= "";
       hparse_f_nexttoken();
+      hparse_i_of_last_accepted= hparse_i;
       hparse_f_nexttoken();
       ++hparse_count_of_accepts;
       return 1;
@@ -10654,7 +10659,9 @@ int MainWindow::hparse_f_accept(unsigned char reftype, int proposed_type, QStrin
       else main_token_types[hparse_i]= proposed_type;
     }
     else main_token_types[hparse_i]= proposed_type;
+    main_token_reftypes[hparse_i]= reftype;
     hparse_expected= "";
+    hparse_i_of_last_accepted= hparse_i;
     hparse_f_nexttoken();
     ++hparse_count_of_accepts;
     return 1;
@@ -14263,7 +14270,7 @@ void MainWindow::hparse_f_alter_or_create_event(int statement_type)
   if (hparse_errno > 0) return;
   if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DO") == 1)
   {
-    hparse_f_block(TOKEN_KEYWORD_EVENT);
+    hparse_f_block(TOKEN_KEYWORD_EVENT, hparse_i);
     if (hparse_errno > 0) return;
   }
   else if (statement_type == TOKEN_KEYWORD_CREATE) hparse_f_error();
@@ -15897,7 +15904,7 @@ void MainWindow::hparse_f_statement()
         if (hparse_errno > 0) return;
         hparse_f_characteristics();
         if (hparse_errno > 0) return;
-        hparse_f_block(TOKEN_KEYWORD_FUNCTION);
+        hparse_f_block(TOKEN_KEYWORD_FUNCTION, hparse_i);
         if (hparse_errno > 0) return;
       }
     }
@@ -15921,7 +15928,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_characteristics();
       if (hparse_errno > 0) return;
-      hparse_f_block(TOKEN_KEYWORD_PROCEDURE);
+      hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i);
       if (hparse_errno > 0) return;
     }
     else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && ((hparse_flags & HPARSE_FLAG_USER) != 0) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROLE, "ROLE") == 1))
@@ -16061,7 +16068,7 @@ void MainWindow::hparse_f_statement()
         if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TRIGGER, TOKEN_REFTYPE_TRIGGER) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      hparse_f_block(TOKEN_KEYWORD_TRIGGER);
+      hparse_f_block(TOKEN_KEYWORD_TRIGGER, hparse_i);
       if (hparse_errno > 0) return;
     }
     else if (((hparse_flags & HPARSE_FLAG_USER) != 0) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USER, "USER") == 1))
@@ -17882,7 +17889,7 @@ void MainWindow::hparse_f_statement()
   compound statement, or statement
   Pass: calling_statement_type = 0 (top level) | TOKEN_KEYWORD_FUNCTION/PROCEDURE/EVENT/TRIGGER
 */
-void MainWindow::hparse_f_block(int calling_statement_type)
+void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
 {
   if (hparse_errno > 0) return;
   hparse_subquery_is_allowed= false;
@@ -17894,8 +17901,15 @@ void MainWindow::hparse_f_block(int calling_statement_type)
       check they're valid when you see reference
       show what they are when you see hover (requires showing where they're declared too)
       ... but currently we're saying any identifier will be okay
-  */
+    But we're working on it. As a first step, for keeping track of
+    scope, we have hparse_i_of_block = offset of last
+    BEGIN|LOOP|WHILE|REPEAT|IF (or label that precedes that, if any).
+    So when we reach END we can set main_token_pointers[] to point
+    "back" to where a block started.
+    Todo: Consider using the same technique for ()s and statements.
+    Todo: Consider pointing forward as well as backward. */
 
+  int hparse_i_of_block= -1;
   QString label= "";
   /* Label check. */
   /* Todo: most checks are illegal if preceded by a label. Check for that. */
@@ -17906,6 +17920,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     {
       label= hparse_token;
       hparse_f_expect(TOKEN_REFTYPE_LABEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_i_of_block= hparse_i_of_last_accepted;
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
       if (hparse_errno > 0) return;
@@ -17929,6 +17944,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   int hparse_i_of_start= hparse_i;
   if ((next_is_semicolon_or_work == false) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN, "BEGIN") == 1))
   {
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_statement_type= TOKEN_KEYWORD_BEGIN;
     hparse_begin_seen= true;
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
@@ -17981,7 +17997,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
             }
             if (hparse_errno > 0) return;
           } while (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-          hparse_f_block(calling_statement_type);
+          hparse_f_block(calling_statement_type, block_top);
           continue;
         }
         int identifier_count= 0;
@@ -18038,17 +18054,19 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     {
       for (;;)
       {
-        hparse_f_block(calling_statement_type);
+        hparse_f_block(calling_statement_type, block_top);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
       }
     }
+    main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, label);
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE, "CASE") == 1)
   {
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     int when_count= 0;
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 0)
      {
@@ -18072,7 +18090,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
       int break_word= 0;
       for (;;)
       {
-        hparse_f_block(calling_statement_type);
+        hparse_f_block(calling_statement_type, block_top);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) {break_word= TOKEN_KEYWORD_END; break; }
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1) {break_word= TOKEN_KEYWORD_WHEN; break; }
@@ -18083,12 +18101,13 @@ void MainWindow::hparse_f_block(int calling_statement_type)
       assert(break_word == TOKEN_KEYWORD_ELSE);
       for (;;)
       {
-        hparse_f_block(calling_statement_type);
+        hparse_f_block(calling_statement_type, block_top);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
       }
       break;
     }
+    main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE, "CASE");
     if (hparse_errno > 0) return;
     hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, label);
@@ -18097,6 +18116,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF") == 1)
   {
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     if (((main_token_flags[hparse_i_of_start] & TOKEN_FLAG_IS_FUNCTION)) != 0)
     {
       main_token_flags[hparse_i_of_start]= (main_token_flags[hparse_i_of_start] ^ TOKEN_FLAG_IS_FUNCTION);
@@ -18112,7 +18132,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
       int break_word= 0;
       for (;;)
       {
-        hparse_f_block(calling_statement_type);
+        hparse_f_block(calling_statement_type, block_top);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) {break_word= TOKEN_KEYWORD_END; break; }
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ELSEIF") == 1) {break_word= TOKEN_KEYWORD_ELSEIF; break; }
@@ -18123,12 +18143,13 @@ void MainWindow::hparse_f_block(int calling_statement_type)
       assert(break_word == TOKEN_KEYWORD_ELSE);
       for (;;)
       {
-        hparse_f_block(calling_statement_type);
+        hparse_f_block(calling_statement_type, block_top);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
       }
       break;
     }
+    main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF");
     if (hparse_errno > 0) return;
     hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, label);
@@ -18137,12 +18158,14 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOOP, "LOOP") == 1)
   {
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
-      hparse_f_block(calling_statement_type);
+      hparse_f_block(calling_statement_type, block_top);
       if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
+    main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOOP, "LOOP");
     if (hparse_errno > 0) return;
     hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, label);
@@ -18151,9 +18174,10 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPEAT, "REPEAT") == 1)
   {
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
-      hparse_f_block(calling_statement_type);
+      hparse_f_block(calling_statement_type, block_top);
       if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNTIL") == 1) break;
     }
@@ -18162,6 +18186,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     hparse_subquery_is_allowed= false;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END");
     if (hparse_errno > 0) return;
+    main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPEAT, "REPEAT");
     if (hparse_errno > 0) return;
     if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, label)) return;
@@ -18171,8 +18196,13 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   else if ((hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ITERATE, "ITERATE") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEAVE") == 1))
   {
     /* todo: ITERATE and LEAVE should cause an error if we've never seen BEGIN/LOOP/etc. */
-    hparse_f_expect(TOKEN_REFTYPE_LABEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
+    //hparse_f_expect(TOKEN_REFTYPE_LABEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    //if (hparse_errno > 0) return;
+    if (hparse_f_labels(block_top) == 0)
+    {
+      hparse_f_error();
+      return;
+    }
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
   }
@@ -18220,6 +18250,7 @@ void MainWindow::hparse_f_block(int calling_statement_type)
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "WHILE") == 1)
   {
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0);
     hparse_subquery_is_allowed= false;
@@ -18228,10 +18259,11 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     if (hparse_errno > 0) return;
     for (;;)
     {
-      hparse_f_block(calling_statement_type);
+      hparse_f_block(calling_statement_type, block_top);
       if (hparse_errno > 0) return;
       if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
+    main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "WHILE");
     if (hparse_errno > 0) return;
     hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, label);
@@ -18250,6 +18282,34 @@ void MainWindow::hparse_f_block(int calling_statement_type)
     if (hparse_errno > 0) return;
     return;
   }
+}
+
+/*
+  Called from hparse_f_block() for LEAVE label or ITERATE label.
+  We go up in main_token list until we hit the top,
+  skipping out-of-scope blocks.
+  If we pass a label, accept it, it's a legitimate target.
+  Todo: Make sure elsewhere that TOKEN_KEYWORD_END is always legitimate.
+*/
+int MainWindow::hparse_f_labels(int block_top)
+{
+  for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
+  {
+    if (main_token_types[i] == TOKEN_KEYWORD_END)
+    {
+      int j= main_token_pointers[i];
+      if ((j >= i) || (j < 0)) return 0; /* should be an assert */
+      i= main_token_pointers[i];
+      continue;
+    }
+    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+     && (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL))
+    {
+      QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (hparse_f_accept(TOKEN_REFTYPE_LABEL, TOKEN_TYPE_IDENTIFIER, s) == 1) return 1;
+    }
+  }
+  return 0;
 }
 
 /*
@@ -18298,6 +18358,7 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_prev_token= "";
     hparse_subquery_is_allowed= false;
     hparse_count_of_accepts= 0;
+    hparse_i_of_last_accepted= 0;
     if (hparse_i == -1) hparse_f_nexttoken();
     if (hparse_f_client_statement() == 1)
     {
@@ -18314,7 +18375,7 @@ void MainWindow::hparse_f_multi_block(QString text)
 #ifdef DBMS_MARIADB
     if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
-      hparse_f_block(0);
+      hparse_f_block(0, hparse_i);
     }
     else
 #endif
@@ -18427,7 +18488,11 @@ error:
         if ((s_token.left(1) == "[")
          || (QString::compare(hparse_token, s_token.left(hparse_token.size()), Qt::CaseInsensitive) == 0))
         {
-          if (expected_list.contains(s_token, Qt::CaseInsensitive) == false)
+          /* This bit is to prevent saying the same token twice */
+          QString s_token_2= s_token;
+          s_token_2.append(" ");
+          QString expected_list_2= expected_list.right(expected_list.size() - 11);
+          if (expected_list_2.contains(s_token_2, Qt::CaseInsensitive) == false)
           {
             expected_list.append(s_token);
             expected_list.append(" ");
@@ -18922,8 +18987,8 @@ void MainWindow::hparse_f_parse_hint_line_create()
 */
 
 /* These items are permanent and are initialized in parse_f_program */
-int tparse_iterator_type= TARANTOOL_BOX_INDEX_EQ;
-int tparse_indexed_condition_count= 0;
+static int tparse_iterator_type= TARANTOOL_BOX_INDEX_EQ;
+static int tparse_indexed_condition_count= 0;
 
 /*
  factor = identifier | literal | "(" expression ")" .

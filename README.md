@@ -418,7 +418,7 @@ will be correct, syntax errors will be underlined in red,
 and -- since the parsing method is predictive -- there will be
 continuous hints about what word is expected next, and
 optionally an error message explaining suspected syntax problems
-before they to to the server.</P>
+before they go to the server.</P>
 
 <P>Once a statement has been entered and is ready to be executed,
 the user can hit control-E, choose menu item Run|Execute, or
@@ -695,10 +695,9 @@ is started again. Alternatively, settings can be placed in my.cnf.</P>
 
 <P>RE: DEBUGGING WITH MYSQL 5.7. Oracle has made a significant
 incompatible behavior change in version 5.7, which affects the
-debugger. The current workaround is to say
-"set global show_compatibility_56=on;". We expect to have a
-more permanent fix for this problem in a forthcoming ocelotgui
-version.</P>
+debugger. The originally recommended workaround was to say
+"set global show_compatibility_56=on;". We believe we have made a
+more permanent fix for this problem in ocelotgui version 1.01.</P>
 
 <P>RE: CONNECTION DIALOG. As stated earlier, if a password is necessary
 to connect, it is sufficient to start ocelotgui with "--password=<i>password</i>"
