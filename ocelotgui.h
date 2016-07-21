@@ -408,8 +408,8 @@ public:
   void hparse_f_indexes_or_keys();
   void hparse_f_alter_or_create_clause(int,unsigned short int*,bool*);
   int hparse_f_semicolon_and_or_delimiter(int);
-  int hparse_f_explainable_statement();
-  void hparse_f_statement();
+  int hparse_f_explainable_statement(int);
+  void hparse_f_statement(int);
   void hparse_f_assignment(int);
   void hparse_f_alter_table();
   int hparse_f_character_set();
@@ -449,18 +449,21 @@ public:
   int hparse_f_analyze_or_optimize(int,int*);
   void hparse_f_call();
   void hparse_f_commit_or_rollback();
-  void hparse_f_explain_or_describe();
+  void hparse_f_explain_or_describe(int);
   void hparse_f_grant_or_revoke(int,bool*);
   void hparse_f_insert_or_replace();
   void hparse_f_condition_information_item_name();
-  int hparse_f_signal_or_resignal(int);
+  int hparse_f_signal_or_resignal(int,int);
   int hparse_f_into();
   int hparse_f_select(bool);
   void hparse_f_where();
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
-  int hparse_f_labels(int);
+  void hparse_f_labels(int);
+  void hparse_f_cursors(int);
+  int hparse_f_conditions(int);
+  void hparse_f_variables(int);
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
@@ -639,6 +642,148 @@ private:
   void statement_edit_widget_setstylesheet();
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
+
+/*
+  ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
+    0 = none
+    1 = use for highlights
+    2 = errors, i.e. pop up a dialog box if user tries to execute a bad-looking statement
+    4 = severe e.g. look whether declared variable is known
+    8 = severe e.g. look whether table is known (need to ask server)
+   16 = tooltip
+   32 = word-completion
+   ... although so far the only thing being checked is 2 = errors
+*/
+#define FLAG_FOR_HIGHLIGHTS 1
+#define FLAG_FOR_ERRORS     2
+
+  void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
+
+  int token_type(QChar *token, int token_length);
+
+  void tokens_to_keywords(QString text, int start);
+  void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text, int start);
+  int next_token(int i);
+  bool is_client_statement(int, int, QString);
+  int find_start_of_body(QString text, int start, int *i_of_function, int *i_of_do);
+  int connect_mysql(unsigned int connection_number);
+  void connect_mysql_error_box(QString, unsigned int);
+#ifdef DBMS_TARANTOOL
+  int connect_tarantool(unsigned int connection_number);
+  void tarantool_flush_and_save_reply();
+  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len);
+  unsigned int tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes);
+  const char * tarantool_seek_0();
+#endif
+  QString select_1_row(const char *select_statement);
+
+  QWidget *main_window;
+  QVBoxLayout *main_layout;
+
+  TextEditHistory *history_edit_widget;
+  QLineEdit *hparse_line_edit;
+#ifdef DEBUGGER
+#define DEBUG_TAB_WIDGET_MAX 10
+  QWidget *debug_top_widget;
+  QVBoxLayout *debug_top_widget_layout;
+  QLineEdit *debug_line_widget;
+  QTabWidget *debug_tab_widget;
+  CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
+#endif
+
+  QMenu *menu_file;
+    QAction *menu_file_action_connect;
+    QAction *menu_file_action_exit;
+  QMenu *menu_edit;
+    QAction *menu_edit_action_cut;
+    QAction *menu_edit_action_copy;
+    QAction *menu_edit_action_paste;
+    QAction *menu_edit_action_undo;
+    QAction *menu_edit_action_redo;
+    QAction *menu_edit_action_select_all;
+    QAction *menu_edit_action_history_markup_previous;
+    QAction *menu_edit_action_history_markup_next;
+  QMenu *menu_run;
+    QAction *menu_run_action_execute;
+    QAction *menu_run_action_kill;
+  QMenu *menu_settings;
+    QAction *menu_settings_action_menu;
+    QAction *menu_settings_action_history;
+    QAction *menu_settings_action_grid;
+    QAction *menu_settings_action_statement;
+    QAction *menu_settings_action_extra_rule_1;
+  QMenu *menu_options;
+    QAction *menu_options_action_option_detach_history_widget;
+    QAction *menu_options_action_option_detach_result_grid_widget;
+    QAction *menu_options_action_option_detach_debug_widget;
+#ifdef DEBUGGER
+  QMenu *menu_debug;
+//    QAction *menu_debug_action_install;
+//    QAction *menu_debug_action_setup;
+//    QAction *menu_debug_action_debug;
+    QAction *menu_debug_action_breakpoint;
+    QAction *menu_debug_action_continue;
+    QAction *menu_debug_action_leave;
+    QAction *menu_debug_action_next;
+//    QAction *menu_debug_action_skip;
+    QAction *menu_debug_action_step;
+    QAction *menu_debug_action_clear;
+//    QAction *menu_debug_action_delete;
+    QAction *menu_debug_action_exit;
+    QAction *menu_debug_action_information;
+    QAction *menu_debug_action_refresh_server_variables;
+    QAction *menu_debug_action_refresh_user_variables;
+    QAction *menu_debug_action_refresh_variables;
+    QAction *menu_debug_action_refresh_call_stack;
+#endif
+  QMenu *menu_help;
+    QAction *menu_help_action_about;
+    QAction *menu_help_action_the_manual;
+    QAction *menu_help_action_libmysqlclient;
+    QAction *menu_help_action_settings;
+
+  //QWidget *the_manual_widget;
+  //  QVBoxLayout *the_manual_layout;
+  //  QTextEdit *the_manual_text_edit;
+  //  QPushButton *the_manual_pushbutton;
+
+  /* QTableWidget *grid_table_widget; */
+  QTabWidget48 *result_grid_tab_widget;
+
+  unsigned long result_row_count;
+
+  int history_markup_counter; /* 0 when execute, +1 when "previous statement", -1 for "next statement" */
+
+  int statement_edit_widget_text_changed_flag;
+  QString ocelot_delimiter_str;                                           /* set up in connect section */
+  QString query_utf16;
+  QString query_utf16_copy;
+  int ocelot_password_was_specified;
+
+  /* MYSQL mysql; */
+  MYSQL_RES *mysql_res;
+  /* MYSQL_FIELD *fields; */
+#ifdef DBMS_TARANTOOL
+  struct tnt_reply tarantool_tnt_reply;
+  char *tarantool_field_names;
+#endif
+
+  /* connections_... [] is not a multi-occurrence list but someday it might be */
+  int connections_is_connected[1];                    /* == 1 if is connected */
+  int connections_dbms[1];                            /* == DBMS_MYSQL or other DBMS_... value */
+
+public:
+  /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
+  int  *main_token_offsets;
+  int  *main_token_lengths;
+  int  *main_token_types;
+  unsigned char *main_token_flags; /* e.g. TOKEN_FLAG_IS_RESERVED */
+  int  *main_token_pointers;
+  unsigned char *main_token_reftypes;
+  unsigned int main_token_max_count;
+  unsigned int main_token_count;
+  unsigned int main_token_count_in_statement;
+  unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
 
   /* main_token_flags[] values. so far there are only four but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
@@ -1569,10 +1714,12 @@ enum {
     TOKEN_REFTYPE_COLLATION,
     TOKEN_REFTYPE_COLUMN,
     TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE,
-    TOKEN_REFTYPE_CONDITION,
+    TOKEN_REFTYPE_CONDITION_DEFINE,
+    TOKEN_REFTYPE_CONDITION_REFER,
     TOKEN_REFTYPE_CONDITION_OR_CURSOR,
     TOKEN_REFTYPE_CONSTRAINT,
-    TOKEN_REFTYPE_CURSOR,
+    TOKEN_REFTYPE_CURSOR_DEFINE,
+    TOKEN_REFTYPE_CURSOR_REFER,
     TOKEN_REFTYPE_DATABASE, /* or schema */
     TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT,
     TOKEN_REFTYPE_DATABASE_OR_EVENT,
@@ -1592,7 +1739,8 @@ enum {
     TOKEN_REFTYPE_HOST,
     TOKEN_REFTYPE_INDEX,
     TOKEN_REFTYPE_KEY_CACHE,
-    TOKEN_REFTYPE_LABEL,
+    TOKEN_REFTYPE_LABEL_DEFINE,
+    TOKEN_REFTYPE_LABEL_REFER,
     TOKEN_REFTYPE_PARAMETER,
     TOKEN_REFTYPE_PARSER,
     TOKEN_REFTYPE_PLUGIN,
@@ -1612,150 +1760,11 @@ enum {
     TOKEN_REFTYPE_USER,
     TOKEN_REFTYPE_USER_VARIABLE,
     TOKEN_REFTYPE_VARIABLE,         /* i.e. either USER_VARIABLE or DECLARED VARIABLE */
+    TOKEN_REFTYPE_VARIABLE_DEFINE,
+    TOKEN_REFTYPE_VARIABLE_REFER,
     TOKEN_REFTYPE_VIEW,
     TOKEN_REFTYPE_WRAPPER
-};
-
-/*
-  ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
-    0 = none
-    1 = use for highlights
-    2 = errors, i.e. pop up a dialog box if user tries to execute a bad-looking statement
-    4 = severe e.g. look whether declared variable is known
-    8 = severe e.g. look whether table is known (need to ask server)
-   16 = tooltip
-   32 = word-completion
-   ... although so far the only thing being checked is 2 = errors
-*/
-#define FLAG_FOR_HIGHLIGHTS 1
-#define FLAG_FOR_ERRORS     2
-
-  void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
-
-  int token_type(QChar *token, int token_length);
-
-  void tokens_to_keywords(QString text, int start);
-  void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text, int start);
-  int next_token(int i);
-  bool is_client_statement(int, int, QString);
-  int find_start_of_body(QString text, int start, int *i_of_function, int *i_of_do);
-  int connect_mysql(unsigned int connection_number);
-  void connect_mysql_error_box(QString, unsigned int);
-#ifdef DBMS_TARANTOOL
-  int connect_tarantool(unsigned int connection_number);
-  void tarantool_flush_and_save_reply();
-  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len);
-  unsigned int tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes);
-  const char * tarantool_seek_0();
-#endif
-  QString select_1_row(const char *select_statement);
-
-  QWidget *main_window;
-  QVBoxLayout *main_layout;
-
-  TextEditHistory *history_edit_widget;
-  QLineEdit *hparse_line_edit;
-#ifdef DEBUGGER
-#define DEBUG_TAB_WIDGET_MAX 10
-  QWidget *debug_top_widget;
-  QVBoxLayout *debug_top_widget_layout;
-  QLineEdit *debug_line_widget;
-  QTabWidget *debug_tab_widget;
-  CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
-#endif
-
-  QMenu *menu_file;
-    QAction *menu_file_action_connect;
-    QAction *menu_file_action_exit;
-  QMenu *menu_edit;
-    QAction *menu_edit_action_cut;
-    QAction *menu_edit_action_copy;
-    QAction *menu_edit_action_paste;
-    QAction *menu_edit_action_undo;
-    QAction *menu_edit_action_redo;
-    QAction *menu_edit_action_select_all;
-    QAction *menu_edit_action_history_markup_previous;
-    QAction *menu_edit_action_history_markup_next;
-  QMenu *menu_run;
-    QAction *menu_run_action_execute;
-    QAction *menu_run_action_kill;
-  QMenu *menu_settings;
-    QAction *menu_settings_action_menu;
-    QAction *menu_settings_action_history;
-    QAction *menu_settings_action_grid;
-    QAction *menu_settings_action_statement;
-    QAction *menu_settings_action_extra_rule_1;
-  QMenu *menu_options;
-    QAction *menu_options_action_option_detach_history_widget;
-    QAction *menu_options_action_option_detach_result_grid_widget;
-    QAction *menu_options_action_option_detach_debug_widget;
-#ifdef DEBUGGER
-  QMenu *menu_debug;
-//    QAction *menu_debug_action_install;
-//    QAction *menu_debug_action_setup;
-//    QAction *menu_debug_action_debug;
-    QAction *menu_debug_action_breakpoint;
-    QAction *menu_debug_action_continue;
-    QAction *menu_debug_action_leave;
-    QAction *menu_debug_action_next;
-//    QAction *menu_debug_action_skip;
-    QAction *menu_debug_action_step;
-    QAction *menu_debug_action_clear;
-//    QAction *menu_debug_action_delete;
-    QAction *menu_debug_action_exit;
-    QAction *menu_debug_action_information;
-    QAction *menu_debug_action_refresh_server_variables;
-    QAction *menu_debug_action_refresh_user_variables;
-    QAction *menu_debug_action_refresh_variables;
-    QAction *menu_debug_action_refresh_call_stack;
-#endif
-  QMenu *menu_help;
-    QAction *menu_help_action_about;
-    QAction *menu_help_action_the_manual;
-    QAction *menu_help_action_libmysqlclient;
-    QAction *menu_help_action_settings;
-
-  //QWidget *the_manual_widget;
-  //  QVBoxLayout *the_manual_layout;
-  //  QTextEdit *the_manual_text_edit;
-  //  QPushButton *the_manual_pushbutton;
-
-  /* QTableWidget *grid_table_widget; */
-  QTabWidget48 *result_grid_tab_widget;
-
-  unsigned long result_row_count;
-
-  int history_markup_counter; /* 0 when execute, +1 when "previous statement", -1 for "next statement" */
-
-  /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
-  int  *main_token_offsets;
-  int  *main_token_lengths;
-  int  *main_token_types;
-  unsigned char *main_token_flags; /* e.g. TOKEN_FLAG_IS_RESERVED */
-  int  *main_token_pointers;
-  unsigned char *main_token_reftypes;
-  unsigned int main_token_max_count;
-  unsigned int main_token_count;
-  unsigned int main_token_count_in_statement;
-  unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
-
-  int statement_edit_widget_text_changed_flag;
-  QString ocelot_delimiter_str;                                           /* set up in connect section */
-  QString query_utf16;
-  QString query_utf16_copy;
-  int ocelot_password_was_specified;
-
-  /* MYSQL mysql; */
-  MYSQL_RES *mysql_res;
-  /* MYSQL_FIELD *fields; */
-#ifdef DBMS_TARANTOOL
-  struct tnt_reply tarantool_tnt_reply;
-  char *tarantool_field_names;
-#endif
-
-  /* connections_... [] is not a multi-occurrence list but someday it might be */
-  int connections_is_connected[1];                    /* == 1 if is connected */
-  int connections_dbms[1];                            /* == DBMS_MYSQL or other DBMS_... value */
+  };
 
 };
 
@@ -5538,7 +5547,76 @@ private slots:
 
 private:
     QWidget *prompt_widget;
+
+/*
+   Here is where we show a tooltip help hint e.g. "reserved keyword"
+   if the user hovers with the mouse over a statement_edit_widget word.
+   Beware: there is more than one CodeEditor.
+   We only did setMouseTracking for statement_edit_widget.
+   But make sure we're right.
+   Beware: This won't work unless we're parsing.
+   text= statement_edit_widget->toPlainText(); but maybe I won't care.
+   Todo: Consider: QToolTip::showText() instead of setToolTip()
+         (it would cause immediate change but might be distracting).
+*/
+void mouseMoveEvent(QMouseEvent *event)
+{
+  if (((main_window->ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS)
+   && (main_window->main_token_max_count > 0)
+   && (main_window->statement_edit_widget == this))
+  {
+    QPoint i= event->pos();
+    QTextCursor c= this->cursorForPosition(i);
+    int p= c.position();
+    QString s= "";
+    for (int i= 0; main_window->main_token_lengths[i] != 0; ++i)
+    {
+      int offset= main_window->main_token_offsets[i];
+      if (offset > p) break;
+      int length= main_window->main_token_lengths[i];
+      int token_flag= main_window->main_token_flags[i];
+      if ((offset <= p) && ((offset+length) > p))
+      {
+        int token_type= main_window->main_token_types[i];
+        if ((token_flag & TOKEN_FLAG_IS_ERROR) != 0) s= "(error) ";
+        if ((token_flag & TOKEN_FLAG_IS_FUNCTION) != 0) s= "(function) ";
+        if ((token_type >= MainWindow::TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+         && (token_type <= MainWindow::TOKEN_TYPE_LITERAL))
+        {
+          s.append("literal");
+        }
+        else if ((token_type >= MainWindow::TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+         && (token_type <= MainWindow::TOKEN_TYPE_IDENTIFIER))
+        {
+          s.append(main_window->hparse_f_token_to_appendee("[identifier]", main_window->main_token_reftypes[i]));
+        }
+        else if ((token_type >= MainWindow::TOKEN_TYPE_COMMENT_WITH_SLASH)
+         && (token_type <= MainWindow::TOKEN_TYPE_COMMENT_WITH_MINUS))
+        {
+          s.append("comment");
+        }
+        else if (token_type == MainWindow::TOKEN_TYPE_OPERATOR)
+        {
+          s.append("operator");
+        }
+        else
+        {
+          if ((token_flag & TOKEN_FLAG_IS_RESERVED) != 0)
+          {
+            s.append("reserved ");
+          }
+          s.append("keyword");
+        }
+        break;
+      }
+    }
+    this->setToolTip(s);
+  }
+  /* We probably don't need to say this. */
+  QPlainTextEdit::mouseMoveEvent(event);
+  }
 };
+
 
 class prompt_class : public QWidget
 {
@@ -5561,6 +5639,8 @@ protected:
 
 private:
   CodeEditor *codeEditor;
+
+
 };
 
 #endif // CODEEDITOR_H

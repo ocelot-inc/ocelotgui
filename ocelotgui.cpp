@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.1
-   Last modified: July 18 2016
+   Last modified: July 20 2016
 */
 
 /*
@@ -846,6 +846,7 @@ void MainWindow::initialize_widget_statement()
   emit statement_edit_widget->update_prompt_width(0);
 
   statement_edit_widget->installEventFilter(this);
+  statement_edit_widget->setMouseTracking(true);
 }
 
 
@@ -877,6 +878,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
       instruction is "return QMainWindow::eventFilter(obj, event);".
       I think the idea there is to go direct to the main processor
       for text editing, bypassing other event filters.
+  Note: statement_edit_widget mouseMoveEvent handling is in ocelotgui.h
   Todo: Consider: Perhaps this should not be in MainWindow:: but in CodeEditor::.
   Todo: Consider: Perhaps this should be a menu item, not a filter event.
                   (There's already a menu item, but it's not for Enter|Return.)
@@ -1988,6 +1990,7 @@ void MainWindow::main_token_new(int text_size)
     desired_count= (desired_count - (desired_count % 1000)) + 1000;
     main_token_offsets= new int[desired_count];
     main_token_lengths= new int[desired_count];
+    main_token_lengths[0]= 0;
     main_token_types= new int[desired_count];
     main_token_flags= new unsigned char[desired_count];
     main_token_pointers= new int[desired_count];
@@ -10683,10 +10686,12 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
     else if (reftype == TOKEN_REFTYPE_COLLATION) appendee= "[collation identifier]";
     else if (reftype == TOKEN_REFTYPE_COLUMN) appendee= "[column identifier]";
     else if (reftype == TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE) appendee= "[column or user variable identifier]";
-    else if (reftype == TOKEN_REFTYPE_CONDITION) appendee= "[condition identifier]";
+    else if (reftype == TOKEN_REFTYPE_CONDITION_DEFINE) appendee= "[condition identifier]";
+    else if (reftype == TOKEN_REFTYPE_CONDITION_REFER) appendee= "[condition identifier]";
     else if (reftype == TOKEN_REFTYPE_CONDITION_OR_CURSOR) appendee= "[condition or cursor identifier]";
     else if (reftype == TOKEN_REFTYPE_CONSTRAINT) appendee= "[constraint identifier]";
-    else if (reftype == TOKEN_REFTYPE_CURSOR) appendee= "[cursor identifier]";
+    else if (reftype == TOKEN_REFTYPE_CURSOR_DEFINE) appendee= "[cursor identifier]";
+    else if (reftype == TOKEN_REFTYPE_CURSOR_REFER) appendee= "[cursor identifier]";
     else if (reftype == TOKEN_REFTYPE_DATABASE) appendee= "[database identifier]";
     else if (reftype == TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT) appendee= "[database|constraint identifier]";
     else if (reftype == TOKEN_REFTYPE_DATABASE_OR_EVENT) appendee= "[database|event identifier]";
@@ -10706,7 +10711,8 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
     else if (reftype == TOKEN_REFTYPE_HOST) appendee= "[host identifier]";
     else if (reftype == TOKEN_REFTYPE_INDEX) appendee= "[index identifier]";
     else if (reftype == TOKEN_REFTYPE_KEY_CACHE) appendee= "[key cache identifier]";
-    else if (reftype == TOKEN_REFTYPE_LABEL) appendee= "[label identifier]";
+    else if (reftype == TOKEN_REFTYPE_LABEL_DEFINE) appendee= "[label identifier]";
+    else if (reftype == TOKEN_REFTYPE_LABEL_REFER) appendee= "[label identifier]";
     else if (reftype == TOKEN_REFTYPE_PARAMETER) appendee= "[parameter identifier]";
     else if (reftype == TOKEN_REFTYPE_PARSER) appendee= "[parser identifier]";
     else if (reftype == TOKEN_REFTYPE_PARTITION) appendee= "[partition identifier]";
@@ -10726,6 +10732,8 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
     else if (reftype == TOKEN_REFTYPE_USER_VARIABLE) appendee= "[user variable identifier]";
     else if (reftype == TOKEN_REFTYPE_VIEW) appendee= "[view identifier]";
     else if (reftype == TOKEN_REFTYPE_VARIABLE) appendee= "[variable identifier]";
+    else if (reftype == TOKEN_REFTYPE_VARIABLE_DEFINE) appendee= "[variable identifier]";
+    else if (reftype == TOKEN_REFTYPE_VARIABLE_REFER) appendee= "[variable identifier]";
     else if (reftype == TOKEN_REFTYPE_WRAPPER) appendee= "[wrapper identifier]";
   }
   return appendee;
@@ -14626,7 +14634,7 @@ void MainWindow::hparse_f_commit_or_rollback()
   }
 }
 
-void MainWindow::hparse_f_explain_or_describe()
+void MainWindow::hparse_f_explain_or_describe(int block_top)
 {
   bool explain_type_seen= false;
   if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXTENDED") == 1)
@@ -14668,7 +14676,7 @@ void MainWindow::hparse_f_explain_or_describe()
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
     return;
   }
-  hparse_f_explainable_statement();
+  hparse_f_explainable_statement(block_top);
   if (hparse_errno > 0) return;
 }
 
@@ -14967,7 +14975,7 @@ void MainWindow::hparse_f_condition_information_item_name()
   else hparse_f_error();
 }
 
-int MainWindow::hparse_f_signal_or_resignal(int who_is_calling)
+int MainWindow::hparse_f_signal_or_resignal(int who_is_calling, int block_top)
 {
   if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLSTATE") == 1)
   {
@@ -14975,7 +14983,7 @@ int MainWindow::hparse_f_signal_or_resignal(int who_is_calling)
     if (hparse_f_literal() == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
   }
-  else if (hparse_f_accept(TOKEN_REFTYPE_CONDITION,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+  else if (hparse_f_conditions(block_top) == 1) {;}
   else if (who_is_calling == TOKEN_KEYWORD_SIGNAL) return 0;
   if (hparse_errno > 0) return 0;
   if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
@@ -15451,7 +15459,7 @@ int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
   hparse_f_accept which is guaranteed to fail.
   Return 1 if it was a statement, else return 0 (which might also mean error).
 */
-int MainWindow::hparse_f_explainable_statement()
+int MainWindow::hparse_f_explainable_statement(int block_top)
 {
   QString hparse_token_upper= hparse_token.toUpper();
   if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
@@ -15462,7 +15470,7 @@ int MainWindow::hparse_f_explainable_statement()
      || (hparse_token_upper == "SELECT")
      || (hparse_token_upper == "UPDATE"))
     {
-      hparse_f_statement();
+      hparse_f_statement(block_top);
       if (hparse_errno > 0) return 0;
       return 1;
     }
@@ -15479,7 +15487,7 @@ int MainWindow::hparse_f_explainable_statement()
      || (hparse_token_upper == "SELECT")
      || (hparse_token_upper == "UPDATE"))
     {
-      hparse_f_statement();
+      hparse_f_statement(block_top);
       if (hparse_errno > 0) return 0;
       return 1;
     }
@@ -15497,7 +15505,7 @@ statement =
     "connect" "create" "drop" etc. etc.
     The idea is to parse everything that's described in the MySQL 5.7 manual.
 */
-void MainWindow::hparse_f_statement()
+void MainWindow::hparse_f_statement(int block_top)
 {
   if (hparse_errno > 0) return;
   hparse_statement_type= 0;
@@ -15634,7 +15642,7 @@ void MainWindow::hparse_f_statement()
         if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRADITIONAL") == 0) hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "JSON");
         if (hparse_errno > 0) return;
       }
-      if (hparse_f_explainable_statement() == 1) return;
+      if (hparse_f_explainable_statement(block_top) == 1) return;
       if (hparse_errno > 0) return;
     }
     hparse_f_error();
@@ -16167,13 +16175,13 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DESC, "DESC") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_DESC;
-    hparse_f_explain_or_describe();
+    hparse_f_explain_or_describe(block_top);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DESCRIBE, "DESCRIBE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_DESCRIBE;
-    hparse_f_explain_or_describe();
+    hparse_f_explain_or_describe(block_top);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO, "DO"))
@@ -16385,7 +16393,7 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXPLAIN, "EXPLAIN"))
   {
     hparse_statement_type= TOKEN_KEYWORD_EXPLAIN;
-    hparse_f_explain_or_describe();
+    hparse_f_explain_or_describe(block_top);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FLUSH, "FLUSH") == 1)
@@ -16961,7 +16969,7 @@ void MainWindow::hparse_f_statement()
   {
     hparse_statement_type= TOKEN_KEYWORD_RESIGNAL;
     /* We accept RESIGNAL even if we're not in a condition handler; we're just a recognizer. */
-    hparse_f_signal_or_resignal(TOKEN_KEYWORD_RESIGNAL);
+    hparse_f_signal_or_resignal(TOKEN_KEYWORD_RESIGNAL, block_top);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REVOKE"))
@@ -17143,7 +17151,7 @@ void MainWindow::hparse_f_statement()
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
       if (hparse_errno > 0) return;
-      hparse_f_statement();
+      hparse_f_statement(block_top);
       if (hparse_errno > 0) return;
       return;
     }
@@ -17611,7 +17619,7 @@ void MainWindow::hparse_f_statement()
   else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SIGNAL, "SIGNAL"))
   {
     hparse_statement_type= TOKEN_KEYWORD_SIGNAL;
-    if (hparse_f_signal_or_resignal(TOKEN_KEYWORD_SIGNAL) == 0) hparse_f_error();
+    if (hparse_f_signal_or_resignal(TOKEN_KEYWORD_SIGNAL, block_top) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SONAME, "SONAME") == 1))
@@ -17885,6 +17893,7 @@ void MainWindow::hparse_f_statement()
   }
 }
 
+
 /*
   compound statement, or statement
   Pass: calling_statement_type = 0 (top level) | TOKEN_KEYWORD_FUNCTION/PROCEDURE/EVENT/TRIGGER
@@ -17919,7 +17928,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_next_token == ":")
     {
       label= hparse_token;
-      hparse_f_expect(TOKEN_REFTYPE_LABEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       hparse_i_of_block= hparse_i_of_last_accepted;
       if (hparse_errno > 0) return;
       hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
@@ -17990,7 +17999,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
               if (hparse_errno > 0) return;
             }
             else if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLEXCEPTION") == 1) {;}
-            else if (hparse_f_accept(TOKEN_REFTYPE_CONDITION,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+            else if (hparse_f_conditions(block_top) == 1) {;}
             else
             {
               if (hparse_f_literal() == 0) hparse_f_error();
@@ -18006,10 +18015,12 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
         do
         {
           hparse_f_expect(TOKEN_REFTYPE_CONDITION_OR_CURSOR,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+          int hparse_i_of_identifier= hparse_i_of_last_accepted;
           if (hparse_errno > 0) return;
           ++identifier_count;
           if ((identifier_count == 1) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONDITION") == 1))
           {
+            main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_CONDITION_DEFINE;
             hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
             if (hparse_errno > 0) return;
             if (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLSTATE") == 1)
@@ -18023,6 +18034,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
           }
           if ((identifier_count == 1) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURSOR") == 1))
           {
+            main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_CURSOR_DEFINE;
             hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
             if (hparse_errno > 0) return;
             if (hparse_f_select(false) == 0)
@@ -18031,6 +18043,10 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
               return;
             }
             cursor_seen= true;
+          }
+          else
+          {
+            main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_VARIABLE_DEFINE;
           }
         } while (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
         if (condition_seen == true) {;}
@@ -18195,20 +18211,14 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if ((hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ITERATE, "ITERATE") == 1) || (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEAVE") == 1))
   {
-    /* todo: ITERATE and LEAVE should cause an error if we've never seen BEGIN/LOOP/etc. */
-    //hparse_f_expect(TOKEN_REFTYPE_LABEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    //if (hparse_errno > 0) return;
-    if (hparse_f_labels(block_top) == 0)
-    {
-      hparse_f_error();
-      return;
-    }
+    hparse_f_labels(block_top);
+    if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLOSE, "CLOSE") == 1))
   {
-    hparse_f_expect(TOKEN_REFTYPE_CURSOR,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_cursors(block_top);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
@@ -18221,13 +18231,13 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       if (hparse_errno > 0) return;
     }
     else hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
-    hparse_f_expect(TOKEN_REFTYPE_CURSOR,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_cursors(block_top);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
     if (hparse_errno > 0) return;
     do
     {
-      hparse_f_expect(TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_variables(block_top);
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
@@ -18235,7 +18245,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OPEN, "OPEN") == 1))
   {
-    hparse_f_expect(TOKEN_REFTYPE_CURSOR,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_cursors(block_top);
     if (hparse_errno > 0) return;
     hparse_f_expect(TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
@@ -18272,7 +18282,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else
   {
-    hparse_f_statement();
+    hparse_f_statement(block_top);
     if (hparse_errno > 0) return;
     /* This kludge occurs more than once. */
     if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
@@ -18291,26 +18301,113 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   If we pass a label, accept it, it's a legitimate target.
   Todo: Make sure elsewhere that TOKEN_KEYWORD_END is always legitimate.
 */
-int MainWindow::hparse_f_labels(int block_top)
+void MainWindow::hparse_f_labels(int block_top)
 {
   for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
   {
     if (main_token_types[i] == TOKEN_KEYWORD_END)
     {
       int j= main_token_pointers[i];
-      if ((j >= i) || (j < 0)) return 0; /* should be an assert */
+      if ((j >= i) || (j < block_top)) break; /* should be an assert */
       i= main_token_pointers[i];
       continue;
     }
     if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
-     && (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL))
+     && (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL_DEFINE))
     {
       QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
-      if (hparse_f_accept(TOKEN_REFTYPE_LABEL, TOKEN_TYPE_IDENTIFIER, s) == 1) return 1;
+      if (hparse_f_accept(TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return;
     }
   }
+  hparse_f_error();
+}
+
+/*
+  Called from hparse_f_block() for OPEN or FETCH or CLOSE cursor.
+  Search method is similar to the one in hparse_f_labels().
+  But maybe it's not error if you can't find cursor definition?
+  I forget whether that's somehow possible, so allow it.
+*/
+void MainWindow::hparse_f_cursors(int block_top)
+{
+  for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
+  {
+    if (main_token_types[i] == TOKEN_KEYWORD_END)
+    {
+      int j= main_token_pointers[i];
+      if ((j >= i) || (j < block_top)) break; /* should be an assert */
+      i= main_token_pointers[i];
+      continue;
+    }
+    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+     && (main_token_reftypes[i] == TOKEN_REFTYPE_CURSOR_DEFINE))
+    {
+      QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (hparse_f_accept(TOKEN_REFTYPE_CURSOR_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return;
+    }
+  }
+  hparse_f_expect(TOKEN_REFTYPE_CURSOR_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+}
+
+/*
+  Called from hparse_f_block() for FETCH x cursor INTO variable.
+  Search method is similar to the one in hparse_f_labels().
+  But maybe it's not error if you can't find cursor definition?
+  I forget whether that's somehow possible, so allow it.
+  (Perhaps fetching into a parameter is okay?)
+  TODO: Finding variables could be useful in lots more places.
+  TODO: Check: what if there are 1000 variables, does anything overflow?
+*/
+void MainWindow::hparse_f_variables(int block_top)
+{
+  for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
+  {
+    if (main_token_types[i] == TOKEN_KEYWORD_END)
+    {
+      int j= main_token_pointers[i];
+      if ((j >= i) || (j < block_top)) break; /* should be an assert */
+      i= main_token_pointers[i];
+      continue;
+    }
+    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+     && (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE))
+    {
+      QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (hparse_f_accept(TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return;
+    }
+  }
+  hparse_f_expect(TOKEN_REFTYPE_VARIABLE_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+}
+
+
+/*
+  Called from hparse_f_block() for SIGNAL or ... HANDLER FOR condition.
+  Search method is similar to the one in hparse_f_labels().
+  But maybe it's not error if you can't find condition definition?
+  I forget whether that's somehow possible, so allow it.
+*/
+int MainWindow::hparse_f_conditions(int block_top)
+{
+  for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
+  {
+    if (main_token_types[i] == TOKEN_KEYWORD_END)
+    {
+      int j= main_token_pointers[i];
+      if ((j >= i) || (j < block_top)) return 0; /* should be an assert */
+      i= main_token_pointers[i];
+      continue;
+    }
+    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+     && (main_token_reftypes[i] == TOKEN_REFTYPE_CONDITION_DEFINE))
+    {
+      QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (hparse_f_accept(TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return 1;
+    }
+  }
+  if (hparse_f_accept(TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
   return 0;
 }
+
 
 /*
   This is the top. This should be the main entry for parsing.
@@ -18387,7 +18484,7 @@ void MainWindow::hparse_f_multi_block(QString text)
       }
       else
 #endif
-      hparse_f_statement();
+      hparse_f_statement(hparse_i);
       if (hparse_errno > 0) goto error;
       /*
         Todo: we had trouble because some functions eat the final semicolon.
