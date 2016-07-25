@@ -152,6 +152,77 @@
     MP_BIN, MP_ARRAY, MP_MAP, MP_BOOL,
     MP_FLOAT, MP_DOUBLE, MP_EXT
   };
+  /**
+   * \brief Request types
+   */
+  enum tnt_request_t {
+      TNT_OP_SELECT = 1,
+      TNT_OP_INSERT = 2,
+      TNT_OP_REPLACE = 3,
+      TNT_OP_UPDATE = 4,
+      TNT_OP_DELETE = 5,
+      TNT_OP_CALL = 6,
+      TNT_OP_AUTH = 7,
+      TNT_OP_EVAL = 8,
+      TNT_OP_UPSERT = 9,
+      TNT_OP_PING = 64,
+      TNT_OP_JOIN = 65,
+      TNT_OP_SUBSCRIBE = 66
+  };
+  /**
+   * \brief Iterator types
+   */
+  enum tnt_iterator_t {
+      TNT_ITER_EQ = 0,
+      TNT_ITER_REQ,
+      TNT_ITER_ALL,
+      TNT_ITER_LT,
+      TNT_ITER_LE,
+      TNT_ITER_GE,
+      TNT_ITER_GT,
+      TNT_ITER_BITS_ALL_SET,
+      TNT_ITER_BITS_ANY_SET,
+      TNT_ITER_BITS_ALL_NOT_SET,
+      TNT_ITER_OVERLAP,
+      TNT_ITER_NEIGHBOR,
+  };
+  struct tnt_request {
+      struct {
+          uint32_t sync; /*!< Request sync id. Generated when encoded */
+          enum tnt_request_t type; /*!< Request type */
+      } hdr; /*!< fields for header */
+      uint32_t space_id; /*!< Space number */
+      uint32_t index_id; /*!< Index number */
+      uint32_t offset; /*!< Offset for select */
+      uint32_t limit; /*!< Limit for select */
+      enum tnt_iterator_t iterator; /*!< Iterator for select */
+      /* Search key, proc name or eval expression */
+      const char *key; /*!< Pointer for
+                * key for select/update/delete,
+                * procedure  for call,
+                * expression for eval,
+                * operations for upsert
+                */
+      const char *key_end;
+      struct tnt_stream *key_object; /*!< Pointer for key object
+                      * if allocated inside requests
+                      * functions
+                      */
+      const char *tuple; /*!< Pointer for
+                  * tuple for insert/replace,
+                  * ops for update
+                  * default tuple for upsert,
+                  * args for eval/call
+                  */
+      const char *tuple_end;
+      struct tnt_stream *tuple_object; /*!< Pointer for tuple object
+                        * if allocated inside requests
+                        * functions
+                        */
+      int index_base; /*!< field offset for UPDATE */
+      int alloc; /*!< allocation mark */
+  };
+
 #endif
 
 /* Flags used for row_form_box. NUM_FLAG is also defined in mysql include, with same value. */
@@ -499,6 +570,7 @@ public:
                  const char *which_field,
                  unsigned int p_result_column_count,
                  char **p_result_field_names);
+  void tarantool_experiment();
 #endif
 
 public slots:
@@ -2430,11 +2502,16 @@ public:
   typedef ssize_t         (*ttnt_object_add_double)(struct tnt_stream *, double);
   typedef ssize_t         (*ttnt_object_container_close)(struct tnt_stream *);
   typedef ssize_t         (*ttnt_object_format)  (struct tnt_stream *, const char *, int, char *);
+  typedef int             (*ttnt_object_reset)   (struct tnt_stream *);
   typedef int             (*ttnt_reload_schema)  (struct tnt_stream *);
   typedef ssize_t         (*ttnt_replace)        (struct tnt_stream *, uint32_t, struct tnt_stream *);
   typedef int             (*ttnt_reply)          (struct tnt_reply *, char *, size_t, size_t *);
   typedef tnt_reply*      (*ttnt_reply_init)     (struct tnt_reply *);
   typedef void            (*ttnt_reply_free)     (struct tnt_reply *);
+  typedef int64_t         (*ttnt_request_compile)(struct tnt_stream *, struct tnt_request *);
+  typedef tnt_request*    (*ttnt_request_eval)   (struct tnt_request *);
+  typedef int             (*ttnt_request_set_exprz) (struct tnt_request *, const char *);
+  typedef int             (*ttnt_request_set_tuple) (struct tnt_request *, struct tnt_stream *);
   typedef ssize_t         (*ttnt_select)         (struct tnt_stream *, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t, struct tnt_stream *);
   typedef int             (*ttnt_set)            (struct tnt_stream *, int, char *);
   typedef ssize_t         (*ttnt_update)         (struct tnt_stream *, uint32_t, uint32_t, struct tnt_stream *, struct tnt_stream *);
@@ -2510,11 +2587,16 @@ public:
   ttnt_object_add_double t__tnt_object_add_double;
   ttnt_object_container_close t__tnt_object_container_close;
   ttnt_object_format t__tnt_object_format;
+  ttnt_object_reset t__tnt_object_reset;
   ttnt_reload_schema t__tnt_reload_schema;
   ttnt_replace t__tnt_replace;
   ttnt_reply t__tnt_reply;
   ttnt_reply_init t__tnt_reply_init;
   ttnt_reply_free t__tnt_reply_free;
+  ttnt_request_compile t__tnt_request_compile;
+  ttnt_request_eval t__tnt_request_eval;
+  ttnt_request_set_exprz t__tnt_request_set_exprz;
+  ttnt_request_set_tuple t__tnt_request_set_tuple;
   ttnt_select t__tnt_select;
   ttnt_set t__tnt_set;
   ttnt_update t__tnt_update;
@@ -2782,10 +2864,15 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__tnt_object_add_double= (ttnt_object_add_double) dlsym(dlopen_handle, "tnt_object_add_double"); if (dlerror() != 0) s.append("tnt_object_add_double ");
         t__tnt_object_container_close= (ttnt_object_container_close) dlsym(dlopen_handle, "tnt_object_container_close"); if (dlerror() != 0) s.append("tnt_object_container_close ");
         t__tnt_object_format= (ttnt_object_format) dlsym(dlopen_handle, "tnt_object_format"); if (dlerror() != 0) s.append("tnt_object_format ");
+        t__tnt_object_reset= (ttnt_object_reset) dlsym(dlopen_handle, "tnt_object_reset"); if (dlerror() != 0) s.append("tnt_object_reset ");
         t__tnt_reload_schema= (ttnt_reload_schema) dlsym(dlopen_handle, "tnt_reload_schema"); if (dlerror() != 0) s.append("tnt_reload_schema ");
         t__tnt_replace= (ttnt_replace) dlsym(dlopen_handle, "tnt_replace"); if (dlerror() != 0) s.append("tnt_replace ");
         t__tnt_reply= (ttnt_reply) dlsym(dlopen_handle, "tnt_reply"); if (dlerror() != 0) s.append("tnt_reply ");
         t__tnt_reply_free= (ttnt_reply_free) dlsym(dlopen_handle, "tnt_reply_free"); if (dlerror() != 0) s.append("tnt_reply_free ");
+        t__tnt_request_compile= (ttnt_request_compile) dlsym(dlopen_handle, "tnt_request_compile"); if (dlerror() != 0) s.append("tnt_request_compile ");
+        t__tnt_request_eval= (ttnt_request_eval) dlsym(dlopen_handle, "tnt_request_eval"); if (dlerror() != 0) s.append("tnt_request_eval ");
+        t__tnt_request_set_exprz= (ttnt_request_set_exprz) dlsym(dlopen_handle, "tnt_request_set_exprz"); if (dlerror() != 0) s.append("tnt_request_set_exprz ");
+        t__tnt_request_set_tuple= (ttnt_request_set_tuple) dlsym(dlopen_handle, "tnt_request_set_tuple"); if (dlerror() != 0) s.append("tnt_request_set_tuple ");
         t__tnt_reply_init= (ttnt_reply_init) dlsym(dlopen_handle, "tnt_reply_init"); if (dlerror() != 0) s.append("tnt_reply_init ");
         t__tnt_select= (ttnt_select) dlsym(dlopen_handle, "tnt_select"); if (dlerror() != 0) s.append("tnt_select ");
         t__tnt_set= (ttnt_set) dlsym(dlopen_handle, "tnt_set"); if (dlerror() != 0) s.append("tnt_set ");
@@ -3176,6 +3263,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     return t__tnt_object_format(a,b,c,d);
   }
+  int ldbms_tnt_object_reset(struct tnt_stream *a)
+  {
+    return t__tnt_object_reset(a);
+  }
   int ldbms_tnt_reload_schema(struct tnt_stream *a)
   {
     return t__tnt_reload_schema(a);
@@ -3191,6 +3282,22 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   void ldbms_tnt_reply_free(struct tnt_reply *a)
   {
     t__tnt_reply_free(a);
+  }
+  int64_t ldbms_tnt_request_compile(struct tnt_stream *a, struct tnt_request *b)
+  {
+    return t__tnt_request_compile(a,b);
+  }
+  struct tnt_request* ldbms_tnt_request_eval(struct tnt_request *a)
+  {
+    return t__tnt_request_eval(a);
+  }
+  int ldbms_tnt_request_set_exprz(struct tnt_request *a, const char *b)
+  {
+    return t__tnt_request_set_exprz(a,b);
+  }
+  int ldbms_tnt_request_set_tuple(struct tnt_request *a, struct tnt_stream *b)
+  {
+    return t__tnt_request_set_tuple(a,b);
   }
   struct tnt_reply* ldbms_tnt_reply_init(struct tnt_reply *a)
   {

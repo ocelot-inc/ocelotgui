@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.1
-   Last modified: July 20 2016
+   Last modified: July 24 2016
 */
 
 /*
@@ -20362,6 +20362,72 @@ void MainWindow::tarantool_scan_field_names(
 //lmysql->ldbms_tnt_stream_free(tuple);
 //lmysql->ldbms_tnt_stream_free(tnt);
 //}
+
+
+/*
+  Experiment with tarantool-sql
+*/
+void MainWindow::tarantool_experiment()
+{
+  /*
+    This gives me "dd ..." i.e. an array result. At last.
+  */
+
+  struct tnt_stream *tnt = lmysql->ldbms_tnt_net(NULL);          /* See note = SETUP */
+  lmysql->ldbms_tnt_set(tnt, TNT_OPT_URI, (char*)"192.168.1.67:3301");
+  if (lmysql->ldbms_tnt_connect(tnt) < 0) {                      /* See note = CONNECT */
+    printf("Connection refused\n");
+    exit(-1);
+  }
+  struct tnt_stream *tuple = lmysql->ldbms_tnt_object(NULL);     /* See note = MAKE REQUEST */
+
+  //struct tnt_stream *tnt_object(struct tnt_stream *s)
+  //    Create an empty MsgPack object.
+  //    If s is passed as NULL, then the object is allocated. Otherwise, the allocated object is initialized.
+  struct tnt_stream *arg;
+  arg = lmysql->ldbms_tnt_object(NULL);
+
+  //int tnt_object_reset(struct tnt_stream *s)
+  //    Reset a stream object to the basic state.
+  lmysql->ldbms_tnt_object_reset(arg);
+
+  //ssize_t tnt_object_add_array(struct tnt_stream *s, uint32_t size)
+  //    Append an array header to a stream object.
+  //    The header’s size is in bytes.
+  //    If TNT_SBO_SPARSE or TNT_SBO_PACKED is set as container type, then size is ignored.
+  lmysql->ldbms_tnt_object_add_array(arg, 0);
+
+  struct tnt_request *req2 = lmysql->ldbms_tnt_request_eval(NULL);
+  //   int m= tnt_request_set_exprz(req2,"return box.space.tester:select()");
+  int m= lmysql->ldbms_tnt_request_set_exprz(req2,"return ocelot_conn:execute('select * from t')");
+  printf("m=%d\n", m);
+
+  lmysql->ldbms_tnt_request_set_tuple(req2, arg);
+
+  /* uint64_t sync1 = */ lmysql->ldbms_tnt_request_compile(tnt, req2);
+
+  lmysql->ldbms_tnt_flush(tnt);
+  struct tnt_reply reply;
+  lmysql->ldbms_tnt_reply_init(&reply);
+  tnt->read_reply(tnt, &reply);
+  if (reply.code != 0) {
+    printf("Eval failed %lu.\n", reply.code);
+   }
+
+  const unsigned char *p= (unsigned char*)reply.data;/* PRINT REPLY */
+  while (p < (unsigned char *) reply.data_end)
+  {
+    printf("%x ", *p);
+    ++p;
+  }
+  printf("\n");
+
+  lmysql->ldbms_tnt_close(tnt);                                  /* See below = TEARDOWN */
+  lmysql->ldbms_tnt_stream_free(tuple);
+  lmysql->ldbms_tnt_stream_free(tnt);
+}
+
+
 #endif
 
 
