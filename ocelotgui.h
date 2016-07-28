@@ -434,10 +434,10 @@ public:
   void hparse_f_next_nexttoken();
   void hparse_f_error();
   bool hparse_f_is_equal(QString,QString);
-  int hparse_f_accept(unsigned char,int,QString);
+  int hparse_f_accept(unsigned char,unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
   QString hparse_f_token_to_appendee(QString,int);
-  int hparse_f_expect(unsigned char,int,QString);
+  int hparse_f_expect(unsigned char,unsigned char,int,QString);
   int hparse_f_literal();
   int hparse_f_default(int);
   int hparse_f_user_name();
@@ -523,9 +523,12 @@ public:
   void hparse_f_explain_or_describe(int);
   void hparse_f_grant_or_revoke(int,bool*);
   void hparse_f_insert_or_replace();
+  void hparse_f_conflict_clause();
+  void hparse_f_conflict_algorithm();
   void hparse_f_condition_information_item_name();
   int hparse_f_signal_or_resignal(int,int);
   int hparse_f_into();
+  void hparse_f_with_clause();
   int hparse_f_select(bool);
   void hparse_f_where();
   int hparse_f_order_by(int);
@@ -570,7 +573,6 @@ public:
                  const char *which_field,
                  unsigned int p_result_column_count,
                  char **p_result_field_names);
-  void tarantool_experiment();
 #endif
 
 public slots:
@@ -1828,6 +1830,7 @@ enum {
     TOKEN_REFTYPE_TABLE_OR_COLUMN,
     TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,
     TOKEN_REFTYPE_TABLESPACE,
+    TOKEN_REFTYPE_TRANSACTION,
     TOKEN_REFTYPE_TRIGGER,
     TOKEN_REFTYPE_USER,
     TOKEN_REFTYPE_USER_VARIABLE,
@@ -1835,6 +1838,7 @@ enum {
     TOKEN_REFTYPE_VARIABLE_DEFINE,
     TOKEN_REFTYPE_VARIABLE_REFER,
     TOKEN_REFTYPE_VIEW,
+    TOKEN_REFTYPE_WITH_TABLE,
     TOKEN_REFTYPE_WRAPPER
   };
 
