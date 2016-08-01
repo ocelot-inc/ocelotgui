@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.1
-   Last modified: July 24 2016
+   Last modified: August 1 2016
 */
 
 /*
@@ -8158,6 +8158,15 @@ next_char:
   {
     expected_char= '=';
     if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
+#ifdef DBMS_TARANTOOL
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      expected_char= '<';
+      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
+      expected_char= '>';
+      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
+    }
+#endif
     goto one_byte_token;
   }
   if (text[char_offset] == '"')    /* " starts a token until next " but watch for ""s and end-of-string and escape */
@@ -8272,13 +8281,23 @@ next_char:
     if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
     goto one_byte_token;
   }
-  if (text[char_offset] == '=') goto one_byte_token; /* = one-byte token */
+  if (text[char_offset] == '=')
+  {
+#ifdef DBMS_TARANTOOL
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      expected_char= '=';
+      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
+    }
+#endif
+    goto one_byte_token;          /* = one-byte token */
+  }
   if (text[char_offset] == '>')   /* > might be start of >= or >>. otherwise one-byte token */
   {
     expected_char= '=';
     if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
     expected_char= '>';
-    if ((char_offset + 1  < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
+    if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
     goto one_byte_token;
   }
   if (text[char_offset] == '?') goto one_byte_token; /* ? one-byte token? */
@@ -8563,7 +8582,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     {
       {"?", 0, 0, TOKEN_KEYWORD_QUESTIONMARK}, /* Ocelot keyword, although tokenize() regards it as an operator */
       {"ABORT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ABORT},
-      {"ABS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ABS},
+      {"ABS", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ABS},
       {"ACCESSIBLE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ACCESSIBLE},
       {"ACOS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ACOS},
       {"ACTION", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ACTION},
@@ -8630,7 +8649,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"CEILING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CEILING},
       {"CENTROID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CENTROID}, /* deprecated in MySQL 5.7.6 */
       {"CHANGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CHANGE},
-      {"CHAR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHAR},
+      {"CHAR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_CHAR},
       {"CHARACTER", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CHARACTER},
       {"CHARACTER_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARACTER_LENGTH},
       {"CHARSET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARSET},  /* + Ocelot keyword */
@@ -8693,9 +8712,9 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"CURTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURTIME},
       {"DATABASE", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATABASE},
       {"DATABASES", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DATABASES},
-      {"DATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATE},
+      {"DATE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_DATE},
       {"DATEDIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATEDIFF},
-      {"DATETIME", 0, 0, TOKEN_KEYWORD_DATETIME},
+      {"DATETIME", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_DATETIME},
       {"DATE_ADD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATE_ADD},
       {"DATE_FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATE_FORMAT},
       {"DATE_SUB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATE_SUB},
@@ -8829,14 +8848,14 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"HANDLER", 0, 0, TOKEN_KEYWORD_HANDLER},
       {"HAVING", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_HAVING},
       {"HELP", 0, 0, TOKEN_KEYWORD_HELP}, /* Ocelot keyword */
-      {"HEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_HEX},
+      {"HEX", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_HEX},
       {"HIGH_PRIORITY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HIGH_PRIORITY},
       {"HOUR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_HOUR},
       {"HOUR_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_MICROSECOND},
       {"HOUR_MINUTE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_MINUTE},
       {"HOUR_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_SECOND},
       {"IF", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IF},
-      {"IFNULL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IFNULL},
+      {"IFNULL", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_IFNULL},
       {"IGNORE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_IGNORE},
       {"IMMEDIATE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_IMMEDIATE},
       {"IMPORT", 0, 0, TOKEN_KEYWORD_IMPORT},
@@ -8855,7 +8874,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"INSERT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INSERT},
       {"INSTALL", 0, 0, TOKEN_KEYWORD_INSTALL},
       {"INSTEAD", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_INSTEAD},
-      {"INSTR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INSTR},
+      {"INSTR", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_INSTR},
       {"INT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT},
       {"INT1", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT1},
       {"INT2", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT2},
@@ -8884,26 +8903,26 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"ITERATE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ITERATE},
       {"JOIN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_JOIN},
       {"JSON_APPEND", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_APPEND},
-      {"JSON_ARRAY", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_ARRAY},
+      {"JSON_ARRAY", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_ARRAY},
       {"JSON_ARRAY_APPEND", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_ARRAY_APPEND},
       {"JSON_ARRAY_INSERT", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_ARRAY_INSERT},
       {"JSON_CONTAINS", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_CONTAINS},
       {"JSON_CONTAINS_PATH", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_CONTAINS_PATH},
       {"JSON_DEPTH", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_DEPTH},
-      {"JSON_EXTRACT", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_EXTRACT},
-      {"JSON_INSERT", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_INSERT},
+      {"JSON_EXTRACT", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_EXTRACT},
+      {"JSON_INSERT", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_INSERT},
       {"JSON_KEYS", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_KEYS},
       {"JSON_LENGTH", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_LENGTH},
       {"JSON_MERGE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_MERGE},
-      {"JSON_OBJECT", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_OBJECT},
+      {"JSON_OBJECT", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_OBJECT},
       {"JSON_QUOTE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_QUOTE},
-      {"JSON_REMOVE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_REMOVE},
-      {"JSON_REPLACE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_REPLACE},
+      {"JSON_REMOVE", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_REMOVE},
+      {"JSON_REPLACE", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_REPLACE},
       {"JSON_SEARCH", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_SEARCH},
-      {"JSON_SET", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_SET},
-      {"JSON_TYPE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_TYPE},
+      {"JSON_SET", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_SET},
+      {"JSON_TYPE", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_TYPE},
       {"JSON_UNQUOTE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_UNQUOTE},
-      {"JSON_VALID", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_JSON_VALID},
+      {"JSON_VALID", 0, FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_VALID},
       {"KEY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_KEY},
       {"KEYS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KEYS},
       {"KILL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KILL},
@@ -8919,9 +8938,9 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"LEAST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LEAST},
       {"LEAVE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LEAVE},
       {"LEFT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LEFT},
-      {"LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LENGTH},
+      {"LENGTH", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LENGTH},
       {"LEVEL", 0, 0, TOKEN_KEYWORD_LEVEL},
-      {"LIKE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LIKE},
+      {"LIKE", FLAG_VERSION_ALL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_LIKE},
       {"LIMIT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LIMIT},
       {"LINEAR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LINEAR},
       {"LINEFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINEFROMTEXT}, /* deprecated in MySQL 5.7.6 */
@@ -8945,10 +8964,10 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"LONGBLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LONGBLOB},
       {"LONGTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LONGTEXT},
       {"LOOP", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOOP},
-      {"LOWER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOWER},
+      {"LOWER", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LOWER},
       {"LOW_PRIORITY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOW_PRIORITY},
       {"LPAD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LPAD},
-      {"LTRIM", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LTRIM},
+      {"LTRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LTRIM},
       {"MAKEDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKEDATE},
       {"MAKETIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKETIME},
       {"MAKE_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKE_SET},
@@ -8957,7 +8976,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"MASTER_POS_WAIT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MASTER_POS_WAIT},
       {"MASTER_SSL_VERIFY_SERVER_CERT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MASTER_SSL_VERIFY_SERVER_CERT},
       {"MATCH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_MATCH},
-      {"MAX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAX},
+      {"MAX", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_MAX},
       {"MAXVALUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MAXVALUE},
       {"MBRCONTAINS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCONTAINS},
       {"MBRCOVEREDBY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCOVEREDBY},
@@ -8976,7 +8995,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"MICROSECOND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MICROSECOND},
       {"MID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MID},
       {"MIDDLEINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MIDDLEINT},
-      {"MIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MIN},
+      {"MIN", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_MIN},
       {"MINUTE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MINUTE},
       {"MINUTE_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_MICROSECOND},
       {"MINUTE_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_SECOND},
@@ -9013,7 +9032,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"NTH_VALUE", 0, 0, TOKEN_KEYWORD_NTH_VALUE}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"NTILE", 0, FLAG_VERSION_MARIADB_10_2, TOKEN_KEYWORD_NTILE},
       {"NULL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NULL},
-      {"NULLIF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NULLIF},
+      {"NULLIF", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_NULLIF},
       {"NULLS", 0, 0, TOKEN_KEYWORD_NULLS}, /* MariaDB 10.2 nonreserved  -- or, maybe not in MariaDB 10.2 */
       {"NUMERIC", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_NUMERIC},
       {"NUMGEOMETRIES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMGEOMETRIES}, /* deprecated in MySQL 5.7.6 */
@@ -9074,7 +9093,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"QUARTER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_QUARTER},
       {"QUERY", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_QUERY},
       {"QUIT", 0, 0, TOKEN_KEYWORD_QUIT}, /* Ocelot keyword */
-      {"QUOTE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_QUOTE},
+      {"QUOTE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_QUOTE},
       {"RADIANS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RADIANS},
       {"RAISE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_RAISE},
       {"RAND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RAND},
@@ -9100,7 +9119,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"REORGANIZE", 0, 0, TOKEN_KEYWORD_REORGANIZE},
       {"REPAIR", 0, 0, TOKEN_KEYWORD_REPAIR},
       {"REPEAT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REPEAT},
-      {"REPLACE", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REPLACE},
+      {"REPLACE", FLAG_VERSION_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_REPLACE},
       {"REPLICATION", 0, 0, TOKEN_KEYWORD_REPLICATION},
       {"REQUIRE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_REQUIRE},
       {"RESET", 0, 0, TOKEN_KEYWORD_RESET},
@@ -9114,12 +9133,12 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"RLIKE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RLIKE},
       {"ROLE", 0, 0, TOKEN_KEYWORD_ROLE},
       {"ROLLBACK", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROLLBACK},
-      {"ROUND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ROUND},
+      {"ROUND", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ROUND},
       {"ROW", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROW},
       {"ROW_COUNT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ROW_COUNT},
       {"ROW_NUMBER", 0, FLAG_VERSION_MARIADB_10_2, TOKEN_KEYWORD_ROW_NUMBER},
       {"RPAD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RPAD},
-      {"RTRIM", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RTRIM},
+      {"RTRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_RTRIM},
       {"SAVEPOINT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SAVEPOINT},
       {"SCHEMA", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SCHEMA},
       {"SCHEMAS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SCHEMAS},
@@ -9149,7 +9168,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"SLOW", 0, 0, TOKEN_KEYWORD_SLOW},
       {"SMALLINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SMALLINT},
       {"SONAME", 0, 0, TOKEN_KEYWORD_SONAME},
-      {"SOUNDEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SOUNDEX},
+      {"SOUNDEX", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_SOUNDEX},
       {"SOURCE", 0, 0, TOKEN_KEYWORD_SOURCE}, /* Ocelot keyword */
       {"SPACE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SPACE},
       {"SPATIAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SPATIAL},
@@ -9262,7 +9281,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"ST_X", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_X},
       {"ST_Y", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_Y},
       {"SUBDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBDATE},
-      {"SUBSTR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBSTR},
+      {"SUBSTR", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_SUBSTR},
       {"SUBSTRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBSTRING},
       {"SUBSTRING_INDEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBSTRING_INDEX},
       {"SUBTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBTIME},
@@ -9279,7 +9298,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"TEMPORARY", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TEMPORARY},
       {"TERMINATED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TERMINATED},
       {"THEN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_THEN},
-      {"TIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIME},
+      {"TIME", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TIME},
       {"TIMEDIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMEDIFF},
       {"TIMESTAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMESTAMP},
       {"TIMESTAMPADD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMESTAMPADD},
@@ -9297,7 +9316,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"TRAILING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TRAILING},
       {"TRANSACTION", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TRANSACTION},
       {"TRIGGER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TRIGGER},
-      {"TRIM", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRIM},
+      {"TRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TRIM},
       {"TRUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TRUE},
       {"TRUNCATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRUNCATE},
       {"UCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UCASE},
@@ -9306,7 +9325,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"UNCOMPRESSED_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UNCOMPRESSED_LENGTH},
       {"UNDO", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_UNDO},
       {"UNHEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UNHEX},
-      {"UNICODE", 0, 0, TOKEN_KEYWORD_UNICODE},
+      {"UNICODE", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_UNICODE},
       {"UNINSTALL", 0, 0, TOKEN_KEYWORD_UNINSTALL},
       {"UNION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_UNION},
       {"UNIQUE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_UNIQUE},
@@ -9316,7 +9335,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"UNSIGNED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_UNSIGNED},
       {"UPDATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_UPDATE},
       {"UPDATEXML", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UPDATEXML},
-      {"UPPER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UPPER},
+      {"UPPER", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_UPPER},
       {"USAGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_USAGE},
       {"USE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_USE}, /* Ocelot keyword, also reserved word */
       {"USER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_USER},
@@ -10812,7 +10831,7 @@ int MainWindow::hparse_f_literal()
   {
     return 1;
   }
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 1) return 1;
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 1) return 1;
   /* DATE '...' | TIME '...' | TIMESTAMP '...' are literals, but DATE|TIME|TIMESTAMP are not. */
   QString hpu= hparse_token.toUpper();
   if ((hpu == "DATE") || (hpu == "TIME") || (hpu == "TIMESTAMP"))
@@ -11117,7 +11136,7 @@ int MainWindow::hparse_f_qualified_name_of_column()
     if (hparse_errno > 0) return 0;
     return 0;
   }
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
   {
       return 1;
   }
@@ -11130,28 +11149,28 @@ int MainWindow::hparse_f_qualified_name_of_operand()
   hparse_f_next_nexttoken();
   if (hparse_next_token == ".")
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return 0;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
     if (hparse_errno > 0) return 0;
     hparse_f_next_nexttoken();
     if (hparse_next_token == ".")
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return 0;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
       if (hparse_errno > 0) return 0;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return 0;
     }
     else
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return 0;
     }
     return 1;
   }
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
   {
     return 1;
   }
@@ -11160,12 +11179,12 @@ int MainWindow::hparse_f_qualified_name_of_operand()
 
 int MainWindow::hparse_f_qualified_name_with_star() /* like hparse_f_qualified_name but may end with * */
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 1)
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*") == 1) return 1;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return 0;
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 1)
       {
@@ -11187,7 +11206,7 @@ int MainWindow::hparse_f_table_references()
   {
     hparse_f_table_escaped_table_reference();
     if (hparse_errno > 0) return 0;
-  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   if (hparse_i == saved_hparse_i) return 0;
   return 1;
 }
@@ -11226,14 +11245,14 @@ int MainWindow::hparse_f_table_reference(int who_is_calling)
     {
       /* todo: figure out whether the word OUTER is on this list correctly */
       if (who_is_calling == TOKEN_KEYWORD_JOIN) return 1;
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "INNER") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CROSS, "CROSS") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN") == 1)
+      if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "INNER") == 1)
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CROSS, "CROSS") == 1)
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STRAIGHT_JOIN, "STRAIGHT_JOIN") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1)
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NATURAL, "NATURAL") == 1))
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER") == 1)
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NATURAL, "NATURAL") == 1))
       {
         hparse_i= saved_hparse_i;
         hparse_token_type= saved_hparse_token_type;
@@ -11331,10 +11350,10 @@ int MainWindow::hparse_f_table_join_table()
     bool inner_or_cross_seen= false;
     for (;;)
     {
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "INNER") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CROSS, "CROSS") == 1))
+      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "INNER") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CROSS, "CROSS") == 1))
       {
         inner_or_cross_seen= true;
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
         if (hparse_errno > 0) return 0;
         if (hparse_f_table_factor() == 0)
         {
@@ -11377,7 +11396,7 @@ int MainWindow::hparse_f_table_join_table()
     }
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NATURAL, "NATURAL"))
     {
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1)) {;}
+      if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1)) {;}
       else
       {
         hparse_f_error();
@@ -11401,13 +11420,13 @@ int MainWindow::hparse_f_table_join_table()
 
 int MainWindow::hparse_f_table_join_condition()
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ON, "ON") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ON, "ON") == 1)
   {
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return 0;
     return 1;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USING, "USING") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USING, "USING") == 1)
   {
     hparse_f_column_list(1, 0);
     if (hparse_errno > 0) return 0;
@@ -11504,7 +11523,7 @@ void MainWindow::hparse_f_opr_1(int who_is_calling) /* Precedence = 1 (bottom) *
 {
   hparse_f_opr_2(who_is_calling);
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1))
+  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1))
   {
     hparse_f_opr_2(who_is_calling);
     if (hparse_errno > 0) return;
@@ -11515,7 +11534,7 @@ void MainWindow::hparse_f_opr_2(int who_is_calling) /* Precedence = 2 */
 {
   hparse_f_opr_3(who_is_calling);
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OR") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "||") == 1))
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OR") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "||") == 1))
   {
     hparse_f_opr_3(who_is_calling);
     if (hparse_errno > 0) return;
@@ -11537,7 +11556,7 @@ void MainWindow::hparse_f_opr_4(int who_is_calling) /* Precedence = 4 */
 {
   hparse_f_opr_5(who_is_calling);
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AND") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "&&") == 1))
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AND") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "&&") == 1))
   {
     hparse_f_opr_5(who_is_calling);
     if (hparse_errno > 0) return;
@@ -11546,7 +11565,7 @@ void MainWindow::hparse_f_opr_4(int who_is_calling) /* Precedence = 4 */
 
 void MainWindow::hparse_f_opr_5(int who_is_calling) /* Precedence = 5 */
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1) {;}
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1) {;}
   hparse_f_opr_6(who_is_calling);
   if (hparse_errno > 0) return;
 }
@@ -11560,10 +11579,10 @@ void MainWindow::hparse_f_opr_5(int who_is_calling) /* Precedence = 5 */
 void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
 {
   if (hparse_errno > 0) return;
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION, "CASE") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION, "CASE") == 1)
   {
     int when_count= 0;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 0)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 0)
     {
       hparse_f_opr_1(who_is_calling);
       if (hparse_errno > 0) return;
@@ -11571,12 +11590,12 @@ void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
     else when_count= 1;
     for (;;)
     {
-      if ((when_count == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1))
+      if ((when_count == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1))
       {
         ++when_count;
         hparse_f_opr_1(who_is_calling);
         if (hparse_errno > 0) return;
-        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "THEN") == 1)
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "THEN") == 1)
         {
           hparse_f_opr_1(who_is_calling);
           if (hparse_errno > 0) return;
@@ -11591,12 +11610,12 @@ void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
       hparse_f_error();
       if (hparse_errno > 0) return;
     }
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ELSE") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ELSE") == 1)
     {
       hparse_f_opr_1(who_is_calling);
       if (hparse_errno > 0) return;
     }
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END_IN_CASE_EXPRESSION, "END") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END_IN_CASE_EXPRESSION, "END") == 1)
     {
       return;
     }
@@ -11670,13 +11689,13 @@ void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
 /* Most comp-ops can be chained e.g. "a <> b <> c", but not LIKE or IN. */
 void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
 {
-  if ((hparse_subquery_is_allowed == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS") == 1))
+  if ((hparse_subquery_is_allowed == true) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS") == 1))
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
     if (hparse_errno > 0) return;
     if (hparse_f_select(false) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
     return;
   }
@@ -11688,11 +11707,11 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
   {
     /* If we see "NOT", the only comp-ops that can follow are "LIKE" and "IN". */
     bool not_seen= false;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
     {
       not_seen= true;
     }
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIKE") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIKE") == 1)
     {
       hparse_like_seen= true;
       if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
@@ -11700,18 +11719,24 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
       hparse_like_seen= false;
       break;
     }
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN") == 1)
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GLOB") == 1)
+    {
+      if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
+      else hparse_f_opr_8(who_is_calling);
+      break;
+    }
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN") == 1)
     {
       hparse_f_parenthesized_multi_expression(&expression_count);
       if (hparse_errno > 0) return;
       break;
     }
     /* The manual says BETWEEN has a higher priority than this */
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BETWEEN") == 1)
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BETWEEN") == 1)
     {
       hparse_f_opr_8(who_is_calling);
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AND");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AND");
       if (hparse_errno > 0) return;
       hparse_f_opr_8(who_is_calling);
       if (hparse_errno > 0) return;
@@ -11730,13 +11755,16 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
       if (hparse_errno > 0) return;
       continue;
     }
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">=") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<=") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<>") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!=") == 1))
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">=") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<=") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<>") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "==") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!<") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!>") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!=") == 1))
     {
       if (hparse_subquery_is_allowed == true)
       {
@@ -11762,8 +11790,8 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IS") == 1)
     {
       hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT");
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRUE") == 1)
+      if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL") == 1)
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRUE") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FALSE") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNKNOWN") == 1))
         {;}
@@ -11788,7 +11816,7 @@ void MainWindow::hparse_f_opr_8(int who_is_calling) /* Precedence = 8 */
   if (hparse_errno > 0) return;
   hparse_f_opr_9(who_is_calling);
   if (hparse_errno > 0) return;
-  while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "|") == 1)
+  while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "|") == 1)
   {
     hparse_f_opr_9(who_is_calling);
     if (hparse_errno > 0) return;
@@ -11799,7 +11827,7 @@ void MainWindow::hparse_f_opr_9(int who_is_calling) /* Precedence = 9 */
 {
   hparse_f_opr_10(who_is_calling);
   if (hparse_errno > 0) return;
-  while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "&") == 1)
+  while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "&") == 1)
   {
     hparse_f_opr_10(who_is_calling);
     if (hparse_errno > 0) return;
@@ -11810,7 +11838,7 @@ void MainWindow::hparse_f_opr_10(int who_is_calling) /* Precedence = 10 */
 {
   hparse_f_opr_11(who_is_calling);
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<<") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">>") == 1))
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<<") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">>") == 1))
   {
     hparse_f_opr_11(who_is_calling);
     if (hparse_errno > 0) return;
@@ -11821,7 +11849,7 @@ void MainWindow::hparse_f_opr_11(int who_is_calling) /* Precedence = 11 */
 {
   hparse_f_opr_12(who_is_calling);
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "+") == 1))
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "+") == 1))
   {
     hparse_f_opr_12(who_is_calling);
     if (hparse_errno > 0) return;
@@ -11833,10 +11861,10 @@ void MainWindow::hparse_f_opr_12(int who_is_calling) /* Precedence = 12 */
   if (hparse_errno > 0) return;
   hparse_f_opr_13(who_is_calling);
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "*") == 1)
-   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "/") == 1)
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "*") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "/") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "DIV") == 1)
-   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "%") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "%") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "MOD") == 1))
   {
     hparse_f_opr_13(who_is_calling);
@@ -11857,7 +11885,7 @@ void MainWindow::hparse_f_opr_13(int who_is_calling) /* Precedence = 13 */
 
 void MainWindow::hparse_f_opr_14(int who_is_calling) /* Precedence = 14 */
 {
-  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "~") == 1)) {;}
+  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "~") == 1)) {;}
   hparse_f_opr_15(who_is_calling);
   if (hparse_errno > 0) return;
 }
@@ -11877,7 +11905,7 @@ void MainWindow::hparse_f_opr_16(int who_is_calling) /* Precedence = 16 */
   if (hparse_errno > 0) return;
   if (hparse_like_seen == true)
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ESCAPE") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ESCAPE") == 1)
     {
       hparse_like_seen= false;
       hparse_f_opr_17(who_is_calling);
@@ -11916,7 +11944,6 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
   if (hparse_errno > 0) return;
   QString opd= hparse_token.toUpper();
   bool identifier_seen= false;
-
   /* Check near the start for all built-in functions that happen to be reserved words */
   if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHAR, "CHAR") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONVERT, "CONVERT") == 1)
@@ -11927,17 +11954,17 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOCALTIMESTAMP, "LOCALTIMESTAMP") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MOD, "MOD") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPEAT_IN_REPEAT_EXPRESSION, "REPEAT") == 1)
-   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPLACE, "REPLACE") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPLACE, "REPLACE") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1))
   {
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 0)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 0)
     {
       hparse_f_function_arguments(opd);
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
       if (hparse_errno > 0) return;
     }
     return;
@@ -11955,7 +11982,6 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     if (hparse_errno > 0) return;
     return;
   }
-
   if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1)
         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCHEMA") == 1))
   {
@@ -11965,10 +11991,10 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     if (hparse_errno > 0) return;
     return;
   }
-  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_DATE") == 1)
-   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_TIME") == 1)
+  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_DATE") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_TIME") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_USER") == 1)
-   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_TIMESTAMP") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_TIMESTAMP") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UTC_DATE") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UTC_TIME") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UTC_TIMESTAMP") == 1))
@@ -11981,7 +12007,6 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     }
     return;
   }
-
   if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATE") == 1) /* DATE 'x', else DATE is not reserved so might be an id */
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TIME") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TIMESTAMP") == 1))
@@ -11996,27 +12021,26 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     if ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0)
     {
       int saved_token= main_token_types[hparse_i];
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
       {
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[reserved function]");
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[reserved function]");
         if (hparse_errno > 0) return;
       }
       identifier_seen= true;
       main_token_types[saved_hparse_i]= saved_token;
     }
   }
-
   if ((identifier_seen == true)
    || (hparse_f_qualified_name_of_operand() == 1))
   {
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 0)
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 0)
       {
         hparse_f_function_arguments(opd);
         if (hparse_errno > 0) return;
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
         if (hparse_errno > 0) return;
       }
       hparse_f_over(saved_hparse_i, who_is_calling);
@@ -12024,7 +12048,6 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     }
     return;
   }
-
   if (hparse_f_literal() == 1)
   {
     if (hparse_errno > 0) return;
@@ -12036,19 +12059,19 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     return;
   }
   else if (hparse_errno > 0) return;
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "("))
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "("))
   {
     if (hparse_errno > 0) return;
     /* if subquery is allowed, check for "(SELECT ...") */
     if ((hparse_subquery_is_allowed == true)
-     && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT") == 1))
+     && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT") == 1))
     {
       hparse_f_select(true);
       if (hparse_errno > 0) return;
     }
     else hparse_f_opr_1(who_is_calling);
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
     return;
   }
@@ -12215,7 +12238,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   {
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
     if (hparse_errno > 0) return;
     hparse_f_data_type();
     if (hparse_errno > 0) return;
@@ -12234,7 +12257,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
-  else if (hparse_f_is_equal(opd, "CONVERT"))
+  else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "CONVERT"))
   {
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
@@ -12243,7 +12266,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_is_equal(opd, "IF"))
+  else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "IF"))
   {
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
@@ -12261,7 +12284,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1) hparse_f_opr_1(0);
     else
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*") == 1) {;}
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*") == 1) {;}
       else hparse_f_opr_1(0);
     }
     if (hparse_errno > 0) return;
@@ -12294,7 +12317,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
       if (hparse_errno > 0) return;
     }
   }
-  else if (hparse_f_is_equal(opd, "WEIGHT_STRING"))
+  else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "WEIGHT_STRING"))
   {
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
@@ -12347,11 +12370,11 @@ void MainWindow::hparse_f_expression_list(int who_is_calling)
     else if ((who_is_calling == TOKEN_KEYWORD_SELECT)
           && (hparse_f_is_equal(hparse_next_token, "."))
           && (hparse_f_is_equal(hparse_next_next_token, "*"))
-          && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]")))
+          && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]")))
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*");
     }
     else
     {
@@ -12361,13 +12384,13 @@ void MainWindow::hparse_f_expression_list(int who_is_calling)
     if (who_is_calling == TOKEN_KEYWORD_SELECT)
     {
       bool as_seen= false;
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1) as_seen= true;
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ALIAS,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1) as_seen= true;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
       else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 1) {;}
       else if (as_seen == true) hparse_f_error();
       if (hparse_errno > 0) return;
     }
-  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
 }
 
 /* e.g. (1,2,3) or ( (1,1), (2,2), (3,3) ) i.e. two parenthesization levels are okay */
@@ -12445,7 +12468,7 @@ void MainWindow::hparse_f_parenthesized_expression()
 void MainWindow::hparse_f_parenthesized_multi_expression(int *expression_count)
 {
   *expression_count= 0;
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
   if (hparse_errno > 0) return;
   if ((hparse_subquery_is_allowed == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT") == 1))
   {
@@ -12460,9 +12483,9 @@ void MainWindow::hparse_f_parenthesized_multi_expression(int *expression_count)
       hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
       ++(*expression_count);
-    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+    } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
 }
 
@@ -12790,7 +12813,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_errno > 0) return;
     return;
   }
-  if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RENAME") == 1))
+  if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RENAME") == 1))
   {
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY") == 1))
     {
@@ -12803,7 +12826,7 @@ void MainWindow::hparse_f_alter_specification()
     }
     else
     {
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)) {;}
+      if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)) {;}
       if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
@@ -13040,11 +13063,11 @@ void MainWindow::hparse_f_definer()
 
 void MainWindow::hparse_f_if_not_exists()
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IF") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IF") == 1)
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
     if (hparse_errno > 0) return;
   }
 }
@@ -13707,7 +13730,7 @@ void MainWindow::hparse_f_comment()
 
 void MainWindow::hparse_f_column_list(int is_compulsory, int is_maybe_qualified)
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 0)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 0)
   {
     if (is_compulsory == 1) hparse_f_error();
     return;
@@ -13716,7 +13739,7 @@ void MainWindow::hparse_f_column_list(int is_compulsory, int is_maybe_qualified)
   {
     if (is_maybe_qualified == 0)
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     }
     else
@@ -13724,8 +13747,8 @@ void MainWindow::hparse_f_column_list(int is_compulsory, int is_maybe_qualified)
       if (hparse_f_qualified_name_of_column() == 0) hparse_f_error();
     }
     if (hparse_errno > 0) return;
-  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
 }
 
@@ -14385,7 +14408,7 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
       if (hparse_errno > 0) return;
     }
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASC") != 1) hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DESC");
-  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
 
@@ -14616,7 +14639,7 @@ void MainWindow::hparse_f_alter_or_create_view()
   if (hparse_errno > 0) return;
   hparse_f_column_list(0, 0);
   if (hparse_errno > 0) return;
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
   if (hparse_errno > 0) return;
   if (hparse_f_select(false) == 0) hparse_f_error();
   if (hparse_errno > 0) return;
@@ -15223,7 +15246,7 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
         if (hparse_errno > 0) return 0;
         if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASC") == 1)
          || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DESC") == 1)) {;}
-      } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+      } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1)
       {
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROLLUP");
@@ -15292,16 +15315,16 @@ void MainWindow::hparse_f_where()
 
 int MainWindow::hparse_f_order_by(int who_is_calling)
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ORDER") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ORDER") == 1)
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY");
     if (hparse_errno > 0) return 0;
     do
     {
       hparse_f_opr_1(who_is_calling);
       if (hparse_errno > 0) return 0;
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASC") == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DESC");
-    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASC") == 0) hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DESC");
+    } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     return 1;
   }
   else return 0;
@@ -15310,20 +15333,20 @@ int MainWindow::hparse_f_order_by(int who_is_calling)
 /* LIMIT 1 or LIMIT 1,0 or LIMIT 1 OFFSET 0 from SELECT, DELETE, UPDATE, or SHOW */
 void MainWindow::hparse_f_limit(int who_is_calling)
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIMIT") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIMIT") == 1)
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 0)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 0)
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     }
     if ((who_is_calling == TOKEN_KEYWORD_DELETE) || (who_is_calling == TOKEN_KEYWORD_UPDATE)) return;
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OFFSET") == 1))
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OFFSET") == 1))
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 0)
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 0)
       {
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
       }
     }
@@ -15525,11 +15548,11 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
     }
     else if ((((*hparse_flags) & (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW)) != 0) && (temporary_seen == false) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEMP") == 1))
     {
-      temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW);
+      temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW | HPARSE_FLAG_ROUTINE);
     }
     else if ((((*hparse_flags) & (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW)) != 0) && (temporary_seen == false) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEMPORARY") == 1))
     {
-      temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW);
+      temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW | HPARSE_FLAG_ROUTINE);
     }
     else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ONLINE") == 1))
     {
@@ -15547,7 +15570,7 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
     {
       (*fulltext_seen)= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
-    else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNIQUE") == 1))
+    else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNIQUE") == 1))
     {
       unique_seen= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
@@ -15638,6 +15661,7 @@ int MainWindow::hparse_f_explainable_statement(int block_top)
 statement =
     "connect" "create" "drop" etc. etc.
     The idea is to parse everything that's described in the MySQL 5.7 manual.
+    Additionally, depending on flags, parse MariaDB or Tarantool statements.
 */
 void MainWindow::hparse_f_statement(int block_top)
 {
@@ -15801,12 +15825,9 @@ void MainWindow::hparse_f_statement(int block_top)
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
       if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFERRED") == 1) {;}
-      if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IMMEDIATE") == 1) {;}
-      if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCLUSIVE") == 1) {;}
-      if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRANSACTION") == 1)
-      {
-        hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_TRANSACTION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      }
+      else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IMMEDIATE") == 1) {;}
+      else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCLUSIVE") == 1) {;}
+      if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRANSACTION") == 1) {;}
     }
     return;
   }
@@ -16011,7 +16032,7 @@ void MainWindow::hparse_f_statement(int block_top)
     hparse_f_commit_or_rollback();
     return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONNECT"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONNECT"))
   {
     hparse_statement_type= TOKEN_KEYWORD_CONNECT;
     return;
@@ -16168,7 +16189,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITHOUT")  == 1)
       {
-        hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "ROWID");
+        hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROWID");
       }
       hparse_f_table_or_partition_options(TOKEN_KEYWORD_TABLE);
       if (hparse_errno > 0) return;
@@ -16176,7 +16197,7 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_errno > 0) return;
       bool ignore_or_as_seen= false;
       if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IGNORE") || hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLACE") == 1)) ignore_or_as_seen= true;
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1) ignore_or_as_seen= true;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1) ignore_or_as_seen= true;
       if (ignore_or_as_seen == true)
       {
         if (hparse_f_select(false) == 0)
@@ -16238,12 +16259,21 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
-      if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EACH");
-      if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROW");
-      if (hparse_errno > 0) return;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EACH");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROW");
+        if (hparse_errno > 0) return;
+      }
+      else
+      {
+        if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+        {
+          hparse_f_error();
+          if (hparse_errno > 0) return;
+        }
+      }
       if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOLLOWS") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PRECEDES")) == 1)
       {
         if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TRIGGER, TOKEN_REFTYPE_TRIGGER) == 0) hparse_f_error();
@@ -16251,6 +16281,11 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
       {
+        if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1)
+        {
+          hparse_f_opr_1(0);
+          if (hparse_errno > 0) return;
+        }
         hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN, "BEGIN");
         if (hparse_errno > 0) return;
         for (;;)
@@ -16283,6 +16318,32 @@ void MainWindow::hparse_f_statement(int block_top)
       hparse_f_alter_or_create_view();
       if (hparse_errno > 0) return;
     }
+    else if ((((hparse_flags) & HPARSE_FLAG_TABLE) != 0) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIRTUAL") == 1))
+    {
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
+      if (hparse_errno > 0) return;
+      hparse_f_if_not_exists();
+      if (hparse_errno > 0) return;
+      hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE);
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USING");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+
+
+      if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
+      {
+        for (;;)
+        {
+          if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_PARAMETER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+          if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1) continue;
+          else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 1) break;
+          else hparse_f_error();
+          if (hparse_errno > 0) return;
+        }
+      }
+    }
     else hparse_f_error();
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEALLOCATE, "DEALLOCATE"))
@@ -16303,7 +16364,7 @@ void MainWindow::hparse_f_statement(int block_top)
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOW_PRIORITY")) {;}
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "QUICK")) {;}
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IGNORE")) {;}
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1)
     {
       bool multi_seen= false;
       if (hparse_f_qualified_name_with_star() == 0) hparse_f_error();
@@ -16443,11 +16504,14 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_INDEX,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON");
-      if (hparse_errno > 0) return;
-      if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
-      if (hparse_errno > 0) return;
-      hparse_f_algorithm_or_lock();
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON");
+        if (hparse_errno > 0) return;
+        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        hparse_f_algorithm_or_lock();
+      }
     }
     else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PREPARE")))
     {
@@ -16552,7 +16616,7 @@ void MainWindow::hparse_f_statement(int block_top)
         if (hparse_errno > 0) return;
       } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     }
-    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIEW")))
+    else if (((temporary_seen == false || (hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIEW")))
     {
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IF") == 1)
@@ -18050,7 +18114,7 @@ void MainWindow::hparse_f_statement(int block_top)
     if (hparse_errno > 0) return;
     hparse_f_assignment(TOKEN_KEYWORD_UPDATE);
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHERE") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHERE") == 1)
     {
       hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
@@ -19003,19 +19067,19 @@ int MainWindow::hparse_f_client_statement()
   QString saved_hparse_token= hparse_token;
   int slash_token= hparse_f_backslash_command(true);
   if (hparse_errno > 0) return 0;
-  if ((slash_token == TOKEN_KEYWORD_QUESTIONMARK) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUESTIONMARK, "?") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_CHARSET) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHARSET, "CHARSET") == 1))
+  if ((slash_token == TOKEN_KEYWORD_QUESTIONMARK) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUESTIONMARK, "?") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_CHARSET) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHARSET, "CHARSET") == 1))
   {
     main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return 0;
     }
   }
-  else if ((slash_token == TOKEN_KEYWORD_CLEAR) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLEAR, "CLEAR") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONNECT, "CONNECT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
+  else if ((slash_token == TOKEN_KEYWORD_CLEAR) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLEAR, "CLEAR") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONNECT, "CONNECT") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
   {
     QString tmp_delimiter= get_delimiter(hparse_token, hparse_text_copy, main_token_offsets[hparse_i]);
     if (tmp_delimiter > " ")
@@ -19046,17 +19110,17 @@ int MainWindow::hparse_f_client_statement()
     else hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EDIT, "EDIT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_EGO) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EGO, "EGO") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_EXIT) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXIT, "EXIT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_GO) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GO, "GO") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_HELP) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HELP, "HELP") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_NOPAGER) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOPAGER, "NOPAGER") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_NOTEE) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOTEE, "NOTEE") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_NOWARNING) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOWARNING, "NOWARNING") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_PAGER) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAGER, "PAGER") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_PRINT) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRINT, "PRINT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_PROMPT) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PROMPT, "PROMPT")== 1))
+  else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EDIT, "EDIT") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_EGO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EGO, "EGO") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_EXIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXIT, "EXIT") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_GO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GO, "GO") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_HELP) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HELP, "HELP") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_NOPAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOPAGER, "NOPAGER") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_NOTEE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOTEE, "NOTEE") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_NOWARNING) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOWARNING, "NOWARNING") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_PAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAGER, "PAGER") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_PRINT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRINT, "PRINT") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_PROMPT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PROMPT, "PROMPT")== 1))
   {
     /* Apparently PROMPT can be followed by any bunch of junk as far as ; or delimiter or eof */
     for (;;)
@@ -19069,10 +19133,10 @@ int MainWindow::hparse_f_client_statement()
       hparse_f_nexttoken();
     }
   }
-  else if ((slash_token == TOKEN_KEYWORD_QUIT) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUIT, "QUIT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_REHASH) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REHASH, "REHASH") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_QUIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUIT, "QUIT") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_REHASH) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REHASH, "REHASH") == 1)) {;}
   //else if ((slash_token == TOKEN_KEYWORD_RESETCONNECTION) || (hparse_f_accept_client(TOKEN_KEYWORD_RESETCONNECTION, "RESETCONNECTION") == 1)) {;}
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET") == 1)
   {
     if (main_token_lengths[hparse_i] != 0)
     {
@@ -19085,90 +19149,90 @@ int MainWindow::hparse_f_client_statement()
         return 0;
       }
     }
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_TEXT_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_BACKGROUND_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_BORDER_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_FAMILY") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_SIZE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_STYLE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_WEIGHT") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_SYNTAX_CHECKER") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_TEXT_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BACKGROUND_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_HEADER_BACKGROUND_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BORDER_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_FAMILY") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_SIZE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_STYLE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_WEIGHT") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_BORDER_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_DRAG_LINE_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BORDER_SIZE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_BORDER_SIZE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_DRAG_LINE_SIZE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_TEXT_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_CONDITION") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_DISPLAY_AS") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_TEXT_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_BACKGROUND_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_BORDER_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_FAMILY") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_SIZE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_STYLE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_WEIGHT") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_TEXT_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_BACKGROUND_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_BORDER_COLOR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_FONT_FAMILY") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_FONT_SIZE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_FONT_STYLE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_FONT_WEIGHT") == 1))
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_TEXT_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_BORDER_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_FAMILY") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_SIZE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_STYLE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_FONT_WEIGHT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_SYNTAX_CHECKER") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_TEXT_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_HEADER_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BORDER_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_FAMILY") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_SIZE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_STYLE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_FONT_WEIGHT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_BORDER_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_DRAG_LINE_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_BORDER_SIZE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_BORDER_SIZE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_GRID_CELL_DRAG_LINE_SIZE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_TEXT_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_CONDITION") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_EXTRA_RULE_1_DISPLAY_AS") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_TEXT_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_BORDER_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_FAMILY") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_SIZE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_STYLE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HISTORY_FONT_WEIGHT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_TEXT_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_BACKGROUND_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_BORDER_COLOR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_FONT_FAMILY") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_FONT_SIZE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_FONT_STYLE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_MENU_FONT_WEIGHT") == 1))
     {
       ;
     }
     else hparse_f_error();
     if (hparse_errno > 0) return 0;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
     if (hparse_errno > 0) return 0;
     main_token_flags[hparse_i]= (main_token_flags[hparse_i] & (~TOKEN_FLAG_IS_RESERVED));
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
+  else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
   {
     hparse_f_other(0);
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STATUS, "STATUS") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1))
+  else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STATUS, "STATUS") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1))
   {
     hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEE, "TEE") == 1))
+  else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEE, "TEE") == 1))
   {
     hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
+  else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
     }
     /* In mysql client, garbage can follow. It's not documented so don't call hparse_f_other(). */
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_WARNINGS) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WARNINGS, "WARNINGS")) == 1) {;}
+  else if ((slash_token == TOKEN_KEYWORD_WARNINGS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WARNINGS, "WARNINGS")) == 1) {;}
   else if (hparse_token.mid(0, 1) == "$")
   {
     /* TODO: We aren't parsing $debug statements well */
@@ -19329,20 +19393,20 @@ static int tparse_indexed_condition_count= 0;
 void MainWindow::tparse_f_factor()
 {
   if (hparse_errno > 0) return;
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[identifier]"))
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[identifier]"))
   {
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]"))
   {
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "("))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "("))
   {
     if (hparse_errno > 0) return;
     tparse_f_expression();
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
   }
   else
@@ -19360,7 +19424,7 @@ void MainWindow::tparse_f_term()
   if (hparse_errno > 0) return;
   tparse_f_factor();
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "*") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "/") == 1))
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "*") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "/") == 1))
   {
     tparse_f_factor();
     if (hparse_errno > 0) return;
@@ -19373,10 +19437,10 @@ void MainWindow::tparse_f_term()
 void MainWindow::tparse_f_expression()
 {
   if (hparse_errno > 0) return;
-  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1)) {;}
+  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1)) {;}
   tparse_f_term();
   if (hparse_errno > 0) return;
-  while ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1))
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1))
   {
     tparse_f_term();
     if (hparse_errno > 0) return;
@@ -19389,8 +19453,8 @@ void MainWindow::tparse_f_expression()
 void MainWindow::tparse_f_restricted_expression()
 {
   if (hparse_errno > 0) return;
-  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1)) {;}
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
+  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "+") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "-") == 1)) {;}
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
 }
 
 /*
@@ -19411,7 +19475,7 @@ void MainWindow::tparse_f_indexed_condition()
     }
     int comp_op= -1;
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[field identifier]") == 0)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[field identifier]") == 0)
     {
       hparse_expected= "field identifier with the format: ";
       hparse_expected.append(TARANTOOL_FIELD_NAME_BASE);
@@ -19430,19 +19494,19 @@ void MainWindow::tparse_f_indexed_condition()
       int ok= 0;
       if ((hparse_token == "<")
        && (tparse_iterator_type == TARANTOOL_BOX_INDEX_LE)
-       && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1)) {;}
+       && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1)) {;}
       else if ((hparse_token == ">")
             && (tparse_iterator_type == TARANTOOL_BOX_INDEX_GE)
-            && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1)) ++ok;
+            && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1)) ++ok;
       else if ((hparse_token == "=")
             && (tparse_iterator_type == TARANTOOL_BOX_INDEX_EQ)
-            && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1)) ++ok;
+            && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1)) ++ok;
       else if ((hparse_token == "<=")
             && (tparse_iterator_type == TARANTOOL_BOX_INDEX_LE)
-            && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1)) ++ok;
+            && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1)) ++ok;
       else if ((hparse_token == ">=")
             && (tparse_iterator_type == TARANTOOL_BOX_INDEX_GE)
-            && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1)) ++ok;
+            && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1)) ++ok;
       if (ok == 0)
       {
         hparse_expected= "A conditional operator compatible with previous ones. ";
@@ -19456,18 +19520,18 @@ void MainWindow::tparse_f_indexed_condition()
     else
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1) comp_op= TARANTOOL_BOX_INDEX_LT;
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1) comp_op= TARANTOOL_BOX_INDEX_LE;
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1) comp_op= TARANTOOL_BOX_INDEX_GT;
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1) comp_op= TARANTOOL_BOX_INDEX_GE;
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1) comp_op= TARANTOOL_BOX_INDEX_LT;
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1) comp_op= TARANTOOL_BOX_INDEX_LE;
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1) comp_op= TARANTOOL_BOX_INDEX_GT;
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1) comp_op= TARANTOOL_BOX_INDEX_GE;
       else hparse_f_error();
       if (hparse_errno > 0) return;
     }
     tparse_iterator_type= comp_op;
     ++tparse_indexed_condition_count;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
     if (hparse_errno > 0) return;
-  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "AND"));
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "AND"));
 }
 
 
@@ -19518,13 +19582,13 @@ void MainWindow::tparse_f_assignment()
   do
   {
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
     if (hparse_errno > 0) return;
     tparse_f_expression();
     if (hparse_errno > 0) return;
-    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
+    } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
 }
 
 /*
@@ -19540,100 +19604,99 @@ statement =
 void MainWindow::tparse_f_statement()
 {
   if (hparse_errno > 0) return;
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INSERT"))
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INSERT"))
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_INSERT;
-    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "VALUES");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "VALUES");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
     do
     {
       if (hparse_errno > 0) return;
       tparse_f_restricted_expression();
       if (hparse_errno > 0) return;
-    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
+    } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "REPLACE"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "REPLACE"))
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_REPLACE;
-    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
     do
     {
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return;
-    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
+    } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ","));
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "DELETE"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "DELETE"))
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_DELETE;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "FROM");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "FROM");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
     if (hparse_errno > 0) return;
     tparse_f_indexed_condition();
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TRUNCATE"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TRUNCATE"))
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_TRUNCATE;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TABLE");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TABLE");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SELECT"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SELECT"))
   {
     if (hparse_errno > 0) return;
-printf("after hparse_f_accept %d %d\n", main_token_types[0], TOKEN_KEYWORD_SELECT);
     hparse_statement_type= TOKEN_KEYWORD_SELECT;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "*");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "*");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "FROM");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "FROM");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE"))
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE"))
     {
       tparse_f_indexed_condition();
       if (hparse_errno > 0) return;
     }
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "UPDATE"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "UPDATE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_UPDATE;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SET");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SET");
     if (hparse_errno > 0) return;
     tparse_f_assignment();
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
     if (hparse_errno > 0) return;
     tparse_f_indexed_condition();
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SET"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SET"))
   {
     hparse_statement_type= TOKEN_KEYWORD_SET;
     tparse_f_assignment();
@@ -19672,8 +19735,8 @@ void MainWindow::tparse_f_program(QString text)
   tparse_f_block(0);
   if (hparse_errno > 0) return;
   /* If you've got a bloody semicolon that's okay too */
-  if (hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ";")) return;
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[eof]"); /* was: parse_expect(TOKEN_KEYWORD_PERIOD); */
+  if (hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ";")) return;
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[eof]"); /* was: parse_expect(TOKEN_KEYWORD_PERIOD); */
   if (hparse_errno > 0) return;
 }
 #endif
