@@ -443,11 +443,10 @@ public:
   int hparse_f_user_name();
   int hparse_f_character_set_name();
   int hparse_f_collation_name();
-  int hparse_f_qualified_name_of_column();
   int hparse_f_qualified_name_with_star();
   int hparse_f_qualified_name_of_object(int,int);
   int hparse_f_qualified_name_of_object_with_star(int,int);
-  int hparse_f_qualified_name_of_operand();
+  int hparse_f_qualified_name_of_operand(bool);
   int hparse_f_table_references();
   void hparse_f_table_escaped_table_reference();
   int hparse_f_table_reference(int);
@@ -1788,6 +1787,7 @@ enum {
     TOKEN_REFTYPE_COLLATION,
     TOKEN_REFTYPE_COLUMN,
     TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE,
+    TOKEN_REFTYPE_COLUMN_OR_VARIABLE,
     TOKEN_REFTYPE_CONDITION_DEFINE,
     TOKEN_REFTYPE_CONDITION_REFER,
     TOKEN_REFTYPE_CONDITION_OR_CURSOR,
@@ -1802,6 +1802,7 @@ enum {
     TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
     TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
     TOKEN_REFTYPE_DATABASE_OR_VIEW,
@@ -1809,6 +1810,7 @@ enum {
     TOKEN_REFTYPE_EVENT,
     TOKEN_REFTYPE_FUNCTION,
     TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE,
+    TOKEN_REFTYPE_FUNCTION_OR_VARIABLE,
     TOKEN_REFTYPE_HANDLER_ALIAS,
     TOKEN_REFTYPE_HOST,
     TOKEN_REFTYPE_INDEX,
