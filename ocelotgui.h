@@ -536,7 +536,7 @@ public:
   void hparse_f_labels(int);
   void hparse_f_cursors(int);
   int hparse_f_conditions(int);
-  void hparse_f_variables(int);
+  int hparse_f_variables(bool);
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
@@ -1814,6 +1814,7 @@ enum {
     TOKEN_REFTYPE_HANDLER_ALIAS,
     TOKEN_REFTYPE_HOST,
     TOKEN_REFTYPE_INDEX,
+    TOKEN_REFTYPE_INTRODUCER,
     TOKEN_REFTYPE_KEY_CACHE,
     TOKEN_REFTYPE_LABEL_DEFINE,
     TOKEN_REFTYPE_LABEL_REFER,
@@ -5711,6 +5712,10 @@ void mouseMoveEvent(QMouseEvent *event)
         else if (token_type == MainWindow::TOKEN_TYPE_OPERATOR)
         {
           s.append("operator");
+        }
+        else if (token_type == MainWindow::TOKEN_TYPE_OTHER)
+        {
+          s.append("[identifier or keyword]");
         }
         else
         {
