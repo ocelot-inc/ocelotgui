@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.1
-   Last modified: August 12 2016
+   Version: 1.0.2
+   Last modified: August 15 2016
 */
 
 /*
@@ -511,7 +511,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.1"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.2"; /* For --version. Make sure it's in manual too. */
 
   static unsigned char dbms_version_mask;
 
@@ -2625,7 +2625,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.1, July 1 2016  \
+  <BR>Version 1.0.2, August 15 2016  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -14020,20 +14020,22 @@ void MainWindow::hparse_f_column_list(int is_compulsory, int is_maybe_qualified)
   engine = engine_name part of either CREATE TABLE or CREATE TABLESPACE.
   Usually it will be a standard engine like MyISAM or InnoDB, but with MariaDB
   there are usually more choices ... in the end, we allow any identifier.
+  Although it's undocumented, ENGINE = 'literal' is okay too.
 */
 void MainWindow::hparse_f_engine()
 {
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1) {;}
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "ARCHIVE") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "CSV") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "EXAMPLE") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "FEDERATED") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "HEAP") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "INNODB") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "MEMORY") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "MERGE") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "MYISAM") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "NDB") == 1) {;}
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "ARCHIVE") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "CSV") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "EXAMPLE") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "FEDERATED") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "HEAP") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "INNODB") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "MEMORY") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "MERGE") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "MYISAM") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "NDB") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "[literal]") == 1) {;}
     else hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
 }
 
@@ -14242,7 +14244,8 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
     else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STATS_SAMPLE_PAGES") == 1))
     {
       hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT") == 0)
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return;
     }
     else if ((keyword == TOKEN_KEYWORD_PARTITION) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STORAGE") == 1))
@@ -16420,7 +16423,7 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else if (((hparse_flags & HPARSE_FLAG_TABLE) != 0) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE, "TABLE") == 1))
     {
-      ; /* TODO: CREATE TABLE -- other possibilities */
+      ; /* TODO: This accepts "CREATE TABLE x;" which has 0 columns */
       hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
@@ -18548,7 +18551,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     next_is_semicolon_or_work= true;
   }
 
-  int hparse_i_of_start= hparse_i;
+  //int hparse_i_of_start= hparse_i;
   if ((next_is_semicolon_or_work == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN, "BEGIN") == 1))
   {
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
