@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: August 15 2016
+   Last modified: August 28 2016
 */
 
 /*
@@ -443,6 +443,7 @@ static const char *s_color_list[308]=
   static char* ocelot_opt_ssl_crl_as_utf8= 0;       /*  --ssl-crl for MYSQL_OPT_SSL_CRL */
   static char* ocelot_opt_ssl_crlpath_as_utf8= 0;   /* --ssl-crlpath for MYSQL_OPT_SSL_CRLPATH */
   static char* ocelot_opt_ssl_key_as_utf8= 0;       /* --ssl-key for MYSQL_OPT_SSL_KEY */
+  static char* ocelot_opt_ssl_mode_as_utf8= 0;      /* --ssl-mode for MYSQL_OPT_SSL_MODE */
   static unsigned short int ocelot_opt_ssl_verify_server_cert= 0;  /* --ssl-verify-server-cert for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert (5.7) */
   static unsigned short ocelot_syslog= 0;           /* --syslog (5.7) */
   static unsigned short ocelot_table= 0;            /* --table */
@@ -865,6 +866,138 @@ void MainWindow::statement_edit_widget_setstylesheet()
   }
 }
 
+/*
+  Formatter -- minimal, but this format might be okay for the debugger.
+  It only works if the input has been recognized.
+  All we're trying to accomplish is "different statements different lines"
+  and "block start causes indent" -- everything else is just left the way it was.
+  Therefore ...
+  Cursor won't move.
+  Undo is not possible.
+  It's not on the menu.
+*/
+void MainWindow::statement_edit_widget_formatter()
+{
+  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return;
+  QString text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
+  QString output= "";
+  int indent_base= 0;
+  int indent_amount= 2;
+  int i;
+  int token;
+  int previous_token= 0;
+  QString s;
+  int token_type;
+  for (i= 0; main_token_lengths[i] != 0; ++i)
+  {
+    token_type= 0;
+    token= main_token_types[i];
+    if ((token == TOKEN_KEYWORD_ALTER)
+    || (token == TOKEN_KEYWORD_ANALYZE)
+    || (token == TOKEN_KEYWORD_ATTACH)
+    || (token == TOKEN_KEYWORD_BEGIN_WORK)
+    || (token == TOKEN_KEYWORD_BINLOG)
+    //|| (token == TOKEN_KEYWORD_CACHE)
+    || (token == TOKEN_KEYWORD_CALL)
+    || (token == TOKEN_KEYWORD_CHANGE)
+    || (token == TOKEN_KEYWORD_CHECK)
+    //|| (token == TOKEN_KEYWORD_CHECKSUM)
+    || (token == TOKEN_KEYWORD_COMMIT)
+    || (token == TOKEN_KEYWORD_CONNECT)
+    || (token == TOKEN_KEYWORD_CREATE)
+    || (token == TOKEN_KEYWORD_DEALLOCATE)
+    || (token == TOKEN_KEYWORD_DELETE)
+    || (token == TOKEN_KEYWORD_DESC)
+    || (token == TOKEN_KEYWORD_DESCRIBE)
+    || (token == TOKEN_KEYWORD_DETACH)
+    || (token == TOKEN_KEYWORD_DO)
+    || (token == TOKEN_KEYWORD_DROP)
+    || (token == TOKEN_KEYWORD_EXECUTE)
+    || (token == TOKEN_KEYWORD_EXPLAIN)
+    || (token == TOKEN_KEYWORD_FLUSH)
+    || (token == TOKEN_KEYWORD_GET)
+    || (token == TOKEN_KEYWORD_GRANT)
+    || (token == TOKEN_KEYWORD_HANDLER)
+    || (token == TOKEN_KEYWORD_HELP)
+    || (token == TOKEN_KEYWORD_INSERT)
+    || (token == TOKEN_KEYWORD_INSTALL)
+    || (token == TOKEN_KEYWORD_KILL)
+    || (token == TOKEN_KEYWORD_LOAD)
+    || (token == TOKEN_KEYWORD_LOCK)
+    || (token == TOKEN_KEYWORD_OPTIMIZE)
+    || (token == TOKEN_KEYWORD_PRAGMA)
+    || (token == TOKEN_KEYWORD_PREPARE)
+    || (token == TOKEN_KEYWORD_PURGE)
+    || (token == TOKEN_KEYWORD_RELEASE)
+    || (token == TOKEN_KEYWORD_REINDEX)
+    || (token == TOKEN_KEYWORD_RENAME)
+    || (token == TOKEN_KEYWORD_REPAIR)
+    || (token == TOKEN_KEYWORD_REPLACE)
+    || (token == TOKEN_KEYWORD_RESET)
+    || (token == TOKEN_KEYWORD_RESIGNAL)
+    || (token == TOKEN_KEYWORD_REVOKE)
+    || (token == TOKEN_KEYWORD_ROLLBACK)
+    || (token == TOKEN_KEYWORD_SAVEPOINT)
+    || (token == TOKEN_KEYWORD_SELECT)
+    || (token == TOKEN_KEYWORD_SET)
+    || (token == TOKEN_KEYWORD_SHOW)
+    || (token == TOKEN_KEYWORD_SHUTDOWN)
+    || (token == TOKEN_KEYWORD_SIGNAL)
+    || (token == TOKEN_KEYWORD_SONAME)
+    || (token == TOKEN_KEYWORD_START)
+    || (token == TOKEN_KEYWORD_STOP)
+    || (token == TOKEN_KEYWORD_TRUNCATE)
+    || (token == TOKEN_KEYWORD_UNINSTALL)
+    || (token == TOKEN_KEYWORD_UNLOCK)
+    || (token == TOKEN_KEYWORD_UPDATE)
+    || (token == TOKEN_KEYWORD_VACUUM)
+    || (token == TOKEN_KEYWORD_XA))
+      token_type= 1;
+    if ((token == TOKEN_KEYWORD_CLOSE)
+    || (token == TOKEN_KEYWORD_DECLARE)
+    || (token == TOKEN_KEYWORD_END)
+    || (token == TOKEN_KEYWORD_FETCH)
+    || (token == TOKEN_KEYWORD_ITERATE)
+    || (token == TOKEN_KEYWORD_LEAVE)
+    || (token == TOKEN_KEYWORD_OPEN))
+      token_type= 2;
+    if ((token == TOKEN_KEYWORD_BEGIN)
+    || (token == TOKEN_KEYWORD_CASE)
+    || (token == TOKEN_KEYWORD_IF)
+    || (token == TOKEN_KEYWORD_LOOP)
+    || (token == TOKEN_KEYWORD_REPEAT)
+    || (token == TOKEN_KEYWORD_WHILE))
+      if (previous_token != TOKEN_KEYWORD_END) token_type= 3;
+    if (token_type > 0)
+    {
+      /* if (not already at indent-base) */
+      output.append("\n");
+      for (int k= 0; k < indent_base; ++k) output.append(" ");
+      if (token == TOKEN_KEYWORD_END)
+      {
+        indent_base-= indent_amount;
+      }
+      if (token_type == 3)
+      {
+        indent_base+= indent_amount;
+      }
+    }
+    if (i > 0)
+    {
+      int j= main_token_offsets[i - 1] + main_token_lengths[i - 1];
+      if (main_token_offsets[i] > j)
+      {
+        s= text.mid(j, main_token_offsets[i] - j);
+        output.append(s);
+      }
+    }
+    s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    output.append(s);
+    previous_token= token;
+  }
+  statement_edit_widget->setPlainText(output);
+}
+
 
 /*
   The event filter, for detecting:
@@ -952,6 +1085,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   {
     if (key->key() == Qt::Key_P) { history_markup_previous(); return true; }
     if (key->key() == Qt::Key_N) { history_markup_next(); return true; }
+    if (key->key() == Qt::Key_1) { statement_edit_widget_formatter(); return true; }
     if (key->key() == Qt::Key_E) { action_execute(1); return true; }
     if (menu_run_action_kill->isEnabled() == true)
     {
@@ -2178,7 +2312,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_is_password= 0;
   row_form_data= 0;
   row_form_width= 0;
-  column_count= 83; /* If you add or remove items, you have to change this */
+  column_count= 84; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
   row_form_is_password= new int[column_count];
@@ -2259,6 +2393,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "ssl_crl"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crl; row_form_width[i]= 5;
   row_form_label[++i]= "ssl_crlpath"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crlpath; row_form_width[i]= 5;
   row_form_label[++i]= "ssl_key"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_key; row_form_width[i]= 5;
+  row_form_label[++i]= "ssl_mode"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_mode; row_form_width[i]= 5;
   row_form_label[++i]= "ssl_verify_server_cert"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_ssl_verify_server_cert); row_form_width[i]= 5;
   row_form_label[++i]= "syslog"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_syslog); row_form_width[i]= 5;
   row_form_label[++i]= "table"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_table); row_form_width[i]= 5;
@@ -2373,6 +2508,7 @@ void MainWindow::action_connect_once(QString message)
       ocelot_opt_ssl_crl= row_form_data[i++].trimmed();
       ocelot_opt_ssl_crlpath= row_form_data[i++].trimmed();
       ocelot_opt_ssl_key= row_form_data[i++].trimmed();
+      ocelot_opt_ssl_mode= row_form_data[i++].trimmed();
       ocelot_opt_ssl_verify_server_cert= to_long(row_form_data[i++].trimmed());
       ocelot_syslog= to_long(row_form_data[i++].trimmed());
       ocelot_table= to_long(row_form_data[i++].trimmed());
@@ -10829,7 +10965,7 @@ int MainWindow::hparse_f_literal()
     else hparse_f_error();
     return 0;
   }
-  else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1)
+  else if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1)
         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TRUE, "TRUE") == 1)
         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FALSE, "FALSE") == 1))
   {
@@ -12051,11 +12187,11 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
       if (hparse_errno > 0) return;
       continue;
     }
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IS") == 1)
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IS") == 1)
     {
-      hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT");
+      hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT");
       if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL") == 1)
-       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRUE") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRUE") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FALSE") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNKNOWN") == 1))
         {;}
@@ -21733,6 +21869,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_opt_ssl_crl= "";
   ocelot_opt_ssl_crlpath= "";
   ocelot_opt_ssl_key= "";
+  ocelot_opt_ssl_mode= "";
   /* ocelot_opt_ssl_verify_server_cert= 0; */ /* already initialized */
   /* ocelot_opt_use_result= 0; */ /* already initialized */
   /* ocelot_opt_write_timeout= 0; */ /* already initialized */
@@ -22903,6 +23040,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_ssl_key= token2;
     return;
   }
+  if (strcmp(token0_as_utf8, "ssl_mode") == 0)
+  {
+    ocelot_opt_ssl_mode= token2;
+    return;
+  }
   if ((token0_length >= sizeof("ssl_verify") - 1) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
   {
     ocelot_opt_ssl_verify_server_cert= to_long(token2);
@@ -22987,6 +23129,7 @@ void MainWindow::connect_make_statement()
   if (ocelot_opt_ssl_crl > "") statement_text= statement_text + "ssl_crl=" + ocelot_opt_ssl_crl;
   if (ocelot_opt_ssl_crlpath > "") statement_text= statement_text + "ssl_crlpath=" + ocelot_opt_ssl_crlpath;
   if (ocelot_opt_ssl_key > "") statement_text= statement_text + "ssl_key=" + ocelot_opt_ssl_key;
+  if (ocelot_opt_ssl_mode > "") statement_text= statement_text + "ssl_mode=" + ocelot_opt_ssl_mode;
   if (ocelot_opt_ssl_verify_server_cert > 0) statement_text= statement_text + "ssl_verify_server_cert=" + ocelot_opt_ssl_verify_server_cert;
   msgBox.setText(statement_text);
   msgBox.exec();
@@ -23013,6 +23156,16 @@ unsigned int MainWindow::get_ocelot_protocol_as_int(QString ocelot_protocol)
   Note: we don't pass ocelot_opt_can_handle_expired_passwords because
   it does nothing (maybe due to an old libmysqlclient?), instead we
   pass client_can_handle_expired_passwords to mysql_real_connect().
+
+  Re MySQL 5.7.11 and ssl_mode: mysql allows truncation e.g.
+  --ssl_mode='PREF' but we don't it must be in full.
+  We don't know in advance whether we'll be connecting with MySQL 5.7.11
+  so we'll call only if we (not MariaDB|Tarantool) and (not default).
+  Our default is '' but we'll also do nothing if 'preferred'.
+  Check if mysql_options() returns != 0 indicating libmysqlclient
+  doesn't recognize MYSQL_OPT_SSL_MODE, if so assume it didn't work.
+  If it's VERIFY_IDENTITY, we don't try to use --ssl-verify-server-cert.
+  It should mean we don't try to use --ssl, but we don't anyway.
 */
 int options_and_connect(
     unsigned int connection_number)
@@ -23040,6 +23193,26 @@ int options_and_connect(
   if (ocelot_protocol_as_int > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_9, (char*)&ocelot_protocol_as_int);
   if (ocelot_opt_read_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_11, (char*)&ocelot_opt_read_timeout);
   if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_20, (char*)&ocelot_opt_reconnect);
+  int opt= 0;
+  if (ocelot_opt_ssl_mode_as_utf8[0] != '\0')
+  {
+    for(int i= 0; ocelot_opt_ssl_mode_as_utf8[i] != 0; ++i)
+    {
+      ocelot_opt_ssl_mode_as_utf8[i] = toupper(ocelot_opt_ssl_mode_as_utf8[i]);
+    }
+    if (strcmp(ocelot_opt_ssl_mode_as_utf8, "DISABLED") == 0) opt= 1;
+    if (strcmp(ocelot_opt_ssl_mode_as_utf8, "PREFERRED") == 0) opt= 2;
+    if (strcmp(ocelot_opt_ssl_mode_as_utf8, "REQUIRED") == 0) opt= 3;
+    if (strcmp(ocelot_opt_ssl_mode_as_utf8, "VERIFY_CA") == 0) opt= 4;
+    if (strcmp(ocelot_opt_ssl_mode_as_utf8, "VERIFY_IDENTITY") == 0) opt= 5;
+    if (opt != 0)
+    {
+      if (lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_42, (char*) &opt) != 0)
+      {
+        opt= 0;
+      }
+    }
+  }
 
   /*
     If dlopen() failed for "myql_ssl_set" then ldbms_mysql_ssl_set is a no-op, which is not an error.
@@ -23061,7 +23234,10 @@ int options_and_connect(
   }
   if (ocelot_opt_ssl_crl_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_30, ocelot_opt_ssl_crl_as_utf8);
   if (ocelot_opt_ssl_crlpath_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_31, ocelot_opt_ssl_crlpath_as_utf8);
-  if (ocelot_opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_21, (char*) &ocelot_opt_ssl_verify_server_cert);
+  if (opt != 5)
+  {
+    if (ocelot_opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_21, (char*) &ocelot_opt_ssl_verify_server_cert);
+  }
   if (ocelot_opt_write_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_12, (char*) &ocelot_opt_write_timeout);
   if (ocelot_plugin_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_22, ocelot_plugin_dir_as_utf8);
   if (ocelot_read_default_file_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_4, ocelot_read_default_file_as_utf8);
@@ -23185,6 +23361,7 @@ void MainWindow::delete_utf8_copies()
   if (ocelot_opt_ssl_crl_as_utf8 != 0) { delete [] ocelot_opt_ssl_crl_as_utf8; ocelot_opt_ssl_crl_as_utf8= 0; }
   if (ocelot_opt_ssl_crlpath_as_utf8 != 0) { delete [] ocelot_opt_ssl_crlpath_as_utf8; ocelot_opt_ssl_crlpath_as_utf8= 0; }
   if (ocelot_opt_ssl_key_as_utf8 != 0) { delete [] ocelot_opt_ssl_key_as_utf8; ocelot_opt_ssl_key_as_utf8= 0; }
+  if (ocelot_opt_ssl_mode_as_utf8 != 0) { delete [] ocelot_opt_ssl_mode_as_utf8; ocelot_opt_ssl_mode_as_utf8= 0; }
   if (ocelot_plugin_dir_as_utf8 != 0) { delete [] ocelot_plugin_dir_as_utf8; ocelot_plugin_dir_as_utf8= 0; }
   if (ocelot_read_default_group_as_utf8 != 0) { delete [] ocelot_read_default_group_as_utf8; ocelot_read_default_group_as_utf8= 0; }
   if (ocelot_read_default_file_as_utf8 != 0) { delete [] ocelot_read_default_file_as_utf8; ocelot_read_default_file_as_utf8= 0; }
@@ -23264,6 +23441,10 @@ void MainWindow::copy_connect_strings_to_utf8()
   int tmp_opt_ssl_key_len= ocelot_opt_ssl_key.toUtf8().size();
   ocelot_opt_ssl_key_as_utf8= new char[tmp_opt_ssl_key_len + 1];
   memcpy(ocelot_opt_ssl_key_as_utf8, ocelot_opt_ssl_key.toUtf8().constData(), tmp_opt_ssl_key_len + 1);
+
+  int tmp_opt_ssl_mode_len= ocelot_opt_ssl_mode.toUtf8().size();
+  ocelot_opt_ssl_mode_as_utf8= new char[tmp_opt_ssl_mode_len + 1];
+  memcpy(ocelot_opt_ssl_mode_as_utf8, ocelot_opt_ssl_mode.toUtf8().constData(), tmp_opt_ssl_mode_len + 1);
 
   int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
   ocelot_plugin_dir_as_utf8= new char[tmp_plugin_dir_len + 1];

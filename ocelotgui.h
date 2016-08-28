@@ -378,6 +378,7 @@ public:
   QString ocelot_opt_ssl_crl;
   QString ocelot_opt_ssl_crlpath;
   QString ocelot_opt_ssl_key;
+  QString ocelot_opt_ssl_mode;
   QString ocelot_pager;
   QString ocelot_plugin_dir;
   QString ocelot_read_default_file;
@@ -715,6 +716,8 @@ private:
   void statement_edit_widget_setstylesheet();
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
+
+  void statement_edit_widget_formatter();
 
 /*
   ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
@@ -2412,6 +2415,11 @@ enum ocelot_option
   OCELOT_OPTION_35=35,  /* for ocelot_server_public_key_as_utf8 */
   OCELOT_OPTION_36=36,  /* for ocelot_enable_cleartext_plugin */
   OCELOT_OPTION_37=37,  /* for ocelot_opt_can_handle_expired_passwords */
+  OCELOT_OPTION_38=38,  /* for ocelot_opt_ssl_enforce */
+  OCELOT_OPTION_39=39,  /* unused. in MySQL, opt_max_allowed_packet */
+  OCELOT_OPTION_40=40,  /* unused. in MySQL, opt_net_buffer_length */
+  OCELOT_OPTION_41=41,  /* unused. in MySQL, opt_tls_version */
+  OCELOT_OPTION_42=42,  /* in MySQL 5.7.11+, opt_ssl_mode */
   OCELOT_OPTION_5999=5999,  /*unused. In MariaDB, progress_callback */
   OCELOT_OPTION_6000=6000,  /* unused. In MariaDB, nonblock */
   OCELOT_OPTION_6001=6001  /* unused. in MariaDB, thread_specific_memory */
