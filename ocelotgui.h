@@ -317,6 +317,9 @@ public:
   QString ocelot_statement_highlight_function_color, new_ocelot_statement_highlight_function_color;
   QString ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker;
   QString ocelot_statement_style_string;
+  QString ocelot_statement_format_statement_indent;
+  QString ocelot_statement_format_clause_indent;
+  QString ocelot_statement_format_keyword_case;
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
   QString ocelot_grid_border_color, new_ocelot_grid_border_color;
@@ -528,7 +531,7 @@ public:
   void hparse_f_condition_information_item_name();
   int hparse_f_signal_or_resignal(int,int);
   int hparse_f_into();
-  void hparse_f_with_clause();
+  void hparse_f_with_clause(int);
   int hparse_f_select(bool);
   void hparse_f_where();
   int hparse_f_order_by(int);
@@ -588,6 +591,7 @@ public slots:
   void action_settings();
   void action_statement_edit_widget_text_changed();
   void action_undo();
+  void statement_edit_widget_formatter();
   void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
   void action_menu();
   void action_history();
@@ -717,8 +721,6 @@ private:
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
 
-  void statement_edit_widget_formatter();
-
 /*
   ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
     0 = none
@@ -779,6 +781,7 @@ private:
     QAction *menu_edit_action_select_all;
     QAction *menu_edit_action_history_markup_previous;
     QAction *menu_edit_action_history_markup_next;
+    QAction *menu_edit_action_formatter;
   QMenu *menu_run;
     QAction *menu_run_action_execute;
     QAction *menu_run_action_kill;
@@ -853,7 +856,7 @@ public:
   int  *main_token_offsets;
   int  *main_token_lengths;
   int  *main_token_types;
-  unsigned char *main_token_flags; /* e.g. TOKEN_FLAG_IS_RESERVED */
+  unsigned int *main_token_flags; /* e.g. TOKEN_FLAG_IS_RESERVED */
   int  *main_token_pointers;
   unsigned char *main_token_reftypes;
   unsigned int main_token_max_count;
@@ -861,11 +864,19 @@ public:
   unsigned int main_token_count_in_statement;
   unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
 
-  /* main_token_flags[] values. so far there are only four but we expect there will be more. */
+  /* main_token_flags[] values. so far there are only seven but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
   #define TOKEN_FLAG_IS_BLOCK_END 2
   #define TOKEN_FLAG_IS_ERROR 4
   #define TOKEN_FLAG_IS_FUNCTION 8
+  #define TOKEN_FLAG_IS_START_STATEMENT 16
+  #define TOKEN_FLAG_IS_START_CLAUSE 32
+  #define TOKEN_FLAG_IS_START_SUBCLAUSE 64
+  #define TOKEN_FLAG_IS_DATA_TYPE 128
+  #define TOKEN_FLAG_IS_START_IN_COLUMN_LIST 256
+  #define TOKEN_FLAG_IS_END_IN_COLUMN_LIST 512
+  #define TOKEN_FLAG_IS_BINARY_PLUS_OR_MINUS 1024
+  #define TOKEN_FLAG_IS_NOT_AFTER_SPACE 2048
 
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
