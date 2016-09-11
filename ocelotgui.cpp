@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: September 2 2016
+   Last modified: September 11 2016
 */
 
 /*
@@ -10627,6 +10627,16 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
 */
 #define MYSQL_MAX_IDENTIFIER_LENGTH 64
 
+/*
+  Currently allow_flags only tries to detect parenthesized expressions
+  with multiple operands inside (which are only allowed for comp-ops).
+  It could be expanded to check for whether subqueries are allowed
+  (currently we depend on hparse_subquery_is_allowed), and even
+  data type e.g. no string literal after << operator.
+*/
+#define ALLOW_FLAG_IS_MULTI 1
+#define ALLOW_FLAG_IS_ANY (1)
+
 void MainWindow::hparse_f_nexttoken()
 {
   if (hparse_errno > 0) return;
@@ -12148,9 +12158,8 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
     if (hparse_errno > 0) return;
     return;
   }
-  int expression_count= 0;
-  if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
-  else hparse_f_opr_8(who_is_calling);
+  if (hparse_f_is_equal(hparse_token, "(")) hparse_f_opr_8(who_is_calling, ALLOW_FLAG_IS_MULTI);
+  else hparse_f_opr_8(who_is_calling, 0);
   if (hparse_errno > 0) return;
   for (;;)
   {
@@ -12163,31 +12172,29 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIKE") == 1)
     {
       hparse_like_seen= true;
-      if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
-      else hparse_f_opr_8(who_is_calling);
+      hparse_f_opr_8(who_is_calling, 0);
       hparse_like_seen= false;
       break;
     }
     if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GLOB") == 1)
     {
-      if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
-      else hparse_f_opr_8(who_is_calling);
+      hparse_f_opr_8(who_is_calling, 0);
       break;
     }
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN") == 1)
     {
-      hparse_f_parenthesized_multi_expression(&expression_count);
+      hparse_f_opr_8(who_is_calling, ALLOW_FLAG_IS_MULTI);
       if (hparse_errno > 0) return;
       break;
     }
     /* The manual says BETWEEN has a higher priority than this */
     else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BETWEEN") == 1)
     {
-      hparse_f_opr_8(who_is_calling);
+      hparse_f_opr_8(who_is_calling, 0);
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AND");
       if (hparse_errno > 0) return;
-      hparse_f_opr_8(who_is_calling);
+      hparse_f_opr_8(who_is_calling, 0);
       if (hparse_errno > 0) return;
       return;
     }
@@ -12200,7 +12207,7 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<=>") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REGEXP") == 1))
     {
-      hparse_f_opr_8(who_is_calling);
+      hparse_f_opr_8(who_is_calling, 0);
       if (hparse_errno > 0) return;
       continue;
     }
@@ -12231,8 +12238,8 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
           continue;
         }
       }
-      if (hparse_f_is_equal(hparse_token, "(")) hparse_f_parenthesized_multi_expression(&expression_count);
-      else hparse_f_opr_8(who_is_calling);
+      if (hparse_f_is_equal(hparse_token, "(")) hparse_f_opr_8(who_is_calling, ALLOW_FLAG_IS_MULTI);
+      else hparse_f_opr_8(who_is_calling, 0);
       if (hparse_errno > 0) return;
       continue;
     }
@@ -12252,7 +12259,7 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIKE");
       if (hparse_errno > 0) return;
-      hparse_f_opr_8(who_is_calling);
+      hparse_f_opr_8(who_is_calling, 0);
       if (hparse_errno > 0) return;
       continue;
     }
@@ -12260,56 +12267,56 @@ void MainWindow::hparse_f_opr_7(int who_is_calling) /* Precedence = 7 */
   }
 }
 
-void MainWindow::hparse_f_opr_8(int who_is_calling) /* Precedence = 8 */
+void MainWindow::hparse_f_opr_8(int who_is_calling, int allow_flags) /* Precedence = 8 */
 {
   if (hparse_errno > 0) return;
-  hparse_f_opr_9(who_is_calling);
+  hparse_f_opr_9(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "|") == 1)
   {
-    hparse_f_opr_9(who_is_calling);
+    hparse_f_opr_9(who_is_calling, 0);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_9(int who_is_calling) /* Precedence = 9 */
+void MainWindow::hparse_f_opr_9(int who_is_calling, int allow_flags) /* Precedence = 9 */
 {
-  hparse_f_opr_10(who_is_calling);
+  hparse_f_opr_10(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "&") == 1)
   {
-    hparse_f_opr_10(who_is_calling);
+    hparse_f_opr_10(who_is_calling, 0);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_10(int who_is_calling) /* Precedence = 10 */
+void MainWindow::hparse_f_opr_10(int who_is_calling, int allow_flags) /* Precedence = 10 */
 {
-  hparse_f_opr_11(who_is_calling);
+  hparse_f_opr_11(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<<") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">>") == 1))
   {
-    hparse_f_opr_11(who_is_calling);
+    hparse_f_opr_11(who_is_calling, 0);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_11(int who_is_calling) /* Precedence = 11 */
+void MainWindow::hparse_f_opr_11(int who_is_calling, int allow_flags) /* Precedence = 11 */
 {
-  hparse_f_opr_12(who_is_calling);
+  hparse_f_opr_12(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "+") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_BINARY_PLUS_OR_MINUS;
-    hparse_f_opr_12(who_is_calling);
+    hparse_f_opr_12(who_is_calling, 0);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_12(int who_is_calling) /* Precedence = 12 */
+void MainWindow::hparse_f_opr_12(int who_is_calling, int allow_flags) /* Precedence = 12 */
 {
   if (hparse_errno > 0) return;
-  hparse_f_opr_13(who_is_calling);
+  hparse_f_opr_13(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
   while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "*") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "/") == 1)
@@ -12317,63 +12324,72 @@ void MainWindow::hparse_f_opr_12(int who_is_calling) /* Precedence = 12 */
    || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "%") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "MOD") == 1))
   {
-    hparse_f_opr_13(who_is_calling);
+    hparse_f_opr_13(who_is_calling, 0);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_13(int who_is_calling) /* Precedence = 13 */
+void MainWindow::hparse_f_opr_13(int who_is_calling, int allow_flags) /* Precedence = 13 */
 {
-  hparse_f_opr_14(who_is_calling);
+  hparse_f_opr_14(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
   while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "^") == 1)
   {
-    hparse_f_opr_14(who_is_calling);
+    hparse_f_opr_14(who_is_calling, 0);
     if (hparse_errno > 0) return;
   }
 }
 
-void MainWindow::hparse_f_opr_14(int who_is_calling) /* Precedence = 14 */
+void MainWindow::hparse_f_opr_14(int who_is_calling, int allow_flags) /* Precedence = 14 */
 {
   if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "+") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "~") == 1)) {;}
-  hparse_f_opr_15(who_is_calling);
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "~") == 1))
+  {
+    hparse_f_opr_15(who_is_calling, 0);
+  }
+  else hparse_f_opr_15(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
 }
 
-void MainWindow::hparse_f_opr_15(int who_is_calling) /* Precedence = 15 */
+void MainWindow::hparse_f_opr_15(int who_is_calling, int allow_flags) /* Precedence = 15 */
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!") == 1) {;}
-  hparse_f_opr_16(who_is_calling);
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!") == 1)
+  {
+    hparse_f_opr_16(who_is_calling, 0);
+  }
+  else hparse_f_opr_16(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
 }
 
 /* Actually I'm not sure what ESCAPE precedence is, as long as it's higher than LIKE. */
-void MainWindow::hparse_f_opr_16(int who_is_calling) /* Precedence = 16 */
+void MainWindow::hparse_f_opr_16(int who_is_calling, int allow_flags) /* Precedence = 16 */
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY") == 1) {;}
-  hparse_f_opr_17(who_is_calling);
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY") == 1)
+  {
+    hparse_f_opr_17(who_is_calling, 0);
+  }
+  else hparse_f_opr_17(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
   if (hparse_like_seen == true)
   {
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ESCAPE") == 1)
     {
       hparse_like_seen= false;
-      hparse_f_opr_17(who_is_calling);
+      hparse_f_opr_17(who_is_calling, 0);
       if (hparse_errno > 0) return;
       return;
     }
   }
   while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
   {
-    hparse_f_opr_17(who_is_calling);
+    hparse_f_opr_17(who_is_calling, 0);
     if (hparse_errno > 0) return;
   }
 }
 
 /* todo: disallow INTERVAL unless we've seen + or - */
-void MainWindow::hparse_f_opr_17(int who_is_calling) /* Precedence = 17 */
+void MainWindow::hparse_f_opr_17(int who_is_calling, int allow_flags) /* Precedence = 17 */
 {
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERVAL") == 1)
   {
@@ -12383,7 +12399,7 @@ void MainWindow::hparse_f_opr_17(int who_is_calling) /* Precedence = 17 */
     if (hparse_errno > 0) return;
     return;
   }
-  hparse_f_opr_18(who_is_calling);
+  hparse_f_opr_18(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
 }
 
@@ -12391,7 +12407,7 @@ void MainWindow::hparse_f_opr_17(int who_is_calling) /* Precedence = 17 */
   Final level is operand.
   factor = identifier | number | "(" expression ")" .
 */
-void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
+void MainWindow::hparse_f_opr_18(int who_is_calling, int allow_flags) /* Precedence = 18, top */
 {
   if (hparse_errno > 0) return;
   QString opd= hparse_token.toUpper();
@@ -12520,6 +12536,11 @@ void MainWindow::hparse_f_opr_18(int who_is_calling) /* Precedence = 18, top */
     {
       hparse_f_select(true);
       if (hparse_errno > 0) return;
+    }
+    else if ((allow_flags & ALLOW_FLAG_IS_MULTI) != 0)
+    {
+      int expression_count= 0;
+      hparse_f_parenthesized_multi_expression(&expression_count);
     }
     else hparse_f_opr_1(who_is_calling);
     if (hparse_errno > 0) return;
@@ -12927,8 +12948,8 @@ void MainWindow::hparse_f_parenthesized_expression()
 void MainWindow::hparse_f_parenthesized_multi_expression(int *expression_count)
 {
   *expression_count= 0;
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
-  if (hparse_errno > 0) return;
+  //hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+  //if (hparse_errno > 0) return;
   if ((hparse_subquery_is_allowed == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT") == 1))
   {
     hparse_f_select(true);
@@ -12944,8 +12965,8 @@ void MainWindow::hparse_f_parenthesized_multi_expression(int *expression_count)
       ++(*expression_count);
     } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
-  if (hparse_errno > 0) return;
+  //hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  //if (hparse_errno > 0) return;
 }
 
 
