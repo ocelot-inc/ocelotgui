@@ -28,6 +28,7 @@ SOURCES += ocelotgui.cpp
 HEADERS += ocelotgui.h
 HEADERS += codeeditor.h
 HEADERS += install_sql.cpp
+HEADERS += hparse.h
 
 FORMS    += ocelotgui.ui
 
