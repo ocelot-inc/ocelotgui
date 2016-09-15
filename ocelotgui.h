@@ -680,8 +680,9 @@ private:
 #endif
   void main_token_new(int);
   void create_menu();
-  int rehash_scan();
-  QString rehash_search(char *search_string);
+  int rehash_scan(char*);
+  QString rehash_search(char *search_string, int reftype);
+  void rehash_get_database_name(char *);
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
   int execute_client_statement(QString text, int *additional_result);
@@ -872,7 +873,7 @@ public:
   unsigned int main_token_count_in_statement;
   unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
 
-  /* main_token_flags[] values. so far there are only seven but we expect there will be more. */
+  /* main_token_flags[] values. so far there are only twelve but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
   #define TOKEN_FLAG_IS_BLOCK_END 2
   #define TOKEN_FLAG_IS_ERROR 4
@@ -1446,6 +1447,7 @@ public:
       TOKEN_KEYWORD_REPLICATION,
       TOKEN_KEYWORD_REQUIRE,
       TOKEN_KEYWORD_RESET,
+      TOKEN_KEYWORD_RESETCONNECTION,
       TOKEN_KEYWORD_RESIGNAL,
       TOKEN_KEYWORD_RESTRICT,
       TOKEN_KEYWORD_RETURN,
@@ -1865,7 +1867,8 @@ enum {
     TOKEN_REFTYPE_VARIABLE_REFER,
     TOKEN_REFTYPE_VIEW,
     TOKEN_REFTYPE_WITH_TABLE,
-    TOKEN_REFTYPE_WRAPPER
+    TOKEN_REFTYPE_WRAPPER,
+    TOKEN_REFTYPE_MAX
   };
 
 };

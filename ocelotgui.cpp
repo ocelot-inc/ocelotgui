@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: September 11 2016
+   Last modified: September 14 2016
 */
 
 /*
@@ -871,7 +871,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
 
 /*
   Formatter -- minimal, but this format might be okay for debugger users.
-  It only works if the input has been recognized.
+  It only works if the statement has been recognized.
   All we're trying to accomplish is
     "different statements different lines"
     "block start causes indent"
@@ -884,6 +884,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
       or add a line in eventfilter() e.g.
       if (key->key() == Qt::Key_1) { statement_edit_widget_formatter(); return true; }
       But I haven't decided what the shortcut key should be.
+  Todo: stop giving up when you see DELIMITER, it can be figured out.
 */
 void MainWindow::statement_edit_widget_formatter()
 {
@@ -891,7 +892,7 @@ void MainWindow::statement_edit_widget_formatter()
 
   int *output_offsets;
   int i;
-  for (i=0; main_token_lengths[i] != 0; ++i) ;
+  for (i= 0; main_token_lengths[i] != 0; ++i) ;
   output_offsets= new int[i + 1];
 
   QString text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
@@ -905,8 +906,28 @@ void MainWindow::statement_edit_widget_formatter()
   int token_type;
   for (i= 0; main_token_lengths[i] != 0; ++i)
   {
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) != 0)
+    {
+      int st= 0;
+      if (i > 0) st= main_token_offsets[i - 1] + main_token_lengths[i - 1];
+      s= text.right(text.length() - st);
+      output.append(s);
+      break; /* Give up */
+    }
     token_type= 0;
     token= main_token_types[i];
+    if (token == TOKEN_TYPE_DELIMITER)
+    {
+      QString d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      output.append(d);
+      continue;
+    }
+    if (text.mid(main_token_offsets[i], 2).toUpper() == "\\G")
+    {
+      output.append(text.mid(main_token_offsets[i], 2));
+      ++i;
+      continue;
+    }
     if ((main_token_flags[i] & TOKEN_FLAG_IS_START_IN_COLUMN_LIST) != 0)
       output_offsets[i]= output.length();
     if ((main_token_flags[i] & TOKEN_FLAG_IS_END_IN_COLUMN_LIST) != 0)
@@ -937,6 +958,34 @@ void MainWindow::statement_edit_widget_formatter()
     }
     else
     {
+      if (token == TOKEN_KEYWORD_DELIMITER)
+      {
+        if (output != "") output.append("\n");
+        QString d;
+        d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        output.append(d);
+        if (main_token_lengths[i + 1] != 0)
+        {
+          int j= main_token_offsets[i] + main_token_lengths[i];
+          d= text.mid(j, main_token_offsets[i + 1] - j);
+          if (d.contains("\n"))
+          {
+            continue; /* delimiter \n = an error, but possible */
+          }
+          output.append(" ");
+          ++i;
+          d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+          output.append(d);
+          while ((main_token_lengths[i + 1] != 0)
+           && (main_token_offsets[i + 1] == main_token_offsets[i] + main_token_lengths[i]))
+          {
+            d= text.mid(main_token_offsets[i + 1], main_token_lengths[i + 1]);
+            output.append(d);
+            ++i;
+          }
+          continue;
+        }
+      }
       if (((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
        || ((main_token_flags[i] & TOKEN_FLAG_IS_START_CLAUSE) != 0))
       {
@@ -968,26 +1017,44 @@ void MainWindow::statement_edit_widget_formatter()
         }
       }
       s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      QString p= "";
+      int p_flags= 0;
+      int p_type= 0;
+      if (i > 0)
+      {
+        p= text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]);
+        p_flags= main_token_flags[i - 1];
+        p_type= main_token_types[i - 1];
+      }
       if (output.right(1) > " ")
       {
         if (main_token_types[i] == TOKEN_TYPE_OPERATOR)
         {
-          if ((s == ",") || (s == ";") || (s == ")") || (s == "}") || (s == ".")) {;}
+          if ((s == ",") || (s == ";") || (s == ")") || (s == "}") || (s == ".") || (s == ":")) {;}
           else if (s == "(")
           {
-            if ((main_token_flags[i] & TOKEN_FLAG_IS_NOT_AFTER_SPACE) == 0)
+            /* no space between function name and '('. mandatory. */
+            if ((p_flags & TOKEN_FLAG_IS_FUNCTION) != 0)
+            {
+              ;
+            }
+            else if (p_type == TOKEN_TYPE_IDENTIFIER)
+            {
+              ;
+            }
+            else if ((p_flags & TOKEN_FLAG_IS_DATA_TYPE) != 0)
+            {
+              ;
+            }
+            else if ((p != "(")
+             && ((main_token_flags[i] & TOKEN_FLAG_IS_NOT_AFTER_SPACE) == 0))
               output.append(" ");
           }
           else output.append(" ");
         }
         else
         {
-          QString p= "";
-          if (i > 0)
-          {
-            p= text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]);
-          }
-          if ((p == "(") || (p == "{") || (p == ".")) {;}
+          if ((p == "(") || (p == "{") || (p == ".") || (p == "@") || (p == "~")) {;}
           else if ((p == "-") || (p == "+"))
           {
             if ((main_token_flags[i - 1] & TOKEN_FLAG_IS_BINARY_PLUS_OR_MINUS) != 0)
@@ -995,6 +1062,7 @@ void MainWindow::statement_edit_widget_formatter()
               output.append(" ");
             }
           }
+          else if (s == "@") {;}
           else output.append(" ");
         }
       }
@@ -7404,9 +7472,10 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   }
   if (statement_type == TOKEN_KEYWORD_REHASH)   /* This overrides a command-line option */
   {
-    char result[32];
-    sprintf(result, "OK, result set size = %d", rehash_scan());
-    ocelot_auto_rehash= 1;
+    char result[1024];
+    int i= rehash_scan(result);
+    if (i > 0) ocelot_auto_rehash= 1;
+    else ocelot_auto_rehash= 0;
     put_message_in_result(result);
     return 1;
   }
@@ -7969,21 +8038,44 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 
 
 /*
-** --auto-rehash or --no-auto-rehash or --skip-auto-rehash. default = TRUE
-** unsigned short ocelot_auto_rehash
-** Add it to Options menu
-** For TOKEN_KEYWORD_REHASH, change ocelot_auto_rehash
-** Use scan_rows to make a copy of database/table/column names for current:
-   if connect, if reconnect, if "rehash", if "use"
-** When user hits \t i.e. tab, if there's an unambiguous name, fill it in
-   (don't worry about what happens if user hits tab twice)
-** There's also the little matter of whether names are case-sensitive.
-They use a hash, we don't.
-They are for current database, we're for all (if qualifier). (No, that's doomed due to correlations / aliases.)
-In fact we'd like to keep lots of information about columns, for hovering.
+  REHASH
+  Make a cache of all objects in the current database.
+  Not a great name, but mysql client requires "rehash" for something
+  vaguely similar (they store some column names with a hash) (we don't).
+  Currently we're taking in table_name, column_name from information_schema
+  for the current database, into result_set_copy.
+
+  Todo: Allow REHASH [TABLES|TRIGGERS|etc.] [database.]name or *
+        There might be multiple databases and multiple connections
+  Todo: Allow triggers events procedures functions indexes
+  Todo: Hover provides more information about the object
+  Todo: declared variables or other things made within a routine
+  Todo: add rehash to Options menu
+  Todo: see correlations | aliases
+  Todo: error messages
+  Beware: You don't have read access for everything.
+  Beware: Names might be case sensitive.
+  Beware: Qualifier might indicate a different database.
+  Columns are "table.column"
+  When is rehash_scan() called:
+    Only the "REHASH" statement does anything.
+    During connect | reconnect | "use" statement, we could look at
+    --auto-rehash or --no-auto-rehash or --skip-auto-rehash. We don't.
+    During "use" statement, we could redo rehashing. We don't.
+    So default = TRUE but unlike with mysql client nothing is automatic.
+    This affects unsigned short ocelot_auto_rehash.
+  When is rehash_search() called:
+    When user hits ` i.e. backtick show the choices.
+    When user hits \t i.e. tab, if there's an unambiguous name, fill it in
+    (don't worry about what happens if user hits tab twice).
+  Why we do a single unioned search with unnecessary columns:
+    If we did multiple searches, we would affect MAX_QUERIES_PER_HOUR
+    more. But this means there could be thousands of entries
+    in the cache, and searches are sequential.
+    Todo: add an order-by in the select, and do binary searches.
 */
 
-int MainWindow::rehash_scan()
+int MainWindow::rehash_scan(char *result)
 {
   MYSQL_RES *res= NULL;
 //  QString s;
@@ -7997,37 +8089,115 @@ int MainWindow::rehash_scan()
   rehash_result_column_count= 0;
   rehash_result_row_count= 0;
 
-  if (connections_is_connected[0] != 1) return 0; /* unexpected_error= "not connected"; */
-
-  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION],
-                  "select table_name, column_name from information_schema.columns where table_schema = database()"))
+  if (connections_is_connected[0] != 1)
+  {
+    sprintf(result, "Error: not connected");
+    return 0;
+  }
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms[0] == DBMS_TARANTOOL)
+  {
+    sprintf(result, "Error: rehash is not supported for Tarantool");
+    return 0;
+  }
+#endif
+  char query[1024];
+  sprintf(query, "select 'D',database(),'' "
+                 "union all "
+                 "select 'C',table_name,column_name "
+                 "from information_schema.columns "
+                 "where table_schema = database() "
+                 "union all "
+                 "select 'T',table_name,table_type "
+                 "from information_schema.tables "
+                 "where table_schema = database() "
+                 "union all "
+                 "select 'F',routine_name,routine_type "
+                 "from information_schema.routines "
+                 "where routine_schema = database() and routine_type = 'FUNCTION' "
+                 "union all "
+                 "select 'P',routine_name,routine_type "
+                 "from information_schema.routines "
+                 "where routine_schema = database() and routine_type = 'PROCEDURE' "
+                 "union all "
+                 "select 't',trigger_name,'' "
+                 "from information_schema.triggers "
+                 "where trigger_schema = database() "
+                 "union all "
+                 "select 'E',event_name,'' "
+                 "from information_schema.events "
+                 "where event_schema = database() "
+                 "union all "
+                 "select 'I',table_name,index_name "
+                 "from information_schema.statistics "
+                 "where table_schema = database() "
+         );
+  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION],query))
     {
-      return 0; /* unexpected_error= "select failed"; */
+      sprintf(result, "Error: select failed");
+      return 0;
     }
-
   res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
-  if (res == NULL) return 0; /* unexpected_error= "mysql_store_result failed"; */
-
+  if (res == NULL)
+  {
+    sprintf(result, "Error: mysql_store_result failed");
+    return 0;
+  }
   rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
   rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
+  if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
+  {
+    sprintf(result, "Error: 0 rows returned");
+    return 0;
+  }
   result_max_column_widths= new unsigned int[rehash_result_column_count];
-  ResultGrid* r;
-  r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
-#ifdef DBMS_TARANTOOL
-  assert(connections_dbms[0] != DBMS_TARANTOOL);
-#endif
-  r->scan_rows(
+  ResultGrid* result_grid;
+  result_grid= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+  result_grid->scan_rows(
           rehash_result_column_count, /* result_column_count, */
           rehash_result_row_count, /* result_row_count, */
           res, /* grid_mysql_res, */
           &rehash_result_set_copy,
           &rehash_result_set_copy_rows,
           &result_max_column_widths);
-
   lmysql->ldbms_mysql_free_result(res);
-
   delete [] result_max_column_widths;
-
+  /* First set of rows is 'D',database(),''. If it's null, error. */
+  char database_name[512];
+  rehash_get_database_name(database_name);
+  if (database_name[0] == '\0')
+  {
+    sprintf(result, "Error: no database selected");
+    return 0;
+  }
+  long unsigned int r;
+  int count_of_columns= 0;
+  int count_of_tables= 0;
+  int count_of_functions= 0;
+  int count_of_procedures= 0;
+  int count_of_triggers= 0;
+  int count_of_events= 0;
+  int count_of_indexes= 0;
+  for (r= 0; r < rehash_result_row_count; ++r)
+  {
+    char *row_pointer;
+    unsigned int column_length;
+    char column_value[512];
+    row_pointer= rehash_result_set_copy_rows[r];
+    memcpy(&column_length, row_pointer, sizeof(unsigned int));
+    row_pointer+= sizeof(unsigned int) + sizeof(char);
+    strncpy(column_value, row_pointer, column_length);
+    column_value[column_length]= '\0';
+    if (strcmp(column_value, "C") == 0) ++count_of_columns;
+    if (strcmp(column_value, "T") == 0) ++count_of_tables;
+    if (strcmp(column_value, "F") == 0) ++count_of_functions;
+    if (strcmp(column_value, "P") == 0) ++count_of_procedures;
+    if (strcmp(column_value, "t") == 0) ++count_of_triggers;
+    if (strcmp(column_value, "E") == 0) ++count_of_events;
+    if (strcmp(column_value, "I") == 0) ++count_of_indexes;
+  }
+  sprintf(result, "OK. database=%s. tables=%d. columns=%d. functions=%d. procedures=%d. triggers=%d. events=%d. indexes=%d.",
+          database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
 ///* TEST! start */
 //{
 //  printf("TEST!\n");
@@ -8040,15 +8210,14 @@ int MainWindow::rehash_scan()
 //  }
 //}
 /* TEST! end */
-
-  return rehash_result_row_count;
+  return 1;
 }
 
 /*
   Pass: search string. Return: column name matching searching string.
   Todo: We only look at column[1] column_name. We should look at column[0] table_name.
 */
-QString MainWindow::rehash_search(char *search_string)
+QString MainWindow::rehash_search(char *search_string, int reftype)
 {
   long unsigned int r;
   char *row_pointer;
@@ -8058,10 +8227,64 @@ QString MainWindow::rehash_search(char *search_string)
   unsigned int search_string_length;
   QString tmp_word= "";
   int count_of_hits= 0;
-
+  char desired_types[TOKEN_REFTYPE_MAX]= "";
+  unsigned int column_to_match= 0;
   search_string_length= strlen(search_string);
   column_value[0]= '\0';
-
+  if ((reftype == TOKEN_REFTYPE_COLUMN)
+   || (reftype == TOKEN_REFTYPE_TABLE_OR_COLUMN)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE)
+   || (reftype == TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE)
+   || (reftype == TOKEN_REFTYPE_COLUMN_OR_VARIABLE)
+   || (reftype == TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION))
+  {
+    strcpy(desired_types, "C");
+    column_to_match= 2;
+  }
+  else if ((reftype == TOKEN_REFTYPE_FUNCTION)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_FUNCTION))
+  {
+    strcpy(desired_types, "F");
+    column_to_match= 1;
+  }
+  else if ((reftype == TOKEN_REFTYPE_PROCEDURE)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_PROCEDURE))
+  {
+    strcpy(desired_types, "P");
+    column_to_match= 1;
+  }
+  else if ((reftype == TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE))
+  {
+    strcpy(desired_types, "FP");
+    column_to_match= 1;
+  }
+  else if ((reftype == TOKEN_REFTYPE_TABLE)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE))
+  {
+    strcpy(desired_types, "T");
+    column_to_match= 1;
+  }
+  else if ((reftype == TOKEN_REFTYPE_TRIGGER)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_TRIGGER))
+  {
+    strcpy(desired_types, "t");
+    column_to_match= 1;
+  }
+  else if ((reftype == TOKEN_REFTYPE_EVENT)
+   || (reftype == TOKEN_REFTYPE_DATABASE_OR_EVENT))
+  {
+    strcpy(desired_types, "E");
+    column_to_match= 1;
+  }
+  else if (reftype == TOKEN_REFTYPE_INDEX)
+  {
+    strcpy(desired_types, "I");
+    column_to_match= 2;
+  }
+  else return tmp_word;
   for (r= 0; r < rehash_result_row_count; ++r)
   {
     row_pointer= rehash_result_set_copy_rows[r];
@@ -8070,7 +8293,12 @@ QString MainWindow::rehash_search(char *search_string)
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
       /* Now row_pointer points to contents, length has # of bytes */
-      if (i == 1)
+      if (i == 0)
+      {
+        assert(column_length == 1);
+        if (strchr(desired_types, *row_pointer) == NULL) break;
+      }
+      if (i == column_to_match)
       {
         if (search_string_length < column_length)
         {
@@ -8090,6 +8318,24 @@ QString MainWindow::rehash_search(char *search_string)
     if (count_of_hits > 10) break;
   }
   return tmp_word;
+}
+
+void MainWindow::rehash_get_database_name(char *database_name)
+{
+  *database_name= '\0';
+  if (rehash_result_set_copy == 0) return;
+  char *row_pointer;
+  unsigned int column_length;
+  row_pointer= rehash_result_set_copy_rows[0];
+  memcpy(&column_length, row_pointer, sizeof(unsigned int));
+  row_pointer+= sizeof(unsigned int) + sizeof(char);
+  row_pointer+= column_length;
+  memcpy(&column_length, row_pointer, sizeof(unsigned int));
+  row_pointer+= sizeof(unsigned int);
+  if ((*row_pointer & FIELD_VALUE_FLAG_IS_NULL) != 0) return;
+  row_pointer+= sizeof(char);
+  strncpy(database_name, row_pointer, column_length);
+  *(database_name + column_length)= '\0';
 }
 
 /*
@@ -9307,6 +9553,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"REPLICATION", 0, 0, TOKEN_KEYWORD_REPLICATION},
       {"REQUIRE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_REQUIRE},
       {"RESET", 0, 0, TOKEN_KEYWORD_RESET},
+      {"RESETCONNECTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RESETCONNECTION},
       {"RESIGNAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RESIGNAL},
       {"RESTRICT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RESTRICT},
       {"RETURN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RETURN},
@@ -9632,15 +9879,15 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "842" */
+      /* If the following assert happens, you inserted/removed something without changing "843" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (842 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (843 - 1));
 
       /* Test strvalues is by bsearching for every item. */
-      //for (int ii= 0; ii < 842; ++ii)
+      //for (int ii= 0; ii < 843; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 842, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 843, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -9648,8 +9895,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 842 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 842, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 843 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 843, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -10786,6 +11033,7 @@ int MainWindow::hparse_f_accept(unsigned char flag_version, unsigned char reftyp
       {
         /* Starts with ` but doesn't end with ` so identifier required but not there yet. */
         /* TODO: hparse_expected= ""; equality stays false; fall though */
+        main_token_reftypes[hparse_i]= reftype;
         hparse_expected= hparse_f_token_to_appendee(token, reftype);
         return 0;
       }
@@ -10796,7 +11044,8 @@ int MainWindow::hparse_f_accept(unsigned char flag_version, unsigned char reftyp
       {
         /* Starts with " but doesn't end with " so identifier required but not there yet. */
           /* TODO: hparse_expected= ""; equality stays false; fall though */
-          hparse_expected= hparse_f_token_to_appendee(token, reftype);
+        main_token_reftypes[hparse_i]= reftype;
+        hparse_expected= hparse_f_token_to_appendee(token, reftype);
         return 0;
       }
     }
@@ -11270,6 +11519,10 @@ int MainWindow::hparse_f_qualified_name_of_object_with_star(int database_or_obje
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return 0;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+    return 1;
+  }
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, object_identifier,TOKEN_TYPE_IDENTIFIER, "*") == 1)
+  {
     return 1;
   }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, database_or_object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
@@ -15606,11 +15859,11 @@ void MainWindow::hparse_f_insert_or_replace()
   }
   else if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUE")) == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
     for (;;)
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
       if (hparse_errno > 0) return;
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
       hparse_f_expression_list(TOKEN_KEYWORD_INSERT);
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
@@ -17471,6 +17724,7 @@ void MainWindow::hparse_f_statement(int block_top)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON");
       if (hparse_errno > 0) return;
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
       if (hparse_f_user_name() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
       proxy_seen= true;
@@ -17482,6 +17736,7 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO");
     if (hparse_errno > 0) return;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
     hparse_f_user_specification_list();
     if (hparse_errno > 0) return;
     hparse_f_require(TOKEN_KEYWORD_GRANT, proxy_seen, role_name_seen);
@@ -17611,8 +17866,9 @@ void MainWindow::hparse_f_statement(int block_top)
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATA") == 1)
     {
       if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOW_PRIORITY") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONCURRENT") == 1)
-       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOCAL") == 1))
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONCURRENT") == 1))
+        {;}
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOCAL") == 1)
         {;}
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INFILE");
       if (hparse_errno > 0) return;
@@ -17625,10 +17881,12 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
       if (hparse_errno > 0) return;
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
+      /* MariaDB manual doesn't mention partition clause but it's supported */
       hparse_f_partition_list(true, false);
       if (hparse_errno > 0) return;
       hparse_f_infile_or_outfile();
@@ -17643,6 +17901,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1) /* [(col_name_or_user_var...)] */
       {
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
         do
         {
           hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -17653,10 +17912,10 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
       {
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
         hparse_f_assignment(TOKEN_KEYWORD_LOAD);
         if (hparse_errno > 0) return;
       }
-
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1)
     {
@@ -17703,6 +17962,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
       if (hparse_errno > 0) return;
+      main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
@@ -17714,6 +17974,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROWS") == 1)
       {
+        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IDENTIFIED");
         if (hparse_errno > 0) return;
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY");
@@ -17723,6 +17984,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IGNORE") == 1)
       {
+        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
         if (hparse_f_literal() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
         if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LINES") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROWS") == 1)) {;}
@@ -17744,6 +18006,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
       {
+        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
         hparse_f_assignment(TOKEN_KEYWORD_LOAD);
         if (hparse_errno > 0) return;
       }
@@ -18960,6 +19223,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     {
       label= hparse_token;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
       hparse_i_of_block= hparse_i_of_last_accepted;
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
@@ -19188,7 +19452,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "THEN");
       if (hparse_errno > 0) return;
-      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
       int break_word= 0;
       for (;;)
       {
@@ -19213,10 +19477,11 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       }
       if (break_word == TOKEN_KEYWORD_ELSEIF)
       {
-        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
         continue;
       }
       assert(break_word == TOKEN_KEYWORD_ELSE);
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
       for (;;)
       {
         hparse_f_block(calling_statement_type, block_top);
@@ -19261,7 +19526,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNTIL") == 1) break;
     }
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0);
     hparse_subquery_is_allowed= false;
@@ -19340,7 +19605,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DO");
     if (hparse_errno > 0) return;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     for (;;)
     {
       hparse_f_block(calling_statement_type, block_top);
@@ -19644,7 +19909,7 @@ error:
           search_string_len= s.toUtf8().size();
           memcpy(search_string, s.toUtf8().constData(), search_string_len);
           search_string[search_string_len]= '\0';
-          QString rehash_search_result= rehash_search(search_string);
+          QString rehash_search_result= rehash_search(search_string, main_token_reftypes[hparse_i]);
           if (rehash_search_result > "")
           {
             expected_list= "Expecting: ";
@@ -19856,9 +20121,13 @@ int MainWindow::hparse_f_client_statement()
   QString saved_hparse_token= hparse_token;
   int slash_token= hparse_f_backslash_command(true);
   if (hparse_errno > 0) return 0;
-  if ((slash_token == TOKEN_KEYWORD_QUESTIONMARK) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUESTIONMARK, "?") == 1)) {;}
+  if ((slash_token == TOKEN_KEYWORD_QUESTIONMARK) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUESTIONMARK, "?") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
   else if ((slash_token == TOKEN_KEYWORD_CHARSET) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHARSET, "CHARSET") == 1))
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
@@ -19866,10 +20135,17 @@ int MainWindow::hparse_f_client_statement()
       if (hparse_errno > 0) return 0;
     }
   }
-  else if ((slash_token == TOKEN_KEYWORD_CLEAR) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLEAR, "CLEAR") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONNECT, "CONNECT") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_CLEAR) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLEAR, "CLEAR") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONNECT, "CONNECT") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
   else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     QString tmp_delimiter= get_delimiter(hparse_token, hparse_text_copy, main_token_offsets[hparse_i]);
     if (tmp_delimiter > " ")
     {
@@ -19899,18 +20175,49 @@ int MainWindow::hparse_f_client_statement()
     else hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EDIT, "EDIT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_EGO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EGO, "EGO") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_EXIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXIT, "EXIT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_GO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GO, "GO") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_HELP) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HELP, "HELP") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_NOPAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOPAGER, "NOPAGER") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_NOTEE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOTEE, "NOTEE") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_NOWARNING) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOWARNING, "NOWARNING") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_PAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAGER, "PAGER") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_PRINT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRINT, "PRINT") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EDIT, "EDIT") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_EGO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EGO, "EGO") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_EXIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXIT, "EXIT") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_GO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GO, "GO") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_HELP) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HELP, "HELP") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_NOPAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOPAGER, "NOPAGER") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_NOTEE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOTEE, "NOTEE") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_NOWARNING) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOWARNING, "NOWARNING") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_PAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAGER, "PAGER") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_PRINT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRINT, "PRINT") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
   else if ((slash_token == TOKEN_KEYWORD_PROMPT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PROMPT, "PROMPT")== 1))
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     /* Apparently PROMPT can be followed by any bunch of junk as far as ; or delimiter or eof */
     for (;;)
     {
@@ -19923,11 +20230,21 @@ int MainWindow::hparse_f_client_statement()
       hparse_f_nexttoken();
     }
   }
-  else if ((slash_token == TOKEN_KEYWORD_QUIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUIT, "QUIT") == 1)) {;}
-  else if ((slash_token == TOKEN_KEYWORD_REHASH) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REHASH, "REHASH") == 1)) {;}
-  //else if ((slash_token == TOKEN_KEYWORD_RESETCONNECTION) || (hparse_f_accept_client(TOKEN_KEYWORD_RESETCONNECTION, "RESETCONNECTION") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_QUIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUIT, "QUIT") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  else if ((slash_token == TOKEN_KEYWORD_REHASH) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REHASH, "REHASH") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
+  //else if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_KEYWORD_RESETCONNECTION, "RESETCONNECTION") == 1))
+  //{
+  // main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  //}
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET") == 1)
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     if (main_token_lengths[hparse_i] != 0)
     {
       QString s= hparse_token.mid(0, 7);
@@ -20004,22 +20321,29 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_f_other(0);
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STATUS, "STATUS") == 1)) {;}
+  else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STATUS, "STATUS") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
   else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1))
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEE, "TEE") == 1))
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
   {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
@@ -20027,9 +20351,13 @@ int MainWindow::hparse_f_client_statement()
     /* In mysql client, garbage can follow. It's not documented so don't call hparse_f_other(). */
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_WARNINGS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WARNINGS, "WARNINGS")) == 1) {;}
+  else if ((slash_token == TOKEN_KEYWORD_WARNINGS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WARNINGS, "WARNINGS")) == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  }
   else if (hparse_token.mid(0, 1) == "$")
   {
+    main_token_flags[hparse_i] |= TOKEN_FLAG_IS_START_STATEMENT;
     /* TODO: We aren't parsing $debug statements well */
     if (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_BREAKPOINT, "$BREAKPOINT", 2) == 1)
     {
