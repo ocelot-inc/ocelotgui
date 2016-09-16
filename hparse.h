@@ -308,6 +308,10 @@ int MainWindow::hparse_f_accept(unsigned char flag_version, unsigned char reftyp
   return 0;
 }
 
+/*
+  Label|condition|cursor refers are handled elsewhere
+  e.g. in hparse_f_labels().
+*/
 QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
 {
   QString appendee= token;
@@ -320,11 +324,11 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
   else if (reftype == TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE) appendee= "[column or user variable identifier]";
   else if (reftype == TOKEN_REFTYPE_COLUMN_OR_VARIABLE) appendee= "[column or variable identifier]";
   else if (reftype == TOKEN_REFTYPE_CONDITION_DEFINE) appendee= "[condition identifier]";
-  else if (reftype == TOKEN_REFTYPE_CONDITION_REFER) appendee= "[condition identifier]";
+  //else if (reftype == TOKEN_REFTYPE_CONDITION_REFER) appendee= "[condition identifier]";
   else if (reftype == TOKEN_REFTYPE_CONDITION_OR_CURSOR) appendee= "[condition or cursor identifier]";
   else if (reftype == TOKEN_REFTYPE_CONSTRAINT) appendee= "[constraint identifier]";
   else if (reftype == TOKEN_REFTYPE_CURSOR_DEFINE) appendee= "[cursor identifier]";
-  else if (reftype == TOKEN_REFTYPE_CURSOR_REFER) appendee= "[cursor identifier]";
+  //else if (reftype == TOKEN_REFTYPE_CURSOR_REFER) appendee= "[cursor identifier]";
   else if (reftype == TOKEN_REFTYPE_DATABASE) appendee= "[database identifier]";
   else if (reftype == TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT) appendee= "[database|constraint identifier]";
   else if (reftype == TOKEN_REFTYPE_DATABASE_OR_EVENT) appendee= "[database|event identifier]";
@@ -348,7 +352,7 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
   else if (reftype == TOKEN_REFTYPE_INTRODUCER) appendee= "[introducer]";
   else if (reftype == TOKEN_REFTYPE_KEY_CACHE) appendee= "[key cache identifier]";
   else if (reftype == TOKEN_REFTYPE_LABEL_DEFINE) appendee= "[label identifier]";
-  else if (reftype == TOKEN_REFTYPE_LABEL_REFER) appendee= "[label identifier]";
+  //else if (reftype == TOKEN_REFTYPE_LABEL_REFER) appendee= "[label identifier]";
   else if (reftype == TOKEN_REFTYPE_PARAMETER) appendee= "[parameter identifier]";
   else if (reftype == TOKEN_REFTYPE_PARSER) appendee= "[parser identifier]";
   else if (reftype == TOKEN_REFTYPE_PARTITION) appendee= "[partition identifier]";
@@ -369,7 +373,7 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
   else if (reftype == TOKEN_REFTYPE_VIEW) appendee= "[view identifier]";
   else if (reftype == TOKEN_REFTYPE_VARIABLE) appendee= "[variable identifier]";
   else if (reftype == TOKEN_REFTYPE_VARIABLE_DEFINE) appendee= "[variable identifier]";
-  else if (reftype == TOKEN_REFTYPE_VARIABLE_REFER) appendee= "[variable identifier]";
+  //else if (reftype == TOKEN_REFTYPE_VARIABLE_REFER) appendee= "[variable identifier]";
   else if (reftype == TOKEN_REFTYPE_WRAPPER) appendee= "[wrapper identifier]";
   return appendee;
 }
@@ -8799,9 +8803,11 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   skipping out-of-scope blocks.
   If we pass a label, accept it, it's a legitimate target.
   Todo: Make sure elsewhere that TOKEN_KEYWORD_END is always legitimate.
+  Todo: This fails to match qq with `qq`. Should I strip the ``s?
 */
 void MainWindow::hparse_f_labels(int block_top)
 {
+  int count_of_accepts= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
   {
     if (main_token_types[i] == TOKEN_KEYWORD_END)
@@ -8816,9 +8822,11 @@ void MainWindow::hparse_f_labels(int block_top)
     {
       QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return;
+      ++count_of_accepts;
     }
   }
-  hparse_f_error();
+  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, "[label identifier]");
+  else hparse_f_error();
 }
 
 /*
@@ -8829,6 +8837,7 @@ void MainWindow::hparse_f_labels(int block_top)
 */
 void MainWindow::hparse_f_cursors(int block_top)
 {
+  int count_of_accepts= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
   {
     if (main_token_types[i] == TOKEN_KEYWORD_END)
@@ -8843,14 +8852,16 @@ void MainWindow::hparse_f_cursors(int block_top)
     {
       QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CURSOR_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return;
+      ++count_of_accepts;
     }
   }
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CURSOR_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CURSOR_REFER, TOKEN_TYPE_IDENTIFIER, "[cursor identifier]");
+  else hparse_f_error();
 }
 
 /*
   Called from hparse_f_block() for FETCH x cursor INTO variable.
-  Also called just to count candidates, in which case is_mandoary=false.
+  Also called just to count candidates, in which case is_mandatory=false.
   Search method is similar to the one in hparse_f_labels(),
   but we go as far as statement start rather than block_top,
   because parameter declarations precede block top.
@@ -8862,6 +8873,7 @@ void MainWindow::hparse_f_cursors(int block_top)
 */
 int MainWindow::hparse_f_variables(bool is_mandatory)
 {
+  int count_of_accepts= 0;
   int candidate_count= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= hparse_i_of_statement)); --i)
   {
@@ -8882,12 +8894,16 @@ int MainWindow::hparse_f_variables(bool is_mandatory)
         {
           QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
           if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return candidate_count;
+          ++count_of_accepts;
         }
       }
     }
   }
   if (is_mandatory)
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  {
+    if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, "[variable identifier]");
+    else hparse_f_error();
+  }
   return candidate_count;
 }
 
@@ -8900,6 +8916,7 @@ int MainWindow::hparse_f_variables(bool is_mandatory)
 */
 int MainWindow::hparse_f_conditions(int block_top)
 {
+  int count_of_accepts= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
   {
     if (main_token_types[i] == TOKEN_KEYWORD_END)
@@ -8914,9 +8931,10 @@ int MainWindow::hparse_f_conditions(int block_top)
     {
       QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return 1;
+      ++count_of_accepts;
     }
   }
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
+  if (count_of_accepts == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, "[condition identifier]");
   return 0;
 }
 
@@ -9168,6 +9186,7 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
   {
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,slash_token, "\\"); /* Todo: mark as TOKEN_FLAG_END */
     if (hparse_errno > 0) return 0;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,slash_token, s);
     if (hparse_errno > 0) return 0;
   }
@@ -9282,11 +9301,11 @@ int MainWindow::hparse_f_client_statement()
   if (hparse_errno > 0) return 0;
   if ((slash_token == TOKEN_KEYWORD_QUESTIONMARK) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUESTIONMARK, "?") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_CHARSET) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHARSET, "CHARSET") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
@@ -9296,15 +9315,15 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_CLEAR) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLEAR, "CLEAR") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONNECT, "CONNECT") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     QString tmp_delimiter= get_delimiter(hparse_token, hparse_text_copy, main_token_offsets[hparse_i]);
     if (tmp_delimiter > " ")
     {
@@ -9336,52 +9355,57 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_EDIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EDIT, "EDIT") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_EGO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EGO, "EGO") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_EXIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXIT, "EXIT") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_GO) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GO, "GO") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_HELP) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HELP, "HELP") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_NOPAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOPAGER, "NOPAGER") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_NOTEE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOTEE, "NOTEE") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_NOWARNING) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOWARNING, "NOWARNING") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_PAGER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAGER, "PAGER") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_PRINT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRINT, "PRINT") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_PROMPT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PROMPT, "PROMPT")== 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
-    /* Apparently PROMPT can be followed by any bunch of junk as far as ; or delimiter or eof */
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    /* PROMPT can be followed by any bunch of junk as far as ; or delimiter or eof or \n*/
+    QString d;
+    int j;
     for (;;)
     {
+      j= main_token_offsets[hparse_i - 1] + main_token_lengths[hparse_i - 1];
+      d= hparse_text_copy.mid(j, main_token_offsets[hparse_i]- j);
+      if (d.contains("\n")) break;
       if ((main_token_lengths[hparse_i] == 0)
-       || (hparse_token == ";")
+       //|| (hparse_token == ";")
        || (hparse_token == hparse_delimiter_str)) break;
       main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
       main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
@@ -9391,19 +9415,19 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_QUIT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUIT, "QUIT") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_REHASH) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REHASH, "REHASH") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   //else if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_KEYWORD_RESETCONNECTION, "RESETCONNECTION") == 1))
   //{
-  // main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+  // if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   //}
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET") == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     if (main_token_lengths[hparse_i] != 0)
     {
       QString s= hparse_token.mid(0, 7);
@@ -9480,29 +9504,29 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_f_other(0);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_STATUS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STATUS, "STATUS") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_SYSTEM) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SYSTEM, "SYSTEM") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_TEE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEE, "TEE") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
   else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
@@ -9512,7 +9536,7 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_WARNINGS) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WARNINGS, "WARNINGS")) == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if (hparse_token.mid(0, 1) == "$")
   {

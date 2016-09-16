@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: September 15 2016
+   Last modified: September 16 2016
 */
 
 /*
@@ -964,7 +964,9 @@ void MainWindow::statement_edit_widget_formatter()
         if (output != "") output.append("\n");
         QString d;
         d= text.mid(main_token_offsets[i], main_token_lengths[i]);
-        output.append(d);
+        QString e= d.toUpper();
+        if (e == "DELIMITER") output.append(e);
+        else output.append(d);
         if (main_token_lengths[i + 1] != 0)
         {
           int j= main_token_offsets[i] + main_token_lengths[i];
@@ -986,6 +988,30 @@ void MainWindow::statement_edit_widget_formatter()
           }
           continue;
         }
+      }
+      if (token == TOKEN_KEYWORD_PROMPT)
+      {
+        if (output != "") output.append("\n");
+        QString d;
+        d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        QString e= d.toUpper();
+        if (e == "PROMPT") output.append(e);
+        else output.append(d);
+        int k= i + 1;
+        while ((main_token_lengths[k] != 0)
+            && ((main_token_flags[k] & TOKEN_FLAG_IS_START_STATEMENT) == 0)
+            && ((main_token_flags[k] & TOKEN_FLAG_IS_ERROR) == 0))
+          ++k;
+        --k;
+        if (k != i)
+        {
+          int j;
+          j= main_token_offsets[k] - (main_token_offsets[i] + main_token_lengths[i]) + main_token_lengths[k];
+          d= text.mid(main_token_offsets[i] + main_token_lengths[i], j);
+          output.append(d);
+        }
+        i= k;
+        continue;
       }
       if (((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
        || ((main_token_flags[i] & TOKEN_FLAG_IS_START_CLAUSE) != 0))
@@ -1027,6 +1053,16 @@ void MainWindow::statement_edit_widget_formatter()
         p_flags= main_token_flags[i - 1];
         p_type= main_token_types[i - 1];
       }
+
+      if (output.right(1) == "\\")
+      {
+        if (main_token_offsets[i] == main_token_offsets[i - 1] + main_token_lengths[i - 1])
+        {
+          output.append(s);
+          continue;
+        }
+      }
+
       if (output.right(1) > " ")
       {
         if (main_token_types[i] == TOKEN_TYPE_OPERATOR)
