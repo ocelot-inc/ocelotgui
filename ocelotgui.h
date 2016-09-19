@@ -348,6 +348,7 @@ public:
   QString ocelot_history_font_style, new_ocelot_history_font_style;
   QString ocelot_history_font_weight, new_ocelot_history_font_weight;
   QString ocelot_history_style_string;
+  QString ocelot_history_max_row_count, new_ocelot_history_max_row_count;
   QString ocelot_menu_text_color, new_ocelot_menu_text_color;
   QString ocelot_menu_background_color, new_ocelot_menu_background_color;
   QString ocelot_menu_border_color, new_ocelot_menu_border_color;
@@ -1789,7 +1790,6 @@ public:
   Todo: knowing it's "column" doesn't help us yet with knowing: column of what?
         but eventually we can bring in lists of objects, and refer to them by number-within-the-list
   Todo: eventually we can be sure, after qualification is done, for a column (e.g. we've seen FROM)
-  Todo: "The syntax .tbl_name means the table tbl_name in the default database."
   Todo: Get rid of enums that aren't actually used.
 ... And my plan is:
 * Always pass reftype for hparse_f_accept and hparse_f_acceptn and hparse_f_expect
@@ -4428,33 +4428,42 @@ bool is_image(int col)
   ocelot_history_max_column_width= 10;
   ocelot_history_max_column_count= 5;
   ocelot_history_max_row_count= 5;
-  This is called after preparing a result set in fillup(), but doesn't really depend on most
-  of the fillup() preparations except for max column widths.
+  This is called after preparing a result set in fillup(), and
+  depends on fillup() results including max_column widths.
   Example output:
-  +==========+==========+==========+==========+======+
+  +----------+----------+----------+----------+------+
   |TABLE_CATA|TABLE_SCHE|TABLE_NAME|TABLE_TYPE|ENGINE|
-  +==========+==========+==========+==========+======+
+  +----------+----------+----------+----------+------+
   |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
   |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
   |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
   |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
   |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
-  +==========+==========+==========+==========+======+
+  +----------+----------+----------+----------+------+
   Todo: this could be adapted for an alternate way to display the result grid.
-  Todo: this is repetitious, for example code for "+===+===+' is done three times. Clean up.
+  Todo: this is repetitious, for example code for "+---+---+' is done three times. Clean up.
   Warning: making the copy bigger would slow down the way the Previous and Next keys work.
+  Remaining challenges with copy_to_history:
+  * Spacing should be the same as in mysql client
+  * NULL should be printed
+  * Only ocelot_history_max_row_count matters
+  * ocelot_history_max_row_count should be settable with my.cnf, with SET, and in the history settings
+  * Finding column names and max widths should depend on result_row stuff not gridx_max stuff
+  * We should try to keep track of statements so we don't spend too much time going backwards.
 */
-QString copy(unsigned int ocelot_history_max_column_width,
+QString copy_to_history(unsigned int ocelot_history_max_column_width,
           unsigned int ocelot_history_max_column_count,
-          unsigned long ocelot_history_max_row_count)
+          long int ocelot_history_max_row_count)
 {
+  if (ocelot_history_max_row_count == 0) return "";
   unsigned int col;
-  long unsigned int xrow;
+  long unsigned int r;
   unsigned int length;
   unsigned int history_result_column_count;
   unsigned int *history_max_column_widths;
   unsigned long history_result_row_count;
   char *history_line;
+  char *divider_line;
   char *pointer_to_history_line;
   unsigned int history_line_width;
   QString s;
@@ -4478,21 +4487,23 @@ QString copy(unsigned int ocelot_history_max_column_width,
     history_max_column_widths[col]= column_width;
     history_line_width+= column_width + 1;
   }
+  history_line= new char[history_line_width + 2];
 
-  history_line= new char[history_line_width + 1];
+  divider_line= new char[history_line_width + 2];
 
   if (ocelot_result_grid_column_names_copy == 1)
   {
-    pointer_to_history_line= history_line;
-    *(pointer_to_history_line++)= '+';
+    char *pointer_to_divider_line;
+    pointer_to_divider_line= divider_line;
+    *(pointer_to_divider_line++)= '+';
     for (col= 0; col < history_result_column_count; ++col)
     {
-      memset(pointer_to_history_line, '=', history_max_column_widths[col]);
-      pointer_to_history_line+= history_max_column_widths[col];
-      *(pointer_to_history_line++)= '+';
+      memset(pointer_to_divider_line, '-', history_max_column_widths[col]);
+      pointer_to_divider_line+= history_max_column_widths[col];
+      *(pointer_to_divider_line++)= '+';
     }
-    *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
-    s.append(history_line);
+    *(pointer_to_divider_line)= '\n'; *(pointer_to_divider_line + 1)= '\0';
+    s.append(divider_line);
 
     pointer_to_history_line= history_line;
     *(pointer_to_history_line++)= '|';
@@ -4513,29 +4524,32 @@ QString copy(unsigned int ocelot_history_max_column_width,
     *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
     s.append(history_line);
   }
-
   pointer_to_history_line= history_line;
   *(pointer_to_history_line++)= '+';
   for (col= 0; col < history_result_column_count; ++col)
   {
-    memset(pointer_to_history_line, '=', history_max_column_widths[col]);
+    memset(pointer_to_history_line, '-', history_max_column_widths[col]);
     pointer_to_history_line+= history_max_column_widths[col];
     *(pointer_to_history_line++)= '+';
   }
   *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
   s.append(history_line);
-
-  if (grid_result_row_count > ocelot_history_max_row_count) history_result_row_count= ocelot_history_max_row_count;
-  else history_result_row_count= grid_result_row_count;
-  for (xrow= 0; (xrow < history_result_row_count); ++xrow)
+  if (result_row_count > (unsigned long) ocelot_history_max_row_count) history_result_row_count= ocelot_history_max_row_count;
+  else history_result_row_count= result_row_count;
+  char *row_pointer;
+  for (r= 0; r < history_result_row_count; ++r)
   {
+    unsigned int column_length;
     pointer_to_history_line= history_line;
+    row_pointer= result_set_copy_rows[r];
     *(pointer_to_history_line++)= '|';
     for (col= 0; col < history_result_column_count; ++col)
     {
-      length= lengths[col];
+      memcpy(&column_length, row_pointer, sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int) + sizeof(char);
+      length= column_length;
       if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
-      memcpy(pointer_to_history_line, row[col], length);
+      memcpy(pointer_to_history_line, row_pointer, length);
       pointer_to_history_line+= length;
       if (length < history_max_column_widths[col])
       {
@@ -4544,25 +4558,14 @@ QString copy(unsigned int ocelot_history_max_column_width,
         pointer_to_history_line+= length;
       }
       *(pointer_to_history_line++)= '|';
+      row_pointer+= column_length;
     }
     *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
     s.append(history_line);
   }
-
-  pointer_to_history_line= history_line;
-  *(pointer_to_history_line++)= '+';
-  for (col= 0; col < history_result_column_count; ++col)
-  {
-    memset(pointer_to_history_line, '=', history_max_column_widths[col]);
-    pointer_to_history_line+= history_max_column_widths[col];
-    *(pointer_to_history_line++)= '+';
-  }
-  *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
-  s.append(history_line);
-
+  s.append(divider_line);
   if (history_line != 0) delete [] history_line;
   if (history_max_column_widths != 0) delete [] history_max_column_widths;
-
   return s;
 }
 

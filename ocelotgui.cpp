@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: September 16 2016
+   Last modified: September 18 2016
 */
 
 /*
@@ -478,9 +478,8 @@ static const char *s_color_list[308]=
   static unsigned short int ocelot_client_side_functions= 1;
 
   /* Items affecting history which cannot be changed except by modifying + rebuilding */
-  //static unsigned int ocelot_history_max_column_width= 10;
-  //static unsigned int ocelot_history_max_column_count= 5;
-  //static unsigned int ocelot_history_max_row_count= 5;
+  static unsigned int ocelot_history_max_column_width= 10;
+  static unsigned int ocelot_history_max_column_count= 5;
 
   /* Some items we allow, but the reasons we allow them are lost in the mists of time */
   /* I gather that one is supposed to read the charset file. I don't think we do. */
@@ -1424,15 +1423,14 @@ bool MainWindow::is_statement_complete(QString text)
   The history widget history_edit_widget is an editable subclass of QTextEdit
   which contains retired statements + errors/warnings, scrolling
   so it looks not much different from the mysql retired-statement
-  scrolling. However, our history does not include result sets.
+  scrolling.
+  However, our history does not include result sets (unless
+  result_set_for_history, described later).
   These user-settable variables affect history_edit_widget:
-  ocelot_history_includes_prompt                   default yes
-  ocelot_history_text_select_includes_prompt       default yes
-  ocelot_history_max_lines                         default 10000. 0 means it's suppressed.
-  ocelot_history_text_font                         default unknown
-  ocelot_history_error_font                        default unknown
-  ocelot_history_prompt_font                       default unknown
-  ocelot_history_includes_warnings                 default no
+  ocelot_history_text|background|border_color      default = system
+  ocelot_history_font_family|size|style|weight     default = system
+  ocelot_history_includes_warnings                 default = 0 (no)
+  ocelot_history_max_row_count                     default = 0 (suppressed)
 
   The statement is always followed by an error message,
   but ocelot_history_includes_warnings is affected by ...
@@ -1441,9 +1439,6 @@ bool MainWindow::is_statement_complete(QString text)
   If the prompt is included, then we should be saving time-of-day
   for the first statement-line prompt and doing prompt_translate()
   for each line of the statement when we copy it out.
-  In mysql client it's possible to say up-arrow and get a prior statement,
-  but we have up-arrow for different purposes, probably PgUp|PgDown is better,
-  or alt+up-arrow|alt+down-arrow.
   The history_edit_widget is TextEditHistory which is derived from
   QTextEdit, differing from statement_edit_widget which is CodeEditor
   which is derived from QPlainTextEdit.
@@ -1451,13 +1446,15 @@ bool MainWindow::is_statement_complete(QString text)
   History menu items / commands:
   * The usual edit menu items = cut, copy, paste, etc.
     Therefore we don't really need to limit history size, users can clear.
-  * PgUp + PgDn
-    * are menu items for "previous statement" / "next statement"
+  * Previous Statement ^P and Next Statement ^N
+    ? Possible alternatives: alt+up-arrow|alt+down-arrow, PgUp|PgDn
+    ? Possible alternative: up-arrow if we're at top of statement widget
+      (which is more like what mysql client would do)
     * disable if there's no previous / next
     * if done on statement widget, brings in from history -- dunno if history should scroll when that happens
     ? when bringing in from history to statement, don't re-execute
     * if user executes a restated statement, there's a behaviour choice: now the restated statement is last statement, or now the last-picked statement is still last statement
-  * Open | Save | Close | Delete
+  * Open | Save | Close | Delete (not implemented)
     * file items, with the intent of keeping history
     * you can go back in history by going back in a file
     * format should be the same as MySQL log history
@@ -3126,7 +3123,7 @@ void MainWindow::action_grid()
   if (result == QDialog::Accepted)
   {
     //make_style_strings();                                                      /* I think this should be commented out */
-    //result_grid_table_widget[0]->set_all_style_sheets();
+    //result_grid_tab_widget[0]->set_all_style_sheets();
     /* For each changed Settings item, produce and execute a settings-change statement. */
     action_change_one_setting(ocelot_grid_text_color, new_ocelot_grid_text_color, "ocelot_grid_text_color");
     action_change_one_setting(ocelot_grid_border_color, new_ocelot_grid_border_color, "ocelot_grid_border_color");
@@ -6983,7 +6980,7 @@ int MainWindow::action_execute_one_statement(QString text)
         {
           /*
             Last statement did not cause a result set. We could hide the grid and shrink the
-            central window with "result_grid_table_widget[0]->hide()", but we don't.
+            central window with "result_grid_tab_widget[0]->hide()", but we don't.
           */
           get_sql_mode(main_token_types[main_token_number], text);
           put_diagnostics_in_result();
@@ -7009,46 +7006,49 @@ int MainWindow::action_execute_one_statement(QString text)
 
             /*
               Todo: consider whether it would be appropriate to set grid width with
-              result_grid_table_widget[0]->result_column_count= lmysql->ldbms_mysql_num_fields(mysql_res);
+              result_grid_tab_widget[0]->result_column_count= lmysql->ldbms_mysql_num_fields(mysql_res);
               but it may be unnecessary, and may cause a crash in garbage_collect()
             */
 
             result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
           }
 
+          ResultGrid *rg;
           {
-            ResultGrid *r;
             for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
             {
-              r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-              r->is_paintable= 0;
-              r->garbage_collect();
+              rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+              rg->is_paintable= 0;
+              rg->garbage_collect();
             }
-            r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+            rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
             //QFont tmp_font;
-            //tmp_font= r->font();
-            r->fillup(mysql_res,
+            //tmp_font= rg->font();
+            rg->fillup(mysql_res,
                       //&tarantool_tnt_reply,
                       connections_dbms[0],
                       this,
                       is_vertical, ocelot_result_grid_column_names,
                       lmysql, ocelot_client_side_functions);
-            result_grid_tab_widget->setCurrentWidget(r);
+            result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
-            r->show();
+            rg->show();
             result_grid_tab_widget->show(); /* Maybe this only has to happen once */
           }
 
           QString result_set_for_history;
           /*
-            Todo: restore this call to copy(), but copy() should be more obviously correct.
+            Following is no-op by default because ocelot_history_max_row_count=0
           */
-          //result_set_for_history= result_grid_table_widget[0]->copy(ocelot_history_max_column_width, ocelot_history_max_column_count, ocelot_history_max_row_count);
-
+          if (ocelot_grid_actual_tabs > 0)
+          {
+            rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+            result_set_for_history= rg->copy_to_history(ocelot_history_max_column_width, ocelot_history_max_column_count, ocelot_history_max_row_count.toLong());
+          }
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(); /* Do this while we still have number of rows */
-          //history_markup_append(result_set_for_history, true);
+          history_markup_append(result_set_for_history, true);
 
 #ifdef DBMS_TARANTOOL
           if ((connections_dbms[0] != DBMS_TARANTOOL)
@@ -7120,7 +7120,7 @@ int MainWindow::action_execute_one_statement(QString text)
                 r->show();
 
                 //Put in something based on this if you want extra results to go to history:
-                //... result_grid_table_widget[result_grid_table_widget_index]->copy(); etc.
+                //... result_grid_table_widget[result_grid_tab_widget_index]->copy_to_history(); etc.
 
                 ++result_grid_table_widget_index;
               }
@@ -8086,10 +8086,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         There might be multiple databases and multiple connections
   Todo: Allow triggers events procedures functions indexes
   Todo: Hover provides more information about the object
-  Todo: declared variables or other things made within a routine
+  Todo: We know declared variables or other things made within a
+        routine (see hparse_f_labels etc.) but didn't merge with
+        the results of this routine
   Todo: add rehash to Options menu
   Todo: see correlations | aliases
   Todo: error messages
+  Todo: information_schema.engines if MySQL version >= 5.6
+  Todo: information_schema.character_sets if MySQL version >= 5.?
   Beware: You don't have read access for everything.
   Beware: Names might be case sensitive.
   Beware: Qualifier might indicate a different database.
@@ -13560,6 +13564,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_font_style(token2); if (ccn != "") ocelot_history_font_style= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_font_weight") == 0)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_history_font_weight= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_max_row_count") == 0) { ocelot_history_max_row_count= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_text_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_background_color") == 0)

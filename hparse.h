@@ -309,13 +309,16 @@ int MainWindow::hparse_f_accept(unsigned char flag_version, unsigned char reftyp
 }
 
 /*
-  Label|condition|cursor refers are handled elsewhere
-  e.g. in hparse_f_labels().
+  Replace [identifier] with something more specific.
+  Todo: there are some problems with what-is-an-identifier calculation:
+  TOKEN_REFTYPE_ANY can be for @ within a user
+  TOKEN_REFTYPE_HOST and TOKEN_REFTYPE_USER can be for literals
+  "*" can be TOKEN_REFTYPE_DATABASE and TOKEN_TYPE_IDENTIFIER
 */
 QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
 {
   QString appendee= token;
-  if (reftype != TOKEN_REFTYPE_ANY) {;}
+  if (token != "[identifier]") return appendee;
   if (reftype == TOKEN_REFTYPE_ALIAS) appendee= "[alias identifier]";
   else if (reftype == TOKEN_REFTYPE_CHANNEL) appendee= "[channel identifier]";
   else if (reftype == TOKEN_REFTYPE_CHARACTER_SET) appendee= "[character set identifier]";
@@ -324,11 +327,11 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
   else if (reftype == TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE) appendee= "[column or user variable identifier]";
   else if (reftype == TOKEN_REFTYPE_COLUMN_OR_VARIABLE) appendee= "[column or variable identifier]";
   else if (reftype == TOKEN_REFTYPE_CONDITION_DEFINE) appendee= "[condition identifier]";
-  //else if (reftype == TOKEN_REFTYPE_CONDITION_REFER) appendee= "[condition identifier]";
+  else if (reftype == TOKEN_REFTYPE_CONDITION_REFER) appendee= "[condition identifier]";
   else if (reftype == TOKEN_REFTYPE_CONDITION_OR_CURSOR) appendee= "[condition or cursor identifier]";
   else if (reftype == TOKEN_REFTYPE_CONSTRAINT) appendee= "[constraint identifier]";
   else if (reftype == TOKEN_REFTYPE_CURSOR_DEFINE) appendee= "[cursor identifier]";
-  //else if (reftype == TOKEN_REFTYPE_CURSOR_REFER) appendee= "[cursor identifier]";
+  else if (reftype == TOKEN_REFTYPE_CURSOR_REFER) appendee= "[cursor identifier]";
   else if (reftype == TOKEN_REFTYPE_DATABASE) appendee= "[database identifier]";
   else if (reftype == TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT) appendee= "[database|constraint identifier]";
   else if (reftype == TOKEN_REFTYPE_DATABASE_OR_EVENT) appendee= "[database|event identifier]";
@@ -352,7 +355,7 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
   else if (reftype == TOKEN_REFTYPE_INTRODUCER) appendee= "[introducer]";
   else if (reftype == TOKEN_REFTYPE_KEY_CACHE) appendee= "[key cache identifier]";
   else if (reftype == TOKEN_REFTYPE_LABEL_DEFINE) appendee= "[label identifier]";
-  //else if (reftype == TOKEN_REFTYPE_LABEL_REFER) appendee= "[label identifier]";
+  else if (reftype == TOKEN_REFTYPE_LABEL_REFER) appendee= "[label identifier]";
   else if (reftype == TOKEN_REFTYPE_PARAMETER) appendee= "[parameter identifier]";
   else if (reftype == TOKEN_REFTYPE_PARSER) appendee= "[parser identifier]";
   else if (reftype == TOKEN_REFTYPE_PARTITION) appendee= "[partition identifier]";
@@ -373,7 +376,7 @@ QString MainWindow::hparse_f_token_to_appendee(QString token, int reftype)
   else if (reftype == TOKEN_REFTYPE_VIEW) appendee= "[view identifier]";
   else if (reftype == TOKEN_REFTYPE_VARIABLE) appendee= "[variable identifier]";
   else if (reftype == TOKEN_REFTYPE_VARIABLE_DEFINE) appendee= "[variable identifier]";
-  //else if (reftype == TOKEN_REFTYPE_VARIABLE_REFER) appendee= "[variable identifier]";
+  else if (reftype == TOKEN_REFTYPE_VARIABLE_REFER) appendee= "[variable identifier]";
   else if (reftype == TOKEN_REFTYPE_WRAPPER) appendee= "[wrapper identifier]";
   return appendee;
 }
@@ -8825,7 +8828,7 @@ void MainWindow::hparse_f_labels(int block_top)
       ++count_of_accepts;
     }
   }
-  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, "[label identifier]");
+  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
   else hparse_f_error();
 }
 
@@ -8855,7 +8858,7 @@ void MainWindow::hparse_f_cursors(int block_top)
       ++count_of_accepts;
     }
   }
-  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CURSOR_REFER, TOKEN_TYPE_IDENTIFIER, "[cursor identifier]");
+  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CURSOR_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
   else hparse_f_error();
 }
 
@@ -8901,7 +8904,7 @@ int MainWindow::hparse_f_variables(bool is_mandatory)
   }
   if (is_mandatory)
   {
-    if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, "[variable identifier]");
+    if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     else hparse_f_error();
   }
   return candidate_count;
@@ -8934,7 +8937,7 @@ int MainWindow::hparse_f_conditions(int block_top)
       ++count_of_accepts;
     }
   }
-  if (count_of_accepts == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, "[condition identifier]");
+  if (count_of_accepts == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
   return 0;
 }
 
