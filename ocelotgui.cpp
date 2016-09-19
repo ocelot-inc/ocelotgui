@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: September 18 2016
+   Last modified: September 19 2016
 */
 
 /*
@@ -476,10 +476,6 @@ static const char *s_color_list[308]=
   static unsigned short int ocelot_grid_tabs= 16;
   static unsigned short int ocelot_grid_actual_tabs= 0; /* Todo: move this, it's not an option. */
   static unsigned short int ocelot_client_side_functions= 1;
-
-  /* Items affecting history which cannot be changed except by modifying + rebuilding */
-  static unsigned int ocelot_history_max_column_width= 10;
-  static unsigned int ocelot_history_max_column_count= 5;
 
   /* Some items we allow, but the reasons we allow them are lost in the mists of time */
   /* I gather that one is supposed to read the charset file. I don't think we do. */
@@ -3178,6 +3174,7 @@ void MainWindow::action_history()
     action_change_one_setting(ocelot_history_font_size, new_ocelot_history_font_size, "ocelot_history_font_size");
     action_change_one_setting(ocelot_history_font_style, new_ocelot_history_font_style, "ocelot_history_font_style");
     action_change_one_setting(ocelot_history_font_weight, new_ocelot_history_font_weight, "ocelot_history_font_weight");
+    action_change_one_setting(ocelot_history_max_row_count, new_ocelot_history_max_row_count, "ocelot_history_max_row_count");
   }
   delete(se);
 }
@@ -3337,6 +3334,7 @@ void MainWindow::set_current_colors_and_font()
   if (font.italic()) ocelot_history_font_style= "italic"; else ocelot_history_font_style= "normal";
   ocelot_history_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_history_font_weight= canonical_font_weight(QString::number(font.weight()));
+  ocelot_history_max_row_count= "0";
 
   ocelot_menu_text_color= ui->menuBar->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_menu_background_color= ui->menuBar->palette().color(QPalette::Window).name(); /* = QPalette::Background */
@@ -6858,6 +6856,8 @@ int MainWindow::action_execute_one_statement(QString text)
   int additional_result= 0;
   int ecs= execute_client_statement(text, &additional_result);
 
+  QString result_set_for_history= "";
+
   if (ecs != 1)
   {
     /* The statement was not handled entirely by the client, it must be passed to the DBMS. */
@@ -7036,19 +7036,19 @@ int MainWindow::action_execute_one_statement(QString text)
             result_grid_tab_widget->show(); /* Maybe this only has to happen once */
           }
 
-          QString result_set_for_history;
           /*
             Following is no-op by default because ocelot_history_max_row_count=0
           */
-          if (ocelot_grid_actual_tabs > 0)
+          if ((ocelot_grid_actual_tabs > 0)
+           && (result_set_for_history == ""))
           {
             rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
-            result_set_for_history= rg->copy_to_history(ocelot_history_max_column_width, ocelot_history_max_column_count, ocelot_history_max_row_count.toLong());
+            result_set_for_history= rg->copy_to_history(ocelot_history_max_row_count.toLong(), is_vertical);
           }
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(); /* Do this while we still have number of rows */
-          history_markup_append(result_set_for_history, true);
+          //history_markup_append(result_set_for_history, true);
 
 #ifdef DBMS_TARANTOOL
           if ((connections_dbms[0] != DBMS_TARANTOOL)
@@ -7139,7 +7139,7 @@ int MainWindow::action_execute_one_statement(QString text)
   /* statement is over */
   if (additional_result != TOKEN_KEYWORD_SOURCE)
   {
-    history_markup_append("", true); /* add prompt+statement+result to history, with markup */
+    history_markup_append(result_set_for_history, true); /* add prompt+statement+result to history, with markup */
   }
   return return_value;
 }
@@ -8000,6 +8000,13 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_history_font_weight= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
+        put_message_in_result(tr("OK")); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_max_row_count", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { put_message_in_result(tr("Illegal value")); return 1; }
+        ocelot_history_max_row_count= ccn;
         put_message_in_result(tr("OK")); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_text_color", Qt::CaseInsensitive) == 0)

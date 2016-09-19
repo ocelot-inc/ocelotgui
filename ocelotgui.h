@@ -4424,36 +4424,37 @@ bool is_image(int col)
 /*
   Move a limited part of a result set to history.
   We want to show what it looks like, but dumping the whole thing might waste time and space,
-  so it's throttled by three ocelot_history variables that are set to small values:
-  ocelot_history_max_column_width= 10;
-  ocelot_history_max_column_count= 5;
-  ocelot_history_max_row_count= 5;
+  so it's throttled by an ocelot_history variable that can be set to a small values:
+  ocelot_history_max_row_count, default "0".
   This is called after preparing a result set in fillup(), and
   depends on fillup() results including max_column widths.
   Example output:
-  +----------+----------+----------+----------+------+
-  |TABLE_CATA|TABLE_SCHE|TABLE_NAME|TABLE_TYPE|ENGINE|
-  +----------+----------+----------+----------+------+
-  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
-  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
-  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
-  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
-  |def       |informatio|PARTITIONS|SYSTEM VIE|Aria  |
-  +----------+----------+----------+----------+------+
+  +------+------+------------+
+  | s1   | s2   | The Rain I |
+  +------+------+------------+
+  |    1 | A    |          0 |
+  | NULL | NULL |          0 |
+  +------+------+------------+
+  The output is the same as what mysql client would display --
+    left margin = 1, right margin = 1, left justify if number,
+    content length = maximum actual length -- except that mysql
+    client has minimum content length = 4 if column is nullable,
+    and we don't bother with that, it looks like a flaw.
+  Defined limits on column width and on number of columns are arbitrary.
+  If changing this, remember to test ^P and ^N which depend on markup.
   Todo: this could be adapted for an alternate way to display the result grid.
-  Todo: this is repetitious, for example code for "+---+---+' is done three times. Clean up.
   Warning: making the copy bigger would slow down the way the Previous and Next keys work.
   Remaining challenges with copy_to_history:
-  * Spacing should be the same as in mysql client
-  * NULL should be printed
-  * Only ocelot_history_max_row_count matters
-  * ocelot_history_max_row_count should be settable with my.cnf, with SET, and in the history settings
-  * Finding column names and max widths should depend on result_row stuff not gridx_max stuff
+  * ocelot_history_max_row_count should be settable with Settings|History
+  * Names and max widths should depend on result_row stuff not gridx_max stuff
   * We should try to keep track of statements so we don't spend too much time going backwards.
+  * The "8192" for vertical output is arbitrary. Max should be calculated.
 */
-QString copy_to_history(unsigned int ocelot_history_max_column_width,
-          unsigned int ocelot_history_max_column_count,
-          long int ocelot_history_max_row_count)
+#define HISTORY_COLUMN_MARGIN 1
+#define HISTORY_MAX_COLUMN_WIDTH 65535
+#define HISTORY_MAX_COLUMN_COUNT 65535
+#define HISTORY_MAX_VERTICAL_COLUMN_WIDTH 8192
+QString copy_to_history(long int ocelot_history_max_row_count, unsigned short int is_vertical)
 {
   if (ocelot_history_max_row_count == 0) return "";
   unsigned int col;
@@ -4469,49 +4470,146 @@ QString copy_to_history(unsigned int ocelot_history_max_column_width,
   QString s;
 
   s= "";
+
+
   history_max_column_widths= 0;
   history_line= 0;
 
-  if (gridx_column_count > ocelot_history_max_column_count) history_result_column_count= ocelot_history_max_column_count;
-  else history_result_column_count= gridx_column_count;
+  /* TODO: See whether gridx_column_count was necessary */
+  //if (gridx_column_count > HISTORY_MAX_COLUMN_COUNT) history_result_column_count= HISTORY_MAX_COLUMN_COUNT;
+  //else history_result_column_count= gridx_column_count;
+  if (result_column_count > HISTORY_MAX_COLUMN_COUNT) history_result_column_count= HISTORY_MAX_COLUMN_COUNT;
+  else history_result_column_count= result_column_count;
 
   history_max_column_widths= new unsigned int[history_result_column_count];
   history_line_width= 2;
   unsigned int column_width;
-  for (col= 0; col < history_result_column_count; ++col)
+
   {
-    if (ocelot_result_grid_column_names_copy == 1) column_width= mysql_fields[col].name_length;
-    else column_width= 0;
-    if (column_width < gridx_max_column_widths[col]) column_width= gridx_max_column_widths[col];
-    if (column_width > ocelot_history_max_column_width) column_width= ocelot_history_max_column_width;
-    history_max_column_widths[col]= column_width;
-    history_line_width+= column_width + 1;
+    char *pointer_to_field_names= result_field_names;
+    unsigned int column_length;
+    for (col= 0; col < history_result_column_count; ++col)
+    {
+      if (ocelot_result_grid_column_names_copy == 1)
+      {
+        memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
+        pointer_to_field_names+= sizeof(unsigned int);
+        pointer_to_field_names+= column_length;
+        column_width= column_length;
+      }
+      else column_width= 0;
+      if (column_width < gridx_max_column_widths[col]) column_width= gridx_max_column_widths[col];
+      if (column_width > HISTORY_MAX_COLUMN_WIDTH) column_width= HISTORY_MAX_COLUMN_WIDTH;
+      history_max_column_widths[col]= column_width;
+      history_line_width+= column_width + 1 + HISTORY_COLUMN_MARGIN * 2;
+    }
   }
+
+  if (result_row_count > (unsigned long) ocelot_history_max_row_count) history_result_row_count= ocelot_history_max_row_count;
+  else history_result_row_count= result_row_count;
+
+  if (is_vertical == 1)
+  {
+    unsigned int longest_column_name_length= 0;
+    unsigned int column_length;
+    if (ocelot_result_grid_column_names_copy == 1)
+    {
+      char *pointer_to_field_names= result_field_names;
+      for (col= 0; col < history_result_column_count; ++col)
+      {
+        memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
+        if (column_length > longest_column_name_length)
+          longest_column_name_length= column_length;
+        pointer_to_field_names+= sizeof(unsigned int);
+        pointer_to_field_names+= column_length;
+      }
+    }
+
+    history_line= new char[HISTORY_MAX_VERTICAL_COLUMN_WIDTH + 256];
+    for (r= 0; r < history_result_row_count; ++r)
+    {
+      sprintf(history_line, "*************************** %ld. row ***************************\n", r + 1);
+      s.append(history_line);
+      char *row_pointer;
+      unsigned int column_length;
+      char flag;
+      char *pointer_to_source;
+      row_pointer= result_set_copy_rows[r];
+      char *pointer_to_field_names= result_field_names;
+      for (col= 0; col < history_result_column_count; ++col)
+      {
+        pointer_to_history_line= history_line;
+        memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
+        pointer_to_field_names+= sizeof(unsigned int);
+        memset(pointer_to_history_line, ' ', longest_column_name_length - column_length);
+        pointer_to_history_line+= longest_column_name_length - column_length;
+        memcpy(pointer_to_history_line, pointer_to_field_names, column_length);
+        pointer_to_field_names+= column_length;
+        pointer_to_history_line+= column_length;
+        *(pointer_to_history_line++)= ':';
+        *(pointer_to_history_line++)= ' ';
+        memcpy(&column_length, row_pointer, sizeof(unsigned int));
+        flag= *(row_pointer + sizeof(unsigned int));
+        row_pointer+= sizeof(unsigned int) + sizeof(char);
+        if ((flag & FIELD_VALUE_FLAG_IS_NULL) != 0)
+        {
+          length= strlen(NULL_STRING);
+          pointer_to_source= (char *) NULL_STRING;
+        }
+        else
+        {
+          length= column_length;
+          pointer_to_source= row_pointer;
+        }
+        if (length > HISTORY_MAX_VERTICAL_COLUMN_WIDTH) length= HISTORY_MAX_VERTICAL_COLUMN_WIDTH;
+        memcpy(pointer_to_history_line, pointer_to_source, length);
+        row_pointer+= column_length;
+        pointer_to_history_line+= length;
+        *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+        s.append(history_line);
+      }
+    }
+    return s;
+  }
+
   history_line= new char[history_line_width + 2];
 
   divider_line= new char[history_line_width + 2];
 
-  if (ocelot_result_grid_column_names_copy == 1)
+
+
   {
     char *pointer_to_divider_line;
     pointer_to_divider_line= divider_line;
     *(pointer_to_divider_line++)= '+';
     for (col= 0; col < history_result_column_count; ++col)
     {
-      memset(pointer_to_divider_line, '-', history_max_column_widths[col]);
-      pointer_to_divider_line+= history_max_column_widths[col];
+      memset(pointer_to_divider_line, '-',
+             history_max_column_widths[col] + HISTORY_COLUMN_MARGIN * 2);
+      pointer_to_divider_line+=
+             history_max_column_widths[col] + HISTORY_COLUMN_MARGIN * 2;
       *(pointer_to_divider_line++)= '+';
     }
     *(pointer_to_divider_line)= '\n'; *(pointer_to_divider_line + 1)= '\0';
-    s.append(divider_line);
+  }
 
+  if (ocelot_result_grid_column_names_copy == 1)
+  {
+    char *pointer_to_field_names= result_field_names;
+    unsigned int column_length;
+    s.append(divider_line);
     pointer_to_history_line= history_line;
     *(pointer_to_history_line++)= '|';
     for (col= 0; col < history_result_column_count; ++col)
     {
-      length= mysql_fields[col].name_length;
+      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
+      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
+      memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
+      pointer_to_field_names+= sizeof(unsigned int);
+      length= column_length;
       if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
-      memcpy(pointer_to_history_line, mysql_fields[col].name, length);
+      memcpy(pointer_to_history_line, pointer_to_field_names, length);
+      pointer_to_field_names+= column_length;
       pointer_to_history_line+= length;
       if (length < history_max_column_widths[col])
       {
@@ -4519,44 +4617,61 @@ QString copy_to_history(unsigned int ocelot_history_max_column_width,
         memset(pointer_to_history_line, ' ', length);
         pointer_to_history_line+= length;
       }
+      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
+      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
       *(pointer_to_history_line++)= '|';
     }
     *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
     s.append(history_line);
   }
   pointer_to_history_line= history_line;
-  *(pointer_to_history_line++)= '+';
-  for (col= 0; col < history_result_column_count; ++col)
-  {
-    memset(pointer_to_history_line, '-', history_max_column_widths[col]);
-    pointer_to_history_line+= history_max_column_widths[col];
-    *(pointer_to_history_line++)= '+';
-  }
-  *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
-  s.append(history_line);
-  if (result_row_count > (unsigned long) ocelot_history_max_row_count) history_result_row_count= ocelot_history_max_row_count;
-  else history_result_row_count= result_row_count;
-  char *row_pointer;
+  s.append(divider_line);
   for (r= 0; r < history_result_row_count; ++r)
   {
+    char *row_pointer;
     unsigned int column_length;
+    char flag;
+    char *pointer_to_source;
+    unsigned int spaces_before, spaces_after;
     pointer_to_history_line= history_line;
     row_pointer= result_set_copy_rows[r];
     *(pointer_to_history_line++)= '|';
     for (col= 0; col < history_result_column_count; ++col)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
+      flag= *(row_pointer + sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
-      length= column_length;
-      if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
-      memcpy(pointer_to_history_line, row_pointer, length);
-      pointer_to_history_line+= length;
-      if (length < history_max_column_widths[col])
+      if ((flag & FIELD_VALUE_FLAG_IS_NULL) != 0)
       {
-        length= history_max_column_widths[col] - length;
-        memset(pointer_to_history_line, ' ', length);
-        pointer_to_history_line+= length;
+        length= strlen(NULL_STRING);
+        pointer_to_source= (char *) NULL_STRING;
       }
+      else
+      {
+        length= column_length;
+        pointer_to_source= row_pointer;
+      }
+      spaces_before= spaces_after= HISTORY_COLUMN_MARGIN;
+      if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
+      else
+      {
+        /* Todo: for Tarantool, check (flag & FIELD_VALUE_FLAG_IS_NUMBER) */
+        if ((result_field_flags[col] & NUM_FLAG) != 0)
+        //if (result_field_types[col] <= MYSQL_TYPE_DOUBLE)
+        {
+          spaces_before+= history_max_column_widths[col] - length;
+        }
+        else
+        {
+          spaces_after+= history_max_column_widths[col] - length;
+        }
+      }
+      memset(pointer_to_history_line, ' ', spaces_before);
+      pointer_to_history_line+= spaces_before;
+      memcpy(pointer_to_history_line, pointer_to_source, length);
+      pointer_to_history_line+= length;
+      memset(pointer_to_history_line, ' ', spaces_after);
+      pointer_to_history_line+= spaces_after;
       *(pointer_to_history_line++)= '|';
       row_pointer+= column_length;
     }
@@ -5915,6 +6030,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_history_font_size= copy_of_parent->ocelot_history_font_size;
   copy_of_parent->new_ocelot_history_font_style= copy_of_parent->ocelot_history_font_style;
   copy_of_parent->new_ocelot_history_font_weight= copy_of_parent->ocelot_history_font_weight;
+  copy_of_parent->new_ocelot_history_max_row_count= copy_of_parent->ocelot_history_max_row_count;
 
   copy_of_parent->new_ocelot_grid_text_color= copy_of_parent->ocelot_grid_text_color;
   copy_of_parent->new_ocelot_grid_background_color= copy_of_parent->ocelot_grid_background_color;
