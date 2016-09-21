@@ -223,8 +223,6 @@ syntax checker, and ocelot_client_side_functions=0 turns off
 the client-side functions, and ocelot_dbms=x means assume
 the DBMS is x until connection is made, and ocelot_grid_tabs=5
 means assume that a stored procedure can return up to 5 result sets.
-Additionally, "ocelot_history_max_row_count=5" means "the history
-widget can have up to 5 result-set rows, with ascii formatting."
 
 one_database. Ignored.
 

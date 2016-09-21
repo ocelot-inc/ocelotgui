@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: September 19 2016
+   Last modified: September 21 2016
 */
 
 /*
@@ -642,6 +642,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   statement_edit_widget= new CodeEditor(this);
   statement_edit_widget->is_debug_widget= false;
 
+  QFont fixed_font= get_fixed_font();
+  history_edit_widget->setFont(fixed_font);
+  statement_edit_widget->setFont(fixed_font);
+
 #ifdef DEBUGGER
   create_widget_debug();
 #endif
@@ -658,7 +662,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     have been seen elsewhere, and also pink|magenta=built-in-function so keep that in reserve.
     Then we read option files.
   */
-  set_current_colors_and_font(); /* set ocelot_statement_text_color, ocelot_grid_text_color, etc. */
+  set_current_colors_and_font(fixed_font); /* set ocelot_statement_text_color, ocelot_grid_text_color, etc. */
   ocelot_statement_border_color= "black";
 
   ocelot_statement_highlight_literal_color= "red";
@@ -704,7 +708,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ui->menuBar->setStyleSheet(ocelot_menu_style_string);
   initialize_widget_history();
 
-  initialize_widget_statement();  
+  initialize_widget_statement();
   result_grid_add_tab();
 
   main_layout->addWidget(history_edit_widget);
@@ -3305,12 +3309,11 @@ void MainWindow::assign_names_for_colors()
   Possibly I should just assume that border width = 0px except for main window, and
   take out any mention of border in the Settings dialogs.
 */
-void MainWindow::set_current_colors_and_font()
+void MainWindow::set_current_colors_and_font(QFont fixed_font)
 {
   QFont font;
 
   QWidget *widget= new QWidget(); /* A dummy to which Qt will assign default settings for palette() etc. */
-
   ocelot_statement_text_color= statement_edit_widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_statement_background_color= statement_edit_widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   font= statement_edit_widget->font();
@@ -3321,7 +3324,7 @@ void MainWindow::set_current_colors_and_font()
 
   ocelot_grid_text_color= widget->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_grid_background_color= widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
-  font= widget->font();
+  font= fixed_font;
   ocelot_grid_font_family= font.family();
   if (font.italic()) ocelot_grid_font_style= "italic"; else ocelot_grid_font_style= "normal";
   ocelot_grid_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
@@ -3352,6 +3355,101 @@ void MainWindow::set_current_colors_and_font()
   delete widget;
 }
 
+/*
+  Call this for the initial default font, which we want as fixed pitch.
+  It can be overridden by command-line options, SET statements, etc.
+  Usually by default Qt will make a widget with a non-fixed font,
+  this might be controlled by qtconfig-qt4 if Qt4,
+  this might be controlled by (say) Gnome|KDE settings if Qt5.
+  Do not use
+    #if QT_VERSION >= 0x50200
+    QFontDatabase::systemFont(QFontDatabase::FixedFont)
+    #endif
+    because Qt5 distribution is for "Qt5", not "Qt5.2+",
+    but we can find the default by making a dummy with "NoSuchFont".
+  If default is fixed: good, return it.
+  Else search QFontDatabase for the font with the most points
+  Else return the default.
+  Points:
+    If (first word match) +3 e.g. if default="Ubuntu" "Ubuntu Mono" wins
+    If (dummy default match) +2 e.g. "DejaVu Sans Mono" often wins
+    If (exact size match) +1
+    If (close size match) +1
+    If (weight match) +1
+    If (italic match) +1
+    If not ("*Webdings*" or "*Wingdings*" or "*Dingbats*") +2
+  After you get it, it should determine the initial style sheets.
+  Todo: consider changing QApplication font rather than individual fonts.
+*/
+QFont MainWindow::get_fixed_font()
+{
+  QWidget *w1= new QWidget();
+  QFont f1= w1->font();
+  QFontInfo fi(f1);
+  if (fi.fixedPitch()) return f1;
+  int point_size= fi.pointSize();
+  int weight= fi.weight();
+  bool italic= fi.italic();
+  QString first_word= fi.family();
+  if (first_word.indexOf(" ") != -1)
+    first_word= first_word.left(first_word.indexOf(" "));
+  first_word= first_word.toUpper();
+  int first_word_length= first_word.length();
+  QFontDatabase database;
+  QPlainTextEdit plain;
+  QFont fo3("NoSuchFont", point_size, weight, italic);
+  fo3.setStyleHint(QFont::TypeWriter);
+  plain.setFont(fo3);
+  QString recommended_family= plain.fontInfo().family();
+  QString winner_font_family= "";
+  int winner_font_point_size= 0;
+  int winner_font_weight= 0;
+  bool winner_font_italic= 0;
+  int winner_font_points= 0;
+  foreach (const QString &family, database.families())
+  {
+    int this_points= 0;
+    QFont fo1= QFont(family, point_size, weight, italic);
+    fo1.setStyleHint(QFont::TypeWriter);
+    plain.setFont(fo1);
+    if ((plain.fontInfo().fixedPitch())
+     && (plain.fontInfo().pointSize() > 5))
+    {
+      if ((plain.fontInfo().family().toUpper().contains("WINGDING"))
+       || (plain.fontInfo().family().toUpper().contains("WEBDING"))
+       || (plain.fontInfo().family().toUpper().contains("DINGBAT")))
+       ;
+      else this_points+= 2;
+      if (plain.fontInfo().family() == recommended_family)
+        this_points+= 2;
+      if (plain.fontInfo().family().left(first_word_length).toUpper() == first_word)
+        this_points+= 3;
+      if (plain.fontInfo().pointSize() == point_size)
+        this_points+= 1;
+      if ((plain.fontInfo().pointSize() >= (point_size * 0.9))
+       && (plain.fontInfo().pointSize() <= (point_size * 1.2)))
+        this_points+= 1;
+      if (plain.fontInfo().weight() == weight)
+        this_points+= 1;
+      if (plain.fontInfo().italic() == italic)
+        this_points+= 1;
+      if (this_points > winner_font_points)
+      {
+        winner_font_family= plain.fontInfo().family();
+        winner_font_point_size= plain.fontInfo().pointSize();
+        winner_font_weight= plain.fontInfo().weight();
+        winner_font_italic= plain.fontInfo().italic();
+        winner_font_points= this_points;
+      }
+    }
+  }
+  if (winner_font_points == 0) return f1;
+  QFont winner_font= QFont(winner_font_family,
+                           winner_font_point_size,
+                           winner_font_weight,
+                           winner_font_italic);
+  return winner_font;
+}
 
 /*
   Pass: a string which is supposed to have a color name. Return: a canonical color name.

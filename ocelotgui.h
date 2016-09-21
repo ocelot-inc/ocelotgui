@@ -711,7 +711,8 @@ private:
   int the_connect_2(); /* intended replacement for the_connect() */
   //my_bool get_one_option(int optid, const struct my_option *opt __attribute__((unused)),char *argument);
   void connect_init();
-  void set_current_colors_and_font();
+  void set_current_colors_and_font(QFont);
+  QFont get_fixed_font();
   void make_style_strings();
   //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
