@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.2
-   Last modified: September 21 2016
+   Last modified: September 25 2016
 */
 
 /*
@@ -1601,6 +1601,8 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
   history_file_write("TEE", query_utf16);
   history_file_write("HIST", query_utf16);
   history_file_write("TEE", statement_edit_widget->result);
+  if (result_set_for_history > "")
+    history_file_write("TEE", result_set_for_history);
 }
 
 
@@ -1751,11 +1753,11 @@ int MainWindow::history_markup_previous_or_next()
   TEE
   * Code related to tee should have the comment somewhere = "for tee"
   * bool ocelot_history_tee_file_is_open initially is false
-  * the options --tee=filename and --no-tee exist and are checked (I think)
+  * the options --tee=filename and --no-tee exist, and they are checked (I think)
   * the client statements tee filename and notee will be seen
   * there are no menu options (todo: decide whether this is a flaw)
   * apparently the mysql client would flush, therefore we call flush() after writing
-  * the mysql client would include results from queries, but we don't (todo: this is a flaw)
+  * the mysql client would include results from queries, but we do so only for TEE (todo: decide whether this is a flaw)
   * there might be html in the output (todo: decide whether this is a flaw)
   HIST
   * read http://ocelot.ca/blog/blog/2015/08/04/mysql_histfile-and-mysql_history/
@@ -3380,6 +3382,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
     If not ("*Webdings*" or "*Wingdings*" or "*Dingbats*") +2
   After you get it, it should determine the initial style sheets.
   Todo: consider changing QApplication font rather than individual fonts.
+  Todo: there's a memory leak, though unimportant (we only call once)
 */
 QFont MainWindow::get_fixed_font()
 {
@@ -7101,7 +7104,7 @@ int MainWindow::action_execute_one_statement(QString text)
             mysql_res= mysql_res_for_new_result_set;
 
             /* We need to think better what to do if we exceed MAX_COLUMNS */
-
+            /* ... or maybe not, it seems we got rid of MAX_COLUMNS */
             /*
               Todo: consider whether it would be appropriate to set grid width with
               result_grid_tab_widget[0]->result_column_count= lmysql->ldbms_mysql_num_fields(mysql_res);

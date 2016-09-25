@@ -64,6 +64,7 @@
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
+#include <QSpinBox>
 #ifndef __linux
 #include <QLibrary>
 #endif
@@ -4446,7 +4447,6 @@ bool is_image(int col)
   Todo: this could be adapted for an alternate way to display the result grid.
   Warning: making the copy bigger would slow down the way the Previous and Next keys work.
   Remaining challenges with copy_to_history:
-  * ocelot_history_max_row_count should be settable with Settings|History
   * Names and max widths should depend on result_row stuff not gridx_max stuff
   * We should try to keep track of statements so we don't spend too much time going backwards.
   * The "8192" for vertical output is arbitrary. Max should be calculated.
@@ -5123,11 +5123,16 @@ void scan_field_names(
    Todo: There's a terrible amount of duplication:
    If vertical == false, this happens once before we do any displaying (but we don't call this).
    If vertical == true, this happens at start and every time we scroll.
+   Todo: pass flags so I don't have to check so many field types
 */
 void set_alignment_and_height(int ki, int grid_col, int field_type)
 {
   TextEditWidget *cell_text_edit_widget= text_edit_widgets[ki];
-  if (field_type <= MYSQL_TYPE_DOUBLE) text_align(cell_text_edit_widget, Qt::AlignRight);
+  if ((field_type <= MYSQL_TYPE_DOUBLE)
+   || (field_type == MYSQL_TYPE_NEWDECIMAL)
+   || (field_type == MYSQL_TYPE_LONGLONG)
+   || (field_type == MYSQL_TYPE_INT24))
+    text_align(cell_text_edit_widget, Qt::AlignRight);
   else text_align(cell_text_edit_widget, Qt::AlignLeft);
   /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
 //  if (xrow == 0)
@@ -5991,6 +5996,11 @@ public:
   QComboBox *combo_box_for_syntax_checker;
   QHBoxLayout *hbox_layout_for_syntax_checker;
 
+  QWidget *widget_for_max_row_count;
+  QLabel *label_for_max_row_count;
+  QSpinBox *spin_box_for_max_row_count;
+  QHBoxLayout *hbox_layout_for_max_row_count;
+
   QWidget *widget_for_size[3];
   QHBoxLayout *hbox_layout_for_size[3];
   QLabel *label_for_size[3];
@@ -6163,6 +6173,23 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     connect(combo_box_for_syntax_checker, SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_syntax_check(int)));
   }
 
+  if (current_widget == HISTORY_WIDGET)
+  {
+    widget_for_max_row_count= new QWidget(this);
+    label_for_max_row_count= new QLabel("Max Row Count");
+    spin_box_for_max_row_count= new QSpinBox();
+    spin_box_for_max_row_count->setFixedWidth(label_for_color_width * 5);
+    spin_box_for_max_row_count->setMaximum(99999);
+    spin_box_for_max_row_count->setMinimum(0);
+    spin_box_for_max_row_count->setValue(copy_of_parent->ocelot_history_max_row_count.toInt());
+    spin_box_for_max_row_count->setButtonSymbols( QAbstractSpinBox::NoButtons);
+    hbox_layout_for_max_row_count= new QHBoxLayout();
+    hbox_layout_for_max_row_count->addWidget(label_for_max_row_count);
+    hbox_layout_for_max_row_count->addWidget(spin_box_for_max_row_count);
+    widget_for_max_row_count->setLayout(hbox_layout_for_max_row_count);
+    connect(spin_box_for_max_row_count, SIGNAL(valueChanged(int)), this, SLOT(handle_spin_box_for_max_row_count(int)));
+  }
+
   if (current_widget == GRID_WIDGET)
   {
     /* int label_for_size_width= this->fontMetrics().boundingRect("W").width(); */
@@ -6278,6 +6305,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   main_layout->addWidget(widget_font_label);
   main_layout->addWidget(widget_for_font_dialog);
   if (current_widget == STATEMENT_WIDGET) main_layout->addWidget(widget_for_syntax_checker);
+  if (current_widget == HISTORY_WIDGET) main_layout->addWidget(widget_for_max_row_count);
   if (current_widget == GRID_WIDGET) for (int ci= 0; ci < 3; ++ci) main_layout->addWidget(widget_for_size[ci]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[0]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
@@ -6872,6 +6900,13 @@ void handle_combo_box_for_syntax_check(int i)
 {
   if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_syntax_checker= QString::number(i);
+}
+
+
+void handle_spin_box_for_max_row_count(int i)
+{
+  if (current_widget == HISTORY_WIDGET)
+    copy_of_parent->new_ocelot_history_max_row_count= QString::number(i);
 }
 
 
