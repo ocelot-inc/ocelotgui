@@ -4750,10 +4750,15 @@ QString copy_to_history(long int ocelot_history_max_row_count, unsigned short in
   there's nothing more that can be squeezed.
   Re <cr>: I'm not very worried because it merely causes elider
       This assumes that every header or cell in the table has the same font.
-      Todo: Consider using font.setStyleHint(QFont::TypeWriter); i.e. default fixed-width font
       I don't look at mysql_fields[i].max_lengths, perhaps that's a mistake.
       Todo: this might have to be re-done after a font change
       Todo: take into account that a number won't contain anything wider than '9'.
+  Todo: We have a default fixed-width font (set by get_fixed_font), and we
+        could check "if it's fixed-pitch then less contortion is needed".
+        Also, depending on font() may be wrong because font() is only what
+        was requested not what is actual, so things might be more reliable
+        if we used fontInfo() then created a font based on that and then
+        used QFontMetrics.
 */
 /* header height calculation should differ from ordinary-row height calculation */
 void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
@@ -4790,9 +4795,11 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
      Anyway, the bizarre calculation for height is instead of
      max_height_of_a_char= mm.lineSpacing()
      and the bizarre calculation for width is just something that usually seems to work.
+     See also https://bugreports.qt.io/browse/QTBUG-15974 (didn't help).
      Todo: if you ever do Windows or Mac OS, you'll have to revisit this.
   */
   max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
+
   if (max_width_of_a_char <= 6) max_width_of_a_char+= 3;
   else if (max_width_of_a_char <= 7) max_width_of_a_char+= 2;
   else if (max_width_of_a_char <= 11) max_width_of_a_char+= 2;

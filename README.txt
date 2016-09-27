@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 1.0.2</P>
+<P>Version 1.0.3</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -104,26 +104,26 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui_1.0.2qt4-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.2qt4-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui_1.0.3qt4-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.3qt4-1_i386.deb</PRE>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui_1.0.2-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.2-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui_1.0.3-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.3-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui_1.0.2qt4-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.2qt4-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui_1.0.3qt4-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.3qt4-1_amd64.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui_1.0.2-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.2-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui_1.0.3-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.3-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui-1.0.2qt4-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.2qt4-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui-1.0.3qt4-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.3qt4-1.x86_64.rpm</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui-1.0.2-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.2-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui-1.0.3-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.3-1.x86_64.rpm</PRE>
 For 32-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui-1.0.2qt4-1.i686.rpm
-sudo rpm -i ocelotgui-1.0.2qt4-1.i686.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui-1.0.3qt4-1.i686.rpm
+sudo rpm -i ocelotgui-1.0.3qt4-1.i686.rpm</PRE>
 </P>
 
 <H3 id="getting-and-using-the-ocelotgui-source">Getting and using the ocelotgui source</H3><HR>
@@ -151,17 +151,17 @@ A release includes the source files as of the release time.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, it usually is more stable.
 A release file is highlighted in green
-by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.2 is at
-https://github.com/ocelotgui/releases/download/1.0.2/ocelotgui-1.0.2.tar.gz.
+by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.3 is at
+https://github.com/ocelotgui/releases/download/1.0.3/ocelotgui-1.0.3.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.2/ocelotgui-1.0.2.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.3/ocelotgui-1.0.3.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui-1.0.2.tar.gz.</P>
+and click ocelotgui-1.0.3.tar.gz.</P>
 
 <P>A tip for SUSE 42.1: do the following install instructions in advance.
-If the packages alread exist, then there will be harmless error messages.<BR>
+If the packages already exist, then there will be harmless error messages.<BR>
  sudo zypper install git<BR>
  sudo zypper install gcc<BR>
  sudo zypper install gcc-c++<BR>
@@ -173,7 +173,7 @@ If the packages alread exist, then there will be harmless error messages.<BR>
  sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui-1.0.2.tar.gz
+ tar -zxvf ocelotgui-1.0.3.tar.gz
  cd ocelotgui</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
@@ -198,14 +198,14 @@ For Debian-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="DEB"
  make
  cpack
- sudo dpkg -i ocelotgui_1.0.2-1_i386.deb
- #or sudo dpkg -i ocelotgui_1.0.2-1_amd64.deb</PRE>
+ sudo dpkg -i ocelotgui_1.0.3-1_i386.deb
+ #or sudo dpkg -i ocelotgui_1.0.3-1_amd64.deb</PRE>
 For RPM-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="RPM"
  make
  cpack
- sudo rpm -i ocelotgui-1.0.2-1.x86_64.rpm
- #or sudo rpm -i ocelotgui-1.0.2-1.i686.rpm</PRE>
+ sudo rpm -i ocelotgui-1.0.3-1.x86_64.rpm
+ #or sudo rpm -i ocelotgui-1.0.3-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
 For additional cmake options see the comments in CMakeLists.txt.
@@ -215,8 +215,7 @@ For additional cmake options see the comments in CMakeLists.txt.
 like to explore code ...
 files with the extension *.png
 or *.htm or *.md or *.txt or *.jpg are for documentation, the file
-LICENSE.GPL is for legal requirements, ocelotgui-qt4 and
-ocelotgui-qt5 are executable copies of the program, and
+LICENSE.GPL is for legal requirements, and
 files with the extension *.cpp or *.pro or *.h are source code.
 The main() code is in ocelotgui.cpp. All the source code has
 comments. Since ocelotgui is a Qt-using program, it is also
@@ -270,7 +269,7 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.0.2, August 15 2016</P>
+<P>Version 1.0.3, September 27 2016</P>
 
 <P>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.</P>
   
@@ -672,23 +671,25 @@ for auto_rehash has not been turned off; (2) enter the statement
 in the current database; (3) when entering an SQL statement, type `
 (backtick) at the point where an identifier is expected.</P>
 
-<P>RE: FONT. By default, ocelotgui uses whatever font was in use
-at the time it started. This may be a bad choice. We strongly
-recommend switching to a fixed-pitch (mono) font, especially for
-the Grid widget, otherwise screen space is wasted.</P>
+<P>RE: FONT. By default, ocelotgui uses a fixed-pitch (mono) font that
+has similar attributes to whatever font was in use
+at the time it started. This may be a bad choice.
+We recommend trying out other fonts with the Settings menu
+for each widget.</P>
 
 <P>RE: PERMANENT CUSTOMIZING. Changes to settings can be done
 with the Settings menu items, but such changes are not permanent.
 So note the commands that ocelotgui performs when settings are
 changed, and paste them into a file. Later this file can be
 executed (for example with SOURCE file-name), whenever ocelotgui
-is started again. Alternatively, settings can be placed in my.cnf.</P>
+is started again. Alternatively, settings can be placed in
+an options file such as my.cnf.</P>
 
 <P>RE: DEBUGGING WITH MYSQL 5.7. Oracle has made a significant
 incompatible behavior change in version 5.7, which affects the
 debugger. The originally recommended workaround was to say
 "set global show_compatibility_56=on;". We believe we have made a
-more permanent fix for this problem in ocelotgui version 1.0.2.</P>
+more permanent fix for this problem in ocelotgui version 1.0.3.</P>
 
 <P>RE: CONNECTION DIALOG. As stated earlier, if a password is necessary
 to connect, it is sufficient to start ocelotgui with "--password=<i>password</i>"
@@ -706,6 +707,14 @@ To disable this feature, start ocelotgui with --ocelot_client_side_functions=0.<
 <P>RE: HOVERING. Use the mouse to hover over a word in the
 statement widget, and Ocelot will display what kind of word
 it is, for example "table identifier".</P>
+
+<P>RE: FORMAT. Click Edit|Format, and Ocelot will change the contents of
+the statement widget so that keywords are upper case and
+sub-clauses or sub-statements are indented.</P>
+
+<P>RE: HISTORY. By default the history does not contain any rows
+from result sets of previous statements. To change this, click
+Settings|History and enter a number for Max Row Count.</P>
 
 <H3 id="contact">Contact</H3><HR>
 

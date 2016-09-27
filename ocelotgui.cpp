@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.2
-   Last modified: September 25 2016
+   Version: 1.0.3
+   Last modified: September 27 2016
 */
 
 /*
@@ -508,7 +508,7 @@ static const char *s_color_list[308]=
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.2"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.3"; /* For --version. Make sure it's in manual too. */
 
   static unsigned char dbms_version_mask;
 
@@ -1902,6 +1902,7 @@ void MainWindow::history_file_stop(QString history_type)   /* see comment=tee+hi
   2. The history widget seems to grow when I type something for the first time
   4. Make sure there's no disaster if file is /dev/null or blank.
   5. ^P doesn't work, and that's probably because we depend on markup to see statement start.
+  TODO: Fix for ^P
   Nothing happens if --batch or --silent
   We try to open the history file during each connect.
   If we successfully open, but only the first time, we copy its lines to the history widget.
@@ -2672,36 +2673,47 @@ void MainWindow::action_connect_once(QString message)
 */
 void MainWindow::action_exit()
 {
-#ifdef DEBUGGER
-  /* Get rid of debuggee if it's still around. */
-  /* Todo: this might not be enough. Maybe you should be intercepting the "close window" event. */
-  if (menu_debug_action_exit->isEnabled() == true) action_debug_exit();
-#endif
-  /* Usually this closes main connection, kill connection or debug connection probably are = 0 */
-  for (int i= 0; i < MYSQL_MAX_CONNECTIONS; ++i)
+  if (ocelot_dbms.contains("tarantool", Qt::CaseInsensitive))
   {
-    if (connected[i] != 0)
-    {
-      lmysql->ldbms_mysql_close(&mysql[i]);
-      connected[i]= 0;
-    }
-  }
-  if (is_mysql_library_init_done == true)
-  {
-    /*
-      This assumes mysql_thread_end() was done for any debugger or kill threads,
-      but we don't call mysql_thread_end() for the main thread (is that okay?).
-      If we don't call mysql_library_end(), we'll get a few extra valgrind complaints.
-    */
-    lmysql->ldbms_mysql_library_end();
-    is_mysql_library_init_done= false;
-  }
-  /* Some code added 2015-08-25 due to valgrind */
-  if (lmysql != 0) { delete lmysql; lmysql= 0; }
+    /* Todo: if there was a successful connection, close it */
 #ifdef __linux
-  if (is_libmysqlclient_loaded == 1) { dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
-  if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
+    if (is_libtarantool_loaded == 1) { dlclose(libtarantool_handle); is_libtarantool_loaded= 0; }
+    if (is_libtarantoolnet_loaded == 1) { dlclose(libtarantoolnet_handle); is_libtarantoolnet_loaded= 0; }
 #endif
+  }
+  else
+  {
+#ifdef DEBUGGER
+    /* Get rid of debuggee if it's still around. */
+    /* Todo: this might not be enough. Maybe you should be intercepting the "close window" event. */
+    if (menu_debug_action_exit->isEnabled() == true) action_debug_exit();
+#endif
+    /* Usually this closes main connection, kill connection or debug connection probably are = 0 */
+    for (int i= 0; i < MYSQL_MAX_CONNECTIONS; ++i)
+    {
+      if (connected[i] != 0)
+      {
+        lmysql->ldbms_mysql_close(&mysql[i]);
+        connected[i]= 0;
+      }
+    }
+    if (is_mysql_library_init_done == true)
+    {
+      /*
+        This assumes mysql_thread_end() was done for any debugger or kill threads,
+        but we don't call mysql_thread_end() for the main thread (is that okay?).
+        If we don't call mysql_library_end(), we'll get a few extra valgrind complaints.
+      */
+      lmysql->ldbms_mysql_library_end();
+      is_mysql_library_init_done= false;
+    }
+    /* Some code added 2015-08-25 due to valgrind */
+    if (lmysql != 0) { delete lmysql; lmysql= 0; }
+#ifdef __linux
+    if (is_libmysqlclient_loaded == 1) { dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
+    if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
+#endif
+  }
   delete_utf8_copies();
   close();
 }
@@ -2885,7 +2897,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.2, August 15 2016  \
+  <BR>Version 1.0.3, September 27 2016  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -12717,7 +12729,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_ld_run_path= "";
   ocelot_login_path= "";
   ocelot_pager= "";
-  ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
+  //ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
 
   options_files_read= "";
 #ifdef __linux
@@ -12892,6 +12904,13 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     }
   }
   connect_read_command_line(argc, argv);
+
+  if (ocelot_prompt_is_default == true)
+  {
+    ocelot_prompt= ocelot_dbms;
+    ocelot_prompt.append(">");
+  }
+
   //connect_make_statement();
 }
 
