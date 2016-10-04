@@ -3484,7 +3484,6 @@ public:
   unsigned int max_text_edit_frames_count;                       /* used for a strange error check during paint events */
 
   unsigned int result_grid_widget_max_height_in_lines;
-  unsigned int result_grid_widget_max_height_in_lines_at_fillup_time;
 
   MYSQL_FIELD *mysql_fields;
   QScrollArea *grid_scroll_area;
@@ -3527,6 +3526,9 @@ public:
   /* QWidget *grid_main_widget;  */                                /* replaces QGridLayout *grid_layout -- but we say "client" */
 
   MainWindow *copy_of_parent;
+  int copy_of_connections_dbms;
+  unsigned short int copy_of_ocelot_result_grid_vertical;
+  unsigned short int copy_of_ocelot_result_grid_column_names;
 
   int border_size;                                             /* used when calculating cell height + width */
   unsigned int ocelot_grid_max_desired_width_in_pixels;        /* used when calculating cell height + width */
@@ -3543,8 +3545,8 @@ public:
   QFont text_edit_widget_font;
   ldbms *lmysql;
 
-/* How many rows can fit on the screen? Take a guess. I'm trying to make this obsolete. */
-#define RESULT_GRID_WIDGET_MAX_HEIGHT 10
+/* How many rows can fit on the screen? Take a guess for initialization. */
+#define RESULT_GRID_WIDGET_INITIAL_HEIGHT 10
 
 /* Use NULL_STRING when displaying a column value which is null. Length is sizeof(NULL_STRING) - 1. */
 #define NULL_STRING "NULL"
@@ -3606,11 +3608,7 @@ ResultGrid(
   grid_result_row_count= 0;
   max_text_edit_frames_count= 0;
 
-  result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_MAX_HEIGHT; /* bad if big screen? */
-
-  /* With result_grid_widget_max_height_in_lines=20 and 20 pixels per row this might be safe though it's sure arbitrary. */
-  /* TEST! Has this become unnecessary now? */
-  //setMaximumHeight(result_grid_widget_max_height_in_lines * 20);
+  result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
   /* We might say "new ResultGrid(0)" merely so we'd have ResultGrid in the middle spot in the layout-> */
 
@@ -3831,17 +3829,12 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 void fillup(MYSQL_RES *mysql_res,
             //struct tnt_reply *tarantool_tnt_reply,
             int connections_dbms,
-            MainWindow *parent,
+            //MainWindow *parent,
             unsigned short ocelot_result_grid_vertical,
             unsigned short ocelot_result_grid_column_names,
             ldbms *passed_lmysql,
             int ocelot_client_side_functions)
 {
-  long unsigned int xrow;
-  unsigned int xcol;
-
-  result_grid_widget_max_height_in_lines_at_fillup_time= result_grid_widget_max_height_in_lines;
-
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
 
   lmysql= passed_lmysql;
@@ -3958,15 +3951,7 @@ void fillup(MYSQL_RES *mysql_res,
       mysql_fields (which we should not use, but we do)
     From now on there should be no need to call mysql_ functions again for this result set.
   */
-
-  /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
-
   copy_result_to_gridx(connections_dbms);
-
-  /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
-  hide();
-  is_paintable= 0;
-
   /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
      said what gridx_row_count is. */
   if (ocelot_result_grid_vertical == 0) grid_result_row_count= gridx_row_count + 1;
@@ -3983,6 +3968,34 @@ void fillup(MYSQL_RES *mysql_res,
     if (ocelot_result_grid_column_names != 0) ++gridx_column_count;
   }
 
+  grid_column_widths= new unsigned int[gridx_column_count];
+  grid_column_heights= new unsigned int[gridx_column_count];
+  grid_column_dbms_sources= new unsigned char[gridx_column_count];
+
+  dbms_set_grid_column_sources();                 /* Todo: this could return an error? */
+
+
+  /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
+  copy_of_connections_dbms= connections_dbms;
+  copy_of_ocelot_result_grid_vertical= ocelot_result_grid_vertical;
+  copy_of_ocelot_result_grid_column_names= ocelot_result_grid_column_names;
+  display();
+}
+
+
+void display()
+{
+  long unsigned int xrow;
+  unsigned int xcol;
+  MainWindow *parent= copy_of_parent;
+  int connections_dbms= copy_of_connections_dbms;
+  unsigned short int ocelot_result_grid_vertical= copy_of_ocelot_result_grid_vertical;
+  unsigned short int ocelot_result_grid_column_names= copy_of_ocelot_result_grid_column_names;
+
+  /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
+  hide();
+  is_paintable= 0;
+
   {
     unsigned int minimum_number_of_cells;
     minimum_number_of_cells= result_grid_widget_max_height_in_lines * gridx_column_count;
@@ -3990,12 +4003,6 @@ void fillup(MYSQL_RES *mysql_res,
     if (row_pool_size < result_grid_widget_max_height_in_lines) row_pool_size= result_grid_widget_max_height_in_lines;
     if (cell_pool_size < minimum_number_of_cells) cell_pool_size= minimum_number_of_cells;
   }
-
-  grid_column_widths= new unsigned int[gridx_column_count];
-  grid_column_heights= new unsigned int[gridx_column_count];
-  grid_column_dbms_sources= new unsigned char[gridx_column_count];
-
-  dbms_set_grid_column_sources();                 /* Todo: this could return an error? */
 
   ocelot_grid_text_color= parent->ocelot_grid_text_color;
   ocelot_grid_background_color= parent->ocelot_grid_background_color;
@@ -4055,7 +4062,6 @@ void fillup(MYSQL_RES *mysql_res,
   QFont *pointer_to_font_2;
   pointer_to_font_2= &text_edit_widget_font;
   QFontMetrics fm= QFontMetrics(*pointer_to_font_2);
-
   /* Todo: see whether this loop could be shifted somewhere so it's not repeated for every fillup */
   for (xrow= 0; (xrow < gridx_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
   {
@@ -4086,7 +4092,6 @@ void fillup(MYSQL_RES *mysql_res,
       text_edit_frames[ki]->minimum_height= fm.height() * 2 + border_size; /* todo: this is probably too much */
     }
   }
-
   /*
     For each cell:
       Set cell type = detail or header, depending on is_vertical + whether it's first row
@@ -4146,7 +4151,6 @@ void fillup(MYSQL_RES *mysql_res,
       }
     }
   }
-
   //if (ocelot_result_grid_vertical != 0)
   //  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
   //                      ocelot_grid_cell_drag_line_size_as_int,
@@ -4181,7 +4185,6 @@ void fillup(MYSQL_RES *mysql_res,
     Todo: Take into account: whether there were any nulls.
   */
   fill_detail_widgets(0, connections_dbms);                                             /* details */
-
   grid_vertical_scroll_bar_value= 0;
   /*
     We'll use the automatic scroll bar for small result sets,
@@ -4204,7 +4207,6 @@ void fillup(MYSQL_RES *mysql_res,
   }
 
   is_paintable= 1;
-
   if (ocelot_result_grid_vertical == 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_drag_line_size_as_int,
@@ -4230,7 +4232,6 @@ void fillup(MYSQL_RES *mysql_res,
     possibly going beyond the original desired maximum width, possibly causing a horizontal scroll bar to appear.
     grid_row_layout->setSpacing(0) means the only thing separating cells is the "border".
   */
-
   if (ocelot_result_grid_vertical == 0)
   {
     for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
@@ -4272,9 +4273,7 @@ void fillup(MYSQL_RES *mysql_res,
       }
     }
   }
-
 //  grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
-
   for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
   {
 //    grid_row_widgets[xrow]->setLayout(grid_row_layouts[xrow]);
@@ -5321,7 +5320,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         result_column_number= 0;
       }
       if (result_row_number >= result_row_count) break;
-      if (grid_row >= result_grid_widget_max_height_in_lines_at_fillup_time) break;
+      if (grid_row >= result_grid_widget_max_height_in_lines) break;
       row_pointer+= new_content_length;
       memcpy(&new_content_length, row_pointer, sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(unsigned char);
@@ -5332,7 +5331,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
   else /* if ocelot_result_grid_vertical_copy == 0 */
   {
     for (result_row_number= first_row, grid_row= 1;
-         (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines_at_fillup_time);
+         (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
          ++result_row_number, ++grid_row)
     {
       row_pointer= result_set_copy_rows[result_row_number];
@@ -5364,7 +5363,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
     }
   }
   /* todo: maybe what we really want is to hide as far as # of used rows, which may be < max */
-  for (grid_row= grid_row; grid_row < result_grid_widget_max_height_in_lines_at_fillup_time; ++grid_row) /* so if scroll bar goes past end we won't see these */
+  for (grid_row= grid_row; grid_row < result_grid_widget_max_height_in_lines; ++grid_row) /* so if scroll bar goes past end we won't see these */
   {
     for (i= 0; i < gridx_column_count; ++i)
     {
@@ -5374,36 +5373,54 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
   }
 }
 
-
 /*
-  If result_grid_table_widget[i] height changes, that should affect max displayable lines.
-  This does not affect other occurrences of result_grid_table_widget[i].
-  This could be called from eventfilter instead.
-  Height changes at start, or due to squeezing by statement + history widgets,
-  or due to user action if the widget is detached.
+  We don't know exactly the maximum number of lines that will fit
+  on a grid widget, but we can guess based on the height of the
+  grid widget divided by the height of one line in a text edit widget.
+  This affects: the size of the row pool (it must be >= the number
+  of lines), the decision what kind of vertical scroll bar to use,
+  and the number of detail widgets that we will fill with data.
+  Two things can affect the calculation:
+  (1) Height of result_grid_table_widget[i] can change, at start,
+      or due to squeezing by statement + history widgets, or due
+      to user action if the widget is detached. resizeEvent() sees that.
+      If the number of lines increases, resize + display again.
+  (2) Height of the text edit widget can change, set_all_style_sheets()
+      sees that. For either increase or decrease, resize + display again.
   We're making the over-cautious assumption that it will be necessary to assign
   1 texteditframe for 1 line. In fact a texteditframe is always bigger than a line.
-  Todo: Font size change could have the same effects so do the calculation there too.
-  Todo: Right now the only effect is on row_pool_size next time fillup() happens,
-  that is, resize's effect becomes visible when the next SELECT happens, not when the
-  resize event happens, and someday we must make the effect more immediate, but without
-  repainting everything every time the user shifts one pixel.
+  We try to avoid recalculating just because user shifts by a few pixels.
+*/
+void resize_or_font_change(int height_of_grid_widget, bool is_resize)
+{
+  QFont tmp_font= this->font();
+  QFontMetrics mm= QFontMetrics(this->font());
+  unsigned int height_of_line= mm.lineSpacing();
+  unsigned int max_height_in_lines= height_of_grid_widget / height_of_line;
+  if ((max_height_in_lines * height_of_line) < (unsigned int) height_of_grid_widget) ++ max_height_in_lines;
+  if ((is_resize == false)
+   || (max_height_in_lines > result_grid_widget_max_height_in_lines))
+  {
+    result_grid_widget_max_height_in_lines= max_height_in_lines;
+    if (result_set_copy != 0)  /* see garbage_collect() comment */
+    {
+      remove_layouts();
+      display();
+      this->show();
+    }
+  }
+}
+
+/*
+  Resize of grid widget. This could be called from eventfilter instead.
+  Warning: changes in statement widget can cause this to be invoked.
 */
 void resizeEvent(QResizeEvent *event)
 {
-  unsigned int h_of_widget= event->size().height();
-
-  if (h_of_widget != (unsigned int) event->oldSize().height())
+  unsigned int height_of_grid_widget= event->size().height();
+  if (height_of_grid_widget != (unsigned int) event->oldSize().height())
   {
-    QFont tmp_font= this->font();
-    QFontMetrics mm= QFontMetrics(this->font());
-    unsigned int h_of_line= mm.lineSpacing();
-    unsigned int max_height_in_lines= h_of_widget / h_of_line;
-    if ((max_height_in_lines * h_of_line) < h_of_widget) ++ max_height_in_lines;
-    if (max_height_in_lines > result_grid_widget_max_height_in_lines)
-    {
-      result_grid_widget_max_height_in_lines= max_height_in_lines;
-    }
+    resize_or_font_change(height_of_grid_widget, true);
   }
 }
 
@@ -5411,6 +5428,7 @@ void resizeEvent(QResizeEvent *event)
 /*
   Called from eventfilter
   "    if (event->type() == QEvent::FontChange) return (result_grid_table_widget->fontchange_event());"
+  Todo: This never happens, set_all_style_sheets() gets called for font change.
 */
 int fontchange_event()
 {
@@ -5444,14 +5462,12 @@ bool show_event()
 bool vertical_scroll_bar_event(int connections_dbms)
 {
   int new_value;
-
   /* It's impossible to get here if the scroll bar is hidden, but it happens. Well, maybe only for "turning it off" events. */
   if (grid_vertical_scroll_bar->isVisible() == false)
   {
       return false;
   }
-
-  /* It's ridiculous to do these settings every time. But when is the best time to to them? Which event matters? */
+  /* It's ridiculous to do these settings every time. But when is the best time to do them? Which event matters? */
   if (ocelot_result_grid_vertical_copy == 0) grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
   else grid_vertical_scroll_bar->setMaximum(grid_result_row_count - 1);
   grid_vertical_scroll_bar->setSingleStep(1);
@@ -5542,6 +5558,7 @@ void remove_layouts()
     Clearing alleviates the problem.
     It would be faster to use max_table_edit_widgets_count not cell_pool_size but that crashes.
     Perhaps it would be better to clear only if current size > (some minimum)?
+  Warning: we check if (result_set_copy == 0) to ensure there's a result.
 */
 void garbage_collect()
 {
@@ -5588,7 +5605,9 @@ void set_frame_color_setting()
   but nowadays we get font with a function that figures it out from the style sheet syntax.
 */
 void set_all_style_sheets(QString new_ocelot_grid_style_string,
-                          QString new_ocelot_grid_cell_drag_line_size)
+                          QString new_ocelot_grid_cell_drag_line_size,
+                          int caller,
+                          bool is_result_grid_font_size_changed)
 {
   text_edit_widget_font= copy_of_parent->get_font_from_style_sheet(new_ocelot_grid_style_string);
 
@@ -5604,6 +5623,11 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
     //text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
     /* todo: skip following line if ocelot_grid_cell_drag_line_size_as_int did not change */
     text_edit_layouts[i_h]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
+  }
+  /* todo: is "caller" redundant? if it's 0, then font change is false? */
+  if ((caller == 1) && (is_result_grid_font_size_changed))
+  {
+    resize_or_font_change(this->height(), false);
   }
 }
 
@@ -5627,6 +5651,7 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
 //}
 
 
+/* Todo: this doesn't appear to do anything any more. */
 void dbms_set_grid_column_sources()
 {
   unsigned int column_number;

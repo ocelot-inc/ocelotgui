@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: September 27 2016
+   Last modified: October 4 2016
 */
 
 /*
@@ -792,6 +792,7 @@ int MainWindow::result_grid_add_tab()
     r->hide(); /* Maybe this isn't necessary */
   }
   {
+    /* Todo: is this pointless? I don't catch fontchange anyway! */
     r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
     assert(r != 0);
     r->installEventFilter(this); /* must catch fontChange, show, etc. */
@@ -799,7 +800,7 @@ int MainWindow::result_grid_add_tab()
   }
   {
     r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-    r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
+    r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size, 0, false);
   }
   ++ocelot_grid_actual_tabs;
   return 0;
@@ -7140,11 +7141,12 @@ int MainWindow::action_execute_one_statement(QString text)
             rg->fillup(mysql_res,
                       //&tarantool_tnt_reply,
                       connections_dbms[0],
-                      this,
+                      //this,
                       is_vertical, ocelot_result_grid_column_names,
                       lmysql, ocelot_client_side_functions);
             result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
+            /* next line redundant? display() ends with show() */
             rg->show();
             result_grid_tab_widget->show(); /* Maybe this only has to happen once */
           }
@@ -7225,11 +7227,12 @@ int MainWindow::action_execute_one_statement(QString text)
                 r->fillup(mysql_res,
                           //&tarantool_tnt_reply,
                           connections_dbms[0],
-                          this,
+                          //this,
                           is_vertical,
                           ocelot_result_grid_column_names,
                           lmysql,
                           ocelot_client_side_functions);
+                /* next line redundant? display() ends with show() */
                 r->show();
 
                 //Put in something based on this if you want extra results to go to history:
@@ -7923,6 +7926,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         put_message_in_result(tr("OK"));return 1;
       }
       bool is_result_grid_style_changed= false;
+      bool is_result_grid_font_size_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
@@ -7960,6 +7964,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        if (ccn != ocelot_grid_font_size) is_result_grid_font_size_changed= true;
         ocelot_grid_font_size= ccn;
         is_result_grid_style_changed= true;
       }
@@ -8019,7 +8024,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
         {
           r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-          r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size);
+          r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size, 1, is_result_grid_font_size_changed);
         }
         put_message_in_result(tr("OK")); return 1;
       }
@@ -12113,7 +12118,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
         int xheight;
         for (long unsigned int xrow= 0;
              (xrow < ancestor_result_grid_widget->result_row_count + 1)
-             && (xrow < ancestor_result_grid_widget->result_grid_widget_max_height_in_lines_at_fillup_time);
+             && (xrow < ancestor_result_grid_widget->result_grid_widget_max_height_in_lines);
              ++xrow)
         {
           TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
@@ -12149,7 +12154,8 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
           ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number]= event->y();
           int xheight;
           for (long unsigned int xrow= 0;
-               (xrow < ancestor_result_grid_widget->result_row_count + 1) && (xrow < RESULT_GRID_WIDGET_MAX_HEIGHT);
+               (xrow < ancestor_result_grid_widget->result_row_count + 1)
+               && (xrow < ancestor_result_grid_widget->result_grid_widget_max_height_in_lines);
                ++xrow)
           {
             TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
