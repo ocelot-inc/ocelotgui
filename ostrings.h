@@ -40,6 +40,9 @@
              (3) rebuild from source.
 */
 
+#ifndef OSTRINGS_H
+#define OSTRINGS_H
+
 static const char *string_languages[]=
 {
   "english",
@@ -647,7 +650,46 @@ static const char *s_color_list[]=
 #define MENU_HELP_THE_MANUAL       46
 #define MENU_HELP_LIBMYSQLCLIENT       47
 #define MENU_HELP_SETTINGS       48
-#define MENU_END 49
+static int MENU_STATEMENT_TEXT_COLOR= 49;
+static int MENU_STATEMENT_BACKGROUND_COLOR= 50;
+static int MENU_STATEMENT_HIGHLIGHT_LITERAL_COLOR= 51;
+static int MENU_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR= 52;
+static int MENU_STATEMENT_HIGHLIGHT_COMMENT_COLOR= 53;
+static int MENU_STATEMENT_HIGHLIGHT_OPERATOR_COLOR= 54;
+static int MENU_STATEMENT_HIGHLIGHT_KEYWORD_COLOR= 55;
+static int MENU_STATEMENT_PROMPT_BACKGROUND_COLOR= 56;
+static int MENU_STATEMENT_BORDER_COLOR= 57;
+static int MENU_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR= 58;
+static int MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR= 59;
+static int MENU_GRID_TEXT_COLOR= 60;
+static int MENU_GRID_BACKGROUND_COLOR= 61;
+static int MENU_GRID_CELL_BORDER_COLOR= 62;
+static int MENU_GRID_CELL_DRAG_LINE_COLOR= 63;
+static int MENU_GRID_HEADER_BACKGROUND_COLOR= 64;
+static int MENU_GRID_BORDER_COLOR= 65;
+static int MENU_GRID_BORDER_SIZE= 66;
+static int MENU_GRID_CELL_BORDER_SIZE= 67;
+static int MENU_GRID_CELL_DRAG_LINE_SIZE= 68;
+static int MENU_HISTORY_TEXT_COLOR= 69;
+static int MENU_HISTORY_BACKGROUND_COLOR= 70;
+static int MENU_HISTORY_BORDER_COLOR= 71;
+static int MENU_MENU_TEXT_COLOR= 72;
+static int MENU_MENU_BACKGROUND_COLOR= 73;
+static int MENU_MENU_BORDER_COLOR= 74;
+static int MENU_FONT= 75;
+static int MENU_MAX_ROW_COUNT= 76;
+static int MENU_SYNTAX_CHECKER= 77;
+static int MENU_CONDITION= 78;
+static int MENU_DISPLAY_AS= 79;
+static int MENU_CANCEL= 80;
+static int MENU_OK= 81;
+static int MENU_SETTINGS_FOR_MENU= 82;
+static int MENU_SETTINGS_FOR_HISTORY= 83;
+static int MENU_SETTINGS_FOR_GRID= 84;
+static int MENU_SETTINGS_FOR_STATEMENT= 85;
+static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 86;
+static int MENU_PICK_NEW_FONT= 87;
+#define MENU_END 88
 
 static const char *menu_strings[]=
 {
@@ -701,6 +743,45 @@ static const char *menu_strings[]=
 "The Manual", /* MENU_HELP_THE_MANUAL */
 "libmysqlclient", /* MENU_HELP_LIBMYSQLCLIENT */
 "settings", /* MENU_HELP_SETTINGS */
+    "Statement text color", /* MENU_STATEMENT_TEXT_COLOR */
+    "Statement Background Color",
+    "Statement Highlight Literal Color",
+    "Statement Highlight Identifier Color",
+    "Statement Highlight Comment Color",
+    "Statement Highlight Operator Color",
+    "Statement Highlight Keyword Color",
+    "Statement Prompt Background Color",
+    "Statement Border Color",
+    "Statement Highlight Current Line Color",
+    "Statement Highlight Function Color",
+    "Grid Text Color",
+    "Grid Background Color",
+    "Grid Cell Border Color",
+    "Grid Cell Drag Line Color",
+    "Grid Header Background Color",
+    "Grid Border Color",
+    "Grid Border Size",
+    "Grid Cell Border Size",
+    "Grid Cell Drag Line Size",
+    "History Text Color",
+    "History Background Color",
+    "History Border Color",
+    "Menu Text Color",
+    "Menu Background Color",
+    "Menu Border Color",
+    "Font       ",
+    "Max Row Count",
+    "Syntax Checker (1=highlight,3=highlight+error dialog)",
+    "Condition",
+    "Display as",
+    "Cancel",
+    "OK",
+    "Settings -- -- for Menu",
+    "Settings -- -- for History",
+    "Settings -- -- for Grid",
+    "Settings -- -- for Statement",
+    "Settings -- -- for Extra Rule 1",
+    "Pick new font",
 /* UPPER */
 "FILE", /* MENU_FILE */
 "CONNECT", /* MENU_FILE_CONNECT */
@@ -750,5 +831,51 @@ static const char *menu_strings[]=
 "ABOUT", /* MENU_HELP_ABOUT */
 "THE MANUAL", /* MENU_HELP_THE_MANUAL */
 "LIBMYSQLCLIENT", /* MENU_HELP_LIBMYSQLCLIENT */
-"SETTINGS" /* MENU_HELP_SETTINGS */
+"SETTINGS", /* MENU_HELP_SETTINGS */
+    "STATEMENT TEXT COLOR", /* MENU_STATEMENT_TEXT_COLOR */
+    "STATEMENT BACKGROUND COLOR",
+    "STATEMENT HIGHLIGHT LITERAL COLOR",
+    "STATEMENT HIGHLIGHT IDENTIFIER COLOR",
+    "STATEMENT HIGHLIGHT COMMENT COLOR",
+    "STATEMENT HIGHLIGHT OPERATOR COLOR",
+    "STATEMENT HIGHLIGHT KEYWORD COLOR",
+    "STATEMENT PROMPT BACKGROUND COLOR",
+    "STATEMENT BORDER COLOR",
+    "STATEMENT HIGHLIGHT CURRENT LINE COLOR",
+    "STATEMENT HIGHLIGHT FUNCTION COLOR",
+    "GRID TEXT COLOR",
+    "GRID BACKGROUND COLOR",
+    "GRID CELL BORDER COLOR",
+    "GRID CELL DRAG LINE COLOR",
+    "GRID HEADER BACKGROUND COLOR",
+    "GRID BORDER COLOR",
+    "GRID BORDER SIZE",
+    "GRID CELL BORDER SIZE",
+    "GRID CELL DRAG LINE SIZE",
+    "HISTORY TEXT COLOR",
+    "HISTORY BACKGROUND COLOR",
+    "HISTORY BORDER COLOR",
+    "MENU TEXT COLOR",
+    "MENU BACKGROUND COLOR",
+    "MENU BORDER COLOR",
+    "FONT       ",
+    "MAX ROW COUNT",
+    "SYNTAX CHECKER (1=HIGHLIGHT,3=HIGHLIGHT+ERROR DIALOG)",
+    "CONDITION",
+    "DISPLAY AS",
+    "CANCEL",
+    "OK",
+    "SETTINGS -- -- FOR MENU",
+    "SETTINGS -- -- FOR HISTORY",
+    "SETTINGS -- -- FOR GRID",
+    "SETTINGS -- -- FOR STATEMENT",
+    "SETTINGS -- -- FOR EXTRA RULE 1",
+    "PICK NEW FONT"
 };
+
+static unsigned int er_off= 0;    /* to offset er_strings language */
+static unsigned int color_off= 0; /* to offset color_strings language */
+static unsigned int menu_off= 0;  /* to offset menu_strings language */
+
+#endif // OSTRINGS_H
+

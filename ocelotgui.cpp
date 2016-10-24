@@ -198,7 +198,7 @@
 */
 
 
-
+#include "ostrings.h"
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
 
@@ -402,10 +402,6 @@
   static QString hparse_delimiter_str;
   static bool hparse_sql_mode_ansi_quotes= false;
   static unsigned char hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
-  static unsigned int er_off= 0;    /* to offset er_strings language */
-  static unsigned int color_off= 0; /* to offset color_strings language */
-  static unsigned int menu_off= 0;  /* to offset menu_strings language */
-#include "ostrings.h"
 
 int main(int argc, char *argv[])
 {

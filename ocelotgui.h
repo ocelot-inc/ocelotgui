@@ -236,6 +236,52 @@
   so say 'static' if you do that.
 */
 
+/* References to ostrings.h variables and pseudo-constants */
+extern const char *menu_strings[];
+extern int MENU_STATEMENT_TEXT_COLOR;
+extern int MENU_STATEMENT_BACKGROUND_COLOR;
+extern int MENU_STATEMENT_HIGHLIGHT_LITERAL_COLOR;
+extern int MENU_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR;
+extern int MENU_STATEMENT_HIGHLIGHT_COMMENT_COLOR;
+extern int MENU_STATEMENT_HIGHLIGHT_OPERATOR_COLOR;
+extern int MENU_STATEMENT_HIGHLIGHT_KEYWORD_COLOR;
+extern int MENU_STATEMENT_PROMPT_BACKGROUND_COLOR;
+extern int MENU_STATEMENT_BORDER_COLOR;
+extern int MENU_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR;
+extern int MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR;
+extern int MENU_GRID_TEXT_COLOR;
+extern int MENU_GRID_BACKGROUND_COLOR;
+extern int MENU_GRID_CELL_BORDER_COLOR;
+extern int MENU_GRID_CELL_DRAG_LINE_COLOR;
+extern int MENU_GRID_HEADER_BACKGROUND_COLOR;
+extern int MENU_GRID_BORDER_COLOR;
+extern int MENU_GRID_BORDER_SIZE;
+extern int MENU_GRID_CELL_BORDER_SIZE;
+extern int MENU_GRID_CELL_DRAG_LINE_SIZE;
+extern int MENU_GRID_TEXT_COLOR;
+extern int MENU_GRID_BACKGROUND_COLOR;
+extern int MENU_HISTORY_TEXT_COLOR;
+extern int MENU_HISTORY_BACKGROUND_COLOR;
+extern int MENU_HISTORY_BORDER_COLOR;
+extern int MENU_MENU_TEXT_COLOR;
+extern int MENU_MENU_BACKGROUND_COLOR;
+extern int MENU_MENU_BORDER_COLOR;
+extern int MENU_FONT;
+extern int MENU_MAX_ROW_COUNT;
+extern int MENU_SYNTAX_CHECKER;
+extern int MENU_CONDITION;
+extern int MENU_DISPLAY_AS;
+extern int MENU_CANCEL;
+extern int MENU_OK;
+extern int MENU_SETTINGS_FOR_MENU;
+extern int MENU_SETTINGS_FOR_HISTORY;
+extern int MENU_SETTINGS_FOR_GRID;
+extern int MENU_SETTINGS_FOR_STATEMENT;
+extern int MENU_SETTINGS_FOR_EXTRA_RULE_1;
+extern int MENU_PICK_NEW_FONT;
+
+extern unsigned int menu_off;
+
 namespace Ui
 {
 class MainWindow;
@@ -6116,12 +6162,12 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_syntax_checker= copy_of_parent->ocelot_statement_syntax_checker;
 
   {
-    QString s= tr("Settings -- ");
-    if (current_widget == MAIN_WIDGET) s.append(" -- for Menu");
-    if (current_widget == HISTORY_WIDGET) s.append(" -- for History");
-    if (current_widget == GRID_WIDGET) s.append(" -- for Grid");
-    if (current_widget == STATEMENT_WIDGET) s.append(" -- for Statement");
-    if (current_widget == EXTRA_RULE_1) s.append(" -- for Extra Rule 1");
+    QString s;
+    if (current_widget == MAIN_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_MENU];
+    if (current_widget == HISTORY_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_HISTORY];
+    if (current_widget == GRID_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_GRID];
+    if (current_widget == STATEMENT_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_STATEMENT];
+    if (current_widget == EXTRA_RULE_1) s= menu_strings[menu_off + MENU_SETTINGS_FOR_EXTRA_RULE_1];
     setWindowTitle(s);                                                /* affects "this"] */
   }
 
@@ -6187,7 +6233,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   label_for_font_dialog= new QLabel(this);
   label_for_font_dialog_set_text();
 
-  button_for_font_dialog= new QPushButton(tr("Pick new font"), this);
+  button_for_font_dialog= new QPushButton(menu_strings[menu_off + MENU_PICK_NEW_FONT], this);
   hbox_layout_for_font_dialog= new QHBoxLayout();
   hbox_layout_for_font_dialog->addWidget(label_for_font_dialog);
   hbox_layout_for_font_dialog->addWidget(button_for_font_dialog);
@@ -6197,7 +6243,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   if (current_widget == STATEMENT_WIDGET)
   {
     widget_for_syntax_checker= new QWidget(this);
-    label_for_syntax_checker= new QLabel("Syntax Checker (1=highlight,3=highlight+error dialog)");
+    label_for_syntax_checker= new QLabel(menu_strings[menu_off + MENU_SYNTAX_CHECKER]);
     combo_box_for_syntax_checker= new QComboBox();
     combo_box_for_syntax_checker->setFixedWidth(label_for_color_width * 3);
     for (int cj= 0; cj <= 3; ++cj) combo_box_for_syntax_checker->addItem(QString::number(cj));
@@ -6212,7 +6258,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   if (current_widget == HISTORY_WIDGET)
   {
     widget_for_max_row_count= new QWidget(this);
-    label_for_max_row_count= new QLabel("Max Row Count");
+    label_for_max_row_count= new QLabel(menu_strings[menu_off + MENU_MAX_ROW_COUNT]);
     spin_box_for_max_row_count= new QSpinBox();
     spin_box_for_max_row_count->setFixedWidth(label_for_color_width * 5);
     spin_box_for_max_row_count->setMaximum(99999);
@@ -6232,9 +6278,9 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     for (int ci= 0; ci < 3; ++ci)
     {
       widget_for_size[ci]= new QWidget(this);
-      if (ci == 0) label_for_size[ci]= new QLabel(tr("Grid Border size"));
-      if (ci == 1) label_for_size[ci]= new QLabel(tr("Grid Cell Border Size"));
-      if (ci == 2) label_for_size[ci]= new QLabel(tr("Grid Cell Drag Line Size"));
+      if (ci == 0) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_BORDER_SIZE]);
+      if (ci == 1) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_CELL_BORDER_SIZE]);
+      if (ci == 2) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_SIZE]);
       combo_box_for_size[ci]= new QComboBox();
       combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 3);
       for (int cj= 0; cj < 11; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
@@ -6259,7 +6305,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   if (current_widget == EXTRA_RULE_1)
   {
     widget_for_size[0]= new QWidget(this);
-    label_for_size[0]= new QLabel(tr("Condition"));
+    label_for_size[0]= new QLabel(menu_strings[menu_off + MENU_CONDITION]);
     combo_box_for_size[0]= new QComboBox();
     //combo_box_for_size[0]->setFixedWidth(label_for_color_width * 30);
 /*
@@ -6307,7 +6353,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     widget_for_size[0]->setLayout(hbox_layout_for_size[0]);
     connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
     widget_for_size[1]= new QWidget(this);
-    label_for_size[1]= new QLabel(tr("Display as"));
+    label_for_size[1]= new QLabel(menu_strings[menu_off + MENU_DISPLAY_AS]);
     combo_box_for_size[1]= new QComboBox();
     //combo_box_for_size[1]->setFixedWidth(label_for_color_width * 30);
     combo_box_for_size[1]->addItem("char");
@@ -6325,8 +6371,8 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 
   /* The Cancel and OK buttons */
   widget_3= new QWidget(this);
-  button_for_cancel= new QPushButton(tr("Cancel"), this);
-  button_for_ok= new QPushButton(tr("OK"), this);
+  button_for_cancel= new QPushButton(menu_strings[menu_off + MENU_CANCEL], this);
+  button_for_ok= new QPushButton(menu_strings[menu_off + MENU_OK], this);
   /* I have no idea why SLOT(accept() and SLOT(reject() cause crashes. The crashes can be worked around. */
   connect(button_for_ok, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
   connect(button_for_cancel, SIGNAL(clicked()), this, SLOT(handle_button_for_cancel()));
@@ -6383,59 +6429,61 @@ void set_widget_values(int ci)
 {
   QString color_type;
   QString color_name;
+
   if (current_widget == STATEMENT_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Statement Text Color"); color_name= copy_of_parent->new_ocelot_statement_text_color; break; }
-    case 1: { color_type= tr("Statement Background Color"); color_name= copy_of_parent->new_ocelot_statement_background_color; break; }
-    case 2: { color_type= tr("Statement Highlight Literal Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_literal_color; break; }
-    case 3: { color_type= tr("Statement Highlight Identifier Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_identifier_color; break; }
-    case 4: { color_type= tr("Statement Highlight Comment Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_comment_color; break; }
-    case 5: { color_type= tr("Statement Highlight Operator Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_operator_color; break; }
-    case 6: { color_type= tr("Statement Highlight Keyword Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_keyword_color; break; }
-    case 7: { color_type= tr("Statement Prompt Background Color"); color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
-    case 8: { color_type= tr("Statement Border Color"); color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
-    case 9: { color_type= tr("Statement Highlight Current Line Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_current_line_color; break; }
-    case 10:{ color_type= tr("Statement Highlight Function Color"); color_name= copy_of_parent->new_ocelot_statement_highlight_function_color; break; }
+    /* TEST! */
+    case 0: { color_type= menu_strings[menu_off + MENU_STATEMENT_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_statement_text_color; break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_STATEMENT_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_statement_background_color; break; }
+    case 2: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_LITERAL_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_literal_color; break; }
+    case 3: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_identifier_color; break; }
+    case 4: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_COMMENT_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_comment_color; break; }
+    case 5: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_OPERATOR_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_operator_color; break; }
+    case 6: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_KEYWORD_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_keyword_color; break; }
+    case 7: { color_type= menu_strings[menu_off + MENU_STATEMENT_PROMPT_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_STATEMENT_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
+    case 9: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_current_line_color; break; }
+    case 10:{ color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_function_color; break; }
     }
   }
   if (current_widget == GRID_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Grid Text Color"); color_name= copy_of_parent->new_ocelot_grid_text_color; break; }
-    case 1: { color_type= tr("Grid Background Color"); color_name= copy_of_parent->new_ocelot_grid_background_color; break; }
-    case 2: { color_type= tr("Grid Cell Border Color"); color_name= copy_of_parent->new_ocelot_grid_cell_border_color; break; }
-    case 3: { color_type= tr("Grid Cell Drag Line Color"); color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color; break; }
-    case 7: { color_type= tr("Grid Header Background Color"); color_name= copy_of_parent->new_ocelot_grid_header_background_color; break; }
-    case 8: { color_type= tr("Grid Border Color"); color_name= copy_of_parent->new_ocelot_grid_border_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_GRID_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_grid_text_color; break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_GRID_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_grid_background_color; break; }
+    case 2: { color_type= menu_strings[menu_off + MENU_GRID_CELL_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_grid_cell_border_color; break; }
+    case 3: { color_type= menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_COLOR]; color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color; break; }
+    case 7: { color_type= menu_strings[menu_off + MENU_GRID_HEADER_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_grid_header_background_color; break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_GRID_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_grid_border_color; break; }
     }
   }
   if (current_widget == EXTRA_RULE_1)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Grid Text Color"); color_name= copy_of_parent->new_ocelot_extra_rule_1_text_color; break; }
-    case 1: { color_type= tr("Grid Background Color"); color_name= copy_of_parent->new_ocelot_extra_rule_1_background_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_GRID_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_extra_rule_1_text_color; break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_GRID_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_extra_rule_1_background_color; break; }
     }
   }
   if (current_widget == HISTORY_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("History Text Color"); color_name= copy_of_parent->new_ocelot_history_text_color; break; }
-    case 1: { color_type= tr("History Background Color"); color_name= copy_of_parent->new_ocelot_history_background_color; break; }
-    case 8: { color_type= tr("History Border Color"); color_name= copy_of_parent->new_ocelot_history_border_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_HISTORY_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_history_text_color; break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_HISTORY_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_history_background_color; break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_HISTORY_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_history_border_color; break; }
     }
   }
   if (current_widget == MAIN_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= tr("Menu Text Color"); color_name= copy_of_parent->new_ocelot_menu_text_color; break; }
-    case 1: { color_type= tr("Menu Background Color"); color_name= copy_of_parent->new_ocelot_menu_background_color; break; }
-    case 8: { color_type= tr("Menu Border Color"); color_name= copy_of_parent->new_ocelot_menu_border_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_MENU_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_menu_text_color; break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_MENU_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_menu_background_color; break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_MENU_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_menu_border_color; break; }
     }
   }
   label_for_color[ci]->setText(color_type);
@@ -6468,7 +6516,7 @@ void handle_combo_box_1(int i)
   for (ci= 0; ci < 11; ++ci) set_widget_values(ci);
   if (i == STATEMENT_WIDGET)
   {
-    color_type= "Prompt background";               /* ?? unnecessary now that set_widget_values() does it, eh? */
+    color_type= menu_strings[menu_off + MENU_STATEMENT_PROMPT_BACKGROUND_COLOR]; /* necessary even though set_widget_values() does it */
     label_for_color[7]->setText(color_type);
     for (ci= 2; ci < 11 ; ++ci)
     {
@@ -6481,7 +6529,7 @@ void handle_combo_box_1(int i)
 
   if (i == GRID_WIDGET)
   {
-    color_type= "Grid Header Background Color";     /* ?? unnecessary now that set_widget_values() does it, eh? */
+    color_type= menu_strings[menu_off + MENU_GRID_HEADER_BACKGROUND_COLOR];  /* necessary even though set_widget_values() does it */
     label_for_color[7]->setText(color_type);
     for (ci= 4; ci < 7; ++ci)
     {
@@ -6542,7 +6590,7 @@ void handle_combo_box_1(int i)
 
 void label_for_font_dialog_set_text()
 {
-  QString s_for_label_for_font_dialog= "Font       ";
+  QString s_for_label_for_font_dialog= menu_strings[menu_off + MENU_FONT];
   if (current_widget == STATEMENT_WIDGET)
   {
     s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_statement_font_family);
