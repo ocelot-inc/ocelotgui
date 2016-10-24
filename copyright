@@ -2,7 +2,7 @@ Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: ocelotgui
 Source: ocelot.ca
 
-Files: ocelotgui.cpp ocelotgui.h *.png *.jpg *.pro *.txt *.ui *.htm *.md
+Files: ocelotgui.cpp ocelotgui.h hparse.h ostrings.h *.png *.jpg *.pro *.txt *.ui *.htm *.md
 Copyright: Copyright 2014-2016 Ocelot Computer Services Inc. <ocelot.ca>
 License: GPL-2
  This program is free software; you can redistribute it

@@ -289,7 +289,7 @@ if (CPACK_GENERATOR MATCHES "RPM")
   install(FILES ocelotgui_logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps RENAME ocelotgui_logo)
 endif (CPACK_GENERATOR MATCHES "RPM")
 # So the only original files not copied are the source files:
-# CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h hparse.h
+# CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h hparse.h ostrings.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
 
 if (CPACK_GENERATOR MATCHES "DEB")

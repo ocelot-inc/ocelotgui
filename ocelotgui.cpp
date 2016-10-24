@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: October 4 2016
+   Last modified: October 23 2016
 */
 
 /*
@@ -121,6 +121,7 @@
     ocelotgui.ui        small. used to make ui_ocelotgui.h
     codeeditor.h        small. separated so license applicability is clear
     hparse.h            the recognizer
+    ostrings.h          strings that contain English translatable text
 
   There are three main widgets, which generally appear top-to-bottom on
   the screen: history_edit_widget = an uncomplicated text edit which gets
@@ -197,169 +198,6 @@
 */
 
 
-/*
-  We use s_color_list only twice, when checking command-line parameters
-  and then to copy its data to q_color_list,
-  which will be what we actually use for handle_combo_box_for_color_pick_*
-  in the Settings class. This list of color names prefers W3C names
-  http://www.w3.org/wiki/CSS/Properties/color/keywords
-  but also includes all X11 color names and hex values, a commonly-available list,
-  example = https://en.wikipedia.org/wiki/X11_color_names#Color_name_chart
-  (including webGray, webGreen, webMaroon, webPurple, and eight
-  others that Qt would reject), and adds GrayX11 GreenX11 MaroonX11 PurpleX11.
-  Doubtless this has been done many times before, but I couldn't find examples.
-*/
-static const char *s_color_list[308]=
-{"AliceBlue","#F0F8FF",
-"AntiqueWhite","#FAEBD7",
-"Aqua","#00FFFF",
-"Aquamarine","#7FFFD4",
-"Azure","#F0FFFF",
-"Beige","#F5F5DC",
-"Bisque","#FFE4C4",
-"Black","#000000",
-"BlanchedAlmond","#FFEBCD",
-"Blue","#0000FF",
-"BlueViolet","#8A2BE2",
-"Brown","#A52A2A",
-"Burlywood","#DEB887",
-"CadetBlue","#5F9EA0",
-"Chartreuse","#7FFF00",
-"Chocolate","#D2691E",
-"Coral","#FF7F50",
-"CornflowerBlue","#6495ED",
-"Cornsilk","#FFF8DC",
-"Crimson","#DC143C",
-"Cyan","#00FFFF",
-"DarkBlue","#00008B",
-"DarkCyan","#008B8B",
-"DarkGoldenrod","#B8860B",
-"DarkGray","#A9A9A9",
-"DarkGreen","#006400",
-"DarkKhaki","#BDB76B",
-"DarkMagenta","#8B008B",
-"DarkOliveGreen","#556B2F",
-"DarkOrange","#FF8C00",
-"DarkOrchid","#9932CC",
-"DarkRed","#8B0000",
-"DarkSalmon","#E9967A",
-"DarkSeaGreen","#8FBC8F",
-"DarkSlateBlue","#483D8B",
-"DarkSlateGray","#2F4F4F",
-"DarkTurquoise","#00CED1",
-"DarkViolet","#9400D3",
-"DeepPink","#FF1493",
-"DeepSkyBlue","#00BFFF",
-"DimGray","#696969",
-"DodgerBlue","#1E90FF",
-"Firebrick","#B22222",
-"FloralWhite","#FFFAF0",
-"ForestGreen","#228B22",
-"Fuchsia","#FF00FF",
-"Gainsboro","#DCDCDC",
-"GhostWhite","#F8F8FF",
-"Gold","#FFD700",
-"Goldenrod","#DAA520",
-"Gray","#808080",
-"GrayX11","#BEBEBE",
-"Green","#008000",
-"GreenX11","#00FF00",
-"GreenYellow","#ADFF2F",
-"Honeydew","#F0FFF0",
-"HotPink","#FF69B4",
-"IndianRed","#CD5C5C",
-"Indigo","#4B0082",
-"Ivory","#FFFFF0",
-"Khaki","#F0E68C",
-"Lavender","#E6E6FA",
-"LavenderBlush","#FFF0F5",
-"LawnGreen","#7CFC00",
-"LemonChiffon","#FFFACD",
-"LightBlue","#ADD8E6",
-"LightCoral","#F08080",
-"LightCyan","#E0FFFF",
-"LightGoldenrodYellow","#FAFAD2",
-"LightGray","#D3D3D3",
-"LightGreen","#90EE90",
-"LightPink","#FFB6C1",
-"LightSalmon","#FFA07A",
-"LightSeaGreen","#20B2AA",
-"LightSkyBlue","#87CEFA",
-"LightSlateGray","#778899",
-"LightSteelBlue","#B0C4DE",
-"LightYellow","#FFFFE0",
-"Lime","#00FF00",
-"LimeGreen","#32CD32",
-"Linen","#FAF0E6",
-"Magenta","#FF00FF",
-"Maroon","#800000",
-"MaroonX11","#B03060",
-"MediumAquamarine","#66CDAA",
-"MediumBlue","#0000CD",
-"MediumOrchid","#BA55D3",
-"MediumPurple","#9370DB",
-"MediumSeaGreen","#3CB371",
-"MediumSlateBlue","#7B68EE",
-"MediumSpringGreen","#00FA9A",
-"MediumTurquoise","#48D1CC",
-"MediumVioletRed","#C71585",
-"MidnightBlue","#191970",
-"MintCream","#F5FFFA",
-"MistyRose","#FFE4E1",
-"Moccasin","#FFE4B5",
-"NavajoWhite","#FFDEAD",
-"Navy","#000080",
-"OldLace","#FDF5E6",
-"Olive","#808000",
-"OliveDrab","#6B8E23",
-"Orange","#FFA500",
-"OrangeRed","#FF4500",
-"Orchid","#DA70D6",
-"PaleGoldenrod","#EEE8AA",
-"PaleGreen","#98FB98",
-"PaleTurquoise","#AFEEEE",
-"PaleVioletRed","#DB7093",
-"PapayaWhip","#FFEFD5",
-"PeachPuff","#FFDAB9",
-"Peru","#CD853F",
-"Pink","#FFC0CB",
-"Plum","#DDA0DD",
-"PowderBlue","#B0E0E6",
-"Purple","#800080",
-"PurpleX11","#A020F0",
-"RebeccaPurple","#663399",
-"Red","#FF0000",
-"RosyBrown","#BC8F8F",
-"RoyalBlue","#4169E1",
-"SaddleBrown","#8B4513",
-"Salmon","#FA8072",
-"SandyBrown","#F4A460",
-"SeaGreen","#2E8B57",
-"Seashell","#FFF5EE",
-"Sienna","#A0522D",
-"Silver","#C0C0C0",
-"SkyBlue","#87CEEB",
-"SlateBlue","#6A5ACD",
-"SlateGray","#708090",
-"Snow","#FFFAFA",
-"SpringGreen","#00FF7F",
-"SteelBlue","#4682B4",
-"Tan","#D2B48C",
-"Teal","#008080",
-"Thistle","#D8BFD8",
-"Tomato","#FF6347",
-"Turquoise","#40E0D0",
-"Violet","#EE82EE",
-"WebGray","#808080",
-"WebGreen","#008000",
-"WebMaroon","#7F0000",
-"WebPurple","#7F007F",
-"Wheat","#F5DEB3",
-"White","#FFFFFF",
-"WhiteSmoke","#F5F5F5",
-"Yellow","#FFFF00",
-"YellowGreen","#9ACD32",
-"",""};
 
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
@@ -564,6 +402,10 @@ static const char *s_color_list[308]=
   static QString hparse_delimiter_str;
   static bool hparse_sql_mode_ansi_quotes= false;
   static unsigned char hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
+  static unsigned int er_off= 0;    /* to offset er_strings language */
+  static unsigned int color_off= 0; /* to offset color_strings language */
+  static unsigned int menu_off= 0;  /* to offset menu_strings language */
+#include "ostrings.h"
 
 int main(int argc, char *argv[])
 {
@@ -698,9 +540,20 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     exit(0);
   }
 
+  for (int q_i= 0; strcmp(string_languages[q_i]," ") > 0; ++q_i)
+  {
+    QString s= string_languages[q_i];
+    if (QString::compare(ocelot_language, s, Qt::CaseInsensitive) == 0)
+    {
+      er_off= ER_END * q_i;
+      color_off= COLOR_END * q_i;
+      menu_off= MENU_END * q_i;
+    }
+  }
+
   set_dbms_version_mask(ocelot_dbms);
 
-  for (int q_i= 0; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
+  for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
 
   make_style_strings();
@@ -1987,142 +1840,142 @@ void MainWindow::history_file_to_history_widget()         /* see comment=tee+his
 */
 void MainWindow::create_menu()
 {
-  menu_file= ui->menuBar->addMenu(tr("File"));
+  menu_file= ui->menuBar->addMenu(menu_strings[menu_off + MENU_FILE]);
   /* Todo: consider adding fileMenu = new QMenu(tr("&File"), this); -*/
-  menu_file_action_connect= menu_file->addAction(tr("Connect"));
+  menu_file_action_connect= menu_file->addAction(menu_strings[menu_off + MENU_FILE_CONNECT]);
   connect(menu_file_action_connect, SIGNAL(triggered()), this, SLOT(action_connect()));
   menu_file_action_connect->setShortcut(QKeySequence::Open); /* Todo: think of a better key sequence than ctrl-o */
-  menu_file_action_exit= menu_file->addAction(tr("Exit"));
+  menu_file_action_exit= menu_file->addAction(menu_strings[menu_off + MENU_FILE_EXIT]);
   connect(menu_file_action_exit, SIGNAL(triggered()), this, SLOT(action_exit()));
   /* With Puppy Linux --non-KDE non-Gnome -- QKeySequence::Quit fails. */
   menu_file_action_exit->setShortcut(QKeySequence("Ctrl+Q"));
-  menu_edit= ui->menuBar->addMenu(tr("Edit"));
-  menu_edit_action_undo= menu_edit->addAction(tr("Undo"));
+  menu_edit= ui->menuBar->addMenu(menu_strings[menu_off + MENU_EDIT]);
+  menu_edit_action_undo= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_UNDO]);
   connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
   menu_edit_action_undo->setShortcut(QKeySequence::Undo);
-  menu_edit_action_redo= menu_edit->addAction(tr("Redo"));
+  menu_edit_action_redo= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_REDO]);
   connect(menu_edit_action_redo, SIGNAL(triggered()), this, SLOT(menu_edit_redo()));
   menu_edit_action_redo->setShortcut(QKeySequence::Redo);
   menu_edit->addSeparator();
-  menu_edit_action_cut= menu_edit->addAction(tr("Cut"));
+  menu_edit_action_cut= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_CUT]);
   connect(menu_edit_action_cut, SIGNAL(triggered()), this, SLOT(menu_edit_cut()));
   menu_edit_action_cut->setShortcut(QKeySequence::Cut);
-  menu_edit_action_copy= menu_edit->addAction(tr("Copy"));
+  menu_edit_action_copy= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_COPY]);
   connect(menu_edit_action_copy, SIGNAL(triggered()), this, SLOT(menu_edit_copy()));
   menu_edit_action_copy->setShortcut(QKeySequence::Copy);
-  menu_edit_action_paste= menu_edit->addAction(tr("Paste"));
+  menu_edit_action_paste= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_PASTE]);
   connect(menu_edit_action_paste, SIGNAL(triggered()), this, SLOT(menu_edit_paste()));
   menu_edit_action_paste->setShortcut(QKeySequence::Paste);
   menu_edit->addSeparator();
-  menu_edit_action_select_all= menu_edit->addAction(tr("Select All"));
+  menu_edit_action_select_all= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_SELECT_ALL]);
   connect(menu_edit_action_select_all, SIGNAL(triggered()), this, SLOT(menu_edit_select_all()));
   menu_edit_action_select_all->setShortcut(QKeySequence::SelectAll);
-  menu_edit_action_history_markup_previous= menu_edit->addAction(tr("Previous statement"));
+  menu_edit_action_history_markup_previous= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_PREVIOUS_STATEMENT]);
   connect(menu_edit_action_history_markup_previous, SIGNAL(triggered()), this, SLOT(history_markup_previous()));
   menu_edit_action_history_markup_previous->setShortcut(QKeySequence(tr("Ctrl+P")));
-  menu_edit_action_history_markup_next= menu_edit->addAction(tr("Next statement"));
+  menu_edit_action_history_markup_next= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_NEXT_STATEMENT]);
   connect(menu_edit_action_history_markup_next, SIGNAL(triggered()), this, SLOT(history_markup_next()));
   menu_edit_action_history_markup_next->setShortcut(QKeySequence(tr("Ctrl+N")));
-  menu_edit_action_formatter= menu_edit->addAction(tr("Format"));
+  menu_edit_action_formatter= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_FORMAT]);
   connect(menu_edit_action_formatter, SIGNAL(triggered()), this, SLOT(statement_edit_widget_formatter()));
-  menu_run= ui->menuBar->addMenu(tr("Run"));
-  menu_run_action_execute= menu_run->addAction(tr("Execute"));
+  menu_run= ui->menuBar->addMenu(menu_strings[menu_off + MENU_RUN]);
+  menu_run_action_execute= menu_run->addAction(menu_strings[menu_off + MENU_RUN_EXECUTE]);
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
   menu_run_action_execute->setShortcut(QKeySequence(tr("Ctrl+E")));
-  menu_run_action_kill= menu_run->addAction(tr("Kill"));
+  menu_run_action_kill= menu_run->addAction(menu_strings[menu_off + MENU_RUN_KILL]);
   connect(menu_run_action_kill, SIGNAL(triggered()), this, SLOT(action_kill()));
   menu_run_action_kill->setShortcut(QKeySequence(tr("Ctrl+C")));
   menu_run_action_kill->setEnabled(false);
-  menu_settings= ui->menuBar->addMenu(tr("Settings"));
-  menu_settings_action_menu= menu_settings->addAction(tr("Menu"));
-  menu_settings_action_history= menu_settings->addAction(tr("History Widget"));
-  menu_settings_action_grid= menu_settings->addAction(tr("Grid Widget"));
-  menu_settings_action_statement= menu_settings->addAction(tr("Statement Widget"));
-  menu_settings_action_extra_rule_1= menu_settings->addAction(tr("Extra Rule 1"));
+  menu_settings= ui->menuBar->addMenu(menu_strings[menu_off + MENU_SETTINGS]);
+  menu_settings_action_menu= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_MENU]);
+  menu_settings_action_history= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_HISTORY_WIDGET]);
+  menu_settings_action_grid= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_GRID_WIDGET]);
+  menu_settings_action_statement= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_STATEMENT_WIDGET]);
+  menu_settings_action_extra_rule_1= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_EXTRA_RULE_1]);
   connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
   connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
   connect(menu_settings_action_grid, SIGNAL(triggered()), this, SLOT(action_grid()));
   connect(menu_settings_action_statement, SIGNAL(triggered()), this, SLOT(action_statement()));
   connect(menu_settings_action_extra_rule_1, SIGNAL(triggered()), this, SLOT(action_extra_rule_1()));
-  menu_options= ui->menuBar->addMenu(tr("Options"));
-  menu_options_action_option_detach_history_widget= menu_options->addAction(tr("detach history widget"));
+  menu_options= ui->menuBar->addMenu(menu_strings[menu_off + MENU_OPTIONS]);
+  menu_options_action_option_detach_history_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
   menu_options_action_option_detach_history_widget->setCheckable(true);
   menu_options_action_option_detach_history_widget->setChecked(ocelot_detach_history_widget);
   connect(menu_options_action_option_detach_history_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_history_widget(bool)));
-  menu_options_action_option_detach_result_grid_widget= menu_options->addAction(tr("detach result grid widget"));
+  menu_options_action_option_detach_result_grid_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
   menu_options_action_option_detach_result_grid_widget->setCheckable(true);
   menu_options_action_option_detach_result_grid_widget->setChecked(ocelot_detach_result_grid_widget);
   connect(menu_options_action_option_detach_result_grid_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_result_grid_widget(bool)));
-  menu_options_action_option_detach_debug_widget= menu_options->addAction(tr("detach debug widget"));
+  menu_options_action_option_detach_debug_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
   menu_options_action_option_detach_debug_widget->setCheckable(true);
   menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
   connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
 #ifdef DEBUGGER
-  menu_debug= ui->menuBar->addMenu(tr("Debug"));
-//  menu_debug_action_install= menu_debug->addAction(tr("Install"));
+  menu_debug= ui->menuBar->addMenu(menu_strings[menu_off + MENU_DEBUG]);
+//  menu_debug_action_install= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
 //  connect(menu_debug_action_install, SIGNAL(triggered()), this, SLOT(action_debug_install()));
 //  menu_debug_action_install->setShortcut(QKeySequence(tr("Alt+A")));
 //  menu_debug_action_setup= menu_debug->addAction(tr("Setup"));
 //  connect(menu_debug_action_setup, SIGNAL(triggered()), this, SLOT(action_debug_setup()));
 //  menu_debug_action_setup->setShortcut(QKeySequence(tr("Alt+5")));
-//  menu_debug_action_debug= menu_debug->addAction(tr("Debug"));
+//  menu_debug_action_debug= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG]);
 //  connect(menu_debug_action_debug, SIGNAL(triggered()), this, SLOT(action_debug_debug()));
 //  menu_debug_action_debug->setShortcut(QKeySequence(tr("Alt+3")));
-  menu_debug_action_breakpoint= menu_debug->addAction(tr("Breakpoint"));
+  menu_debug_action_breakpoint= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_BREAKPOINT]);
   connect(menu_debug_action_breakpoint, SIGNAL(triggered()), this, SLOT(action_debug_breakpoint()));
   menu_debug_action_breakpoint->setShortcut(QKeySequence(tr("Alt+1")));
-  menu_debug_action_continue= menu_debug->addAction(tr("Continue"));
+  menu_debug_action_continue= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_CONTINUE]);
   connect(menu_debug_action_continue, SIGNAL(triggered()), this, SLOT(action_debug_continue()));
   menu_debug_action_continue->setShortcut(QKeySequence(tr("Alt+2")));
-//  menu_debug_action_leave= menu_debug->addAction(tr("Leave"));
+//  menu_debug_action_leave= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_LEAVE);
 //  connect(menu_debug_action_leave, SIGNAL(triggered()), this, SLOT(action_debug_leave()));
 //  menu_debug_action_leave->setShortcut(QKeySequence(tr("Alt+B")));
-  menu_debug_action_next= menu_debug->addAction(tr("Next"));
+  menu_debug_action_next= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_NEXT]);
   connect(menu_debug_action_next, SIGNAL(triggered()), this, SLOT(action_debug_next()));
   menu_debug_action_next->setShortcut(QKeySequence(tr("Alt+3")));
-//  menu_debug_action_skip= menu_debug->addAction(tr("Skip"));
+//  menu_debug_action_skip= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_SKIP);
 //  connect(menu_debug_action_skip, SIGNAL(triggered()), this, SLOT(action_debug_skip()));
 //  menu_debug_action_skip->setShortcut(QKeySequence(tr("Alt+4")));
-  menu_debug_action_step= menu_debug->addAction(tr("Step"));
+  menu_debug_action_step= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_STEP]);
   connect(menu_debug_action_step, SIGNAL(triggered()), this, SLOT(action_debug_step()));
   menu_debug_action_step->setShortcut(QKeySequence(tr("Alt+5")));
-  menu_debug_action_clear= menu_debug->addAction(tr("Clear"));
+  menu_debug_action_clear= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_CLEAR]);
   connect(menu_debug_action_clear, SIGNAL(triggered()), this, SLOT(action_debug_clear()));
   menu_debug_action_clear->setShortcut(QKeySequence(tr("Alt+6")));
-//  menu_debug_action_delete= menu_debug->addAction(tr("Delete"));
+//  menu_debug_action_delete= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_DELETE]);
 //  connect(menu_debug_action_delete, SIGNAL(triggered()), this, SLOT(action_debug_delete()));
 //  menu_debug_action_delete->setShortcut(QKeySequence(tr("Alt+G")));
-  menu_debug_action_exit= menu_debug->addAction(tr("Exit"));
+  menu_debug_action_exit= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_EXIT]);
   connect(menu_debug_action_exit, SIGNAL(triggered()), this, SLOT(action_debug_exit()));
   menu_debug_action_exit->setShortcut(QKeySequence(tr("Alt+7")));
-  menu_debug_action_information= menu_debug->addAction(tr("Information"));
+  menu_debug_action_information= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INFORMATION]);
   connect(menu_debug_action_information, SIGNAL(triggered()), this, SLOT(action_debug_information()));
   menu_debug_action_information->setShortcut(QKeySequence(tr("Alt+8")));
-  menu_debug_action_refresh_server_variables= menu_debug->addAction(tr("Refresh server_variables"));
+  menu_debug_action_refresh_server_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_SERVER_VARIABLES]);
   connect(menu_debug_action_refresh_server_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_server_variables()));
   menu_debug_action_refresh_server_variables->setShortcut(QKeySequence(tr("Alt+9")));
-  menu_debug_action_refresh_user_variables= menu_debug->addAction(tr("Refresh user_variables"));
+  menu_debug_action_refresh_user_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_USER_VARIABLES]);
   connect(menu_debug_action_refresh_user_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_user_variables()));
   menu_debug_action_refresh_user_variables->setShortcut(QKeySequence(tr("Alt+0")));
-  menu_debug_action_refresh_variables= menu_debug->addAction(tr("Refresh variables"));
+  menu_debug_action_refresh_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_VARIABLES]);
   connect(menu_debug_action_refresh_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_variables()));
   menu_debug_action_refresh_variables->setShortcut(QKeySequence(tr("Alt+A")));
-  menu_debug_action_refresh_call_stack= menu_debug->addAction(tr("Refresh call_stack"));
+  menu_debug_action_refresh_call_stack= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_CALL_STACK]);
   connect(menu_debug_action_refresh_call_stack, SIGNAL(triggered()), this, SLOT(action_debug_refresh_call_stack()));
   menu_debug_action_refresh_call_stack->setShortcut(QKeySequence(tr("Alt+B")));
   debug_menu_enable_or_disable(TOKEN_KEYWORD_BEGIN); /* Disable most of debug menu */
 #endif
-  menu_help= ui->menuBar->addMenu(tr("Help"));
-  menu_help_action_about= menu_help->addAction(tr("About"));
+  menu_help= ui->menuBar->addMenu(menu_strings[menu_off + MENU_HELP]);
+  menu_help_action_about= menu_help->addAction(menu_strings[menu_off + MENU_HELP_ABOUT]);
   connect(menu_help_action_about, SIGNAL(triggered()), this, SLOT(action_about()));
-  menu_help_action_the_manual= menu_help->addAction(tr("The Manual"));
+  menu_help_action_the_manual= menu_help->addAction(menu_strings[menu_off + MENU_HELP_THE_MANUAL]);
   connect(menu_help_action_the_manual, SIGNAL(triggered()), this, SLOT(action_the_manual()));
   /* Qt says I should also do "addSeparator" if Motif style. Harmless. */
   ui->menuBar->addSeparator();
   /* exitAction->setPriority(QAction::LowPriority); */
-  menu_help_action_libmysqlclient= menu_help->addAction(tr("libmysqlclient"));
+  menu_help_action_libmysqlclient= menu_help->addAction(menu_strings[menu_off + MENU_HELP_LIBMYSQLCLIENT]);
   connect(menu_help_action_libmysqlclient, SIGNAL(triggered()), this, SLOT(action_libmysqlclient()));
-  menu_help_action_settings= menu_help->addAction(tr("settings"));
+  menu_help_action_settings= menu_help->addAction(menu_strings[menu_off + MENU_HELP_SETTINGS]);
   connect(menu_help_action_settings, SIGNAL(triggered()), this, SLOT(action_settings()));
 }
 
@@ -3477,15 +3330,17 @@ QFont MainWindow::get_fixed_font()
   3. Check color_list (RGBs). If match, return name. e.g. Gray not #BEBEBE.
   4. Return the #RRGGBB color.
   This does not mean that absolutely no synonyms are allowed -- two names may have the same #RRGGBB.
+  The canonical name is English, so we can accept BLEU but store BLUE.
 */
 QString MainWindow::canonical_color_name(QString color_name_string)
 {
   QString s;
-  for (int i= 0; strcmp(s_color_list[i], "") > 0; i+= 2)
+  for (int i= color_off; strcmp(s_color_list[i], "") > 0; i+= 2)
   {
     s= s_color_list[i];
     if (QString::compare(color_name_string, s, Qt::CaseInsensitive) == 0)
     {
+      if (color_off > 0) s= s_color_list[i - color_off];
       return s;
     }
   }
@@ -3504,7 +3359,7 @@ QString MainWindow::canonical_color_name(QString color_name_string)
   qq_color.setNamedColor(color_name_string);
   if (qq_color.isValid() == false) return "";                 /* bad color, maybe bad format */
   QString qq_color_name= qq_color.name();                      /* returns name as "#RRGGBB" */
-  for (int i= 1; strcmp(s_color_list[i], "") > 0; i+= 2)
+  for (int i= color_off + 1; strcmp(s_color_list[i], "") > 0; i+= 2)
   {
     s= s_color_list[i];
     if (QString::compare(qq_color_name, s, Qt::CaseInsensitive) == 0)
@@ -4103,7 +3958,7 @@ QString MainWindow::select_1_row(const char *select_statement)
     row= lmysql->ldbms_mysql_fetch_row(res);
     if (row == NULL)
     {
-      unexpected_error= "mysql_fetch row failed"; /* Beware! Look for a proc that compares routine with this string value! */
+      unexpected_error= er_strings[er_off + ER_MYSQL_FETCH_ROW_FAILED]; /* Beware! Look for a proc that compares routine with this string value! */
     }
     else
     {
@@ -4545,7 +4400,7 @@ void MainWindow::debug_install_go()
   if ((statement_edit_widget->dbms_version.mid(1,1) == ".")
   &&  (statement_edit_widget->dbms_version < "5.5"))
   {
-    strcpy(command_string, "Debugger requires MySQL version 5.5 or later");
+    strcpy(command_string, er_strings[er_off + ER_DEBUGGER_REQUIRES]);
     if (debug_error(command_string) != 0) return;
   }
 
@@ -4646,7 +4501,7 @@ void MainWindow::debug_setup_go(QString text)
   q_routine_name= debug_q_routine_name_in_statement;
   if ((q_routine_schema == "") || (q_routine_name == ""))
   {
-    if (debug_error((char*)"Missing routine name(s). Expected syntax is: $setup routine-name [, routine-name ...]") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_MISSING_ROUTINE_NAMES]) != 0) return;
   }
   /* Todo: since yes there is a bug, but we want to get this out, just release the lock instead of doing the right thing. */
   {
@@ -4703,7 +4558,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
     res= NULL;
     if (num_rows - 3 >= DEBUG_TAB_WIDGET_MAX)
     {
-      sprintf(command, "$setup generated %d surrogates but the current maximum is %d'", num_rows - 3, DEBUG_TAB_WIDGET_MAX - 1);
+      sprintf(command, er_strings[er_off + ER_SETUP], num_rows - 3, DEBUG_TAB_WIDGET_MAX - 1);
       put_message_in_result(command);
       return;
     }
@@ -4799,11 +4654,8 @@ void MainWindow::debug_setup_mysql_proc_insert()
             {
               lmysql->ldbms_mysql_free_result(res_2);
               res_2= NULL;
-              strcpy(tmp, "Could not get a routine definition for ");
-              strcat(tmp, row[0]);
-              strcat(tmp, ".");
-              strcat(tmp, row[1]);
-              strcat(tmp, ". Are you the routine creator and/or do you have SELECT privilege for mysql.proc?");
+              /* ""Could not get a routine definition for %s.%s" ... */
+              sprintf(tmp, er_strings[er_off + ER_COULD_NOT_GET], row[0], row[1]);
               /* Todo: merge this sort of stuff into debug_error() */
               unexpected_error= "create failed";
               put_message_in_result(tmp);
@@ -5299,7 +5151,7 @@ int MainWindow::debug_error(char *text)
   if (connections_is_connected[0] == 0)
   {
     /* Unfortunately this might not get through. */
-    statement_edit_widget->result= tr("ERROR not connected");
+    make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
     return 1;
   }
 
@@ -5313,12 +5165,15 @@ int MainWindow::debug_error(char *text)
       strcpy(tmp_string, debuggee_state_error);
       for (int i= 0; tmp_string[i] != '\0'; ++i) if (tmp_string[i] == '\047') tmp_string[i]= ' ';
     }
-    sprintf(tmp_string_2, "'%s %d. %s'", "debuggee_state:", debuggee_state, tmp_string);
     if (debuggee_state == DEBUGGEE_STATE_END)
     {
-      sprintf(tmp_string_2, "Routine has stopped. Suggested next step is: $EXIT");
+      make_and_put_message_in_result(ER_ROUTINE_HAS_STOPPED, 0, (char*)"");
     }
-    put_message_in_result(tmp_string_2);
+    else
+    {
+      sprintf(tmp_string_2, "'%s %d. %s'", "debuggee_state:", debuggee_state, tmp_string);
+      put_message_in_result(tmp_string_2);
+    }
     return 1;
   }
 
@@ -5358,7 +5213,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
 
   if ((q_routine_schema == "") || (q_routine_name == ""))
   {
-    if (debug_error((char*)"Missing routine name") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_MISSING_ROUTINE_NAME]) != 0) return;
   }
 
   /*
@@ -5369,7 +5224,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   */
   if (debug_thread_exists == true)
   {
-    if (debug_error((char*)"Debug is already running. Use Debug|exit to stop it. This could be temporary.") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_DEBUG_IS_ALREADY_RUNNING]) != 0) return;
   }
 
   if (debuggee_state < 0) debuggee_state= DEBUGGEE_STATE_0;
@@ -5381,7 +5236,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
 
   if (debuggee_state > 0)
   {
-    if (debug_error((char*)"Debug is already running. Use Debug|exit to stop it. This could be temporary.") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_DEBUG_IS_ALREADY_RUNNING]) != 0) return;
   }
 
   qstring_error_message= debug_privilege_check(TOKEN_KEYWORD_DEBUG_DEBUG);
@@ -5399,7 +5254,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   strcat(call_statement, "',@schema_identifier,@surrogate_routine_identifier,@routine_type,@remainder_of_original_name)");
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
-    if (debug_error((char*)"Surrogate not found. Probably $setup wasn't done for a group including this routine.") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_SURROGATE]) != 0) return;
   }
   result_string= select_1_row("select @schema_identifier, concat(left(@surrogate_routine_identifier,11), '%'), @routine_type, @remainder_of_original_name, isnull(@schema_identifier)");
   if (result_string != "")
@@ -5413,7 +5268,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   /* Todo: this checks whether select returned null, good. But it should make even more certain that $debug will succeed. */
   if (select_1_row_result_5.toInt() == 1)
   {
-    if (debug_error((char*)"Surrogate not found. Perhaps $setup was not done?") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_SURROGATE_NOT_FOUND]) != 0) return;
   }
 
   QString routine_schema_name_for_search= select_1_row_result_1;
@@ -5442,7 +5297,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     if (result_string != "")
     {
       char char_result_string[512];
-      if (result_string == "mysql_fetch row failed") break;
+      if (result_string == er_strings[er_off + ER_MYSQL_FETCH_ROW_FAILED]) break;
       strcpy(char_result_string, result_string.toUtf8());
       if (debug_error(char_result_string) != 0) return;
     }
@@ -5484,11 +5339,20 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     if (error_return != "")
     {
       debug_delete_tab_widgets();                          /* delete already-made widgets. Rest of 'exit' shouldn't happen. */
-      strcpy(call_statement, error_return.toUtf8());
-      strcat(call_statement, " Could not find a routine in the $setup group: ");
-      strcat(call_statement, debug_routine_schema_name[debug_widget_index].toUtf8());
-      strcat(call_statement,".");
-      strcat(call_statement, debug_routine_name[debug_widget_index].toUtf8());
+      {
+        /* Could not find a routine in the $setup group: ... */
+        char t_error_return[256];
+        char t_schema_name[256];
+        char t_routine_name[256];
+        strcpy(t_error_return, error_return.toUtf8());
+        strcpy(t_schema_name, debug_routine_schema_name[debug_widget_index].toUtf8());
+        strcpy(t_routine_name, debug_routine_name[debug_widget_index].toUtf8());
+        sprintf(call_statement,
+                er_strings[er_off + ER_COULD_NOT_FIND_A_ROUTINE],
+                t_error_return,
+                t_schema_name,
+                t_routine_name);
+      }
       debug_error(call_statement);                         /* Todo: you forgot to look for icc_core */
       return;
     }
@@ -5497,9 +5361,12 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     if (routine_definition == "")
     {
       debug_delete_tab_widgets();
-      strcpy(call_statement, "Could not get a routine definition for ");
-      strcat(call_statement, debug_routine_name[debug_widget_index].toUtf8());
-      strcat(call_statement, ". Are you the routine creator and/or do you have SELECT privilege for mysql.proc?");
+      {
+        /* Could not get a routine definition for ... */
+        char t_routine_name[256];
+        strcpy(t_routine_name, debug_routine_name[debug_widget_index].toUtf8());
+        sprintf(call_statement, er_strings[er_off + ER_COULD_NOT_GET], t_routine_name);
+      }
       if (debug_error(call_statement)) return;
     }
 
@@ -5531,7 +5398,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   if (current_widget_index == -1)
   {
     debug_delete_tab_widgets();
-    if (debug_error((char*)"routine is missing")) return;
+    if (debug_error((char*)er_strings[er_off + ER_ROUTINE_IS_MISSING])) return;
   }
 
   debug_tab_widget->setCurrentIndex(current_widget_index);
@@ -5572,7 +5439,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   {
     /* Todo: if somehow (bizarrely) debuggee_state >= 0, then the thread did not end and needs to be stopped. */
     debug_delete_tab_widgets();
-    sprintf(error_message, "Debuggee not responding. Code = %d. Thread has not been stopped.\n", debuggee_state);
+    sprintf(error_message, er_strings[er_off + ER_DEBUGGEE_NOT_RESPONDING], debuggee_state);
     if (debug_error(error_message) != 0) return;
   }
   /*
@@ -5742,17 +5609,18 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
   /* Todo: Check that 'debug' has happened */
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
-    if (debug_error((char*)"No debug session in progress") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
 
   if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
   {
     char error_message[512];
-    strcpy(error_message, "Error, correct statement format is ");
-    if (statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT) strcat(error_message," $breakpoint ");
-    else if (statement_type == TOKEN_KEYWORD_DEBUG_TBREAKPOINT) strcat(error_message," $tbreakpoint ");
-    else strcat(error_message," $clear ");
-    strcat(error_message,"[schema_identifier.].routine_identifier] line_number_minimum [-line_number_maximum]");
+    if (statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT)
+      strcpy(error_message, er_strings[er_off + ER_BREAKPOINT_SYNTAX]);
+    else if (statement_type == TOKEN_KEYWORD_DEBUG_TBREAKPOINT)
+      strcpy(error_message, er_strings[er_off + ER_TBREAKPOINT_SYNTAX]);
+    else
+      strcpy(error_message, er_strings[er_off + ER_CLEAR_SYNTAX]);
     if (debug_error(error_message) != 0) return;
   }
   schema_name= debug_q_schema_name_in_statement;
@@ -5760,7 +5628,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 
   if ((schema_name == "") || (routine_name == ""))
   {
-    if (debug_error((char*)"Missing routine name") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_MISSING_ROUTINE_NAME]) != 0) return;
   }
 
   if (debug_error((char*)"") != 0) return;
@@ -5829,7 +5697,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 */
 void MainWindow::debug_delete_go()
 {
-  put_message_in_result("The $DELETE statement is not supported at this time");
+  make_and_put_message_in_result(ER_DELETE_STATEMENT, 0, (char*)"");
 }
 
 
@@ -5935,13 +5803,13 @@ void MainWindow::action_debug_step()
 /* $SKIP seems to act like $CONT which isn't terribly useful */
 void MainWindow::debug_skip_go()
 {
-  put_message_in_result("The $SKIP statement is not supported at this time");
+  make_and_put_message_in_result(ER_SKIP_STATEMENT, 0, (char*)"");
 }
 
 
 void MainWindow::debug_source_go()
 {
-  put_message_in_result("The $SOURCE statement is not supported at this time");
+  make_and_put_message_in_result(ER_SOURCE_STATEMENT, 0, (char*)"");
 }
 
 
@@ -5957,11 +5825,11 @@ void MainWindow::debug_set_go(QString text)
 
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
-    if (debug_error((char*)"No debug session in progress") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
   if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
   {
-    if (debug_error((char*)"Overflow") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_OVERFLOW]) != 0) return;
     return;
   }
   debug_call_xxxmdbug_command(command_string);
@@ -5976,7 +5844,7 @@ void MainWindow::debug_set_go(QString text)
 */
 void MainWindow::debug_execute_go()
 {
-  put_message_in_result("The $EXECUTE statement is not supported at this time");
+  make_and_put_message_in_result(ER_EXECUTE_STATEMENT, 0, (char*)"");
 
 //  QString s;
 //  char command_string[5120];
@@ -6011,11 +5879,11 @@ void MainWindow::debug_other_go(QString text)
 
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
-    if (debug_error((char*)"No debug session in progress") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
   if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
   {
-    if (debug_error((char*)"Overflow") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_OVERFLOW]) != 0) return;
     return;
   }
   q_schema_name= debug_q_schema_name_in_statement;
@@ -6190,7 +6058,7 @@ void MainWindow::debug_exit_go(int flagger)
     /* Todo: merge this with debug_error somehow, and make sure nothing's enabled/disabled unless debug/exit succeeded! */
     if (menu_debug_action_exit->isEnabled() == false)
     {
-      put_message_in_result("$DEBUG not done");
+      make_and_put_message_in_result(ER_DEBUG_NOT_DONE, 0, (char*)"");
       return;
     }
   }
@@ -6292,7 +6160,7 @@ void MainWindow::action_debug_refresh_server_variables()
 {
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
-    if (debug_error((char*)"No debug session in progress") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh server_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables;");
@@ -6307,7 +6175,7 @@ void MainWindow::action_debug_refresh_user_variables()
 {
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
-    if (debug_error((char*)"No debug session in progress") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh user_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.user_variables;");
@@ -6322,7 +6190,7 @@ void MainWindow::action_debug_refresh_variables()
 {
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
-    if (debug_error((char*)"No debug session in progress") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.variables;");
@@ -6337,7 +6205,7 @@ void MainWindow::action_debug_refresh_call_stack()
 {
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
-    if (debug_error((char*)"No debug session in progress") != 0) return;
+    if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
   if (debug_call_xxxmdbug_command("refresh call_stack") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.call_stack;");
@@ -6476,13 +6344,12 @@ void MainWindow::action_debug_timer_status()
   {
     if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR)
     {
-      strcpy(unexpected_error, debuggee_state_error);
-      strcat(unexpected_error, ". maybe a new $SETUP needed? cannot continue. Suggested next step is: $EXIT");
+      sprintf(unexpected_error, er_strings[er_off + ER_DEBUGGEE_WAIT_LOOP], debuggee_state_error);
     }
     else
     {
       if ((debuggee_state < 0) || (debuggee_state == DEBUGGEE_STATE_END)) strcpy(unexpected_error, "debuggee_wait_loop ended");
-      else strcpy(unexpected_error, "debuggee_wait_loop() is not happening");
+      else strcpy(unexpected_error, er_strings[er_off + ER_DEBUGGEE_WAIT_LOOP_IS_NOT]);
     }
   }
 
@@ -6491,7 +6358,7 @@ void MainWindow::action_debug_timer_status()
     if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
     {
       /* Initially this can happen because we start the timer immediately after we call 'attach'. */
-      strcpy(unexpected_error, "i status command failed");
+      strcpy(unexpected_error, er_strings[er_off + ER_I_STATUS_FAILED]);
     }
   }
 
@@ -6500,7 +6367,7 @@ void MainWindow::action_debug_timer_status()
     const char *query= "select * from xxxmdbug.information_status";
     if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], query, strlen(query)))
     {
-      strcpy(unexpected_error, "i status command failed (this is not always a severe error)");
+      strcpy(unexpected_error, er_strings[er_off + ER_I_STATUS_FAILED_NOT_SEVERE]);
     }
   }
 
@@ -6509,7 +6376,7 @@ void MainWindow::action_debug_timer_status()
     debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
     if (debug_res == NULL)
     {
-      strcpy(unexpected_error, "mysql_store_result failed");
+      strcpy(unexpected_error, er_strings[er_off + ER_MYSQL_STORE_RESULT_FAILED]);
     }
   }
 
@@ -6518,13 +6385,13 @@ void MainWindow::action_debug_timer_status()
     row= lmysql->ldbms_mysql_fetch_row(debug_res);
     if (row == NULL)
     {
-      strcpy(unexpected_error, "mysql_fetch row failed");
+      strcpy(unexpected_error, er_strings[er_off + ER_MYSQL_FETCH_ROW_FAILED]);
     }
     else
     {
       if (lmysql->ldbms_mysql_num_fields(debug_res) < 14)
       {
-        strcpy(unexpected_error, "mysql_num_fields < 14");
+        strcpy(unexpected_error, er_strings[er_off + ER_MYSQL_NUM_FIELDS]);
       }
       else
       {
@@ -6981,14 +6848,14 @@ int MainWindow::action_execute_one_statement(QString text)
     /* If DBMS is not (yet) connected, except for certain SET ocelot_... statements, this is an error. */
     if (connections_is_connected[0] == 0)
     {
-      if (ecs == 2) statement_edit_widget->result= tr("OK");
-      else statement_edit_widget->result= tr("ERROR not connected");
+      if (ecs == 2) make_and_put_message_in_result(ER_OK, 0, (char*)"");
+      else make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
       do_something= false;
     }
     /* If --one-database, and USE caused default database to change, error */
     if ((ocelot_one_database > 0) && (ocelot_database != statement_edit_widget->dbms_database))
     {
-      statement_edit_widget->result= tr("ERROR due to --one-database");
+      make_and_put_message_in_result(ER_ONE_DATABASE, 0, (char*)"");
       do_something= false;
     }
 
@@ -7431,7 +7298,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else if (i2 >= 3) s= text.mid(sub_token_offsets[2], sub_token_lengths[2]);
     else
     {
-      put_message_in_result(tr("Error. USE statement has no argument."));
+      make_and_put_message_in_result(ER_USE, 0, (char*)"");
       return 1;
     }
     /* If database name is in quotes or delimited, strip. Todo: stripping might be necessary in lots of cases. */
@@ -7446,7 +7313,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else
     {
       statement_edit_widget->dbms_database= s;
-      put_message_in_result(tr("Database changed"));
+      make_and_put_message_in_result(ER_DATABASE_CHANGED, 0, (char*)"");
     }
     return 1;
   }
@@ -7469,7 +7336,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     if (i2 >= 2) s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     else
     {
-      put_message_in_result(tr("Error, SOURCE statement has no argument"));
+      make_and_put_message_in_result(ER_SOURCE, 0, (char*)"");
       return 1;
     }
     s= connect_stripper(s, true);
@@ -7477,7 +7344,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     bool open_result= file.open(QIODevice::ReadOnly | QIODevice::Text);
     if (open_result == false)
     {
-      put_message_in_result(tr("Error, file open() failed"));
+      make_and_put_message_in_result(ER_FILE_OPEN, 0, (char*)"");
       return 1;
     }
     /* Todo: this gets rid of SOURCE statement, but maybe it should be a comment in history. */
@@ -7536,7 +7403,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     ocelot_prompt= s;
     emit statement_edit_widget->update_prompt_width(0); /* not necessary with Qt 5.2 */
     ocelot_prompt_is_default= false;
-    put_message_in_result(tr("OK"));
+    make_and_put_message_in_result(ER_OK, 0, (char*)"");
     return 1;
   }
 
@@ -7544,7 +7411,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   if (statement_type == TOKEN_KEYWORD_WARNINGS)
   {
     ocelot_history_includes_warnings= 1;
-    put_message_in_result(tr("OK"));
+    make_and_put_message_in_result(ER_OK, 0, (char*)"");
     return 1;
   }
 
@@ -7552,7 +7419,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   if (statement_type == TOKEN_KEYWORD_NOWARNING)
   {
     ocelot_history_includes_warnings= 0;
-    put_message_in_result(tr("OK"));
+    make_and_put_message_in_result(ER_OK, 0, (char*)"");
     return 1;
   }
 
@@ -7563,90 +7430,87 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     QString s_result= get_delimiter(s, text, sub_token_offsets[1]);
     if (s_result == "")
     {
-      put_message_in_result(tr("Error, delimiter should not be blank"));
+      make_and_put_message_in_result(ER_DELIMITER, 0, (char*)"");
       return 1;
     }
     ocelot_delimiter_str= s_result;
-    put_message_in_result(tr("OK"));
+    make_and_put_message_in_result(ER_OK, 0, (char*)"");
     return 1;
     }
 
   /* Todo: the following are placeholders, we want actual actions like what mysql would do. */
   if (statement_type == TOKEN_KEYWORD_QUESTIONMARK)
   {
-    put_message_in_result(tr("For HELP, use the Help menu items. For example click: Help | The Manual."));
+    make_and_put_message_in_result(ER_HELP, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_CHARSET)
   {
-    put_message_in_result(tr("CHARSET is not implemented."));
+    make_and_put_message_in_result(ER_CHARSET, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_EDIT)
   {
-    put_message_in_result(tr("EDIT is not implemented."));
+    make_and_put_message_in_result(ER_EDIT, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_EGO)
   {
-    put_message_in_result(tr("EGO does nothing unless it's on its own line after an executable statement, and --named-commands is true."));
+    make_and_put_message_in_result(ER_EGO, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_GO)
   {
-    put_message_in_result(tr("GO does nothing unless it's on its own line after an executable statement, and --named-commands is true."));
-    return 1;
+    make_and_put_message_in_result(ER_GO, 0, (char*)"");
   }
   if (statement_type == TOKEN_KEYWORD_HELP)
   {
-    put_message_in_result(tr("For HELP, use the Help menu items. For example click: Help | The Manual."));
+    make_and_put_message_in_result(ER_HELP, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_NOPAGER)
   {
-    put_message_in_result(tr("NOPAGER is not implemented."));
+    make_and_put_message_in_result(ER_NOPAGER, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_NOTEE) /* see comment=tee+hist */
   {
     history_file_stop("TEE");
-    put_message_in_result(tr("OK"));
+    make_and_put_message_in_result(ER_OK, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_PAGER)
   {
-    put_message_in_result(tr("PAGER is not implemented."));
+    make_and_put_message_in_result(ER_PAGER, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_PRINT)
   {
-    put_message_in_result(tr("PRINT is not implemented."));
+    make_and_put_message_in_result(ER_PRINT, 0, (char*)"");
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_REHASH)   /* This overrides a command-line option */
   {
-    char result[1024];
-    int i= rehash_scan(result);
+    int i= rehash_scan();
     if (i > 0) ocelot_auto_rehash= 1;
     else ocelot_auto_rehash= 0;
-    put_message_in_result(result);
     return 1;
   }
   /* TODO: "STATUS" should output as much information as the mysql client does. */
   if (statement_type == TOKEN_KEYWORD_STATUS)
   {
-    if (connections_is_connected[0] != 1) put_message_in_result(tr("not connected."));
+    if (connections_is_connected[0] != 1) make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
     else
     {
-      QString s, s2;
-      s2= "";
-      s= "DBMS version = " + statement_edit_widget->dbms_version;
-      s2.append(s);
-      s= " Host = " + statement_edit_widget->dbms_host;
-      s2.append(s);
-      s= " Port = " + statement_edit_widget->dbms_port.toUtf8();
-      s2.append(s);
-      put_message_in_result(s2);
+      char dbms_version[256];
+      char dbms_host[256];
+      char dbms_port[256];
+      char buffer[1024];
+      strcpy(dbms_version, statement_edit_widget->dbms_version.toUtf8());
+      strcpy(dbms_host, statement_edit_widget->dbms_host.toUtf8());
+      strcpy(dbms_port, statement_edit_widget->dbms_port.toUtf8());
+      sprintf(buffer, er_strings[er_off + ER_STATUS], dbms_version, dbms_host, dbms_port);
+      put_message_in_result(buffer);
     }
     return 1;
   }
@@ -7656,7 +7520,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       With mysql client "system ls" would do an ls with system. We use popen not system.
       I don't know whether there is a Windows equivalent; mysql client doesn't support one.
       So the easiest thing for a Windows port is:
-      put_message_in_result(tr("SYSTEM is not implemented."));
+      make_and_put_message_in_result(tr("SYSTEM is not implemented."));
       Todo: allow "kill" -- some research required about how to stop a shell command.
       Todo: reconsider: maybe output should go to result grid rather than history.
     */
@@ -7670,7 +7534,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     int status;
     char result_line[STRING_LENGTH_512]; /* arbitrary maximum expected line length */
     fp= popen(command_string, "r");
-    if (fp == NULL) statement_edit_widget->result.append(tr("popen() failed"));
+    if (fp == NULL) make_and_append_message_in_result(ER_POPEN_FAILED, 0, (char*)"");
     else
     {
       while (fgets(result_line, STRING_LENGTH_512, fp) != NULL)
@@ -7678,7 +7542,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget->result.append(result_line);
       }
       status= pclose(fp);
-      if (status == -1) statement_edit_widget->result.append(tr("pclose() failed"));
+      if (status == -1) make_and_append_message_in_result(ER_PCLOSE_FAILED, 0, (char*)"");
       /* We do not bother to check whether the command failed, display will be blank. */
     }
     delete [] command_string;
@@ -7691,8 +7555,8 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     unsigned statement_length= /* text.size() */ true_text_size;
     if (i2 >= 2) s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     else s= "";
-    if (history_file_start("TEE", s) == 0) put_message_in_result(tr("Error, fopen failed"));
-    else put_message_in_result(tr("OK"));
+    if (history_file_start("TEE", s) == 0) make_and_put_message_in_result(ER_FOPEN_FAILED, 0, (char*)"");
+    else make_and_put_message_in_result(ER_OK, 0, (char*)"");
     return 1;
   }
 #ifdef DEBUGGER
@@ -7771,27 +7635,27 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_text_color= ccn;
-        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_background_color= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_border_color= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
                because only 'Courier New' exists. There should be a warning, and
@@ -7802,156 +7666,156 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         ocelot_statement_font_size= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_style", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font style")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_statement_font_style= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_weight", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font weight")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
         ocelot_statement_font_weight= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_literal_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_literal_color= ccn;
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_identifier_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { statement_edit_widget->result= tr("Unknown color"); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_identifier_color= ccn;
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_comment_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_comment_color= ccn;
-        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_operator_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_operator_color= ccn;
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_keyword_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_keyword_color= ccn;
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_prompt_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_prompt_background_color= ccn;
         statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
-        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_current_line_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_current_line_color= ccn;
         statement_edit_widget->highlightCurrentLine();
-        assign_names_for_colors(); put_message_in_result(tr("OK"));return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_function_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_function_color= ccn;
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_syntax_checker", Qt::CaseInsensitive) == 0)
       {
         QString syntax_checker= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int syntax_checker_as_int= syntax_checker.toInt();
         if ((syntax_checker_as_int < 0) || (syntax_checker_as_int > 3))
-        { put_message_in_result(tr("Syntax checker value must be between 0 and 3")); return 1; }
+        { make_and_put_message_in_result(ER_SYNTAX, 0, (char*)""); return 1; }
         ocelot_statement_syntax_checker= syntax_checker;
-        put_message_in_result(tr("OK"));return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_format_statement_indent", Qt::CaseInsensitive) == 0)
       {
         QString format_indent= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int format_indent_as_int= format_indent.toInt();
         if ((format_indent_as_int < 0) || (format_indent_as_int > 8))
-        { put_message_in_result(tr("Format statement indent value must be between 0 and 8")); return 1; }
+        { make_and_put_message_in_result(ER_FORMAT_STATEMENT, 0, (char*)""); return 1; }
         ocelot_statement_format_statement_indent= format_indent;
-        put_message_in_result(tr("OK"));return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_format_clause_indent", Qt::CaseInsensitive) == 0)
       {
         QString format_indent= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int format_indent_as_int= format_indent.toInt();
         if ((format_indent_as_int < 0) || (format_indent_as_int > 8))
-        { put_message_in_result(tr("Format clause indent value must be between 0 and 8")); return 1; }
+        { make_and_put_message_in_result(ER_FORMAT_CLAUSE, 0, (char*)""); return 1; }
         ocelot_statement_format_clause_indent= format_indent;
-        put_message_in_result(tr("OK"));return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_format_keyword_case", Qt::CaseInsensitive) == 0)
       {
         QString format_case= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         format_case= format_case.toLower();
         if ((format_case != "upper") && (format_case != "lower") && (format_case != "unchanged"))
-        { put_message_in_result(tr("Format key case value must be be 'upper' or 'lower' or 'unchanged'")); return 1; }
+        { make_and_put_message_in_result(ER_FORMAT_KEY_CASE, 0, (char*)""); return 1; }
         ocelot_statement_format_keyword_case= format_case;
-        put_message_in_result(tr("OK"));return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       bool is_result_grid_style_changed= false;
       bool is_result_grid_font_size_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_text_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_header_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_header_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
@@ -7963,7 +7827,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         if (ccn != ocelot_grid_font_size) is_result_grid_font_size_changed= true;
         ocelot_grid_font_size= ccn;
         is_result_grid_style_changed= true;
@@ -7971,49 +7835,49 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_style", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font style")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_grid_font_style= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_weight", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font weight")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
         ocelot_grid_font_weight= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_cell_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_cell_drag_line_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { put_message_in_result(tr("Unknown border size")); return 1; }
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { make_and_put_message_in_result(ER_UNKNOWN_BORDER_SIZE, 0, (char*)""); return 1; }
         ocelot_grid_border_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { put_message_in_result(tr("Unknown cell border size")); return 1; }
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_BORDER_SIZE, 0, (char*)""); return 1; }
         ocelot_grid_cell_border_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { put_message_in_result(tr("Unknown cell drag line size")); return 1; }
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_DRAG_LINE_SIZE, 0, (char*)""); return 1; }
         ocelot_grid_cell_drag_line_size= ccn;
         is_result_grid_style_changed= true;
       }
@@ -8026,20 +7890,20 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
           r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
           r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size, 1, is_result_grid_font_size_changed);
         }
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       bool is_extra_rule_1_style_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_extra_rule_1_text_color= ccn;
         assign_names_for_colors(); is_extra_rule_1_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_extra_rule_1_background_color= ccn;
         assign_names_for_colors(); is_extra_rule_1_style_changed= true;
       }
@@ -8056,103 +7920,103 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (is_extra_rule_1_style_changed == true)
       {
         make_style_strings();
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
 
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_history_text_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_history_background_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_history_border_color= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_family", Qt::CaseInsensitive) == 0)
       {
         ocelot_history_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         ocelot_history_font_size= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_style", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font style")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_history_font_style= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_weight", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font weight")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
         ocelot_history_font_weight= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_max_row_count", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { put_message_in_result(tr("Illegal value")); return 1; }
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_max_row_count= ccn;
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_text_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_menu_text_color= ccn;
         make_style_strings();
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_background_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_menu_background_color= ccn;
         make_style_strings();
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_border_color", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown color")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_menu_border_color= ccn;
         make_style_strings();
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); put_message_in_result(tr("OK")); return 1;
+        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_family", Qt::CaseInsensitive) == 0)
       {
@@ -8160,37 +8024,37 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { put_message_in_result(tr("Unknown font size")); return 1; }
+        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         ocelot_menu_font_size= ccn;
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_style", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font style")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_menu_font_style= ccn;
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_weight", Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { put_message_in_result(tr("Unknown font weight")); return 1; }
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
         ocelot_menu_font_weight= ccn;
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        put_message_in_result(tr("OK")); return 1;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
     }
   }
@@ -8241,7 +8105,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     Todo: add an order-by in the select, and do binary searches.
 */
 
-int MainWindow::rehash_scan(char *result)
+int MainWindow::rehash_scan()
 {
   MYSQL_RES *res= NULL;
 //  QString s;
@@ -8257,13 +8121,13 @@ int MainWindow::rehash_scan(char *result)
 
   if (connections_is_connected[0] != 1)
   {
-    sprintf(result, "Error: not connected");
+    make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
     return 0;
   }
 #ifdef DBMS_TARANTOOL
   if (connections_dbms[0] == DBMS_TARANTOOL)
   {
-    sprintf(result, "Error: rehash is not supported for Tarantool");
+    make_and_put_message_in_result(ER_REHASH_IS_NOT_SUPPORTED, 0, (char*)"");
     return 0;
   }
 #endif
@@ -8300,20 +8164,20 @@ int MainWindow::rehash_scan(char *result)
          );
   if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION],query))
     {
-      sprintf(result, "Error: select failed");
+      make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
       return 0;
     }
   res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
   if (res == NULL)
   {
-    sprintf(result, "Error: mysql_store_result failed");
+    make_and_put_message_in_result(ER_MYSQL_STORE_RESULT_FAILED, 0, (char*)"");
     return 0;
   }
   rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
   rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
   if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
   {
-    sprintf(result, "Error: 0 rows returned");
+    make_and_put_message_in_result(ER_0_ROWS_RETURNED, 0, (char*)"");
     return 0;
   }
   result_max_column_widths= new unsigned int[rehash_result_column_count];
@@ -8333,7 +8197,7 @@ int MainWindow::rehash_scan(char *result)
   rehash_get_database_name(database_name);
   if (database_name[0] == '\0')
   {
-    sprintf(result, "Error: no database selected");
+    make_and_put_message_in_result(ER_NO_DATABASE_SELECTED, 0, (char*)"");
     return 0;
   }
   long unsigned int r;
@@ -8362,9 +8226,11 @@ int MainWindow::rehash_scan(char *result)
     if (strcmp(column_value, "E") == 0) ++count_of_events;
     if (strcmp(column_value, "I") == 0) ++count_of_indexes;
   }
-  sprintf(result, "OK. database=%s. tables=%d. columns=%d. functions=%d. procedures=%d. triggers=%d. events=%d. indexes=%d.",
+  char buffer[ER_MAX_LENGTH];
+  sprintf(buffer, er_strings[er_off + ER_OK_REHASH],
           database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
-///* TEST! start */
+  put_message_in_result(buffer);
+  ///* TEST! start */
 //{
 //  printf("TEST!\n");
 //  long unsigned int r;
@@ -8656,6 +8522,36 @@ void MainWindow::put_message_in_result(QString s1)
 {
   statement_edit_widget->result= s1;
 }
+
+/*
+  Todo: truncate if length would be greater than ER_MAX_LENGTH
+*/
+void MainWindow::make_and_put_message_in_result(
+        unsigned int er_number,
+        int er_numeric_parameter,
+        char *er_string_parameter)
+{
+  char buffer[ER_MAX_LENGTH];
+  if (strstr(er_strings[er_off + er_number], "%s") != NULL)
+    sprintf(buffer, er_strings[er_off + er_number], er_string_parameter);
+  else
+    sprintf(buffer, er_strings[er_off + er_number], er_numeric_parameter);
+  put_message_in_result(buffer);
+}
+
+void MainWindow::make_and_append_message_in_result(
+        unsigned int er_number,
+        int er_numeric_parameter,
+        char *er_string_parameter)
+{
+  char buffer[ER_MAX_LENGTH];
+  if (strstr(er_strings[er_off + er_number], "%s") != NULL)
+    sprintf(buffer, er_strings[er_off + er_number], er_string_parameter);
+  else
+    sprintf(buffer, er_strings[er_off + er_number], er_numeric_parameter);
+  statement_edit_widget->result.append(buffer);
+}
+
 
 /*
    tokenize(): Produce a list of tokens given an SQL statement using MySQL rules.
@@ -10728,11 +10624,10 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (is_libmysqlclient_loaded == -2)
   {
     QMessageBox msgbox;
-    QString error_message;
-    error_message= "Severe error: libmysqlclient does not have these names: ";
-    error_message.append(ldbms_return_string);
-    error_message.append(". Close ocelotgui, restart with a better libmysqlclient. See Help|libmysqlclient for tips.");
-    error_message.append(". For tips about making sure ocelotgui finds the right libmysqlclient, click Help|libmysqlclient");
+    char error_message[2048];
+    char t_ldbms_return_string[2048];
+    strcpy(t_ldbms_return_string, ldbms_return_string.toUtf8());
+    sprintf(error_message, er_strings[er_off + ER_LIBMYSQLCLIENT_DOES_NOT_HAVE], t_ldbms_return_string);
     msgbox.setText(error_message);
     msgbox.exec();
     //delete lmysql;
@@ -10742,10 +10637,10 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (is_libmysqlclient_loaded == 0)
   {
     QMessageBox msgbox;
-    QString error_message;
-    error_message= "Error, libmysqlclient was not found or a loading error occurred. Message was: ";
-    error_message.append(ldbms_return_string);
-    error_message.append(". For tips about making sure ocelotgui finds libmysqlclient, click Help|libmysqlclient");
+    char error_message[2048];
+    char t_ldbms_return_string[2048];
+    strcpy(t_ldbms_return_string, ldbms_return_string.toUtf8());
+    sprintf(error_message, er_strings[er_off + ER_LIBMYSQLCLIENT_WAS_NOT_FOUND], t_ldbms_return_string);
     msgbox.setText(error_message);
     msgbox.exec();
     //delete lmysql;
@@ -10757,7 +10652,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     if (lmysql->ldbms_mysql_library_init(0, NULL, NULL))
     {
       QMessageBox msgbox;
-      msgbox.setText("Error, mysql_library_init() failed");
+      msgbox.setText(er_strings[er_off + ER_MYSQL_LIBRARY_INIT_FAILED]);
       msgbox.exec();
       return 1;
     }
@@ -10769,10 +10664,10 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (the_connect(connection_number))
   {
     put_diagnostics_in_result();
-    statement_edit_widget->result.append(tr(" Failed to connect. Use menu item File|Connect to try again"));
+    make_and_append_message_in_result(ER_FAILED_TO_CONNECT, 0, (char*)"");
     return 1;
   }
-  statement_edit_widget->result= tr("OK");
+  make_and_put_message_in_result(ER_OK, 0, (char*)"");
 
   /*
     Initially ocelot_prompt == "mysql>" and ocelot_prompt_is_default == true.
@@ -10814,7 +10709,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   int query_result= lmysql->ldbms_mysql_query(&mysql[connection_number], "select version(), database(), @@port, current_user(), connection_id()");
   if (query_result != 0 )
   {
-    connect_mysql_error_box("(mysql_query failure)", connection_number);
+    connect_mysql_error_box(er_strings[er_off + ER_MYSQL_QUERY_FAILED], connection_number);
     connections_is_connected[0]= 1;
     return 0;
   }
@@ -10827,14 +10722,14 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   mysql_res_for_connect= lmysql->ldbms_mysql_store_result(&mysql[connection_number]);
   if (mysql_res_for_connect == NULL)
   {
-    connect_mysql_error_box("(mysql_store_result failure)", connection_number);
+    connect_mysql_error_box(er_strings[er_off + ER_MYSQL_STORE_RESULT_FAILED], connection_number);
     connections_is_connected[0]= 1;
     return 0;
   }
   connect_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_connect);
   if (connect_row == NULL)
   {
-    connect_mysql_error_box("(mysql_fetch_row failure)", connection_number);
+    connect_mysql_error_box(er_strings[er_off + ER_MYSQL_FETCH_ROW_FAILED], connection_number);
     connections_is_connected[0]= 1;
     return 0;
   }
@@ -11136,10 +11031,10 @@ int MainWindow::connect_tarantool(unsigned int connection_number)
   if (tarantool_errno != 0)
   {
     put_diagnostics_in_result();
-    statement_edit_widget->result.append(tr(" Failed to connect to Tarantool server. Use menu item File|Connect to try again"));
+    make_and_append_message_in_result(ER_FAILED_TO_CONNECT_TO_TARANTOOL, 0, (char*)"");
     return 1;
   }
-  statement_edit_widget->result= tr("OK");
+  make_and_put_message_in_result(ER_OK, 0, (char*)"");
   connections_is_connected[0]= 1;
 
   /*
@@ -11179,7 +11074,7 @@ void MainWindow::tarantool_flush_and_save_reply()
     while (x1 < tarantool_tnt_reply.error_end) *(x2++)=*(x1++);
     *x2= '\0';
   }
-  else strcpy(tarantool_errmsg, "OK");
+  else strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
 }
 
 /* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
@@ -13698,6 +13593,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "ocelot_history_font_weight") == 0)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_history_font_weight= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_max_row_count") == 0) { ocelot_history_max_row_count= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_language") == 0) { ocelot_language= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_text_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_background_color") == 0)

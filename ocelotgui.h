@@ -359,6 +359,8 @@ public:
   QString ocelot_menu_font_weight, new_ocelot_menu_font_weight;
   QString ocelot_menu_style_string;
 
+  QString ocelot_language;
+
   /* Strings for CONNECT. Some of these will be converted e.g. ocelot_host to ocelot_host_as_utf8 */
   QString ocelot_histignore;
   QString ocelot_host;
@@ -682,7 +684,7 @@ private:
 #endif
   void main_token_new(int);
   void create_menu();
-  int rehash_scan(char*);
+  int rehash_scan();
   QString rehash_search(char *search_string, int reftype);
   void rehash_get_database_name(char *);
   void widget_sizer();
@@ -690,6 +692,8 @@ private:
   int execute_client_statement(QString text, int *additional_result);
   void put_diagnostics_in_result();
   void put_message_in_result(QString);
+  void make_and_put_message_in_result(unsigned int, int, char*);
+  void make_and_append_message_in_result(unsigned int, int, char*);
   unsigned int get_ocelot_protocol_as_int(QString s);
 //  int options_and_connect(char *host, char *database, char *user, char *password, char *tmp_init_command,
 //                       char *tmp_plugin_dir, char *tmp_default_auth, char *unix_socket, unsigned int connection_number);
