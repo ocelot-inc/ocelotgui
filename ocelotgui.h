@@ -2198,8 +2198,8 @@ Row_form_box(int column_count, QString *row_form_label,
     widget[i]->setLayout(hbox_layout[i]);
     main_layout->addWidget(widget[i]);
   }
-  button_for_cancel= new QPushButton(tr("Cancel"), this);
-  button_for_ok= new QPushButton(tr("OK"), this);
+  button_for_cancel= new QPushButton(menu_strings[menu_off + MENU_CANCEL], this);
+  button_for_ok= new QPushButton(menu_strings[menu_off + MENU_OK], this);
   hbox_layout_for_ok_and_cancel= new QHBoxLayout();
   hbox_layout_for_ok_and_cancel->addWidget(button_for_cancel);
   hbox_layout_for_ok_and_cancel->addWidget(button_for_ok);

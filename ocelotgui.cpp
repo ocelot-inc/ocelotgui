@@ -2394,7 +2394,7 @@ void MainWindow::action_connect_once(QString message)
   else /* if (message == "File|Connect") */
   {
 
-    row_form_title= tr("Connection Dialog Box");
+    row_form_title= menu_strings[menu_off + MENU_CONNECTION_DIALOG_BOX];
     row_form_message= message;
 
     co= new Row_form_box(column_count, row_form_label,
@@ -2402,7 +2402,7 @@ void MainWindow::action_connect_once(QString message)
                                        row_form_is_password, row_form_data,
   //                                     row_form_width,
                                        row_form_title,
-                                       "File|Connect. Usually only the first 8 fields are important.",
+                                       menu_strings[menu_off + MENU_FILE_CONNECT_HEADING],
                                        this);
     co->exec();
 
@@ -6672,13 +6672,18 @@ int MainWindow::action_execute(int force)
       {
         QString s;
         QMessageBox msgbox;
-        s= "The Syntax Checker thinks there might be a syntax error. ";
+        s= er_strings[er_off + ER_THE_SYNTAX_CHECKER_THINKS];
         s.append(hparse_errmsg);
         msgbox.setText(s);
-        msgbox.setInformativeText("Do you want to continue?");
-        msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        msgbox.setDefaultButton(QMessageBox::Yes);
-        if (msgbox.exec() == QMessageBox::No) return 1;
+        msgbox.setInformativeText(er_strings[er_off + ER_DO_YOU_WANT_TO_CONTINUE]);
+        //msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
+        //msgbox.setDefaultButton(QMessageBox::Yes);
+        //if (msgbox.exec() == no_button) return 1;
+        QPushButton *yes_button= msgbox.addButton(er_strings[er_off + ER_YES], QMessageBox::YesRole);
+        QPushButton *no_button= msgbox.addButton(er_strings[er_off + ER_NO], QMessageBox::NoRole);
+        msgbox.setDefaultButton(yes_button);
+        msgbox.exec();
+        if (msgbox.clickedButton() == no_button) return 1;
       }
     }
 
@@ -8447,7 +8452,8 @@ void MainWindow::put_diagnostics_in_result()
   mysql_warning_count= lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]);
   if (mysql_errno_result == 0)
   {
-    s1= tr("OK ");
+    s1= er_strings[er_off + ER_OK];
+    s1.append(" ");
 
     /* This should output, e.g. "Records: 3 Duplicates: 0 Warnings: 0" -- but actually nothing happens. */
     if (lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])!= NULL)
@@ -8457,11 +8463,11 @@ void MainWindow::put_diagnostics_in_result()
     }
     else
     {
-      sprintf(mysql_error_and_state, " %llu rows affected", lmysql->ldbms_mysql_affected_rows(&mysql[MYSQL_MAIN_CONNECTION]));
+      sprintf(mysql_error_and_state, er_strings[er_off + ER_ROWS_AFFECTED], lmysql->ldbms_mysql_affected_rows(&mysql[MYSQL_MAIN_CONNECTION]));
       s1.append(mysql_error_and_state);
       if (mysql_warning_count > 0)
       {
-        sprintf(mysql_error_and_state, ", %d warning", mysql_warning_count);
+        sprintf(mysql_error_and_state, er_strings[er_off + ER_WARNING], mysql_warning_count);
         s1.append(mysql_error_and_state);
         if (mysql_warning_count > 1) s1.append("s");
       }
@@ -8498,7 +8504,7 @@ void MainWindow::put_diagnostics_in_result()
   }
   if (mysql_errno_result > 0)
   {
-    s1= tr("Error ");
+    s1= er_strings[er_off + ER_ERROR];
     sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, lmysql->ldbms_mysql_sqlstate(&mysql[MYSQL_MAIN_CONNECTION]));
     s1.append(mysql_error_and_state);
     s2= lmysql->ldbms_mysql_error(&mysql[MYSQL_MAIN_CONNECTION]);
@@ -11021,7 +11027,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number)
   else
   {
     tarantool_errno= 0;
-    strcpy(tarantool_errmsg, "OK");
+    strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
   }
 
   if (tarantool_errno != 0)

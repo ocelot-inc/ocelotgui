@@ -23,7 +23,7 @@
   Of course it does not translate messages from the server,
   for that you need to read
   https://dev.mysql.com/doc/refman/5.7/en/error-message-language.html
-  Todo: many string literals (the majority?) haven't been moved yet.
+  Todo: many string literals haven't been moved yet.
   Todo: help and documentation are still pure English.
   Languages: There are two languages: english (the default) and upper.
              To set language to upper, say ocelotgui --ocelot_language='upper'.
@@ -130,7 +130,14 @@ static const char *string_languages[]=
 #define ER_LIBMYSQLCLIENT_DOES_NOT_HAVE   69
 #define ER_LIBMYSQLCLIENT_WAS_NOT_FOUND   70
 #define ER_MYSQL_QUERY_FAILED             71
-#define ER_END                            72
+#define ER_ROWS_AFFECTED                  72
+#define ER_WARNING                        73
+#define ER_ERROR                          74
+#define ER_THE_SYNTAX_CHECKER_THINKS      75
+#define ER_DO_YOU_WANT_TO_CONTINUE        76
+#define ER_YES                            77
+#define ER_NO                             78
+#define ER_END                            79
 #define ER_MAX_LENGTH       1024
 static const char *er_strings[]=
 {
@@ -207,6 +214,13 @@ static const char *er_strings[]=
   "Severe error: libmysqlclient does not have these names: %s. Close ocelotgui, restart with a better libmysqlclient. See Help|libmysqlclient for tips. For tips about making sure ocelotgui finds the right libmysqlclient, click Help|libmysqlclient", /* ER_LIBMYSQLCLIENT_DOES_NOT_HAVE */
   "Error, libmysqlclient was not found or a loading error occurred. Message was: %s. For tips about making sure ocelotgui finds libmysqlclient, click Help|libmysqlclient", /* ER_LIBMYSQLCLIENT_WAS_NOT_FOUND */
   "(mysql_query failed)", /* ER_MYSQL_QUERY_FAILED */
+  " %llu rows affected", /* ER_ROWS_AFFECTED */
+  ", %d warning", /* ER_WARNING */
+  "Error ", /* ER_ERROR */
+  "The Syntax Checker thinks there might be a syntax error. ", /* ER_THE_SYNTAX_CHECKER_THINKS */
+  "Do you want to continue?", /* ER_DO_YOU_WANT_TO_CONTINUE */
+  "Yes", /* ER_YES */
+  "No", /* ER_NO */
   /* UPPER */
   "OK",                           /* ER_OK */
   "ERROR NOT CONNECTED",          /* ER_NOT_CONNECTED */
@@ -279,7 +293,14 @@ static const char *er_strings[]=
   "ERROR, MYSQL_LIBRARY_INIT() FAILED", /* ER_MYSQL_LIBRARY_INIT_FAILED */
   "SEVERE ERROR: LIBMYSQLCLIENT DOES NOT HAVE THESE NAMES: %S. CLOSE OCELOTGUI, RESTART WITH A BETTER LIBMYSQLCLIENT. SEE HELP|LIBMYSQLCLIENT FOR TIPS. FOR TIPS ABOUT MAKING SURE OCELOTGUI FINDS THE RIGHT LIBMYSQLCLIENT, CLICK HELP|LIBMYSQLCLIENT", /* ER_LIBMYSQLCLIENT_DOES_NOT_HAVE */
   "ERROR, LIBMYSQLCLIENT WAS NOT FOUND OR A LOADING ERROR OCCURRED. MESSAGE WAS: %S. FOR TIPS ABOUT MAKING SURE OCELOTGUI FINDS LIBMYSQLCLIENT, CLICK HELP|LIBMYSQLCLIENT", /* ER_LIBMYSQLCLIENT_WAS_NOT_FOUND */
-  "(MYSQL_QUERY FAILED)" /* ER_MYSQL_QUERY_FAILED */
+  "(MYSQL_QUERY FAILED)", /* ER_MYSQL_QUERY_FAILED */
+  " %llu ROWS AFFECTED", /* ER_ROWS_AFFECTED */
+  ", %d WARNING", /* ER_WARNING */
+  "ERROR ", /* ER_ERROR */
+  "THE SYNTAX CHECKER THINKS THERE MIGHT BE A SYNTAX ERROR. ", /* ER_THE_SYNTAX_CHECKER_THINKS */
+  "DO YOU WANT TO CONTINUE?", /* ER_DO_YOU_WANT_TO_CONTINUE */
+  "YES", /* ER_YES */
+  "NO" /* ER_NO */
 };
 
 /*
@@ -689,7 +710,9 @@ static int MENU_SETTINGS_FOR_GRID= 84;
 static int MENU_SETTINGS_FOR_STATEMENT= 85;
 static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 86;
 static int MENU_PICK_NEW_FONT= 87;
-#define MENU_END 88
+#define MENU_CONNECTION_DIALOG_BOX 88
+#define MENU_FILE_CONNECT_HEADING 89
+#define MENU_END 90
 
 static const char *menu_strings[]=
 {
@@ -782,6 +805,8 @@ static const char *menu_strings[]=
     "Settings -- -- for Statement",
     "Settings -- -- for Extra Rule 1",
     "Pick new font",
+    "Connection Dialog Box",
+    "File|Connect. Usually only the first 8 fields are important.",
 /* UPPER */
 "FILE", /* MENU_FILE */
 "CONNECT", /* MENU_FILE_CONNECT */
@@ -870,7 +895,9 @@ static const char *menu_strings[]=
     "SETTINGS -- -- FOR GRID",
     "SETTINGS -- -- FOR STATEMENT",
     "SETTINGS -- -- FOR EXTRA RULE 1",
-    "PICK NEW FONT"
+    "PICK NEW FONT",
+    "CONNECTION DIALOG BOX",
+    "FILE|CONNECT. USUALLY ONLY THE FIRST 8 FIELDS ARE IMPORTANT."
 };
 
 static unsigned int er_off= 0;    /* to offset er_strings language */
