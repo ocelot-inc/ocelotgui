@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: October 23 2016
+   Last modified: October 28 2016
 */
 
 /*
@@ -419,11 +419,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
   assert(sizeof(int) >= 4);
-
-  /* TEST!!!! */
-  er_off= ER_END ;
-  color_off= COLOR_END ;
-  menu_off= MENU_END ;
 
   /* Initialization */
 
