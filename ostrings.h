@@ -315,6 +315,155 @@ static const char *er_strings[]=
   others that Qt would reject), and adds GrayX11 GreenX11 MaroonX11 PurpleX11.
   Doubtless this has been done many times before, but I couldn't find examples.
 */
+#define COLOR_ALICEBLUE 0
+#define COLOR_ANTIQUEWHITE 1
+#define COLOR_AQUA 2
+#define COLOR_AQUAMARINE 3
+#define COLOR_AZURE 4
+#define COLOR_BEIGE 5
+#define COLOR_BISQUE 6
+#define COLOR_BLACK 7
+#define COLOR_BLANCHEDALMOND 8
+#define COLOR_BLUE 9
+#define COLOR_BLUEVIOLET 10
+#define COLOR_BROWN 11
+#define COLOR_BURLYWOOD 12
+#define COLOR_CADETBLUE 13
+#define COLOR_CHARTREUSE 14
+#define COLOR_CHOCOLATE 15
+#define COLOR_CORAL 16
+#define COLOR_CORNFLOWERBLUE 17
+#define COLOR_CORNSILK 18
+#define COLOR_CRIMSON 19
+#define COLOR_CYAN 20
+#define COLOR_DARKBLUE 21
+#define COLOR_DARKCYAN 22
+#define COLOR_DARKGOLDENROD 23
+#define COLOR_DARKGRAY 24
+#define COLOR_DARKGREEN 25
+#define COLOR_DARKKHAKI 26
+#define COLOR_DARKMAGENTA 27
+#define COLOR_DARKOLIVEGREEN 28
+#define COLOR_DARKORANGE 29
+#define COLOR_DARKORCHID 30
+#define COLOR_DARKRED 31
+#define COLOR_DARKSALMON 32
+#define COLOR_DARKSEAGREEN 33
+#define COLOR_DARKSLATEBLUE 34
+#define COLOR_DARKSLATEGRAY 35
+#define COLOR_DARKTURQUOISE 36
+#define COLOR_DARKVIOLET 37
+#define COLOR_DEEPPINK 38
+#define COLOR_DEEPSKYBLUE 39
+#define COLOR_DIMGRAY 40
+#define COLOR_DODGERBLUE 41
+#define COLOR_FIREBRICK 42
+#define COLOR_FLORALWHITE 43
+#define COLOR_FORESTGREEN 44
+#define COLOR_FUCHSIA 45
+#define COLOR_GAINSBORO 46
+#define COLOR_GHOSTWHITE 47
+#define COLOR_GOLD 48
+#define COLOR_GOLDENROD 49
+#define COLOR_GRAY 50
+#define COLOR_GRAYX11 51
+#define COLOR_GREEN 52
+#define COLOR_GREENX11 53
+#define COLOR_GREENYELLOW 54
+#define COLOR_HONEYDEW 55
+#define COLOR_HOTPINK 56
+#define COLOR_INDIANRED 57
+#define COLOR_INDIGO 58
+#define COLOR_IVORY 59
+#define COLOR_KHAKI 60
+#define COLOR_LAVENDER 61
+#define COLOR_LAVENDERBLUSH 62
+#define COLOR_LAWNGREEN 63
+#define COLOR_LEMONCHIFFON 64
+#define COLOR_LIGHTBLUE 65
+#define COLOR_LIGHTCORAL 66
+#define COLOR_LIGHTCYAN 67
+#define COLOR_LIGHTGOLDENRODYELLOW 68
+#define COLOR_LIGHTGRAY 69
+#define COLOR_LIGHTGREEN 70
+#define COLOR_LIGHTPINK 71
+#define COLOR_LIGHTSALMON 72
+#define COLOR_LIGHTSEAGREEN 73
+#define COLOR_LIGHTSKYBLUE 74
+#define COLOR_LIGHTSLATEGRAY 75
+#define COLOR_LIGHTSTEELBLUE 76
+#define COLOR_LIGHTYELLOW 77
+#define COLOR_LIME 78
+#define COLOR_LIMEGREEN 79
+#define COLOR_LINEN 80
+#define COLOR_MAGENTA 81
+#define COLOR_MAROON 82
+#define COLOR_MAROONX11 83
+#define COLOR_MEDIUMAQUAMARINE 84
+#define COLOR_MEDIUMBLUE 85
+#define COLOR_MEDIUMORCHID 86
+#define COLOR_MEDIUMPURPLE 87
+#define COLOR_MEDIUMSEAGREEN 88
+#define COLOR_MEDIUMSLATEBLUE 89
+#define COLOR_MEDIUMSPRINGGREEN 90
+#define COLOR_MEDIUMTURQUOISE 91
+#define COLOR_MEDIUMVIOLETRED 92
+#define COLOR_MIDNIGHTBLUE 93
+#define COLOR_MINTCREAM 94
+#define COLOR_MISTYROSE 95
+#define COLOR_MOCCASIN 96
+#define COLOR_NAVAJOWHITE 97
+#define COLOR_NAVY 98
+#define COLOR_OLDLACE 99
+#define COLOR_OLIVE 100
+#define COLOR_OLIVEDRAB 101
+#define COLOR_ORANGE 102
+#define COLOR_ORANGERED 103
+#define COLOR_ORCHID 104
+#define COLOR_PALEGOLDENROD 105
+#define COLOR_PALEGREEN 106
+#define COLOR_PALETURQUOISE 107
+#define COLOR_PALEVIOLETRED 108
+#define COLOR_PAPAYAWHIP 109
+#define COLOR_PEACHPUFF 110
+#define COLOR_PERU 111
+#define COLOR_PINK 112
+#define COLOR_PLUM 113
+#define COLOR_POWDERBLUE 114
+#define COLOR_PURPLE 115
+#define COLOR_PURPLEX11 116
+#define COLOR_REBECCAPURPLE 117
+#define COLOR_RED 118
+#define COLOR_ROSYBROWN 119
+#define COLOR_ROYALBLUE 120
+#define COLOR_SADDLEBROWN 121
+#define COLOR_SALMON 122
+#define COLOR_SANDYBROWN 123
+#define COLOR_SEAGREEN 124
+#define COLOR_SEASHELL 125
+#define COLOR_SIENNA 126
+#define COLOR_SILVER 127
+#define COLOR_SKYBLUE 128
+#define COLOR_SLATEBLUE 129
+#define COLOR_SLATEGRAY 130
+#define COLOR_SNOW 131
+#define COLOR_SPRINGGREEN 132
+#define COLOR_STEELBLUE 133
+#define COLOR_TAN 134
+#define COLOR_TEAL 135
+#define COLOR_THISTLE 136
+#define COLOR_TOMATO 137
+#define COLOR_TURQUOISE 138
+#define COLOR_VIOLET 139
+#define COLOR_WEBGRAY 140
+#define COLOR_WEBGREEN 141
+#define COLOR_WEBMAROON 142
+#define COLOR_WEBPURPLE 143
+#define COLOR_WHEAT 144
+#define COLOR_WHITE 145
+#define COLOR_WHITESMOKE 146
+#define COLOR_YELLOW 147
+#define COLOR_YELLOWGREEN 148
 #define COLOR_END 300
 static const char *s_color_list[]=
 {
@@ -339,7 +488,7 @@ static const char *s_color_list[]=
 "CornflowerBlue","#6495ED",
 "Cornsilk","#FFF8DC",
 "Crimson","#DC143C",
-"Cyan","#00FFFF",
+"Cyan","#00FFFF",                /* same as aqua */
 "DarkBlue","#00008B",
 "DarkCyan","#008B8B",
 "DarkGoldenrod","#B8860B",
@@ -397,10 +546,10 @@ static const char *s_color_list[]=
 "LightSlateGray","#778899",
 "LightSteelBlue","#B0C4DE",
 "LightYellow","#FFFFE0",
-"Lime","#00FF00",
+"Lime","#00FF00",                /* same RGB as greenx11 */
 "LimeGreen","#32CD32",
 "Linen","#FAF0E6",
-"Magenta","#FF00FF",
+"Magenta","#FF00FF", /* same RGB as Fuchsia so display will say Fuchsia */
 "Maroon","#800000",
 "MaroonX11","#B03060",
 "MediumAquamarine","#66CDAA",
@@ -469,156 +618,156 @@ static const char *s_color_list[]=
 "Yellow","#FFFF00",
 "YellowGreen","#9ACD32",
 "","",
-/* UPPER */
-"ALICEBLUE","#F0F8FF",
-"ANTIQUEWHITE","#FAEBD7",
-"AQUA","#00FFFF",
-"AQUAMARINE","#7FFFD4",
-"AZURE","#F0FFFF",
-"BEIGE","#F5F5DC",
-"BISQUE","#FFE4C4",
-"BLACK","#000000",
-"BLANCHEDALMOND","#FFEBCD",
-"BLUE","#0000FF",
-"BLUEVIOLET","#8A2BE2",
-"BROWN","#A52A2A",
-"BURLYWOOD","#DEB887",
-"CADETBLUE","#5F9EA0",
-"CHARTREUSE","#7FFF00",
-"CHOCOLATE","#D2691E",
-"CORAL","#FF7F50",
-"CORNFLOWERBLUE","#6495ED",
-"CORNSILK","#FFF8DC",
-"CRIMSON","#DC143C",
-"CYAN","#00FFFF",
-"DARKBLUE","#00008B",
-"DARKCYAN","#008B8B",
-"DARKGOLDENROD","#B8860B",
-"DARKGRAY","#A9A9A9",
-"DARKGREEN","#006400",
-"DARKKHAKI","#BDB76B",
-"DARKMAGENTA","#8B008B",
-"DARKOLIVEGREEN","#556B2F",
-"DARKORANGE","#FF8C00",
-"DARKORCHID","#9932CC",
-"DARKRED","#8B0000",
-"DARKSALMON","#E9967A",
-"DARKSEAGREEN","#8FBC8F",
-"DARKSLATEBLUE","#483D8B",
-"DARKSLATEGRAY","#2F4F4F",
-"DARKTURQUOISE","#00CED1",
-"DARKVIOLET","#9400D3",
-"DEEPPINK","#FF1493",
-"DEEPSKYBLUE","#00BFFF",
-"DIMGRAY","#696969",
-"DODGERBLUE","#1E90FF",
-"FIREBRICK","#B22222",
-"FLORALWHITE","#FFFAF0",
-"FORESTGREEN","#228B22",
-"FUCHSIA","#FF00FF",
-"GAINSBORO","#DCDCDC",
-"GHOSTWHITE","#F8F8FF",
-"GOLD","#FFD700",
-"GOLDENROD","#DAA520",
-"GRAY","#808080",
-"GRAYX11","#BEBEBE",
-"GREEN","#008000",
-"GREENX11","#00FF00",
-"GREENYELLOW","#ADFF2F",
-"HONEYDEW","#F0FFF0",
-"HOTPINK","#FF69B4",
-"INDIANRED","#CD5C5C",
-"INDIGO","#4B0082",
-"IVORY","#FFFFF0",
-"KHAKI","#F0E68C",
-"LAVENDER","#E6E6FA",
-"LAVENDERBLUSH","#FFF0F5",
-"LAWNGREEN","#7CFC00",
-"LEMONCHIFFON","#FFFACD",
-"LIGHTBLUE","#ADD8E6",
-"LIGHTCORAL","#F08080",
-"LIGHTCYAN","#E0FFFF",
-"LIGHTGOLDENRODYELLOW","#FAFAD2",
-"LIGHTGRAY","#D3D3D3",
-"LIGHTGREEN","#90EE90",
-"LIGHTPINK","#FFB6C1",
-"LIGHTSALMON","#FFA07A",
-"LIGHTSEAGREEN","#20B2AA",
-"LIGHTSKYBLUE","#87CEFA",
-"LIGHTSLATEGRAY","#778899",
-"LIGHTSTEELBLUE","#B0C4DE",
-"LIGHTYELLOW","#FFFFE0",
-"LIME","#00FF00",
-"LIMEGREEN","#32CD32",
-"LINEN","#FAF0E6",
-"MAGENTA","#FF00FF",
-"MAROON","#800000",
-"MAROONX11","#B03060",
-"MEDIUMAQUAMARINE","#66CDAA",
-"MEDIUMBLUE","#0000CD",
-"MEDIUMORCHID","#BA55D3",
-"MEDIUMPURPLE","#9370DB",
-"MEDIUMSEAGREEN","#3CB371",
-"MEDIUMSLATEBLUE","#7B68EE",
-"MEDIUMSPRINGGREEN","#00FA9A",
-"MEDIUMTURQUOISE","#48D1CC",
-"MEDIUMVIOLETRED","#C71585",
-"MIDNIGHTBLUE","#191970",
-"MINTCREAM","#F5FFFA",
-"MISTYROSE","#FFE4E1",
-"MOCCASIN","#FFE4B5",
-"NAVAJOWHITE","#FFDEAD",
-"NAVY","#000080",
-"OLDLACE","#FDF5E6",
-"OLIVE","#808000",
-"OLIVEDRAB","#6B8E23",
-"ORANGE","#FFA500",
-"ORANGERED","#FF4500",
-"ORCHID","#DA70D6",
-"PALEGOLDENROD","#EEE8AA",
-"PALEGREEN","#98FB98",
-"PALETURQUOISE","#AFEEEE",
-"PALEVIOLETRED","#DB7093",
-"PAPAYAWHIP","#FFEFD5",
-"PEACHPUFF","#FFDAB9",
-"PERU","#CD853F",
-"PINK","#FFC0CB",
-"PLUM","#DDA0DD",
-"POWDERBLUE","#B0E0E6",
-"PURPLE","#800080",
-"PURPLEX11","#A020F0",
-"REBECCAPURPLE","#663399",
-"RED","#FF0000",
-"ROSYBROWN","#BC8F8F",
-"ROYALBLUE","#4169E1",
-"SADDLEBROWN","#8B4513",
-"SALMON","#FA8072",
-"SANDYBROWN","#F4A460",
-"SEAGREEN","#2E8B57",
-"SEASHELL","#FFF5EE",
-"SIENNA","#A0522D",
-"SILVER","#C0C0C0",
-"SKYBLUE","#87CEEB",
-"SLATEBLUE","#6A5ACD",
-"SLATEGRAY","#708090",
-"SNOW","#FFFAFA",
-"SPRINGGREEN","#00FF7F",
-"STEELBLUE","#4682B4",
-"TAN","#D2B48C",
-"TEAL","#008080",
-"THISTLE","#D8BFD8",
-"TOMATO","#FF6347",
-"TURQUOISE","#40E0D0",
-"VIOLET","#EE82EE",
-"WEBGRAY","#808080",
-"WEBGREEN","#008000",
-"WEBMAROON","#7F0000",
-"WEBPURPLE","#7F007F",
-"WHEAT","#F5DEB3",
-"WHITE","#FFFFFF",
-"WHITESMOKE","#F5F5F5",
-"YELLOW","#FFFF00",
-"YELLOWGREEN","#9ACD32",
+/* UPPER */ /* Actually, French, some is from an uncopyrighted web page */
+"Bleu Gris","#F0F8FF",
+"Blanc antique","#FAEBD7",
+"Bleu-vert","#00FFFF",
+"Aigue-Marine","#7FFFD4",
+"Bleu Azur","#F0FFFF",
+"Beige","#F5F5DC",
+"Beige rosé","#FFE4C4",
+"Noir","#000000",
+"Coquille d'oeuf","#FFEBCD",
+"Bleu","#0000FF",
+"Bleu-violet","#8A2BE2",
+"Brun","#A52A2A",
+"Bois précieux","#DEB887",
+"Bleu pétrole","#5F9EA0",
+"Vert vif","#7FFF00",
+"Chocolat","#D2691E",
+"Corail","#FF7F50",
+"Bleuet","#6495ED",
+"Vanille","#FFF8DC",
+"Cramoisi","#DC143C",
+"Cyan","#00FFFF",
+"Bleu foncé","#00008B",
+"Cyan foncé","#008B8B",
+"Jaune paille foncé","#B8860B",
+"Gris foncé","#A9A9A9",
+"Vert foncé","#006400",
+"Kaki foncé","#BDB76B",
+"Magenta foncé","#8B008B",
+"Olive foncé","#556B2F",
+"Orange foncé","#FF8C00",
+"Orchidée foncé","#9932CC",
+"Rouge foncé","#8B0000",
+"Saumon foncé","#E9967A",
+"Vert d'eau foncé","#8FBC8F",
+"Bleu ardoise foncé","#483D8B",
+"Gris ardoise foncé","#2F4F4F",
+"Turquoise foncé","#00CED1",
+"Violet foncé","#9400D3",
+"Rose soutenu","#FF1493",
+"Bleu ciel soutenu","#00BFFF",
+"Gris soutenu","#696969",
+"Bleu France","#1E90FF",
+"Rouge brique","#B22222",
+"Lys","#FFFAF0",
+"Vert sapin","#228B22",
+"Fuchsia","#FF00FF",
+"Gris Souris","#DCDCDC",
+"Blanc laiteux","#F8F8FF",
+"Or","#FFD700",
+"Jaune paille","#DAA520",
+"Gris","#808080",
+"GrisX11","#BEBEBE",
+"Vert","#008000",
+"VertX11","#00FF00",
+"Vert-jaune","#ADFF2F",
+"Opalin","#F0FFF0",
+"Rose Intense","#FF69B4",
+"Rouge indien","#CD5C5C",
+"Indigo","#4B0082",
+"Ivoire","#FFFFF0",
+"Kaki","#F0E68C",
+"Lavande","#E6E6FA",
+"Lavandin","#FFF0F5",
+"Vert prairie","#7CFC00",
+"Mousse de citron","#FFFACD",
+"Bleu clair","#ADD8E6",
+"Corail clair","#F08080",
+"Cyan clair","#E0FFFF",
+"Jaune paille clair","#FAFAD2",
+"Gris clair","#D3D3D3",
+"Vert clair","#90EE90",
+"Rose clair","#FFB6C1",
+"Saumon clair","#FFA07A",
+"Vert d'eau clair","#20B2AA",
+"Bleu ciel clair","#87CEFA",
+"Gris ardoise clair","#778899",
+"Bleu acier clair","#B0C4DE",
+"Jaune clair","#FFFFE0",
+"Vert citron","#00FF00",
+"Citron vert","#32CD32",
+"Écru","#FAF0E6",
+"Magenta","#FF00FF",
+"Marron","#800000",
+"Marron Medium X11","#B03060",
+"Aigue-marine moyen","#66CDAA",
+"Bleu moyen","#0000CD",
+"Lilas moyen","#BA55D3",
+"Pourpre moyen","#9370DB",
+"Vert d'eau moyen","#3CB371",
+"Bleu ardoise moyen","#7B68EE",
+"Vert printemps moyen","#00FA9A",
+"Turquoise moyen","#48D1CC",
+"Rouge violacé moyen","#C71585",
+"Bleu nuit","#191970",
+"Crème de menthe","#F5FFFA",
+"Rose pâle","#FFE4E1",
+"Chamois","#FFE4B5",
+"Chair","#FFDEAD",
+"Bleu marine","#000080",
+"Blanc cassé","#FDF5E6",
+"Olive","#808000",
+"Brun verdâtre","#6B8E23",
+"Orange","#FFA500",
+"Rouge orangé","#FF4500",
+"Lilas","#DA70D6",
+"Jaune paille pâle","#EEE8AA",
+"Vert pâle","#98FB98",
+"Turquoise pâle","#AFEEEE",
+"Rouge violacé pâle","#DB7093",
+"Crème de papaye","#FFEFD5",
+"Pêche","#FFDAB9",
+"Caramel","#CD853F",
+"Rose","#FFC0CB",
+"Prune","#DDA0DD",
+"Bleu léger","#B0E0E6",
+"Pourpre","#800080",
+"PourpreX11","#A020F0",
+"Rebecca Pourpre","#663399",
+"Rouge","#FF0000",
+"Vieux rose","#BC8F8F",
+"Bleu roi","#4169E1",
+"Brun cuir","#8B4513",
+"Saumon","#FA8072",
+"Sable","#F4A460",
+"Vert d'eau","#2E8B57",
+"Coquillage","#FFF5EE",
+"Terre de Sienne","#A0522D",
+"Argent","#C0C0C0",
+"Bleu ciel","#87CEEB",
+"Bleu ardoise","#6A5ACD",
+"Gris ardoise","#708090",
+"Neige","#FFFAFA",
+"Vert printemps","#00FF7F",
+"Bleu acier","#4682B4",
+"Grège","#D2B48C",
+"Sarcelle","#008080",
+"Chardon","#D8BFD8",
+"Tomate","#FF6347",
+"Turquoise","#40E0D0",
+"Violet","#EE82EE",
+"WebGris","#808080",
+"WebGris","#008000",
+"WebMarron","#7F0000",
+"WebPourpre","#7F007F",
+"Blé","#F5DEB3",
+"Blanc","#FFFFFF",
+"Blanc blanc cendré","#F5F5F5",
+"Jaune","#FFFF00",
+"Vert jaunâtre","#9ACD32",
 "",""
 };
 

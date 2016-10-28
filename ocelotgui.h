@@ -452,6 +452,7 @@ public:
   QList<QString> q_color_list;
   QString q_color_list_name(QString rgb_name);
   QString qt_color(QString);
+  QString rgb_to_color(QString);
   QString canonical_color_name(QString);
   void assign_names_for_colors();
   QString canonical_font_weight(QString);
@@ -6434,66 +6435,140 @@ void set_widget_values(int ci)
   {
     switch (ci)
     {
-    /* TEST! */
-    case 0: { color_type= menu_strings[menu_off + MENU_STATEMENT_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_statement_text_color; break; }
-    case 1: { color_type= menu_strings[menu_off + MENU_STATEMENT_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_statement_background_color; break; }
-    case 2: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_LITERAL_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_literal_color; break; }
-    case 3: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_identifier_color; break; }
-    case 4: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_COMMENT_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_comment_color; break; }
-    case 5: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_OPERATOR_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_operator_color; break; }
-    case 6: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_KEYWORD_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_keyword_color; break; }
-    case 7: { color_type= menu_strings[menu_off + MENU_STATEMENT_PROMPT_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_statement_prompt_background_color; break; }
-    case 8: { color_type= menu_strings[menu_off + MENU_STATEMENT_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_statement_border_color; break; }
-    case 9: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_current_line_color; break; }
-    case 10:{ color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR]; color_name= copy_of_parent->new_ocelot_statement_highlight_function_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_STATEMENT_TEXT_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_text_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_STATEMENT_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 2: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_LITERAL_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_highlight_literal_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 3: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_highlight_identifier_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 4: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_COMMENT_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_highlight_comment_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 5: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_OPERATOR_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_highlight_operator_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 6: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_KEYWORD_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_highlight_keyword_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 7: { color_type= menu_strings[menu_off + MENU_STATEMENT_PROMPT_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_prompt_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_STATEMENT_BORDER_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_border_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 9: { color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_highlight_current_line_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 10:{ color_type= menu_strings[menu_off + MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR];
+              color_name= copy_of_parent->new_ocelot_statement_highlight_function_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
     }
   }
   if (current_widget == GRID_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= menu_strings[menu_off + MENU_GRID_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_grid_text_color; break; }
-    case 1: { color_type= menu_strings[menu_off + MENU_GRID_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_grid_background_color; break; }
-    case 2: { color_type= menu_strings[menu_off + MENU_GRID_CELL_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_grid_cell_border_color; break; }
-    case 3: { color_type= menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_COLOR]; color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color; break; }
-    case 7: { color_type= menu_strings[menu_off + MENU_GRID_HEADER_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_grid_header_background_color; break; }
-    case 8: { color_type= menu_strings[menu_off + MENU_GRID_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_grid_border_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_GRID_TEXT_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_text_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_GRID_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 2: { color_type= menu_strings[menu_off + MENU_GRID_CELL_BORDER_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_cell_border_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 3: { color_type= menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 7: { color_type= menu_strings[menu_off + MENU_GRID_HEADER_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_header_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_GRID_BORDER_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_border_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
     }
   }
   if (current_widget == EXTRA_RULE_1)
   {
     switch (ci)
     {
-    case 0: { color_type= menu_strings[menu_off + MENU_GRID_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_extra_rule_1_text_color; break; }
-    case 1: { color_type= menu_strings[menu_off + MENU_GRID_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_extra_rule_1_background_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_GRID_TEXT_COLOR];
+              color_name= copy_of_parent->new_ocelot_extra_rule_1_text_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_GRID_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_extra_rule_1_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
     }
   }
   if (current_widget == HISTORY_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= menu_strings[menu_off + MENU_HISTORY_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_history_text_color; break; }
-    case 1: { color_type= menu_strings[menu_off + MENU_HISTORY_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_history_background_color; break; }
-    case 8: { color_type= menu_strings[menu_off + MENU_HISTORY_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_history_border_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_HISTORY_TEXT_COLOR];
+              color_name= copy_of_parent->new_ocelot_history_text_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_HISTORY_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_history_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_HISTORY_BORDER_COLOR];
+              color_name= copy_of_parent->new_ocelot_history_border_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
     }
   }
   if (current_widget == MAIN_WIDGET)
   {
     switch (ci)
     {
-    case 0: { color_type= menu_strings[menu_off + MENU_MENU_TEXT_COLOR]; color_name= copy_of_parent->new_ocelot_menu_text_color; break; }
-    case 1: { color_type= menu_strings[menu_off + MENU_MENU_BACKGROUND_COLOR]; color_name= copy_of_parent->new_ocelot_menu_background_color; break; }
-    case 8: { color_type= menu_strings[menu_off + MENU_MENU_BORDER_COLOR]; color_name= copy_of_parent->new_ocelot_menu_border_color; break; }
+    case 0: { color_type= menu_strings[menu_off + MENU_MENU_TEXT_COLOR];
+              color_name= copy_of_parent->new_ocelot_menu_text_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_MENU_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_menu_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 8: { color_type= menu_strings[menu_off + MENU_MENU_BORDER_COLOR];
+              color_name= copy_of_parent->new_ocelot_menu_border_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
     }
   }
   label_for_color[ci]->setText(color_type);
   //label_for_color_rgb[ci]->setText(color_name);
-
   int cli;
-  cli= q_color_list_index(color_name);
+  /* Todo: This is a very roundabout way to get the color index. */
+  cli= q_color_list_index(copy_of_parent->rgb_to_color(color_name));
   combo_box_for_color_pick[ci]->setCurrentIndex(cli);
   label_for_color_rgb[ci]->setText(combo_box_for_color_pick[ci]->currentText());
-
   QString sss= "border: 1px solid black; background-color: ";
   sss.append(copy_of_parent->qt_color(color_name));
   label_for_color_show[ci]->setStyleSheet(sss);
@@ -6705,7 +6780,7 @@ void handle_combo_box_for_color_pick_0(int item_number)
   {
     QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
     copy_of_parent->new_ocelot_statement_text_color= new_color;
-    label_for_color_rgb[0]->setText(new_color);
+    label_for_color_rgb[0]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
@@ -6714,7 +6789,7 @@ void handle_combo_box_for_color_pick_0(int item_number)
   {
     QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
     copy_of_parent->new_ocelot_grid_text_color= new_color;
-    label_for_color_rgb[0]->setText(new_color);
+    label_for_color_rgb[0]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
@@ -6723,7 +6798,7 @@ void handle_combo_box_for_color_pick_0(int item_number)
   {
     QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
     copy_of_parent->new_ocelot_extra_rule_1_text_color= new_color;
-    label_for_color_rgb[0]->setText(new_color);
+    label_for_color_rgb[0]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
@@ -6732,7 +6807,7 @@ void handle_combo_box_for_color_pick_0(int item_number)
   {
     QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
     copy_of_parent->new_ocelot_history_text_color= new_color;
-    label_for_color_rgb[0]->setText(new_color);
+    label_for_color_rgb[0]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
@@ -6741,7 +6816,7 @@ void handle_combo_box_for_color_pick_0(int item_number)
   {
     QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
     copy_of_parent->new_ocelot_menu_text_color= new_color;
-    label_for_color_rgb[0]->setText(new_color);
+    label_for_color_rgb[0]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
@@ -6754,8 +6829,9 @@ void handle_combo_box_for_color_pick_1(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_background_color= new_color;
-    label_for_color_rgb[1]->setText(new_color);
+    label_for_color_rgb[1]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[1]->setStyleSheet(s);
@@ -6763,8 +6839,9 @@ void handle_combo_box_for_color_pick_1(int item_number)
   if (current_widget == GRID_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_grid_background_color= new_color;
-    label_for_color_rgb[1]->setText(new_color);
+    label_for_color_rgb[1]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[1]->setStyleSheet(s);
@@ -6772,8 +6849,9 @@ void handle_combo_box_for_color_pick_1(int item_number)
   if (current_widget == EXTRA_RULE_1)
   {
     QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_extra_rule_1_background_color= new_color;
-    label_for_color_rgb[1]->setText(new_color);
+    label_for_color_rgb[1]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[1]->setStyleSheet(s);
@@ -6781,8 +6859,9 @@ void handle_combo_box_for_color_pick_1(int item_number)
   if (current_widget == HISTORY_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_history_background_color= new_color;
-    label_for_color_rgb[1]->setText(new_color);
+    label_for_color_rgb[1]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[1]->setStyleSheet(s);
@@ -6790,8 +6869,9 @@ void handle_combo_box_for_color_pick_1(int item_number)
   if (current_widget == MAIN_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_menu_background_color= new_color;
-    label_for_color_rgb[1]->setText(new_color);
+    label_for_color_rgb[1]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[1]->setStyleSheet(s);
@@ -6803,8 +6883,9 @@ void handle_combo_box_for_color_pick_2(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[2]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_highlight_literal_color= new_color;
-    label_for_color_rgb[2]->setText(new_color);
+    label_for_color_rgb[2]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[2]->setStyleSheet(s);
@@ -6813,8 +6894,9 @@ void handle_combo_box_for_color_pick_2(int item_number)
   if (current_widget == GRID_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[2]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_grid_cell_border_color= new_color;
-    label_for_color_rgb[2]->setText(new_color);
+    label_for_color_rgb[2]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[2]->setStyleSheet(s);
@@ -6827,8 +6909,9 @@ void handle_combo_box_for_color_pick_3(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[3]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_highlight_identifier_color= new_color;
-    label_for_color_rgb[3]->setText(new_color);
+    label_for_color_rgb[3]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[3]->setStyleSheet(s);
@@ -6837,8 +6920,9 @@ void handle_combo_box_for_color_pick_3(int item_number)
   if (current_widget == GRID_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[3]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_grid_cell_drag_line_color= new_color;
-    label_for_color_rgb[3]->setText(new_color);
+    label_for_color_rgb[3]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[3]->setStyleSheet(s);
@@ -6851,8 +6935,9 @@ void handle_combo_box_for_color_pick_4(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[4]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_highlight_comment_color= new_color;
-    label_for_color_rgb[4]->setText(new_color);
+    label_for_color_rgb[4]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[4]->setStyleSheet(s);
@@ -6865,8 +6950,9 @@ void handle_combo_box_for_color_pick_5(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[5]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_highlight_operator_color= new_color;
-    label_for_color_rgb[5]->setText(new_color);
+    label_for_color_rgb[5]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[5]->setStyleSheet(s);
@@ -6879,8 +6965,9 @@ void handle_combo_box_for_color_pick_6(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[6]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_highlight_keyword_color= new_color;
-    label_for_color_rgb[6]->setText(new_color);
+    label_for_color_rgb[6]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[6]->setStyleSheet(s);
@@ -6893,8 +6980,9 @@ void handle_combo_box_for_color_pick_7(int item_number)
  if (current_widget == STATEMENT_WIDGET)
  {
    QString new_color= combo_box_for_color_pick[7]->itemText(item_number);
+   new_color= copy_of_parent->canonical_color_name(new_color);
    copy_of_parent->new_ocelot_statement_prompt_background_color= new_color;
-   label_for_color_rgb[7]->setText(new_color);
+   label_for_color_rgb[7]->setText(copy_of_parent->rgb_to_color(new_color));
    QString s= "border: 1px solid black; background-color: ";
    s.append(copy_of_parent->qt_color(new_color));
    label_for_color_show[7]->setStyleSheet(s);
@@ -6902,8 +6990,9 @@ void handle_combo_box_for_color_pick_7(int item_number)
   if (current_widget == GRID_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[7]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_grid_header_background_color= new_color;
-    label_for_color_rgb[7]->setText(new_color);
+    label_for_color_rgb[7]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[7]->setStyleSheet(s);
@@ -6916,8 +7005,9 @@ void handle_combo_box_for_color_pick_8(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_border_color= new_color;
-    label_for_color_rgb[8]->setText(new_color);
+    label_for_color_rgb[8]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[8]->setStyleSheet(s);
@@ -6925,8 +7015,9 @@ void handle_combo_box_for_color_pick_8(int item_number)
   if (current_widget == GRID_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_grid_border_color= new_color;
-    label_for_color_rgb[8]->setText(new_color);
+    label_for_color_rgb[8]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[8]->setStyleSheet(s);
@@ -6934,8 +7025,9 @@ void handle_combo_box_for_color_pick_8(int item_number)
   if (current_widget == HISTORY_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_history_border_color= new_color;
-    label_for_color_rgb[8]->setText(new_color);
+    label_for_color_rgb[8]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[8]->setStyleSheet(s);
@@ -6943,8 +7035,9 @@ void handle_combo_box_for_color_pick_8(int item_number)
   if (current_widget == MAIN_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_menu_border_color= new_color;
-    label_for_color_rgb[8]->setText(new_color);
+    label_for_color_rgb[8]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[8]->setStyleSheet(s);
@@ -6957,8 +7050,9 @@ void handle_combo_box_for_color_pick_9(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[9]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_highlight_current_line_color= new_color;
-    label_for_color_rgb[9]->setText(new_color);
+    label_for_color_rgb[9]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[9]->setStyleSheet(s);
@@ -6971,8 +7065,9 @@ void handle_combo_box_for_color_pick_10(int item_number)
   if (current_widget == STATEMENT_WIDGET)
   {
     QString new_color= combo_box_for_color_pick[10]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
     copy_of_parent->new_ocelot_statement_highlight_function_color= new_color;
-    label_for_color_rgb[10]->setText(new_color);
+    label_for_color_rgb[10]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[10]->setStyleSheet(s);
@@ -7102,7 +7197,10 @@ void handle_button_for_font_dialog()
   }
 }
 
-
+/*
+  Given color name, return index.
+  Todo: It can be tricky, if color name isn't in the current language.
+*/
 int q_color_list_index(QString color_name_string)
 {
 //  char color_name_string_as_utf8[64];
@@ -7112,10 +7210,10 @@ int q_color_list_index(QString color_name_string)
 //  memcpy(color_name_string_as_utf8, color_name_string.toUtf8().constData(), color_name_string_len);
 //  color_name_string_as_utf8[color_name_string_len]= '\0';
 
-
   for (int i= 0; i < copy_of_parent->q_color_list.size(); i+= 2)
   {
     if (QString::compare(color_name_string, copy_of_parent->q_color_list[i], Qt::CaseInsensitive) == 0) return i / 2;
+    if (QString::compare(color_name_string, copy_of_parent->q_color_list[i + 1], Qt::CaseInsensitive) == 0) return i / 2;
   }
   //return (i - 1) / 2;
   return 0;  /* TEST! */

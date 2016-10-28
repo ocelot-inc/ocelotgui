@@ -420,6 +420,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
   assert(sizeof(int) >= 4);
 
+  /* TEST!!!! */
+  er_off= ER_END ;
+  color_off= COLOR_END ;
+  menu_off= MENU_END ;
+
   /* Initialization */
 
   main_window_maximum_width= 0;
@@ -457,11 +462,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_dbms= "mysql";
   connections_dbms[0]= DBMS_MYSQL;
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
-  ocelot_statement_prompt_background_color= "lightGray"; /* set early because initialize_widget_statement() depends on this */
-  ocelot_grid_border_color= "black";
-  ocelot_grid_header_background_color= "lightGray";
-  ocelot_grid_cell_drag_line_color= "lightBlue";
-  ocelot_grid_cell_border_color= "black";
+  ocelot_statement_prompt_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1]; /* set early because initialize_widget_statement() depends on this */
+  ocelot_grid_border_color= s_color_list[COLOR_BLACK*2 + 1];;
+  ocelot_grid_header_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1];
+  ocelot_grid_cell_drag_line_color= s_color_list[COLOR_LIGHTBLUE*2 + 1];;
+  ocelot_grid_cell_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_grid_cell_border_size= "1";
   ocelot_grid_cell_drag_line_size= "5";
   /* Probably result_grid_table_widget_saved_font only matters if the connection dialog box has to go up. */
@@ -501,22 +506,22 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     Then we read option files.
   */
   set_current_colors_and_font(fixed_font); /* set ocelot_statement_text_color, ocelot_grid_text_color, etc. */
-  ocelot_statement_border_color= "black";
+  ocelot_statement_border_color= s_color_list[COLOR_BLACK*2 + 1];
 
-  ocelot_statement_highlight_literal_color= "red";
-  ocelot_statement_highlight_identifier_color= "green";
-  ocelot_statement_highlight_comment_color= "limeGreen";
-  ocelot_statement_highlight_operator_color= "darkGray";
-  ocelot_statement_highlight_keyword_color= "blue";
-  ocelot_statement_highlight_current_line_color= "yellow";
-  ocelot_statement_highlight_function_color= "magenta";
+  ocelot_statement_highlight_literal_color= s_color_list[COLOR_RED*2 + 1];
+  ocelot_statement_highlight_identifier_color= s_color_list[COLOR_GREEN*2 + 1];
+  ocelot_statement_highlight_comment_color= s_color_list[COLOR_LIMEGREEN*2 + 1];
+  ocelot_statement_highlight_operator_color= s_color_list[COLOR_DARKGRAY*2 + 1];;
+  ocelot_statement_highlight_keyword_color= s_color_list[COLOR_BLUE*2 + 1];
+  ocelot_statement_highlight_current_line_color= s_color_list[COLOR_YELLOW*2 + 1];
+  ocelot_statement_highlight_function_color= s_color_list[COLOR_FUCHSIA*2 + 1];
   ocelot_statement_syntax_checker= "1";
   ocelot_statement_format_statement_indent= "2";
   ocelot_statement_format_clause_indent= "4";
   ocelot_statement_format_keyword_case= "upper";
 
-  ocelot_history_border_color= "black";
-  ocelot_menu_border_color= "black";
+  ocelot_history_border_color= s_color_list[COLOR_BLACK*2 + 1];
+  ocelot_menu_border_color= s_color_list[COLOR_BLACK*2 + 1];
 
   lmysql= new ldbms();                               /* lmysql will be deleted in action_exit(). */
 
@@ -3068,12 +3073,12 @@ void MainWindow::action_menu()
   delete(se);
 }
 
-
 /*
   If a Settings-menu use has caused a change:
   Produce a settings-change SQL statement, e.g.
   SET ocelot_statement_background_color = 'red'
   and execute it.
+  If it's a color, it might be an RGB, in that case change to name first.
 */
 void MainWindow::action_change_one_setting(QString old_setting,
                                            QString new_setting,
@@ -3088,9 +3093,12 @@ void MainWindow::action_change_one_setting(QString old_setting,
     text.append(name_of_setting);
     text.append(" = ");
     text.append("'");
-    for (int i= 0; i < new_setting.length(); ++i)
+    QString source= new_setting;
+    if (strstr(name_of_setting, "_color") != NULL)
+      source= rgb_to_color(new_setting);
+    for (int i= 0; i < source.length(); ++i)
     {
-      QString c= new_setting.mid(i, 1);
+      QString c= source.mid(i, 1);
       text.append(c);
       if (c == "'") text.append(c);
     }
@@ -3126,42 +3134,44 @@ QString MainWindow::q_color_list_name(QString rgb_name)
 /*
   It's possible to say SET [ocelot color name] = rgb_name e.g. "#FFFFFF"
   or have rgb_name in an options file or get an RGB name with set_current_colors_and_fonts().
-  We'd prefer to show as W3C names where possible, X11 names as second choice.
+  We'd prefer to show as W3C names where possible, X11 names as second choice, if English.
+  Todo: with the new system, we don't appear to need this any more,
+        the colors are stored as RGB. So soon we can throw this away.
 */
 void MainWindow::assign_names_for_colors()
 {
-  if (ocelot_statement_text_color.left(1) == "#") ocelot_statement_text_color= q_color_list_name(ocelot_statement_text_color);
-  if (ocelot_statement_background_color.left(1) == "#") ocelot_statement_background_color= q_color_list_name(ocelot_statement_background_color);
-  if (ocelot_statement_border_color.left(1) == "#") ocelot_statement_border_color= q_color_list_name(ocelot_statement_border_color);
-  if (ocelot_statement_highlight_literal_color.left(1) == "#") ocelot_statement_highlight_literal_color= q_color_list_name(ocelot_statement_highlight_literal_color);
-  if (ocelot_statement_highlight_identifier_color.left(1) == "#") ocelot_statement_highlight_identifier_color= q_color_list_name(ocelot_statement_highlight_identifier_color);
-  if (ocelot_statement_highlight_comment_color.left(1) == "#") ocelot_statement_highlight_comment_color= q_color_list_name(ocelot_statement_highlight_comment_color);
-  if (ocelot_statement_highlight_operator_color.left(1) == "#") ocelot_statement_highlight_operator_color= q_color_list_name(ocelot_statement_highlight_operator_color);
-  if (ocelot_statement_highlight_keyword_color.left(1) == "#") ocelot_statement_highlight_keyword_color= q_color_list_name(ocelot_statement_highlight_keyword_color);
-  if (ocelot_statement_prompt_background_color.left(1) == "#") ocelot_statement_prompt_background_color= q_color_list_name(ocelot_statement_prompt_background_color);
-  if (ocelot_statement_highlight_current_line_color.left(1) == "#") ocelot_statement_highlight_current_line_color= q_color_list_name(ocelot_statement_highlight_current_line_color);
-  if (ocelot_statement_highlight_function_color.left(1) == "#") ocelot_statement_highlight_function_color= q_color_list_name(ocelot_statement_highlight_function_color);
-  if (ocelot_grid_text_color.left(1) == "#") ocelot_grid_text_color= q_color_list_name(ocelot_grid_text_color);
-  if (ocelot_grid_border_color.left(1) == "#") ocelot_grid_border_color= q_color_list_name(ocelot_grid_border_color);
-  if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
-  if (ocelot_grid_header_background_color.left(1) == "#") ocelot_grid_header_background_color= q_color_list_name(ocelot_grid_header_background_color);
-  if (ocelot_grid_font_family.left(1) == "#") ocelot_grid_font_family= q_color_list_name(ocelot_grid_font_family);
-  if (ocelot_grid_font_size.left(1) == "#") ocelot_grid_font_size= q_color_list_name(ocelot_grid_font_size);
-  if (ocelot_grid_font_style.left(1) == "#") ocelot_grid_font_style= q_color_list_name(ocelot_grid_font_style);
-  if (ocelot_grid_font_weight.left(1) == "#") ocelot_grid_font_weight= q_color_list_name(ocelot_grid_font_weight);
-  if (ocelot_grid_cell_border_color.left(1) == "#") ocelot_grid_cell_border_color= q_color_list_name(ocelot_grid_cell_border_color);
-  if (ocelot_grid_cell_drag_line_color.left(1) == "#") ocelot_grid_cell_drag_line_color= q_color_list_name(ocelot_grid_cell_drag_line_color);
-  if (ocelot_grid_border_size.left(1) == "#") ocelot_grid_border_size= q_color_list_name(ocelot_grid_border_size);
-  if (ocelot_grid_cell_border_size.left(1) == "#") ocelot_grid_cell_border_size= q_color_list_name(ocelot_grid_cell_border_size);
-  if (ocelot_grid_cell_drag_line_size.left(1) == "#") ocelot_grid_cell_drag_line_size= q_color_list_name(ocelot_grid_cell_drag_line_size);
-  if (ocelot_history_text_color.left(1) == "#") ocelot_history_text_color= q_color_list_name(ocelot_history_text_color);
-  if (ocelot_history_background_color.left(1) == "#") ocelot_history_background_color= q_color_list_name(ocelot_history_background_color);
-  if (ocelot_history_border_color.left(1) == "#") ocelot_history_border_color= q_color_list_name(ocelot_history_border_color);
-  if (ocelot_menu_text_color.left(1) == "#") ocelot_menu_text_color= q_color_list_name(ocelot_menu_text_color);
-  if (ocelot_menu_background_color.left(1) == "#") ocelot_menu_background_color= q_color_list_name(ocelot_menu_background_color);
-  if (ocelot_menu_border_color.left(1) == "#") ocelot_menu_border_color= q_color_list_name(ocelot_menu_border_color);
-  if (ocelot_extra_rule_1_text_color.left(1) == "#") ocelot_extra_rule_1_text_color= q_color_list_name(ocelot_extra_rule_1_text_color);
-  if (ocelot_extra_rule_1_background_color.left(1) == "#") ocelot_extra_rule_1_background_color= q_color_list_name(ocelot_extra_rule_1_background_color);
+  //if (ocelot_statement_text_color.left(1) == "#") ocelot_statement_text_color= q_color_list_name(ocelot_statement_text_color);
+  //if (ocelot_statement_background_color.left(1) == "#") ocelot_statement_background_color= q_color_list_name(ocelot_statement_background_color);
+  //if (ocelot_statement_border_color.left(1) == "#") ocelot_statement_border_color= q_color_list_name(ocelot_statement_border_color);
+  //if (ocelot_statement_highlight_literal_color.left(1) == "#") ocelot_statement_highlight_literal_color= q_color_list_name(ocelot_statement_highlight_literal_color);
+  //if (ocelot_statement_highlight_identifier_color.left(1) == "#") ocelot_statement_highlight_identifier_color= q_color_list_name(ocelot_statement_highlight_identifier_color);
+  //if (ocelot_statement_highlight_comment_color.left(1) == "#") ocelot_statement_highlight_comment_color= q_color_list_name(ocelot_statement_highlight_comment_color);
+  //if (ocelot_statement_highlight_operator_color.left(1) == "#") ocelot_statement_highlight_operator_color= q_color_list_name(ocelot_statement_highlight_operator_color);
+  //if (ocelot_statement_highlight_keyword_color.left(1) == "#") ocelot_statement_highlight_keyword_color= q_color_list_name(ocelot_statement_highlight_keyword_color);
+  //if (ocelot_statement_prompt_background_color.left(1) == "#") ocelot_statement_prompt_background_color= q_color_list_name(ocelot_statement_prompt_background_color);
+  //if (ocelot_statement_highlight_current_line_color.left(1) == "#") ocelot_statement_highlight_current_line_color= q_color_list_name(ocelot_statement_highlight_current_line_color);
+  //if (ocelot_statement_highlight_function_color.left(1) == "#") ocelot_statement_highlight_function_color= q_color_list_name(ocelot_statement_highlight_function_color);
+  //if (ocelot_grid_text_color.left(1) == "#") ocelot_grid_text_color= q_color_list_name(ocelot_grid_text_color);
+  //if (ocelot_grid_border_color.left(1) == "#") ocelot_grid_border_color= q_color_list_name(ocelot_grid_border_color);
+  //if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
+  //if (ocelot_grid_header_background_color.left(1) == "#") ocelot_grid_header_background_color= q_color_list_name(ocelot_grid_header_background_color);
+  //if (ocelot_grid_font_family.left(1) == "#") ocelot_grid_font_family= q_color_list_name(ocelot_grid_font_family);
+  //if (ocelot_grid_font_size.left(1) == "#") ocelot_grid_font_size= q_color_list_name(ocelot_grid_font_size);
+  //if (ocelot_grid_font_style.left(1) == "#") ocelot_grid_font_style= q_color_list_name(ocelot_grid_font_style);
+  //if (ocelot_grid_font_weight.left(1) == "#") ocelot_grid_font_weight= q_color_list_name(ocelot_grid_font_weight);
+  //if (ocelot_grid_cell_border_color.left(1) == "#") ocelot_grid_cell_border_color= q_color_list_name(ocelot_grid_cell_border_color);
+  //if (ocelot_grid_cell_drag_line_color.left(1) == "#") ocelot_grid_cell_drag_line_color= q_color_list_name(ocelot_grid_cell_drag_line_color);
+  //if (ocelot_grid_border_size.left(1) == "#") ocelot_grid_border_size= q_color_list_name(ocelot_grid_border_size);
+  //if (ocelot_grid_cell_border_size.left(1) == "#") ocelot_grid_cell_border_size= q_color_list_name(ocelot_grid_cell_border_size);
+  //if (ocelot_grid_cell_drag_line_size.left(1) == "#") ocelot_grid_cell_drag_line_size= q_color_list_name(ocelot_grid_cell_drag_line_size);
+  //if (ocelot_history_text_color.left(1) == "#") ocelot_history_text_color= q_color_list_name(ocelot_history_text_color);
+  //if (ocelot_history_background_color.left(1) == "#") ocelot_history_background_color= q_color_list_name(ocelot_history_background_color);
+  //if (ocelot_history_border_color.left(1) == "#") ocelot_history_border_color= q_color_list_name(ocelot_history_border_color);
+  //if (ocelot_menu_text_color.left(1) == "#") ocelot_menu_text_color= q_color_list_name(ocelot_menu_text_color);
+  //if (ocelot_menu_background_color.left(1) == "#") ocelot_menu_background_color= q_color_list_name(ocelot_menu_background_color);
+  //if (ocelot_menu_border_color.left(1) == "#") ocelot_menu_border_color= q_color_list_name(ocelot_menu_border_color);
+  //if (ocelot_extra_rule_1_text_color.left(1) == "#") ocelot_extra_rule_1_text_color= q_color_list_name(ocelot_extra_rule_1_text_color);
+  //if (ocelot_extra_rule_1_background_color.left(1) == "#") ocelot_extra_rule_1_background_color= q_color_list_name(ocelot_extra_rule_1_background_color);
 }
 
 
@@ -3317,40 +3327,71 @@ QFont MainWindow::get_fixed_font()
 }
 
 /*
-  Pass: a string which is supposed to have a color name. Return: a canonical color name.
-  1. Check color_list (names). If match, return name. Might be a case change e.g. Gray not gray.
+  Given RGB, return color name for current language
+  If current language is not English, this may not be the
+  canonical color name.
+  It might be a bug if we don't find the rgb in s_color_list,
+  but there a few extra RGBs in q_color_list.
+  Todo: I think there's redundancy somewhere, that is,
+        some other procedure does the same thing.
+*/
+QString MainWindow::rgb_to_color(QString rgb)
+{
+  char rgb_as_utf8[128]; /* must be > max rgb length, allow for error */
+  strcpy(rgb_as_utf8, rgb.toUtf8());
+  for (int q_i= 0; strcmp(s_color_list[q_i]," ") > 0; q_i+= 2)
+  {
+    if (strcmp(s_color_list[q_i + 1], rgb_as_utf8) == 0)
+    {
+      QString color_name= s_color_list[q_i + color_off];
+      return color_name;
+    }
+  }
+  return rgb;
+}
+
+
+/*
+  Pass: a string which is supposed to have a color name.
+  Return: a canonical color name, i.e. an RGB value.
+  1. Check color_list (names). If match, return RGB. Might be a case change e.g. Gray not gray.
   2. Accept some color name variants, return the name in the list. e.g. Gray not Grey.
      They appear in http://www.w3.org/TR/SVG/types.html#ColorKeywords.
   3. Put the color in a QColor. If result is invalid, return "" which means invalid.
   4. Get the color back as #RRGGBB
   3. Check color_list (RGBs). If match, return name. e.g. Gray not #BEBEBE.
   4. Return the #RRGGBB color.
-  This does not mean that absolutely no synonyms are allowed -- two names may have the same #RRGGBB.
-  The canonical name is English, so we can accept BLEU but store BLUE.
+  This does not mean that absolutely no synonyms are allowed
+  -- two names may have the same #RRGGBB, as with Fuchsia|Magenta.
 */
 QString MainWindow::canonical_color_name(QString color_name_string)
 {
+  if (color_name_string.left(1) == "#") return color_name_string;
+
   QString s;
+  /* Search #1: in the color list for the current language offset. */
   for (int i= color_off; strcmp(s_color_list[i], "") > 0; i+= 2)
   {
     s= s_color_list[i];
     if (QString::compare(color_name_string, s, Qt::CaseInsensitive) == 0)
     {
-      if (color_off > 0) s= s_color_list[i - color_off];
+      s= s_color_list[i + 1];                /* Return the RGB */
       return s;
     }
   }
 
-  if (QString::compare(color_name_string, "Cornflower", Qt::CaseInsensitive) == 0) return "CornflowerBlue";
-  if (QString::compare(color_name_string, "Darkgrey", Qt::CaseInsensitive) == 0) return "Darkgray";
-  if (QString::compare(color_name_string, "DarkSlateGrey", Qt::CaseInsensitive) == 0) return "DarkSlateGray";
-  if (QString::compare(color_name_string, "DimGrey", Qt::CaseInsensitive) == 0) return "DimGray";
-  if (QString::compare(color_name_string, "Grey", Qt::CaseInsensitive) == 0) return "Gray";
-  if (QString::compare(color_name_string, "LightGoldenrod", Qt::CaseInsensitive) == 0) return "LightGoldenrodYellow";
-  if (QString::compare(color_name_string, "LightGrey", Qt::CaseInsensitive) == 0) return "LightGray";
-  if (QString::compare(color_name_string, "LightSlateGrey", Qt::CaseInsensitive) == 0) return "LightSlateGray";
-  if (QString::compare(color_name_string, "NavyBlue", Qt::CaseInsensitive) == 0) return "Navy";
-  if (QString::compare(color_name_string, "SlateGrey", Qt::CaseInsensitive) == 0) return "SlateGray";
+  /* Search #2: ?? */
+
+  if (QString::compare(color_name_string, "Cornflower", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_CORNFLOWERBLUE*2 + 1];
+  if (QString::compare(color_name_string, "Darkgrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DARKGRAY*2 + 1];
+  if (QString::compare(color_name_string, "DarkSlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DARKSLATEGRAY*2 + 1];
+  if (QString::compare(color_name_string, "DimGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DIMGRAY*2 + 1];
+  if (QString::compare(color_name_string, "Grey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_GRAY*2 + 1];
+  if (QString::compare(color_name_string, "LightGoldenrod", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTGOLDENRODYELLOW*2 + 1];
+  if (QString::compare(color_name_string, "LightGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTGRAY*2 + 1];
+  if (QString::compare(color_name_string, "LightSlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTSLATEGRAY*2 + 1];
+  if (QString::compare(color_name_string, "NavyBlue", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_NAVY*2 + 1];
+  if (QString::compare(color_name_string, "SlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_SLATEGRAY*2 + 1];
   QColor qq_color;
   qq_color.setNamedColor(color_name_string);
   if (qq_color.isValid() == false) return "";                 /* bad color, maybe bad format */
