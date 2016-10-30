@@ -20,24 +20,35 @@
   Ocelot's policy is to keep strings containing English text
   separate from ocelotgui.cpp, so translations to other
   languages will be easier.
-  Of course it does not translate messages from the server,
-  for that you need to read
-  https://dev.mysql.com/doc/refman/5.7/en/error-message-language.html
-  Todo: many string literals haven't been moved yet.
-  Todo: help and documentation are still pure English.
-  Languages: There are two languages: english (the default) and upper.
-             To set language to upper, say ocelotgui --ocelot_language='upper'.
-             Upper has the same strings as english, except all upper case.
-             Upper is not a serious language, so we don't document it.
+  Languages: There are two languages: english (the default) and french.
+             To set language to french, say ocelotgui --ocelot_language='french'.
+             French has translations (thanks google).
+             French is not tested, so we don't document it.
              It's just to illustrate how easy it is to add a language:
-             (1) in string_languages[], add new language's name,
-                 after "upper", before ""
+             (1) in string_languages[], add new language's English name,
+                 after "french", before "", and add new language's
+                 name for itself, after "français", before "".
              (2) add the new language's strings in er_strings,
                  er_colors, and er_menu. Important: the number
-                 of strings must be the same as for english and upper,
+                 of strings must be the same as for english and french,
                  and the %d and %s markers in strings must be preserved,
                  or ocelotgui will crash.
              (3) rebuild from source.
+  Of course ocelotgui does not translate messages from the server,
+  for that you need to read
+  https://dev.mysql.com/doc/refman/5.7/en/error-message-language.html
+*/
+/*
+Todo: many string literals haven't been moved yet.
+Todo: help and documentation are still pure English.
+Todo: add english/canadian, with correct spelling "colour", eh?
+Todo: You need to figure out whether it's okay to change the order
+Todo: Even if language = english, I still want to accept BLEU.
+      Even if language = french, I still want to accept BLUE.
+Tod:  Rename canonical_color_name --> color_to_rgb
+Todo: fontMetrics().boundingRect("LightGoldenrodYellow").width());
+Todo: During initialization, check validity of everything in ostrings.
+Todo: Look at the comparison with "_color" to make sure it is only for local settings
 */
 
 #ifndef OSTRINGS_H
@@ -46,7 +57,10 @@
 static const char *string_languages[]=
 {
   "english",
-  "upper",
+  "french",
+  ""
+  "anglais",
+  "français",
   ""
 };
 
@@ -221,86 +235,86 @@ static const char *er_strings[]=
   "Do you want to continue?", /* ER_DO_YOU_WANT_TO_CONTINUE */
   "Yes", /* ER_YES */
   "No", /* ER_NO */
-  /* UPPER */
-  "OK",                           /* ER_OK */
-  "ERROR NOT CONNECTED",          /* ER_NOT_CONNECTED */
-  "ERROR DUE TO --ONE-DATABASE",  /* ER_ONE_DATABASE */
-  "UNKNOWN COLOR",                /* ER_UNKNOWN_COLOR */
-  "UNKNOWN FONT SIZE",            /* ER_UNKNOWN_FONT_SIZE */
-  "UNKNOWN FONT WEIGHT",          /* ER_UNKNOWN_FONT_WEIGHT */
-  "UNKNOWN FONT STYLE",           /* ER_UNKNOWN_FONT_STYLE */
-  "THE $DELETE STATEMENT IS NOT SUPPORTED AT THIS TIME", /* ER_DELETE_STATEMENT */
-  "THE $SKIP STATEMENT IS NOT SUPPORTED AT THIS TIME", /* ER_SKIP_STATEMENT */
-  "THE $SOURCE STATEMENT IS NOT SUPPORTED AT THIS TIME", /* ER_SOURCE_STATEMENT */
-  "THE $EXECUTE STATEMENT IS NOT SUPPORTED AT THIS TIME", /* ER_EXECUTE_STATEMENT */
-  "$DEBUG NOT DONE",               /* ER_DEBUG_NOT_DONE */
-  "ERROR: REHASH IS NOT SUPPORTED FOR TARANTOOL", /* ER_REHASH_IS_NOT_SUPPORTED */
-  "ERROR: SELECT FAILED", /* ER_SELECT_FAILED */
-  "ERROR: MYSQL_STORE_RESULT FAILED", /* ER_MYSQL_STORE_RESULT_FAILED */
-  "ERROR: 0 ROWS RETURNED", /* ER_0_ROWS_RETURNED */
-  "ERROR: NO DATABASE SELECTED", /* ER_NO_DATABASE_SELECTED */
-  "OK. DATABASE=%S. TABLES=%D. COLUMNS=%D. FUNCTIONS=%D. PROCEDURES=%D. TRIGGERS=%D. EVENTS=%D. INDEXES=%D.", /* ER_OK_REHASH */
-  "ERROR. USE STATEMENT HAS NO ARGUMENT.", /* ER_USE */
-  "DATABASE CHANGED", /* ER_DATABASE_CHANGED */
-  "ERROR, SOURCE STATEMENT HAS NO ARGUMENT", /* ER_SOURCE */
-  "ERROR, FILE OPEN() FAILED", /* ER_FILE_OPEN */
-  "ERROR, DELIMITER SHOULD NOT BE BLANK", /* ER_DELIMITER */
-  "FOR HELP, USE THE HELP MENU ITEMS. FOR EXAMPLE CLICK: HELP | THE MANUAL.", /* ER_HELP */
-  "CHARSET NOT IMPLEMENTED",
-  "EDIT NOT IMPLEMENTED",
-  "EGO DOES NOTHING UNLESS IT'S ON ITS OWN LINE AFTER AN EXECUTABLE STATEMENT, AND --NAMED-COMMANDS IS TRUE.", /* ER_EGO */
-  "GO DOES NOTHING UNLESS IT'S ON ITS OWN LINE AFTER AN EXECUTABLE STATEMENT, AND --NAMED-COMMANDS IS TRUE.", /* ER_GO */
-  "NOPAGER NOT IMPLEMENTED", /* ER_NOPAGER */
-  "PAGER NOT IMPLEMENTED", /* ER_PAGER */
-  "PRINT NOT IMPLEMENTED", /* ER_PRINT */
-  "ERROR, FOPEN FAILED", /* ER_FOPEN */
-  "SYNTAX CHECKER VALUE MUST BE BETWEEN 0 AND 3", /* ER_SYNTAX */
-  "FORMAT STATEMENT INDENT VALUE MUST BE BETWEEN 0 AND 8", /* ER_FORMAT_STATEMENT */
-  "FORMAT CLAUSE INDENT VALUE MUST BE BETWEEN 0 AND 8", /* ER_FORMAT_CLAUSE */
-  "FORMAT KEY CASE VALUE MUST BE BE 'UPPER' OR 'LOWER' OR 'UNCHANGED'", /* FORMAT_KEY_CASE */
-  "UNKNOWN BORDER SIZE", /* ER_UNKNOWN_BORDER_SIZE */
-  "UNKNOWN CELL BORDER SIZE", /* ER_UNKNOWN_CELL_BORDER_SIZE */
-  "UNKNOWN CELL DRAG LINE SIZE", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */
-  "ILLEGAL VALUE", /* ER_ILLEGAL_VALUE */
-  " FAILED TO CONNECT. USE MENU ITEM FILE|CONNECT TO TRY AGAIN", /* ER_FAILED_TO_CONNECT */
-  " POPEN() FAILED", /* ER_POPEN_FAILED */
-  " PCLOSE() FAILED", /* ER_PCLOSE_FAILED */
-  " FAILED TO CONNECT TO TARANTOOL SERVER. USE MENU ITEM FILE|CONNECT TO TRY AGAIN", /* ER_FAILED_TO_CONNECT_TO_TARANTOOL */
-  "$SETUP GENERATED %D SURROGATES BUT THE CURRENT MAXIMUM IS %D'", /* ER_SETUP */
-  "COULD NOT GET A ROUTINE DEFINITION FOR %S.%S. ARE YOU THE ROUTINE CREATOR AND/OR DO YOU HAVE SELECT PRIVILEGE FOR MYSQL.PROC?", /* ER_COULD_NOT_GET */
-  "DBMS VERSION = %S HOST = %S PORT = %S", /* ER_STATUS */
-  "ROUTINE HAS STOPPED. SUGGESTED NEXT STEP IS: $EXIT", /* ER_ROUTINE_HAS_STOPPED */
-  "DEBUGGER REQUIRES MYSQL VERSION 5.5 OR LATER", /* ER_DEBUGGER_REQUIRES */
-  "MISSING ROUTINE NAME(S). EXPECTED SYNTAX IS: $SETUP ROUTINE-NAME [, ROUTINE-NAME ...]", /* ER_MISSING_ROUTINE_NAMES */
-  "MISSING ROUTINE NAME", /* ER_MISSING_ROUTINE_NAME */
-  "DEBUG IS ALREADY RUNNING. USE DEBUG|EXIT TO STOP IT. THIS COULD BE TEMPORARY.", /* ER_DEBUG_IS_ALREADY_RUNNING */
-  "SURROGATE NOT FOUND. PROBABLY $SETUP WASN'T DONE FOR A GROUP INCLUDING THIS ROUTINE.", /* ER_SURROGATE */
-  "SURROGATE NOT FOUND. PERHAPS $SETUP WAS NOT DONE?", /* ER_SURROGATE_NOT_FOUND */
-  "%S COULD NOT FIND A ROUTINE IN THE $SETUP GROUP: %S.%S", /* ER_COULD_NOT_FIND_A_ROUTINE */
-  "ROUTINE IS MISSING", /* ER_ROUTINE_IS_MISSING */
-  "DEBUGGEE NOT RESPONDING. CODE = %D. THREAD HAS NOT BEEN STOPPED.\n", /* ER_DEBUGGEE_NOT_RESPONDING */
-  "NO DEBUG SESSION IN PROGRESS", /* ER_NO_DEBUG_SESSION */
-  "ERROR, CORRECT STATEMENT FORMAT IS $BREAKPOINT [SCHEMA_IDENTIFIER.].ROUTINE_IDENTIFIER] LINE_NUMBER_MINIMUM [-LINE_NUMBER_MAXIMUM]", /* ER_BREAKPOINT_SYNTAX */
-  "ERROR, CORRECT STATEMENT FORMAT IS $TBREAKPOINT [SCHEMA_IDENTIFIER.].ROUTINE_IDENTIFIER] LINE_NUMBER_MINIMUM [-LINE_NUMBER_MAXIMUM]", /* ER_TBREAKPOINT_SYNTAX */
-  "ERROR, CORRECT STATEMENT FORMAT IS $CLEAR [SCHEMA_IDENTIFIER.].ROUTINE_IDENTIFIER] LINE_NUMBER_MINIMUM [-LINE_NUMBER_MAXIMUM]", /* ER_CLEAR_SYNTAX */
-  "OVERFLOW", /* ER_OVERFLOW */
-  "%S. MAYBE A NEW $SETUP NEEDED? CANNOT CONTINUE. SUGGESTED NEXT STEP IS: $EXIT", /* ER_DEBUGGEE_WAIT_LOOP */
-  "DEBUGGEE_WAIT_LOOP() IS NOT HAPPENING", /* ER_DEBUGGEE_WAIT_LOOP_IS_NOT */
-  "I STATUS COMMAND FAILED", /* ER_I_STATUS_FAILED */
-  "I STATUS COMMAND FAILED (THIS IS NOT ALWAYS A SEVERE ERROR)", /* ER_I_STATUS_FAILED_NOT_SEVERE */
-  "MYSQL_FETCH ROW FAILED", /* ER_MYSQL_FETCH_ROW_FAILED */
-  "MYSQL_NUM_FIELDS < 14", /* ER_MYSQL_NUM_FIELDS */
-  "ERROR, MYSQL_LIBRARY_INIT() FAILED", /* ER_MYSQL_LIBRARY_INIT_FAILED */
-  "SEVERE ERROR: LIBMYSQLCLIENT DOES NOT HAVE THESE NAMES: %S. CLOSE OCELOTGUI, RESTART WITH A BETTER LIBMYSQLCLIENT. SEE HELP|LIBMYSQLCLIENT FOR TIPS. FOR TIPS ABOUT MAKING SURE OCELOTGUI FINDS THE RIGHT LIBMYSQLCLIENT, CLICK HELP|LIBMYSQLCLIENT", /* ER_LIBMYSQLCLIENT_DOES_NOT_HAVE */
-  "ERROR, LIBMYSQLCLIENT WAS NOT FOUND OR A LOADING ERROR OCCURRED. MESSAGE WAS: %S. FOR TIPS ABOUT MAKING SURE OCELOTGUI FINDS LIBMYSQLCLIENT, CLICK HELP|LIBMYSQLCLIENT", /* ER_LIBMYSQLCLIENT_WAS_NOT_FOUND */
-  "(MYSQL_QUERY FAILED)", /* ER_MYSQL_QUERY_FAILED */
-  " %llu ROWS AFFECTED", /* ER_ROWS_AFFECTED */
-  ", %d WARNING", /* ER_WARNING */
-  "ERROR ", /* ER_ERROR */
-  "THE SYNTAX CHECKER THINKS THERE MIGHT BE A SYNTAX ERROR. ", /* ER_THE_SYNTAX_CHECKER_THINKS */
-  "DO YOU WANT TO CONTINUE?", /* ER_DO_YOU_WANT_TO_CONTINUE */
-  "YES", /* ER_YES */
-  "NO" /* ER_NO */
+  /* FRENCH */
+    "OK",                           /* ER_OK */
+    "Erreur non connecté",          /* ER_NOT_CONNECTED */
+    "Erreur due à --one-database",  /* ER_ONE_DATABASE */
+    "Couleur inconnue",                /* ER_UNKNOWN_COLOR */
+    "Inconnu taille de la police",            /* ER_UNKNOWN_FONT_SIZE */
+    "Inconnu poids de la police",          /* ER_UNKNOWN_FONT_WEIGHT */
+    "Inconnue style de police",           /* ER_UNKNOWN_FONT_STYLE */
+    "L'instruction $DELETE est pas pris en charge à ce moment", /* ER_DELETE_STATEMENT */
+    "L'instruction $SKIP est pas pris en charge à ce moment", /* ER_SKIP_STATEMENT */
+    "L'instruction $SOURCE est pas pris en charge à ce moment", /* ER_SOURCE_STATEMENT */
+    "L'instruction $EXECUTE est pas pris en charge à ce moment", /* ER_EXECUTE_STATEMENT */
+    "$DEBUG n'a pas été fait",               /* ER_DEBUG_NOT_DONE */
+    "Erreur: rehash est pas pris en charge pour Tarantool", /* ER_REHASH_IS_NOT_SUPPORTED */
+    "Erreur: select échoué", /* ER_SELECT_FAILED */
+    "Erreur: mysql_store_result échoué", /* ER_MYSQL_STORE_RESULT_FAILED */
+    "Erreur: 0 lignes retournées", /* ER_0_ROWS_RETURNED */
+    "Erreur: aucune base de données sélectionnée", /* ER_NO_DATABASE_SELECTED */
+    "OK. base de données =% s. tables =% d. colonnes =% d. fonctions =% et. procédures =% et. = déclenche% et. events =% d. index =% d", /* ER_OK_REHASH */
+    "Error. USE statement has no argument.", /* ER_USE */
+    "Erreur. instruction USE n'a pas d'argument.", /* ER_DATABASE_CHANGED */
+    "Erreur. instruction SOURCE n'a pas d'argument.", /* ER_SOURCE */
+    "Erreur: file_open() échoué", /* ER_FILE_OPEN */
+    "Erreur, delimiter ne doit pas être vide", /* ER_DELIMITER */
+    "Pour HELP, utiliser les éléments du menu Aide. Par exemple cliquez sur: Aide | Le manuel.", /* ER_HELP */
+    "CHARSET pas mis en oeuvre",
+    "EDIT not implemented",
+    "EGO ne fait rien à moins que son sur sa propre ligne après une instruction exécutable, et --named-commandes est vrai.", /* ER_EGO */
+    "GO ne fait rien à moins que son sur sa propre ligne après une instruction exécutable, et --named-commandes est vrai..", /* ER_GO */
+    "NOPAGER pas mis en œuvre", /* ER_NOPAGER */
+    "PAGER pas mis en oeuvre", /* ER_PAGER */
+    "PRINT pas mis en oeuvre", /* ER_PRINT */
+    "Erreur, fopen échoué", /* ER_FOPEN */
+    "Syntaxe valeur (pour vérificateur de syntaxe) doit être comprise entre 0 et 3", /* ER_SYNTAX */
+    "Format déclaration  valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_STATEMENT */
+    "Format clause valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_CLAUSE */
+    "Format valeur de cas clé doit être soit «supérieure» ou «inférieur» ou «inchangé»", /* FORMAT_KEY_CASE */
+    "Taille de la bordure inconnu", /* ER_UNKNOWN_BORDER_SIZE */
+    "Taille de la bordure de la cellule inconnu ", /* ER_UNKNOWN_CELL_BORDER_SIZE */
+    "Taille de dragline cellulaire inconnu", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */
+    "Valeur illégale", /* ER_ILLEGAL_VALUE */
+    " Échec de connexion. Utilisez le menu Fichier|Connexion pour essayer de nouveau", /* ER_FAILED_TO_CONNECT */
+    " popen() échoué", /* ER_POPEN_FAILED */
+    " pclose() échoué", /* ER_PCLOSE_FAILED */
+    " Échec de connexion au serveur Tarantool. Utilisez le menu Fichier|Connexion pour essayer de nouveau", /* ER_FAILED_TO_CONNECT_TO_TARANTOOL */
+    "$setup a généré %d substituts, mais le courant maximum est %d'", /* ER_SETUP */
+    "Impossible d'obtenir une définition de routine pour %s.%s. Êtes-vous le créateur de routine et / ou avez-vous le privilège SELECT pour mysql.proc?", /* ER_COULD_NOT_GET */
+    "SGBD version = %s Hôte = %s Port = %s", /* ER_STATUS */
+    "Routine est arrêté. Suggérée étape suivante est: $EXIT", /* ER_ROUTINE_HAS_STOPPED */
+    "Debugger nécessite la version MySQL 5.5 ou version ultérieure", /* ER_DEBUGGER_REQUIRES */
+    "Nom(s) de routine(s) manquant(s). syntaxe attendue est: $setup nom-routine [, nom-routine ...]", /* ER_MISSING_ROUTINE_NAMES */
+    "Nom de routine manquant", /* ER_MISSING_ROUTINE_NAME */
+    "Debug est déjà en cours d'exécution. Utilisez Debug | sortie pour l'arrêter. Ceci pourrait être temporaire.", /* ER_DEBUG_IS_ALREADY_RUNNING */
+    "Surrogate pas trouvé. Probablement $setup n'a pas été fait pour un groupe, y compris cette routine.", /* ER_SURROGATE */
+    "Surrogate pas trouvé. Peut-être $setup n'a pas été fait?", /* ER_SURROGATE_NOT_FOUND */
+    "%s n'a pas pu trouver une routine dans le groupe de $setup: %s.%s", /* ER_COULD_NOT_FIND_A_ROUTINE */
+    "Routine is missing", /* ER_ROUTINE_IS_MISSING */
+    "Debuggee ne répond pas. Code =%d. Sujet n'a pas été arrêté.\n", /* ER_DEBUGGEE_NOT_RESPONDING */
+    "Aucune session de débogage en cours", /* ER_NO_DEBUG_SESSION */
+    "Erreur, le format de l'instruction correcte est $breakpoint [schema_identifier.].routine_identifier] line_number_minimum [-line_number_maximum]", /* ER_BREAKPOINT_SYNTAX */
+    "Erreur, le format de l'instruction correcte est $tbreakpoint [schema_identifier.].routine_identifier] line_number_minimum [-line_number_maximum]", /* ER_TBREAKPOINT_SYNTAX */
+    "Erreur, le format de l'instruction correcte est $clear [schema_identifier.].routine_identifier] line_number_minimum [-line_number_maximum]", /* ER_CLEAR_SYNTAX */
+    "Débordement", /* ER_OVERFLOW */
+    "%s. peut-être une nouvelle $SETUP nécessaire? ne peut pas continuer. Suggérée étape suivante est: $EXIT", /* ER_DEBUGGEE_WAIT_LOOP */
+    "debuggee_wait_loop() ne se produit pas", /* ER_DEBUGGEE_WAIT_LOOP_IS_NOT */
+    "i status commande a échoué", /* ER_I_STATUS_FAILED */
+    "i status commande a échoué (ceci n'est pas toujours une erreur grave)", /* ER_I_STATUS_FAILED_NOT_SEVERE */
+    "mysql_fetch row échoué", /* ER_MYSQL_FETCH_ROW_FAILED */
+    "mysql_num_fields < 14", /* ER_MYSQL_NUM_FIELDS */
+    "Erreur, mysql_library_init() échoué", /* ER_MYSQL_LIBRARY_INIT_FAILED */
+    "Severe error: libmysqlclient n'a pas ces noms: %s. Fermer ocelotgui, redémarrez avec une meilleure libmysqlclient. Voir Aide|libmysqlclient pour obtenir des conseils. Pour des conseils sur comment ocelotgui cherche le correct libmysqlclient, cliquez sur Aide|libmysqlclient", /* ER_LIBMYSQLCLIENT_DOES_NOT_HAVE */
+    "Erreur, libmysqlclient n'a pas été trouvé ou une erreur de chargement est produite. Message était: %s. Pour des conseils sur comment ocelotgui cherche le correct libmysqlclient, cliquez sur Aide|libmysqlclient", /* ER_LIBMYSQLCLIENT_WAS_NOT_FOUND */
+    "(mysql_query échoué)", /* ER_MYSQL_QUERY_FAILED */
+    " %llu lignes affectées", /* ER_ROWS_AFFECTED */
+    ", %d avertissement", /* ER_WARNING */
+    "Erreur ", /* ER_ERROR */
+    "Le vérificateur de syntaxe pense qu'il pourrait y avoir une erreur de syntaxe.", /* ER_THE_SYNTAX_CHECKER_THINKS */
+    "Voulez-vous continuer?", /* ER_DO_YOU_WANT_TO_CONTINUE */
+    "Oui", /* ER_YES */
+    "Non" /* ER_NO */
 };
 
 /*
@@ -618,7 +632,7 @@ static const char *s_color_list[]=
 "Yellow","#FFFF00",
 "YellowGreen","#9ACD32",
 "","",
-/* UPPER */ /* Actually, French, some is from an uncopyrighted web page */
+/* FRENCH */ /* Some French colors are from an uncopyrighted web page */
 "Bleu Gris","#F0F8FF",
 "Blanc antique","#FAEBD7",
 "Bleu-vert","#00FFFF",
@@ -956,97 +970,97 @@ static const char *menu_strings[]=
     "Pick new font",
     "Connection Dialog Box",
     "File|Connect. Usually only the first 8 fields are important.",
-/* UPPER */
-"FILE", /* MENU_FILE */
-"CONNECT", /* MENU_FILE_CONNECT */
-"EXIT", /* MENU_FILE_EXIT */
-"EDIT", /* MENU_EDIT */
-"UNDO", /* MENU_EDIT_UNDO */
-"REDO", /* MENU_EDIT_REDO */
-"CUT", /* MENU_EDIT_CUT */
-"COPY", /* MENU_EDIT_COPY */
-"PASTE", /* MENU_EDIT_PASTE */
-"SELECT ALL", /* MENU_EDIT_SELECT_ALL */
-"PREVIOUS STATEMENT", /* MENU_EDIT_PREVIOUS_STATEMENT */
-"NEXT STATEMENT", /* MENU_EDIT_NEXT_STATEMENT */
-"FORMAT", /* MENU_EDIT_FORMAT */
-"RUN", /* MENU_RUN */
-"EXECUTE", /* MENU_RUN_EXECUTE */
-"KILL", /* MENU_RUN_KILL */
-"SETTINGS", /* MENU_SETTINGS */
-"MENU", /* MENU_SETTINGS_MENU */
-"HISTORY WIDGET", /* MENU_SETTINGS_HISTORY_WIDGET */
-"GRID WIDGET", /* MENU_SETTINGS_GRID_WIDGET */
-"STATEMENT WIDGET", /* MENU_SETTINGS_STATEMENT_WIDGET */
-"EXTRA RULE 1", /* MENU_SETTINGS_EXTRA_RULE_1 */
-"OPTIONS", /* MENU_OPTIONS */
-"DETACH HISTORY WIDGET", /* MENU_OPTIONS_DETACH_HISTORY_WIDGET */
-"DETACH RESULT GRID WIDGET", /* MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET */
-"DETACH DEBUG WIDGET", /* MENU_OPTIONS_DETACH_DEBUG_WIDGET */
-"DEBUG", /* MENU_DEBUG */
-"INSTALL", /* MENU_DEBUG_INSTALL */
-"SETUP", /* MENU_DEBUG_SETUP */
-"DEBUG", /* MENU_DEBUG_DEBUG */
-"BREAKPOINT", /* MENU_DEBUG_BREAKPOINT */
-"CONTINUE", /* MENU_DEBUG_CONTINUE */
-"LEAVE", /* MENU_DEBUG_LEAVE */
-"NEXT", /* MENU_DEBUG_NEXT */
-"SKIP", /* MENU_DEBUG_SKIP */
-"STEP", /* MENU_DEBUG_STEP */
-"CLEAR", /* MENU_DEBUG_CLEAR */
-"DELETE", /* MENU_DEBUG_DELETE */
-"EXIT", /* MENU_DEBUG_EXIT */
-"INFORMATION", /* MENU_DEBUG_INFORMATION */
-"REFRESH SERVER VARIABLE", /* MENU_DEBUG_REFRESH_SERVER_VARIABLES */
-"REFRESH USER VARIABLES", /* MENU_DEBUG_REFRESH_USER_VARIABLES */
-"REFRESH VARIABLES", /* MENU_DEBUG_REFRESH_VARIABLES */
-"REFRESH CALL STACK", /* MENU_DEBUG_REFRESH_CALL_STACK */
-"HELP", /* MENU_HELP */
-"ABOUT", /* MENU_HELP_ABOUT */
-"THE MANUAL", /* MENU_HELP_THE_MANUAL */
-"LIBMYSQLCLIENT", /* MENU_HELP_LIBMYSQLCLIENT */
-"SETTINGS", /* MENU_HELP_SETTINGS */
-    "STATEMENT TEXT COLOR", /* MENU_STATEMENT_TEXT_COLOR */
-    "STATEMENT BACKGROUND COLOR",
-    "STATEMENT HIGHLIGHT LITERAL COLOR",
-    "STATEMENT HIGHLIGHT IDENTIFIER COLOR",
-    "STATEMENT HIGHLIGHT COMMENT COLOR",
-    "STATEMENT HIGHLIGHT OPERATOR COLOR",
-    "STATEMENT HIGHLIGHT KEYWORD COLOR",
-    "STATEMENT PROMPT BACKGROUND COLOR",
-    "STATEMENT BORDER COLOR",
-    "STATEMENT HIGHLIGHT CURRENT LINE COLOR",
-    "STATEMENT HIGHLIGHT FUNCTION COLOR",
-    "GRID TEXT COLOR",
-    "GRID BACKGROUND COLOR",
-    "GRID CELL BORDER COLOR",
-    "GRID CELL DRAG LINE COLOR",
-    "GRID HEADER BACKGROUND COLOR",
-    "GRID BORDER COLOR",
-    "GRID BORDER SIZE",
-    "GRID CELL BORDER SIZE",
-    "GRID CELL DRAG LINE SIZE",
-    "HISTORY TEXT COLOR",
-    "HISTORY BACKGROUND COLOR",
-    "HISTORY BORDER COLOR",
-    "MENU TEXT COLOR",
-    "MENU BACKGROUND COLOR",
-    "MENU BORDER COLOR",
-    "FONT       ",
-    "MAX ROW COUNT",
-    "SYNTAX CHECKER (1=HIGHLIGHT,3=HIGHLIGHT+ERROR DIALOG)",
-    "CONDITION",
-    "DISPLAY AS",
-    "CANCEL",
-    "OK",
-    "SETTINGS -- -- FOR MENU",
-    "SETTINGS -- -- FOR HISTORY",
-    "SETTINGS -- -- FOR GRID",
-    "SETTINGS -- -- FOR STATEMENT",
-    "SETTINGS -- -- FOR EXTRA RULE 1",
-    "PICK NEW FONT",
-    "CONNECTION DIALOG BOX",
-    "FILE|CONNECT. USUALLY ONLY THE FIRST 8 FIELDS ARE IMPORTANT."
+    /* FRENCH */
+    "Fichier", /* MENU_FILE */
+    "Connexion", /* MENU_FILE_CONNECT */
+    "Sortie", /* MENU_FILE_EXIT */
+    "Éditer", /* MENU_EDIT */
+    "Défaire", /* MENU_EDIT_UNDO */
+    "Fefaire", /* MENU_EDIT_REDO */
+    "Couper", /* MENU_EDIT_CUT */
+    "Copier", /* MENU_EDIT_COPY */
+    "Coller", /* MENU_EDIT_PASTE */
+    "Sélectionné Tout", /* MENU_EDIT_SELECT_ALL */
+    "Instruction précédente", /* MENU_EDIT_PREVIOUS_STATEMENT */
+    "Instruction suivante", /* MENU_EDIT_NEXT_STATEMENT */
+    "Format", /* MENU_EDIT_FORMAT */
+    "Courir", /* MENU_RUN */
+    "Exécuter", /* MENU_RUN_EXECUTE */
+    "Tuer", /* MENU_RUN_KILL */
+    "Réglages", /* MENU_SETTINGS */
+    "Menu", /* MENU_SETTINGS_MENU */
+    "Histoire Widget", /* MENU_SETTINGS_HISTORY_WIDGET */
+    "Grille Widget", /* MENU_SETTINGS_GRID_WIDGET */
+    "Instruction Widget", /* MENU_SETTINGS_STATEMENT_WIDGET */
+    "Règle supplémentaire 1", /* MENU_SETTINGS_EXTRA_RULE_1 */
+    "Options", /* MENU_OPTIONS */
+    "Détacher history widget", /* MENU_OPTIONS_DETACH_HISTORY_WIDGET */
+    "Détacher result grid widget", /* MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET */
+    "Détacher debug widget", /* MENU_OPTIONS_DETACH_DEBUG_WIDGET */
+    "Debug", /* MENU_DEBUG */
+    "Install", /* MENU_DEBUG_INSTALL */
+    "Setup", /* MENU_DEBUG_SETUP */
+    "Debug", /* MENU_DEBUG_DEBUG */
+    "Breakpoint", /* MENU_DEBUG_BREAKPOINT */
+    "Continue", /* MENU_DEBUG_CONTINUE */
+    "Leave", /* MENU_DEBUG_LEAVE */
+    "Next", /* MENU_DEBUG_NEXT */
+    "Skip", /* MENU_DEBUG_SKIP */
+    "Step", /* MENU_DEBUG_STEP */
+    "Clear", /* MENU_DEBUG_CLEAR */
+    "Delete", /* MENU_DEBUG_DELETE */
+    "Exit", /* MENU_DEBUG_EXIT */
+    "Information", /* MENU_DEBUG_INFORMATION */
+    "Refresh server variable", /* MENU_DEBUG_REFRESH_SERVER_VARIABLES */
+    "Refresh user variables", /* MENU_DEBUG_REFRESH_USER_VARIABLES */
+    "Refresh variables", /* MENU_DEBUG_REFRESH_VARIABLES */
+    "Refresh call stack", /* MENU_DEBUG_REFRESH_CALL_STACK */
+    "Aide", /* MENU_HELP */
+    "Sur", /* MENU_HELP_ABOUT */
+    "Le Manuel", /* MENU_HELP_THE_MANUAL */
+    "libmysqlclient", /* MENU_HELP_LIBMYSQLCLIENT */
+    "réglages", /* MENU_HELP_SETTINGS */
+        "Instruction Texte Couleur", /* MENU_STATEMENT_TEXT_COLOR */
+        "Instruction Couleur de fond",
+        "Instruction Surbrillance Literal Couleur",
+        "Instruction Surbrillance Identificateur Couleur",
+        "Instruction Surbrillance Commentaire Couleur",
+        "Instruction Surbrillance Opérateur Couleur",
+        "Instruction Surbrillance Mot-clé Couleur",
+        "Instruction Incitation Couleur de fond",
+        "Instruction Bordure Couleur",
+        "Instruction Surbrillance Ligne Courante Couleur",
+        "Instruction Surbrillance Fonction Couleur",
+        "Grille Texte Couleur",
+        "Grille Couleur de fond",
+        "Grille Cellule Couleur de fond",
+        "Grille Cellule Drag Line Couleur",
+        "Grille Rubrique Couleur de fond",
+        "Grille Bordure Couleur",
+        "Grille Bordure Taille",
+        "Grille Cellule Border Taille",
+        "Grille Cellule Drag Line Taille",
+        "Histoire Texte Couleur",
+        "Histoire Texte Couleur de fond",
+        "Histoire Bordure Couleur",
+        "Menu Texte Couleur",
+        "Menu Couleur de fond",
+        "Menu Bordure Couleur",
+        "Police     ",
+        "Comte Max Line",
+        "Cérificateur de syntaxe (1=Surbrillance,3=Surbrillance+dialogue d'erreur)",
+        "Condition",
+        "Afficher comme",
+        "Annuler",
+        "OK",
+        "Réglages -- -- pour Menu",
+        "Réglages -- -- pour Histoire",
+        "Réglages -- -- pour Grille",
+        "Réglages -- -- pour Instruction",
+        "Réglages -- -- pour Règle supplémentaire 1",
+        "Choisir nouvelle police",
+        "Connexion Boîte de dialogue",
+        "Fichier|Connect. Habituellement, seuls les 8 premiers champs sont importants."
 };
 
 static unsigned int er_off= 0;    /* to offset er_strings language */

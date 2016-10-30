@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: October 28 2016
+   Last modified: October 30 2016
 */
 
 /*
@@ -3119,7 +3119,7 @@ QString MainWindow::q_color_list_name(QString rgb_name)
 {
   for (int i= 1; i < q_color_list.size(); i+= 2)
   {
-    if (QString::compare(rgb_name, q_color_list[i], Qt::CaseInsensitive) == 0) return q_color_list[i - 1];
+    if (QString::compare(rgb_name, q_color_list[i], Qt::CaseInsensitive) == 0) return rgb_name;
   }
   q_color_list.append(rgb_name);
   q_color_list.append(rgb_name);
@@ -3130,43 +3130,42 @@ QString MainWindow::q_color_list_name(QString rgb_name)
   It's possible to say SET [ocelot color name] = rgb_name e.g. "#FFFFFF"
   or have rgb_name in an options file or get an RGB name with set_current_colors_and_fonts().
   We'd prefer to show as W3C names where possible, X11 names as second choice, if English.
-  Todo: with the new system, we don't appear to need this any more,
-        the colors are stored as RGB. So soon we can throw this away.
+  But where the color is not in the W3C or X11 lists, we'll add.
 */
 void MainWindow::assign_names_for_colors()
 {
-  //if (ocelot_statement_text_color.left(1) == "#") ocelot_statement_text_color= q_color_list_name(ocelot_statement_text_color);
-  //if (ocelot_statement_background_color.left(1) == "#") ocelot_statement_background_color= q_color_list_name(ocelot_statement_background_color);
-  //if (ocelot_statement_border_color.left(1) == "#") ocelot_statement_border_color= q_color_list_name(ocelot_statement_border_color);
-  //if (ocelot_statement_highlight_literal_color.left(1) == "#") ocelot_statement_highlight_literal_color= q_color_list_name(ocelot_statement_highlight_literal_color);
-  //if (ocelot_statement_highlight_identifier_color.left(1) == "#") ocelot_statement_highlight_identifier_color= q_color_list_name(ocelot_statement_highlight_identifier_color);
-  //if (ocelot_statement_highlight_comment_color.left(1) == "#") ocelot_statement_highlight_comment_color= q_color_list_name(ocelot_statement_highlight_comment_color);
-  //if (ocelot_statement_highlight_operator_color.left(1) == "#") ocelot_statement_highlight_operator_color= q_color_list_name(ocelot_statement_highlight_operator_color);
-  //if (ocelot_statement_highlight_keyword_color.left(1) == "#") ocelot_statement_highlight_keyword_color= q_color_list_name(ocelot_statement_highlight_keyword_color);
-  //if (ocelot_statement_prompt_background_color.left(1) == "#") ocelot_statement_prompt_background_color= q_color_list_name(ocelot_statement_prompt_background_color);
-  //if (ocelot_statement_highlight_current_line_color.left(1) == "#") ocelot_statement_highlight_current_line_color= q_color_list_name(ocelot_statement_highlight_current_line_color);
-  //if (ocelot_statement_highlight_function_color.left(1) == "#") ocelot_statement_highlight_function_color= q_color_list_name(ocelot_statement_highlight_function_color);
-  //if (ocelot_grid_text_color.left(1) == "#") ocelot_grid_text_color= q_color_list_name(ocelot_grid_text_color);
-  //if (ocelot_grid_border_color.left(1) == "#") ocelot_grid_border_color= q_color_list_name(ocelot_grid_border_color);
-  //if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
-  //if (ocelot_grid_header_background_color.left(1) == "#") ocelot_grid_header_background_color= q_color_list_name(ocelot_grid_header_background_color);
-  //if (ocelot_grid_font_family.left(1) == "#") ocelot_grid_font_family= q_color_list_name(ocelot_grid_font_family);
-  //if (ocelot_grid_font_size.left(1) == "#") ocelot_grid_font_size= q_color_list_name(ocelot_grid_font_size);
-  //if (ocelot_grid_font_style.left(1) == "#") ocelot_grid_font_style= q_color_list_name(ocelot_grid_font_style);
-  //if (ocelot_grid_font_weight.left(1) == "#") ocelot_grid_font_weight= q_color_list_name(ocelot_grid_font_weight);
-  //if (ocelot_grid_cell_border_color.left(1) == "#") ocelot_grid_cell_border_color= q_color_list_name(ocelot_grid_cell_border_color);
-  //if (ocelot_grid_cell_drag_line_color.left(1) == "#") ocelot_grid_cell_drag_line_color= q_color_list_name(ocelot_grid_cell_drag_line_color);
-  //if (ocelot_grid_border_size.left(1) == "#") ocelot_grid_border_size= q_color_list_name(ocelot_grid_border_size);
-  //if (ocelot_grid_cell_border_size.left(1) == "#") ocelot_grid_cell_border_size= q_color_list_name(ocelot_grid_cell_border_size);
-  //if (ocelot_grid_cell_drag_line_size.left(1) == "#") ocelot_grid_cell_drag_line_size= q_color_list_name(ocelot_grid_cell_drag_line_size);
-  //if (ocelot_history_text_color.left(1) == "#") ocelot_history_text_color= q_color_list_name(ocelot_history_text_color);
-  //if (ocelot_history_background_color.left(1) == "#") ocelot_history_background_color= q_color_list_name(ocelot_history_background_color);
-  //if (ocelot_history_border_color.left(1) == "#") ocelot_history_border_color= q_color_list_name(ocelot_history_border_color);
-  //if (ocelot_menu_text_color.left(1) == "#") ocelot_menu_text_color= q_color_list_name(ocelot_menu_text_color);
-  //if (ocelot_menu_background_color.left(1) == "#") ocelot_menu_background_color= q_color_list_name(ocelot_menu_background_color);
-  //if (ocelot_menu_border_color.left(1) == "#") ocelot_menu_border_color= q_color_list_name(ocelot_menu_border_color);
-  //if (ocelot_extra_rule_1_text_color.left(1) == "#") ocelot_extra_rule_1_text_color= q_color_list_name(ocelot_extra_rule_1_text_color);
-  //if (ocelot_extra_rule_1_background_color.left(1) == "#") ocelot_extra_rule_1_background_color= q_color_list_name(ocelot_extra_rule_1_background_color);
+  if (ocelot_statement_text_color.left(1) == "#") ocelot_statement_text_color= q_color_list_name(ocelot_statement_text_color);
+  if (ocelot_statement_background_color.left(1) == "#") ocelot_statement_background_color= q_color_list_name(ocelot_statement_background_color);
+  if (ocelot_statement_border_color.left(1) == "#") ocelot_statement_border_color= q_color_list_name(ocelot_statement_border_color);
+  if (ocelot_statement_highlight_literal_color.left(1) == "#") ocelot_statement_highlight_literal_color= q_color_list_name(ocelot_statement_highlight_literal_color);
+  if (ocelot_statement_highlight_identifier_color.left(1) == "#") ocelot_statement_highlight_identifier_color= q_color_list_name(ocelot_statement_highlight_identifier_color);
+  if (ocelot_statement_highlight_comment_color.left(1) == "#") ocelot_statement_highlight_comment_color= q_color_list_name(ocelot_statement_highlight_comment_color);
+  if (ocelot_statement_highlight_operator_color.left(1) == "#") ocelot_statement_highlight_operator_color= q_color_list_name(ocelot_statement_highlight_operator_color);
+  if (ocelot_statement_highlight_keyword_color.left(1) == "#") ocelot_statement_highlight_keyword_color= q_color_list_name(ocelot_statement_highlight_keyword_color);
+  if (ocelot_statement_prompt_background_color.left(1) == "#") ocelot_statement_prompt_background_color= q_color_list_name(ocelot_statement_prompt_background_color);
+  if (ocelot_statement_highlight_current_line_color.left(1) == "#") ocelot_statement_highlight_current_line_color= q_color_list_name(ocelot_statement_highlight_current_line_color);
+  if (ocelot_statement_highlight_function_color.left(1) == "#") ocelot_statement_highlight_function_color= q_color_list_name(ocelot_statement_highlight_function_color);
+  if (ocelot_grid_text_color.left(1) == "#") ocelot_grid_text_color= q_color_list_name(ocelot_grid_text_color);
+  if (ocelot_grid_border_color.left(1) == "#") ocelot_grid_border_color= q_color_list_name(ocelot_grid_border_color);
+  if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
+  if (ocelot_grid_header_background_color.left(1) == "#") ocelot_grid_header_background_color= q_color_list_name(ocelot_grid_header_background_color);
+  if (ocelot_grid_font_family.left(1) == "#") ocelot_grid_font_family= q_color_list_name(ocelot_grid_font_family);
+  if (ocelot_grid_font_size.left(1) == "#") ocelot_grid_font_size= q_color_list_name(ocelot_grid_font_size);
+  if (ocelot_grid_font_style.left(1) == "#") ocelot_grid_font_style= q_color_list_name(ocelot_grid_font_style);
+  if (ocelot_grid_font_weight.left(1) == "#") ocelot_grid_font_weight= q_color_list_name(ocelot_grid_font_weight);
+  if (ocelot_grid_cell_border_color.left(1) == "#") ocelot_grid_cell_border_color= q_color_list_name(ocelot_grid_cell_border_color);
+  if (ocelot_grid_cell_drag_line_color.left(1) == "#") ocelot_grid_cell_drag_line_color= q_color_list_name(ocelot_grid_cell_drag_line_color);
+  if (ocelot_grid_border_size.left(1) == "#") ocelot_grid_border_size= q_color_list_name(ocelot_grid_border_size);
+  if (ocelot_grid_cell_border_size.left(1) == "#") ocelot_grid_cell_border_size= q_color_list_name(ocelot_grid_cell_border_size);
+  if (ocelot_grid_cell_drag_line_size.left(1) == "#") ocelot_grid_cell_drag_line_size= q_color_list_name(ocelot_grid_cell_drag_line_size);
+  if (ocelot_history_text_color.left(1) == "#") ocelot_history_text_color= q_color_list_name(ocelot_history_text_color);
+  if (ocelot_history_background_color.left(1) == "#") ocelot_history_background_color= q_color_list_name(ocelot_history_background_color);
+  if (ocelot_history_border_color.left(1) == "#") ocelot_history_border_color= q_color_list_name(ocelot_history_border_color);
+  if (ocelot_menu_text_color.left(1) == "#") ocelot_menu_text_color= q_color_list_name(ocelot_menu_text_color);
+  if (ocelot_menu_background_color.left(1) == "#") ocelot_menu_background_color= q_color_list_name(ocelot_menu_background_color);
+  if (ocelot_menu_border_color.left(1) == "#") ocelot_menu_border_color= q_color_list_name(ocelot_menu_border_color);
+  if (ocelot_extra_rule_1_text_color.left(1) == "#") ocelot_extra_rule_1_text_color= q_color_list_name(ocelot_extra_rule_1_text_color);
+  if (ocelot_extra_rule_1_background_color.left(1) == "#") ocelot_extra_rule_1_background_color= q_color_list_name(ocelot_extra_rule_1_background_color);
 }
 
 
@@ -3361,9 +3360,20 @@ QString MainWindow::rgb_to_color(QString rgb)
 */
 QString MainWindow::canonical_color_name(QString color_name_string)
 {
+  /* Todo: This is bad, you fail to check if the RGB is valid now. */
   if (color_name_string.left(1) == "#") return color_name_string;
 
   QString s;
+  QString co;
+
+  /*
+    Todo: This appears to work for setting colors that contain ''
+    but what if I SET ... = "...''..." elsewhere?
+  */
+  if (color_name_string.contains("''"))
+    co= color_name_string.replace("''", "'");
+  else co= color_name_string;
+
   /* Search #1: in the color list for the current language offset. */
   for (int i= color_off; strcmp(s_color_list[i], "") > 0; i+= 2)
   {
@@ -7674,6 +7684,8 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_text_color= ccn;
+        make_style_strings();
+        statement_edit_widget_setstylesheet();
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_background_color", Qt::CaseInsensitive) == 0)
@@ -7772,6 +7784,8 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_prompt_background_color= ccn;
+        make_style_strings();
+        statement_edit_widget_setstylesheet();
         statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
