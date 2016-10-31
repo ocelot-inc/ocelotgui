@@ -346,6 +346,16 @@ public:
     Problem: you cannot muck statement itself because menu might be changed while statement is up
     See also: Client variables that can be changed with the Settings widget
     Todo: Shouldn't client variables be in statement widget?
+    Todo: (bug) If I change grid color or font weight or font style
+          via the settings menu, the effect is immediate. But if I change
+          them by executing SET ..., the effect is delayed, until the
+          next time I type something or bring up a menu. I believe this
+          is happening because going to settings menu will invalidate the
+          grid widget area so it gets repainted; however, explicitly
+          saying update() or repaint() solves nothing -- only hide()
+          and show() force the widget change to be immediate.
+          For other widgets I have kludged around similar problems,
+          but I fear that I'm repainting multiple times unnecessarily.
   */
   QString ocelot_statement_text_color, new_ocelot_statement_text_color;
   QString ocelot_statement_background_color, new_ocelot_statement_background_color;
@@ -6097,6 +6107,9 @@ public:
   int current_widget;
 
 
+/* Following might be too short for some new language in ostrings.h */
+#define MAX_COLOR_NAME_WIDTH 24
+
 /* TODO: probably some memory is leaking. I don't say "(this)" every time I say "new". */
 public:
 Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
@@ -6201,7 +6214,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 
     label_for_color_show[ci]= new QLabel(this);
     set_widget_values(ci);
-    label_for_color[ci]->setFixedWidth(label_for_color_width * 20);
+    label_for_color[ci]->setFixedWidth(label_for_color_width * MAX_COLOR_NAME_WIDTH);
     //label_for_color_rgb[ci]->setFixedWidth(label_for_color_width * 12);
     label_for_color_rgb[ci]->setFixedWidth(this->fontMetrics().boundingRect("LightGoldenrodYellow").width());
     //label_for_color_show[ci]->setEnabled(false);
@@ -6285,7 +6298,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       combo_box_for_size[ci]= new QComboBox();
       combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 3);
       for (int cj= 0; cj < 11; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
-      label_for_size[ci]->setFixedWidth(label_for_color_width * 20);
+      label_for_size[ci]->setFixedWidth(label_for_color_width * MAX_COLOR_NAME_WIDTH);
       if (ci == 0) combo_box_for_size[0]->setCurrentIndex(copy_of_parent->new_ocelot_grid_border_size.toInt());
       if (ci == 1) combo_box_for_size[1]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_border_size.toInt());
       if (ci == 2) combo_box_for_size[2]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_drag_line_size.toInt());

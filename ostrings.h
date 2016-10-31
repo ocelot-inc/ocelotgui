@@ -33,7 +33,14 @@
                  of strings must be the same as for english and french,
                  and the %d and %s markers in strings must be preserved,
                  or ocelotgui will crash.
-             (3) rebuild from source.
+             (3) translating color names: color names must not begin
+                 with "#" or be blank. We accept SET ..._color = 'bleu';
+                 etc. even if language='english' because
+                 canonical_color_name() searches all s_color_list.
+                 Color names should be short, watch MAX_COLOR_NAME_WIDTH.
+                 Probably French names don't have to be in the same order
+                 as English names, but I haven't tested that carefully.
+             (4) rebuild from source.
   Of course ocelotgui does not translate messages from the server,
   for that you need to read
   https://dev.mysql.com/doc/refman/5.7/en/error-message-language.html
@@ -42,13 +49,8 @@
 Todo: many string literals haven't been moved yet.
 Todo: help and documentation are still pure English.
 Todo: add english/canadian, with correct spelling "colour", eh?
-Todo: You need to figure out whether it's okay to change the order
-Todo: Even if language = english, I still want to accept BLEU.
-      Even if language = french, I still want to accept BLUE.
-Tod:  Rename canonical_color_name --> color_to_rgb
 Todo: fontMetrics().boundingRect("LightGoldenrodYellow").width());
 Todo: During initialization, check validity of everything in ostrings.
-Todo: Look at the comparison with "_color" to make sure it is only for local settings
 */
 
 #ifndef OSTRINGS_H
@@ -58,7 +60,7 @@ static const char *string_languages[]=
 {
   "english",
   "french",
-  ""
+  "",
   "anglais",
   "français",
   ""
@@ -779,7 +781,7 @@ static const char *s_color_list[]=
 "WebPourpre","#7F007F",
 "Blé","#F5DEB3",
 "Blanc","#FFFFFF",
-"Blanc blanc cendré","#F5F5F5",
+"Blanc cendré","#F5F5F5",
 "Jaune","#FFFF00",
 "Vert jaunâtre","#9ACD32",
 "",""
@@ -1038,7 +1040,7 @@ static const char *menu_strings[]=
         "Grille Rubrique Couleur de fond",
         "Grille Bordure Couleur",
         "Grille Bordure Taille",
-        "Grille Cellule Border Taille",
+        "Grille Cellule Bordure Taille",
         "Grille Cellule Drag Line Taille",
         "Histoire Texte Couleur",
         "Histoire Texte Couleur de fond",
@@ -1068,4 +1070,3 @@ static unsigned int color_off= 0; /* to offset color_strings language */
 static unsigned int menu_off= 0;  /* to offset menu_strings language */
 
 #endif // OSTRINGS_H
-

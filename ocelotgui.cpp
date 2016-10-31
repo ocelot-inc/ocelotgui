@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: October 30 2016
+   Last modified: October 31 2016
 */
 
 /*
@@ -3329,15 +3329,19 @@ QFont MainWindow::get_fixed_font()
   Todo: I think there's redundancy somewhere, that is,
         some other procedure does the same thing.
 */
+/*
+  Test: change q_i = 0 to q_i= color_off
+        change q_i + color_off to q_i
+*/
 QString MainWindow::rgb_to_color(QString rgb)
 {
-  char rgb_as_utf8[128]; /* must be > max rgb length, allow for error */
-  strcpy(rgb_as_utf8, rgb.toUtf8());
-  for (int q_i= 0; strcmp(s_color_list[q_i]," ") > 0; q_i+= 2)
+  char rgb_as_utf8[128]; /* actually max rgb len = 7, allow for error */
+  strcpy(rgb_as_utf8, rgb.toUpper().toUtf8());
+  for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; q_i+= 2)
   {
     if (strcmp(s_color_list[q_i + 1], rgb_as_utf8) == 0)
     {
-      QString color_name= s_color_list[q_i + color_off];
+      QString color_name= s_color_list[q_i];
       return color_name;
     }
   }
@@ -3349,67 +3353,94 @@ QString MainWindow::rgb_to_color(QString rgb)
   Pass: a string which is supposed to have a color name.
   Return: a canonical color name, i.e. an RGB value.
   1. Check color_list (names). If match, return RGB. Might be a case change e.g. Gray not gray.
-  2. Accept some color name variants, return the name in the list. e.g. Gray not Grey.
+  2. Accept some color name variants, e.g. Gray not grey, return RGB.
      They appear in http://www.w3.org/TR/SVG/types.html#ColorKeywords.
   3. Put the color in a QColor. If result is invalid, return "" which means invalid.
   4. Get the color back as #RRGGBB
-  3. Check color_list (RGBs). If match, return name. e.g. Gray not #BEBEBE.
-  4. Return the #RRGGBB color.
+  5. Return the #RRGGBB color.
   This does not mean that absolutely no synonyms are allowed
   -- two names may have the same #RRGGBB, as with Fuchsia|Magenta.
 */
 QString MainWindow::canonical_color_name(QString color_name_string)
 {
-  /* Todo: This is bad, you fail to check if the RGB is valid now. */
-  if (color_name_string.left(1) == "#") return color_name_string;
-
   QString s;
   QString co;
 
-  /*
-    Todo: This appears to work for setting colors that contain ''
-    but what if I SET ... = "...''..." elsewhere?
-  */
-  if (color_name_string.contains("''"))
-    co= color_name_string.replace("''", "'");
-  else co= color_name_string;
+  co= color_name_string;
 
-  /* Search #1: in the color list for the current language offset. */
-  for (int i= color_off; strcmp(s_color_list[i], "") > 0; i+= 2)
+  if (co.left(1) != "#")
   {
-    s= s_color_list[i];
-    if (QString::compare(color_name_string, s, Qt::CaseInsensitive) == 0)
+    /*
+      Todo: This appears to work for setting colors that contain ''
+      but what if I SET ... = "...''..." elsewhere?
+      Also: I think co.replace() does the job, I don't need to assign.
+    */
+    if (co.contains("''")) co= co.replace("''", "'");
+
+    /* Search #1: in the color list for the current language offset. */
+    for (int i= color_off; strcmp(s_color_list[i], "") > 0; i+= 2)
     {
-      s= s_color_list[i + 1];                /* Return the RGB */
-      return s;
+      s= s_color_list[i];
+      if (QString::compare(co, s, Qt::CaseInsensitive) == 0)
+      {
+        s= s_color_list[i + 1];                /* Return the RGB */
+        return s;
+      }
+    }
+
+    /* Search #2: Fixed list of variants equivalent to some W3C words */
+    if (QString::compare(color_name_string, "Cornflower", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_CORNFLOWERBLUE*2 + 1];
+    if (QString::compare(color_name_string, "Darkgrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DARKGRAY*2 + 1];
+    if (QString::compare(color_name_string, "DarkSlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DARKSLATEGRAY*2 + 1];
+    if (QString::compare(color_name_string, "DimGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DIMGRAY*2 + 1];
+    if (QString::compare(color_name_string, "Grey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_GRAY*2 + 1];
+    if (QString::compare(color_name_string, "LightGoldenrod", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTGOLDENRODYELLOW*2 + 1];
+    if (QString::compare(color_name_string, "LightGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTGRAY*2 + 1];
+    if (QString::compare(color_name_string, "LightSlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTSLATEGRAY*2 + 1];
+    if (QString::compare(color_name_string, "NavyBlue", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_NAVY*2 + 1];
+    if (QString::compare(color_name_string, "SlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_SLATEGRAY*2 + 1];
+
+    /* Search #3: in the color list for all languages */
+    {
+      int lc;
+      for (lc= 0; strcmp(string_languages[lc], "") != 0; ++lc) ;
+      for (int j= 0; j < lc; ++j)
+      {
+        for (int i= j * COLOR_END; strcmp(s_color_list[i], "") > 0; i+= 2)
+        {
+          s= s_color_list[i];
+          if (QString::compare(co, s, Qt::CaseInsensitive) == 0)
+          {
+            s= s_color_list[i + 1];                /* Return the RGB */
+            return s;
+          }
+        }
+      }
     }
   }
 
-  /* Search #2: ?? */
+  /*
+    It's not in any of our color lists, but it might be a name that Qt
+    will accept anyway (e.g. in some version that I'm unaware of),
+    or it was passed with an initial # so it's some variant of #RGB.
+    But make sure it's valid, and convert to the canonical: #RRGGBB.
+    NB: returning "" means error but not every caller checks for that.
+  */
 
-  if (QString::compare(color_name_string, "Cornflower", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_CORNFLOWERBLUE*2 + 1];
-  if (QString::compare(color_name_string, "Darkgrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DARKGRAY*2 + 1];
-  if (QString::compare(color_name_string, "DarkSlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DARKSLATEGRAY*2 + 1];
-  if (QString::compare(color_name_string, "DimGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_DIMGRAY*2 + 1];
-  if (QString::compare(color_name_string, "Grey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_GRAY*2 + 1];
-  if (QString::compare(color_name_string, "LightGoldenrod", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTGOLDENRODYELLOW*2 + 1];
-  if (QString::compare(color_name_string, "LightGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTGRAY*2 + 1];
-  if (QString::compare(color_name_string, "LightSlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_LIGHTSLATEGRAY*2 + 1];
-  if (QString::compare(color_name_string, "NavyBlue", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_NAVY*2 + 1];
-  if (QString::compare(color_name_string, "SlateGrey", Qt::CaseInsensitive) == 0) return s_color_list[COLOR_SLATEGRAY*2 + 1];
   QColor qq_color;
-  qq_color.setNamedColor(color_name_string);
+  qq_color.setNamedColor(co);
   if (qq_color.isValid() == false) return "";                 /* bad color, maybe bad format */
   QString qq_color_name= qq_color.name();                      /* returns name as "#RRGGBB" */
-  for (int i= color_off + 1; strcmp(s_color_list[i], "") > 0; i+= 2)
-  {
-    s= s_color_list[i];
-    if (QString::compare(qq_color_name, s, Qt::CaseInsensitive) == 0)
-    {
-      s= s_color_list[i - 1];
-      return s;
-    }
-  }
+
+  //for (int i= color_off + 1; strcmp(s_color_list[i], "") > 0; i+= 2)
+  //{
+  //  s= s_color_list[i];
+  //  if (QString::compare(qq_color_name, s, Qt::CaseInsensitive) == 0)
+  //  {
+  //    s= s_color_list[i - 1];
+  //    return s;
+  //  }
+  //}
   return qq_color_name;
 }
 
