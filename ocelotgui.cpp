@@ -7022,7 +7022,8 @@ int MainWindow::action_execute_one_statement(QString text)
         if (connections_dbms[0] == DBMS_TARANTOOL)
         {
           /* todo: failing to check if statement started with comment */
-          if (main_token_types[0] == TOKEN_KEYWORD_SELECT)
+          if ((main_token_types[0] == TOKEN_KEYWORD_SELECT)
+           || (main_token_types[0] == TOKEN_KEYWORD_LUA))
           {
             /* Yes mysql_res_for_new_result_set will be invalid. Fix, eh? */
             {
@@ -9543,6 +9544,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"LOW_PRIORITY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOW_PRIORITY},
       {"LPAD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LPAD},
       {"LTRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LTRIM},
+      {"LUA", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_LUA},
       {"MAKEDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKEDATE},
       {"MAKETIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKETIME},
       {"MAKE_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKE_SET},
@@ -10024,15 +10026,15 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "843" */
+      /* If the following assert happens, you inserted/removed something without changing "844" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (843 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (844 - 1));
 
       /* Test strvalues is by bsearching for every item. */
-      //for (int ii= 0; ii < 843; ++ii)
+      //for (int ii= 0; ii < 844; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 843, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 844, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -10040,8 +10042,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 843 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 843, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 844 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 844, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -11163,6 +11165,15 @@ void MainWindow::tarantool_flush_and_save_reply()
 /* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
 /*
    Todo: we shouldn't be calling tparse_f_program() yet again!
+   Todo: I succeeded in making this work
+           lua 'return box.space.t:select()';
+         after saying on the main connection
+           net_box = require('net.box')
+         ocelot_conn2=net_box.new('localhost:3301')
+         but:
+           should use [[...]] or escapes
+           should not depend later on looking at TOKEN_KEYWORD_LUA
+           should have a plan for things that don't return result sets
 */
 int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len)
 {
@@ -11244,9 +11255,20 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
       So what you really want to do is change ' or " to escapes.
     */
     char request_string[1024];
-    strcpy(request_string, "return ocelot_conn:execute([[");
-    strncat(request_string, dbms_query, dbms_query_len);
-    strcat(request_string, "]])");
+    if (statement_type == TOKEN_KEYWORD_LUA)
+    {
+      QString s;
+      s= text.mid(main_token_offsets[1], main_token_lengths[1]);
+      strcpy(request_string, "return ocelot_conn2:eval(");
+      strcat(request_string, s.toUtf8());
+      strcat(request_string, ")");
+    }
+    else
+    {
+      strcpy(request_string, "return ocelot_conn:execute([[");
+      strncat(request_string, dbms_query, dbms_query_len);
+      strcat(request_string, "]])");
+    }
     int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
     assert(m >= 0);
     //printf("m=%d\n", m);
