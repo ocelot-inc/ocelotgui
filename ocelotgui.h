@@ -3591,6 +3591,9 @@ public:
   int copy_of_connections_dbms;
   unsigned short int copy_of_ocelot_result_grid_vertical;
   unsigned short int copy_of_ocelot_result_grid_column_names;
+  unsigned short int copy_of_ocelot_batch;
+
+  QTextEdit *batch_text_edit;
 
   int border_size;                                             /* used when calculating cell height + width */
   unsigned int ocelot_grid_max_desired_width_in_pixels;        /* used when calculating cell height + width */
@@ -3748,6 +3751,9 @@ ResultGrid(
 
   text_edit_widget_font= this->font();
   set_frame_color_setting();
+
+  batch_text_edit= new QTextEdit(this);
+  batch_text_edit->hide();
 }
 
 
@@ -3895,7 +3901,8 @@ void fillup(MYSQL_RES *mysql_res,
             unsigned short ocelot_result_grid_vertical,
             unsigned short ocelot_result_grid_column_names,
             ldbms *passed_lmysql,
-            int ocelot_client_side_functions)
+            int ocelot_client_side_functions,
+            unsigned short ocelot_batch)
 {
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
 
@@ -4036,17 +4043,29 @@ void fillup(MYSQL_RES *mysql_res,
 
   dbms_set_grid_column_sources();                 /* Todo: this could return an error? */
 
-
   /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
   copy_of_connections_dbms= connections_dbms;
   copy_of_ocelot_result_grid_vertical= ocelot_result_grid_vertical;
   copy_of_ocelot_result_grid_column_names= ocelot_result_grid_column_names;
+  copy_of_ocelot_batch= ocelot_batch;
   display();
 }
 
-
+/*
+  Todo: find out why I get here twice.
+        I think it's because fillup() calls display(), but then
+        resize_or_font_change() calls display() again.
+        This is invisible because resize_or_font_change() calls
+        remove_layouts() first, but it's a silly waste of time.
+        However, maybe it only happens for the first time I select.
+*/
 void display()
 {
+  if (copy_of_ocelot_batch != 0)
+  {
+    display_batch();
+    return;
+  }
   long unsigned int xrow;
   unsigned int xcol;
   MainWindow *parent= copy_of_parent;
@@ -4057,14 +4076,6 @@ void display()
   /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
   hide();
   is_paintable= 0;
-
-  {
-    unsigned int minimum_number_of_cells;
-    minimum_number_of_cells= result_grid_widget_max_height_in_lines * gridx_column_count;
-    pools_resize(row_pool_size, result_grid_widget_max_height_in_lines, cell_pool_size, minimum_number_of_cells);
-    if (row_pool_size < result_grid_widget_max_height_in_lines) row_pool_size= result_grid_widget_max_height_in_lines;
-    if (cell_pool_size < minimum_number_of_cells) cell_pool_size= minimum_number_of_cells;
-  }
 
   ocelot_grid_text_color= parent->ocelot_grid_text_color;
   ocelot_grid_background_color= parent->ocelot_grid_background_color;
@@ -4077,6 +4088,14 @@ void display()
   //  grid_scroll_area->verticalScrollBar()->setSingleStep(1);
   //  grid_scroll_area->verticalScrollBar()->setPageStep(gridx_row_count / 10);    /* Todo; check if this could become 0 */
   grid_vertical_scroll_bar_value= -1;
+
+  {
+    unsigned int minimum_number_of_cells;
+    minimum_number_of_cells= result_grid_widget_max_height_in_lines * gridx_column_count;
+    pools_resize(row_pool_size, result_grid_widget_max_height_in_lines, cell_pool_size, minimum_number_of_cells);
+    if (row_pool_size < result_grid_widget_max_height_in_lines) row_pool_size= result_grid_widget_max_height_in_lines;
+    if (cell_pool_size < minimum_number_of_cells) cell_pool_size= minimum_number_of_cells;
+  }
 
   /*
     Calculate desired width and height based on parent width and height.
@@ -4094,7 +4113,7 @@ void display()
   QFontMetrics mm= QFontMetrics(*pointer_to_font);
 
   /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
-  ocelot_grid_max_desired_width_in_pixels=(parent->width() - (mm.width("W") * 3));
+  ocelot_grid_max_desired_width_in_pixels= (parent->width() - (mm.width("W") * 3));
 
   {
     /*
@@ -4362,11 +4381,109 @@ void display()
 }
 
 /*
- The grid may have columns that are not in the result set.
- So far the only one is "row count" and (for vertical) "header",
- but there will be more.
- So we want to copy the result_ lists to gridx_ lists, possibly adding extra non-result-set columns.
- The values are for a single detail row or single header row.
+  For --batch, avoid normal grid display. Result won't go to history.
+  We say setReadOnly() so edit won't generate update statement.
+  Todo: Clean up when you're done, garbage collection is different now
+        + memory leak, we don't clear batch_text_edit in garbage_collect().
+  Todo: SET ocelot_batch = x; should be possible.
+        It would not change the current result grid.
+  Todo: going directly to a file should be possible too
+  Todo: check what happens if row data contains "\n"
+  Todo: pay attention to --vertical, --column-names, --extra-rule
+  Todo: Do what you do for other displays, e.g. check for null
+  Todo: look for --raw, currently we're just assuming it's true
+        + we don't need to multiply size by 2 if --raw is off (?)
+        Escape ' " \ nul tab newline =  \' \" \\ \0 \t \n
+  Todo: we can also support --html and --xml, I don't know whether
+        they override --batch or whether they complement it somehow.
+        also csv and msgpack and json
+        also "--html --raw" i.e. dump the html, don't process it
+        also "--like-mysql-client"
+        or SET ocelot_grid_format = {'fancy'|'html'|'xml'|'csv'|etc.}
+  Todo: Setting should be possible with the syntax that's used for
+        INTO OUTFILE
+  Todo: I was getting
+        QTextOdfWriter: unsupported paragraph alignment;  QFlags(0x20)
+        if ^A (select all), ^C (Copy) on a large output.
+        Specifying "...Qt::AlignLeft" solved it.
+        But it might be nice to write a bug report for the Qt folks.
+  Todo: it would take less memory and possibly display quicker if
+        I only output when necessary, i.e. when user scrolls
+  Todo: check: does it do any good to hide() first?
+  Todo: callback to a local Lua function prior to display, for each row
+  Todo: Allow switch from one output to another. This does require
+        having fillup() completely separate from display().
+        setSizeConstraint and setVerticalScrollBarPolicy should be
+        reset if we change to non-batch display.
+  Todo: allow row update. and, if there's a change in one mode, show
+        the changed row when modes are switched
+*/
+void display_batch()
+{
+  hide();
+  batch_text_edit->clear();
+  grid_main_layout->setSizeConstraint(QLayout::SetDefaultConstraint);
+  grid_vertical_scroll_bar->setVisible(false);
+  grid_main_layout->addWidget(batch_text_edit);
+  batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
+  /* Todo: next four lines could be done during the initial setup */
+  batch_text_edit->setReadOnly(true);
+  batch_text_edit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  batch_text_edit->setWordWrapMode(QTextOption::NoWrap);
+  batch_text_edit->setFrameStyle(QFrame::NoFrame);
+  long unsigned int tmp_xrow;
+  char *pointer= result_set_copy_rows[0];
+  unsigned int v_length;
+  unsigned int tmp_size= 1;
+  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      memcpy(&v_length, pointer, sizeof(unsigned int));
+      pointer+= sizeof(unsigned int) + sizeof(char);
+      tmp_size+= v_length * 2 + 1; /* 1 = sizeof("\9") */
+      pointer+= v_length;
+    }
+    tmp_size+= 1; /* 1 = sizeof("\n"); */
+  }
+  char *tmp;
+  tmp= new char[tmp_size];
+  char *tmp_pointer= &tmp[0];
+  pointer= result_set_copy_rows[0];
+  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      memcpy(&v_length, pointer, sizeof(unsigned int));
+      pointer+= sizeof(unsigned int) + sizeof(char);
+      memcpy(tmp_pointer, pointer, v_length);
+      tmp_pointer+= v_length;
+      *tmp_pointer= 0x09; /* horizontal tab */
+      tmp_pointer+= 1; /* 1 = sizeof("\9") */
+      pointer+= v_length;
+    }
+    *tmp_pointer= '\n';
+    tmp_pointer+= 1; /* 1 = sizeof("\n") */
+  }
+  *tmp_pointer= '\0';
+  batch_text_edit->insertPlainText(tmp);
+  batch_text_edit->moveCursor(QTextCursor::Start);
+  batch_text_edit->ensureCursorVisible();
+  batch_text_edit->show();
+  show();
+  client->show();
+  delete [] tmp;
+  return;
+}
+
+/*
+  Copy the result_ lists to gridx_lists.
+  Originally the idea behind this was that we'd optionally add columns
+  that weren't in the result set, like "row count" and (for vertical)
+  "header". That's becoming obsolete now, because we change the result
+  set copy if ocelot_client_side_functions_copy <> 0. So, perhaps,
+  someday we will get rid of this step.
+  The values are for a single detail row or single header row.
    gridx_field_names
    gridx_original_field_names
    gridx_original_table_names
@@ -4408,7 +4525,7 @@ void copy_result_to_gridx(int connections_dbms)
     result_field_names_pointer+= v_lengths + sizeof(unsigned int);
   }
 
-  gridx_field_names= new char[total_size];                                   /* allocate */
+  gridx_field_names= new char[total_size];                                  /* allocate */
 
   result_field_names_pointer= &result_field_names[0];
   gridx_field_names_pointer= &gridx_field_names[0];
@@ -5455,6 +5572,11 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
+  if (copy_of_ocelot_batch != 0)
+  {
+    batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
+    return;
+  }
   QFont tmp_font= this->font();
   QFontMetrics mm= QFontMetrics(this->font());
   unsigned int height_of_line= mm.lineSpacing();
@@ -5605,6 +5727,7 @@ void remove_layouts()
       }
       grid_main_layout->removeWidget(grid_row_widgets[xrow]);
     }
+    grid_main_layout->removeWidget(batch_text_edit);
   }
 }
 
@@ -5671,6 +5794,11 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
                           int caller,
                           bool is_result_grid_font_size_changed)
 {
+  if (copy_of_ocelot_batch != 0)
+  {
+    resize_or_font_change(this->height(), false);
+    return;
+  }
   text_edit_widget_font= copy_of_parent->get_font_from_style_sheet(new_ocelot_grid_style_string);
 
   unsigned int i_h;

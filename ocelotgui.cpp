@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: October 31 2016
+   Last modified: November 6 2016
 */
 
 /*
@@ -197,6 +197,12 @@
         re-enter Qt Creator. Build | Clean all. Build all. Run.
 */
 
+/*
+  Todo: when I started, I wasn't aware that I could say
+  QString::fromUtf8 to copy a C string to a QString.
+  So there are several places where I copy to another temporary
+  C string and then assign. Such code should be replaced.
+*/
 
 #include "ostrings.h"
 #include "ocelotgui.h"
@@ -7089,7 +7095,7 @@ int MainWindow::action_execute_one_statement(QString text)
                       connections_dbms[0],
                       //this,
                       is_vertical, ocelot_result_grid_column_names,
-                      lmysql, ocelot_client_side_functions);
+                      lmysql, ocelot_client_side_functions, ocelot_batch);
             result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
             /* next line redundant? display() ends with show() */
@@ -7177,7 +7183,7 @@ int MainWindow::action_execute_one_statement(QString text)
                           is_vertical,
                           ocelot_result_grid_column_names,
                           lmysql,
-                          ocelot_client_side_functions);
+                          ocelot_client_side_functions, ocelot_batch);
                 /* next line redundant? display() ends with show() */
                 r->show();
 
