@@ -911,8 +911,6 @@ private:
 
   int statement_edit_widget_text_changed_flag;
   QString ocelot_delimiter_str;                                           /* set up in connect section */
-  QString query_utf16;
-  QString query_utf16_copy;
   int ocelot_password_was_specified;
 
   /* MYSQL mysql; */
@@ -928,6 +926,8 @@ private:
   int connections_dbms[1];                            /* == DBMS_MYSQL or other DBMS_... value */
 
 public:
+  QString query_utf16;
+  QString query_utf16_copy;
   /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
   int  *main_token_offsets;
   int  *main_token_lengths;
@@ -3597,6 +3597,7 @@ public:
   unsigned short int copy_of_ocelot_batch;
   unsigned short int copy_of_ocelot_html;
   unsigned short int copy_of_ocelot_raw;
+  unsigned short int copy_of_ocelot_xml;
 
   QTextEdit *batch_text_edit;
 
@@ -3909,7 +3910,8 @@ void fillup(MYSQL_RES *mysql_res,
             int ocelot_client_side_functions,
             unsigned short int ocelot_batch,
             unsigned short int ocelot_html,
-            unsigned short int ocelot_raw)
+            unsigned short int ocelot_raw,
+            unsigned short int ocelot_xml)
 {
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
 
@@ -4057,6 +4059,7 @@ void fillup(MYSQL_RES *mysql_res,
   copy_of_ocelot_batch= ocelot_batch;
   copy_of_ocelot_html= ocelot_html;
   copy_of_ocelot_raw= ocelot_raw;
+  copy_of_ocelot_xml= ocelot_xml;
   display();
 }
 
@@ -4067,14 +4070,34 @@ void fillup(MYSQL_RES *mysql_res,
         This is invisible because resize_or_font_change() calls
         remove_layouts() first, but it's a silly waste of time.
         However, maybe it only happens for the first time I select.
+  Todo: grid_main_layout->setSizeConstraint() is only necessary if
+        we've recently turned off ocelot_batch + ocelot_html; it
+        could be shifted so it's only reset when we reconnect
+        and|or change those variables.
+  Todo: Bug:
+        (start program with ocelot_batch == ocelot_html == 0)
+        select * from information_schema.tables limit 10;
+        SET ocelot_html = 1;
+        select * from information_schema.tables limit 10;
+        SET ocelot_html = 0;
+        select * from information_schema.tables limit 10;
+        the display is obscured, that is why in display() I say
+        batch_text_edit->hide();
+        but why do I need it, if I've removed it from layout?
 */
 void display()
 {
-  if ((copy_of_ocelot_batch != 0) || (copy_of_ocelot_html != 0))
+  if ((copy_of_ocelot_batch != 0)
+   || (copy_of_ocelot_html != 0)
+   || (copy_of_ocelot_xml != 0))
   {
     display_batch();
     return;
   }
+
+  grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
+  batch_text_edit->hide();
+
   long unsigned int xrow;
   unsigned int xcol;
   MainWindow *parent= copy_of_parent;
@@ -4182,6 +4205,7 @@ void display()
       text_edit_frames[ki]->minimum_height= fm.height() * 2 + border_size; /* todo: this is probably too much */
     }
   }
+
   /*
     For each cell:
       Set cell type = detail or header, depending on is_vertical + whether it's first row
@@ -4274,8 +4298,9 @@ void display()
     While we're passing through, we also get max column lengths (in characters).
     Todo: Take into account: whether there were any nulls.
   */
-  fill_detail_widgets(0, connections_dbms);                                             /* details */
+  fill_detail_widgets(0, connections_dbms);                                        /* details */
   grid_vertical_scroll_bar_value= 0;
+
   /*
     We'll use the automatic scroll bar for small result sets,
     we'll use our own scroll bar for large ones.
@@ -4431,6 +4456,7 @@ void display()
         reset if we change to non-batch display.
   Todo: allow row update. and, if there's a change in one mode, show
         the changed row when modes are switched
+  Todo: xml statement="" and field name="" contents lack escaping.
 */
 /*
   Eventually ...
@@ -4565,7 +4591,7 @@ void display_batch()
     strcpy(ocelot_grid_detail_char_column_end , "</TD>");
     strcpy(ocelot_grid_table_end, "</TABLE></BODY></HTML>");
   }
-  else /* copy_of_ocelot_batch != 0 */
+  else if (copy_of_ocelot_batch != 0)
   {
     strcpy(ocelot_grid_table_start, "");
     strcpy(ocelot_grid_header_row_start, "");
@@ -4575,16 +4601,36 @@ void display_batch()
     strcpy(ocelot_grid_header_char_column_start, "");
     strcpy(ocelot_grid_header_char_column_end, "\t");
     strcpy(ocelot_grid_detail_row_start, "");
-    strcpy(ocelot_grid_detail_row_end, "");
+    strcpy(ocelot_grid_detail_row_end, "\n");
     strcpy(ocelot_grid_detail_numeric_column_start, "");
-    strcpy(ocelot_grid_detail_numeric_column_end, "");
+    strcpy(ocelot_grid_detail_numeric_column_end, "\t");
     strcpy(ocelot_grid_detail_char_column_start, "");
-    strcpy(ocelot_grid_detail_char_column_end , "");
+    strcpy(ocelot_grid_detail_char_column_end , "\t");
     strcpy(ocelot_grid_table_end, "");
+  }
+  else /* copy_of_ocelot_xml != 0 */
+  {
+    strcpy(ocelot_grid_table_start, "<?xml version=\"1.0\"?>"
+                                    "<resultset statement=\"");
+    strcat(ocelot_grid_table_start, copy_of_parent->query_utf16_copy.toUtf8());
+    strcat(ocelot_grid_table_start, "\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+    strcpy(ocelot_grid_header_row_start, "<row>");
+    strcpy(ocelot_grid_header_row_end, "</row>");
+    strcpy(ocelot_grid_header_numeric_column_start, "<field name=\"");
+    strcpy(ocelot_grid_header_numeric_column_end, "</field>");
+    strcpy(ocelot_grid_header_char_column_start, "<field name=\"");
+    strcpy(ocelot_grid_header_char_column_end, "</field>");
+    strcpy(ocelot_grid_detail_row_start, "<row>");
+    strcpy(ocelot_grid_detail_row_end, "</row>");
+    strcpy(ocelot_grid_detail_numeric_column_start, "<field name=\"");
+    strcpy(ocelot_grid_detail_numeric_column_end, "</field>");
+    strcpy(ocelot_grid_detail_char_column_start, "<field name=\"");
+    strcpy(ocelot_grid_detail_char_column_end , "</field>");
+    strcpy(ocelot_grid_table_end, "</resultset>");
   }
   hide();
   batch_text_edit->clear();
-  grid_main_layout->setSizeConstraint(QLayout::SetDefaultConstraint);
+  grid_main_layout->setSizeConstraint(QLayout::SetMinimumSize);
   grid_vertical_scroll_bar->setVisible(false);
   grid_main_layout->addWidget(batch_text_edit);
 
@@ -4597,7 +4643,8 @@ void display_batch()
   batch_text_edit->setFrameStyle(QFrame::NoFrame);
   long unsigned int tmp_xrow;
   char *pointer= result_set_copy_rows[0];
-  unsigned int v_length;
+  unsigned int v_length, f_length;
+  char *result_field_names_pointer;
 
   /*
     Todo: Adjust calculation for numeric columns, for escapes, for hex.
@@ -4605,9 +4652,9 @@ void display_batch()
  */
   unsigned int tmp_size= sizeof(char);
 
-  if (ocelot_result_grid_column_names_copy == 1)
+  if ((ocelot_result_grid_column_names_copy == 1)
+   && (copy_of_ocelot_xml == 0))
   {
-    char *result_field_names_pointer;
     tmp_size+= strlen(ocelot_grid_header_row_start);
     result_field_names_pointer= &result_field_names[0];
     for (unsigned int i= 0; i < result_column_count; ++i)
@@ -4624,6 +4671,7 @@ void display_batch()
   tmp_size+= strlen(ocelot_grid_table_start);
   for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
   {
+    result_field_names_pointer= &result_field_names[0];
     tmp_size+= strlen(ocelot_grid_detail_row_start);
     for (unsigned int i= 0; i < result_column_count; ++i)
     {  
@@ -4631,6 +4679,12 @@ void display_batch()
         tmp_size+= strlen(ocelot_grid_detail_numeric_column_start);
       else
         tmp_size+= strlen(ocelot_grid_detail_char_column_start);
+      if (copy_of_ocelot_xml != 0)
+      {
+        memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
+        tmp_size+= f_length + 2;
+        result_field_names_pointer+= f_length + sizeof(unsigned int);
+      }
       memcpy(&v_length, pointer, sizeof(unsigned int));
       pointer+= sizeof(unsigned int) + sizeof(char);
       /* Todo: we only need v_length*1 unless it's img or hex or escaped */
@@ -4642,13 +4696,15 @@ void display_batch()
   }
   tmp_size+= strlen(ocelot_grid_table_end);
   char *tmp;
+
   tmp= new char[tmp_size];
   char *tmp_pointer= &tmp[0];
 
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
 
-  if (ocelot_result_grid_column_names_copy == 1)
+  if ((ocelot_result_grid_column_names_copy == 1)
+   && (copy_of_ocelot_xml == 0))
   {
     char *result_field_names_pointer;
     result_field_names_pointer= &result_field_names[0];
@@ -4673,6 +4729,7 @@ void display_batch()
   pointer= result_set_copy_rows[0];
   for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
   {
+    result_field_names_pointer= &result_field_names[0];
     strcpy(tmp_pointer, ocelot_grid_detail_row_start);
     tmp_pointer+= strlen(ocelot_grid_detail_row_start);
     for (unsigned int i= 0; i < result_column_count; ++i)
@@ -4687,11 +4744,20 @@ void display_batch()
         strcpy(tmp_pointer, ocelot_grid_detail_char_column_start);
         tmp_pointer+= strlen(ocelot_grid_detail_char_column_start);
       }
+      if (copy_of_ocelot_xml != 0)
+      {
+        memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
+        result_field_names_pointer+= sizeof(unsigned int);
+        memcpy(tmp_pointer, result_field_names_pointer, f_length);
+        tmp_pointer+= f_length;
+        result_field_names_pointer+= f_length;
+        strcpy(tmp_pointer, "\">");
+        tmp_pointer+= 2;
+      }
       memcpy(&v_length, pointer, sizeof(unsigned int));
       pointer+= sizeof(unsigned int) + sizeof(char);
-
       bool is_image_written= false;
-      if (is_image(i) == true)
+      if ((copy_of_ocelot_html != 0) && (is_image(i) == true))
       {
         char img_type[4]= "";
         if (v_length > 4)
@@ -4736,6 +4802,7 @@ void display_batch()
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
+
   if ((copy_of_ocelot_html != 0) && (copy_of_ocelot_raw == 0))
   {
     batch_text_edit->setHtml(tmp);
@@ -5849,9 +5916,10 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
-  if ((copy_of_ocelot_batch != 0) || (copy_of_ocelot_html != 0))
+  if ((copy_of_ocelot_batch != 0)
+   || (copy_of_ocelot_html != 0)
+   || (copy_of_ocelot_xml != 0))
   {
-    /* TODO: for html, you have to parse the sheet */
     if (copy_of_ocelot_html == 0)
       batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
     return;
@@ -6074,7 +6142,9 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
                           int caller,
                           bool is_result_grid_font_size_changed)
 {
-  if ((copy_of_ocelot_batch != 0) || (copy_of_ocelot_html != 0))
+  if ((copy_of_ocelot_batch != 0)
+   || (copy_of_ocelot_html != 0)
+   || (copy_of_ocelot_xml != 0))
   {
     resize_or_font_change(this->height(), false);
     return;

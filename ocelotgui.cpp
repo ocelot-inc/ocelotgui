@@ -7096,7 +7096,7 @@ int MainWindow::action_execute_one_statement(QString text)
                       //this,
                       is_vertical, ocelot_result_grid_column_names,
                       lmysql, ocelot_client_side_functions,
-                      ocelot_batch, ocelot_html, ocelot_raw);
+                      ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml);
             result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
             /* next line redundant? display() ends with show() */
@@ -7185,7 +7185,7 @@ int MainWindow::action_execute_one_statement(QString text)
                           ocelot_result_grid_column_names,
                           lmysql,
                           ocelot_client_side_functions,
-                          ocelot_batch, ocelot_html, ocelot_raw);
+                          ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml);
                 /* next line redundant? display() ends with show() */
                 r->show();
 
@@ -8145,6 +8145,42 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_batch", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        int i= ccn.toInt();
+        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_batch= i;
+        if (i == 1) ocelot_html= ocelot_xml= 0; /* should we warn? */
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_html", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        int i= ccn.toInt();
+        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_html= i;
+        if (i == 1) ocelot_batch= ocelot_xml= 0; /* should we warn? */
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_xml", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        int i= ccn.toInt();
+        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_xml= i;
+        if (i == 1) ocelot_batch= ocelot_html= 0; /* should we warn? */
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_raw", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        int i= ccn.toInt();
+        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_raw= i;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
     }
