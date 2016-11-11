@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: November 6 2016
+   Last modified: November 10 2016
 */
 
 /*
@@ -7095,7 +7095,8 @@ int MainWindow::action_execute_one_statement(QString text)
                       connections_dbms[0],
                       //this,
                       is_vertical, ocelot_result_grid_column_names,
-                      lmysql, ocelot_client_side_functions, ocelot_batch);
+                      lmysql, ocelot_client_side_functions,
+                      ocelot_batch, ocelot_html, ocelot_raw);
             result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
             /* next line redundant? display() ends with show() */
@@ -7183,7 +7184,8 @@ int MainWindow::action_execute_one_statement(QString text)
                           is_vertical,
                           ocelot_result_grid_column_names,
                           lmysql,
-                          ocelot_client_side_functions, ocelot_batch);
+                          ocelot_client_side_functions,
+                          ocelot_batch, ocelot_html, ocelot_raw);
                 /* next line redundant? display() ends with show() */
                 r->show();
 
