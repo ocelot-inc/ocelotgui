@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: November 10 2016
+   Last modified: November 30 2016
 */
 
 /*
@@ -2122,25 +2122,25 @@ void MainWindow::main_token_new(int text_size)
 
 /*
   action_statement_edit_widget_text_changed() is a slot.
-  Actually the connect() was for statement_edit_widget->document()'s contentsChanged(),
-  rather than statement_edit_widget's textChanged(), but I don't see any difference.
+  Actually the connect() was for statement_edit_widget->document()'s
+  contentsChanged(), rather than statement_edit_widget's textChanged(),
+  but I don't see any difference.
+  This routine can cause the document to change, causing a signal
+  and we get action_statement_edit_widget_text_changed() again.
+  It would be infinite. We have two ways to prevent the loop, and we
+  use them both (yes it's redundant but this loop really worries me):
+    I'll exit if a global flag is on, then set it.
+    I'll ensure the document emits no signals during this routine.
 */
 void MainWindow::action_statement_edit_widget_text_changed()
 {
-  QString text;
-  int i;
-  // int j;
-  int pos;
-
-  /*
-    When insertText happens later in this routine, it causes a signal
-    and we get action_statement_edit_widget_text_changed() again.
-    It would be infinite. Doubtless there are good ways to avoid looping.
-    I don't know them. So I'll exit if a global flag is on, then set it.
-  */
-  /* Todo: check whether "wasModified" would have been a better slot. */
   if (statement_edit_widget_text_changed_flag != 0) return;
   statement_edit_widget_text_changed_flag= 1;
+  statement_edit_widget->document()->blockSignals(true);
+
+  QString text;
+  int i;
+  int pos;
 
   /* Syntax highlighting */
   text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
@@ -2252,6 +2252,7 @@ void MainWindow::action_statement_edit_widget_text_changed()
 
   widget_sizer(); /* Perhaps adjust relative sizes of the main widgets. */
 
+  statement_edit_widget->document()->blockSignals(false);
   statement_edit_widget_text_changed_flag= 0;
 }
 

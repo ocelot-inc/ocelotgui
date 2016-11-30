@@ -4520,14 +4520,14 @@ void display_batch()
   /* Todo: this should be done permanently, on persistent variables. */
   if (copy_of_ocelot_html != 0)
   {
-    char html_border_color[16];
-    char html_color[16];
-    char html_background_color[16];
-    char html_header_background_color[16];
-    char html_font_family[16];
-    char html_font_size[16];
-    char html_font_style[16];
-    char html_font_weight[16];
+    char html_border_color[32];
+    char html_color[32];
+    char html_background_color[32];
+    char html_header_background_color[32];
+    char html_font_family[32];
+    char html_font_size[32];
+    char html_font_style[32];
+    char html_font_weight[32];
     int html_border_size;
     strcpy(html_border_color, copy_of_parent->ocelot_grid_cell_border_color.toUtf8());
     strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
