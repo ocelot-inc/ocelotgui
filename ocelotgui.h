@@ -619,6 +619,7 @@ public:
   void hparse_f_other(int);
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
+  bool hparse_f_is_nosql(QString);
 
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
@@ -919,6 +920,7 @@ private:
 #ifdef DBMS_TARANTOOL
   struct tnt_reply tarantool_tnt_reply;
   char *tarantool_field_names;
+  bool tarantool_select_nosql;
 #endif
 
   /* connections_... [] is not a multi-occurrence list but someday it might be */

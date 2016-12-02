@@ -11226,26 +11226,11 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
   strcpy(tarantool_errmsg, "Unknown Tarantool Error");
 
   QString text= statement_edit_widget->toPlainText();
+
   int token_type=-1;
-  //int hparse_statement_type=-1, clause_type=-1;
-  //QString current_token, what_we_expect, what_we_got;
-
-//  tparse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
-
-//printf("tarantool_real_query %d\n", hparse_errno);
-//printf("main_token_number=%d\n", main_token_number);
-//printf("main_token_count_in_statement=%d\n", main_token_count_in_statement);
-
-
-  if (hparse_errno > 0)
-  {
-    strcpy(tarantool_errmsg, hparse_errmsg);
-    tarantool_errno= hparse_errno;
-    return tarantool_errno;
-  }
+  int statement_type= -1;
 
   /* The first non-comment in a statement must be the statement type. */
-  int statement_type= -1;
   for (unsigned int i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
   {
     int token_type= main_token_types[i];
@@ -11261,89 +11246,111 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
 
   result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
 
-  //if (statement_type == TOKEN_KEYWORD_SELECT)
+  /* TODO: Make sure changing hparse_i doesn't muck up something */
+  hparse_i= main_token_number;
+  if (hparse_f_is_nosql(text) == false)
   {
-    /*
-      This gives me "dd ..." i.e. an array result. At last.
-    */
-
-    //struct tnt_stream *tnt = lmysql->ldbms_tnt_net(NULL);          /* See note = SETUP */
-    //lmysql->ldbms_tnt_set(tnt, TNT_OPT_URI, (char*)"192.168.1.67:3301");
-    //if (lmysql->ldbms_tnt_connect(tnt) < 0) {                      /* See note = CONNECT */
-    //  printf("Connection refused\n");
-    //  exit(-1);
-    //}
-    //struct tnt_stream *tuple = lmysql->ldbms_tnt_object(NULL);     /* See note = MAKE REQUEST */
-
-    //struct tnt_stream *tnt_object(struct tnt_stream *s)
-    //    Create an empty MsgPack object.
-    //    If s is passed as NULL, then the object is allocated. Otherwise, the allocated object is initialized.
-    struct tnt_stream *arg;
-    arg = lmysql->ldbms_tnt_object(NULL);
-
-    //int tnt_object_reset(struct tnt_stream *s)
-    //    Reset a stream object to the basic state.
-    lmysql->ldbms_tnt_object_reset(arg);
-
-    //ssize_t tnt_object_add_array(struct tnt_stream *s, uint32_t size)
-    //    Append an array header to a stream object.
-    //    The header’s size is in bytes.
-    //    If TNT_SBO_SPARSE or TNT_SBO_PACKED is set as container type, then size is ignored.
-    lmysql->ldbms_tnt_object_add_array(arg, 0);
-
-    struct tnt_request *req2 = lmysql->ldbms_tnt_request_eval(NULL);
-    //   int m= tnt_request_set_exprz(req2,"return box.space.tester:select()");
-
-    /*
-      TODO:
-      The [[ ... ]] trick will fail if the string contains [[ or ]].
-      So what you really want to do is change ' or " to escapes.
-    */
-    char request_string[1024];
-    if (statement_type == TOKEN_KEYWORD_LUA)
+    tarantool_select_nosql= false;
+    //if (statement_type == TOKEN_KEYWORD_SELECT)
     {
-      QString s;
-      s= text.mid(main_token_offsets[1], main_token_lengths[1]);
-      strcpy(request_string, "return ocelot_conn2:eval(");
-      strcat(request_string, s.toUtf8());
-      strcat(request_string, ")");
-    }
-    else
-    {
-      strcpy(request_string, "return ocelot_conn:execute([[");
-      strncat(request_string, dbms_query, dbms_query_len);
-      strcat(request_string, "]])");
-    }
-    int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
-    assert(m >= 0);
-    //printf("m=%d\n", m);
+      /*
+        This gives me "dd ..." i.e. an array result. At last.
+      */
 
-    lmysql->ldbms_tnt_request_set_tuple(req2, arg);
+      //struct tnt_stream *tnt = lmysql->ldbms_tnt_net(NULL);          /* See note = SETUP */
+      //lmysql->ldbms_tnt_set(tnt, TNT_OPT_URI, (char*)"192.168.1.67:3301");
+      //if (lmysql->ldbms_tnt_connect(tnt) < 0) {                      /* See note = CONNECT */
+      //  printf("Connection refused\n");
+      //  exit(-1);
+      //}
+      //struct tnt_stream *tuple = lmysql->ldbms_tnt_object(NULL);     /* See note = MAKE REQUEST */
 
-    /* uint64_t sync1 = */ lmysql->ldbms_tnt_request_compile(tnt, req2);
+      //struct tnt_stream *tnt_object(struct tnt_stream *s)
+      //    Create an empty MsgPack object.
+      //    If s is passed as NULL, then the object is allocated. Otherwise, the allocated object is initialized.
+      struct tnt_stream *arg;
+      arg = lmysql->ldbms_tnt_object(NULL);
 
-    tarantool_flush_and_save_reply();
-    if (tarantool_errno != 0) return tarantool_errno;
-    /* The return should be an array of arrays of scalars. */
+      //int tnt_object_reset(struct tnt_stream *s)
+      //    Reset a stream object to the basic state.
+      lmysql->ldbms_tnt_object_reset(arg);
 
-    /* If there are no rows, then there are no fields, so we cannot put up a grid. */
-    /* Todo: don't forget to free if there are zero rows. */
-    {
-      const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
-      unsigned long r= tarantool_num_rows();
-      tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
-      if (r == 0)
+      //ssize_t tnt_object_add_array(struct tnt_stream *s, uint32_t size)
+      //    Append an array header to a stream object.
+      //    The header’s size is in bytes.
+      //    If TNT_SBO_SPARSE or TNT_SBO_PACKED is set as container type, then size is ignored.
+      lmysql->ldbms_tnt_object_add_array(arg, 0);
+
+      struct tnt_request *req2 = lmysql->ldbms_tnt_request_eval(NULL);
+      //   int m= tnt_request_set_exprz(req2,"return box.space.tester:select()");
+
+      /*
+        TODO:
+        The [[ ... ]] trick will fail if the string contains [[ or ]].
+        So what you really want to do is change ' or " to escapes.
+      */
+      char request_string[1024];
+      if (statement_type == TOKEN_KEYWORD_LUA)
       {
-        strcpy(tarantool_errmsg, "Zero rows.");
-        tarantool_errno= 10027;
+        QString s;
+        s= text.mid(main_token_offsets[1], main_token_lengths[1]);
+        strcpy(request_string, "return ocelot_conn2:eval(");
+        strcat(request_string, s.toUtf8());
+        strcat(request_string, ")");
       }
+      else
+      {
+        strcpy(request_string, "return ocelot_conn:execute([[");
+        strncat(request_string, dbms_query, dbms_query_len);
+        strcat(request_string, "]])");
+      }
+      int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
+      assert(m >= 0);
+      //printf("m=%d\n", m);
+
+      lmysql->ldbms_tnt_request_set_tuple(req2, arg);
+
+      /* uint64_t sync1 = */ lmysql->ldbms_tnt_request_compile(tnt, req2);
+
+      tarantool_flush_and_save_reply();
+      if (tarantool_errno != 0) return tarantool_errno;
+      /* The return should be an array of arrays of scalars. */
+
+      /* If there are no rows, then there are no fields, so we cannot put up a grid. */
+      /* Todo: don't forget to free if there are zero rows. */
+      {
+        const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
+        unsigned long r= tarantool_num_rows();
+        tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
+
+        if (r == 0)
+        {
+          strcpy(tarantool_errmsg, "Zero rows.");
+          tarantool_errno= 10027;
+        }
+      }
+      return tarantool_errno;
     }
+
     return tarantool_errno;
   }
 
-  return tarantool_errno;
+  tarantool_select_nosql= true;
+  //int hparse_statement_type=-1, clause_type=-1;
+  //QString current_token, what_we_expect, what_we_got;
 
-  /* FOLLOWING IS ALL OLD STUFF */
+  tparse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
+
+//printf("tarantool_real_query %d\n", hparse_errno);
+//printf("main_token_number=%d\n", main_token_number);
+//printf("main_token_count_in_statement=%d\n", main_token_count_in_statement);
+
+  if (hparse_errno > 0)
+  {
+    strcpy(tarantool_errmsg, hparse_errmsg);
+    tarantool_errno= hparse_errno;
+    return tarantool_errno;
+  }
 
   /* The number of literals in a statement must be what we'd insert etc. */
   int number_of_literals= 0;
@@ -11495,6 +11502,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
 
   if (statement_type == TOKEN_KEYWORD_SELECT)
   {
+
     lmysql->ldbms_tnt_select(tnt, spaceno, 0, (2^32) - 1, 0, iterator_type, tuple);
     tarantool_flush_and_save_reply();
     if (tarantool_errno != 0) return tarantool_errno;
@@ -11512,6 +11520,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
         tarantool_errno= 10027;
       }
     }
+
     return tarantool_errno;
   }
 
@@ -11526,17 +11535,20 @@ long unsigned int MainWindow::tarantool_num_rows()
   assert(tarantool_tnt_reply.data != NULL);
 
   char field_type;
-  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY)
+  if (tarantool_select_nosql == false)
   {
-    tarantool_errno= 10008;
-    strcpy(tarantool_errmsg, "Error: result contains non-scalar value\n");
-    return tarantool_errno;
+    field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+    if (field_type != MP_ARRAY)
+    {
+      tarantool_errno= 10008;
+      strcpy(tarantool_errmsg, "Error: result contains non-scalar value\n");
+      return tarantool_errno;
+    }
+    /* The first item will be dd 00 00 01 i.e. "array of length = 1" */
+    long unsigned int r;
+    r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+    assert(r == 1);
   }
-  /* The first item will be dd 00 00 01 i.e. "array of length = 1" */
-  long unsigned int r;
-  r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  assert(r == 1);
   /* The next item will be e.g. 93 i.e. "fixarray 3" */
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   if (field_type != MP_ARRAY)
@@ -11545,6 +11557,7 @@ long unsigned int MainWindow::tarantool_num_rows()
     strcpy(tarantool_errmsg, "Error: failed to decode row_count\n");
     return tarantool_errno;
   }
+
   result_row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   return result_row_count;
 }
@@ -11569,9 +11582,11 @@ unsigned int MainWindow::tarantool_num_fields()
   /* asserts like the following are unnecessary if the data is good */
   field_type= lmysql->ldbms_mp_typeof(**tarantool_tnt_reply_data);
   assert(field_type == MP_ARRAY);
-
-  /* See tarantool_num_rows for long form of this, with checking */
-  lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+  if (tarantool_select_nosql == false)
+  {
+    /* See tarantool_num_rows for long form of this, with checking */
+    lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+  }
   result_row_count= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
   strcpy(field_name, TARANTOOL_FIELD_NAME_BASE);
   strcat(field_name, "_");
@@ -11698,7 +11713,10 @@ const char * MainWindow::tarantool_seek_0()
 
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   assert(field_type == MP_ARRAY);
-  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  if (tarantool_select_nosql == false)
+  {
+    lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  }
   row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   assert(row_count == result_row_count);
   assert(tarantool_tnt_reply_data != tarantool_tnt_reply.data);
@@ -11718,6 +11736,7 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
 {
   const char *original_tarantool_tnt_reply_data= tarantool_tnt_reply_data;
   unsigned int total_length= 0;
+
   char field_type;
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   assert(field_type == MP_ARRAY);
@@ -11821,7 +11840,6 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   //char **v_row;
   //unsigned long *v_lengths;
 //  unsigned int ki;
-
   const char *tarantool_tnt_reply_data_copy;
 
   for (i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;

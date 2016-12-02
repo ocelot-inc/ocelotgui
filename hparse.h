@@ -9020,11 +9020,10 @@ void MainWindow::hparse_f_multi_block(QString text)
 #endif
     {
 #ifdef DBMS_TARANTOOL
-//      if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
-//      {
-//        tparse_f_block(0);
-//      }
-//      else
+      if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+       && (hparse_f_is_nosql(text) == true))
+         tparse_f_block(0);
+      else
 #endif
       hparse_f_statement(hparse_i);
       if (hparse_errno > 0) goto error;
@@ -9147,6 +9146,26 @@ error:
   hparse_line_edit->setCursorPosition(0);
   hparse_line_edit->show();
 }
+
+#ifdef DBMS_TARANTOOL
+bool MainWindow::hparse_f_is_nosql(QString text)
+{
+  QString s= text.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
+  if (QString::compare(s, "SELECT", Qt::CaseInsensitive) == 0)
+  {
+    QString s= text.mid(main_token_offsets[hparse_i + 1], main_token_lengths[hparse_i + 1]);
+    if ((s.left(2) == "/*") && (s.right(2) == "*/"))
+    {
+      s= s.mid(2, s.length() - 4).trimmed();
+      if (QString::compare(s, "NOSQL", Qt::CaseInsensitive) == 0)
+      {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+#endif
 
 /*
   A client statement can be "\" followed by a character, for example \C.
@@ -9703,6 +9722,7 @@ void MainWindow::hparse_f_parse_hint_line_create()
   Legal comparison-operators within SELECT are = > < >= <=
   Comments are legal anywhere.
   Todo: Keywords should not be reserved, for example DELETE FROM INTO WHERE SELECT=5; is legal.
+  Currently we only call tparse_f_block(0) for "SELECT / * NOSQL * / ..."
 */
 
 /* These items are permanent and are initialized in parse_f_program */
@@ -9781,7 +9801,7 @@ void MainWindow::tparse_f_restricted_expression()
 
 /*
  condition =
-     identifier ("="|"<"|"<="|">"|">=") literal
+     identifier ("="|"<"|"<="|"="|">"|">=") literal
      [AND condition ...]
 */
 void MainWindow::tparse_f_indexed_condition()
@@ -9844,6 +9864,7 @@ void MainWindow::tparse_f_indexed_condition()
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
       else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1) comp_op= TARANTOOL_BOX_INDEX_LT;
       else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1) comp_op= TARANTOOL_BOX_INDEX_LE;
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
       else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1) comp_op= TARANTOOL_BOX_INDEX_GT;
       else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1) comp_op= TARANTOOL_BOX_INDEX_GE;
       else hparse_f_error();
@@ -9859,7 +9880,7 @@ void MainWindow::tparse_f_indexed_condition()
 
 /*
  unindexed condition =
-     expression ("="|"<"|"<="|">"|">=") expression
+     expression ("="|"<"|"<="|"="|">"|">=") expression
      [AND|OR condition ...]
   For a sequential search, i.e. a full-table scan or a filter of the
   rows selected by indexed conditions, we can have OR as well as AND,
