@@ -5000,7 +5000,13 @@ void MainWindow::hparse_f_insert_or_replace()
     hparse_f_conflict_algorithm();
     if (hparse_errno > 0) return;
   }
-  hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
+  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
+    if (hparse_errno > 0) return;
+  }
+  else
+    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
   if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
   if (hparse_errno > 0) return;
   hparse_f_partition_list(true, false);
@@ -6449,7 +6455,15 @@ void MainWindow::hparse_f_statement(int block_top)
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOW_PRIORITY")) {;}
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "QUICK")) {;}
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IGNORE")) {;}
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1)
+    bool is_from_seen= false;
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
+      if (hparse_errno > 0) return;
+      is_from_seen= true;
+    }
+    if ((is_from_seen == true)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1))
     {
       bool multi_seen= false;
       if (hparse_f_qualified_name_with_star() == 0) hparse_f_error();
@@ -9151,7 +9165,9 @@ error:
 bool MainWindow::hparse_f_is_nosql(QString text)
 {
   QString s= text.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
-  if (QString::compare(s, "SELECT", Qt::CaseInsensitive) == 0)
+  if ((QString::compare(s, "SELECT", Qt::CaseInsensitive) == 0)
+   || (QString::compare(s, "INSERT", Qt::CaseInsensitive) == 0)
+   || (QString::compare(s, "DELETE", Qt::CaseInsensitive) == 0))
   {
     QString s= text.mid(main_token_offsets[hparse_i + 1], main_token_lengths[hparse_i + 1]);
     if ((s.left(2) == "/*") && (s.right(2) == "*/"))
@@ -9722,7 +9738,10 @@ void MainWindow::hparse_f_parse_hint_line_create()
   Legal comparison-operators within SELECT are = > < >= <=
   Comments are legal anywhere.
   Todo: Keywords should not be reserved, for example DELETE FROM INTO WHERE SELECT=5; is legal.
-  Currently we only call tparse_f_block(0) for "SELECT / * NOSQL * / ..."
+  We call tparse_f_block(0) for "SELECT|INSERT|DELETE / * NOSQL * / ..."
+  Todo: with the current arrangement we never could reach "TRUNCATE".
+  Todo: with the current arrangement we never could reach "SET".
+  Todo: UPDATE fails.
 */
 
 /* These items are permanent and are initialized in parse_f_program */
@@ -9804,7 +9823,7 @@ void MainWindow::tparse_f_restricted_expression()
      identifier ("="|"<"|"<="|"="|">"|">=") literal
      [AND condition ...]
 */
-void MainWindow::tparse_f_indexed_condition()
+void MainWindow::tparse_f_indexed_condition(int keyword)
 {
   if (hparse_errno > 0) return;
   do
@@ -9861,14 +9880,23 @@ void MainWindow::tparse_f_indexed_condition()
     }
     else
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1) comp_op= TARANTOOL_BOX_INDEX_LT;
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1) comp_op= TARANTOOL_BOX_INDEX_LE;
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1) comp_op= TARANTOOL_BOX_INDEX_GT;
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1) comp_op= TARANTOOL_BOX_INDEX_GE;
-      else hparse_f_error();
-      if (hparse_errno > 0) return;
+      if (keyword == TOKEN_KEYWORD_SELECT)
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<") == 1) comp_op= TARANTOOL_BOX_INDEX_LT;
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<=") == 1) comp_op= TARANTOOL_BOX_INDEX_LE;
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=") == 1) comp_op= TARANTOOL_BOX_INDEX_EQ;
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">") == 1) comp_op= TARANTOOL_BOX_INDEX_GT;
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">=") == 1) comp_op= TARANTOOL_BOX_INDEX_GE;
+        else hparse_f_error();
+        if (hparse_errno > 0) return;
+      }
+      else
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_errno > 0) return;
+        comp_op= TARANTOOL_BOX_INDEX_EQ;
+      }
     }
     tparse_iterator_type= comp_op;
     ++tparse_indexed_condition_count;
@@ -9951,7 +9979,7 @@ void MainWindow::tparse_f_statement()
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_INSERT;
-    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
@@ -9971,9 +9999,9 @@ void MainWindow::tparse_f_statement()
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_REPLACE;
-    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
-    if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INTO");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
     if (hparse_errno > 0) return;
@@ -9997,7 +10025,7 @@ void MainWindow::tparse_f_statement()
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
     if (hparse_errno > 0) return;
-    tparse_f_indexed_condition();
+    tparse_f_indexed_condition(TOKEN_KEYWORD_DELETE);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TRUNCATE"))
@@ -10021,7 +10049,7 @@ void MainWindow::tparse_f_statement()
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE"))
     {
-      tparse_f_indexed_condition();
+      tparse_f_indexed_condition(TOKEN_KEYWORD_SELECT);
       if (hparse_errno > 0) return;
     }
   }
@@ -10036,7 +10064,7 @@ void MainWindow::tparse_f_statement()
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WHERE");
     if (hparse_errno > 0) return;
-    tparse_f_indexed_condition();
+    tparse_f_indexed_condition(TOKEN_KEYWORD_UPDATE);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SET"))

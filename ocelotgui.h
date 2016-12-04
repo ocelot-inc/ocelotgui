@@ -626,7 +626,7 @@ public:
   void tparse_f_term();
   void tparse_f_expression();
   void tparse_f_restricted_expression();
-  void tparse_f_indexed_condition();
+  void tparse_f_indexed_condition(int);
   void tparse_f_statement();
   void tparse_f_assignment();
   void tparse_f_block(int);

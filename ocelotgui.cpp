@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.3
-   Last modified: November 30 2016
+   Last modified: December 4 2016
 */
 
 /*
@@ -11323,6 +11323,18 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
         unsigned long r= tarantool_num_rows();
         tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
 
+        /*
+          KLUDGE ALERT
+          The current version of Tarantool says # of rows = 1 if there
+          are zero rows, because of the idea that column names are a row.
+          This is supposed to be fixed soon!
+          When it's fixed, we'll miss result sets that really have 1 row.
+        */
+        if ((result_row_count == 1)
+         && (tarantool_select_nosql == false)
+         && (statement_type == TOKEN_KEYWORD_SELECT))
+          r= 0;
+
         if (r == 0)
         {
           strcpy(tarantool_errmsg, "Zero rows.");
@@ -11340,10 +11352,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query, unsigned long dbms_
   //QString current_token, what_we_expect, what_we_got;
 
   tparse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
-
-//printf("tarantool_real_query %d\n", hparse_errno);
-//printf("main_token_number=%d\n", main_token_number);
-//printf("main_token_count_in_statement=%d\n", main_token_count_in_statement);
 
   if (hparse_errno > 0)
   {
@@ -11559,6 +11567,7 @@ long unsigned int MainWindow::tarantool_num_rows()
   }
 
   result_row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+
   return result_row_count;
 }
 
@@ -11566,6 +11575,7 @@ long unsigned int MainWindow::tarantool_num_rows()
   Given tarantool_tnt_reply, return number of fields from a SELECT. Used by result grid.
   Actually there are two counts: the count of main fields, and the count of sub-fields.
   Todo: what if there are arrays within arrays?
+  Todo: shouldn't map fields be arranged so new map value = new field?
   Due to flattening, field_count is count of scalars not count of arrays and maps.
   For example, array[2] X Y array[3] A B C has 5 scalars.
 */
