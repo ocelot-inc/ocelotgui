@@ -633,7 +633,7 @@ public:
   void tparse_f_program(QString text);
 #endif
 #ifdef DBMS_TARANTOOL
-  long unsigned int tarantool_num_rows();
+  long unsigned int tarantool_num_rows(unsigned int connection_number);
   unsigned int tarantool_num_fields();
   int tarantool_num_fields_recursive(const char **tarantool_tnt_reply_data,
                                      char *field_name,
@@ -649,6 +649,7 @@ public:
                  const char *which_field,
                  unsigned int p_result_column_count,
                  char **p_result_field_names);
+  int tarantool_local_subquery(QString, int *, unsigned int, unsigned int);
 #endif
 
 public slots:
@@ -743,7 +744,7 @@ private:
   void debug_maintain_prompt(int action, int debug_widget_index, int line_number);
   QString debug_privilege_check(int statement_type);
 #endif
-  void main_token_new(int);
+  void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
   int rehash_scan();
   QString rehash_search(char *search_string, int reftype);
@@ -824,9 +825,9 @@ private:
   int connect_mysql(unsigned int connection_number);
   void connect_mysql_error_box(QString, unsigned int);
 #ifdef DBMS_TARANTOOL
-  int connect_tarantool(unsigned int connection_number);
-  void tarantool_flush_and_save_reply();
-  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len);
+  int connect_tarantool(unsigned int connection_number, QString, QString, QString, QString);
+  void tarantool_flush_and_save_reply(unsigned int);
+  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, bool);
   unsigned int tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes);
   const char * tarantool_seek_0();
 #endif
@@ -923,11 +924,8 @@ private:
   bool tarantool_select_nosql;
 #endif
 
-  /* connections_... [] is not a multi-occurrence list but someday it might be */
-  int connections_is_connected[1];                    /* == 1 if is connected */
-  int connections_dbms[1];                            /* == DBMS_MYSQL or other DBMS_... value */
-
 public:
+  int tarantool_execute_sql(const char *, unsigned long, unsigned int, int, QString);
   QString query_utf16;
   QString query_utf16_copy;
   /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
@@ -938,9 +936,20 @@ public:
   int  *main_token_pointers;
   unsigned char *main_token_reftypes;
   unsigned int main_token_max_count;
-  unsigned int main_token_count;
+  unsigned int main_token_count_in_all;
   unsigned int main_token_count_in_statement;
   unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
+
+  int  *saved_main_token_offsets;
+  int  *saved_main_token_lengths;
+  int  *saved_main_token_types;
+  unsigned int *saved_main_token_flags;
+  int  *saved_main_token_pointers;
+  unsigned char *saved_main_token_reftypes;
+  /* unsigned int saved_main_token_max_count; doesn't need saving */
+  unsigned int saved_main_token_count_in_all;
+  unsigned int saved_main_token_count_in_statement;
+  unsigned int saved_main_token_number;
 
   /* main_token_flags[] values. so far there are only twelve but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
@@ -3913,7 +3922,8 @@ void fillup(MYSQL_RES *mysql_res,
             unsigned short int ocelot_batch,
             unsigned short int ocelot_html,
             unsigned short int ocelot_raw,
-            unsigned short int ocelot_xml)
+            unsigned short int ocelot_xml,
+            unsigned int connection_number)
 {
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
 
@@ -3929,7 +3939,7 @@ void fillup(MYSQL_RES *mysql_res,
   if (connections_dbms == DBMS_TARANTOOL)
   {
     result_column_count= copy_of_parent->tarantool_num_fields();
-    result_row_count= copy_of_parent->tarantool_num_rows();
+    result_row_count= copy_of_parent->tarantool_num_rows(connection_number);
   }
   else
 #endif
@@ -4821,6 +4831,86 @@ void display_batch()
   delete [] tmp;
   return;
 }
+
+#ifdef DBMS_TARANTOOL
+/* Make a create statement for a remote subquery temporary table */
+int creates(char *temporary_table_name)
+{
+  char tmp[1024];
+  strcpy(tmp, "CREATE TEMPORARY TABLE ");
+  strcat(tmp, temporary_table_name);
+  strcat(tmp, "(s1 BLOB PRIMARY KEY)");
+  int result= copy_of_parent->tarantool_execute_sql(
+              tmp,
+              strlen(tmp),
+              0, /* MYSQL_MAIN_CONNECTION, */
+              MainWindow::TOKEN_KEYWORD_CREATE,
+              "");
+  if (result != 0) return result;
+  return result;
+}
+#endif
+
+#ifdef DBMS_TARANTOOL
+/* Make some insert statements for a remote subquery temporary table */
+/*
+  KLUDGE ALERT: A column in the first row might be non-numeric
+  (field name) even though the field is numeric.
+  This is supposed to be fixed soon. Meanwhile we put '' around it.
+  What we're saying is "if it doesn't start with a digit then put
+  quotes around it", which is close to absurd.
+*/
+int inserts(char *temporary_table_name)
+{
+  long unsigned int tmp_xrow;
+  char *pointer= result_set_copy_rows[0];
+  unsigned int v_length;
+  char tmp[1024];
+  char *tmp_pointer;
+
+  pointer= result_set_copy_rows[0];
+  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    tmp_pointer= &tmp[0];
+    strcpy(tmp_pointer, "INSERT INTO ");
+    tmp_pointer+= strlen("INSERT INTO ");
+    strcpy(tmp_pointer, temporary_table_name);
+    tmp_pointer+= strlen(temporary_table_name);
+    strcpy(tmp_pointer, " VALUES (");
+    tmp_pointer+= strlen(" VALUES (");
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if (i > 0) {strcpy(tmp_pointer, ","); ++tmp_pointer; }
+      memcpy(&v_length, pointer, sizeof(unsigned int));
+      pointer+= sizeof(unsigned int) + sizeof(char);
+      if ((v_length > 0) && (*pointer >= '0') && (*pointer <= '9'))
+      {
+        memcpy(tmp_pointer, pointer, v_length);
+        tmp_pointer+= v_length;
+      }
+      else
+      {
+        *tmp_pointer= 39; /* ' */
+        ++tmp_pointer;
+        memcpy(tmp_pointer, pointer, v_length);
+        tmp_pointer+= v_length;
+        *tmp_pointer= 39;
+        ++tmp_pointer;
+      }
+      pointer+= v_length;
+    }
+    strcpy(tmp_pointer, ");");
+    int result= copy_of_parent->tarantool_execute_sql(
+                tmp,
+                strlen(tmp),
+                0, /* MYSQL_MAIN_CONNECTION, */
+                MainWindow::TOKEN_KEYWORD_INSERT,
+                "");
+    if (result != 0) return result;
+  }
+  return 0;
+}
+#endif
 
 /*
   Copy the result_ lists to gridx_lists.

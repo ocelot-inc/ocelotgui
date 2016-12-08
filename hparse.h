@@ -4481,11 +4481,11 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
 
 void MainWindow::hparse_f_alter_or_create_server(int statement_type)
 {
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
   if (hparse_errno > 0) return;
   if (statement_type == TOKEN_KEYWORD_CREATE)
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN");
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "FOREIGN");
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATA");
     if (hparse_errno > 0) return;
@@ -4494,26 +4494,26 @@ void MainWindow::hparse_f_alter_or_create_server(int statement_type)
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_WRAPPER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
   }
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPTIONS");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPTIONS");
   if (hparse_errno > 0) return;
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
   if (hparse_errno > 0) return;
   do
   {
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HOST") == 1)
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HOST") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USER") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PASSWORD") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USER") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PASSWORD") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SOCKET") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OWNER") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PORT") == 1))
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PORT") == 1))
     {
       if (hparse_f_literal() == 0) hparse_f_error();
     }
     else hparse_f_error();
     if (hparse_errno > 0) return;
-  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
 }
 
@@ -5760,7 +5760,7 @@ void MainWindow::hparse_f_statement(int block_top)
     {
       hparse_f_alter_database();
     }
-    else if ((((hparse_flags) & HPARSE_FLAG_SERVER) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SERVER") == 1))
+    else if ((((hparse_flags) & HPARSE_FLAG_SERVER) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SERVER, "SERVER") == 1))
     {
       hparse_f_alter_or_create_server(TOKEN_KEYWORD_ALTER);
       if (hparse_errno > 0) return;
@@ -6203,7 +6203,7 @@ void MainWindow::hparse_f_statement(int block_top)
       hparse_f_create_database();
       if (hparse_errno > 0) return;
     }
-    else if (((hparse_flags & HPARSE_FLAG_SERVER) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SERVER") == 1))
+    else if (((hparse_flags & HPARSE_FLAG_SERVER) != 0) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SERVER, "SERVER") == 1))
     {
       hparse_f_alter_or_create_server(TOKEN_KEYWORD_CREATE);
       if (hparse_errno > 0) return;
@@ -9365,7 +9365,7 @@ int MainWindow::hparse_f_client_statement()
   }
   else if ((slash_token == TOKEN_KEYWORD_CONNECT) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONNECT, "CONNECT") == 1))
   {
-    if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+     if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
   else if ((slash_token == TOKEN_KEYWORD_DELIMITER) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELIMITER, "DELIMITER") == 1))
   {
@@ -10093,7 +10093,7 @@ void MainWindow::tparse_f_block(int calling_type)
 
 void MainWindow::tparse_f_program(QString text)
 {
-  tarantool_errno= 0; /* unnecessary, I think */
+  //tarantool_errno[connection_number]= 0; /* unnecessary, I think */
 
   hparse_text_copy= text;
   hparse_token= "";

@@ -118,42 +118,43 @@ static const char *string_languages[]=
 #define ER_POPEN_FAILED                   41
 #define ER_PCLOSE_FAILED                  42
 #define ER_FAILED_TO_CONNECT_TO_TARANTOOL 43
-#define ER_SETUP                          44
-#define ER_COULD_NOT_GET                  45
-#define ER_STATUS                         46
-#define ER_ROUTINE_HAS_STOPPED            47
-#define ER_DEBUGGER_REQUIRES              48
-#define ER_MISSING_ROUTINE_NAMES          49
-#define ER_MISSING_ROUTINE_NAME           50
-#define ER_DEBUG_IS_ALREADY_RUNNING       51
-#define ER_SURROGATE                      52
-#define ER_SURROGATE_NOT_FOUND            53
-#define ER_COULD_NOT_FIND_A_ROUTINE       54
-#define ER_ROUTINE_IS_MISSING             55
-#define ER_DEBUGGEE_NOT_RESPONDING        56
-#define ER_NO_DEBUG_SESSION               57
-#define ER_BREAKPOINT_SYNTAX              58
-#define ER_TBREAKPOINT_SYNTAX             59
-#define ER_CLEAR_SYNTAX                   60
-#define ER_OVERFLOW                       61
-#define ER_DEBUGGEE_WAIT_LOOP             62
-#define ER_DEBUGGEE_WAIT_LOOP_IS_NOT      63
-#define ER_I_STATUS_FAILED                64
-#define ER_I_STATUS_FAILED_NOT_SEVERE     65
-#define ER_MYSQL_FETCH_ROW_FAILED         66
-#define ER_MYSQL_NUM_FIELDS               67
-#define ER_MYSQL_LIBRARY_INIT_FAILED      68
-#define ER_LIBMYSQLCLIENT_DOES_NOT_HAVE   69
-#define ER_LIBMYSQLCLIENT_WAS_NOT_FOUND   70
-#define ER_MYSQL_QUERY_FAILED             71
-#define ER_ROWS_AFFECTED                  72
-#define ER_WARNING                        73
-#define ER_ERROR                          74
-#define ER_THE_SYNTAX_CHECKER_THINKS      75
-#define ER_DO_YOU_WANT_TO_CONTINUE        76
-#define ER_YES                            77
-#define ER_NO                             78
-#define ER_END                            79
+#define ER_FAILED_TO_CONNECT_TO_TARANTOOL_FOR_SERVER 44
+#define ER_SETUP                          45
+#define ER_COULD_NOT_GET                  46
+#define ER_STATUS                         47
+#define ER_ROUTINE_HAS_STOPPED            48
+#define ER_DEBUGGER_REQUIRES              49
+#define ER_MISSING_ROUTINE_NAMES          50
+#define ER_MISSING_ROUTINE_NAME           51
+#define ER_DEBUG_IS_ALREADY_RUNNING       52
+#define ER_SURROGATE                      53
+#define ER_SURROGATE_NOT_FOUND            54
+#define ER_COULD_NOT_FIND_A_ROUTINE       55
+#define ER_ROUTINE_IS_MISSING             56
+#define ER_DEBUGGEE_NOT_RESPONDING        57
+#define ER_NO_DEBUG_SESSION               58
+#define ER_BREAKPOINT_SYNTAX              59
+#define ER_TBREAKPOINT_SYNTAX             60
+#define ER_CLEAR_SYNTAX                   61
+#define ER_OVERFLOW                       62
+#define ER_DEBUGGEE_WAIT_LOOP             63
+#define ER_DEBUGGEE_WAIT_LOOP_IS_NOT      64
+#define ER_I_STATUS_FAILED                65
+#define ER_I_STATUS_FAILED_NOT_SEVERE     66
+#define ER_MYSQL_FETCH_ROW_FAILED         67
+#define ER_MYSQL_NUM_FIELDS               68
+#define ER_MYSQL_LIBRARY_INIT_FAILED      69
+#define ER_LIBMYSQLCLIENT_DOES_NOT_HAVE   70
+#define ER_LIBMYSQLCLIENT_WAS_NOT_FOUND   71
+#define ER_MYSQL_QUERY_FAILED             72
+#define ER_ROWS_AFFECTED                  73
+#define ER_WARNING                        74
+#define ER_ERROR                          75
+#define ER_THE_SYNTAX_CHECKER_THINKS      76
+#define ER_DO_YOU_WANT_TO_CONTINUE        77
+#define ER_YES                            78
+#define ER_NO                             79
+#define ER_END                            80
 #define ER_MAX_LENGTH       1024
 static const char *er_strings[]=
 {
@@ -202,6 +203,7 @@ static const char *er_strings[]=
   " popen() failed", /* ER_POPEN_FAILED */
   " pclose() failed", /* ER_PCLOSE_FAILED */
   " Failed to connect to Tarantool server. Use menu item File|Connect to try again", /* ER_FAILED_TO_CONNECT_TO_TARANTOOL */
+  " Failed to connect to Tarantool server. Server not created", /* ER_FAILED_TO_CONNECT_TO_TARANTOOL_FOR_SERVER */
   "$setup generated %d surrogates but the current maximum is %d'", /* ER_SETUP */
   "Could not get a routine definition for %s.%s. Are you the routine creator and/or do you have SELECT privilege for mysql.proc?", /* ER_COULD_NOT_GET */
   "DBMS version = %s Host = %s Port = %s", /* ER_STATUS */
@@ -282,6 +284,7 @@ static const char *er_strings[]=
     " popen() échoué", /* ER_POPEN_FAILED */
     " pclose() échoué", /* ER_PCLOSE_FAILED */
     " Échec de connexion au serveur Tarantool. Utilisez le menu Fichier|Connexion pour essayer de nouveau", /* ER_FAILED_TO_CONNECT_TO_TARANTOOL */
+    " Échec de connexion au serveur Tarantool. Serveur pas créé", /* ER_FAILED_TO_CONNECT_TO_TARANTOOL_FOR_SERVER */
     "$setup a généré %d substituts, mais le courant maximum est %d'", /* ER_SETUP */
     "Impossible d'obtenir une définition de routine pour %s.%s. Êtes-vous le créateur de routine et / ou avez-vous le privilège SELECT pour mysql.proc?", /* ER_COULD_NOT_GET */
     "SGBD version = %s Hôte = %s Port = %s", /* ER_STATUS */
