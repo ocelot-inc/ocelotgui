@@ -166,7 +166,10 @@ histignore. Pattern to ignore when writing to histfile.
 For example, if histignoreis "*select*", then statements
 containing the string "select" will not be written.
 
-html. Ignored.
+html. If one starts ocelotgui with --html, the grid display
+will be based on HTML rather than on widgets, making results
+look quite different. If one starts ocelotgui with --html --raw,
+the actual html markup code will appear.
 
 ignore_spaces. Ignored.
 
@@ -218,11 +221,32 @@ ocelot_statement_highlight_identifier_color ocelot_statement_highlight_comment_c
 ocelot_statement_highlight_operator_color ocelot_statement_highlight_keyword_color
 ocelot_statement_prompt_background_color ocelot_statement_highlight_function_color
 ocelot_statement_highlight_current_line_color.
-Additionally, ocelot_statement_syntax_checker=1 turns on the
-syntax checker, and ocelot_client_side_functions=0 turns off
-the client-side functions, and ocelot_dbms=x means assume
-the DBMS is x until connection is made, and ocelot_grid_tabs=5
+See also: the ocelot_ options which aren't related to Settings, below.
+
+ocelot_client_side_functions: ocelot_client_side_functions=0 turns off
+the client-side functions, such as "select row_number() over ...".
+This may be unnecessary with newer versions of MariaDB.
+The default is 1.
+
+ocelot_dbms: --ocelot_dbms=x means assume the server DBMS is x
+until connection is made. The possible values are 'mysql',
+'mariadb', and 'tarantool'. The default is 'mysql'.
+
+ocelot_grid_tabs: ocelot_grid_tabs=5
 means assume that a stored procedure can return up to 5 result sets.
+The default is 16.
+
+ocelot_language: --ocelot_language='english' means the menu and the
+client error messages should be in English, --ocelot_language='french'
+means the menu and the client error messages should be in French.
+The default is 'english'. 
+
+ocelot_statement_syntax_checker: setting
+ocelot_statement_syntax_checker=1 turns on the
+syntax checker; setting ocelot_statement_syntax_checker=2
+turns on the syntax checker and is insistent -- if ocelotgui
+doesn't like the syntax checker, a confirmation dialog box
+will appear. The default is 1.
 
 one_database. Ignored.
 
@@ -285,4 +309,6 @@ per line.
 
 wait. Ignored.
 
-xml. Ignored.
+xml. If one starts with ocelotgui --xml, the grid display will
+show raw xml. See also --html.
+

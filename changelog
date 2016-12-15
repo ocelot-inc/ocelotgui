@@ -1,3 +1,9 @@
+ocelotgui (1.0.4) UNRELEASED; urgency=low
+
+  * New options html, xml, ocelot_language
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Mon, 12 Dec 2016 12:00:00 -0600
+
 ocelotgui (1.0.3) UNRELEASED; urgency=low
 
   * Better default font, new formatter and history-output options.

@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.3
-   Last modified: December 8 2016
+   Version: 1.0.4
+   Last modified: December 15 2016
 */
 
 /*
@@ -202,6 +202,12 @@
         re-enter Qt Creator. Build | Clean all. Build all. Run.
 */
 
+#define MYSQL_MAIN_CONNECTION 0
+#define MYSQL_DEBUGGER_CONNECTION 1
+#define MYSQL_KILL_CONNECTION 2
+#define MYSQL_LOCAL_CONNECTION 3
+#define MYSQL_MAX_CONNECTIONS 4
+
 #include "ostrings.h"
 #include "ocelotgui.h"
 #include "ui_ocelotgui.h"
@@ -350,16 +356,11 @@
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.3"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.4"; /* For --version. Make sure it's in manual too. */
 
   static unsigned char dbms_version_mask;
 
 /* Global mysql definitions */
-#define MYSQL_MAIN_CONNECTION 0
-#define MYSQL_DEBUGGER_CONNECTION 1
-#define MYSQL_KILL_CONNECTION 2
-#define MYSQL_LOCAL_CONNECTION 3
-#define MYSQL_MAX_CONNECTIONS 4
   static MYSQL mysql[MYSQL_MAX_CONNECTIONS];
   static int connected[MYSQL_MAX_CONNECTIONS]= {0, 0, 0, 0};
   pthread_t debug_thread_id;
@@ -636,7 +637,7 @@ int MainWindow::result_grid_add_tab()
   && (ocelot_grid_tabs != 0))
     return 1;
   {
-    r= new ResultGrid(lmysql, this);
+    r= new ResultGrid(lmysql, this, true);
     int new_tab_index= result_grid_tab_widget->addTab(r, QString::number(i_r + 1));
     assert(new_tab_index == i_r);
     r->hide(); /* Maybe this isn't necessary */
@@ -1792,7 +1793,7 @@ void MainWindow::history_file_to_history_widget()         /* see comment=tee+his
   }
   fclose(history_file);
   ocelot_history_hist_file_is_copied= true;
-  query_utf16= "/* Start Of Session */;";
+  query_utf16= er_strings[er_off + ER_START_OF_SESSION];
 }
 
 
@@ -2804,7 +2805,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.3, September 27 2016  \
+  <BR>Version 1.0.4, December 15 2016  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -8468,18 +8469,6 @@ int MainWindow::rehash_scan()
   sprintf(buffer, er_strings[er_off + ER_OK_REHASH],
           database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
   put_message_in_result(buffer);
-  ///* TEST! start */
-//{
-//  printf("TEST!\n");
-//  long unsigned int r;
-//  char *row_pointer;
-//  unsigned long column_length;
-//  for (r= 0; r < rehash_result_row_count; ++r)
-//  {
-//    row_pointer= rehash_result_set_copy_rows[r];  printf("TEST! end\n");
-//  }
-//}
-/* TEST! end */
   return 1;
 }
 
@@ -8673,10 +8662,11 @@ void MainWindow::put_diagnostics_in_result()
   if (connections_dbms[0] == DBMS_TARANTOOL)
   {
     /* todo: show elapsed time */
-    if (tarantool_errno[0] == 0) s1= "OK";
+    if (tarantool_errno[0] == 0) s1= er_strings[er_off + ER_OK];
     else
     {
-      s1= "Error. ";
+      s1= s1= er_strings[er_off + ER_OK];
+      s1.append(". ");
       s1.append(tarantool_errmsg);
     }
     s1.append(elapsed_time_string);
@@ -11167,9 +11157,8 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
   or "create server id options (port=x);".
   Todo: disconnect old if already connected.
   TODO: LOTS OF ERROR CHECKS NEEDED IN THIS!
-*/
-/*
   Usually libtarantool.so and libtarantoolnet.so are in /usr/local/lib or LD_LIBRARY_PATH.
+  todo: We no longer use libtarantoolnet.so, remove reference to it.
 */
 int MainWindow::connect_tarantool(unsigned int connection_number,
                                   QString port_maybe,
@@ -11193,14 +11182,15 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   }
 
   /* Find libtarantoolnet. Prefer ld_run_path. */
-  if (is_libtarantoolnet_loaded != 1)
-  {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET);
-  }
-  if (is_libtarantool_loaded != 1)
-  {
-    lmysql->ldbms_get_library("", &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET);
-  }
+  /* Now libtarantool.so has everything so this is removed. */
+  //if (is_libtarantoolnet_loaded != 1)
+  //{
+  //  lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET);
+  //}
+  //if (is_libtarantoolnet_loaded != 1)
+  //{
+  //  lmysql->ldbms_get_library("", &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET);
+  //}
 
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
 
@@ -11229,7 +11219,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     return 1;
   }
 
-  /* !! todo: same checking for tarantoolnet.so */
+  /* todo: same checking for tarantoolnet.so (no longer necessary) */
 
   /* TEST! this is from the sample program in the manual */
 
@@ -11336,6 +11326,7 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
   lmysql->ldbms_tnt_reply_init(&tarantool_tnt_reply);
   tnt[connection_number]->read_reply(tnt[connection_number], &tarantool_tnt_reply);
   tarantool_errno[connection_number]= tarantool_tnt_reply.code;
+
   if (tarantool_tnt_reply.code != 0)
   {
     char *x1= (char*)tarantool_tnt_reply.error;
@@ -12291,6 +12282,8 @@ int MainWindow::tarantool_local_subquery(QString text,
   int result= 0;
   QString new_query= "";
 
+  ResultGrid *rg= new ResultGrid(lmysql, this, false);
+
   for (;;)
   {
     bool is_containing_more_subqueries= false;
@@ -12352,8 +12345,9 @@ int MainWindow::tarantool_local_subquery(QString text,
                          i_of_end,
                          true);
     if (result != 0) break;
-    ResultGrid *rg;
-    rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+
+    /* TODO: I'd be much happier if we didn't fool with existing grid */
+    //rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
     rg->fillup(mysql_res,
               //&tarantool_tnt_reply,
               connections_dbms[MYSQL_LOCAL_CONNECTION],
@@ -12362,7 +12356,6 @@ int MainWindow::tarantool_local_subquery(QString text,
               lmysql, ocelot_client_side_functions,
               ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
               MYSQL_LOCAL_CONNECTION);
-
     char temporary_table_name[64];
     strcpy(temporary_table_name, "ocelot_tmp_");
     char tmp_number[10];
@@ -12408,7 +12401,7 @@ int MainWindow::tarantool_local_subquery(QString text,
   }
 
   /* Todo: Now destroy the temporary tables? */
-
+  delete rg;
   return result;
 }
 
@@ -12639,6 +12632,8 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     return;
   }
 
+  printf("paintEvent, image\n");
+
   if (text_edit_frame_of_cell->content_pointer == 0)
   {
     setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
@@ -12668,8 +12663,13 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     We could have shown a fragment with a scrollbar.
     We could have shown a portion without a scrollbar (one can see the rest by dragging)
     by leaving out the line with the "p.scaled()" function. Maybe users would want such choices?
+    Anyway, the line here was wrong:
+    p= p.scaled(event->rect().size(), Qt::KeepAspectRatio);
+    because event->rect().size() is constantly changing.
+    I'm not sure whether this->width(), this->height() might be a few
+    pixels too large, but am not seeing noticeable harm.
   */
-  p= p.scaled(event->rect().size(), Qt::KeepAspectRatio);
+  p= p.scaled(this->width(), this->height(), Qt::KeepAspectRatio);
   painter.drawPixmap(0, 0, p);
   //painter.drawPixmap(event->rect(), p);
   return;

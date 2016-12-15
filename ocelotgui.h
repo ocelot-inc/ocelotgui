@@ -140,10 +140,12 @@
           const char *data;
           const char *data_end;
   };
+  /* Amazing but true: write_request was silently added after release! */
   struct tnt_stream {
           int alloc; /*!< Allocation mark */
           ssize_t (*write)(struct tnt_stream *s, const char *buf, size_t size); /*!< write to buffer function */
           ssize_t (*writev)(struct tnt_stream *s, struct iovec *iov, int count); /*!< writev function */
+          ssize_t (*write_request)(struct tnt_stream *s, struct tnt_request *r, uint64_t *sync); /*!< write request function */
           ssize_t (*read)(struct tnt_stream *s, char *buf, size_t size); /*!< read from buffer function */
           int (*read_reply)(struct tnt_stream *s, struct tnt_reply *r); /*!< read reply from buffer */
           void (*free)(struct tnt_stream *s); /*!< free custom buffer types (destructor) */
@@ -151,6 +153,7 @@
           uint32_t wrcnt; /*!< count of write operations */
           uint64_t reqid; /*!< request id of current operation */
   };
+
   enum  	mp_type {
     MP_NIL = 0, MP_UINT, MP_INT, MP_STR,
     MP_BIN, MP_ARRAY, MP_MAP, MP_BOOL,
@@ -2617,7 +2620,7 @@ public:
   typedef ssize_t         (*ttnt_object_add_float)(struct tnt_stream *s, float);
   typedef ssize_t         (*ttnt_object_add_double)(struct tnt_stream *, double);
   typedef ssize_t         (*ttnt_object_container_close)(struct tnt_stream *);
-  typedef ssize_t         (*ttnt_object_format)  (struct tnt_stream *, const char *, int, char *);
+  typedef ssize_t         (*ttnt_object_format)  (struct tnt_stream *, const char *, int);
   typedef int             (*ttnt_object_reset)   (struct tnt_stream *);
   typedef int             (*ttnt_reload_schema)  (struct tnt_stream *);
   typedef ssize_t         (*ttnt_replace)        (struct tnt_stream *, uint32_t, struct tnt_stream *);
@@ -3375,9 +3378,9 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     return t__tnt_object_container_close(a);
   }
-  ssize_t ldbms_tnt_object_format(struct tnt_stream *a, const char *b, int c, char *d)
+  ssize_t ldbms_tnt_object_format(struct tnt_stream *a, const char *b, int c)
   {
-    return t__tnt_object_format(a,b,c,d);
+    return t__tnt_object_format(a,b,c);
   }
   int ldbms_tnt_object_reset(struct tnt_stream *a)
   {
@@ -3643,10 +3646,12 @@ public:
 ResultGrid(
 //        MYSQL_RES *mysql_res,
         ldbms *passed_lmysql,
-        MainWindow *parent): QWidget(parent)
+        MainWindow *parent,
+        bool is_displayable): QWidget(parent)
 {
   is_paintable= 0;
 
+  /* todo: see if we can get rid of client and go direct to resultgrid */
   client= new QWidget(this);
 
   lmysql= passed_lmysql;
@@ -3689,6 +3694,14 @@ ResultGrid(
   //result_column_count= 0;
   grid_result_row_count= 0;
   max_text_edit_frames_count= 0;
+
+  if (is_displayable == false)
+  {
+    row_pool_size= cell_pool_size= 0;
+    grid_main_layout= 0;
+    batch_text_edit= NULL;
+    return;
+  }
 
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
@@ -3926,7 +3939,6 @@ void fillup(MYSQL_RES *mysql_res,
             unsigned int connection_number)
 {
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
-
   lmysql= passed_lmysql;
 
   ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
@@ -3983,7 +3995,6 @@ void fillup(MYSQL_RES *mysql_res,
     scan_field_names("org_table", result_column_count, &result_original_table_names);
     scan_field_names("db", result_column_count, &result_original_database_names);
   }
-
 #ifdef DBMS_TARANTOOL
   /* Scan entire result set to determine if NUM_FLAG should go on. */
   if (connections_dbms == DBMS_TARANTOOL)
@@ -4030,7 +4041,6 @@ void fillup(MYSQL_RES *mysql_res,
       result_field_flags[i]= mysql_fields[i].flags;
     }
   }
-
   /*
     At this point, we have:
       result_column_count, result_row_count
@@ -4041,6 +4051,9 @@ void fillup(MYSQL_RES *mysql_res,
       mysql_fields (which we should not use, but we do)
     From now on there should be no need to call mysql_ functions again for this result set.
   */
+
+  /* todo: gotta use MYSQL_LOCAL_CONNECTION rather than 3 someday. */
+  if (connection_number == 3) return;
   copy_result_to_gridx(connections_dbms);
   /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
      said what gridx_row_count is. */
@@ -4833,13 +4846,35 @@ void display_batch()
 }
 
 #ifdef DBMS_TARANTOOL
-/* Make a create statement for a remote subquery temporary table */
+/*
+  Make a create statement for a remote subquery temporary table.
+  We've done fillup() so we've done tarantool_scan_field_names()
+  so we have result_field_names and result_column_count.
+*/
 int creates(char *temporary_table_name)
 {
   char tmp[1024];
+  char *result_field_names_pointer;
+  char column_name[512 + 1];
+  unsigned int v_length;
+
   strcpy(tmp, "CREATE TEMPORARY TABLE ");
   strcat(tmp, temporary_table_name);
-  strcat(tmp, "(s1 BLOB PRIMARY KEY)");
+  strcat(tmp, "(");
+  result_field_names_pointer= &result_field_names[0];
+  for (unsigned int i= 0; i < result_column_count; ++i)
+  {
+    memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+    result_field_names_pointer+= sizeof(unsigned int);
+    memcpy(column_name, result_field_names_pointer, v_length);
+    column_name[v_length]= '\0';
+    if (i != 0) strcat(tmp, ",");
+    strcat(tmp, column_name);
+    strcat(tmp, " BLOB ");
+    if (i == 0) strcat(tmp, "PRIMARY KEY");
+    result_field_names_pointer+= v_length;
+  }
+  strcat(tmp, ")");
   int result= copy_of_parent->tarantool_execute_sql(
               tmp,
               strlen(tmp),
@@ -6206,7 +6241,7 @@ void garbage_collect()
   if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
   if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
   for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear(); /* unnecessary? */
-  batch_text_edit->clear(); /* unnecessary? */
+  if (batch_text_edit != NULL) batch_text_edit->clear(); /* unnecessary? */
 }
 
 
@@ -6374,7 +6409,6 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
 */
 ~ResultGrid()
 {
-  //printf("deleting ResultGrid()\n");
   //remove_layouts(); /* I think this is unnecessary */
   garbage_collect();
   if (row_pool_size != 0)

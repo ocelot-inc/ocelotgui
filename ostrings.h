@@ -154,7 +154,8 @@ static const char *string_languages[]=
 #define ER_DO_YOU_WANT_TO_CONTINUE        77
 #define ER_YES                            78
 #define ER_NO                             79
-#define ER_END                            80
+#define ER_START_OF_SESSION               80
+#define ER_END                            81
 #define ER_MAX_LENGTH       1024
 static const char *er_strings[]=
 {
@@ -239,6 +240,7 @@ static const char *er_strings[]=
   "Do you want to continue?", /* ER_DO_YOU_WANT_TO_CONTINUE */
   "Yes", /* ER_YES */
   "No", /* ER_NO */
+  "/* Start of Session */" /* ER_START_OF_SESSION */
   /* FRENCH */
     "OK",                           /* ER_OK */
     "Erreur non connecté",          /* ER_NOT_CONNECTED */
@@ -258,14 +260,14 @@ static const char *er_strings[]=
     "Erreur: 0 lignes retournées", /* ER_0_ROWS_RETURNED */
     "Erreur: aucune base de données sélectionnée", /* ER_NO_DATABASE_SELECTED */
     "OK. base de données =% s. tables =% d. colonnes =% d. fonctions =% et. procédures =% et. = déclenche% et. events =% d. index =% d", /* ER_OK_REHASH */
-    "Error. USE statement has no argument.", /* ER_USE */
-    "Erreur. instruction USE n'a pas d'argument.", /* ER_DATABASE_CHANGED */
+    "Erreur. instruction USE n'a pas d'argument.", /* ER_USE */
+    "Base de données changée.", /* ER_DATABASE_CHANGED */
     "Erreur. instruction SOURCE n'a pas d'argument.", /* ER_SOURCE */
     "Erreur: file_open() échoué", /* ER_FILE_OPEN */
     "Erreur, delimiter ne doit pas être vide", /* ER_DELIMITER */
     "Pour HELP, utiliser les éléments du menu Aide. Par exemple cliquez sur: Aide | Le manuel.", /* ER_HELP */
     "CHARSET pas mis en oeuvre",
-    "EDIT not implemented",
+    "EDIT pas mis en oeuvre",
     "EGO ne fait rien à moins que son sur sa propre ligne après une instruction exécutable, et --named-commandes est vrai.", /* ER_EGO */
     "GO ne fait rien à moins que son sur sa propre ligne après une instruction exécutable, et --named-commandes est vrai..", /* ER_GO */
     "NOPAGER pas mis en œuvre", /* ER_NOPAGER */
@@ -320,6 +322,7 @@ static const char *er_strings[]=
     "Voulez-vous continuer?", /* ER_DO_YOU_WANT_TO_CONTINUE */
     "Oui", /* ER_YES */
     "Non" /* ER_NO */
+    "/* Début de Session */" /* ER_START_OF_SESSION */
 };
 
 /*
@@ -1065,7 +1068,7 @@ static const char *menu_strings[]=
         "Réglages -- -- pour Règle supplémentaire 1",
         "Choisir nouvelle police",
         "Connexion Boîte de dialogue",
-        "Fichier|Connect. Habituellement, seuls les 8 premiers champs sont importants."
+        "Fichier|Connexion. Habituellement, seuls les 8 premiers champs sont importants."
 };
 
 static unsigned int er_off= 0;    /* to offset er_strings language */
