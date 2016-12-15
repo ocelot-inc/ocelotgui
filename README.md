@@ -152,7 +152,7 @@ Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, it usually is more stable.
 A release file is highlighted in green
 by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.4 is at
-https://github.com/ocelotgui/releases/download/1.0.4/ocelotgui-1.0.4.tar.gz.
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.4/ocelotgui-1.0.4.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
 wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.4/ocelotgui-1.0.4.tar.gz
