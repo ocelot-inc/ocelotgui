@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.4
-   Last modified: December 15 2016
+   Last modified: December 30 2016
 */
 
 /*
@@ -8073,14 +8073,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_BORDER_SIZE, 0, (char*)""); return 1; }
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 10)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_BORDER_SIZE, 0, (char*)""); return 1; }
         ocelot_grid_cell_border_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_DRAG_LINE_SIZE, 0, (char*)""); return 1; }
+        if ((ccn.toInt() < 0) || (ccn.toInt() > 10)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_DRAG_LINE_SIZE, 0, (char*)""); return 1; }
         ocelot_grid_cell_drag_line_size= ccn;
         is_result_grid_style_changed= true;
       }
@@ -12004,6 +12004,8 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
 //  unsigned int ki;
   const char *tarantool_tnt_reply_data_copy;
 
+  ResultGrid *rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+
   for (i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;
 
   /*
@@ -12127,7 +12129,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
-        if (field_type == MP_INT)
+        else if (field_type == MP_INT)
         {
           int64_t int_value= lmysql->ldbms_mp_decode_int(&tarantool_tnt_reply_data_copy);
           long long int lli= int_value;
@@ -12135,45 +12137,52 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
-        if (field_type == MP_STR)
+        else if (field_type == MP_STR)
         {
           value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
         }
-        if (field_type == MP_BIN)
+        else if (field_type == MP_BIN)
         {
           value= lmysql->ldbms_mp_decode_bin(&tarantool_tnt_reply_data_copy, &value_length);
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
         }
-        if (field_type == MP_BOOL)
+        else if (field_type == MP_BOOL)
         {
           bool bool_value= lmysql->ldbms_mp_decode_bool(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%d", bool_value);
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
         }
-        if (field_type == MP_FLOAT)
+        else if (field_type == MP_FLOAT)
         {
           float float_value= lmysql->ldbms_mp_decode_float(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%f", float_value);
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
-        if (field_type == MP_DOUBLE)
+        else if (field_type == MP_DOUBLE)
         {
           double double_value= lmysql->ldbms_mp_decode_double(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%f", double_value);
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
-        if (field_type == MP_EXT)
+        else if (field_type == MP_EXT)
         {
           lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
           value_length= sprintf(value_as_string, "%s", "EXT");
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
         }
-        if (value_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= value_length;
+        else
+        {
+          /* it probably would be proper to assert() here */
+          value_length= 0;
+          value= "";
+        }
+        //if (value_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= value_length;
+        rg->set_max_column_width(value_length, value, (&(*p_result_max_column_widths)[i]));
         memcpy(result_set_copy_pointer, &value_length, sizeof(unsigned int));
         result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
         memcpy(result_set_copy_pointer, value, value_length);
@@ -12478,7 +12487,8 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
     {
       if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy != 0)
       {
-        setFixedSize(event->x(), height());
+        ancestor_result_grid_widget->frame_resize(text_edit_frames_index, ancestor_grid_column_number, event->x(), height());
+        //setFixedSize(event->x(), height());
       }
       else
       {
@@ -12494,7 +12504,8 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
           TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
           if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
           if (xrow == 0) xheight= f->height();
-          f->setFixedSize(event->x(), xheight);
+          ancestor_result_grid_widget->frame_resize(f->text_edit_frames_index, ancestor_grid_column_number, event->x(), xheight);
+          //f->setFixedSize(event->x(), xheight);
         }
       }
     }
@@ -12505,10 +12516,10 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
     {
       if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy > 0)
       {
-        setFixedSize(width(), event->y());
+        ancestor_result_grid_widget->frame_resize(text_edit_frames_index, ancestor_grid_column_number, width(), event->y());
+        //setFixedSize(width(), event->y());
       }
       else
-
       /*
         The following extra 'if' exists because Qt was displaying warnings like
         "QWidget::setMinimumSize: (/TextEditFrame) Negative sizes (-4,45) are not possible"
@@ -12517,7 +12528,6 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
       */
       if (event->x() >= minimum_width)
       {
-
         {
           /* todo: try to remember why you're looking at event->x() when change is to event->y()) */
           /*  Now you must persuade ResultGrid to update all the rows. Beware of multiline rows and header row (row#0). */
@@ -12531,7 +12541,8 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
             TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
             if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
             if (xrow == 0) xheight= f->height();
-            f->setFixedSize(event->x(), xheight);
+            ancestor_result_grid_widget->frame_resize(f->text_edit_frames_index, ancestor_grid_column_number, event->x(), xheight);
+            //f->setFixedSize(event->x(), xheight);
           }
         }
       }
@@ -12632,8 +12643,6 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     return;
   }
 
-  printf("paintEvent, image\n");
-
   if (text_edit_frame_of_cell->content_pointer == 0)
   {
     setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
@@ -12657,6 +12666,7 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     return;
   }
   QPainter painter(this->viewport());
+
   /*
     There were choices for QPixmap display. We could have said Qt::IgnoreAspectRatio (the default)
     or Qt::KeepAspectRatioByExpanding. We could have used this->viewport()->size().

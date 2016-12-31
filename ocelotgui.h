@@ -654,6 +654,7 @@ public:
                  char **p_result_field_names);
   int tarantool_local_subquery(QString, int *, unsigned int, unsigned int);
 #endif
+  QVBoxLayout *main_layout;
 
 public slots:
   void action_connect();
@@ -837,7 +838,6 @@ private:
   QString select_1_row(const char *select_statement);
 
   QWidget *main_window;
-  QVBoxLayout *main_layout;
 
   TextEditHistory *history_edit_widget;
   QLineEdit *hparse_line_edit;
@@ -3551,7 +3551,7 @@ public:
   long unsigned int result_row_count, grid_result_row_count;
   long unsigned int *lengths;
   unsigned int *grid_column_widths;                         /* dynamic-sized list of widths */
-  unsigned int *result_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
+  unsigned int *result_max_column_widths; /* chars not bytes */ /* dynamic-sized list of actual maximum widths in detail columns */
   unsigned int *grid_column_heights;                         /* dynamic-sized list of heights */
   unsigned char *grid_column_dbms_sources;                   /* dynamic-sized list of sources */
   unsigned short int *result_field_types;          /* dynamic-sized list of types */
@@ -3586,7 +3586,7 @@ public:
   unsigned int gridx_column_count;
   long unsigned int gridx_row_count;
   char *gridx_field_names;                                   /* gets a copy of result_field_names */
-  unsigned int *gridx_max_column_widths;                     /* gets a copy of result_max_column_widths */
+  unsigned int *gridx_max_column_widths; /* chars not bytes */ /* gets a copy of result_max_column_widths */
   unsigned int *gridx_result_indexes;                        /* points to result_ lists */
   unsigned char *gridx_flags;                                /* 0 = normal, 1 = row counter */
   unsigned short int *gridx_field_types;                     /* gets a copy of result_field_types */
@@ -3594,8 +3594,7 @@ public:
 //  unsigned int grid_actual_grid_height_in_rows;
   unsigned int grid_actual_row_height_in_lines;
   /* ocelot_grid_height_of_highest_column will be between 1 and ocelot_grid_max_column_height_in_lines, * pixels-per-line */
-  unsigned int grid_height_of_highest_column_in_pixels;
-  unsigned int max_height_of_a_char;
+  unsigned int max_width_of_a_char, max_height_of_a_char;
 
   QHBoxLayout *hbox_layout;
 
@@ -3629,6 +3628,7 @@ public:
   QString frame_color_setting;                                 /* based on drag line color */
   QFont text_edit_widget_font;
   ldbms *lmysql;
+  unsigned int scroll_bar_width;
 
 /* How many rows can fit on the screen? Take a guess for initialization. */
 #define RESULT_GRID_WIDGET_INITIAL_HEIGHT 10
@@ -3764,6 +3764,13 @@ ResultGrid(
   row_pool_size= result_grid_widget_max_height_in_lines;
   cell_pool_size= result_grid_widget_max_height_in_lines * 50;
 
+  /* Typically scroll_bar_width = 13.
+     If there was an option to change it, we'd have to use
+     a different way to find its width.
+     Todo: move this, it doesn't need recalculation
+  */
+  scroll_bar_width= text_edit_widgets[0]->style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+
   /*
     Just a note for the archives ...
     Originally I had "grid_main_layout= new QVBoxLayout(client);" here.
@@ -3875,6 +3882,9 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
     {
       text_edit_widgets[i_cp]= new TextEditWidget(this);
       text_edit_widgets[i_cp]->setCursor(Qt::ArrowCursor); /* See Note#1 above */
+      /* todo: this should be a constant e.g. MARGIN_AMOUNT_IN_PIXELS */
+      text_edit_widgets[i_cp]->document()->setDocumentMargin(0); /* default = 4 */
+      text_edit_widgets[i_cp]->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
       text_edit_layouts[i_cp]= new QHBoxLayout();
       text_edit_layouts[i_cp]->addWidget(text_edit_widgets[i_cp]);
       text_edit_frames[i_cp]= new TextEditFrame(this, this, i_cp);
@@ -4180,7 +4190,7 @@ void display()
       We assume result grid height = height of main window / 3 (todo: calculate it).
     */
     int result_grid_height= (parent->height() / 3) - 11;
-    int line_height= mm.lineSpacing() + extra_height(1);
+    int line_height= mm.lineSpacing();
     if ((ocelot_result_grid_column_names == 1) && (ocelot_result_grid_vertical == 0))
         result_grid_height-= line_height;
     ocelot_grid_max_column_height_in_lines= result_grid_height / line_height;
@@ -4396,16 +4406,11 @@ void display()
           int header_height= max_height_of_a_char
                            + ocelot_grid_cell_border_size_as_int * 2
                            + ocelot_grid_cell_drag_line_size_as_int;
-          header_height+= extra_height(1);
-          text_edit_frames[xrow * gridx_column_count + xcol]->setFixedSize(grid_column_widths[xcol], header_height);
-//          text_edit_frames[xrow * gridx_column_count + xcol]->setMaximumHeight(header_height);
-//          text_edit_frames[xrow * gridx_column_count + xcol]->setMinimumHeight(header_height);
+          frame_resize(xrow * gridx_column_count + xcol, xcol, grid_column_widths[xcol], header_height);
         }
         else
         {
-          text_edit_frames[xrow * gridx_column_count + xcol]->setFixedSize(grid_column_widths[xcol], grid_column_heights[xcol]);
-//          text_edit_frames[xrow * gridx_column_count + xcol]->setMaximumHeight(grid_column_heights[col]);
-//          text_edit_frames[xrow * gridx_column_count + xcol]->setMinimumHeight(grid_column_heights[col]);
+          frame_resize(xrow * gridx_column_count + xcol, xcol, grid_column_widths[xcol], grid_column_heights[xcol]);
         }
         /* todo: test whether we really need to show always */
         text_edit_frames[xrow * gridx_column_count + xcol]->show();
@@ -4437,6 +4442,40 @@ void display()
 
   /* area->horizontalScrollBar()->setSingleStep(client->width() / 24); */ /* single-stepping seems pointless */
 
+}
+
+/*
+  frame_resize() == Setting text_edit_frames[n] size.
+  Called from: display() if vertical == 0 (initial),
+               set_alignment_and_height() if vertical != 0 (always),
+               TextEditFrame::mouseMoveEvent() if drag line moved.
+  Re scroll bar: we make most of the initial size calculations with the
+                 assumption that scroll bar will be off, as it usually
+                 will be, and since otherwise grid_column_size_calc()
+                 becomes tremendously complicated. Here, if you know
+                 the contents will fit, turn off the scroll bar.
+  I think the width is of the frame; we want the width of the widget.
+*/
+void frame_resize(int ki, int grid_col, int width, int height)
+{
+  unsigned int text_edit_width= width -
+          (ocelot_grid_cell_drag_line_size_as_int
+           + ocelot_grid_cell_border_size_as_int * 2);
+  unsigned int text_edit_height= height -
+          (ocelot_grid_cell_drag_line_size_as_int
+           + ocelot_grid_cell_border_size_as_int * 2);
+  unsigned int number_of_characters_per_line= text_edit_width / max_width_of_a_char;
+  unsigned int number_of_lines= text_edit_height / max_height_of_a_char;
+  unsigned int number_of_characters_in_cell= number_of_characters_per_line
+                                        * number_of_lines;
+  if (number_of_characters_in_cell < gridx_max_column_widths[grid_col])
+    text_edit_widgets[ki]->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  else
+    text_edit_widgets[ki]->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  text_edit_frames[ki]->setFixedSize(width, height);
+  /* Todo: test if following 2 lines are redundant since setFixedSize does the job. */
+  //text_edit_frames[ki]->setMaximumHeight(height);
+  //text_edit_frames[ki]->setMinimumHeight(height);
 }
 
 /*
@@ -5372,44 +5411,70 @@ QString copy_to_history(long int ocelot_history_max_row_count, unsigned short in
 
 
 /*
-  More thoughts about grid cell sizing.
-  * If it's not plaintext: HTML can cause all sorts of foolishness, but just would cause a scrollbar.
-  * There has to be some maximum size, perhaps a user setting.
-  * Allow expansion if ctrl-+
-  User overrides in statements:
-    SQL queries can contain comments in HTML (not just SELECT, also INSERT or UPDATE) so the forms can be changed.
-    E.g. SELECT / * <font=times> * / a, b  / * </font> * / c FROM t.
-  ocelot.settings:
-    Things like default width, maximum height, whether blobs are .png, are all in a table which users can update.
-    Maximum height can be # of lines or # of pixels. Maximum width can be # of characters or # of pixels.
-  See http://qt-project.org/doc/qt-5.1/qtwidgets/qtextedit.html
-  What we've got from (priority order) ocelot.settings, user statement comments, data type + contents.
-  result_column_width_in_pixels[]
-  result_column_width_in_characters[]
-  result_maximum_column_width_in_characters[]           <-- ultimately from data definition
-*/
-
-/*
-  We know the defined width (update: rather than defined width we now use actual max width)
-  and the number of columns
-  (result_column_count which became gridx_column_count).
-  We don't want to exceed the maximum grid width if we can help it.
+  grid_column_size_calc()
+  Given column lengths in characters, calculate widths+heights in pixels.
+  We aren't using defined width -- we went through the rows earlier and
+  know what the maximum actual width is for each column.
   So let's give each column exactly what it needs, and perform a
   "squeeze" (reducing big columns) until the rows will fit, or until
-  there's nothing more that can be squeezed.
-  Re <cr>: I'm not very worried because it merely causes elider
-      This assumes that every header or cell in the table has the same font.
-      I don't look at mysql_fields[i].max_lengths, perhaps that's a mistake.
-      Todo: this might have to be re-done after a font change
-      Todo: take into account that a number won't contain anything wider than '9'.
-  Todo: We have a default fixed-width font (set by get_fixed_font), and we
-        could check "if it's fixed-pitch then less contortion is needed".
-        Also, depending on font() may be wrong because font() is only what
+  there's nothing more that can be squeezed. The text_edit_frame will
+  be wider+higher than the text_edit_widget because it also has the
+  drag line and the border.
+  In order to support drag lines and variable-height columns, we have to
+  calculate cell sizes ourselves. There were surprise difficulties:
+  * Qt will decide there isn't enough space in a cell even if the
+    total character-widths and/or character-heights would fit; the
+    only solution that I found was to turn off the horizontal and
+    vertical scrolls "Qt::ScrollBarAlwaysOff)", and turn the vertical
+    scroll bar back on "Qt::ScrollBarAsNeeded)" only when our own
+  * Qt has a left margin setting which I didn't know about, see the line
+    text_edit_widgets[i_cp]->document()->setDocumentMargin(0);
+  * There are bugs for some Qt versions and platforms.
+     Mono fonts seem to be more susceptible. Perhaps outline-versus-bitmap is a hint too.
+     Courier New is particularly awful, and we don't seem to be the only ones who've noticed, see
+     https://bitbucket.org/equalsraf/vim-qt/issues/59/undercurl-underline-or-even-underscore-not
+     Incomprehensibly, sometimes leading and descent can be negative.
+     See also https://bugreports.qt.io/browse/QTBUG-15974 (didn't help).
+  Todo: For italic|oblique we double the width, but for some fonts
+        e.g. Ubuntu mono it's not necessary. Discourage italic|oblique.
+  Todo: There has to be some maximum size, perhaps a user setting.
+  Todo: If contents are not plaintext, HTML can cause chaos. We allow
+        HTML because its effects might be what users want to see, for
+        example "select '<i>HELLO</i>';" really shows in italics. But
+        our calculator won't detect markup that changes character sizes.
+  Todo: The calculator won't detect line feeds or other control
+        characters, which change height. But I'm not worried about
+        <cr>, it should only cause an elider.
+  Todo: Allow expansion if ctrl-+.
+  Todo: All calculations are for text. Images work, but that's luck.
+  Todo: Maximum line width and maximum lines per row aren't user settable.
+  Todo: We calculate column width based on the width of 'W'. For fixed
+        fonts this is of course correct since all characters have the
+        same width. But for non-fixed fonts, if the column is numeric,
+        we know that there is no wide character like 'W' so we can
+        calculate a smaller maximum character width, but beware of 'NULL'.
+        And for non-fixed fonts, maybe some obscure non-Latin characters
+        are wider than 'W'.
+  Todo: Depending on font() may be wrong because font() is only what
         was requested not what is actual, so things might be more reliable
         if we used fontInfo() then created a font based on that and then
         used QFontMetrics.
+  Todo: Allow different cells to have different fonts.
+  Todo: Sometimes we recalculate after font change, but not always.
+        Therefore sometimes font change will cause an existing grid
+        to look ugly, and users can only fix it by redoing the query.
+  Todo: see if some non-fixed-font characters are wider than "W".
+  Todo: Our minimum width is the header width, or, when the header width
+        is short|unstated, the width of one character + the width of a
+        vertical scroll bar (which we assume is always the same).
+        Maybe there should be a user-settable minimum column width.
+        Or there should be a minimum for the sake of elide.
+  Todo: Header height calculation should differ from ordinary-row height
+        calculation, but shouldn't be done in a different place.
+  Todo: Japanese kanji, size 40, Ubuntu mono, needed another pixel,
+        has no top margin i.e. it hugs the top border.
+  Todo: if you ever do Windows or Mac OS, you'll have to revisit this.
 */
-/* header height calculation should differ from ordinary-row height calculation */
 void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
                            int ocelot_grid_cell_drag_line_size_as_int,
                            unsigned short int is_using_column_names,
@@ -5426,56 +5491,62 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
 
   pointer_to_font= &text_edit_widget_font;
 
-  /* Translate from char width+height to pixel width+height */
+  /* Calculate with rounding up because of inter-character spacing. */
   QFontMetrics mm= QFontMetrics(*pointer_to_font);
-  /* This was a bug: "this" might not have been updated by setStyleSheet() yet ... QFontMetrics mm(this->fontMetrics()); */
-  unsigned int max_width_of_a_char= mm.width("WWWW") / 4;/* not really a maximum unless fixed-width font */
+  max_width_of_a_char= mm.width("WWWW") / 4;
+  if ((max_width_of_a_char * 4) < (unsigned int) mm.width("WWWW")) ++max_width_of_a_char;
 
   /*
-     KLUDGE.
-     Small fonts don't work, we have to pretend they're wider. No, I don't know why.
-     Mono fonts seem to be more susceptible. Perhaps outline-versus-bitmap is a hint too.
-     Courier New is particularly awful, and we don't seem to be the only ones who've noticed, see
-     https://bitbucket.org/equalsraf/vim-qt/issues/59/undercurl-underline-or-even-underscore-not
-     One suggestion has been to set up the painter and get boundingrect.
-     One suggestion was to use more modern fonts like DejaVu sans mono.
-     Our earlier attempt for height was: if <=11 add 7, else add 4.
-     Incomprehensibly, sometimes leading and descent can be negative.
-     Anyway, the bizarre calculation for height is instead of
-     max_height_of_a_char= mm.lineSpacing()
-     and the bizarre calculation for width is just something that usually seems to work.
-     See also https://bugreports.qt.io/browse/QTBUG-15974 (didn't help).
-     Todo: if you ever do Windows or Mac OS, you'll have to revisit this.
+     For italic|oblique I sometimes need zero extra pixels, but I
+     sometimes need an incredible number of extra pixels.
+     abs(qfm.rightBearing('W')) + abs(qfm.leftBearing('W')) is not enough
+     Todo: try again to reduce, meanwhile document: don't use italics.
   */
-  max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
+  if (pointer_to_font->italic() == true)
+  {
+    max_width_of_a_char*= 2;
+  }
 
-  if (max_width_of_a_char <= 6) max_width_of_a_char+= 3;
-  else if (max_width_of_a_char <= 7) max_width_of_a_char+= 2;
-  else if (max_width_of_a_char <= 11) max_width_of_a_char+= 2;
-  else if (max_width_of_a_char <= 14) max_width_of_a_char+= 1;
+  /* (pointer_to_font->fixedPitch() always == false, I don't know why */
+  if (mm.width("WWWWWWWWWW") != mm.width("I- 1a!~:wX"))
+  {
+    ++max_width_of_a_char;
+  }
+
+  /* max_height_of_a_char= mm.lineSpacing(); didn't work */
+  max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
 
   sum_tmp_column_lengths= 0;
 
   /*
     The first approximation
-    Take it that grid_column_widths[i] = defined column width or max actual column width.
-    If this is good enough, then grid_row_heights[i] = 1 char and column width = grid_column_widths[i] chars.
-    Todo: the lengths are in bytes; take into account that they might arrive in a multi-byte character set.
+    Take it that grid_column_widths[i] = max actual column width.
+    If this is good enough, then grid_row_heights[i] = 1 char
+    and column width = grid_column_widths[i] chars.
   */
   for (i= 0; i < gridx_column_count; ++i)
   {
     if (is_using_column_names != 0)
     {
-      grid_column_widths[i]= dbms_get_field_name_length(i, connections_dbms); /* this->mysql_fields[i].name_length; */
+      /* probably this->mysql_fields[i].name_length */
+      grid_column_widths[i]= 0;
+      char tmp[1024];
+      unsigned int l= dbms_get_field_name_length(i, connections_dbms);
+      strncpy(tmp, dbms_get_field_name(i, connections_dbms).toUtf8(), l);
+      set_max_column_width(l, tmp, &grid_column_widths[i]);
+      //grid_column_widths[i]= dbms_get_field_name_length(i, connections_dbms);
     }
     else grid_column_widths[i]= 1;
+    /*
+      For some reason -- I never figured it out -- if column width < 3
+      and there is a drag line, the drag line disappears.
+    */
+    if ((grid_column_widths[i] < 3) && (ocelot_grid_cell_drag_line_size_as_int > 0))
+      grid_column_widths[i]= 3;
     if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
-    /* For explanation of next line, see comment "Extra size". Removed temporarily. */
-    if ((grid_column_widths[i] < 2) && (ocelot_grid_cell_drag_line_size_as_int > 0)) grid_column_widths[i]= 2;
-    grid_column_widths[i]= grid_column_widths[i] * max_width_of_a_char;
-    grid_column_widths[i]+= ocelot_grid_cell_border_size_as_int * 2
-                            + ocelot_grid_cell_drag_line_size_as_int;
-    grid_column_widths[i]+= max_width_of_a_char; /* ?? something to do with border width, I suppose */
+    grid_column_widths[i]= grid_column_widths[i] * max_width_of_a_char
+                           + ocelot_grid_cell_border_size_as_int * 2
+                           + ocelot_grid_cell_drag_line_size_as_int;
     sum_tmp_column_lengths+= grid_column_widths[i];
   }
 
@@ -5484,9 +5555,6 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
     This cuts the widths of the really long columns, it might loop several times.
     This is a strong attempt to reduce to the user-settable maximum, but if we have to override it, we do.
     Cannot squeeze to less than header length
-    Todo: there should be a minimum for the sake of elide, and null, and border
-          (actually I think now we're taking null into account well enough)
-    Todo: maybe there should be a user-settable minimum column width, not just the header-related minimum
   */
 
   sum_amount_reduced= 1;
@@ -5494,28 +5562,23 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   while ((sum_tmp_column_lengths > ocelot_grid_max_desired_width_in_pixels) && (sum_amount_reduced > 0))
   {
     necessary_reduction= sum_tmp_column_lengths - ocelot_grid_max_desired_width_in_pixels;
+    necessary_reduction-= necessary_reduction % max_width_of_a_char;
     sum_amount_reduced= 0;
     for (i= 0; i < gridx_column_count; ++i)
     {
       unsigned int min_width;
-      //min_width= (dbms_get_field_name_length(i) + 1) * max_width_of_a_char /* mysql_fields[i].name_length */
-      //       + ocelot_grid_cell_border_size_as_int * 2
-      //        + ocelot_grid_cell_drag_line_size_as_int;
-//              + border_size * 2;
-
-      /* KlUDGE. Usually we don't need "+= 3" but before removing test with Courier New */
-      min_width= mm.width(dbms_get_field_name(i, connections_dbms))
-              + max_width_of_a_char
-              + ocelot_grid_cell_border_size_as_int * 2
-              + ocelot_grid_cell_drag_line_size_as_int
-              + max_width_of_a_char
-              + 3;
-
+      min_width= mm.width(dbms_get_field_name(i, connections_dbms));
+      if (min_width < max_width_of_a_char + scroll_bar_width + 1)
+        min_width= max_width_of_a_char + scroll_bar_width + 1;
+      min_width+= ocelot_grid_cell_border_size_as_int * 2
+                  + ocelot_grid_cell_drag_line_size_as_int;
       if (grid_column_widths[i] <= min_width) continue;
       max_reduction= grid_column_widths[i] - min_width;
+      max_reduction-= max_reduction % max_width_of_a_char;
       if (grid_column_widths[i] >= (sum_tmp_column_lengths / gridx_column_count))
       {
         amount_being_reduced= grid_column_widths[i] / 2;
+        amount_being_reduced-= amount_being_reduced % max_width_of_a_char;
         if (amount_being_reduced > necessary_reduction) amount_being_reduced= necessary_reduction;
         if (amount_being_reduced > max_reduction) amount_being_reduced= max_reduction;
         grid_column_widths[i]= grid_column_widths[i] - amount_being_reduced;
@@ -5523,7 +5586,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
         necessary_reduction-= amount_being_reduced;
         sum_tmp_column_lengths-= amount_being_reduced;
       }
-      if (necessary_reduction == 0) break; /* todo: consider making this "< 10" */
+      if (necessary_reduction <= max_width_of_a_char) break; /* todo: consider making this "< 10" */
     }
   }
 
@@ -5532,7 +5595,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   /*
     Each column's height = (gridx_max_column_widths[i] i.e. actual max) / grid_column_widths[i] rounded up.
     If that's greater than the user-defined maximum, reduce to user-defined maximum
-    (the QTextEdit will get a vertical scroll bar if there's an overflow).
+    The QTextEdit will get a vertical scroll bar if there's an overflow,
   */
 
   for (i= 0; i < gridx_column_count; ++i)
@@ -5547,63 +5610,13 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
     if (grid_column_heights[i] > grid_actual_row_height_in_lines) grid_actual_row_height_in_lines= grid_column_heights[i];
   }
 
-  grid_height_of_highest_column_in_pixels= 0;
-
-  /* Warning: header-height calculation is also "*(max_height_of_a_char+(border_size*2))", in a different place. */
-  /* This calculation of height is horrendously difficult, and still does not seem to be exactly right. */
-  /* todo: it looks as if grid_height_of_highest_column_in_pixels is no longer used */
+  /* Warning: header_height is also calculated like this but in a different place. */
   for (i= 0; i < gridx_column_count; ++i)
   {
-//    grid_column_heights[i]= (grid_column_heights[i] * (max_height_of_a_char+(border_size * 2))) + 9;
-    int old_grid_column_height= grid_column_heights[i];
     grid_column_heights[i]= (grid_column_heights[i] * max_height_of_a_char)
                             + ocelot_grid_cell_border_size_as_int * 2
                             + ocelot_grid_cell_drag_line_size_as_int;
-    grid_column_heights[i]+= extra_height(old_grid_column_height);
-    if (grid_column_heights[i] > grid_height_of_highest_column_in_pixels)
-    {
-      grid_height_of_highest_column_in_pixels= grid_column_heights[i];
-    }
   }
-}
-
-
-/*
-  Increase the allowed height in pixels for a detail column or a header.
-  The numbers in this routine are the result of trial and error.
-  I have no idea why we need to allow for anything extra.
-*/
-/*
-   Extra size
-   I'm saying "if width<2 then width=2" and "if height<2 then height=2".
-   If I don't, then the drag line doesn't appear.
-   It seems I don't need to do this if drag line size = 0.
-   Todo: Maybe the problem is that Qt is allowing for a scroll bar,
-   but in that case the addition should be size of scroll bar
-   rather than size of char, i.e. QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent)
-   and in that case the scroll bar policy could be changed too.
-   Todo: Other than that, I can't figure out what else is screwing up the
-   calculations, but perhaps lineSpacing() shouldn't be added if there is only one line.
-   I know there's a line = text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
-   but removing it doesn't solve the problem.
-   ... todo: check: Maybe setting minimum height / width of text_edit_frames[...] is a problem?
-   Update: June 7 2015: the problem seems to have disappeared so I temporarily removed the line.
-   Todo: another way to calculate a size involves layout->activate().
-*/
-int extra_height(int line_count)
-{
-  int extra= 6;
-  if (ocelot_grid_cell_drag_line_size_as_int > 0)
-  {
-    extra+= 3;
-    if (ocelot_grid_cell_drag_line_size_as_int > 8) ++extra;
-  }
-  else
-  {
-    extra+= 2;
-  }
-  if (line_count > 1) extra+= line_count;
-  return extra;
 }
 
 
@@ -5614,7 +5627,6 @@ int extra_height(int line_count)
     Also, after the copy, we're less (or not at all?) dependent on calls to MySQL functions.
   For each column, we have: (unsigned int) length, (char) unused or null flag, (char[n]) contents.
   We want max actual length too.
-  Todo: reconsider: maybe result_max_column_widths should have come from max_length in MYSQL_FIELD.
 */
 void scan_rows(unsigned int p_result_column_count,
                unsigned int p_result_row_count,
@@ -5697,7 +5709,8 @@ void scan_rows(unsigned int p_result_column_count,
           char tmp[16];
           sprintf(tmp, "%ld", v_r + 1);
           unsigned int v_length= strlen(tmp);
-          if (v_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_length;
+          //if (v_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_length;
+          set_max_column_width(v_length, tmp, (&(*p_result_max_column_widths)[i]));
           memcpy(result_set_copy_pointer, &v_length, sizeof(unsigned int));
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_ZERO;
           result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
@@ -5706,7 +5719,8 @@ void scan_rows(unsigned int p_result_column_count,
         }
         else
         {
-          if (v_lengths[i] > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_lengths[i];
+          //if (v_lengths[i] > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_lengths[i];
+          set_max_column_width(v_lengths[i], v_row[i], (&(*p_result_max_column_widths)[i]));
           memcpy(result_set_copy_pointer, &v_lengths[i], sizeof(unsigned int));
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_ZERO;
           result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
@@ -5716,6 +5730,41 @@ void scan_rows(unsigned int p_result_column_count,
       }
     }
   }
+}
+
+
+/*
+  How many UTF-8 characters are there, maximum?
+  This is more important for a width calculation than length in bytes.
+  The following doesn't do a great job -- I wanted to get it right for
+  Latin special characters and Greek or Cyrillic or other alphabets --
+  so it misses combining characters and it mishandles Chinese|Japanese
+  characters which sometimes are wide. Essentially the algorithm is:
+  count all the ASCII and continuation bytes, don't count leading bytes.
+  Don't bother if the length can't be greater than the current maximum.
+  Todo: skip this if it's an image.
+  Todo: we're not doing this if vertical!
+  Todo: The "++i;" in this code exists so that 3-byte UTF-8 will
+        result in double-wide, which seems okay for Japanese kanji.
+        But it's ridiculous! Surely many 3-byte UTF-8 characters
+        (U+0800 and beyond) are not double-wide, surely some
+        2-byte UTF-8 characters are double-wide.
+*/
+void set_max_column_width(unsigned int v_length,
+                         const char *result_set_copy_pointer,
+                         unsigned int *p_result_max_column_width)
+{
+  if (v_length <= *p_result_max_column_width) return;
+  unsigned int j= v_length;
+  for (unsigned int i= 0; i < v_length; ++i)
+  {
+    if (( *(result_set_copy_pointer + i)   & 0xc0) == 0x80)
+    {
+      --j;
+      ++i;
+    }
+  }
+  if (j > *p_result_max_column_width) *p_result_max_column_width= j;
 }
 
 
@@ -5811,10 +5860,7 @@ void set_alignment_and_height(int ki, int grid_col, int field_type)
     //}
     //else
     this_width= grid_column_widths[grid_col];
-    text_edit_frames[ki]->setFixedSize(this_width, grid_column_heights[grid_col]);
-    /* Todo: test if following 2 lines are redundant since setFixedSize does the job. */
-    text_edit_frames[ki]->setMaximumHeight(grid_column_heights[grid_col]);
-    text_edit_frames[ki]->setMinimumHeight(grid_column_heights[grid_col]);
+    frame_resize(ki, grid_col, this_width, grid_column_heights[grid_col]);
   }
 }
 
