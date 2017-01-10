@@ -8665,7 +8665,7 @@ void MainWindow::put_diagnostics_in_result()
     if (tarantool_errno[0] == 0) s1= er_strings[er_off + ER_OK];
     else
     {
-      s1= s1= er_strings[er_off + ER_OK];
+      s1= s1= er_strings[er_off + ER_ERROR];
       s1.append(". ");
       s1.append(tarantool_errmsg);
     }
@@ -11324,7 +11324,13 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
   lmysql->ldbms_tnt_flush(tnt[connection_number]);
 
   lmysql->ldbms_tnt_reply_init(&tarantool_tnt_reply);
-  tnt[connection_number]->read_reply(tnt[connection_number], &tarantool_tnt_reply);
+  int read_result= tnt[connection_number]->read_reply(tnt[connection_number], &tarantool_tnt_reply);
+  if (read_result != 0)
+  {
+    tarantool_errno[connection_number]= 1;
+    sprintf(tarantool_errmsg, "read_result=%d", read_result);
+    return;
+  }
   tarantool_errno[connection_number]= tarantool_tnt_reply.code;
 
   if (tarantool_tnt_reply.code != 0)
@@ -11572,7 +11578,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     tarantool_flush_and_save_reply(connection_number);
     if (tarantool_errno[connection_number] != 0) return tarantool_errno[connection_number];
     /* The return should be an array of arrays of scalars. */
-
     /* If there are no rows, then there are no fields, so we cannot put up a grid. */
     /* Todo: don't forget to free if there are zero rows. */
     {
