@@ -38,15 +38,17 @@
 #define FLAG_VERSION_MYSQL_5_5      1
 #define FLAG_VERSION_MYSQL_5_6      2
 #define FLAG_VERSION_MYSQL_5_7      4
-#define FLAG_VERSION_MYSQL_ALL      (1 | 2 | 4)
-#define FLAG_VERSION_MARIADB_5_5    8
-#define FLAG_VERSION_MARIADB_10_0   16
-#define FLAG_VERSION_MARIADB_10_1   32
-#define FLAG_VERSION_MARIADB_10_2   64
-#define FLAG_VERSION_MARIADB_ALL    (8 | 16 | 32 | 64)
-#define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64)
-#define FLAG_VERSION_TARANTOOL      128
-#define FLAG_VERSION_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128)
+#define FLAG_VERSION_MYSQL_8_0      8
+#define FLAG_VERSION_MYSQL_ALL      (1 | 2 | 4 | 8)
+#define FLAG_VERSION_MARIADB_5_5    16
+#define FLAG_VERSION_MARIADB_10_0   32
+#define FLAG_VERSION_MARIADB_10_1   64
+#define FLAG_VERSION_MARIADB_10_2_2 128
+#define FLAG_VERSION_MARIADB_10_2_3 256
+#define FLAG_VERSION_MARIADB_ALL    (16 | 32 | 64 | 128 | 256)
+#define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256)
+#define FLAG_VERSION_TARANTOOL      512
+#define FLAG_VERSION_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512)
 
 #include <assert.h>
 
@@ -505,10 +507,10 @@ public:
   void hparse_f_next_nexttoken();
   void hparse_f_error();
   bool hparse_f_is_equal(QString,QString);
-  int hparse_f_accept(unsigned char,unsigned char,int,QString);
+  int hparse_f_accept(unsigned short int,unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
   QString hparse_f_token_to_appendee(QString,int);
-  int hparse_f_expect(unsigned char,unsigned char,int,QString);
+  int hparse_f_expect(unsigned short int,unsigned char,int,QString);
   int hparse_f_literal();
   int hparse_f_default(int);
   int hparse_f_user_name();
@@ -1212,6 +1214,7 @@ public:
       TOKEN_KEYWORD_FLOOR,
       TOKEN_KEYWORD_FLUSH,
       TOKEN_KEYWORD_FOLLOWING,
+      TOKEN_KEYWORD_FOLLOWS,
       TOKEN_KEYWORD_FOR,
       TOKEN_KEYWORD_FORCE,
       TOKEN_KEYWORD_FOREIGN,
@@ -1320,6 +1323,7 @@ public:
       TOKEN_KEYWORD_JSON_LENGTH,
       TOKEN_KEYWORD_JSON_MERGE,
       TOKEN_KEYWORD_JSON_OBJECT,
+      TOKEN_KEYWORD_JSON_QUERY,
       TOKEN_KEYWORD_JSON_QUOTE,
       TOKEN_KEYWORD_JSON_REMOVE,
       TOKEN_KEYWORD_JSON_REPLACE,
@@ -1328,6 +1332,7 @@ public:
       TOKEN_KEYWORD_JSON_TYPE,
       TOKEN_KEYWORD_JSON_UNQUOTE,
       TOKEN_KEYWORD_JSON_VALID,
+      TOKEN_KEYWORD_JSON_VALUE,
       TOKEN_KEYWORD_KEY,
       TOKEN_KEYWORD_KEYS,
       TOKEN_KEYWORD_KILL,
@@ -1487,6 +1492,7 @@ public:
       TOKEN_KEYWORD_POW,
       TOKEN_KEYWORD_POWER,
       TOKEN_KEYWORD_PRAGMA,
+      TOKEN_KEYWORD_PRECEDES,
       TOKEN_KEYWORD_PRECISION,
       TOKEN_KEYWORD_PREPARE,
       TOKEN_KEYWORD_PRIMARY,
@@ -5748,7 +5754,9 @@ void scan_rows(unsigned int p_result_column_count,
         result in double-wide, which seems okay for Japanese kanji.
         But it's ridiculous! Surely many 3-byte UTF-8 characters
         (U+0800 and beyond) are not double-wide, surely some
-        2-byte UTF-8 characters are double-wide.
+        2-byte UTF-8 characters are double-wide. For details see
+        http://unicode.org/reports/tr11/, http://www.unicode.org/Public/5.2.0/ucd/EastAsianWidth.txt,
+        http://stackoverflow.com/questions/3634627/how-to-know-the-preferred-display-width-in-columns-of-unicode-characters
 */
 void set_max_column_width(unsigned int v_length,
                          const char *result_set_copy_pointer,
