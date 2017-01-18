@@ -9345,9 +9345,12 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"BEGIN", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BEGIN},
       {"BENCHMARK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BENCHMARK},
       {"BETWEEN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BETWEEN},
+      {"BFILE", 0, 0, TOKEN_KEYWORD_BFILE},
       {"BIGINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BIGINT},
       {"BIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIN},
       {"BINARY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BINARY},
+      {"BINARY_DOUBLE", 0, 0, TOKEN_KEYWORD_BINARY_DOUBLE},
+      {"BINARY_FLOAT", 0, 0, TOKEN_KEYWORD_BINARY_FLOAT},
       {"BINLOG", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BINLOG},
       {"BINLOG_GTID_POS", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BINLOG_GTID_POS},
       {"BIT", 0, 0, TOKEN_KEYWORD_BIT},
@@ -9624,6 +9627,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"IS_USED_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_USED_LOCK},
       {"ITERATE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ITERATE},
       {"JOIN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_JOIN},
+      {"JSON", 0, 0, TOKEN_KEYWORD_JSON},
       {"JSON_APPEND", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_APPEND},
       {"JSON_ARRAY", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_ARRAY},
       {"JSON_ARRAY_APPEND", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_ARRAY_APPEND},
@@ -9759,10 +9763,12 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"NULL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NULL},
       {"NULLIF", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_NULLIF},
       {"NULLS", 0, 0, TOKEN_KEYWORD_NULLS}, /* MariaDB 10.2 nonreserved  -- or, maybe not in MariaDB 10.2 */
+      {"NUMBER", 0, 0, TOKEN_KEYWORD_NUMBER},
       {"NUMERIC", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_NUMERIC},
       {"NUMGEOMETRIES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMGEOMETRIES}, /* deprecated in MySQL 5.7.6 */
       {"NUMINTERIORRINGS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMINTERIORRINGS}, /* deprecated in MySQL 5.7.6 */
       {"NUMPOINTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMPOINTS}, /* deprecated in MySQL 5.7.6 */
+      {"NVARCHAR2", 0, 0, TOKEN_KEYWORD_NVARCHAR2},
       {"OCT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OCT},
       {"OCTET_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OCTET_LENGTH},
       {"OF", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_OF},
@@ -9826,6 +9832,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"RANDOM_BYTES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RANDOM_BYTES},
       {"RANGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RANGE},
       {"RANK", 0, FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_RANK},
+      {"RAW", 0, 0, TOKEN_KEYWORD_RAW},
       {"READ", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_READ},
       {"READS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_READS},
       {"READ_WRITE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_READ_WRITE},
@@ -10078,6 +10085,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"VALUES", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VALUES},
       {"VARBINARY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARBINARY},
       {"VARCHAR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARCHAR},
+      {"VARCHAR2", 0, 0, TOKEN_KEYWORD_VARCHAR2},
       {"VARCHARACTER", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARCHARACTER},
       {"VARIANCE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VARIANCE},
       {"VARYING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARYING},
@@ -10175,15 +10183,15 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "848" */
+      /* If the following assert happens, you inserted/removed something without changing "856" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (848 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (856 - 1));
 
       /* Test strvalues is by bsearching for every item. */
-      //for (int ii= 0; ii < 848; ++ii)
+      //for (int ii= 0; ii < 856; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 848, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 856, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -10191,8 +10199,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 848 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 848, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 856 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 856, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -10385,6 +10393,7 @@ bool MainWindow::is_client_statement(int token, int i,QString text)
   First find out whether the statement is CREATE ... FUNCTION|PROCEDURE|TRIGGER|EVENT.
   A definer clause might have to be skipped.
   If it's CREATE TRIGGER: skip till past FOR EACH ROW.
+                          but watch for new PRECEDES|FOLLOWS clauses
   If it's CREATE EVENT: skip till past ON and past DO.
   If it's CREATE PROCEDURE|FUNCTION:
     skip past ()s
@@ -10400,6 +10409,7 @@ bool MainWindow::is_client_statement(int token, int i,QString text)
      COMMENT 'string', LANGUAGE SQL, DETERMINISTIC, NOT DETERMINISTIC,
      CONTAINS SQL, NO SQL, READS SQL DATA, MODIFIES SQL DATA,
      SQL SECURITY DEFINER, SQL SECURITY INVOKER
+   (Function or Procedure) Watch for Oracle-style {IS|AS} body
    Skipping comments too
    Return: offset for first word of body, or -1 if not-create-routine | body-not-found
    todo: there might be a problem with "create procedure|function function ...".
@@ -10414,6 +10424,8 @@ int MainWindow::find_start_of_body(QString text, int start, int *i_of_function, 
   int trigger_seen= 0;
   int trigger_for_seen= 0;
   int trigger_row_seen= 0;
+  int trigger_precedes_seen= 0;
+  int trigger_name_seen= 0;
   int parameter_list_seen= 0;
   int parentheses_count= 0;
   int characteristic_seen= 0;
@@ -10432,8 +10444,28 @@ int MainWindow::find_start_of_body(QString text, int start, int *i_of_function, 
     {
       continue;
     }
+    if (trigger_precedes_seen == 1)
+    {
+      if (main_token_types[i] == TOKEN_TYPE_OPERATOR)
+      {
+        trigger_name_seen= 0;
+        continue;
+      }
+      if (trigger_name_seen == 1)
+      {
+        return i;
+      }
+      trigger_name_seen= 1;
+      continue;
+    }
     if (trigger_row_seen == 1)
     {
+      if ((main_token_types[i] == TOKEN_KEYWORD_PRECEDES)
+       || (main_token_types[i] == TOKEN_KEYWORD_FOLLOWS))
+      {
+        trigger_precedes_seen= 1;
+        continue;
+      }
       return i;
     }
     if (event_do_seen == 1)
@@ -10538,7 +10570,11 @@ int MainWindow::find_start_of_body(QString text, int start, int *i_of_function, 
       {
         if ((main_token_types[i] == TOKEN_KEYWORD_ASCII)
          || (main_token_types[i] == TOKEN_KEYWORD_BIGINT)
+         || (main_token_types[i] == TOKEN_KEYWORD_BFILE)
+         || (main_token_types[i] == TOKEN_KEYWORD_BIGINT)
          || (main_token_types[i] == TOKEN_KEYWORD_BINARY)
+         || (main_token_types[i] == TOKEN_KEYWORD_BINARY_DOUBLE)
+         || (main_token_types[i] == TOKEN_KEYWORD_BINARY_FLOAT)
          || (main_token_types[i] == TOKEN_KEYWORD_BIT)
          || (main_token_types[i] == TOKEN_KEYWORD_BLOB)
          || (main_token_types[i] == TOKEN_KEYWORD_BOOL)
@@ -10556,7 +10592,7 @@ int MainWindow::find_start_of_body(QString text, int start, int *i_of_function, 
          || (main_token_types[i] == TOKEN_KEYWORD_GEOMETRYCOLLECTION)
          || (main_token_types[i] == TOKEN_KEYWORD_INT)
          || (main_token_types[i] == TOKEN_KEYWORD_INTEGER)
-         // todo: || (main_token_types[i] == TOKEN_KEYWORD_JSON)
+         || (main_token_types[i] == TOKEN_KEYWORD_JSON)
          || (main_token_types[i] == TOKEN_KEYWORD_LINESTRING)
          || (main_token_types[i] == TOKEN_KEYWORD_LONGBLOB)
          || (main_token_types[i] == TOKEN_KEYWORD_LONGTEXT)
@@ -10566,9 +10602,12 @@ int MainWindow::find_start_of_body(QString text, int start, int *i_of_function, 
          || (main_token_types[i] == TOKEN_KEYWORD_MULTILINESTRING)
          || (main_token_types[i] == TOKEN_KEYWORD_MULTIPOINT)
          || (main_token_types[i] == TOKEN_KEYWORD_MULTIPOLYGON)
+         || (main_token_types[i] == TOKEN_KEYWORD_NUMBER)
          || (main_token_types[i] == TOKEN_KEYWORD_NUMERIC)
+         || (main_token_types[i] == TOKEN_KEYWORD_NVARCHAR2)
          || (main_token_types[i] == TOKEN_KEYWORD_POINT)
          || (main_token_types[i] == TOKEN_KEYWORD_POLYGON)
+         || (main_token_types[i] == TOKEN_KEYWORD_RAW)
          || (main_token_types[i] == TOKEN_KEYWORD_SERIAL)
          || (main_token_types[i] == TOKEN_KEYWORD_SET)
          || (main_token_types[i] == TOKEN_KEYWORD_SMALLINT)
@@ -10579,6 +10618,7 @@ int MainWindow::find_start_of_body(QString text, int start, int *i_of_function, 
          || (main_token_types[i] == TOKEN_KEYWORD_TINYTEXT)
          || (main_token_types[i] == TOKEN_KEYWORD_UNICODE)
          || (main_token_types[i] == TOKEN_KEYWORD_VARCHAR)
+         || (main_token_types[i] == TOKEN_KEYWORD_VARCHAR2)
          || (main_token_types[i] == TOKEN_KEYWORD_VARCHARACTER)
          || (main_token_types[i] == TOKEN_KEYWORD_YEAR))
         {
@@ -10662,6 +10702,11 @@ int MainWindow::find_start_of_body(QString text, int start, int *i_of_function, 
     if ((function_seen == 1) || (procedure_seen == 1))
     {
       if (parameter_list_seen == 0) continue;
+      if ((main_token_types[i] == TOKEN_KEYWORD_IS)
+       || (main_token_types[i] == TOKEN_KEYWORD_AS))
+      {
+        continue;
+      }
       return i;
     }
   }
