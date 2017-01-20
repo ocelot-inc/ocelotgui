@@ -639,6 +639,8 @@ public:
   void tparse_f_program(QString text);
 #endif
 #ifdef DBMS_TARANTOOL
+  QString tarantool_add_return(QString);
+  int tarantool_result_set_type(int);
   long unsigned int tarantool_num_rows(unsigned int connection_number);
   unsigned int tarantool_num_fields();
   int tarantool_num_fields_recursive(const char **tarantool_tnt_reply_data,
@@ -837,6 +839,7 @@ private:
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, bool);
   unsigned int tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes);
   const char * tarantool_seek_0();
+  QString tarantool_internal_query(char*, int);
 #endif
   QString select_1_row(const char *select_statement);
 

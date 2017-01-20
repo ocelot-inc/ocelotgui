@@ -7083,10 +7083,16 @@ int MainWindow::action_execute_one_statement(QString text)
           if ((main_token_types[0] == TOKEN_KEYWORD_SELECT)
            || (main_token_types[0] == TOKEN_KEYWORD_LUA))
           {
-            /* Yes mysql_res_for_new_result_set will be invalid. Fix, eh? */
+            int result_set_type= tarantool_result_set_type(0);
+            if ((result_set_type == 0) || (result_set_type == 1))
+              mysql_res_for_new_result_set= 0;
+            else
             {
-              MYSQL_RES r;
-              mysql_res_for_new_result_set= &r;
+              /* Yes mysql_res_for_new_result_set will be invalid. Fix, eh? */
+              {
+                MYSQL_RES r;
+                mysql_res_for_new_result_set= &r;
+              }
             }
           }
           else mysql_res_for_new_result_set= 0;
@@ -11212,6 +11218,16 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
   TODO: LOTS OF ERROR CHECKS NEEDED IN THIS!
   Usually libtarantool.so and libtarantoolnet.so are in /usr/local/lib or LD_LIBRARY_PATH.
   todo: We no longer use libtarantoolnet.so, remove reference to it.
+  After connecting:
+    -- get session.id and version
+    -- set a global variable ocelot_conn
+       -- the setting will fail if require('sql') fails, but probably
+          that is because the server version is old, and we continue
+          anyway so that LUA '...' will still be possible
+       -- if there are two connections, they both set ocelot_conn.
+          I don't think that's an error, but if it is, then we'd have
+          to make a different global for each connection, that is,
+          "ocelot_connX" where X = session.id
 */
 int MainWindow::connect_tarantool(unsigned int connection_number,
                                   QString port_maybe,
@@ -11343,6 +11359,19 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   make_and_put_message_in_result(ER_OK, 0, (char*)"");
   connections_is_connected[connection_number]= 1;
 
+  QString session_id, conn, version;
+  {
+    char query_string[1024];
+    sprintf(query_string, "return box.session.id()");
+    session_id= tarantool_internal_query(query_string, connection_number);
+    sprintf(query_string, "ocelot_conn = require('sql').connect('')");
+    conn= tarantool_internal_query(query_string, connection_number);
+    sprintf(query_string, "return box.info.version");
+    version= tarantool_internal_query(query_string, connection_number);
+    int index_of_hyphen= version.indexOf("-");
+    if (index_of_hyphen > 0) version= version.left(index_of_hyphen);
+  }
+
   if (connection_number == MYSQL_LOCAL_CONNECTION)
   {
     /* The caller should save the connection for the server id. */
@@ -11357,15 +11386,73 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   statement_edit_widget->prompt_default= ocelot_prompt;
   statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
 
-  statement_edit_widget->dbms_version= "Unknown-Version"; /* todo: find out */
+  statement_edit_widget->dbms_version= version;
   statement_edit_widget->dbms_database= ocelot_database;
   statement_edit_widget->dbms_port= QString::number(ocelot_port);
   statement_edit_widget->dbms_current_user= ocelot_user;
   statement_edit_widget->dbms_current_user_without_host= ocelot_user;
-  statement_edit_widget->dbms_connection_id= 0; /* todo: find out */
+  statement_edit_widget->dbms_connection_id= session_id.toInt();
   statement_edit_widget->dbms_host= ocelot_host;
   //connections_is_connected[connection_number]= 1;
   return 0;
+}
+#endif
+
+#ifdef DBMS_TARANTOOL
+/*
+  For some internal (not user-generated) requests
+  returns tarantool_errno[connection_number]
+  returns tarantool_errmsg[connection_number]
+  if first word is "return" and no error, return a scalar
+  the scalar must be MP_STR or MP_UINT or MP_INT, otherwise return = ""
+*/
+QString MainWindow::tarantool_internal_query(char *query,
+                                            int connection_number)
+{
+  QString returned_string;
+  struct tnt_stream *empty= lmysql->ldbms_tnt_object(NULL);
+  lmysql->ldbms_tnt_object_add_array(empty, 0);
+  lmysql->ldbms_tnt_eval(tnt[connection_number], query, strlen(query), empty);
+  tarantool_flush_and_save_reply(connection_number);
+  if ((tarantool_errno[connection_number] == 0)
+   && (strncmp(query, "return ", 7) == 0))
+  {
+    uint32_t value_length;
+    const char *value;
+    char value_as_string[64]; /* must be big enough for any sprintf() result */
+    char field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply.data);
+    /* if field_type != MP_ARRAY that's an error but we just return "" */
+    if (field_type == MP_ARRAY)
+    {
+      /* The first item will be dd 00 00 01 i.e. "array of length = 1" */
+      long unsigned int result;
+      result= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply.data);
+      if (result == 1)
+        field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply.data);
+    }
+    if (field_type == MP_STR)
+    {
+      value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply.data, &value_length);
+      returned_string= QString::fromUtf8(value, value_length);
+    }
+    else if (field_type == MP_UINT)
+    {
+      uint64_t uint_value= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply.data);
+      long long unsigned int llu= uint_value;
+      value_length= sprintf(value_as_string, "%llu", llu);
+      returned_string= QString::fromUtf8(value_as_string);
+    }
+    else if (field_type == MP_INT)
+    {
+      int64_t int_value= lmysql->ldbms_mp_decode_int(&tarantool_tnt_reply.data);
+      long long int lli= int_value;
+      value_length= sprintf(value_as_string, "%lld", lli);
+      returned_string= QString::fromUtf8(value_as_string);
+    }
+  }
+  else returned_string= "";
+  lmysql->ldbms_tnt_reply_free(&tarantool_tnt_reply);
+  return returned_string;
 }
 #endif
 
@@ -11626,7 +11713,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
 
   if (statement_type == TOKEN_KEYWORD_SELECT)
   {
-
     lmysql->ldbms_tnt_select(tnt[connection_number], spaceno, 0, (2^32) - 1, 0, iterator_type, tuple);
     tarantool_flush_and_save_reply(connection_number);
     if (tarantool_errno[connection_number] != 0) return tarantool_errno[connection_number];
@@ -11650,39 +11736,86 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   return tarantool_errno[connection_number];
 }
 
-/* Given tarantool_tnt_reply, return number of rows from a SELECT. Used by result grid. */
+
+/*
+  What is in tarantool_tnt_reply.data?
+  LUA '"a"'         ... dd 0 0 0 1 a1 61
+  LUA '15'          ... dd 0 0 0 1 f
+  LUA 'm = 1'       ... dd 0 0 0 0
+  LUA '...select()' ... dd 0 0 0 1 93 92  (93 is row count, 92 is field count)
+  LUA '1,2,3'       ... dd 0 0 0 3 1  2  3
+  SELECT is like LUA '...select()' but there's an extra row for field names
+  SELECT / * NOSQL * /  dd 0 0 0 4 92 1 a5 68 65 (0 0 0 4 is row count)
+  (dd is fixarray-32, 93 is fixarray)
+  (the NOSQL option uses tarantool_tnt_select rather than eval)
+  So return:
+  0 == there is no result set because we don't understand ... error?
+  1 == there is no result set because we start with fixarray-32 == 0
+  2 == array-32 == field count, then fields. so assume row_count == 1
+  3 == array-32 == 1, array-x = row count, array-x == field count
+  4 == array-32 == row count, then array-x == field count
+*/
+int MainWindow::tarantool_result_set_type(int connection_number)
+{
+  const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
+  char field_type;
+  long unsigned int r;
+  if ((tarantool_tnt_reply.data == NULL)
+   || (tarantool_tnt_reply.data_end == NULL))
+    goto erret;
+  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+  if (field_type != MP_ARRAY) goto erret;
+  if (tarantool_select_nosql == true) return 4;
+  r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  if (r == 0) return 1;
+  if (r != 1) return 2;
+  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+  if (field_type != MP_ARRAY) return 2;
+  r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+  if (field_type != MP_ARRAY) return 2;
+  return 3;
+erret:
+  tarantool_errno[connection_number]= 10008;
+  strcpy(tarantool_errmsg, "Error: did not understand received data. ");
+  if (tarantool_tnt_reply.data == NULL)
+    strcat(tarantool_errmsg, "tarantool_tnt_reply.data == NULL");
+  else if (tarantool_tnt_reply.data_end == NULL)
+    strcat(tarantool_errmsg, "tarantool_tnt_reply.data_end == NULL");
+  else
+  {
+    int j= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
+    strcat(tarantool_errmsg, "First few bytes are: ");
+    char tmp_hex[16];
+    for (int i= 0; i < 10 && i < j; ++i)
+    {
+      sprintf(tmp_hex, "%x ", *(tarantool_tnt_reply.data + i) & 0xff);
+      strcat(tarantool_errmsg, tmp_hex);
+    }
+    strcat(tarantool_errmsg, ".");
+  }
+  return 0;
+}
+
+/*
+  Given tarantool_tnt_reply, return number of rows from a SELECT.
+  Used by result grid.
+  Some of this code is nearly duplicated in tarantool_num_fields.
+*/
 long unsigned int MainWindow::tarantool_num_rows(unsigned int connection_number)
 {
   const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
 
-  assert(tarantool_tnt_reply.data != NULL);
-
-  char field_type;
-  if (tarantool_select_nosql == false)
+  int result_set_type= tarantool_result_set_type(connection_number);
+  if (result_set_type == 0) return 0;
+  if (result_set_type == 2) return 1;
+  if (result_set_type != 4)
   {
-    field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-    if (field_type != MP_ARRAY)
-    {
-      tarantool_errno[connection_number]= 10008;
-      strcpy(tarantool_errmsg, "Error: result contains non-scalar value\n");
-      return tarantool_errno[connection_number];
-    }
-    /* The first item will be dd 00 00 01 i.e. "array of length = 1" */
-    long unsigned int r;
-    r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-    assert(r == 1);
+    lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   }
-  /* The next item will be e.g. 93 i.e. "fixarray 3" */
-  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY)
-  {
-    tarantool_errno[connection_number]= 10008;
-    strcpy(tarantool_errmsg, "Error: failed to decode row_count\n");
-    return tarantool_errno[connection_number];
-  }
-
-  result_row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  return result_row_count;
+  long unsigned int r;
+  r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  return r;
 }
 
 int MainWindow::tarantool_execute_sql(
@@ -11731,9 +11864,9 @@ int MainWindow::tarantool_execute_sql(
     char request_string[1024];
     if (statement_type == TOKEN_KEYWORD_LUA)
     {
-      strcpy(request_string, "return ocelot_conn2:eval(");
-      strcat(request_string, s.toUtf8());
-      strcat(request_string, ")");
+      s= connect_stripper(s, false);
+      s= tarantool_add_return(s);
+      strcpy(request_string, s.toUtf8());
     }
     else
     {
@@ -11782,6 +11915,45 @@ int MainWindow::tarantool_execute_sql(
 }
 
 /*
+  For LUA 'x x x', how on earth do I know if it returns a result set?
+  As far as I can tell, I must know this in advance because for eval()
+  I have to say 'return ' somewhere. Somehow the regular tarantool client
+  figures this out, but I don't know the official method if there is one.
+  My guess is based on the Lua keyword list ...
+  If first word = and break do else elseif end for function if in local or repeat return then until while
+  (But not: true nil false not)
+  then do not add "return "
+  else If the second token is: "="
+  then do not add "return "
+  else add "return "
+  ... Eventually we should parse Lua and then we can get rid of this.
+*/
+QString MainWindow::tarantool_add_return(QString s)
+{
+  int token_offsets[100]; /* Surely a single assignable target can't have more */
+  int token_lengths[100];
+  tokenize(s.data(),
+           s.size(),
+           &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 2);
+  QString word_1= s.mid(token_offsets[0], token_lengths[0]);
+  if ((word_1 == "and") || (word_1 == "break") || (word_1 == "do")
+   || (word_1 == "else") || (word_1 == "elseif") || (word_1 == "end")
+   || (word_1 == "for") || (word_1 == "function") || (word_1 == "if")
+   || (word_1 == "in") || (word_1 == "local") || (word_1 == "or")
+   || (word_1 == "repeat") || (word_1 == "return") || (word_1 == "then")
+   || (word_1 == "until") || (word_1 == "while"))
+    return s;
+  QString word_2;
+  for (int i= 1; i < 100 - 1; ++i)
+  {
+    word_2= s.mid(token_offsets[i], token_lengths[i]);
+    if ((word_2 == "") || (word_2 == "(")) break;
+    if (word_2 == "=") return s;
+  }
+  return "return " + s;
+}
+
+/*
   Given tarantool_tnt_reply, return number of fields from a SELECT. Used by result grid.
   Actually there are two counts: the count of main fields, and the count of sub-fields.
   Todo: what if there are arrays within arrays?
@@ -11793,21 +11965,29 @@ unsigned int MainWindow::tarantool_num_fields()
 {
   const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
   const char **tarantool_tnt_reply_data= &tarantool_tnt_reply.data;
-  char field_type;
   char field_name[TARANTOOL_MAX_FIELD_NAME_LENGTH];
   unsigned int max_field_count;
 
   QString field_name_list= "";
 
-  /* asserts like the following are unnecessary if the data is good */
-  field_type= lmysql->ldbms_mp_typeof(**tarantool_tnt_reply_data);
-  assert(field_type == MP_ARRAY);
-  if (tarantool_select_nosql == false)
+  /* See tarantool_num_rows for pretty well the same code as this */
+  /* Todo: this is wrong, connection_number might not be 0 */
+  int result_set_type= tarantool_result_set_type(0);
+  if ((result_set_type == 0) || (result_set_type == 1))
   {
-    /* See tarantool_num_rows for long form of this, with checking */
-    lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+    result_row_count= 0;
+    return 0;
   }
-  result_row_count= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+  if (result_set_type == 2) result_row_count= 1;
+  else
+  {
+    if (result_set_type != 4)
+    {
+      lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+    }
+    result_row_count= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+  }
+
   strcpy(field_name, TARANTOOL_FIELD_NAME_BASE);
   strcat(field_name, "_");
   for (long unsigned int r= 0; r < result_row_count; ++r)
@@ -11926,20 +12106,25 @@ int MainWindow::tarantool_num_fields_recursive(const char **tarantool_tnt_reply_
 /* To "seek to row zero", start with the initial pointer and skip over the row count. */
 const char * MainWindow::tarantool_seek_0()
 {
-  char field_type;
   uint32_t row_count;
   const char *tarantool_tnt_reply_data;
   tarantool_tnt_reply_data= tarantool_tnt_reply.data;
 
-  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  assert(field_type == MP_ARRAY);
-  if (tarantool_select_nosql == false)
+  int result_set_type= tarantool_result_set_type(0);
+  if ((result_set_type == 0) || (result_set_type == 1))
   {
-    lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+    assert(result_set_type > 1);
   }
-  row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  if (result_set_type == 2) row_count= 1;
+  else
+  {
+    if (result_set_type != 4)
+    {
+      lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+    }
+    row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  }
   assert(row_count == result_row_count);
-  assert(tarantool_tnt_reply_data != tarantool_tnt_reply.data);
   return tarantool_tnt_reply_data;
 }
 
@@ -12396,13 +12581,21 @@ int MainWindow::tarantool_local_subquery(QString text,
         --parentheses_count;
       }
     }
-    /* todo: this assumes there is no comment inside "server_name.name" */
+    /* copy without server identifier + comments (if any) + "." */
     QString q= "";
     {
       int start= main_token_offsets[i_of_start + 1];
       q= text.mid(start, main_token_offsets[i_of_server_name] - start);
-      start= main_token_offsets[i_of_server_name + 2];
-      q.append(text.mid(start, (main_token_offsets[i_of_end] - 1) - start));
+      int i_of_table= i_of_server_name + 1;
+      while ((main_token_types[i_of_table] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
+          && (main_token_types[i_of_table] <= TOKEN_TYPE_COMMENT_WITH_MINUS))
+        ++i_of_table;
+      if (text.mid(main_token_offsets[i_of_table], main_token_lengths[i_of_table]) != ".")
+      {
+        assert(0 == 1);
+      }
+      start= main_token_offsets[i_of_table + 1];
+      q.append(text.mid(start, main_token_offsets[i_of_end] - start));
     }
     result=
     tarantool_real_query(q.toUtf8(),
