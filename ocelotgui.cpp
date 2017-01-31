@@ -3885,6 +3885,12 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           is_maybe_in_compound_statement= 1;
         }
 #endif
+#ifdef DBMS_TARANTOOL
+        if (main_token_types[i] == TOKEN_KEYWORD_DO_LUA)
+        {
+          is_maybe_in_compound_statement= 1;
+        }
+#endif
         if ((main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
          && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
          && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_MINUS))
@@ -3897,6 +3903,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
       if (is_maybe_in_compound_statement == 1)
       {
         if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+        ||  (main_token_types[i] == TOKEN_KEYWORD_DO_LUA)
         ||  ((main_token_types[i] == TOKEN_KEYWORD_CASE)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
         ||  ((main_token_types[i] == TOKEN_KEYWORD_IF)     && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
         ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
@@ -8823,6 +8830,8 @@ void MainWindow::make_and_append_message_in_result(
       1: '-' is an operator, this is the norm when tokenizing SQL
       2: '-' is a token part, this is the norm when tokenizing options
 
+  If ocelot_dbms='tarantool': #... is not a comment, [[...]] is a string
+
   Adjusting the tokenizer for Qt:
     With tokenize(QString text, char* comment_handling) we find the tokens of a string in statement.
     The results go to token_offsets[] and token_lengths[].
@@ -8903,6 +8912,7 @@ next_char:
   }
   if (text[char_offset] == '#')          /* # starts a comment */
   {
+    if ((dbms_version_mask&FLAG_VERSION_TARANTOOL) != 0) goto one_byte_token;
     expected_char= '\n';
     goto comment_start;
   }
@@ -9037,7 +9047,15 @@ next_char:
     }
     goto one_byte_token;
   }
-  if (text[char_offset] == '[') goto one_byte_token; /* [ one-byte token which is never used */
+  if (text[char_offset] == '[')
+  {
+    if ((dbms_version_mask&FLAG_VERSION_TARANTOOL) != 0)
+    {
+      expected_char= '[';
+      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == '[')) goto string_starting_with_bracket_start;
+    }
+    goto one_byte_token; /* [ one-byte token which is never used */
+  }
   if (text[char_offset] == 92)  goto one_byte_token; /* \ one-byte token which is never used */
   if (text[char_offset] == ']') goto one_byte_token; /* ] one-byte token which is never used */
   if (text[char_offset] == '^') goto one_byte_token; /* ^ one-byte token */
@@ -9076,6 +9094,24 @@ string_end:
 white_space:
   if (token_lengths[token_number] > 0) ++token_number;
   ++char_offset;
+  goto next_token;
+string_starting_with_bracket_start:
+  for (;;)
+  {
+    if (char_offset >= text_length) goto string_end;
+    if (text[char_offset] == 0) goto string_end;
+    if ((char_offset + 1 < text_length)
+     && (text[char_offset] == ']')
+     && (text[char_offset + 1] == ']'))
+     {
+       char_offset+= 2;
+       token_lengths[token_number]+= 2;
+       break;
+     }
+    ++char_offset;
+    ++token_lengths[token_number];
+  }
+  ++token_number;
   goto next_token;
 comment_starting_with_slash_start:
 comment_start:
@@ -9259,6 +9295,10 @@ int MainWindow::token_type(QChar *token, int token_length)
     if ((*token == 'N') && (*(token + 1) == 39)) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
     if ((*token == 'X') && (*(token + 1) == 39)) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
     if ((*token == 'B') && (*(token + 1) == 39)) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
+    if ((*token == '[') && (*(token + 1) == '['))
+    {
+      return TOKEN_TYPE_LITERAL_WITH_BRACKET;
+    }
   }
   if (*token == '"') return TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE;
   if ((*token >= '0') && (*token <= '9')) return TOKEN_TYPE_LITERAL_WITH_DIGIT;
@@ -9325,7 +9365,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"ALTER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ALTER},
       {"ALWAYS", 0, 0, TOKEN_KEYWORD_ALWAYS},
       {"ANALYZE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ANALYZE},
-      {"AND", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_AND},
+      {"AND", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_AND},
       {"ANY_VALUE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ANY_VALUE},
       {"AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AREA}, /* deprecated in MySQL 5.7.6 */
       {"AS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_AS},
@@ -9369,6 +9409,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"BOOL", 0, 0, TOKEN_KEYWORD_BOOL},
       {"BOOLEAN", 0, 0, TOKEN_KEYWORD_BOOLEAN},
       {"BOTH", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BOTH},
+      {"BREAK", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_BREAK},
       {"BUFFER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BUFFER}, /* deprecated in MySQL 5.7.6 */
       {"BY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BY},
       {"CALL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CALL},
@@ -9484,7 +9525,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"DISTINCT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DISTINCT},
       {"DISTINCTROW", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DISTINCTROW},
       {"DIV", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DIV},
-      {"DO", 0, 0, TOKEN_KEYWORD_DO},
+      {"DO", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_DO},
       {"DOUBLE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DOUBLE},
       {"DROP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DROP},
       {"DUAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DUAL},
@@ -9493,14 +9534,14 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"EACH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_EACH},
       {"EDIT", 0, 0, TOKEN_KEYWORD_EDIT}, /* Ocelot keyword */
       {"EGO", 0, 0, TOKEN_KEYWORD_EGO}, /* Ocelot keyword */
-      {"ELSE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ELSE},
-      {"ELSEIF", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ELSEIF},
+      {"ELSE", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_ELSE},
+      {"ELSEIF", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_ELSEIF},
       {"ELT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ELT},
       {"ENABLE", 0, 0, TOKEN_KEYWORD_ENABLE},
       {"ENCLOSED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ENCLOSED},
       {"ENCODE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENCODE},
       {"ENCRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENCRYPT}, /* deprecated in MySQL 5.7.6 */
-      {"END", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_END},
+      {"END", FLAG_VERSION_TARANTOOL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_END},
       {"ENDPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENDPOINT}, /* deprecated in MySQL 5.7.6 */
       {"ENUM", 0, 0, TOKEN_KEYWORD_ENUM},
       {"ENVELOPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENVELOPE}, /* deprecated in MySQL 5.7.6 */
@@ -9523,7 +9564,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"EXTRACT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXTRACT},
       {"EXTRACTVALUE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXTRACTVALUE},
       {"FAIL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_FAIL},
-      {"FALSE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FALSE},
+      {"FALSE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FALSE},
       {"FETCH", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FETCH},
       {"FIELD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FIELD},
       {"FILE", 0, 0, TOKEN_KEYWORD_FILE},
@@ -9538,7 +9579,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"FLUSH", 0, 0, TOKEN_KEYWORD_FLUSH},
       {"FOLLOWING", FLAG_VERSION_MARIADB_10_2_2, 0, TOKEN_KEYWORD_FOLLOWING},
       {"FOLLOWS", FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, 0, TOKEN_KEYWORD_FOLLOWS},
-      {"FOR", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FOR},
+      {"FOR", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FOR},
       {"FORCE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FORCE},
       {"FOREIGN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FOREIGN},
       {"FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FORMAT},
@@ -9549,7 +9590,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"FROM_UNIXTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FROM_UNIXTIME},
       {"FULL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_FULL},
       {"FULLTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FULLTEXT},
-      {"FUNCTION", 0, 0, TOKEN_KEYWORD_FUNCTION},
+      {"FUNCTION", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FUNCTION},
       {"GENERAL", 0, 0, TOKEN_KEYWORD_GENERAL},
       {"GENERATED", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_GENERATED},
       {"GEOMCOLLFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMCOLLFROMTEXT}, /* deprecated in MySQL 5.7.6 */
@@ -9585,12 +9626,12 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"HOUR_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_MICROSECOND},
       {"HOUR_MINUTE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_MINUTE},
       {"HOUR_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_SECOND},
-      {"IF", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IF},
+      {"IF", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IF},
       {"IFNULL", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_IFNULL},
       {"IGNORE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_IGNORE},
       {"IMMEDIATE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_IMMEDIATE},
       {"IMPORT", 0, 0, TOKEN_KEYWORD_IMPORT},
-      {"IN", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IN},
+      {"IN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IN},
       {"INDEX", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INDEX},
       {"INDEXED", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_INDEXED},
       {"INET6_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_ATON},
@@ -9686,6 +9727,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"LN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LN},
       {"LOAD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOAD},
       {"LOAD_FILE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOAD_FILE},
+      {"LOCAL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_LOCAL},
       {"LOCALTIME", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOCALTIME},
       {"LOCALTIMESTAMP", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOCALTIMESTAMP},
       {"LOCATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOCATE},
@@ -9756,9 +9798,10 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"MULTIPOLYGONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGONFROMWKB}, /* deprecated in MySQL 5.7.6 */
       {"NAME_CONST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NAME_CONST},
       {"NATURAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NATURAL},
+      {"NIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NIL},
       {"NO", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_NO},
       {"NOPAGER", 0, 0, TOKEN_KEYWORD_NOPAGER}, /* Ocelot keyword */
-      {"NOT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_NOT},
+      {"NOT", FLAG_VERSION_TARANTOOL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NOT},
       {"NOTEE", 0, 0, TOKEN_KEYWORD_NOTEE}, /* Ocelot keyword */
       {"NOTNULL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_NOTNULL},
       {"NOW", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NOW},
@@ -9788,7 +9831,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"OPTIMIZER_COSTS", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_OPTIMIZER_COSTS},
       {"OPTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTION},
       {"OPTIONALLY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTIONALLY},
-      {"OR", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_OR},
+      {"OR", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_OR},
       {"ORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ORD},
       {"ORDER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ORDER},
       {"OUT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OUT},
@@ -9857,7 +9900,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"RENAME", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RENAME},
       {"REORGANIZE", 0, 0, TOKEN_KEYWORD_REORGANIZE},
       {"REPAIR", 0, 0, TOKEN_KEYWORD_REPAIR},
-      {"REPEAT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REPEAT},
+      {"REPEAT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REPEAT},
       {"REPLACE", FLAG_VERSION_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_REPLACE},
       {"REPLICATION", 0, 0, TOKEN_KEYWORD_REPLICATION},
       {"REQUIRE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_REQUIRE},
@@ -9865,7 +9908,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"RESETCONNECTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RESETCONNECTION},
       {"RESIGNAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RESIGNAL},
       {"RESTRICT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RESTRICT},
-      {"RETURN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RETURN},
+      {"RETURN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_RETURN},
       {"RETURNS", 0, 0, TOKEN_KEYWORD_RETURNS},
       {"REVERSE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REVERSE},
       {"REVOKE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_REVOKE},
@@ -10037,7 +10080,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"TEMP", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TEMP},
       {"TEMPORARY", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TEMPORARY},
       {"TERMINATED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TERMINATED},
-      {"THEN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_THEN},
+      {"THEN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_THEN},
       {"TIME", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TIME},
       {"TIMEDIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMEDIFF},
       {"TIMESTAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMESTAMP},
@@ -10057,7 +10100,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"TRANSACTION", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TRANSACTION},
       {"TRIGGER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TRIGGER},
       {"TRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TRIM},
-      {"TRUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TRUE},
+      {"TRUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_TRUE},
       {"TRUNCATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRUNCATE},
       {"UCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UCASE},
       {"UNBOUNDED", 0, 0, TOKEN_KEYWORD_UNBOUNDED},
@@ -10073,6 +10116,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"UNKNOWN", 0, 0, TOKEN_KEYWORD_UNKNOWN},
       {"UNLOCK", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_UNLOCK},
       {"UNSIGNED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_UNSIGNED},
+      {"UNTIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_UNTIL},
       {"UPDATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_UPDATE},
       {"UPDATEXML", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UPDATEXML},
       {"UPPER", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_UPPER},
@@ -10109,7 +10153,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"WEIGHT_STRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WEIGHT_STRING},
       {"WHEN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WHEN},
       {"WHERE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WHERE},
-      {"WHILE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_WHILE},
+      {"WHILE", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_WHILE},
       {"WITH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WITH},
       {"WITHIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WITHIN}, /* deprecated in MySQL 5.7.6 */
       {"WITHOUT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_WITHOUT},
@@ -10189,24 +10233,25 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "856" */
+      /* If the following assert happens, you inserted/removed something without changing "860" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (856 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (860 - 1));
 
-      /* Test strvalues is by bsearching for every item. */
-      //for (int ii= 0; ii < 856; ++ii)
+      /* Test strvalues is ordered by bsearching for every item. */
+      //for (int ii= 0; ii < 860; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 856, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 860, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
+      ////  printf("ii=%d, index=%d, k=%s.\n", ii, index, k);
       //  assert(index == strvalues[ii].token_keyword);
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 856 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 856, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 860 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 860, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -10217,6 +10262,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
         {
           main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_FUNCTION);
         }
+        if ((strvalues[index].reserved_flags & FLAG_VERSION_LUA) != 0)
+          main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_MAYBE_LUA);
         index+= TOKEN_KEYWORDS_START;
         main_token_types[i2]= index;
       }
@@ -11488,13 +11535,9 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
    Todo: we shouldn't be calling tparse_f_program() yet again!
    Todo: I succeeded in making this work
            lua 'return box.space.t:select()';
-         after saying on the main connection
-           net_box = require('net.box')
-         ocelot_conn2=net_box.new('localhost:3301')
          but:
            should use [[...]] or escapes
            should not depend later on looking at TOKEN_KEYWORD_LUA
-           should have a plan for things that don't return result sets
 */
 int MainWindow::tarantool_real_query(const char *dbms_query,
                                      unsigned long dbms_query_len,
@@ -11862,7 +11905,11 @@ int MainWindow::tarantool_execute_sql(
       So what you really want to do is change ' or " to escapes.
     */
     char request_string[1024];
-    if (statement_type == TOKEN_KEYWORD_LUA)
+    if ((main_token_flags[hparse_i] | TOKEN_FLAG_IS_MAYBE_LUA) != 0)
+    {
+      strcpy(request_string, s.toUtf8());
+    }
+    else if (statement_type == TOKEN_KEYWORD_LUA)
     {
       s= connect_stripper(s, false);
       s= tarantool_add_return(s);
@@ -12435,7 +12482,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     while ((unsigned int) field_number_in_main_list < p_result_column_count)
     {
       /* Dump null. Todo: similar code appears 3 times. */
-      if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
+      if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[field_number_in_main_list]) (*p_result_max_column_widths)[field_number_in_main_list]= sizeof(NULL_STRING) - 1;
       memset(result_set_copy_pointer, 0, sizeof(unsigned int));
       *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
       result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);

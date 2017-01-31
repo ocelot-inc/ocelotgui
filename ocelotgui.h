@@ -50,6 +50,8 @@
 #define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512)
 #define FLAG_VERSION_TARANTOOL      1024
 #define FLAG_VERSION_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512 | 1024)
+#define FLAG_VERSION_LUA            2048
+#define FLAG_VERSION_ALL_OR_LUA (FLAG_VERSION_ALL | FLAG_VERSION_LUA)
 
 #include <assert.h>
 
@@ -615,6 +617,48 @@ public:
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
+  void hparse_f_lua_blocklist(int,int);
+  void hparse_f_lua_blockseries(int,int);
+  int hparse_f_lua_block(int,int);
+  int hparse_f_lua_funcname();
+  int hparse_f_lua_varlist();
+  int hparse_f_lua_var();
+  int hparse_f_lua_namelist();
+  int hparse_f_lua_explist();
+  int hparse_f_lua_exp();
+  int hparse_f_lua_prefixexp();
+  int hparse_f_lua_functioncall();
+  int hparse_f_lua_args();
+  int hparse_f_lua_function();
+  int hparse_f_lua_funcbody();
+  int hparse_f_lua_parlist();
+  int hparse_f_lua_tableconstructor();
+  int hparse_f_lua_fieldlist();
+  int hparse_f_lua_field();
+  int hparse_f_lua_fieldsep();
+  int hparse_f_lua_name();
+  int hparse_f_lua_number();
+  int hparse_f_lua_string();
+  int hparse_f_lua_oprlist();
+  int hparse_f_lua_literal();
+  void hparse_f_lua_opr_1(int);
+  void hparse_f_lua_opr_2(int);
+  void hparse_f_lua_opr_3(int);
+  void hparse_f_lua_opr_4(int);
+  void hparse_f_lua_opr_5(int);
+  void hparse_f_lua_opr_6(int);
+  void hparse_f_lua_opr_7(int);
+  void hparse_f_lua_opr_8(int,int);
+  void hparse_f_lua_opr_9(int,int);
+  void hparse_f_lua_opr_10(int,int);
+  void hparse_f_lua_opr_11(int,int);
+  void hparse_f_lua_opr_12(int,int);
+  void hparse_f_lua_opr_13(int,int);
+  void hparse_f_lua_opr_14(int,int);
+  void hparse_f_lua_opr_15(int,int);
+  void hparse_f_lua_opr_16(int,int);
+  void hparse_f_lua_opr_17(int,int);
+  void hparse_f_lua_opr_18(int,int);
   void hparse_f_labels(int);
   void hparse_f_cursors(int);
   int hparse_f_conditions(int);
@@ -973,22 +1017,24 @@ public:
   #define TOKEN_FLAG_IS_END_IN_COLUMN_LIST 512
   #define TOKEN_FLAG_IS_BINARY_PLUS_OR_MINUS 1024
   #define TOKEN_FLAG_IS_NOT_AFTER_SPACE 2048
+  #define TOKEN_FLAG_IS_MAYBE_LUA 4096
 
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
     TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE= 2, /* starts with " */
     TOKEN_TYPE_LITERAL_WITH_DIGIT= 3,        /* starts with 0-9 */
-    TOKEN_TYPE_LITERAL_WITH_BRACE= 4,        /* starts with { */ /* obsolete? */
-    TOKEN_TYPE_LITERAL= 4,
-    TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK= 5,  /* starts with ` */
-    TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE= 6, /* starts with " and hparse_ansi_quote=true */
-    TOKEN_TYPE_IDENTIFIER_WITH_AT= 7,        /* starts with @ */
-    TOKEN_TYPE_IDENTIFIER= 7,
-    TOKEN_TYPE_COMMENT_WITH_SLASH = 8,        /* starts with / * or * / */
-    TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE= 9,   /* starts with # */
-    TOKEN_TYPE_COMMENT_WITH_MINUS= 10,        /* starts with -- */
-    TOKEN_TYPE_OPERATOR= 11,                 /* starts with < > = ! etc. */
-    TOKEN_TYPE_OTHER= 12,                    /* identifier? keyword? */
+    TOKEN_TYPE_LITERAL_WITH_BRACKET= 4,      /* starts with [[, Lua only */
+    TOKEN_TYPE_LITERAL_WITH_BRACE= 5,        /* starts with { */ /* obsolete? */
+    TOKEN_TYPE_LITERAL= 5,
+    TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK= 6,  /* starts with ` */
+    TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE= 7, /* starts with " and hparse_ansi_quote=true */
+    TOKEN_TYPE_IDENTIFIER_WITH_AT= 8,        /* starts with @ */
+    TOKEN_TYPE_IDENTIFIER= 8,
+    TOKEN_TYPE_COMMENT_WITH_SLASH = 9,        /* starts with / * or * / */
+    TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE= 10,   /* starts with # */
+    TOKEN_TYPE_COMMENT_WITH_MINUS= 11,        /* starts with -- */
+    TOKEN_TYPE_OPERATOR= 12,                 /* starts with < > = ! etc. */
+    TOKEN_TYPE_OTHER= 13,                    /* identifier? keyword? */
     /* The TOKEN_KEYWORD_... numbers must match the list in tokens_to_keywords(). */
     TOKEN_KEYWORDS_START= TOKEN_TYPE_OTHER + 1,
     TOKEN_KEYWORD_QUESTIONMARK= TOKEN_KEYWORDS_START, /* Ocelot keyword */
@@ -1053,6 +1099,7 @@ public:
       TOKEN_KEYWORD_BOOL,
       TOKEN_KEYWORD_BOOLEAN,
       TOKEN_KEYWORD_BOTH,
+      TOKEN_KEYWORD_BREAK,
       TOKEN_KEYWORD_BUFFER,
       TOKEN_KEYWORD_BY,
       TOKEN_KEYWORD_CALL,
@@ -1370,6 +1417,7 @@ public:
       TOKEN_KEYWORD_LN,
       TOKEN_KEYWORD_LOAD,
       TOKEN_KEYWORD_LOAD_FILE,
+      TOKEN_KEYWORD_LOCAL,
       TOKEN_KEYWORD_LOCALTIME,
       TOKEN_KEYWORD_LOCALTIMESTAMP,
       TOKEN_KEYWORD_LOCATE,
@@ -1440,6 +1488,7 @@ public:
       TOKEN_KEYWORD_MULTIPOLYGONFROMWKB,
       TOKEN_KEYWORD_NAME_CONST,
       TOKEN_KEYWORD_NATURAL,
+      TOKEN_KEYWORD_NIL,
       TOKEN_KEYWORD_NO,
       TOKEN_KEYWORD_NOPAGER,
       TOKEN_KEYWORD_NOT,
@@ -1757,6 +1806,7 @@ public:
       TOKEN_KEYWORD_UNKNOWN,
       TOKEN_KEYWORD_UNLOCK,
       TOKEN_KEYWORD_UNSIGNED,
+      TOKEN_KEYWORD_UNTIL,
       TOKEN_KEYWORD_UPDATE,
       TOKEN_KEYWORD_UPDATEXML,
       TOKEN_KEYWORD_UPPER,
@@ -1875,6 +1925,7 @@ public:
     TOKEN_KEYWORD_IF_IN_IF_EXPRESSION,
     TOKEN_KEYWORD_IF_IN_IF_EXISTS,
     TOKEN_KEYWORD_REPEAT_IN_REPEAT_EXPRESSION,
+    TOKEN_KEYWORD_DO_LUA,
     TOKEN_TYPE_DELIMITER
   };
 
