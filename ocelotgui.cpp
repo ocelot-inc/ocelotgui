@@ -7088,7 +7088,8 @@ int MainWindow::action_execute_one_statement(QString text)
         {
           /* todo: failing to check if statement started with comment */
           if ((main_token_types[0] == TOKEN_KEYWORD_SELECT)
-           || (main_token_types[0] == TOKEN_KEYWORD_LUA))
+           || (main_token_types[0] == TOKEN_KEYWORD_LUA)
+           || ((main_token_flags[0]&TOKEN_FLAG_IS_LUA) != 0))
           {
             int result_set_type= tarantool_result_set_type(0);
             if ((result_set_type == 0) || (result_set_type == 1))
@@ -9311,7 +9312,11 @@ int MainWindow::token_type(QChar *token, int token_length)
     if ((*token == '/') && (*(token + 1) == '*')) return TOKEN_TYPE_COMMENT_WITH_SLASH;
     if ((*token == '*') && (*(token + 1) == '/')) return TOKEN_TYPE_COMMENT_WITH_SLASH;
   }
-  if (*token == '#') return TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE;
+  if (*token == '#')
+  {
+    if (dbms_version_mask&FLAG_VERSION_TARANTOOL) return TOKEN_TYPE_OPERATOR;
+    return TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE;
+  }
   if (token_length > 1)
   {
     if ((*token == '-') && (*(token + 1) == '-')) return TOKEN_TYPE_COMMENT_WITH_MINUS;
@@ -11582,8 +11587,13 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   hparse_i= passed_main_token_number;
   if (hparse_f_is_nosql(text) == false)
   {
-    QString s= "";
-    if (statement_type == TOKEN_KEYWORD_LUA) s= s= text.mid(main_token_offsets[1], main_token_lengths[1]);
+    QString s;
+    if (statement_type == TOKEN_KEYWORD_LUA) s= text.mid(main_token_offsets[1], main_token_lengths[1]);
+    if (main_token_flags[passed_main_token_number] & TOKEN_FLAG_IS_LUA)
+    {
+      s= text;
+      statement_type= TOKEN_KEYWORD_DO_LUA;
+    }
     tarantool_execute_sql(dbms_query,
                           dbms_query_len,
                           connection_number,
@@ -11905,7 +11915,7 @@ int MainWindow::tarantool_execute_sql(
       So what you really want to do is change ' or " to escapes.
     */
     char request_string[1024];
-    if ((main_token_flags[hparse_i] | TOKEN_FLAG_IS_MAYBE_LUA) != 0)
+    if (statement_type == TOKEN_KEYWORD_DO_LUA)
     {
       strcpy(request_string, s.toUtf8());
     }
@@ -11945,10 +11955,13 @@ int MainWindow::tarantool_execute_sql(
         This is supposed to be fixed soon!
         When it's fixed, we'll miss result sets that really have 1 row.
       */
-      if ((result_row_count == 1)
+      /* ?? I don't know why this used to say result_row_count == 1 */
+      if ((r == 1)
        && (tarantool_select_nosql == false)
        && (statement_type == TOKEN_KEYWORD_SELECT))
         r= 0;
+
+      result_row_count= r;
 
       if (r == 0)
       {

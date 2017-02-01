@@ -340,6 +340,7 @@ int MainWindow::hparse_f_accept(unsigned short int flag_version, unsigned char r
     ++hparse_count_of_accepts;
     return 1;
   }
+  /* these 2 lines are duplicated in hparse_f_accept_dotted() */
   if (hparse_expected > "") hparse_expected.append(" or ");
   hparse_expected.append(hparse_f_token_to_appendee(token, reftype));
   return 0;
@@ -8895,27 +8896,28 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   local function Name funcbody |
   local namelist [`=´ explist]
 */
-int lua_calling_statement_type, lua_block_top;
-int lua_depth;
+static int lua_calling_statement_type, lua_block_top;
+static int lua_depth;
 
 void MainWindow::hparse_f_lua_blocklist(int calling_statement_type, int block_top)
 {
-  printf("hparse_f_lua_blocklist\n");
+  int saved_hparse_i= hparse_i;
   unsigned short int saved_hparse_dbms_mask= hparse_dbms_mask;
   lua_depth= 0;
   hparse_dbms_mask= FLAG_VERSION_LUA;
-  hparse_f_lua_blockseries(calling_statement_type, block_top);
+  hparse_f_lua_blockseries(calling_statement_type, block_top, false);
   hparse_dbms_mask= saved_hparse_dbms_mask;
+  if (hparse_errno > 0) return;
+  main_token_flags[saved_hparse_i]|= TOKEN_FLAG_IS_LUA;
 }
 /* 0 or more statements or blocks of statements, optional semicolons */
-void MainWindow::hparse_f_lua_blockseries(int calling_statement_type, int block_top)
+void MainWindow::hparse_f_lua_blockseries(int calling_statement_type, int block_top, bool is_in_loop)
 {
-  printf("hparse_f_lua_blockseries\n");
   int statement_type;
   ++lua_depth;
   for (;;)
   {
-    statement_type= hparse_f_lua_block(calling_statement_type, block_top);
+    statement_type= hparse_f_lua_block(calling_statement_type, block_top, is_in_loop);
     if (statement_type == 0) break;
     assert(lua_depth >= 0);
     /* todo: if "break" or "return", can anything follow? */
@@ -8933,21 +8935,25 @@ void MainWindow::hparse_f_lua_blockseries(int calling_statement_type, int block_
   }
   --lua_depth;
 }
-int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top)
+int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top, bool is_in_loop)
 {
-  printf("hparse_f_lua_block. hparse_i=%d\n", hparse_i);
-
   lua_calling_statement_type= calling_statement_type;
   lua_block_top= block_top;
   if (hparse_errno > 0) return 0;
   hparse_subquery_is_allowed= false;
   int hparse_i_of_block= -1;
-  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO_LUA, "do") == 1)
+  if ((is_in_loop == true)
+   && (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BREAK, "break") == 1))
   {
-    printf("it ought to be DO_LUA!\n");
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
-    hparse_f_lua_blockseries(calling_statement_type, block_top);
+    return TOKEN_KEYWORD_BREAK;
+  }
+  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO_LUA, "do") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
+    hparse_f_lua_blockseries(calling_statement_type, block_top, is_in_loop);
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "end");
     if (hparse_errno > 0) return 0;
@@ -8974,7 +8980,7 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top)
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_FUNCTION,TOKEN_KEYWORD_DO, "do");
     if (hparse_errno > 0) return 0;
-    hparse_f_lua_blockseries(calling_statement_type, block_top);
+    hparse_f_lua_blockseries(calling_statement_type, block_top, true);
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "end");
     if (hparse_errno > 0) return 0;
@@ -9006,7 +9012,7 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top)
       if (hparse_errno > 0) return 0;
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
       int break_word= 0;
-      hparse_f_lua_blockseries(calling_statement_type, block_top);
+      hparse_f_lua_blockseries(calling_statement_type, block_top, is_in_loop);
       if (hparse_errno > 0) return 0;
       if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "end") == 1)
       {
@@ -9036,7 +9042,7 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top)
       }
       assert(break_word == TOKEN_KEYWORD_ELSE);
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
-      hparse_f_lua_blockseries(calling_statement_type, block_top);
+      hparse_f_lua_blockseries(calling_statement_type, block_top, is_in_loop);
       if (hparse_errno > 0) return 0;
       hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "end");
       if (hparse_errno > 0) return 0;
@@ -9073,7 +9079,7 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
-    hparse_f_lua_blockseries(calling_statement_type, block_top);
+    hparse_f_lua_blockseries(calling_statement_type, block_top, true);
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "until");
     if (hparse_errno > 0) return 0;
@@ -9109,7 +9115,7 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top)
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO, "do");
     if (hparse_errno > 0) return 0;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
-    hparse_f_lua_blockseries(calling_statement_type, block_top);
+    hparse_f_lua_blockseries(calling_statement_type, block_top, true);
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "end");
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
@@ -9139,12 +9145,11 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top)
 /* funcname ::= Name {`.´ Name} [`:´ Name] */
 int MainWindow::hparse_f_lua_funcname()
 {
-  printf("hparse_f_lua_funcname\n");
   do
   {
     if (hparse_f_lua_name() == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
-  } while (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".") == 1);
+  } while (hparse_f_lua_accept_dotted(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".") == 1);
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ":") == 1)
   {
     if (hparse_f_lua_name() == 0) hparse_f_error();
@@ -9154,7 +9159,6 @@ int MainWindow::hparse_f_lua_funcname()
 /* varlist ::= var {`,´ var} */
 int MainWindow::hparse_f_lua_varlist()
 {
-  printf("hparse_f_lua_varlist\n");
   do
   {
     if (hparse_f_lua_var() == 0) hparse_f_error();
@@ -9166,8 +9170,8 @@ int MainWindow::hparse_f_lua_varlist()
 /* var ::=  Name | prefixexp `[´ exp `]´ | prefixexp `.´ Name */
 int MainWindow::hparse_f_lua_var()
 {
-  printf("hparse_f_lua_var %d\n", main_token_types[hparse_i]);
-  if (hparse_f_lua_name() == 1)
+  if ((hparse_f_lua_name() == 1)
+   || (hparse_f_lua_name_equivalent() == 1))
   {
     if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[") == 1)
     {
@@ -9176,7 +9180,7 @@ int MainWindow::hparse_f_lua_var()
       hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "]");
       if (hparse_errno > 0) return 0;
     }
-    if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".") == 1)
+    if (hparse_f_lua_accept_dotted(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".") == 1)
     {
       if (hparse_f_lua_var() == 0) hparse_f_error();
       if (hparse_errno > 0) return 0;
@@ -9189,7 +9193,6 @@ int MainWindow::hparse_f_lua_var()
 /* namelist ::= Name {`,´ Name} */
 int MainWindow::hparse_f_lua_namelist()
 {
-  printf("hparse_f_lua_namelist\n");
   do
   {
     if (hparse_f_lua_name() == 0) hparse_f_error();
@@ -9200,13 +9203,11 @@ int MainWindow::hparse_f_lua_namelist()
 /* explist ::= {exp `,´} exp */
 int MainWindow::hparse_f_lua_explist()
 {
-  printf("hparse_f_lua_explist\n");
   do
   {
     if (hparse_f_lua_exp() == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
   } while (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-   printf("hparse_f_lua_explist return\n");
    return 1;
 }
 /*
@@ -9215,17 +9216,16 @@ int MainWindow::hparse_f_lua_explist()
 */
 int MainWindow::hparse_f_lua_exp()
 {
-  printf("hparse_f_lua_exp\n");
   //if (hparse_f_lua_prefixexp() == 1) return 1;
   //if (hparse_errno > 0) return 0;
   hparse_f_lua_opr_1(0);
   if (hparse_errno > 0) return 0;
   return 1;
 }
-    /* prefixexp ::= var | functioncall | `(´ exp `)´ */
+/* prefixexp ::= var | functioncall | `(´ exp `)´ */
+/* todo: this is never called. remove? */
 int MainWindow::hparse_f_lua_prefixexp()
 {
-  printf("hparse_f_lua_prefixexp\n");
   if (hparse_f_lua_var() == 1) return 1;
   if (hparse_errno > 0) return 0;
   if (hparse_f_lua_functioncall() == 1) return 1;
@@ -9247,11 +9247,9 @@ int MainWindow::hparse_f_lua_prefixexp()
 int MainWindow::hparse_f_lua_functioncall()
 {
   bool is_var;
-  printf("hparse_f_lua_functioncall\n");
   if (hparse_f_lua_var() == 0) return 0;
   if (hparse_errno > 0) return 0;
 so_far_it_is_a_var:
-  printf("  so far it is a var\n");
   if (hparse_f_lua_args() == 1) goto so_far_it_is_a_functioncall;
   if (hparse_errno > 0) return 0;
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ":") == 1)
@@ -9264,7 +9262,6 @@ so_far_it_is_a_var:
   }
   return 1;
 so_far_it_is_a_functioncall:
-  printf("  so far it is a functioncall\n");
   is_var= false;
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[") == 1)
   {
@@ -9274,7 +9271,7 @@ so_far_it_is_a_functioncall:
     if (hparse_errno > 0) return 0;
     is_var= true;
   }
-  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".") == 1)
+  if (hparse_f_lua_accept_dotted(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".") == 1)
   {
     if (hparse_f_lua_var() == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
@@ -9286,7 +9283,6 @@ so_far_it_is_a_functioncall:
 /* args ::=  `(´ [explist] `)´ | tableconstructor | String */
 int MainWindow::hparse_f_lua_args()
 {
-  printf("hparse_f_lua_args\n");
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(") == 1)
   {
     if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")") == 0)
@@ -9306,7 +9302,6 @@ int MainWindow::hparse_f_lua_args()
 /* function ::= function funcbody */
 int MainWindow::hparse_f_lua_function()
 {
-  printf("hparse_f_lua_function\n");
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_FUNCTION, "function") == 0)
   {
     if (hparse_f_lua_funcbody() == 0) hparse_f_error();
@@ -9318,14 +9313,13 @@ int MainWindow::hparse_f_lua_function()
 /* funcbody ::= `(´ [parlist] `)´ block end */
 int MainWindow::hparse_f_lua_funcbody()
 {
-  printf("hparse_f_lua_parlist\n");
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(") == 0)
   {
     hparse_f_lua_parlist();
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return 0;
-    hparse_f_lua_blockseries(lua_calling_statement_type, lua_block_top);
+    hparse_f_lua_blockseries(lua_calling_statement_type, lua_block_top, false);
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_END, "end");
     if (hparse_errno > 0) return 0;
@@ -9341,7 +9335,6 @@ int MainWindow::hparse_f_lua_parlist()
 /* tableconstructor ::= `{´ [fieldlist] `}´ */
 int MainWindow::hparse_f_lua_tableconstructor()
 {
-  printf("hparse_f_lua_tableconstructor\n");
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "{") == 0)
     return 0;
   if (hparse_f_lua_fieldlist() == 0) hparse_f_error();
@@ -9352,7 +9345,6 @@ int MainWindow::hparse_f_lua_tableconstructor()
 /* fieldlist ::= field {fieldsep field} [fieldsep] */
 int MainWindow::hparse_f_lua_fieldlist()
 {
-  printf("hparse_f_lua_fieldlist\n");
   do
   {
     hparse_f_lua_field();
@@ -9365,7 +9357,6 @@ int MainWindow::hparse_f_lua_fieldlist()
 /* field ::= `[´ exp `]´ `=´ exp | Name `=´ exp | exp */
 int MainWindow::hparse_f_lua_field()
 {
-  printf("hparse_f_lua_field\n");
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "[") == 1)
   {
     if (hparse_f_lua_exp() == 0) hparse_f_error();
@@ -9396,22 +9387,54 @@ int MainWindow::hparse_f_lua_field()
 /* fieldsep ::= `,´ | `;´ */
 int MainWindow::hparse_f_lua_fieldsep()
 {
-  printf("hparse_f_lua_fieldsep\n");
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ",") == 1) return 1;
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ";") == 1) return 1;
   return 0;
 }
-
 /* Name = "any string of letters, digits, and underscores, not beginning with a digit. */
 int MainWindow::hparse_f_lua_name()
 {
-  printf("hparse_f_lua_name\n");
   return hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+}
+/* (exp).name and (exp)[x] are variables, but (exp) is not a name */
+int MainWindow::hparse_f_lua_name_equivalent()
+{
+  int i= hparse_i;
+  QString token;
+  token= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+  if (token != "(")
+  {
+    hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
+    return 0;
+  }
+  int parentheses_count= 0;
+  for (;;)
+  {
+    token= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+    if (token == "(") ++parentheses_count;
+    if (token == ")")
+    {
+      --parentheses_count;
+      if (parentheses_count == 0) break;
+    }
+    if (token == "") break;
+    ++i;
+  }
+  token= hparse_text_copy.mid(main_token_offsets[i + 1], main_token_lengths[i + 1]);
+  if ((token != "[") && (token != ".") && (token != "")) return 0;
+  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(") == 1)
+  {
+    hparse_f_lua_exp();
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  return 0;
 }
 /* Number ::= decimals and approximates ok. todo: 0xff */
 int MainWindow::hparse_f_lua_number()
 {
-  printf("hparse_f_lua_number\n");
   if (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DIGIT)
   {
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL_WITH_DIGIT, "[literal]"); /* guaranteed to succeed */
@@ -9424,21 +9447,17 @@ int MainWindow::hparse_f_lua_number()
 /* String :: = in 's or "s or (todo:) [[...]]s or [==...]==]s */
 int MainWindow::hparse_f_lua_string()
 {
-  printf("hparse_f_lua_string %d\n",  main_token_types[hparse_i]);
   if ((main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
    || (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_BRACKET)
    || (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
   {
-    printf("        type=%d\n", main_token_types[hparse_i]);
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]"); /* guaranteed to succeed */
     if (hparse_errno > 0) return 0;
-    printf("    it is a string\n");
     return 1;
   }
   hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[string]"); /* guaranteed to fail */
   return 0;
 }
-
 int MainWindow::hparse_f_lua_literal()
 {
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_NIL, "nil") == 1) return 1;
@@ -9453,7 +9472,6 @@ int MainWindow::hparse_f_lua_literal()
 
 void MainWindow::hparse_f_lua_opr_1(int who_is_calling) /* Precedence = 1 (bottom) */
 {
-  printf("hparse_f_lua_opr_1\n");
   hparse_f_lua_opr_2(who_is_calling);
 }
 
@@ -9523,9 +9541,9 @@ void MainWindow::hparse_f_lua_opr_8(int who_is_calling, int allow_flags) /* Prec
   if (hparse_errno > 0) return;
   hparse_f_lua_opr_9(who_is_calling, allow_flags);
   if (hparse_errno > 0) return;
-  while (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "..") == 1)
+  while (hparse_f_lua_accept_dotted(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "..") == 1)
   {
-    hparse_f_lua_opr_9(who_is_calling, 0);
+    hparse_f_lua_opr_9(who_is_calling, allow_flags);
     if (hparse_errno > 0) return;
   }
 }
@@ -9596,7 +9614,7 @@ void MainWindow::hparse_f_lua_opr_15(int who_is_calling, int allow_flags) /* Pre
 
 void MainWindow::hparse_f_lua_opr_16(int who_is_calling, int allow_flags) /* Precedence = 16 */
 {
-  hparse_f_lua_opr_17(who_is_calling, 0);
+  hparse_f_lua_opr_17(who_is_calling, allow_flags);
 }
 
 void MainWindow::hparse_f_lua_opr_17(int who_is_calling, int allow_flags) /* Precedence = 17 */
@@ -9610,15 +9628,12 @@ void MainWindow::hparse_f_lua_opr_17(int who_is_calling, int allow_flags) /* Pre
 */
 void MainWindow::hparse_f_lua_opr_18(int who_is_calling, int allow_flags) /* Precedence = 18, top */
 {
-  printf("hparse_f_lua_opr_18\n");
   if (hparse_errno > 0) return;
   /* if we get 1 it's var, ok. if we get 2 it's functioncall, ok. */
   if (hparse_f_lua_functioncall() > 0) return;
   if (hparse_errno > 0) return;
-  printf("  not var or functioncall\n");
 
-  QString opd= hparse_token.toUpper();
-  bool identifier_seen= false;
+  QString opd= hparse_token;
 
   int saved_hparse_i= hparse_i;
   hparse_f_next_nexttoken();
@@ -9632,32 +9647,15 @@ void MainWindow::hparse_f_lua_opr_18(int who_is_calling, int allow_flags) /* Pre
         hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[reserved function]");
         if (hparse_errno > 0) return;
       }
-      identifier_seen= true;
       main_token_types[saved_hparse_i]= saved_token;
     }
-  }
-  if ((identifier_seen == true)
-   || (hparse_f_qualified_name_of_operand(true) == 1))
-  {
-    if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
-    {
-      if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 0)
-      {
-        hparse_f_lua_parlist();
-        if (hparse_errno > 0) return;
-        hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
-        if (hparse_errno > 0) return;
-      }
-      hparse_f_over(saved_hparse_i, who_is_calling);
-      if (hparse_errno > 0) return;
-    }
-    return;
   }
   if (hparse_f_lua_literal() == 1) return;
   if (hparse_errno > 0) return;
   if (hparse_f_lua_tableconstructor() == 1) return;
   if (hparse_errno > 0) return;
+  if (hparse_f_lua_accept_dotted(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "..."))
+    return;
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "("))
   {
     if (hparse_errno > 0) return;
@@ -9676,7 +9674,30 @@ void MainWindow::hparse_f_lua_opr_18(int who_is_calling, int allow_flags) /* Pre
   hparse_f_error();
   return;
 }
+/* tokenize() treats every "." as a separate token, work around that */
+int MainWindow::hparse_f_lua_accept_dotted(unsigned short int flag_version, unsigned char reftype, int proposed_type, QString token)
+{
+  if (hparse_errno > 0) return 0;
+  int i= hparse_i;
+  int dots;
+  if (hparse_text_copy.mid(main_token_offsets[i], 3) == "...") dots= 3;
+  else if (hparse_text_copy.mid(main_token_offsets[i], 2) == "..") dots= 2;
+  else if (hparse_text_copy.mid(main_token_offsets[i], 1) == ".") dots= 1;
+  else dots= 0;
+  if (dots == token.length())
+  {
+    if (dots >= 3) hparse_f_accept(flag_version, reftype,proposed_type, ".");
+    if (hparse_errno > 0) return 0;
+    if (dots >= 2) hparse_f_accept(flag_version, reftype,proposed_type, ".");
+    if (hparse_errno > 0) return 0;
+    return (hparse_f_accept(flag_version, reftype,proposed_type, "."));
+  }
 
+  /* these 2 lines are duplicated in hparse_f_accept() */
+  if (hparse_expected > "") hparse_expected.append(" or ");
+  hparse_expected.append(hparse_f_token_to_appendee(token, reftype));
+  return 0;
+}
 #endif
 
 /*

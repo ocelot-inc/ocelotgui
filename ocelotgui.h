@@ -618,8 +618,8 @@ public:
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
   void hparse_f_lua_blocklist(int,int);
-  void hparse_f_lua_blockseries(int,int);
-  int hparse_f_lua_block(int,int);
+  void hparse_f_lua_blockseries(int,int,bool);
+  int hparse_f_lua_block(int,int,bool);
   int hparse_f_lua_funcname();
   int hparse_f_lua_varlist();
   int hparse_f_lua_var();
@@ -637,6 +637,7 @@ public:
   int hparse_f_lua_field();
   int hparse_f_lua_fieldsep();
   int hparse_f_lua_name();
+  int hparse_f_lua_name_equivalent();
   int hparse_f_lua_number();
   int hparse_f_lua_string();
   int hparse_f_lua_oprlist();
@@ -659,6 +660,7 @@ public:
   void hparse_f_lua_opr_16(int,int);
   void hparse_f_lua_opr_17(int,int);
   void hparse_f_lua_opr_18(int,int);
+  int hparse_f_lua_accept_dotted(unsigned short int,unsigned char,int,QString);
   void hparse_f_labels(int);
   void hparse_f_cursors(int);
   int hparse_f_conditions(int);
@@ -1018,6 +1020,7 @@ public:
   #define TOKEN_FLAG_IS_BINARY_PLUS_OR_MINUS 1024
   #define TOKEN_FLAG_IS_NOT_AFTER_SPACE 2048
   #define TOKEN_FLAG_IS_MAYBE_LUA 4096
+  #define TOKEN_FLAG_IS_LUA 8192
 
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
