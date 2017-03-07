@@ -11272,14 +11272,7 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
   todo: We no longer use libtarantoolnet.so, remove reference to it.
   After connecting:
     -- get session.id and version
-    -- set a global variable ocelot_conn
-       -- the setting will fail if require('sql') fails, but probably
-          that is because the server version is old, and we continue
-          anyway so that LUA '...' will still be possible
-       -- if there are two connections, they both set ocelot_conn.
-          I don't think that's an error, but if it is, then we'd have
-          to make a different global for each connection, that is,
-          "ocelot_connX" where X = session.id
+    -- todo: if version is old we shouldn't try to use SQL
 */
 int MainWindow::connect_tarantool(unsigned int connection_number,
                                   QString port_maybe,
@@ -11411,13 +11404,11 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   make_and_put_message_in_result(ER_OK, 0, (char*)"");
   connections_is_connected[connection_number]= 1;
 
-  QString session_id, conn, version;
+  QString session_id, version;
   {
     char query_string[1024];
     sprintf(query_string, "return box.session.id()");
     session_id= tarantool_internal_query(query_string, connection_number);
-    sprintf(query_string, "ocelot_conn = require('sql').connect('')");
-    conn= tarantool_internal_query(query_string, connection_number);
     sprintf(query_string, "return box.info.version");
     version= tarantool_internal_query(query_string, connection_number);
     int index_of_hyphen= version.indexOf("-");
@@ -11797,7 +11788,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   LUA 'm = 1'       ... dd 0 0 0 0
   LUA '...select()' ... dd 0 0 0 1 93 92  (93 is row count, 92 is field count)
   LUA '1,2,3'       ... dd 0 0 0 3 1  2  3
-  SELECT is like LUA '...select()' but there's an extra row for field names
+  SELECT is like LUA '...select()' is like LUA '...select()'
   SELECT / * NOSQL * /  dd 0 0 0 4 92 1 a5 68 65 (0 0 0 4 is row count)
   (dd is fixarray-32, 93 is fixarray)
   (the NOSQL option uses tarantool_tnt_select rather than eval)
@@ -11927,7 +11918,7 @@ int MainWindow::tarantool_execute_sql(
     }
     else
     {
-      strcpy(request_string, "return ocelot_conn:execute([[");
+      strcpy(request_string, "return box.sql.execute([[");
       strncat(request_string, dbms_query, dbms_query_len);
       strcat(request_string, "]])");
     }
@@ -11949,17 +11940,15 @@ int MainWindow::tarantool_execute_sql(
       unsigned long r= tarantool_num_rows(connection_number);
       tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
       /*
-        KLUDGE ALERT
-        The current version of Tarantool says # of rows = 1 if there
-        are zero rows, because of the idea that column names are a row.
-        This is supposed to be fixed soon!
-        When it's fixed, we'll miss result sets that really have 1 row.
+        At this point we used to check for zero rows, because Tarantool
+        used to return # of rows = 1 if there are zero rows, because of
+        the idea that column names are a row. That is gone, but I don't
+        know what will replace it.
       */
-      /* ?? I don't know why this used to say result_row_count == 1 */
-      if ((r == 1)
-       && (tarantool_select_nosql == false)
-       && (statement_type == TOKEN_KEYWORD_SELECT))
-        r= 0;
+      //if ((r == 1)
+      // && (tarantool_select_nosql == false)
+      // && (statement_type == TOKEN_KEYWORD_SELECT))
+      //  r= 0;
 
       result_row_count= r;
 

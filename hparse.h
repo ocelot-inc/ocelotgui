@@ -9630,9 +9630,9 @@ void MainWindow::hparse_f_lua_opr_18(int who_is_calling, int allow_flags) /* Pre
 {
   if (hparse_errno > 0) return;
   /* if we get 1 it's var, ok. if we get 2 it's functioncall, ok. */
-  if (hparse_f_lua_functioncall() > 0) return;
+  int nn= hparse_f_lua_functioncall();
+  if (nn > 0) return;
   if (hparse_errno > 0) return;
-
   QString opd= hparse_token;
 
   int saved_hparse_i= hparse_i;
