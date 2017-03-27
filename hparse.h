@@ -326,12 +326,12 @@ int MainWindow::hparse_f_accept(unsigned short int flag_version, unsigned char r
       Change the token type now that we're sure what it is.
       But for keyword: if it's already more specific, leave it.
       TODO: that exception no longer works because we moved TOKEN_TYPE_KEYWORD to the end
+      But for literal: if it's already more specific, leave it
     */
-    if (proposed_type == TOKEN_TYPE_KEYWORD)
-    {
-      if (main_token_types[hparse_i] >= TOKEN_KEYWORDS_START) {;}
-      else main_token_types[hparse_i]= proposed_type;
-    }
+    if ((proposed_type == TOKEN_TYPE_KEYWORD)
+     && (main_token_types[hparse_i] >= TOKEN_KEYWORDS_START)) {;}
+    else if ((proposed_type == TOKEN_TYPE_LITERAL)
+     && (main_token_types[hparse_i] < TOKEN_TYPE_LITERAL)) {;}
     else main_token_types[hparse_i]= proposed_type;
     main_token_reftypes[hparse_i]= reftype;
     hparse_expected= "";
@@ -4540,18 +4540,19 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
 
 void MainWindow::hparse_f_alter_or_create_server(int statement_type)
 {
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_LITERAL, "[literal]");
   if (hparse_errno > 0) return;
   if (statement_type == TOKEN_KEYWORD_CREATE)
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "FOREIGN");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "FOREIGN");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATA");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATA");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WRAPPER");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WRAPPER");
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_WRAPPER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_WRAPPER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_WRAPPER,TOKEN_TYPE_LITERAL, "[literal]");
   }
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPTIONS");
   if (hparse_errno > 0) return;
@@ -6280,6 +6281,16 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
         if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        return;
+      }
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SERVER, "SERVER") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LUA, "LUA");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
         if (hparse_errno > 0) return;
         return;
       }

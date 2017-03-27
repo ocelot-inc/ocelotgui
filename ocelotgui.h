@@ -703,7 +703,8 @@ public:
                  const char *which_field,
                  unsigned int p_result_column_count,
                  char **p_result_field_names);
-  int tarantool_local_subquery(QString, int *, unsigned int, unsigned int);
+  int create_table_server(QString, bool *, unsigned int, unsigned int);
+  int real_query(QString, int);
 #endif
   QVBoxLayout *main_layout;
 
@@ -882,7 +883,7 @@ private:
 #ifdef DBMS_TARANTOOL
   int connect_tarantool(unsigned int connection_number, QString, QString, QString, QString);
   void tarantool_flush_and_save_reply(unsigned int);
-  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, bool);
+  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int);
   unsigned int tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes);
   const char * tarantool_seek_0();
   QString tarantool_internal_query(char*, int);
@@ -4115,6 +4116,7 @@ void fillup(MYSQL_RES *mysql_res,
   }
   else
 #endif
+
   {
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
@@ -4958,20 +4960,23 @@ void display_batch()
 
 #ifdef DBMS_TARANTOOL
 /*
-  Make a create statement for a remote subquery temporary table.
+  Make a create statement for a CREATE TABLE ... SERVER table.
   We've done fillup() so we've done tarantool_scan_field_names()
   so we have result_field_names and result_column_count.
+  Todo: max_column_widths might be unreliable if multibyte character.
+  Todo: don't assume primary key is first field
+        primary key isn't even necessary if Tarantool fixes a problem
 */
-int creates(char *temporary_table_name)
+int creates(QString create_table_statement, int connections_dbms_0)
 {
-  char tmp[1024];
+  QString tmp;
   char *result_field_names_pointer;
   char column_name[512 + 1];
   unsigned int v_length;
 
-  strcpy(tmp, "CREATE TEMPORARY TABLE ");
-  strcat(tmp, temporary_table_name);
-  strcat(tmp, "(");
+  tmp= create_table_statement;
+  tmp.append("(");
+
   result_field_names_pointer= &result_field_names[0];
   for (unsigned int i= 0; i < result_column_count; ++i)
   {
@@ -4979,19 +4984,23 @@ int creates(char *temporary_table_name)
     result_field_names_pointer+= sizeof(unsigned int);
     memcpy(column_name, result_field_names_pointer, v_length);
     column_name[v_length]= '\0';
-    if (i != 0) strcat(tmp, ",");
-    strcat(tmp, column_name);
-    strcat(tmp, " BLOB ");
-    if (i == 0) strcat(tmp, "PRIMARY KEY");
+    if (i != 0) tmp.append(",");
+    tmp.append(column_name);
+    if ((result_field_flags[i] & NUM_FLAG) != 0)
+    {
+      tmp.append(" BIGINT ");
+    }
+    else
+    {
+      tmp.append(" VARCHAR(");
+      tmp.append(QString::number(result_max_column_widths[i]));
+      tmp.append(") ");
+    }
+    if ((i == 0) && (connections_dbms_0 == DBMS_TARANTOOL)) tmp.append("PRIMARY KEY");
     result_field_names_pointer+= v_length;
   }
-  strcat(tmp, ")");
-  int result= copy_of_parent->tarantool_execute_sql(
-              tmp,
-              strlen(tmp),
-              0, /* MYSQL_MAIN_CONNECTION, */
-              MainWindow::TOKEN_KEYWORD_CREATE,
-              "");
+  tmp.append(")");
+  int result= copy_of_parent->real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
   if (result != 0) return result;
   return result;
 }
@@ -5006,52 +5015,49 @@ int creates(char *temporary_table_name)
   What we're saying is "if it doesn't start with a digit then put
   quotes around it", which is close to absurd.
 */
-int inserts(char *temporary_table_name)
+int inserts(QString temporary_table_name)
 {
   long unsigned int tmp_xrow;
   char *pointer= result_set_copy_rows[0];
   unsigned int v_length;
-  char tmp[1024];
-  char *tmp_pointer;
+  QString tmp;
+  QString s;
+  char ctmp[1024];
 
   pointer= result_set_copy_rows[0];
   for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
   {
-    tmp_pointer= &tmp[0];
-    strcpy(tmp_pointer, "INSERT INTO ");
-    tmp_pointer+= strlen("INSERT INTO ");
-    strcpy(tmp_pointer, temporary_table_name);
-    tmp_pointer+= strlen(temporary_table_name);
-    strcpy(tmp_pointer, " VALUES (");
-    tmp_pointer+= strlen(" VALUES (");
+    tmp= "INSERT INTO ";
+    tmp.append(temporary_table_name);
+    tmp.append(" VALUES (");
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
-      if (i > 0) {strcpy(tmp_pointer, ","); ++tmp_pointer; }
+      if (i > 0) tmp.append(",");
       memcpy(&v_length, pointer, sizeof(unsigned int));
+      char tmp_flag= *(pointer + sizeof(unsigned int));
       pointer+= sizeof(unsigned int) + sizeof(char);
-      if ((v_length > 0) && (*pointer >= '0') && (*pointer <= '9'))
+      if (tmp_flag == FIELD_VALUE_FLAG_IS_NULL)
       {
-        memcpy(tmp_pointer, pointer, v_length);
-        tmp_pointer+= v_length;
+        tmp.append("NULL");
+      }
+      else if ((v_length > 0) && (*pointer >= '0') && (*pointer <= '9'))
+      {
+        memcpy(ctmp, pointer, v_length);
+        ctmp[v_length]= '\0';
+        tmp.append(ctmp);
       }
       else
       {
-        *tmp_pointer= 39; /* ' */
-        ++tmp_pointer;
-        memcpy(tmp_pointer, pointer, v_length);
-        tmp_pointer+= v_length;
-        *tmp_pointer= 39;
-        ++tmp_pointer;
+        tmp.append("'");
+        memcpy(ctmp, pointer, v_length);
+        ctmp[v_length]= '\0';
+        tmp.append(ctmp);
+        tmp.append("'");
       }
       pointer+= v_length;
     }
-    strcpy(tmp_pointer, ");");
-    int result= copy_of_parent->tarantool_execute_sql(
-                tmp,
-                strlen(tmp),
-                0, /* MYSQL_MAIN_CONNECTION, */
-                MainWindow::TOKEN_KEYWORD_INSERT,
-                "");
+    tmp.append(");");
+    int result= copy_of_parent->real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
     if (result != 0) return result;
   }
   return 0;

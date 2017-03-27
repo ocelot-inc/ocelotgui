@@ -3975,6 +3975,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   We have a guarantee that the result i.e. "char *query" is big enough.
   Rremove comments if that's what the user requested with --skip-comments which is default.
   Remove final token if it's delimiter but not ';'.
+  Ignore last token(s) if delimiter, \G, \g, or (sometimes) go, ego.
   Todo: there's a conversion to UTF8 but it should be to what server expects.
   Todo: um, in that case, make server expect UTF8.
   Re comment stripping: currently this is default because in mysql client it's default
@@ -3984,42 +3985,42 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
     routine will use both (original string,offset,length) and (returned string).
     Comments should be replaced with a single space.
     Do not strip comments that start with / * ! or / * M !
+  Todo: Tarantool comments are different, eh?
+  Todo: It's silly to call this every time you call real_query.
+        Do it once, and you don't even need to call tokenize() again.
 */
 int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int dbms_query_len)
 {
-  int token_type;
+  int  *token_offsets;
+  int  *token_lengths;
+  int desired_count;
   unsigned int i;
   QString q;
   char *tmp;
   int tmp_len;
   //unsigned int token_count;
+  desired_count= dbms_query_len + 1;
+  token_offsets= new int[desired_count];
+  token_lengths= new int[desired_count];
+  token_lengths[0]= 0;
+  tokenize(text.data(),
+           text.size(),
+           &token_lengths[0], &token_offsets[0], desired_count - 1, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
   dbms_query[0]= '\0';
-  ///* Ignore last token(s) if delimiter, \G, \g, or (sometimes) go, ego */
-  //if (strip_last_token == true)
-  //{
-  //  int last_i= main_token_number + main_token_count_in_statement - 1;
-  //  QString last_token= text.mid(main_token_offsets[last_i], main_token_lengths[last_i]);
-  //  if ((last_token == "G") || (last_token == "g"))
-  //  {
-  //    token_count= main_token_count_in_statement - 2;
-  //  }
-  //  else token_count= main_token_count_in_statement - 1;
-  //}
-  //else token_count= main_token_count_in_statement;
-  //token_count= main_token_count_in_statement;
-
-  for (i= main_token_number; i < main_token_number + main_token_count_in_statement; ++i)
+  for (i= 0; token_lengths[i] != 0; ++i)
   {
-    token_type= main_token_types[i];
     /* Don't send comments unless --comments or equivalent, or comment is / * special ... */
     if (ocelot_comments == 0)
     {
-      if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
-       || (token_type == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-       || (token_type == TOKEN_TYPE_COMMENT_WITH_MINUS))
+      /* TOKEN_TYPE_COMMENT_WITH_SLASH */
+      /* or TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE */
+      /* or TOKEN_TYPE_COMMENT_WITH_MINUS */
+      if ((text.mid(token_offsets[i], 2) == "/*")
+       || (text.mid(token_offsets[i], 2) == "--")
+       || (text.mid(token_offsets[i], 1) == "#"))
       {
-        if ((text.mid(main_token_offsets[i], 3) != "/*!")
-         && (text.mid(main_token_offsets[i], 4) != "/*M!"))
+        if ((text.mid(token_offsets[i], 3) != "/*!")
+         && (text.mid(token_offsets[i], 4) != "/*M!"))
         {
           strcat(dbms_query," ");
           continue;
@@ -4027,24 +4028,23 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
       }
     }
     /* Don't send \G or \g */
-    if ((i < main_token_number - 1)
-     && (main_token_lengths[i + 1] == 1)
-     && (text.mid(main_token_offsets[i], 2).toUpper() == "\\G"))
+    if ((token_lengths[i + 1] == 1)
+     && (text.mid(token_offsets[i], 2).toUpper() == "\\G"))
     {
       ++i;
       continue;
     }
     /* Don't send delimiter unless it is ; */
     if ((ocelot_delimiter_str != ";")
-     && (text.mid(main_token_offsets[i], main_token_lengths[i]) == ocelot_delimiter_str))
+     && (text.mid(token_offsets[i], ocelot_delimiter_str.length()) == ocelot_delimiter_str))
     {
-      continue;
+      break;
     }
     /* Preserve whitespace after a token, unless this is the last token */
     int token_length;
-    if (i + 1 >= main_token_number + main_token_count_in_statement) token_length= main_token_lengths[i];
-    else token_length= main_token_offsets[i + 1] - main_token_offsets[i];
-    q= text.mid(main_token_offsets[i], token_length);
+    if (token_lengths[i + 1] == 0) token_length= token_lengths[i];
+    else token_length= token_offsets[i + 1] - token_offsets[i];
+    q= text.mid(token_offsets[i], token_length);
     tmp_len= q.toUtf8().size();           /* See comment "UTF8 Conversion" */
     tmp= new char[tmp_len + 1];
     memcpy(tmp, q.toUtf8().constData(), tmp_len);
@@ -4053,6 +4053,8 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
     strcat(dbms_query, tmp);
     delete [] tmp;
   }
+  delete [] token_offsets;
+  delete [] token_lengths;
   return (strlen(dbms_query));
 }
 
@@ -4129,6 +4131,7 @@ int volatile kill_connection_id;
 #define LONG_QUERY_STATE_ENDED 1
 char *dbms_query;
 int dbms_query_len;
+int dbms_query_connection_number;
 volatile int dbms_long_query_result;
 volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
@@ -6724,6 +6727,10 @@ void* kill_thread(void* unused)
 
 bool is_kill_requested;
 
+/*
+  Todo: This is no good if the running query isn't
+  on the main connection.
+*/
 void MainWindow::action_kill()
 {
   pthread_t thread_id;
@@ -6753,16 +6760,18 @@ void MainWindow::action_kill()
   Todo: this could be done via a permanently-existing thread or pool of threads.
   Todo: QThread is more portable than pthread, although it looks harder to understand.
   Todo: put this together with the dbms_* routines in ocelotgui.h in a separate class.
+  Normally dbms_query_connection_number is for the main connection.
 */
 void* dbms_long_query_thread(void* unused)
 {
   (void) unused; /* suppress "unused parameter" warning */
 
-  dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
+  dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[dbms_query_connection_number], dbms_query, dbms_query_len);
   dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   return ((void*) NULL);
 }
 
+/* Todo: This assumes connection_number must be MYSQL_MAIN_CONNECTION */
 void* dbms_long_next_result_thread(void* unused)
 {
   (void) unused; /* suppress "unused parameter" warning */
@@ -7004,73 +7013,21 @@ int MainWindow::action_execute_one_statement(QString text)
 
     if (do_something == true)
     {
-
-      /*
-        If the last error was CR_SERVER_LOST 2013 or CR_SERVER_GONE_ERROR 2006,
-        and it might be possible to reconnect, try.
-        But if mysql_ping() fails, I don't see much that we can do.
-      */
-      if ((mysql_errno_result == 2006) || (mysql_errno_result == 2013))
-      {
-        if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_ping(&mysql[MYSQL_MAIN_CONNECTION]);
-      }
-
-      /* todo: figure out why you used global dbms_query for this */
-      /* TODO: BUG. This statement caused a crash when ocelot_comments == 0:
-               create procedure p27 ()
-               begin
-               declare xxx int;
-               declare yyy int;
-               set xxx = 0;
-               while xxx < 1000 do
-                 set xxx = xxx;
-                 set xxx = xxx + 1;
-                 end while;
-               end
-          We work around it by allocating double what we need for dbms_query. */
-      dbms_query_len= query_utf16_copy.toUtf8().size();           /* See comment "UTF8 Conversion" */
-      dbms_query= new char[(dbms_query_len + 1) * 2];
-      dbms_query_len= make_statement_ready_to_send(text,
-                                                   dbms_query, dbms_query_len + 1);
-
-      assert(strlen(dbms_query) < ((unsigned int) dbms_query_len + 1) * 2);
-
-      pthread_t thread_id;
-#ifdef DBMS_TARANTOOL
-      /* todo: for tarantool as for mysql, call with a separate thread so it's killable */
-      if (connections_dbms[0] == DBMS_TARANTOOL)
-      {
-        dbms_long_query_result= tarantool_real_query(dbms_query, dbms_query_len, MYSQL_MAIN_CONNECTION, main_token_number, main_token_count_in_statement, false);
-        dbms_long_query_state= LONG_QUERY_STATE_ENDED;
-      }
-      else
-#endif
-      {
-        dbms_long_query_state= LONG_QUERY_STATE_STARTED;
-        pthread_create(&thread_id, NULL, &dbms_long_query_thread, NULL);
-        for (;;)
-        {
-          QThread48::msleep(10);
-          if (dbms_long_query_state == LONG_QUERY_STATE_ENDED) break;
-          QApplication::processEvents();
-        }
-        pthread_join(thread_id, NULL);
-        //     dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
-        //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
-      }
+      /* Look for a CREATE TABLE statement with a SERVER clause. */
+      bool is_create_table_server;
+      int result= create_table_server(text, &is_create_table_server, main_token_number, main_token_count_in_statement);
+      dbms_long_query_result= result;
+      if (is_create_table_server == false)
+        real_query(query_utf16, MYSQL_MAIN_CONNECTION);
 
       if (dbms_long_query_result)
       {
-
         /* beep() hasn't been tested because getting sound to work on my computer is so hard */
         if (ocelot_no_beep == 0) QApplication::beep();
-        delete []dbms_query;
         return_value= 1;
         put_diagnostics_in_result();
       }
       else {
-        delete []dbms_query;
-
         /*
           It was a successful SQL statement, and now look if it returned a result.
           If it did, as determined by looking at the mysql_res that lmysql->ldbms_mysql_store_result() returns,
@@ -7206,6 +7163,7 @@ int MainWindow::action_execute_one_statement(QString text)
             for (;;)
             {
               dbms_long_query_state= LONG_QUERY_STATE_STARTED;
+              pthread_t thread_id;
               pthread_create(&thread_id, NULL, &dbms_long_next_result_thread, NULL);
 
               for (;;)
@@ -7280,6 +7238,75 @@ int MainWindow::action_execute_one_statement(QString text)
     history_markup_append(result_set_for_history, true); /* add prompt+statement+result to history, with markup */
   }
   return return_value;
+}
+
+/*
+  Bottom-level call to DBMS.
+  We call this when we know that there will be no more change
+  to the query (no local-subquery substitution, but maybe
+  stripping of comments and delimiters other than ;).
+  During this query we allocate or use globals:
+  dbms_query, dbms_query_len, dbms_query_connection.
+  The query might go to either the main or the local
+  connection, the local connection might be either
+  mysql or tarantool.
+  Todo: Tarantool can't be killed so easily. Make a fiber?
+*/
+int MainWindow::real_query(QString query, int connection_number)
+{
+  /*
+    If the last error was CR_SERVER_LOST 2013 or CR_SERVER_GONE_ERROR 2006,
+    and it might be possible to reconnect, try.
+    But if mysql_ping() fails, I don't see much that we can do.
+  */
+  if ((mysql_errno_result == 2006) || (mysql_errno_result == 2013))
+  {
+    if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_ping(&mysql[MYSQL_MAIN_CONNECTION]);
+  }
+  /* todo: figure out why you used global dbms_query for this */
+  /* TODO: BUG. This statement caused a crash when ocelot_comments == 0:
+         create procedure p27 ()
+           begin
+           declare xxx int;
+           declare yyy int;
+           set xxx = 0;
+           while xxx < 1000 do
+             set xxx = xxx;
+             set xxx = xxx + 1;
+             end while;
+           end
+      We work around it by allocating double what we need for dbms_query. */
+  dbms_query_len= query.toUtf8().size();           /* See comment "UTF8 Conversion" */
+  dbms_query= new char[(dbms_query_len + 1) * 2];
+  dbms_query_len= make_statement_ready_to_send(query,
+                                               dbms_query, dbms_query_len + 1);
+  assert(strlen(dbms_query) < ((unsigned int) dbms_query_len + 1) * 2);
+  dbms_query_connection_number= connection_number;
+#ifdef DBMS_TARANTOOL
+  /* todo: for tarantool as for mysql, call with a separate thread so it's killable */
+  if (connections_dbms[connection_number] == DBMS_TARANTOOL)
+  {
+    dbms_long_query_result= tarantool_real_query(dbms_query, dbms_query_len, MYSQL_MAIN_CONNECTION, main_token_number, main_token_count_in_statement);
+    dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+  }
+  else
+#endif
+  {
+    pthread_t thread_id;
+    dbms_long_query_state= LONG_QUERY_STATE_STARTED;
+    pthread_create(&thread_id, NULL, &dbms_long_query_thread, NULL);
+    for (;;)
+    {
+      QThread48::msleep(10);
+      if (dbms_long_query_state == LONG_QUERY_STATE_ENDED) break;
+      QApplication::processEvents();
+    }
+    pthread_join(thread_id, NULL);
+    //     dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
+    //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+  }
+  delete []dbms_query;
+  return dbms_long_query_result;
 }
 
 /*
@@ -7430,57 +7457,65 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 
 #ifdef DBMS_TARANTOOL
   /*
-    CREATE SERVER id OPTIONS (PORT ..., HOST ..., PASSWORD, ... USER ...)
-    Do Tarantool connect for the sake of tarantool_local_subquery.
+    CREATE SERVER id FOREIGN DATA WRAPPER tarantool
+    OPTIONS (PORT ..., HOST ..., PASSWORD, ... USER ...)
+    Do Tarantool connect for the sake of create_table_server.
     Todo: check port isn't re-used
   */
   if ((statement_type == TOKEN_KEYWORD_CREATE)
    && (sub_token_types[1] == TOKEN_KEYWORD_SERVER)
-   && (sub_token_types[2] == TOKEN_TYPE_IDENTIFIER)
-   && (sub_token_types[3] != TOKEN_KEYWORD_FOREIGN)
-   && (sub_token_types[4] == TOKEN_TYPE_OPERATOR)
-   && (connections_dbms[MYSQL_MAIN_CONNECTION] == DBMS_TARANTOOL))
+   && (sub_token_lengths[2] != 0)
+   && (sub_token_types[3] == TOKEN_KEYWORD_FOREIGN)
+   && (sub_token_lengths[4] != 0)
+   && (sub_token_types[5] != 0)
+   && (sub_token_lengths[6] != 0))
   {
-    QString create_server_port= "DEFAULT";
-    QString create_server_host= "DEFAULT";
-    QString create_server_password= "DEFAULT";
-    QString create_server_user= "DEFAULT";
-    QString curr, prev;
-    for (int i= 5; ; ++i)
+    QString wrapper_name= text.mid(sub_token_offsets[6], sub_token_lengths[6]);
+    wrapper_name= connect_stripper(wrapper_name, true);
+    wrapper_name= wrapper_name.toUpper();
+    if (wrapper_name == "OCELOT_TARANTOOL")
     {
-      if ((i >= MAX_SUB_TOKENS) || (sub_token_lengths[i] == 0))
+      QString create_server_port= "DEFAULT";
+      QString create_server_host= "DEFAULT";
+      QString create_server_password= "DEFAULT";
+      QString create_server_user= "DEFAULT";
+      QString curr, prev;
+      for (int i= 9; ; ++i)
       {
-        make_and_put_message_in_result(ER_USE, 0, (char*)"");
-        return 1;
+        if ((i >= MAX_SUB_TOKENS) || (sub_token_lengths[i] == 0))
+        {
+          make_and_put_message_in_result(ER_USE, 0, (char*)"");
+          return 1;
+        }
+        curr= text.mid(sub_token_offsets[i], sub_token_lengths[i]);
+        if (curr == ")") break;
+        if ((main_token_types[i] >= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+         && (main_token_types[i] <= TOKEN_TYPE_LITERAL_WITH_BRACE))
+        {
+          if (prev == "PORT") create_server_port= connect_stripper(curr, true);
+          if (prev == "HOST") create_server_host= connect_stripper(curr, true);
+          if (prev == "PASSWORD") create_server_password= connect_stripper(curr, true);
+          if (prev == "USER") create_server_user= connect_stripper(curr, true);
+        }
+        prev= curr.toUpper();
       }
-      curr= text.mid(sub_token_offsets[i], sub_token_lengths[i]);
-      if (curr == ")") break;
-      if ((main_token_types[i] >= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-       && (main_token_types[i] <= TOKEN_TYPE_LITERAL_WITH_BRACE))
+      int result= connect_tarantool(MYSQL_LOCAL_CONNECTION,
+                                    create_server_port,
+                                    create_server_host,
+                                    create_server_password,
+                                    create_server_user);
+      if (result == 0)
       {
-        if (prev == "PORT") create_server_port= connect_stripper(curr, true);
-        if (prev == "HOST") create_server_host= connect_stripper(curr, true);
-        if (prev == "PASSWORD") create_server_password= connect_stripper(curr, true);
-        if (prev == "USER") create_server_user= connect_stripper(curr, true);
+        tarantool_server_name= connect_stripper(text.mid(sub_token_offsets[2], sub_token_lengths[2]), true);
+        connections_dbms[MYSQL_LOCAL_CONNECTION]= DBMS_TARANTOOL;
       }
-      prev= curr.toUpper();
+      else
+      {
+        tarantool_server_name= "";
+        connections_dbms[MYSQL_LOCAL_CONNECTION]= 0;
+      }
+      return 1;
     }
-    int result= connect_tarantool(MYSQL_LOCAL_CONNECTION,
-                                  create_server_port,
-                                  create_server_host,
-                                  create_server_password,
-                                  create_server_user);
-    if (result == 0)
-    {
-      tarantool_server_name= text.mid(sub_token_offsets[2], sub_token_lengths[2]);
-      connections_dbms[MYSQL_LOCAL_CONNECTION]= DBMS_TARANTOOL;
-    }
-    else
-    {
-      tarantool_server_name= "";
-      connections_dbms[MYSQL_LOCAL_CONNECTION]= 0;
-    }
-    return 1;
   }
 #endif
 
@@ -11539,8 +11574,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
                                      unsigned long dbms_query_len,
                                      unsigned int connection_number,
                                      unsigned int passed_main_token_number,
-                                     unsigned int passed_main_token_count_in_statement,
-                                     bool is_recursion)
+                                     unsigned int passed_main_token_count_in_statement)
 {
   tarantool_errno[connection_number]= 10001;
   strcpy(tarantool_errmsg, "Unknown Tarantool Error");
@@ -11566,20 +11600,12 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
 
   result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
 
-  /* Look for a subquery that selects from the server name */
-  if ((tarantool_server_name != "") && (is_recursion == false))
-  {
-    int subquery_count;
-    int result= tarantool_local_subquery(text, &subquery_count, passed_main_token_number, passed_main_token_count_in_statement);
-    if (subquery_count > 0) return result;
-  }
-
   /* TODO: Make sure changing hparse_i doesn't muck up something */
   hparse_i= passed_main_token_number;
   if (hparse_f_is_nosql(text) == false)
   {
     QString s;
-    if (statement_type == TOKEN_KEYWORD_LUA) s= text.mid(main_token_offsets[1], main_token_lengths[1]);
+    if (statement_type == TOKEN_KEYWORD_LUA) s= text.mid(main_token_offsets[passed_main_token_number + 1], main_token_lengths[passed_main_token_number + 1]);
     if (main_token_flags[passed_main_token_number] & TOKEN_FLAG_IS_LUA)
     {
       s= text;
@@ -11924,7 +11950,6 @@ int MainWindow::tarantool_execute_sql(
     }
     int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
     assert(m >= 0);
-    //printf("m=%d\n", m);
 
     lmysql->ldbms_tnt_request_set_tuple(req2, arg);
 
@@ -12405,7 +12430,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       }
       if ((field_type == MP_NIL) || (field_type == MP_ARRAY) || (field_type == MP_MAP))
       {
-        if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
+        if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[field_number_in_main_list - 1]) (*p_result_max_column_widths)[field_number_in_main_list - 1]= sizeof(NULL_STRING) - 1;
         if (field_type == MP_NIL) lmysql->ldbms_mp_decode_nil(&tarantool_tnt_reply_data_copy);
         memset(result_set_copy_pointer, 0, sizeof(unsigned int));
         *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
@@ -12474,7 +12499,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
           value= "";
         }
         //if (value_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= value_length;
-        rg->set_max_column_width(value_length, value, (&(*p_result_max_column_widths)[i]));
+        rg->set_max_column_width(value_length, value, (&(*p_result_max_column_widths)[field_number_in_main_list - 1]));
         memcpy(result_set_copy_pointer, &value_length, sizeof(unsigned int));
         result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
         memcpy(result_set_copy_pointer, value, value_length);
@@ -12559,100 +12584,117 @@ void MainWindow::tarantool_scan_field_names(
   }
 }
 
+//void MainWindow::tarantool_close()
+//{
+//lmysql->ldbms_tnt_close(tnt);
+//lmysql->ldbms_tnt_stream_free(tuple);
+//lmysql->ldbms_tnt_stream_free(tnt);
+//}
+
+#endif
+
 /*
-  This is going to be complicated.
-  SELECT ... FROM (SELECT * FROM server.table) ...; must cause
-    SELECT * FROM table -- on the server (local) connection.
-    (use tarantool_real_query, so beware of recursion)
-    fillup
-    from the fillup, create a temporary table
-    use the temporary table in the outer query i.e.
-    SELECT ... FROM (SELECT * FROM temporary-table) ...;
-  Illegal: nested subquery, join in subquery, correlation, comment,
-           more than one subquery, more than one column
+  Handle CREATE [TEMPORARY] TABLE table-name SERVER server-name 'literal';
+  We want to exeute the literal on the remote server created
+  with CREATE SERVER. This is going to be complicated.
+  The 'literal' must cause return a result set.
+  Do a fillup.
+  From the result set, we can figure out field names and types.
+  So that tells us how to CREATE TABLE table-name (...) on main.
+  Then we can INSERT INTO table-name VALUES (result-set values);
 */
-int MainWindow::tarantool_local_subquery(QString text,
-                                         int *subquery_count,
+int MainWindow::create_table_server(QString text,
+                                         bool *is_create_table_server,
                                          unsigned int passed_main_token_number,
                                          unsigned int passed_main_token_count_in_statement)
 {
-  unsigned int i_of_server_name= 0;
-  unsigned int prev_i_of_end= passed_main_token_number;
-  unsigned int i_of_end= 0;
-  *subquery_count= 0;
-  int result= 0;
-  QString new_query= "";
+  *is_create_table_server= false;
 
+  /* Quick search -- if there is no SERVER id clause, get out now. */
+
+  bool is_create= false;
+  unsigned int i_of_table= 0;
+  unsigned int i_of_server= 0;
+  unsigned int i_of_server_id= 0;
+  unsigned int i_of_literal= 0;
+  unsigned int i_of_lua= 0;
+  for (unsigned int i= passed_main_token_number; i < passed_main_token_number + passed_main_token_count_in_statement; ++i)
+  {
+    if ((main_token_types[i] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
+     && (main_token_types[i] <= TOKEN_TYPE_COMMENT_WITH_MINUS))
+      continue;
+    if (main_token_types[i] == TOKEN_KEYWORD_CREATE)
+    {
+      is_create= true;
+    }
+    if (is_create == false) break;
+    if (main_token_types[i] == TOKEN_KEYWORD_TABLE)
+    {
+      i_of_table= i;
+    }
+    if ((main_token_types[i] == TOKEN_KEYWORD_SERVER)
+     && (i_of_table > 0))
+    {
+      i_of_server= i;
+    }
+    if (i_of_server > 0)
+    {
+      if (main_token_reftypes[i] == TOKEN_REFTYPE_SERVER)
+      {
+        i_of_server_id= i;
+      }
+      if (main_token_types[i] == TOKEN_KEYWORD_LUA)
+      {
+        i_of_lua= i;
+      }
+      if ((main_token_types[i] <= TOKEN_TYPE_LITERAL)
+       && (main_token_types[i] >= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE))
+      {
+        i_of_literal= i;
+      }
+    }
+  }
+
+  if (i_of_server == 0) return 0;
+
+  *is_create_table_server= true;
+
+  if (tarantool_server_name == "")
+  {
+    /* "CREATE TABLE ... SERVER fails, CREATE SERVER not done?" */
+    return 0;
+  }
+
+  {
+    QString s;
+    if (i_of_server_id == 0) s= "";
+    else s= text.mid(main_token_offsets[i_of_server_id], main_token_lengths[i_of_server_id]);
+    if (QString::compare(s, tarantool_server_name, Qt::CaseSensitive) != 0)
+    {
+      /* "CREATE TABLE ... SERVER fails, server id <> CREATE SERVER id\n" */
+      return 0;
+    }
+  }
+  QString q;
+  {
+    if (i_of_literal == 0)
+    {
+      /* "CREATE TABLE ... SERVER fails, blank literal\n" */
+      return 0;
+    }
+  }
+  q= text.mid(main_token_offsets[i_of_lua],
+              main_token_offsets[i_of_literal] + main_token_lengths[i_of_literal] - main_token_offsets[i_of_lua]);
+  int result;
   ResultGrid *rg= new ResultGrid(lmysql, this, false);
-
   for (;;)
   {
-    bool is_containing_more_subqueries= false;
-    for (unsigned int i= prev_i_of_end + 1; i < passed_main_token_number + passed_main_token_count_in_statement; ++i)
-    {
-      if (main_token_reftypes[i] == TOKEN_REFTYPE_DATABASE)
-      {
-        QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);
-        if (QString::compare(s, tarantool_server_name, Qt::CaseSensitive) == 0)
-        {
-          i_of_server_name= i;
-          *subquery_count= *subquery_count + 1;
-          is_containing_more_subqueries= true;
-          break;
-        }
-      }
-    }
-    if (is_containing_more_subqueries == false) break;
-    int i_of_start= 0;
-    i_of_end= 0;
-
-    int parentheses_count= 0;
-    for (int i= i_of_server_name; i >= 0; --i)
-    {
-      assert((unsigned int) i != main_token_number);
-      if (text.mid(main_token_offsets[i], main_token_lengths[i]) == ")")
-        ++parentheses_count;
-      else if (text.mid(main_token_offsets[i], main_token_lengths[i]) == "(")
-      {
-        if (parentheses_count == 0) { i_of_start= i; break; }
-        --parentheses_count;
-      }
-    }
-    for (int i= i_of_server_name; ; ++i)
-    {
-      assert(main_token_lengths[i] != 0);
-      assert((unsigned int) i != main_token_number + main_token_count_in_statement);
-      if (text.mid(main_token_offsets[i], main_token_lengths[i]) == "(")
-        ++parentheses_count;
-      else if (text.mid(main_token_offsets[i], main_token_lengths[i]) == ")")
-      {
-        if (parentheses_count == 0) { i_of_end= i; break; }
-        --parentheses_count;
-      }
-    }
-    /* copy without server identifier + comments (if any) + "." */
-    QString q= "";
-    {
-      int start= main_token_offsets[i_of_start + 1];
-      q= text.mid(start, main_token_offsets[i_of_server_name] - start);
-      int i_of_table= i_of_server_name + 1;
-      while ((main_token_types[i_of_table] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
-          && (main_token_types[i_of_table] <= TOKEN_TYPE_COMMENT_WITH_MINUS))
-        ++i_of_table;
-      if (text.mid(main_token_offsets[i_of_table], main_token_lengths[i_of_table]) != ".")
-      {
-        assert(0 == 1);
-      }
-      start= main_token_offsets[i_of_table + 1];
-      q.append(text.mid(start, main_token_offsets[i_of_end] - start));
-    }
     result=
     tarantool_real_query(q.toUtf8(),
                          q.toUtf8().size(),
                          MYSQL_LOCAL_CONNECTION,
-                         i_of_start + 1,
-                         i_of_end,
-                         true);
+                         i_of_lua,
+                         i_of_literal);
     if (result != 0) break;
 
     /* TODO: I'd be much happier if we didn't fool with existing grid */
@@ -12665,63 +12707,29 @@ int MainWindow::tarantool_local_subquery(QString text,
               lmysql, ocelot_client_side_functions,
               ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
               MYSQL_LOCAL_CONNECTION);
-    char temporary_table_name[64];
-    strcpy(temporary_table_name, "ocelot_tmp_");
-    char tmp_number[10];
-    sprintf(tmp_number, "%d", *subquery_count);
-    strcat(temporary_table_name, tmp_number);
-    /* CREATE TEMPORARY TABLE [temporary_table_name] (...); */
-    result= rg->creates(temporary_table_name);
-    if (tarantool_errno[MYSQL_MAIN_CONNECTION] != 0)
-    {
-      char drop_table_statement[128];
-      strcpy(drop_table_statement, "DROP TABLE ");
-      strcat(drop_table_statement, temporary_table_name);
-      tarantool_execute_sql(drop_table_statement,
-                            strlen(drop_table_statement),
-                            MYSQL_MAIN_CONNECTION,
-                            TOKEN_KEYWORD_DROP,
-                            "");
-      result= tarantool_errno[MYSQL_MAIN_CONNECTION];
-      if (tarantool_errno[MYSQL_MAIN_CONNECTION] != 0) break;
-      result= rg->creates(temporary_table_name);
-      if (tarantool_errno[MYSQL_MAIN_CONNECTION] != 0) break;
-    }
+
+    /* TODO: Get field names and data types from fillup!! */
+    QString create_table_statement=
+    text.mid(main_token_offsets[passed_main_token_number],
+             main_token_offsets[i_of_server] - main_token_offsets[passed_main_token_number]);
+
+    /* Pass "CREATE TABLE table-name", fill in (field-names) + execute */
+    result= rg->creates(create_table_statement, connections_dbms[0]);
+    if (result != 0) break;
+    QString temporary_table_name=
+            text.mid(main_token_offsets[i_of_table] + main_token_lengths[i_of_table],
+                     main_token_offsets[i_of_server] - (main_token_offsets[i_of_table] + main_token_lengths[i_of_table]));
     /* INSERT INTO [temporary_table_name] VALUES (...); */
     result= rg->inserts(temporary_table_name);
     if (result != 0) break;
 
-    /* ... (SELECT * FROM [temporary_table_name] ...; */
-    new_query.append(text.mid(main_token_offsets[prev_i_of_end], main_token_offsets[i_of_server_name] - main_token_offsets[prev_i_of_end]));
-    new_query.append(temporary_table_name);
-    prev_i_of_end= i_of_end;
+    break;
   }
-
-  new_query.append(text.mid(main_token_offsets[i_of_end]));
-
-  if (result == 0)
-  {
-    tarantool_execute_sql(new_query.toUtf8(),
-                          new_query.toUtf8().size(),
-                          MYSQL_MAIN_CONNECTION,
-                          TOKEN_KEYWORD_SELECT,
-                          "");
-    result= tarantool_errno[MYSQL_MAIN_CONNECTION];
-  }
-
-  /* Todo: Now destroy the temporary tables? */
+  /* Todo: Now destroy the temporary tables? (What temporary tables?) */
   delete rg;
+
   return result;
 }
-
-//void MainWindow::tarantool_close()
-//{
-//lmysql->ldbms_tnt_close(tnt);
-//lmysql->ldbms_tnt_stream_free(tuple);
-//lmysql->ldbms_tnt_stream_free(tnt);
-//}
-
-#endif
 
 #include "codeeditor.h"
 
