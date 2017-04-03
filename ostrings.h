@@ -154,8 +154,10 @@ static const char *string_languages[]=
 #define ER_DO_YOU_WANT_TO_CONTINUE        77
 #define ER_YES                            78
 #define ER_NO                             79
-#define ER_START_OF_SESSION               80
-#define ER_END                            81
+#define ER_CREATE_SERVER                  80
+#define ER_EMPTY_LITERAL                  81
+#define ER_START_OF_SESSION               82
+#define ER_END                            83
 #define ER_MAX_LENGTH       1024
 static const char *er_strings[]=
 {
@@ -240,6 +242,8 @@ static const char *er_strings[]=
   "Do you want to continue?", /* ER_DO_YOU_WANT_TO_CONTINUE */
   "Yes", /* ER_YES */
   "No", /* ER_NO */
+  "CREATE SERVER not done for this name", /* ER_CREATE_SERVER */
+  "Empty literal", /* ER_EMPTY_LITERAL */
   "/* Start of Session */" /* ER_START_OF_SESSION */
   /* FRENCH */
     "OK",                           /* ER_OK */
@@ -321,7 +325,9 @@ static const char *er_strings[]=
     "Le vérificateur de syntaxe pense qu'il pourrait y avoir une erreur de syntaxe.", /* ER_THE_SYNTAX_CHECKER_THINKS */
     "Voulez-vous continuer?", /* ER_DO_YOU_WANT_TO_CONTINUE */
     "Oui", /* ER_YES */
-    "Non" /* ER_NO */
+    "Non", /* ER_NO */
+    "CREATE SERVER pas fait pour ce nom", /* ER_CREATE_SERVER */
+    "Vide constant", /* ER_EMPTY_LITERAL */
     "/* Début de Session */" /* ER_START_OF_SESSION */
 };
 

@@ -205,7 +205,7 @@
 #define MYSQL_MAIN_CONNECTION 0
 #define MYSQL_DEBUGGER_CONNECTION 1
 #define MYSQL_KILL_CONNECTION 2
-#define MYSQL_LOCAL_CONNECTION 3
+#define MYSQL_REMOTE_CONNECTION 3
 #define MYSQL_MAX_CONNECTIONS 4
 
 #include "ostrings.h"
@@ -4554,11 +4554,11 @@ void MainWindow::debug_install_go()
 
   if (debug_mdbug_install_sql(&mysql[MYSQL_MAIN_CONNECTION], x) < 0)
   {
-      put_diagnostics_in_result();
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
       return;
     //if (debug_error((char*)"Install failed") != 0) return;
   }
-  put_diagnostics_in_result();
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
 }
 
 /* For copyright and license notice of debug_mdbug_install function contents, see beginning of this program. */
@@ -4661,7 +4661,7 @@ void MainWindow::debug_setup_go(QString text)
 
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
-    put_diagnostics_in_result();
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     return;
     //if (debug_error((char*)"call xxxmdbug.setup() failed.") != 0) return;
   }
@@ -4863,7 +4863,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
                 if (it_is_ok_if_proc_is_already_there == 0)
                 {
                   unexpected_error= "create failed";
-                  put_diagnostics_in_result();
+                  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
                   //second_iteration_is_necessary= 1;
                   if (res != NULL)
                   {
@@ -4920,7 +4920,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
     put_message_in_result(unexpected_error);
     return;
   }
-  put_diagnostics_in_result();
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
 }
 
 
@@ -5596,7 +5596,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Attach failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
-    put_diagnostics_in_result();
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     debug_exit_go(1); /* This tries to tell the debuggee to stop, because we're giving up. */
     return;
   }
@@ -5644,11 +5644,11 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   if (debug_call_xxxmdbug_command(command_string) != 0)
   {
     /* Debug failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
-    put_diagnostics_in_result();
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     debug_exit_go(1); /* This tries to tell the debuggee to stop, because we're giving up. */
     return;
   }
-  put_diagnostics_in_result();
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
 
   /* TODO: next line was removed TEMPORARILY. But maybe highlighting will occur due to temporary breakpoint? */
   //debug_highlight_line(); /* highlight the first line. todo: should be the first executable line, no? */
@@ -5776,7 +5776,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 
   if (debug_call_xxxmdbug_command(command_string) != 0)
   {
-    put_diagnostics_in_result();
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     return;
   }
 
@@ -5828,7 +5828,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
   */
   debug_widget[debug_widget_index]->repaint();
   debug_widget[debug_widget_index]->viewport()->update();
-  put_diagnostics_in_result();
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
 }
 
 
@@ -5974,7 +5974,7 @@ void MainWindow::debug_set_go(QString text)
     return;
   }
   debug_call_xxxmdbug_command(command_string);
-  put_diagnostics_in_result();
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
 }
 
 
@@ -6003,7 +6003,7 @@ void MainWindow::debug_execute_go()
 //  strcpy(command_string, s.toUtf8());
 //  printf("command_string=%s.\n", command_string);
 //  debug_call_xxxmdbug_command(s.toUtf8());
-//  put_diagnostics_in_result();
+//  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
 ////  put_message_in_result("This statement is not supported at this time");
 }
 
@@ -6032,7 +6032,7 @@ void MainWindow::debug_other_go(QString text)
 
   if (debug_error((char*)"") != 0) return;
   if (debug_call_xxxmdbug_command(command_string) != 0) return;
-  put_diagnostics_in_result();
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
 }
 
 
@@ -6215,7 +6215,7 @@ void MainWindow::debug_exit_go(int flagger)
   {
     if (debug_call_xxxmdbug_command("exit") != 0)
     {
-      put_diagnostics_in_result();
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
       return;
     }
     for (int kk= 0; kk < 10; ++kk) {QThread48::msleep(100); if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP) break; }
@@ -6261,7 +6261,7 @@ void MainWindow::debug_exit_go(int flagger)
 
   if (flagger == 0)
   {
-    put_diagnostics_in_result(); /* This should show the result of the final call or select, so it should be "ok" */
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION); /* This should show the result of the final call or select, so it should be "ok" */
   }
 }
 
@@ -6376,12 +6376,12 @@ int MainWindow::debug_call_xxxmdbug_command(const char *command)
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Initially this can happen because we start the timer immediately after we call 'attach'. */
-    put_diagnostics_in_result();
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     return 1;
   }
   debug_statement= command;
 
-  //put_diagnostics_in_result()???
+  //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION)???
 
   /* We no longer try to get the debuggee response with debug_information_status(). */
   //if (strcmp(command, "information status") != 0)
@@ -7025,7 +7025,8 @@ int MainWindow::action_execute_one_statement(QString text)
         /* beep() hasn't been tested because getting sound to work on my computer is so hard */
         if (ocelot_no_beep == 0) QApplication::beep();
         return_value= 1;
-        put_diagnostics_in_result();
+        if (is_create_table_server == false)
+          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
       }
       else {
         /*
@@ -7072,7 +7073,7 @@ int MainWindow::action_execute_one_statement(QString text)
             central window with "result_grid_tab_widget[0]->hide()", but we don't.
           */
           get_sql_mode(main_token_types[main_token_number], text);
-          put_diagnostics_in_result();
+          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
         }
         else
         {
@@ -7139,7 +7140,7 @@ int MainWindow::action_execute_one_statement(QString text)
           }
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
-          put_diagnostics_in_result(); /* Do this while we still have number of rows */
+          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION); /* Do this while we still have number of rows */
           //history_markup_append(result_set_for_history, true);
 
 #ifdef DBMS_TARANTOOL
@@ -7181,7 +7182,7 @@ int MainWindow::action_execute_one_statement(QString text)
                 /* TODO: don't do this for SOURCE. Check for beep. */
                 if (dbms_long_query_result == 1)
                 {
-                  put_diagnostics_in_result();
+                  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
                   //history_markup_append("", true);
                 }
                 break;
@@ -7228,7 +7229,7 @@ int MainWindow::action_execute_one_statement(QString text)
           }
         }
       }
-      //put_diagnostics_in_result();
+      //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     }
   }
 
@@ -7499,7 +7500,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         }
         prev= curr.toUpper();
       }
-      int result= connect_tarantool(MYSQL_LOCAL_CONNECTION,
+      int result= connect_tarantool(MYSQL_REMOTE_CONNECTION,
                                     create_server_port,
                                     create_server_host,
                                     create_server_password,
@@ -7507,12 +7508,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (result == 0)
       {
         tarantool_server_name= connect_stripper(text.mid(sub_token_offsets[2], sub_token_lengths[2]), true);
-        connections_dbms[MYSQL_LOCAL_CONNECTION]= DBMS_TARANTOOL;
+        connections_dbms[MYSQL_REMOTE_CONNECTION]= DBMS_TARANTOOL;
       }
       else
       {
         tarantool_server_name= "";
-        connections_dbms[MYSQL_LOCAL_CONNECTION]= 0;
+        connections_dbms[MYSQL_REMOTE_CONNECTION]= 0;
       }
       return 1;
     }
@@ -7557,7 +7558,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 
     mysql_select_db_result= lmysql->ldbms_mysql_select_db(&mysql[MYSQL_MAIN_CONNECTION], query);
     delete []query;
-    if (mysql_select_db_result != 0) put_diagnostics_in_result();
+    if (mysql_select_db_result != 0) put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     else
     {
       statement_edit_widget->dbms_database= s;
@@ -8691,7 +8692,7 @@ void MainWindow::widget_sizer()
   Todo: the elapsed-time calculation in the diagnostics is calculated at the wrong time,
   it includes the time to set up the widgets. Move it to just after statement-execution.
 */
-void MainWindow::put_diagnostics_in_result()
+void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
 {
   unsigned int mysql_warning_count;
   char mysql_error_and_state[50]; /* actually we should need less than 50 */
@@ -8708,10 +8709,10 @@ void MainWindow::put_diagnostics_in_result()
   }
 
 #ifdef DBMS_TARANTOOL
-  if (connections_dbms[0] == DBMS_TARANTOOL)
+  if (connections_dbms[connection_number] == DBMS_TARANTOOL)
   {
     /* todo: show elapsed time */
-    if (tarantool_errno[0] == 0) s1= er_strings[er_off + ER_OK];
+    if (tarantool_errno[connection_number] == 0) s1= er_strings[er_off + ER_OK];
     else
     {
       s1= s1= er_strings[er_off + ER_ERROR];
@@ -8724,22 +8725,22 @@ void MainWindow::put_diagnostics_in_result()
   }
 #endif
 
-  mysql_errno_result= lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]);
-  mysql_warning_count= lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]);
+  mysql_errno_result= lmysql->ldbms_mysql_errno(&mysql[connection_number]);
+  mysql_warning_count= lmysql->ldbms_mysql_warning_count(&mysql[connection_number]);
   if (mysql_errno_result == 0)
   {
     s1= er_strings[er_off + ER_OK];
     s1.append(" ");
 
     /* This should output, e.g. "Records: 3 Duplicates: 0 Warnings: 0" -- but actually nothing happens. */
-    if (lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])!= NULL)
+    if (lmysql->ldbms_mysql_info(&mysql[connection_number])!= NULL)
     {
       /* This only works for certain insert, load, alter or update statements */
-      s1.append(tr(lmysql->ldbms_mysql_info(&mysql[MYSQL_MAIN_CONNECTION])));
+      s1.append(tr(lmysql->ldbms_mysql_info(&mysql[connection_number])));
     }
     else
     {
-      sprintf(mysql_error_and_state, er_strings[er_off + ER_ROWS_AFFECTED], lmysql->ldbms_mysql_affected_rows(&mysql[MYSQL_MAIN_CONNECTION]));
+      sprintf(mysql_error_and_state, er_strings[er_off + ER_ROWS_AFFECTED], lmysql->ldbms_mysql_affected_rows(&mysql[connection_number]));
       s1.append(mysql_error_and_state);
       if (mysql_warning_count > 0)
       {
@@ -8753,14 +8754,14 @@ void MainWindow::put_diagnostics_in_result()
     {
       if (ocelot_history_includes_warnings > 0)
       {
-        lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "show warnings");
+        lmysql->ldbms_mysql_query(&mysql[connection_number], "show warnings");
         MYSQL_RES *mysql_res_for_warnings;
         MYSQL_ROW warnings_row;
         QString s;
         // unsigned long connect_lengths[0];
-        mysql_res_for_warnings= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+        mysql_res_for_warnings= lmysql->ldbms_mysql_store_result(&mysql[connection_number]);
         assert(mysql_res_for_warnings != NULL);
-        //for (unsigned int wi= 0; wi <= lmysql->ldbms_mysql_warning_count(&mysql[MYSQL_MAIN_CONNECTION]); ++wi)
+        //for (unsigned int wi= 0; wi <= lmysql->ldbms_mysql_warning_count(&mysql[connection_number]); ++wi)
         int count_of_fields= lmysql->ldbms_mysql_num_fields(mysql_res_for_warnings);
         assert(count_of_fields == 3);
         for (;;)
@@ -8781,9 +8782,9 @@ void MainWindow::put_diagnostics_in_result()
   if (mysql_errno_result > 0)
   {
     s1= er_strings[er_off + ER_ERROR];
-    sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, lmysql->ldbms_mysql_sqlstate(&mysql[MYSQL_MAIN_CONNECTION]));
+    sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, lmysql->ldbms_mysql_sqlstate(&mysql[connection_number]));
     s1.append(mysql_error_and_state);
-    s2= lmysql->ldbms_mysql_error(&mysql[MYSQL_MAIN_CONNECTION]);
+    s2= lmysql->ldbms_mysql_error(&mysql[connection_number]);
     s1.append(s2);
   }
   statement_edit_widget->result= s1;
@@ -11036,7 +11037,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   //lmysql->ldbms_mysql_init(&mysql[connection_number]);
   if (the_connect(connection_number))
   {
-    put_diagnostics_in_result();
+    put_diagnostics_in_result(connection_number);
     make_and_append_message_in_result(ER_FAILED_TO_CONNECT, 0, (char*)"");
     return 1;
   }
@@ -11429,7 +11430,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
 
   if (tarantool_errno[connection_number] != 0)
   {
-    put_diagnostics_in_result();
+    put_diagnostics_in_result(connection_number);
     if (connection_number == MYSQL_MAIN_CONNECTION)
       make_and_append_message_in_result(ER_FAILED_TO_CONNECT_TO_TARANTOOL, 0, (char*)"");
     else
@@ -11450,7 +11451,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     if (index_of_hyphen > 0) version= version.left(index_of_hyphen);
   }
 
-  if (connection_number == MYSQL_LOCAL_CONNECTION)
+  if (connection_number == MYSQL_REMOTE_CONNECTION)
   {
     /* The caller should save the connection for the server id. */
     return 0;
@@ -12662,7 +12663,8 @@ int MainWindow::create_table_server(QString text,
   if (tarantool_server_name == "")
   {
     /* "CREATE TABLE ... SERVER fails, CREATE SERVER not done?" */
-    return 0;
+    make_and_put_message_in_result(ER_CREATE_SERVER, 0, (char*)"");
+    return 1;
   }
 
   {
@@ -12672,7 +12674,8 @@ int MainWindow::create_table_server(QString text,
     if (QString::compare(s, tarantool_server_name, Qt::CaseSensitive) != 0)
     {
       /* "CREATE TABLE ... SERVER fails, server id <> CREATE SERVER id\n" */
-      return 0;
+    make_and_put_message_in_result(ER_CREATE_SERVER, 0, (char*)"");
+    return 1;
     }
   }
   QString q;
@@ -12680,7 +12683,8 @@ int MainWindow::create_table_server(QString text,
     if (i_of_literal == 0)
     {
       /* "CREATE TABLE ... SERVER fails, blank literal\n" */
-      return 0;
+      make_and_put_message_in_result(ER_EMPTY_LITERAL, 0, (char*)"");
+      return 1;
     }
   }
   q= text.mid(main_token_offsets[i_of_lua],
@@ -12692,21 +12696,25 @@ int MainWindow::create_table_server(QString text,
     result=
     tarantool_real_query(q.toUtf8(),
                          q.toUtf8().size(),
-                         MYSQL_LOCAL_CONNECTION,
+                         MYSQL_REMOTE_CONNECTION,
                          i_of_lua,
                          i_of_literal);
-    if (result != 0) break;
+    if (result != 0)
+    {
+      put_diagnostics_in_result(MYSQL_REMOTE_CONNECTION);
+      break;
+    }
 
     /* TODO: I'd be much happier if we didn't fool with existing grid */
     //rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
     rg->fillup(mysql_res,
               //&tarantool_tnt_reply,
-              connections_dbms[MYSQL_LOCAL_CONNECTION],
+              connections_dbms[MYSQL_REMOTE_CONNECTION],
               //this,
               false, ocelot_result_grid_column_names,
               lmysql, ocelot_client_side_functions,
               ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
-              MYSQL_LOCAL_CONNECTION);
+              MYSQL_REMOTE_CONNECTION);
 
     /* TODO: Get field names and data types from fillup!! */
     QString create_table_statement=
@@ -12714,20 +12722,26 @@ int MainWindow::create_table_server(QString text,
              main_token_offsets[i_of_server] - main_token_offsets[passed_main_token_number]);
 
     /* Pass "CREATE TABLE table-name", fill in (field-names) + execute */
-    result= rg->creates(create_table_statement, connections_dbms[0]);
-    if (result != 0) break;
+    result= rg->creates(create_table_statement, connections_dbms[MYSQL_MAIN_CONNECTION]);
+    if (result != 0)
+    {
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      break;
+    }
     QString temporary_table_name=
             text.mid(main_token_offsets[i_of_table] + main_token_lengths[i_of_table],
                      main_token_offsets[i_of_server] - (main_token_offsets[i_of_table] + main_token_lengths[i_of_table]));
     /* INSERT INTO [temporary_table_name] VALUES (...); */
     result= rg->inserts(temporary_table_name);
-    if (result != 0) break;
-
+    if (result != 0)
+    {
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      break;
+    }
     break;
   }
   /* Todo: Now destroy the temporary tables? (What temporary tables?) */
   delete rg;
-
   return result;
 }
 

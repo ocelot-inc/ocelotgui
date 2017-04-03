@@ -808,7 +808,7 @@ private:
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
   int execute_client_statement(QString text, int *additional_result);
-  void put_diagnostics_in_result();
+  void put_diagnostics_in_result(unsigned int);
   void put_message_in_result(QString);
   void make_and_put_message_in_result(unsigned int, int, char*);
   void make_and_append_message_in_result(unsigned int, int, char*);
@@ -4136,7 +4136,7 @@ void fillup(MYSQL_RES *mysql_res,
     From now on there should be no need to call mysql_ functions again for this result set.
   */
 
-  /* todo: gotta use MYSQL_LOCAL_CONNECTION rather than 3 someday. */
+  /* todo: gotta use MYSQL_REMOTE_CONNECTION rather than 3 someday. */
   if (connection_number == 3) return;
   copy_result_to_gridx(connections_dbms);
   /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
