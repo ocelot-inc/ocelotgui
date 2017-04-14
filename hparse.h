@@ -147,6 +147,29 @@ bool MainWindow::hparse_f_is_equal(QString hparse_token_copy, QString token)
 }
 
 /*
+  Tarantool only -- after WITH, and within CREATE TRIGGER,
+  only certain verbs are legal.
+*/
+bool MainWindow::hparse_f_is_special_verb(int outer_verb)
+{
+  QString s= hparse_token.toUpper();
+  if ((s== "DELETE") || (s == "INSERT") || (s == "REPLACE")
+   || (s== "SELECT") || (s == "UPDATE") || (s == "VALUES"))
+    return true;
+  if ((outer_verb == TOKEN_KEYWORD_TRIGGER) && (s == "WITH")) return true;
+  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELETE, "DELETE");
+  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSERT, "INSERT");
+  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPLACE, "REPLACE");
+  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SELECT, "SELECT");
+  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UPDATE, "UPDATE");
+  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES");
+  if (outer_verb == TOKEN_KEYWORD_TRIGGER)
+    hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH");
+  hparse_f_error();
+  return false;
+}
+
+/*
   accept means: if current == expected then clear list of what was expected, get next, and return 1,
                 else add to list of what was expected, and return 0
 */
@@ -1288,11 +1311,11 @@ int MainWindow::hparse_f_table_join_table()
       }
       return 1;
     }
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1))
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1))
     {
       main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-      hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER");
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
+      hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
       if (hparse_errno > 0) return 0;
       if (hparse_f_table_reference(0) == 0)
       {
@@ -1303,7 +1326,7 @@ int MainWindow::hparse_f_table_join_table()
       if (hparse_errno > 0) return 0;
       return 1;
     }
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NATURAL, "NATURAL"))
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NATURAL, "NATURAL"))
     {
       if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1))
       {
@@ -1314,8 +1337,8 @@ int MainWindow::hparse_f_table_join_table()
         hparse_f_error();
         return 0;
       }
-      hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER");
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
+      hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
       if (hparse_errno > 0) return 0;
       if (hparse_f_table_factor() == 0)
       {
@@ -2157,10 +2180,11 @@ int MainWindow::hparse_f_over_end()
 void MainWindow::hparse_f_function_arguments(QString opd)
 {
   if ((hparse_f_is_equal(opd,"AVG"))
+   || (hparse_f_is_equal(opd, "SUM"))
    || (hparse_f_is_equal(opd, "MIN"))
    || (hparse_f_is_equal(opd, "MAX")))
   {
-    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT");
+    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT");
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
   }
@@ -2211,7 +2235,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   }
   else if (hparse_f_is_equal(opd, "COUNT"))
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1) hparse_f_opr_1(0);
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1) hparse_f_opr_1(0);
     else
     {
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*") == 1) {;}
@@ -2816,7 +2840,8 @@ void MainWindow::hparse_f_alter_specification()
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTITIONING");
     if (hparse_errno > 0) return;
     return;
-  }  if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1))
+  }
+  if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1))
   {
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALIDATION");
     if (hparse_errno > 0) return;
@@ -5100,12 +5125,17 @@ void MainWindow::hparse_f_insert_or_replace()
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
       if (hparse_errno > 0) return;
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 0) break;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 0) break;
     }
   }
   else if (hparse_f_select(false) == 1)
   {
     return;
+  }
+  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES");
+    if (hparse_errno > 0) return;
   }
   else hparse_f_error();
   if (hparse_errno > 0) return;
@@ -5233,21 +5263,9 @@ void MainWindow::hparse_f_with_clause(int block_top)
   if (hparse_errno > 0) return;
   hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
-  hparse_f_next_nexttoken();
-  if ((QString::compare(hparse_next_token, "SELECT", Qt::CaseInsensitive) == 1)
-   || (QString::compare(hparse_next_token, "UPDATE", Qt::CaseInsensitive) == 1)
-   || (QString::compare(hparse_next_token, "DELETE", Qt::CaseInsensitive) == 1))
-  {
-    hparse_f_statement(block_top);
-    return;
-  }
-  else
-  {
-    hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "SELECT");
-    hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "UPDATE");
-    hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "DELETE");
-    if (hparse_errno > 0) return;
-  }
+  if (hparse_f_is_special_verb(TOKEN_KEYWORD_WITH) == false) return;
+  hparse_f_statement(block_top);
+  return;
 }
 
 /*
@@ -5327,11 +5345,13 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
     if (hparse_errno > 0) return 0;
     hparse_f_where();
     if (hparse_errno > 0) return 0;
+    bool is_group_by_seen= false;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GROUP"))
     {
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY");
       if (hparse_errno > 0) return 0;
+      is_group_by_seen= true;
       do
       {
         hparse_f_opr_1(0);
@@ -5345,11 +5365,14 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
         if (hparse_errno > 0) return 0;
       }
     }
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HAVING"))
+    if ((is_group_by_seen == true) || ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) == 0))
     {
-      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
-      hparse_f_opr_1(0);
-      if (hparse_errno > 0) return 0;
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HAVING"))
+      {
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+        hparse_f_opr_1(0);
+        if (hparse_errno > 0) return 0;
+      }
     }
   }
   hparse_f_order_by(TOKEN_KEYWORD_SELECT);
@@ -6469,6 +6492,8 @@ void MainWindow::hparse_f_statement(int block_top)
           {
             if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
           }
+          /* check first word of statement is okay, else return error */
+          if (hparse_f_is_special_verb(TOKEN_KEYWORD_TRIGGER) == false) return;
           hparse_f_statement(block_top);
           if (hparse_errno > 0) return;
           /* This kludge occurs more than once. */

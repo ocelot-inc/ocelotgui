@@ -9461,6 +9461,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"CEILING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CEILING},
       {"CENTROID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CENTROID}, /* deprecated in MySQL 5.7.6 */
       {"CHANGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CHANGE},
+      {"CHANGES", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_CHANGES},
       {"CHAR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_CHAR},
       {"CHARACTER", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CHARACTER},
       {"CHARACTER_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARACTER_LENGTH},
@@ -9469,7 +9470,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"CHECK", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CHECK},
       {"CLEAR", 0, 0, TOKEN_KEYWORD_CLEAR}, /* Ocelot keyword */
       {"CLOSE", 0, 0, TOKEN_KEYWORD_CLOSE},
-      {"COALESCE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COALESCE},
+      {"COALESCE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_COALESCE},
       {"COERCIBILITY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COERCIBILITY},
       {"COLLATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_COLLATE},
       {"COLLATION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COLLATION},
@@ -9650,7 +9651,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"GET_FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GET_FORMAT},
       {"GET_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GET_LOCK},
       {"GLENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GLENGTH}, /* deprecated in MySQL 5.7.6 */
-      {"GLOB", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_GLOB},
+      {"GLOB", FLAG_VERSION_TARANTOOL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_GLOB},
       {"GO", 0, 0, TOKEN_KEYWORD_GO}, /* Ocelot keyword */
       {"GRANT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_GRANT},
       {"GREATEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GREATEST},
@@ -9739,6 +9740,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"JSON_UNQUOTE", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_UNQUOTE},
       {"JSON_VALID", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_VALID},
       {"JSON_VALUE", 0, FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_VALUE},
+      {"JULIANDAY", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JULIANDAY},
       {"KEY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_KEY},
       {"KEYS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KEYS},
       {"KILL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KILL},
@@ -9907,6 +9909,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"PREPARE", 0, 0, TOKEN_KEYWORD_PREPARE},
       {"PRIMARY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PRIMARY},
       {"PRINT", 0, 0, TOKEN_KEYWORD_PRINT}, /* Ocelot keyword */
+      {"PRINTF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_PRINTF},
       {"PROCEDURE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_PROCEDURE},
       {"PROCESS", 0, 0, TOKEN_KEYWORD_PROCESS},
       {"PROMPT", 0, 0, TOKEN_KEYWORD_PROMPT}, /* Ocelot keyword */
@@ -9917,8 +9920,10 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"QUIT", 0, 0, TOKEN_KEYWORD_QUIT}, /* Ocelot keyword */
       {"QUOTE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_QUOTE},
       {"RADIANS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RADIANS},
-      {"RAISE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_RAISE},
+      {"RAISE", FLAG_VERSION_TARANTOOL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RAISE},
       {"RAND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RAND},
+      {"RANDOM", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RANDOM},
+      {"RANDOMBLOB", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RANDOMBLOB},
       {"RANDOM_BYTES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RANDOM_BYTES},
       {"RANGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RANGE},
       {"RANK", 0, FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_RANK},
@@ -10019,6 +10024,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"STORED", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_STORED},
       {"STRAIGHT_JOIN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_STRAIGHT_JOIN},
       {"STRCMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STRCMP},
+      {"STRFTIME", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_STRFTIME},
       {"STR_TO_DATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STR_TO_DATE},
       {"ST_AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_AREA},
       {"ST_ASBINARY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASBINARY},
@@ -10133,6 +10139,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"TINYINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYINT},
       {"TINYTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYTEXT},
       {"TO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TO},
+      {"TOTAL_CHANGES", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_TOTAL_CHANGES},
       {"TOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TOUCHES}, /* deprecated in MySQL 5.7.6 */
       {"TO_BASE64", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_BASE64},
       {"TO_DAYS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_DAYS},
@@ -10143,6 +10150,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"TRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TRIM},
       {"TRUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_TRUE},
       {"TRUNCATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRUNCATE},
+      {"TYPEOF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_TYPEOF},
       {"UCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UCASE},
       {"UNBOUNDED", 0, 0, TOKEN_KEYWORD_UNBOUNDED},
       {"UNCOMPRESS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UNCOMPRESS},
@@ -10274,15 +10282,15 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "860" */
+      /* If the following assert happens, you inserted/removed something without changing "868" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (860 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (868 - 1));
 
       /* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 860; ++ii)
+      //for (int ii= 0; ii < 868; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 860, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 868, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -10291,8 +10299,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 860 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 860, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 868 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 868, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
