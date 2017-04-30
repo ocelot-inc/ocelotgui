@@ -5116,15 +5116,19 @@ void MainWindow::hparse_f_insert_or_replace()
   }
   else if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUE")) == 1)
   {
+    /* 2017-04-30: "VALUES ()" is legal */
     for (;;)
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
       if (hparse_errno > 0) return;
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
-      hparse_f_expression_list(TOKEN_KEYWORD_INSERT);
-      if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
-      if (hparse_errno > 0) return;
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR,")") == 0)
+      {
+        hparse_f_expression_list(TOKEN_KEYWORD_INSERT);
+        if (hparse_errno > 0) return;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+        if (hparse_errno > 0) return;
+      }
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 0) break;
     }
   }

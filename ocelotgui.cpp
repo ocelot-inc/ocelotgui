@@ -11823,7 +11823,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   LUA 'm = 1'       ... dd 0 0 0 0
   LUA '...select()' ... dd 0 0 0 1 93 92  (93 is row count, 92 is field count)
   LUA '1,2,3'       ... dd 0 0 0 3 1  2  3
-  SELECT is like LUA '...select()' is like LUA '...select()'
+  SELECT is like LUA '...select()'
   SELECT / * NOSQL * /  dd 0 0 0 4 92 1 a5 68 65 (0 0 0 4 is row count)
   (dd is fixarray-32, 93 is fixarray)
   (the NOSQL option uses tarantool_tnt_select rather than eval)
@@ -11839,6 +11839,24 @@ int MainWindow::tarantool_result_set_type(int connection_number)
   const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
   char field_type;
   long unsigned int r;
+
+  ///* TEST!! start */
+  //printf("tarantool_result_set_type\n");
+  //int mm= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
+  //printf("  mm=%d\n", mm);
+  //for (int i= 0; i < mm; ++i)
+  //{
+  //  printf("  %x\n", *(tarantool_tnt_reply_data + i));
+  //}
+  //const char *tarantool_tnt_reply_error= tarantool_tnt_reply.error;
+  //mm= tarantool_tnt_reply.error_end - tarantool_tnt_reply.error;
+  //printf("    mm=%d\n", mm);
+  //for (int i= 0; i < mm; ++i)
+  //{
+  //  printf("    %x\n", *(tarantool_tnt_reply_error + i));
+  //}
+  ///* TEST!! end */
+
   if ((tarantool_tnt_reply.data == NULL)
    || (tarantool_tnt_reply.data_end == NULL))
     goto erret;
@@ -11969,28 +11987,20 @@ int MainWindow::tarantool_execute_sql(
 
     /* If there are no rows, then there are no fields, so we cannot put up a grid. */
     /* Todo: don't forget to free if there are zero rows. */
+    /* Todo: Maybe that's not true now? look at result[0] for field names. */
+    /* Todo: Really it's not true now, so we get r == 1 with a null. */
     {
       const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
       unsigned long r= tarantool_num_rows(connection_number);
       tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
-      /*
-        At this point we used to check for zero rows, because Tarantool
-        used to return # of rows = 1 if there are zero rows, because of
-        the idea that column names are a row. That is gone, but I don't
-        know what will replace it.
-      */
-      //if ((r == 1)
-      // && (tarantool_select_nosql == false)
-      // && (statement_type == TOKEN_KEYWORD_SELECT))
-      //  r= 0;
-
-      result_row_count= r;
-
-      if (r == 0)
+      if ((r == 0)
+       && (tarantool_select_nosql == false)
+       && (statement_type == TOKEN_KEYWORD_SELECT))
       {
         strcpy(tarantool_errmsg, "Zero rows.");
         tarantool_errno[connection_number]= 10027;
       }
+      result_row_count= r;
     }
     return tarantool_errno[connection_number];
   }
