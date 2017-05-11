@@ -705,6 +705,7 @@ public:
                  unsigned int p_result_column_count,
                  char **p_result_field_names);
   int create_table_server(QString, bool *, unsigned int, unsigned int);
+  QString tarantool_read_format(QString);
   int real_query(QString, int);
 #endif
   QVBoxLayout *main_layout;
@@ -4968,15 +4969,42 @@ void display_batch()
 }
 
 #ifdef DBMS_TARANTOOL
+/* Given column name e.g. f_15_1 return number e.g. 15 */
+int column_number(char *column_name, int *off)
+{
+  char tmp[10]= "";
+  int tmp_offset= 0;
+  int i= 0;
+  for (;; ++i)
+  {
+    if (*(column_name + i) == '_') break;
+    if (*(column_name + i) == '\0') return 0;
+  }
+  ++i;
+  for (;; ++i)
+  {
+    if (*(column_name + i) == '_') break;
+    if (*(column_name + i) == '\0') break;
+    tmp[tmp_offset++]= *(column_name + i);
+  }
+  tmp[tmp_offset]= '\0';
+  *off= i;
+  return atoi(tmp);
+}
+#endif
+
+#ifdef DBMS_TARANTOOL
 /*
   Make a create statement for a CREATE TABLE ... SERVER table.
   We've done fillup() so we've done tarantool_scan_field_names()
   so we have result_field_names and result_column_count.
+  If Lua statement was 'box.space.X:select()" we may have X's field names,
+  in read_format_result.
   Todo: max_column_widths might be unreliable if multibyte character.
   Todo: don't assume primary key is first field
         primary key isn't even necessary if Tarantool fixes a problem
 */
-int creates(QString create_table_statement, int connections_dbms_0)
+int creates(QString create_table_statement, int connections_dbms_0, QString read_format_result)
 {
   QString tmp;
   char *result_field_names_pointer;
@@ -4985,7 +5013,6 @@ int creates(QString create_table_statement, int connections_dbms_0)
 
   tmp= create_table_statement;
   tmp.append("(");
-
   result_field_names_pointer= &result_field_names[0];
   for (unsigned int i= 0; i < result_column_count; ++i)
   {
@@ -4994,7 +5021,28 @@ int creates(QString create_table_statement, int connections_dbms_0)
     memcpy(column_name, result_field_names_pointer, v_length);
     column_name[v_length]= '\0';
     if (i != 0) tmp.append(",");
-    tmp.append(column_name);
+    char tmp_column_name_number[10];
+    int off= 0;
+    int c= column_number(column_name, &off);
+    sprintf(tmp_column_name_number, "[%d]", c);
+    int word_start, word_end;
+    QString word= "";
+    word_start= read_format_result.indexOf(tmp_column_name_number, 0);
+    if (word_start != -1)
+    {
+      word_start+= strlen(tmp_column_name_number);
+      word_end= read_format_result.indexOf("[", word_start);
+      if (word_end == -1) word_end= read_format_result.size();
+      word= read_format_result.mid(word_start, (word_end - word_start));
+    }
+    if (word != "")
+    {
+      char tmp_column_name[512];
+      strcpy(tmp_column_name, word.toUtf8());
+      strcat(tmp_column_name, column_name + off);
+      tmp.append(tmp_column_name);
+    }
+    else tmp.append(column_name);
     if ((result_field_flags[i] & NUM_FLAG) != 0)
     {
       tmp.append(" BIGINT ");

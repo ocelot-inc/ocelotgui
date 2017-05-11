@@ -12707,6 +12707,7 @@ int MainWindow::create_table_server(QString text,
   }
   q= text.mid(main_token_offsets[i_of_lua],
               main_token_offsets[i_of_literal] + main_token_lengths[i_of_literal] - main_token_offsets[i_of_lua]);
+  QString read_format_result= tarantool_read_format(q);
   int result;
   ResultGrid *rg= new ResultGrid(lmysql, this, false);
   for (;;)
@@ -12740,7 +12741,7 @@ int MainWindow::create_table_server(QString text,
              main_token_offsets[i_of_server] - main_token_offsets[passed_main_token_number]);
 
     /* Pass "CREATE TABLE table-name", fill in (field-names) + execute */
-    result= rg->creates(create_table_statement, connections_dbms[MYSQL_MAIN_CONNECTION]);
+    result= rg->creates(create_table_statement, connections_dbms[MYSQL_MAIN_CONNECTION], read_format_result);
     if (result != 0)
     {
       put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
@@ -12762,6 +12763,59 @@ int MainWindow::create_table_server(QString text,
   delete rg;
   return result;
 }
+
+/*
+  Pass: lua_request which might contain space_name.
+  Read the _space tuple for space_name. Example:
+  - [514,                                                                   -- id
+     1,                                                                     -- owner
+     'y1',                                                                  -- name
+     'memtx',                                                               -- engine
+     2,                                                                     -- field_count
+     {'sql': 'CREATE TABLE y1 (f_1 VARCHAR(5) PRIMARY KEY,f_2 BIGINT )'},   -- flags
+     [{'name': 'f_1', 'type': 'scalar'},                                    -- format
+      {'name': 'f_2', 'type': 'scalar'}]]
+  We care about the format field. It might be blank i.e. [].
+  If it is not blank, we want to use the list of names.
+  This is for create_table_server i.e. CREATE TABLE ... SERVER ... LUA '...';
+  It only works if the Lua request looks like box.space.space-name:select().
+  The list might not be complete.
+  Compare tarantool_internal_query()
+  Returns e.g. [1]id[2]owner[3]name[4]engine[5]field_count[6]flags[7]format
+  Todo: the loop calls the server once per field! Fix this real soon, eh?
+  Todo: someday use the types too.
+  Todo: use for any SELECT from a single table, or box.space.space_name:select()
+*/
+QString MainWindow::tarantool_read_format(QString lua_request)
+{
+  QString read_format_result= "";
+  QString word= "";
+  /* e.g. from LUA 'box.space.t:select()' find 't' */
+  /* Todo: this doesn't allow for whitespace */
+  int word_start= lua_request.indexOf("box.space.", 0);
+  if (word_start == -1) return "";
+  word_start+= strlen("box.space.");
+  int word_end= lua_request.indexOf(":", word_start);
+  if (word_end == -1) return "";
+  word= lua_request.mid(word_start, (word_end - word_start));
+  for (int i= 1; i < 10; ++i)
+  {
+    char i_str[10];
+    sprintf(i_str, "%d", i);
+    QString request= "return box.space._space.index.name:select('"
+                     + word
+                     + "')[1][7]["
+                     + i_str
+                     + "].name";
+    char tmp[1024];
+    strcpy(tmp, request.toUtf8());
+    QString result= tarantool_internal_query(tmp, MYSQL_REMOTE_CONNECTION);
+    if (result == "") break;
+    read_format_result= read_format_result + "[" + i_str + "]" + result;
+  }
+  return read_format_result;
+}
+
 
 #include "codeeditor.h"
 

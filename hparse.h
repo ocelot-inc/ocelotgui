@@ -7375,20 +7375,20 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_PRAGMA;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1)
+    bool is_parenthesis_seen= false;
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1) is_parenthesis_seen= true;
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_LITERAL, "[literal]") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NO") == 1) {;}
+    else hparse_f_error();
+    if (hparse_errno > 0) return;
+    if (is_parenthesis_seen == true)
     {
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
-        hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_LITERAL, "[literal]");
-      if (hparse_errno > 0) return;
-    }
-    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
-    {
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
-        hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_LITERAL, "[literal]");
-      if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
       if (hparse_errno > 0) return;
     }
   }
@@ -10546,10 +10546,10 @@ int MainWindow::hparse_f_client_statement()
     hparse_f_other(1);
     if (hparse_errno > 0) return 0;
   }
-  else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
+  else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
   {
     if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
     }
@@ -10560,7 +10560,8 @@ int MainWindow::hparse_f_client_statement()
   {
     if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
-  else if (hparse_token.mid(0, 1) == "$")
+  else if ((hparse_token.mid(0, 1) == "$")
+    && ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0))
   {
     main_token_flags[hparse_i] |= TOKEN_FLAG_IS_START_STATEMENT;
     /* TODO: We aren't parsing $debug statements well */
