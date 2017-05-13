@@ -260,6 +260,7 @@
   static unsigned short ocelot_line_numbers= 0;   /* --line_numbers */
   static unsigned short ocelot_opt_local_infile= 0;    /* --local_infile[=n]  for MYSQL_OPT_LOCAL_INFILE */
   /* QString ocelot_login_path */            /* --login_path=s */
+  static int ocelot_log_level= 100;          /* --ocelot_log_level */
   static unsigned long int ocelot_max_allowed_packet= 16777216; /* --max_allowed_packet=n */
   static unsigned long int ocelot_max_join_size= 1000000; /* --max_join_size = n */
   static unsigned short ocelot_named_commands= 0;         /* --named_commands */
@@ -2186,6 +2187,7 @@ void MainWindow::main_token_pop()
 void MainWindow::action_statement_edit_widget_text_changed()
 {
   if (statement_edit_widget_text_changed_flag != 0) return;
+  log("action_statement_edit_widget_text_changed start", 90);
   statement_edit_widget_text_changed_flag= 1;
   statement_edit_widget->document()->blockSignals(true);
 
@@ -2305,6 +2307,7 @@ void MainWindow::action_statement_edit_widget_text_changed()
 
   statement_edit_widget->document()->blockSignals(false);
   statement_edit_widget_text_changed_flag= 0;
+  log("action_statement_edit_widget_text_changed end", 90);
 }
 
 
@@ -8887,6 +8890,7 @@ void MainWindow::tokenize(QChar *text, int text_length, int *token_lengths,
                            int *token_offsets, int max_tokens, QChar *version,
                            int passed_comment_behaviour, QString special_token, int minus_behaviour)
 {
+  log("tokenize start", 80);
   int token_number;
   QChar expected_char;
   int char_offset;
@@ -9127,6 +9131,7 @@ part_of_token:
   goto next_char;
 string_end:
   if (token_lengths[token_number] > 0) token_lengths[token_number + 1]= 0;
+  log("tokenize end", 80);
   return;
 white_space:
   if (token_lengths[token_number] > 0) ++token_number;
@@ -9373,6 +9378,7 @@ int MainWindow::token_type(QChar *token, int token_length)
 #define MAX_KEYWORD_LENGTH 34
 void MainWindow::tokens_to_keywords(QString text, int start)
 {
+  log("tokens_to_keywords start", 80);
   /*
     Sorted list of keywords.
     If you change this, you must also change bsearch parameters and change TOKEN_KEYWORD list.
@@ -10440,6 +10446,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     if (s == QString("\\u")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_USE;
     if (s == QString("\\W")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_WARNINGS;
   }
+  log("tokens_to_keywords end", 80);
 }
 
 /*
@@ -12816,6 +12823,29 @@ QString MainWindow::tarantool_read_format(QString lua_request)
   return read_format_result;
 }
 
+/*
+  log() may be useful for debugging if the program is acting strangely.
+  We do not use printf() ordinarily, but if level > ocelot_log_level,
+  we printf(message).
+  We also fflush(stdout) which is usually unnecessary (messages
+  are printed with "\n") unless stdout has been redirected to a file.
+  ocelot_log default value = 100, can be changed with --ocelot_log==N.
+  Todo: consider using stderr or a named file.
+  Todo: attach a timer or counter so printf occurs if dangers exist.
+  Todo: consider using a bit mask instead of a greater-than comparison.
+  Todo: consider making this a macro so invocation is easier.
+*/
+void MainWindow::log(const char *message, int level)
+{
+  if (level > ocelot_log_level)
+  {
+    printf("%s\n", message);
+#ifdef __linux
+    fflush(stdout);
+#endif
+  }
+}
+
 
 #include "codeeditor.h"
 
@@ -14529,7 +14559,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "ocelot_statement_format_keyword_case") == 0)
   { ocelot_statement_format_keyword_case= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_client_side_functions") == 0) { ocelot_client_side_functions= is_enable; return; }
-
+  if (strcmp(token0_as_utf8, "ocelot_log_level") == 0)
+  {
+    ocelot_log_level= to_long(token2);
+    return;
+  }
   if (strcmp(token0_as_utf8, "one_database") == 0) { ocelot_one_database= is_enable; return; }
   if (strcmp(token0_as_utf8, "pager") == 0) { ocelot_pager= is_enable; return; }
   if ((token0_length >= sizeof("pas") - 1) && (strncmp(token0_as_utf8, "password", token0_length) == 0))

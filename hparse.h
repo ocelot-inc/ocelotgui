@@ -1226,16 +1226,16 @@ int MainWindow::hparse_f_table_factor()
   {
     hparse_f_partition_list(false, false);
     if (hparse_errno > 0) return 0;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ALIAS,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
       if (hparse_errno > 0) return 0;
     }
     else
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ALIAS,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
-        hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+        hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
     }
     hparse_f_table_index_hint_list();
     if (hparse_errno > 0) return 0;
@@ -9951,6 +9951,7 @@ int MainWindow::hparse_f_conditions(int block_top)
 */
 void MainWindow::hparse_f_multi_block(QString text)
 {
+  log("hparse_f_multi_block start", 90);
   hparse_line_edit->hide();
   if (connections_is_connected[0] == 1) hparse_dbms_mask= dbms_version_mask;
   else if (ocelot_dbms == "mariadb") hparse_dbms_mask= FLAG_VERSION_MARIADB_ALL;
@@ -10028,8 +10029,10 @@ void MainWindow::hparse_f_multi_block(QString text)
     if (hparse_i > 0) main_token_flags[hparse_i - 1]= (main_token_flags[hparse_i - 1] | TOKEN_FLAG_IS_BLOCK_END);
     if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
   }
+  log("hparse_f_multi_block end", 90);
   return;
 error:
+  log("hparse_f_multi_block error", 90);
   QString expected_list;
   bool unfinished_comment_seen= false;
   bool unfinished_identifier_seen= false;
@@ -10130,6 +10133,7 @@ error:
   hparse_line_edit->setText(expected_list);
   hparse_line_edit->setCursorPosition(0);
   hparse_line_edit->show();
+  log("hparse_f_multi_block end", 90);
 }
 
 #ifdef DBMS_TARANTOOL

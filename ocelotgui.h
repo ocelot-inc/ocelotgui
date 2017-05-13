@@ -706,6 +706,7 @@ public:
                  char **p_result_field_names);
   int create_table_server(QString, bool *, unsigned int, unsigned int);
   QString tarantool_read_format(QString);
+  void log(const char*,int);
   int real_query(QString, int);
 #endif
   QVBoxLayout *main_layout;
