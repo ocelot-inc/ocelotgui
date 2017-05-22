@@ -694,7 +694,7 @@ public:
                                      char *field_name,
                                      int field_number_within_array,
                                      QString *field_name_list);
-  void tarantool_scan_rows(unsigned int p_result_column_count,
+  QString tarantool_scan_rows(unsigned int p_result_column_count,
                  unsigned int p_result_row_count,
                  MYSQL_RES *p_mysql_res,
                  char **p_result_set_copy,
@@ -885,10 +885,12 @@ private:
   void connect_mysql_error_box(QString, unsigned int);
 #ifdef DBMS_TARANTOOL
   int connect_tarantool(unsigned int connection_number, QString, QString, QString, QString);
+  void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int);
-  unsigned int tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes);
-  const char * tarantool_seek_0();
+  QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
+  QString tarantool_fetch_header_row(int);
+  const char * tarantool_seek_0(int*);
   QString tarantool_internal_query(char*, int);
 #endif
   QString select_1_row(const char *select_statement);
@@ -4018,7 +4020,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 #define OCELOT_DATA_TYPE_TEXT        10003
 
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
-void fillup(MYSQL_RES *mysql_res,
+QString fillup(MYSQL_RES *mysql_res,
             //struct tnt_reply *tarantool_tnt_reply,
             int connections_dbms,
             //MainWindow *parent,
@@ -4040,7 +4042,6 @@ void fillup(MYSQL_RES *mysql_res,
   ocelot_client_side_functions_copy= ocelot_client_side_functions;
 
   grid_mysql_res= mysql_res;
-
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
   {
@@ -4061,10 +4062,17 @@ void fillup(MYSQL_RES *mysql_res,
 
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
-    copy_of_parent->tarantool_scan_rows(result_column_count, result_row_count,
+  {
+    QString result= copy_of_parent->tarantool_scan_rows(result_column_count, result_row_count,
               grid_mysql_res,
               &result_set_copy, &result_set_copy_rows,
               &result_max_column_widths);
+    if (result != "OK")
+    {
+      garbage_collect();
+      return result;
+    }
+  }
   else
 #endif
     scan_rows(result_column_count, result_row_count,
@@ -4148,7 +4156,7 @@ void fillup(MYSQL_RES *mysql_res,
   */
 
   /* todo: gotta use MYSQL_REMOTE_CONNECTION rather than 3 someday. */
-  if (connection_number == 3) return;
+  if (connection_number == 3) return "OK";
   copy_result_to_gridx(connections_dbms);
   /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
      said what gridx_row_count is. */
@@ -4181,6 +4189,7 @@ void fillup(MYSQL_RES *mysql_res,
   copy_of_ocelot_raw= ocelot_raw;
   copy_of_ocelot_xml= ocelot_xml;
   display();
+  return "OK";
 }
 
 /*

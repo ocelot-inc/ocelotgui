@@ -2183,13 +2183,17 @@ void MainWindow::main_token_pop()
   use them both (yes it's redundant but this loop really worries me):
     I'll exit if a global flag is on, then set it.
     I'll ensure the document emits no signals during this routine.
+  Todo: A hang occurs sometimes, and log() suggests it's in this routine.
+        That's why there are so many log() and assert() invocations.
 */
 void MainWindow::action_statement_edit_widget_text_changed()
 {
-  if (statement_edit_widget_text_changed_flag != 0) return;
   log("action_statement_edit_widget_text_changed start", 90);
-  statement_edit_widget_text_changed_flag= 1;
-  statement_edit_widget->document()->blockSignals(true);
+  if (statement_edit_widget_text_changed_flag != 0) return;
+  log("action_statement_edit_widget_text_changed after flag check", 90);
+  //statement_edit_widget_text_changed_flag= 1;
+  //statement_edit_widget->document()->blockSignals(true);
+  disconnect(statement_edit_widget->document(), SIGNAL(contentsChanged()), this, SLOT(action_statement_edit_widget_text_changed()));
 
   QString text;
   int i;
@@ -2209,6 +2213,8 @@ void MainWindow::action_statement_edit_widget_text_changed()
   {
     hparse_f_multi_block(text); /* recognizer */
   }
+
+  log("action_statement_edit_widget_text_changed after hparse_f_multi_block", 90);
   /* This "sets" the colour, it does not "merge" it. */
   /* Do not try to set underlines, they won't go away. */
   QTextDocument *pDoc= statement_edit_widget->document();
@@ -2245,8 +2251,18 @@ void MainWindow::action_statement_edit_widget_text_changed()
     cur.setCharFormat(format_of_white_space);
   }
 
+  log("action_statement_edit_widget_text_changed loop start", 90);
+
   for (i= 0; main_token_lengths[i] != 0; ++i)
   {
+    assert(main_token_lengths[i] > 0);
+    assert(main_token_lengths[i] <= text.size());
+    assert(main_token_offsets[i] >= 0);
+    assert(main_token_offsets[i] <= text.size());
+    assert(pos >= 0);
+    assert(pos <= text.size());
+    assert(i >= 0);
+    assert(i <= (int) main_token_max_count);
     QTextCharFormat format_of_current_token;
     /* Todo: find out why this is necessary. It looks redundant but without it there's trouble. */
     for (; pos < main_token_offsets[i]; ++pos)
@@ -2299,14 +2315,17 @@ void MainWindow::action_statement_edit_widget_text_changed()
     cur.setCharFormat(format_of_current_token);
     pos+= main_token_lengths[i];
   }
+
+  log("action_statement_edit_widget_text_changed loop end", 90);
   cur.endEditBlock();
 
   /* Todo: consider what to do about trailing whitespace. */
 
   widget_sizer(); /* Perhaps adjust relative sizes of the main widgets. */
-
-  statement_edit_widget->document()->blockSignals(false);
-  statement_edit_widget_text_changed_flag= 0;
+  log("action_statement_edit_widget_text_changed after widget_sizer", 90);
+  //statement_edit_widget->document()->blockSignals(false);
+  connect(statement_edit_widget->document(), SIGNAL(contentsChanged()), this, SLOT(action_statement_edit_widget_text_changed()));
+  //statement_edit_widget_text_changed_flag= 0;
   log("action_statement_edit_widget_text_changed end", 90);
 }
 
@@ -2584,6 +2603,7 @@ void MainWindow::action_connect_once(QString message)
 */
 void MainWindow::action_exit()
 {
+  log("action_exit start", 90);
   if (ocelot_dbms.contains("tarantool", Qt::CaseInsensitive))
   {
     /* Todo: if there was a successful connection, close it */
@@ -2626,7 +2646,9 @@ void MainWindow::action_exit()
 #endif
   }
   delete_utf8_copies();
+  log("action_exit mid", 90);
   close();
+  log("action_exit end", 90);
 }
 
 
@@ -2962,13 +2984,19 @@ void MainWindow::action_settings()
   Todo: consider: what if the user wants to undo with control-Z instead of menu?
   Todo: consider: will there be a bug if syntax highlighting is disabled?
   Todo: consider: perhaps now redo will be no good.
+  Until May 2017 the enclosure was:
+    statement_edit_widget_text_changed_flag= 1;
+    ...
+    statement_edit_widget_text_changed_flag= 0;
 */
 void MainWindow::action_undo()
 {
+  log("action_undo start", 90);
   statement_edit_widget_text_changed_flag= 1;
   statement_edit_widget->undo();
   statement_edit_widget->undo();
   statement_edit_widget_text_changed_flag= 0;
+  log("action_undo end", 90);
 }
 
 
@@ -6853,7 +6881,6 @@ int MainWindow::action_execute(int force)
     statement_edit_widget->setReadOnly(true);
     is_kill_requested= false;
     return_value= action_execute_one_statement(text);
-
     menu_file->setEnabled(true);
     menu_edit->setEnabled(true);
     menu_run_action_execute->setEnabled(true);
@@ -6870,9 +6897,11 @@ int MainWindow::action_execute(int force)
       so main_token_... variables will all change.
       Todo: check again, I think the above statement might be false.
     */
+    log("before remove_statement", 90);
     statement_edit_widget_text_changed_flag= 1;
     remove_statement(text);
     statement_edit_widget_text_changed_flag= 0;
+    log("after remove_statement", 90);
     action_statement_edit_widget_text_changed();
     //widget_sizer();
     /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
@@ -6880,7 +6909,10 @@ int MainWindow::action_execute(int force)
     history_edit_widget->show(); /* Todo: find out if this is really necessary */
     if (is_kill_requested == true) break;
   }
-  if (return_value != 0) return 2;
+  if (return_value != 0)
+  {
+    return 2;
+  }
   return 0;
 }
 
@@ -7105,7 +7137,6 @@ int MainWindow::action_execute_one_statement(QString text)
 
             result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
           }
-
           ResultGrid *rg;
           {
             for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
@@ -7117,7 +7148,7 @@ int MainWindow::action_execute_one_statement(QString text)
             rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
             //QFont tmp_font;
             //tmp_font= rg->font();
-            rg->fillup(mysql_res,
+            QString fillup_result= rg->fillup(mysql_res,
                       //&tarantool_tnt_reply,
                       connections_dbms[0],
                       //this,
@@ -7125,6 +7156,13 @@ int MainWindow::action_execute_one_statement(QString text)
                       lmysql, ocelot_client_side_functions,
                       ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
                       MYSQL_MAIN_CONNECTION);
+            if (fillup_result != "OK")
+            {
+              /* fillup() failure is unexpected so this is crude */
+              put_message_in_result(fillup_result);
+              return_value= 1;
+              goto statement_is_over;
+            }
             result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
             /* next line redundant? display() ends with show() */
@@ -7235,7 +7273,7 @@ int MainWindow::action_execute_one_statement(QString text)
       //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
     }
   }
-
+statement_is_over:
   /* statement is over */
   if (additional_result != TOKEN_KEYWORD_SOURCE)
   {
@@ -11488,6 +11526,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   statement_edit_widget->dbms_connection_id= session_id.toInt();
   statement_edit_widget->dbms_host= ocelot_host;
   //connections_is_connected[connection_number]= 1;
+  tarantool_initialize(connection_number);
   return 0;
 }
 #endif
@@ -11547,6 +11586,32 @@ QString MainWindow::tarantool_internal_query(char *query,
   else returned_string= "";
   lmysql->ldbms_tnt_reply_free(&tarantool_tnt_reply);
   return returned_string;
+}
+#endif
+
+#ifdef DBMS_TARANTOOL
+/*
+  Call tarantool_initialize() from tarantool_connect() if successful.
+  The main task is to create a function that wraps box.sql.execute()
+  so we can get column names -- a temporary thing that will have to
+  be changed when Tarantool itself has a good way to do such a return.
+  We look for 0xa1 0x08 in the return, as a signal "column list here".
+  Todo: check tarantool_errno[connection_number=0 and tarantool_errmsg
+  Todo: version check, unless that's somewhere else already.
+*/
+void MainWindow::tarantool_initialize(int connection_number)
+{
+const char *my_string= "function ocelot_sqle(p)"
+                 "  local n = {}"
+                 "    local x, y = pcall(function() n = box.sql.execute(p) end)"
+                 "    if (x) then"
+                 "      table.insert(n[0], 1, string.char(8))"
+                 "      table.insert(n, 1, n[0])"
+                 "      return n"
+                 "    end"
+                 "    box.error{code = 555, reason = y}"
+                 "  end";
+  QString query_return= tarantool_internal_query((char*)my_string, connection_number);
 }
 #endif
 
@@ -11840,12 +11905,14 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   2 == array-32 == field count, then fields. so assume row_count == 1
   3 == array-32 == 1, array-x = row count, array-x == field count
   4 == array-32 == row count, then array-x == field count
+  5 == same as 3, but first row is 0xa1 0x08 then column names.
 */
 int MainWindow::tarantool_result_set_type(int connection_number)
 {
   const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
   char field_type;
   long unsigned int r;
+  int data_length;
 
   ///* TEST!! start */
   //printf("tarantool_result_set_type\n");
@@ -11863,7 +11930,6 @@ int MainWindow::tarantool_result_set_type(int connection_number)
   //  printf("    %x\n", *(tarantool_tnt_reply_error + i));
   //}
   ///* TEST!! end */
-
   if ((tarantool_tnt_reply.data == NULL)
    || (tarantool_tnt_reply.data_end == NULL))
     goto erret;
@@ -11878,6 +11944,19 @@ int MainWindow::tarantool_result_set_type(int connection_number)
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   if (field_type != MP_ARRAY) return 2;
+  {
+    /* Look for the signature of the ocelot_sqle function */
+    data_length= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
+    if (data_length > 20) data_length= 20;
+    for (int ik= 0; ik < data_length - 1; ++ik)
+    {
+      if (((unsigned char)*(tarantool_tnt_reply_data + ik) == 0xa1)
+       && (*(tarantool_tnt_reply_data + ik + 1) == 0x08))
+      {
+        return 5;
+      }
+    }
+  }
   return 3;
 erret:
   tarantool_errno[connection_number]= 10008;
@@ -11919,6 +11998,7 @@ long unsigned int MainWindow::tarantool_num_rows(unsigned int connection_number)
   }
   long unsigned int r;
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  if (result_set_type == 5) --r;
   return r;
 }
 
@@ -11978,6 +12058,9 @@ int MainWindow::tarantool_execute_sql(
     }
     else
     {
+      if (statement_type == TOKEN_KEYWORD_SELECT)
+        strcpy(request_string, "return ocelot_sqle([[");
+      else
       strcpy(request_string, "return box.sql.execute([[");
       strncat(request_string, dbms_query, dbms_query_len);
       strcat(request_string, "]])");
@@ -12086,6 +12169,15 @@ unsigned int MainWindow::tarantool_num_fields()
       lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
     }
     result_row_count= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+  }
+  if (result_set_type == 5)
+  {
+    int bytes;
+    int row_size_1;
+    QString fetch_row_result= tarantool_fetch_row(*tarantool_tnt_reply_data, &bytes, &row_size_1);
+    //if (fetch_row_result != "OK") return fetch_row_result;
+    *(tarantool_tnt_reply_data)+= bytes;
+    --result_row_count;
   }
 
   strcpy(field_name, TARANTOOL_FIELD_NAME_BASE);
@@ -12204,7 +12296,9 @@ int MainWindow::tarantool_num_fields_recursive(const char **tarantool_tnt_reply_
 }
 
 /* To "seek to row zero", start with the initial pointer and skip over the row count. */
-const char * MainWindow::tarantool_seek_0()
+/* Also skip field names if result_set_type == 5. */
+/* Todo: there's similar code in multiple places now. */
+const char * MainWindow::tarantool_seek_0(int *returned_result_set_type)
 {
   uint32_t row_count;
   const char *tarantool_tnt_reply_data;
@@ -12224,7 +12318,17 @@ const char * MainWindow::tarantool_seek_0()
     }
     row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   }
+  if (result_set_type == 5)
+  {
+    int bytes;
+    int row_size_1;
+    QString fetch_row_result= tarantool_fetch_row(tarantool_tnt_reply_data, &bytes, &row_size_1);
+    //if (fetch_row_result != "OK") return fetch_row_result;
+    tarantool_tnt_reply_data+= bytes;
+    --row_count;
+  }
   assert(row_count == result_row_count);
+  *returned_result_set_type= result_set_type;
   return tarantool_tnt_reply_data;
 }
 
@@ -12236,17 +12340,17 @@ const char * MainWindow::tarantool_seek_0()
   when sprintf'd to the row copy, but not the per-field overhead for all fields.
   todo: value_length is usually an unnecessary variable, just add to total_length
 */
-unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
-                                             int *bytes)
+QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
+                                             int *bytes, int *tsize)
 {
   const char *original_tarantool_tnt_reply_data= tarantool_tnt_reply_data;
   unsigned int total_length= 0;
 
   char field_type;
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  assert(field_type == MP_ARRAY);
+  if (field_type != MP_ARRAY) return "tarantool_fetch_row: field_type != MP_ARRAY";
   uint32_t field_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  assert(field_count != 0);
+  if (field_count == 0) return "tarantool_fetch_row: field_count == 0";
 
   for (uint32_t field_number= 0; field_number < field_count; ++field_number)
   {
@@ -12321,8 +12425,78 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
     total_length+= value_length;
   }
   *bytes=   tarantool_tnt_reply_data - original_tarantool_tnt_reply_data;
-  assert(bytes != 0);
-  return total_length;
+  if (*bytes <= 0) return "tarantool_fetch_row: *bytes <= 0";
+  *tsize= total_length;
+  return "OK";
+}
+
+
+/*
+  The same loop as the one in tarantool_fetch_row(), for row#1.
+  This is for result_set_type == 5, where row#1 should actually
+  be the header i.e. the field names.
+  Skip the dd 00 00 00 01 and the row count.
+  Skip the first field which is the a1 08 signature.
+  For each header field
+   replacing "f_n" section, i.e. as far as the second "_", if any.
+   replacing "f_1..." with name#1..., "f_2..." with name#2..., etc.
+  Todo: finding "f_n" is inefficient, memcmp etc. should be avoided.
+*/
+QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
+{
+  const char *tarantool_tnt_reply_data;
+  tarantool_tnt_reply_data= tarantool_tnt_reply.data;
+
+  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+
+  char field_type;
+  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+  if (field_type != MP_ARRAY) return "tarantool_fetch_header_row: field_type != MP_ARRAY";
+  uint32_t field_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+  if (field_count == 0) return "tarantool_fetch_header_row: field_count == 0";
+
+  uint32_t value_length;
+  const char *value;
+  char *c, *c2;
+  value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data, &value_length);
+
+  for (uint32_t field_number= 0; field_number < field_count - 1; ++field_number)
+  {
+    field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+    if (field_type != MP_STR) return "tarantool_fetch_header_row: non-string field";
+    value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data, &value_length);
+    //printf("value=%d\n", value);
+    for (int rf= 0; rf < p_result_column_count; ++rf)
+    {
+      c= &tarantool_field_names[rf*TARANTOOL_MAX_FIELD_NAME_LENGTH];
+      char fn[8];
+      if (memcmp(c, TARANTOOL_FIELD_NAME_BASE, strlen(TARANTOOL_FIELD_NAME_BASE)) == 0)
+      {
+        char cm= *(c + strlen(TARANTOOL_FIELD_NAME_BASE));
+        if (cm == '_')
+        {
+          c2= c + strlen(TARANTOOL_FIELD_NAME_BASE) + 1;
+          int j1, j2;
+          for (j1= 0, j2= 0; *(c2 + j1) != '\0' && *(c2 + j1) != '_'; ++j1, ++j2)
+          {
+            fn[j2]= *(c2 + j1);
+          }
+          fn[j2]= '\0';
+          unsigned int j3= atoi(fn);
+          if ((isdigit(fn[0]) && j3 == field_number + 1))
+          {
+            char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
+            strcpy(tmp, c2 + j1 + strlen(TARANTOOL_FIELD_NAME_BASE) + 1);
+            memcpy(c, value, value_length);
+            *(c + value_length)= '\0';
+            strcat(c, tmp);
+          }
+        }
+      }
+    }
+  }
+  return "OK";
 }
 
 
@@ -12332,7 +12506,7 @@ unsigned int MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_dat
   Called from: scan_rows in result grid.
   Compare: what we do for first loop in scan_rows().
 */
-void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
+QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
                unsigned int p_result_row_count,
                MYSQL_RES *p_mysql_res,
                char **p_result_set_copy,
@@ -12342,6 +12516,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   (void) p_mysql_res; /* suppress "unused parameter" warning */
   unsigned long int v_r;
   unsigned int i;
+  int returned_result_set_type;
   //char **v_row;
   //unsigned long *v_lengths;
 //  unsigned int ki;
@@ -12356,23 +12531,25 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   */
   unsigned int total_size= 0;
   char *result_set_copy_pointer;
-  tarantool_tnt_reply_data_copy= tarantool_seek_0(); /* "seek to row 0" */
+  tarantool_tnt_reply_data_copy= tarantool_seek_0(&returned_result_set_type); /* "seek to row 0" */
 
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                /* first loop */
   {
     int bytes;
-    int row_size_1= tarantool_fetch_row(tarantool_tnt_reply_data_copy, &bytes);
+    int row_size_1;
+    QString fetch_row_result= tarantool_fetch_row(tarantool_tnt_reply_data_copy, &bytes, &row_size_1);
+    if (fetch_row_result != "OK") return fetch_row_result;
     tarantool_tnt_reply_data_copy+= bytes;
     total_size+= row_size_1;
     /* per-field overhead includes overhead for missing fields; they are null */
     int row_size_2= p_result_column_count * (sizeof(unsigned int) + sizeof(char));
     total_size+= row_size_2;
   }
+  if (total_size > 2000000000) return "tarantool_scan_rows: total_size too big";
   *p_result_set_copy= new char[total_size];                                         /* allocate */
-  assert(total_size < 1000000000);
   *p_result_set_copy_rows= new char*[p_result_row_count];
   result_set_copy_pointer= *p_result_set_copy;
-  tarantool_tnt_reply_data_copy= tarantool_seek_0(); /* "seek to row 0" */
+  tarantool_tnt_reply_data_copy= tarantool_seek_0(&returned_result_set_type); /* "seek to row 0" */
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
   {
     (*p_result_set_copy_rows)[v_r]= result_set_copy_pointer;
@@ -12387,14 +12564,14 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       strcat(field_name, "_");
       int return_value= tarantool_num_fields_recursive(tarantool_tnt_reply_data,
                                                        field_name, 0, &field_name_list);
-      if (return_value < 0) assert(0 != 0);
+      if (return_value < 0) return "tarantool_scan_rows: return_value < 0";
       tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_copy_2;
     }
     char field_type;
     field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
-    assert(field_type == MP_ARRAY);
+    if (field_type != MP_ARRAY) return "tarantool_scan_rows: field_type != MP_ARRAY";
     uint32_t field_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
-    assert(field_count <= p_result_column_count);
+    if (field_count > p_result_column_count) return "tarantool_scan_rows: field_count > p_result_column_count";
     const char *value;
     uint32_t value_length;
     char value_as_string[64]; /* must be big enough for any sprintf() result */
@@ -12412,7 +12589,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     {
       int i= field_number;
       field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
-      assert(field_type <= MP_EXT);
+      if (field_type > MP_EXT) return "tarantool_scan_rows: field_type > MP_EXT";
       if (field_type == MP_ARRAY)
       {
         int array_size= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
@@ -12434,7 +12611,8 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       {
         char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
         int j= field_name_list.indexOf(" ", mid_index);
-        assert((j != -1) && ((j-mid_index) < TARANTOOL_MAX_FIELD_NAME_LENGTH));
+        if ((j != -1) && ((j-mid_index) < TARANTOOL_MAX_FIELD_NAME_LENGTH)) {;}
+        else return "tarantool_scan_rows: check TARANTOOL_MAX_FIELD_NAME_LENGTH";
         QString sv;
         sv= field_name_list.mid(mid_index, j-mid_index);
         strcpy(tmp, sv.toUtf8());
@@ -12442,7 +12620,7 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         for (;;)
         {
           int strcmp_result= strcmp(&tarantool_field_names[field_number_in_main_list*TARANTOOL_MAX_FIELD_NAME_LENGTH], tmp);
-          assert(strcmp_result <= 0);
+          if (strcmp_result > 0) return "tarantool_scan_rows: strcmp_result > 0";
           if (strcmp_result == 0) break;
           /* Dump null. Todo: similar code appears 3 times. */
           if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
@@ -12565,8 +12743,21 @@ void MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       *(c + k - 2)= '\0';
     }
   }
+
+  if (returned_result_set_type == 5)
+  {
+    QString fetch_header_row_result= tarantool_fetch_header_row(p_result_column_count);
+    if (fetch_header_row_result != "OK") return fetch_header_row_result;
+  }
+
+  return "OK";
 }
 
+
+/*
+  Todo: check: in tarantool_scan_field_names(), should I use
+  sizeof(TARANTOOL_FIELD_NAME_BASE) or strlen(TARANTOOL_FIELD_NAME_BASE)?
+*/
 
 void MainWindow::tarantool_scan_field_names(
                const char *which_field,
@@ -12732,6 +12923,7 @@ int MainWindow::create_table_server(QString text,
     }
 
     /* TODO: I'd be much happier if we didn't fool with existing grid */
+    /* TODO: Check for an error return from fillup(). */
     //rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
     rg->fillup(mysql_res,
               //&tarantool_tnt_reply,

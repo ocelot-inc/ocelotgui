@@ -1373,6 +1373,17 @@ int MainWindow::hparse_f_table_join_condition()
 /*  index_hint [, index_hint] ... */
 void MainWindow::hparse_f_table_index_hint_list()
 {
+  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+  {
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INDEXED") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "BY");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
+    return;
+  }
   do
   {
     if (hparse_f_table_index_hint() == 0) return;
@@ -6298,7 +6309,6 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else if (((hparse_flags & HPARSE_FLAG_TABLE) != 0) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE, "TABLE") == 1))
     {
-      ; /* TODO: This accepts "CREATE TABLE x;" which has 0 columns */
       hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
@@ -6334,19 +6344,27 @@ void MainWindow::hparse_f_statement(int block_top)
         }
         main_token_flags[hparse_i] |= TOKEN_FLAG_IS_START_IN_COLUMN_LIST;
         bool comma_is_seen;
+        bool item_is_seen;
         do
         {
           comma_is_seen= false;
+          item_is_seen= false;
           if (hparse_f_qualified_name_of_operand(false) == 1)
           {
             hparse_f_column_definition();
             if (hparse_errno > 0) return;
+            item_is_seen= true;
           }
           else
           {
             if (hparse_errno > 0) return;
-            hparse_f_create_definition();
+            if (hparse_f_create_definition() != 3) item_is_seen= true;
             if (hparse_errno > 0) return;
+          }
+          if (item_is_seen == false)
+          {
+            hparse_f_error();
+            return;
           }
           if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","))
           {
@@ -6570,6 +6588,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELETE, "DELETE"))
   {
     /* todo: look up how partitions are supposed to be handled */
+    /* todo: this won't catch Tarantool INDEXED BY */
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_DELETE;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
@@ -8413,6 +8432,7 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_errno > 0) return;
     }
     hparse_subquery_is_allowed= true;
+    /* todo: this sees some choices that are only valid with SELECT */
     if (hparse_f_table_reference(0) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     bool multi_seen= false;
@@ -10036,7 +10056,11 @@ error:
   QString expected_list;
   bool unfinished_comment_seen= false;
   bool unfinished_identifier_seen= false;
-  if ((hparse_i == 0) && (main_token_lengths[0] == 0)) return;
+  if ((hparse_i == 0) && (main_token_lengths[0] == 0))
+  {
+    log("hparse_f_multi_block error return #1", 90);
+    return;
+  }
   /* Do not add to expecteds if we're still inside a comment */
   if ((hparse_i > 0) && (main_token_lengths[hparse_i] == 0))
   {
@@ -10055,7 +10079,11 @@ error:
      || (main_token_types[j] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE))
     {
       QString rest= hparse_text_copy.mid(main_token_offsets[j]);
-      if (rest.contains("\n") == false) return;
+      if (rest.contains("\n") == false)
+      {
+        log("hparse_f_multi_block error return #2", 90);
+        return;
+      }
     }
   }
   /* Add different set of expecteds if we're still inside a quoted identifier */
@@ -10133,7 +10161,7 @@ error:
   hparse_line_edit->setText(expected_list);
   hparse_line_edit->setCursorPosition(0);
   hparse_line_edit->show();
-  log("hparse_f_multi_block end", 90);
+  log("hparse_f_multi_block error end", 90);
 }
 
 #ifdef DBMS_TARANTOOL
