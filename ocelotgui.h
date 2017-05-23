@@ -4019,6 +4019,28 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 #define OCELOT_DATA_TYPE_VARBINARY   10002
 #define OCELOT_DATA_TYPE_TEXT        10003
 
+/*
+  Return true if what's at pointer has an image signature.
+  We only do this for Tarantool, we set data type = OCELOT_DATA_TYPE_BLOB
+  if the length is > 100 (arbitrary) and if the signature for .jpg or
+  .png is at the start (not a reliable check but a false hit won't do a
+  lot of harm). See wikipedia article = List of file signatures.
+  We don't actually care except for extra_rule_1.
+  We could do this check for MySQL/MariaDB too, but for them we simply
+  look at the data type.
+  Todo: check for other signatures, e.g. gif.
+*/
+bool is_image_format(int length, char* pointer)
+{
+  unsigned char *p= (unsigned char*) pointer;
+  if (length <= 100) return false;
+  if ((*p = 0x89) && (*(p+1) == 0x50) && (*(p+2) == 0x4e))
+    return true;
+  if ((*p = 0xff) && (*(p+1) == 0xd8) && (*(p+2) == 0xff))
+    return true;
+  return false;
+}
+
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
 QString fillup(MYSQL_RES *mysql_res,
             //struct tnt_reply *tarantool_tnt_reply,
@@ -4101,6 +4123,7 @@ QString fillup(MYSQL_RES *mysql_res,
   /* Scan entire result set to determine if NUM_FLAG should go on. */
   if (connections_dbms == DBMS_TARANTOOL)
   {
+    bool is_image_seen= false;
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
       result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING;
@@ -4122,6 +4145,11 @@ QString fillup(MYSQL_RES *mysql_res,
           {
             result_field_flags[i]= tmp_flag;
           }
+          else
+          {
+            if (is_image_format(v_length, pointer + sizeof(unsigned int) + sizeof(char)))
+              is_image_seen= true;
+          }
         }
         pointer+= v_length + sizeof(unsigned int) + sizeof(char);
       }
@@ -4130,7 +4158,15 @@ QString fillup(MYSQL_RES *mysql_res,
     {
       if (result_field_flags[i] == FIELD_VALUE_FLAG_IS_NUMBER)
         result_field_flags[i]= NUM_FLAG;
-      else result_field_flags[i]= 0;
+      else
+      {
+        result_field_flags[i]= 0;
+        if (is_image_seen == true)
+        {
+          result_field_types[i]= OCELOT_DATA_TYPE_BLOB;
+          result_field_charsetnrs[i]= 63;
+        }
+      }
     }
   }
   else

@@ -10007,12 +10007,20 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_i_of_statement= hparse_i;
     if (hparse_f_client_statement() == 1)
     {
-      if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
+      if (main_token_lengths[hparse_i] == 0)
+      {
+        log("hparse_f_multi_block end", 90);
+        return; /* empty token marks end of input */
+      }
       if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
       {
         hparse_f_semicolon_and_or_delimiter(0);
         if (hparse_errno > 0) goto error;
-        if (main_token_lengths[hparse_i] == 0) return;
+        if (main_token_lengths[hparse_i] == 0)
+        {
+          log("hparse_f_multi_block end", 90);
+          return;
+        }
       }
       continue; /* ?? rather than "return"? */
     }
@@ -10047,6 +10055,7 @@ void MainWindow::hparse_f_multi_block(QString text)
     //hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "[eof]");
     if (hparse_errno > 0) goto error;
     if (hparse_i > 0) main_token_flags[hparse_i - 1]= (main_token_flags[hparse_i - 1] | TOKEN_FLAG_IS_BLOCK_END);
+    log("hparse_f_multi_block end", 90);
     if (main_token_lengths[hparse_i] == 0) return; /* empty token marks end of input */
   }
   log("hparse_f_multi_block end", 90);

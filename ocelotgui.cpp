@@ -2185,6 +2185,9 @@ void MainWindow::main_token_pop()
     I'll ensure the document emits no signals during this routine.
   Todo: A hang occurs sometimes, and log() suggests it's in this routine.
         That's why there are so many log() and assert() invocations.
+  Until May 2017 I used blockSignals(true)+blockSignals(false) instead
+  of disconnect+connect; also I set statement_edit_widget_text_changed_flag= 1;
+  within the routine; I hope these changes are safe.
 */
 void MainWindow::action_statement_edit_widget_text_changed()
 {
@@ -2984,10 +2987,6 @@ void MainWindow::action_settings()
   Todo: consider: what if the user wants to undo with control-Z instead of menu?
   Todo: consider: will there be a bug if syntax highlighting is disabled?
   Todo: consider: perhaps now redo will be no good.
-  Until May 2017 the enclosure was:
-    statement_edit_widget_text_changed_flag= 1;
-    ...
-    statement_edit_widget_text_changed_flag= 0;
 */
 void MainWindow::action_undo()
 {
@@ -8765,7 +8764,12 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
     return;
   }
 #endif
-
+  if ((connections_dbms[connection_number] != DBMS_MYSQL)
+   && (connections_dbms[connection_number] != DBMS_MARIADB))
+  {
+    statement_edit_widget->result= "Bad connection."; /* shouldn't happen! */
+    return;
+  }
   mysql_errno_result= lmysql->ldbms_mysql_errno(&mysql[connection_number]);
   mysql_warning_count= lmysql->ldbms_mysql_warning_count(&mysql[connection_number]);
   if (mysql_errno_result == 0)
@@ -11483,11 +11487,17 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
 
   if (tarantool_errno[connection_number] != 0)
   {
+    /* Kludge so put_diagnostics_in_result won't crash */
+    connections_dbms[connection_number]= DBMS_TARANTOOL;
     put_diagnostics_in_result(connection_number);
     if (connection_number == MYSQL_MAIN_CONNECTION)
+    {
       make_and_append_message_in_result(ER_FAILED_TO_CONNECT_TO_TARANTOOL, 0, (char*)"");
+    }
     else
+    {
       make_and_append_message_in_result(ER_FAILED_TO_CONNECT_TO_TARANTOOL_FOR_SERVER, 0, (char*)"");
+    }
     return 1;
   }
   make_and_put_message_in_result(ER_OK, 0, (char*)"");
@@ -12466,7 +12476,6 @@ QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
     field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
     if (field_type != MP_STR) return "tarantool_fetch_header_row: non-string field";
     value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data, &value_length);
-    //printf("value=%d\n", value);
     for (int rf= 0; rf < p_result_column_count; ++rf)
     {
       c= &tarantool_field_names[rf*TARANTOOL_MAX_FIELD_NAME_LENGTH];
