@@ -7078,10 +7078,12 @@ int MainWindow::action_execute_one_statement(QString text)
 #ifdef DBMS_TARANTOOL
         if (connections_dbms[0] == DBMS_TARANTOOL)
         {
+          int statement_type= get_statement_type(main_token_number, main_token_count_in_statement);
           /* todo: failing to check if statement started with comment */
-          if ((main_token_types[0] == TOKEN_KEYWORD_SELECT)
-           || (main_token_types[0] == TOKEN_KEYWORD_LUA)
-           || ((main_token_flags[0]&TOKEN_FLAG_IS_LUA) != 0))
+          if ((statement_type == TOKEN_KEYWORD_SELECT)
+           || (statement_type == TOKEN_KEYWORD_VALUES)
+           || (statement_type == TOKEN_KEYWORD_LUA)
+           || ((main_token_flags[main_token_number]&TOKEN_FLAG_IS_LUA) != 0))
           {
             int result_set_type= tarantool_result_set_type(0);
             if ((result_set_type == 0) || (result_set_type == 1))
@@ -11652,6 +11654,52 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
   else strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
 }
 
+/*
+  Return statement type = first keyword = TOKEN_KEYWORD_SELECT etc.
+  If it's WITH, search for INSERT|DELETE|UPDATE and if that fails
+  assume it's SELECT. Probably hparse has already found the facts
+  in a better way but perhaps you haven't called hparse.
+*/
+int MainWindow::get_statement_type(unsigned int passed_main_token_number,
+                                   unsigned int passed_main_token_count_in_statement)
+{
+  unsigned int i;
+  int token_type;
+  for (i= passed_main_token_number; ; ++i)
+  {
+    if ((main_token_lengths[i] == 0)
+     || (i == passed_main_token_number + passed_main_token_count_in_statement))
+    {
+      token_type= -1;
+      break;
+    }
+    token_type= main_token_types[i];
+    if ((token_type != TOKEN_TYPE_COMMENT_WITH_SLASH)
+     || (token_type != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     || (token_type != TOKEN_TYPE_COMMENT_WITH_MINUS))
+      break;
+  }
+  if (token_type == TOKEN_KEYWORD_WITH)
+  {
+    for (; ; ++i)
+    {
+      if ((main_token_lengths[i] == 0)
+       || (i == passed_main_token_number + passed_main_token_count_in_statement))
+      {
+        token_type= TOKEN_KEYWORD_SELECT;
+        break;
+      }
+      token_type= main_token_types[i];
+      if ((token_type == TOKEN_KEYWORD_INSERT)
+       || (token_type == TOKEN_KEYWORD_UPDATE)
+       || (token_type == TOKEN_KEYWORD_DELETE))
+        break;
+    }
+  }
+  return token_type;
+}
+
+
 /* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
 /*
    Todo: we shouldn't be calling tparse_f_program() yet again!
@@ -11673,21 +11721,8 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   QString text= statement_edit_widget->toPlainText();
 
   int token_type= -1;
-  int statement_type= -1;
 
-  /* The first non-comment in a statement must be the statement type. */
-  for (unsigned int i= passed_main_token_number; i < passed_main_token_number + passed_main_token_count_in_statement; ++i)
-  {
-    int token_type= main_token_types[i];
-    if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
-     || (token_type == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-     || (token_type == TOKEN_TYPE_COMMENT_WITH_MINUS))
-    {
-      continue;
-    }
-    statement_type= main_token_types[i];
-    break;
-  }
+  int statement_type= get_statement_type(passed_main_token_number, passed_main_token_count_in_statement);
 
   result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
 
@@ -11947,13 +11982,13 @@ int MainWindow::tarantool_result_set_type(int connection_number)
   if (field_type != MP_ARRAY) goto erret;
   if (tarantool_select_nosql == true) return 4;
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  if (r == 0) return 1;
-  if (r != 1) return 2;
+  if (r == 0) { return 1; }
+  if (r != 1) { return 2; }
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY) return 2;
+  if (field_type != MP_ARRAY) { return 2; }
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY) return 2;
+  if (field_type != MP_ARRAY) { return 2; }
   {
     /* Look for the signature of the ocelot_sqle function */
     data_length= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
@@ -12068,7 +12103,8 @@ int MainWindow::tarantool_execute_sql(
     }
     else
     {
-      if (statement_type == TOKEN_KEYWORD_SELECT)
+      if ((statement_type == TOKEN_KEYWORD_SELECT)
+       || (statement_type == TOKEN_KEYWORD_VALUES))
         strcpy(request_string, "return ocelot_sqle([[");
       else
       strcpy(request_string, "return box.sql.execute([[");

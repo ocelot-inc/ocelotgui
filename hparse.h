@@ -3527,6 +3527,7 @@ int MainWindow::hparse_f_data_type()
     return TOKEN_KEYWORD_BOOLEAN;
   }
   /* If SQLite-style column definition, anything unreserved is acceptable. */
+  /* In fact even nothing-at-all is acceptable. */
   if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
   {
     if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
@@ -3537,6 +3538,7 @@ int MainWindow::hparse_f_data_type()
       if (hparse_errno > 0) return 0;
       return TOKEN_KEYWORD_ALL;
     }
+    return TOKEN_KEYWORD_ALL;
   }
   return -1; /* -1 means error unless SQLite-style column definition */
 }
@@ -5264,24 +5266,77 @@ int MainWindow::hparse_f_into()
 /*
   Todo: A problem with WITH is that it makes it hard to know what the true
   statement type is. Perhaps we should change main_token_flags?
+  See also get_statement_type().
 */
 void MainWindow::hparse_f_with_clause(int block_top)
 {
   hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RECURSIVE");
   hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_WITH_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
   if (hparse_errno > 0) return;
+  hparse_f_column_list(0, 0);
+  if (hparse_errno > 0) return;
   hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
   if (hparse_errno > 0) return;
   hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
   if (hparse_errno > 0) return;
-  hparse_f_select(false);
-  if (hparse_errno > 0) return;
+  if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
+  {
+    hparse_f_values();
+    if (hparse_errno > 0) return;
+  }
+  else
+  {
+    hparse_f_select(false);
+    if (hparse_errno > 0) return;
+  }
   hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
   if (hparse_f_is_special_verb(TOKEN_KEYWORD_WITH) == false) return;
   hparse_f_statement(block_top);
   return;
 }
+
+/*
+  Todo: check VALUES(...) ORDER BY etc. again
+  (last time I tried, it wasn't legal despite SQLite diagrams).
+*/
+int MainWindow::hparse_f_values()
+{
+  hparse_statement_type= TOKEN_KEYWORD_VALUES;
+  hparse_f_expression_list(TOKEN_KEYWORD_VALUES);
+  hparse_f_unionize();
+  return 0;
+}
+
+int MainWindow::hparse_f_unionize()
+{
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNION") == 1)
+  {
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)) {;}
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
+    {
+      hparse_f_values();
+      if (hparse_errno > 0) return 0;
+    }
+    else if (hparse_f_select(false) == 0)
+    {
+      hparse_f_error();
+      return 0;
+    }
+  }
+  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCEPT") == 1))
+  {
+    if (hparse_f_select(false) == 0)
+    {
+      hparse_f_error();
+      return 0;
+    }
+  }
+  if (hparse_errno > 0) return 0;
+  return 1;
+}
+
 
 /*
   "SELECT ..." or "(SELECT ...)"
@@ -5416,24 +5471,8 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten)
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MODE");
     if (hparse_errno > 0) return 0;
   }
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNION") == 1)
-  {
-    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)) {;}
-    if (hparse_f_select(false) == 0)
-    {
-      hparse_f_error();
-      return 0;
-    }
-  }
-  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
-   || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCEPT") == 1))
-  {
-    if (hparse_f_select(false) == 0)
-    {
-      hparse_f_error();
-      return 0;
-    }
-  }
+  hparse_f_unionize();
+  if (hparse_errno > 0) return 0;
   return 1;
 }
 
@@ -8468,6 +8507,12 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_VACUUM;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    return;
+  }
+  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES"))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    hparse_f_values();
     return;
   }
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH"))

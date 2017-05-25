@@ -613,6 +613,8 @@ public:
   int hparse_f_signal_or_resignal(int,int);
   int hparse_f_into();
   void hparse_f_with_clause(int);
+  int hparse_f_values();
+  int hparse_f_unionize();
   int hparse_f_select(bool);
   void hparse_f_where();
   int hparse_f_order_by(int);
@@ -888,6 +890,7 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int);
+  int get_statement_type(unsigned int, unsigned int);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
   QString tarantool_fetch_header_row(int);
   const char * tarantool_seek_0(int*);
