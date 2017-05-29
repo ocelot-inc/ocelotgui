@@ -6827,6 +6827,7 @@ int MainWindow::action_execute(int force)
 {
   QString text;
   int return_value= 0;
+  log("action_execute start", 90);
   for (;;)
   {
     int returned_begin_count;
@@ -6848,24 +6849,30 @@ int MainWindow::action_execute(int force)
     */
     if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_ERRORS) != 0)
     {
+      log("FLAG_FOR_ERRORS seen. before hparse_f_multi_block", 90);
       hparse_f_multi_block(text);
+      log("FLAG_FOR_ERRORS seen. after hparse_f_multi_block", 90);
+      /* TODO: QMessageBox jiggle, it displays then moves to centre */
       if (hparse_errno != 0)
       {
         QString s;
-        QMessageBox msgbox;
+        QMessageBox *msgbox= new QMessageBox(this);
         s= er_strings[er_off + ER_THE_SYNTAX_CHECKER_THINKS];
         s.append(hparse_errmsg);
-        msgbox.setText(s);
-        msgbox.setInformativeText(er_strings[er_off + ER_DO_YOU_WANT_TO_CONTINUE]);
-        //msgbox.setStandardButtons(QMessageBox::Yes | QMessageBox::No);
-        //msgbox.setDefaultButton(QMessageBox::Yes);
-        //if (msgbox.exec() == no_button) return 1;
-        QPushButton *yes_button= msgbox.addButton(er_strings[er_off + ER_YES], QMessageBox::YesRole);
-        QPushButton *no_button= msgbox.addButton(er_strings[er_off + ER_NO], QMessageBox::NoRole);
-        msgbox.setDefaultButton(yes_button);
-        msgbox.exec();
-        if (msgbox.clickedButton() == no_button) return 1;
+        msgbox->setText(s);
+        msgbox->setInformativeText(er_strings[er_off + ER_DO_YOU_WANT_TO_CONTINUE]);
+        QPushButton *yes_button= msgbox->addButton(er_strings[er_off + ER_YES], QMessageBox::YesRole);
+        QPushButton *no_button= msgbox->addButton(er_strings[er_off + ER_NO], QMessageBox::NoRole);
+        msgbox->setDefaultButton(yes_button);
+        msgbox->exec();
+        if (msgbox->clickedButton() == no_button)
+        {
+          delete msgbox;
+          return 1;
+        }
+        delete msgbox;
       }
+      log("FLAG_FOR_ERRORS seen. end of if", 90);
     }
 
     /* While executing, we allow no more statements, but a few things are enabled. */
@@ -6908,6 +6915,7 @@ int MainWindow::action_execute(int force)
     history_edit_widget->show(); /* Todo: find out if this is really necessary */
     if (is_kill_requested == true) break;
   }
+  log("action_execute end", 90);
   if (return_value != 0)
   {
     return 2;
@@ -7202,6 +7210,7 @@ int MainWindow::action_execute_one_statement(QString text)
               after that, to avoid the dreaded out-of-sync error message.
               If it's an ordinary select, lmysql->ldbms_mysql_free_result(mysql_res) happens later, see above.
             */
+            log("sleep loop start", 90);
             int result_grid_table_widget_index= 1;
             for (;;)
             {
@@ -7265,8 +7274,8 @@ int MainWindow::action_execute_one_statement(QString text)
               }
 
               if (mysql_res != 0) lmysql->ldbms_mysql_free_result(mysql_res);
-
             }
+            log("sleep loop end", 90);
             mysql_res= 0;
           }
         }
@@ -9573,6 +9582,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"CURRENT_USER", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURRENT_USER},
       {"CURSOR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CURSOR},
       {"CURTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURTIME},
+      {"CYCLE", 0, 0, TOKEN_KEYWORD_CYCLE},
       {"DATABASE", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATABASE},
       {"DATABASES", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DATABASES},
       {"DATE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_DATE},
@@ -9797,6 +9807,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"LAG", 0, 0, TOKEN_KEYWORD_LAG}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"LANGUAGE", 0, 0, TOKEN_KEYWORD_LANGUAGE},
       {"LAST", 0, 0, TOKEN_KEYWORD_LAST}, /* MariaDB 10.2 nonreserved */
+      {"LASTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LASTVAL},
       {"LAST_DAY", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_LAST_DAY},
       {"LAST_INSERT_ID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LAST_INSERT_ID},
       {"LAST_VALUE", 0, 0, TOKEN_KEYWORD_LAST_VALUE}, /* MariaDB 10.2 nonreserved */
@@ -9869,6 +9880,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"MINUTE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MINUTE},
       {"MINUTE_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_MICROSECOND},
       {"MINUTE_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_SECOND},
+      {"MINVALUE", 0, 0, TOKEN_KEYWORD_MINVALUE},
       {"MLINEFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MLINEFROMTEXT},  /* deprecated in MySQL 5.7.6 */
       {"MLINEFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MLINEFROMWKB},  /* deprecated in MySQL 5.7.6 */
       {"MOD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MOD},
@@ -9891,6 +9903,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"MULTIPOLYGONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGONFROMWKB}, /* deprecated in MySQL 5.7.6 */
       {"NAME_CONST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NAME_CONST},
       {"NATURAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NATURAL},
+      {"NEXTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NEXTVAL},
       {"NIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NIL},
       {"NO", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_NO},
       {"NOPAGER", 0, 0, TOKEN_KEYWORD_NOPAGER}, /* Ocelot keyword */
@@ -10028,11 +10041,13 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"SELECT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SELECT},
       {"SENSITIVE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SENSITIVE},
       {"SEPARATOR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SEPARATOR},
+      {"SEQUENCE", 0, 0, TOKEN_KEYWORD_SEQUENCE},
       {"SERIAL", 0, 0, TOKEN_KEYWORD_SERIAL},
       {"SERVER", 0, 0, TOKEN_KEYWORD_SERVER},
       {"SESSION", 0, 0, TOKEN_KEYWORD_SESSION},
       {"SESSION_USER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SESSION_USER},
       {"SET", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SET},
+      {"SETVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_SETVAL},
       {"SHA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA},
       {"SHA1", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA1},
       {"SHA2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA2},
@@ -10332,15 +10347,15 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       const char *key= key_as_byte_array.data();
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i)); key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "868" */
+      /* If the following assert happens, you inserted/removed something without changing "874" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (868 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (874 - 1));
 
       /* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 868; ++ii)
+      //for (int ii= 0; ii < 874; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 868, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 874, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -10349,8 +10364,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 868 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 868, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 874 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 874, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -11056,6 +11071,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   if (is_libmysqlclient_loaded == -2)
   {
+    /* Todo: QMessageBox should have a parent, use "= new" */
     QMessageBox msgbox;
     char error_message[2048];
     char t_ldbms_return_string[2048];
@@ -11069,6 +11085,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   if (is_libmysqlclient_loaded == 0)
   {
+    /* Todo: QMessageBox should have a parent, use "= new" */
     QMessageBox msgbox;
     char error_message[2048];
     char t_ldbms_return_string[2048];
@@ -11084,6 +11101,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   {
     if (lmysql->ldbms_mysql_library_init(0, NULL, NULL))
     {
+      /* Todo: QMessageBox should have a parent, use "= new" */
       QMessageBox msgbox;
       msgbox.setText(er_strings[er_off + ER_MYSQL_LIBRARY_INIT_FAILED]);
       msgbox.exec();
@@ -11199,6 +11217,7 @@ void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_num
   s1.append(i_mysql_error_and_state);
   s2= lmysql->ldbms_mysql_error(&mysql[connection_number]);
   s1.append(s2);
+  /* Todo: QMessageBox should have a parent, use "= new" */
   QMessageBox msgbox;
   msgbox.setText(s1);
   msgbox.exec();
@@ -11405,6 +11424,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
 
   if (is_libtarantool_loaded == -2)
   {
+    /* Todo: QMessageBox should have a parent, use "= new" */
     QMessageBox msgbox;
     QString error_message;
     error_message= "Severe error: libtarantool does not have these names: ";
@@ -11418,6 +11438,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
 
   if (is_libtarantool_loaded == 0)
   {
+    /* Todo: QMessageBox should have a parent, use "= new" */
     QMessageBox msgbox;
     QString error_message;
     error_message= "Error, libtarantool was not found or a loading error occurred. Message was: ";
@@ -14991,6 +15012,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
 */
 void MainWindow::connect_make_statement()
 {
+  /* Todo: QMessageBox should have a parent, use "= new" */
   QMessageBox msgBox;
   QString statement_text;
 

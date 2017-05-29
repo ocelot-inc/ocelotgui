@@ -516,6 +516,7 @@ public:
   QString hparse_f_token_to_appendee(QString,int);
   int hparse_f_expect(unsigned short int,unsigned char,int,QString);
   int hparse_f_literal();
+  int hparse_f_integer_literal();
   int hparse_f_default(int);
   int hparse_f_user_name();
   int hparse_f_character_set_name();
@@ -595,6 +596,7 @@ public:
   void hparse_f_for_channel();
   void hparse_f_interval_quantity(int);
   void hparse_f_alter_or_create_event(int);
+  void hparse_f_alter_or_create_sequence(int);
   void hparse_f_alter_or_create_server(int);
   void hparse_f_require(int,bool,bool);
   void hparse_f_user_specification_list();
@@ -1184,6 +1186,7 @@ public:
       TOKEN_KEYWORD_CURRENT_USER,
       TOKEN_KEYWORD_CURSOR,
       TOKEN_KEYWORD_CURTIME,
+      TOKEN_KEYWORD_CYCLE,
       TOKEN_KEYWORD_DATABASE,
       TOKEN_KEYWORD_DATABASES,
       TOKEN_KEYWORD_DATE,
@@ -1408,6 +1411,7 @@ public:
       TOKEN_KEYWORD_LAG,
       TOKEN_KEYWORD_LANGUAGE,
       TOKEN_KEYWORD_LAST,
+      TOKEN_KEYWORD_LASTVAL,
       TOKEN_KEYWORD_LAST_DAY,
       TOKEN_KEYWORD_LAST_INSERT_ID,
       TOKEN_KEYWORD_LAST_VALUE,
@@ -1480,6 +1484,7 @@ public:
       TOKEN_KEYWORD_MINUTE,
       TOKEN_KEYWORD_MINUTE_MICROSECOND,
       TOKEN_KEYWORD_MINUTE_SECOND,
+      TOKEN_KEYWORD_MINVALUE,
       TOKEN_KEYWORD_MLINEFROMTEXT,
       TOKEN_KEYWORD_MLINEFROMWKB,
       TOKEN_KEYWORD_MOD,
@@ -1502,6 +1507,7 @@ public:
       TOKEN_KEYWORD_MULTIPOLYGONFROMWKB,
       TOKEN_KEYWORD_NAME_CONST,
       TOKEN_KEYWORD_NATURAL,
+      TOKEN_KEYWORD_NEXTVAL,
       TOKEN_KEYWORD_NIL,
       TOKEN_KEYWORD_NO,
       TOKEN_KEYWORD_NOPAGER,
@@ -1639,11 +1645,13 @@ public:
       TOKEN_KEYWORD_SELECT,
       TOKEN_KEYWORD_SENSITIVE,
       TOKEN_KEYWORD_SEPARATOR,
+      TOKEN_KEYWORD_SEQUENCE,
       TOKEN_KEYWORD_SERIAL,
       TOKEN_KEYWORD_SERVER,
       TOKEN_KEYWORD_SESSION,
       TOKEN_KEYWORD_SESSION_USER,
       TOKEN_KEYWORD_SET,
+      TOKEN_KEYWORD_SETVAL,
       TOKEN_KEYWORD_SHA,
       TOKEN_KEYWORD_SHA1,
       TOKEN_KEYWORD_SHA2,
@@ -1995,6 +2003,7 @@ enum {
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION,
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
+    TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION,
@@ -2021,6 +2030,7 @@ enum {
     TOKEN_REFTYPE_PARTITION,
     TOKEN_REFTYPE_ROLE,
     TOKEN_REFTYPE_SAVEPOINT,
+    TOKEN_REFTYPE_SEQUENCE,
     TOKEN_REFTYPE_SERVER,
     TOKEN_REFTYPE_STATEMENT,
     TOKEN_REFTYPE_SUBPARTITION,

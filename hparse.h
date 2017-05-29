@@ -160,7 +160,7 @@ bool MainWindow::hparse_f_is_special_verb(int outer_verb)
   hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELETE, "DELETE");
   hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSERT, "INSERT");
   hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPLACE, "REPLACE");
-  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SELECT, "SELECT");
+  hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SELECT, "SELECT");
   hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UPDATE, "UPDATE");
   hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES");
   if (outer_verb == TOKEN_KEYWORD_TRIGGER)
@@ -522,6 +522,25 @@ int MainWindow::hparse_f_literal()
       }
     }
   }
+  return 0;
+}
+
+/*
+  Allow for literal or -literal.
+  Todo: ensure it's an integer.
+  Todo: allow for +literal.
+  Return 1 if integer literal seen.
+*/
+int MainWindow::hparse_f_integer_literal()
+{
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]") == 1)
+    return 1;
   return 0;
 }
 
@@ -1928,7 +1947,6 @@ void MainWindow::hparse_f_opr_18(int who_is_calling, int allow_flags) /* Precede
     }
     return;
   }
-
   /* TODO: This should only work for INSERT ... ON DUPLICATE KEY UPDATE */
   if ((hparse_statement_type == TOKEN_KEYWORD_INSERT)
    && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1))
@@ -1975,6 +1993,27 @@ void MainWindow::hparse_f_opr_18(int who_is_calling, int allow_flags) /* Precede
   }
   int saved_hparse_i= hparse_i;
   hparse_f_next_nexttoken();
+
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0)
+  {
+    if ((hparse_token.toUpper() == "NEXT")
+     || (hparse_token.toUpper() == "PREVIOUS"))
+    {
+      if (hparse_next_token.toUpper() == "VALUE")
+      {
+        if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NEXT") == 0)
+          hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PREVIOUS");
+        hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUE");
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR, "FOR");
+        if (hparse_errno > 0) return;
+        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,TOKEN_REFTYPE_SEQUENCE) == 0)
+          hparse_f_error();
+        if (hparse_errno > 0) return;
+        return;
+      }
+    }
+  }
+
   if (hparse_next_token == "(")
   {
     if ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_FUNCTION) != 0)
@@ -4576,6 +4615,146 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
   }
 }
 
+void MainWindow::hparse_f_alter_or_create_sequence(int statement_type)
+{
+  if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,TOKEN_REFTYPE_SEQUENCE) == 0)
+  {
+    hparse_f_error();
+    return;
+  }
+  bool is_start_seen= false, is_minvalue_seen= false, is_maxvalue_seen= false;
+  bool is_increment_seen= false, is_cycle_seen= false, is_cache_seen= false;
+  bool is_restart_seen= false;
+  for (;;)
+  {
+    if (is_start_seen == false)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_START, "START") == 1)
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH") == 0)
+          hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_f_integer_literal() == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        is_start_seen= true;
+        continue;
+      }
+    }
+    if (is_minvalue_seen== false)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MINVALUE, "MINVALUE") == 1)
+      {
+        hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_f_integer_literal() == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        is_minvalue_seen= true;
+        continue;
+      }
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOMINVALUE") == 1)
+      {
+        is_minvalue_seen= true;
+        continue;
+      }
+    }
+    if (is_maxvalue_seen== false)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAXVALUE, "MAXVALUE") == 1)
+      {
+        hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_f_integer_literal() == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        is_maxvalue_seen= true;
+        continue;
+      }
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOMAXVALUE") == 1)
+      {
+        is_maxvalue_seen= true;
+        continue;
+      }
+    }
+    if (is_increment_seen == false)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INCREMENT") == 1)
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BY, "BY") == 0)
+          hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_f_integer_literal() == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        is_increment_seen= true;
+        continue;
+      }
+    }
+    if (is_cycle_seen == false)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CYCLE, "CYCLE") == 1)
+      {
+        is_cycle_seen= true;
+        continue;
+      }
+    }
+    if (is_cache_seen == false)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CACHE") == 1)
+      {
+        hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_f_integer_literal() == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+        is_cache_seen= true;
+        continue;
+      }
+    }
+    if ((is_restart_seen == false)
+     && (statement_type == TOKEN_KEYWORD_ALTER))
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RESTART") == 1)
+      {
+        bool is_with_seen= false;
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH") == 1) is_with_seen= true;
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1) is_with_seen= true;
+        if (is_with_seen == true)
+        {
+          if (hparse_f_integer_literal() == 0) hparse_f_error();
+        }
+        else
+        {
+          hparse_f_integer_literal();
+        }
+        if (hparse_errno > 0) return;
+        is_restart_seen= true;
+        continue;
+      }
+    }
+    if ((is_minvalue_seen == false)
+     || (is_maxvalue_seen == false)
+     || (is_cycle_seen== false))
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NO, "NO") == 1)
+      {
+        if ((is_minvalue_seen == false)
+         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MINVALUE, "MINVALUE") == 1))
+        {
+          is_minvalue_seen= true;
+          continue;
+        }
+        if ((is_maxvalue_seen == false)
+         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAXVALUE, "MAXVALUE") == 1))
+        {
+          is_maxvalue_seen= true;
+          continue;
+        }
+        if ((is_cycle_seen == false)
+         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CYCLE, "CYCLE") == 1))
+        {
+          is_cycle_seen= true;
+          continue;
+        }
+      }
+    }
+    break;
+  }
+  /* TODO: table options */
+  return;
+}
+
 void MainWindow::hparse_f_alter_or_create_server(int statement_type)
 {
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
@@ -5270,16 +5449,16 @@ int MainWindow::hparse_f_into()
 */
 void MainWindow::hparse_f_with_clause(int block_top)
 {
-  hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RECURSIVE");
-  hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_WITH_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RECURSIVE");
+  hparse_f_expect(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_WITH_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
   if (hparse_errno > 0) return;
   hparse_f_column_list(0, 0);
   if (hparse_errno > 0) return;
-  hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
+  hparse_f_expect(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
   if (hparse_errno > 0) return;
-  hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+  hparse_f_expect(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
   if (hparse_errno > 0) return;
-  if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
+  if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
   {
     hparse_f_values();
     if (hparse_errno > 0) return;
@@ -5289,7 +5468,7 @@ void MainWindow::hparse_f_with_clause(int block_top)
     hparse_f_select(false);
     if (hparse_errno > 0) return;
   }
-  hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  hparse_f_expect(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
   if (hparse_f_is_special_verb(TOKEN_KEYWORD_WITH) == false) return;
   hparse_f_statement(block_top);
@@ -5671,6 +5850,7 @@ void MainWindow::hparse_f_indexes_or_keys() /* for SHOW {INDEX | INDEXES | KEYS}
 #define HPARSE_FLAG_USER       1024
 #define HPARSE_FLAG_VIEW       2048
 #define HPARSE_FLAG_INSTANCE   4096
+#define HPARSE_FLAG_SEQUENCE   8192
 #define HPARSE_FLAG_ANY        65535
 
 void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned short int *hparse_flags, bool *fulltext_seen)
@@ -5728,7 +5908,7 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
     }
     else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && (temporary_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEMPORARY") == 1))
     {
-      temporary_seen= true; (*hparse_flags) &= HPARSE_FLAG_TABLE;
+      temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_SEQUENCE);
     }
     else if ((((*hparse_flags) & (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW)) != 0) && (temporary_seen == false) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEMP") == 1))
     {
@@ -5896,6 +6076,11 @@ void MainWindow::hparse_f_statement(int block_top)
     else if ((((hparse_flags) & HPARSE_FLAG_DATABASE) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCHEMA") == 1))
     {
       hparse_f_alter_database();
+    }
+    else if ((((hparse_flags) & HPARSE_FLAG_SEQUENCE) != 0) && (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SEQUENCE") == 1))
+    {
+      hparse_f_alter_or_create_sequence(TOKEN_KEYWORD_ALTER);
+      if (hparse_errno > 0) return;
     }
     else if ((((hparse_flags) & HPARSE_FLAG_SERVER) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SERVER, "SERVER") == 1))
     {
@@ -6339,6 +6524,11 @@ void MainWindow::hparse_f_statement(int block_top)
     else if (((hparse_flags & HPARSE_FLAG_DATABASE) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SCHEMA, "SCHEMA") == 1))
     {
       hparse_f_create_database();
+      if (hparse_errno > 0) return;
+    }
+    else if (((hparse_flags & HPARSE_FLAG_SEQUENCE) != 0) && (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SERVER, "SEQUENCE") == 1))
+    {
+      hparse_f_alter_or_create_sequence(TOKEN_KEYWORD_CREATE);
       if (hparse_errno > 0) return;
     }
     else if (((hparse_flags & HPARSE_FLAG_SERVER) != 0) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SERVER, "SERVER") == 1))
@@ -6844,6 +7034,21 @@ void MainWindow::hparse_f_statement(int block_top)
         if (hparse_errno > 0) return;
       }
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_SERVER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
+    else if ((online_seen == false) && (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SEQUENCE")))
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF_IN_IF_EXISTS, "IF") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
+        if (hparse_errno > 0) return;
+      }
+      do
+      {
+        if (hparse_errno > 0) return;
+        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_SEQUENCE, TOKEN_REFTYPE_SEQUENCE) == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+      } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
       if (hparse_errno > 0) return;
     }
     else if ((online_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE")))
@@ -7916,6 +8121,11 @@ void MainWindow::hparse_f_statement(int block_top)
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
       }
+      else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SEQUENCE") == 1)
+      {
+        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_SEQUENCE, TOKEN_REFTYPE_SEQUENCE) == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+      }
       else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") == 1)
       {
         if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
@@ -8515,7 +8725,7 @@ void MainWindow::hparse_f_statement(int block_top)
     hparse_f_values();
     return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH"))
+  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH"))
   {
     hparse_statement_type= TOKEN_KEYWORD_WITH;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
@@ -9471,19 +9681,20 @@ int MainWindow::hparse_f_lua_function()
 /* funcbody ::= `(´ [parlist] `)´ block end */
 int MainWindow::hparse_f_lua_funcbody()
 {
-  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(") == 0)
+  hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "(");
+  if (hparse_errno > 0) return 0;
+  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")") == 0)
   {
     hparse_f_lua_parlist();
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return 0;
-    hparse_f_lua_blockseries(lua_calling_statement_type, lua_block_top, false);
-    if (hparse_errno > 0) return 0;
-    hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_END, "end");
-    if (hparse_errno > 0) return 0;
-    return 1;
   }
-  return 0;
+  hparse_f_lua_blockseries(lua_calling_statement_type, lua_block_top, false);
+  if (hparse_errno > 0) return 0;
+  hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_END, "end");
+  if (hparse_errno > 0) return 0;
+  return 1;
 }
 /* parlist ::= namelist [`,´ `...´] | `...´ */
 int MainWindow::hparse_f_lua_parlist()
