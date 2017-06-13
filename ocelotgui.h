@@ -2066,7 +2066,6 @@ enum {
   The letter "f" is arbitrary, it's #define TARANTOOL_FIELD_NAME_BASE.
 
   Todo: probable bug: a map of arrays will probably cause a crash.
-  Todo: consider whether hparse_sql_mode_ansi_quotes should be true.
 */
 
 /* If you want field names to start with "foo" instead of "f", change TARANTOOL_FIELD_NAME_BASE. */
@@ -4071,7 +4070,6 @@ QString fillup(MYSQL_RES *mysql_res,
 {
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
   lmysql= passed_lmysql;
-
   ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
   ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
   ocelot_client_side_functions_copy= ocelot_client_side_functions;
@@ -4211,7 +4209,6 @@ QString fillup(MYSQL_RES *mysql_res,
      said what gridx_row_count is. */
   if (ocelot_result_grid_vertical == 0) grid_result_row_count= gridx_row_count + 1;
   else grid_result_row_count= result_row_count * result_column_count;
-
   if (ocelot_result_grid_vertical == 0)
   {
     gridx_row_count= grid_result_row_count + 1;
@@ -5059,13 +5056,15 @@ int column_number(char *column_name, int *off)
   so we have result_field_names and result_column_count.
   If Lua statement was 'box.space.X:select()" we may have X's field names,
   in read_format_result.
+  If the main connection is also Tarantool, then we make a primary key
+  on the first one or two columns -- todo: these might not be the right
+  columns, and I'm hoping Tarantool won't always have this requirement.
   Todo: max_column_widths might be unreliable if multibyte character.
-  Todo: don't assume primary key is first field
-        primary key isn't even necessary if Tarantool fixes a problem
 */
 int creates(QString create_table_statement, int connections_dbms_0, QString read_format_result)
 {
   QString tmp;
+  QString first_columns= "";
   char *result_field_names_pointer;
   char column_name[512 + 1];
   unsigned int v_length;
@@ -5099,9 +5098,11 @@ int creates(QString create_table_statement, int connections_dbms_0, QString read
       char tmp_column_name[512];
       strcpy(tmp_column_name, word.toUtf8());
       strcat(tmp_column_name, column_name + off);
-      tmp.append(tmp_column_name);
+      strcpy(column_name, tmp_column_name);
     }
-    else tmp.append(column_name);
+    tmp.append(column_name);
+    if (i == 0) first_columns.append(column_name);
+    if (i == 1) {first_columns.append(","); first_columns.append(column_name); }
     if ((result_field_flags[i] & NUM_FLAG) != 0)
     {
       tmp.append(" BIGINT ");
@@ -5112,8 +5113,13 @@ int creates(QString create_table_statement, int connections_dbms_0, QString read
       tmp.append(QString::number(result_max_column_widths[i]));
       tmp.append(") ");
     }
-    if ((i == 0) && (connections_dbms_0 == DBMS_TARANTOOL)) tmp.append("PRIMARY KEY");
     result_field_names_pointer+= v_length;
+  }
+  if (connections_dbms_0 == DBMS_TARANTOOL)
+  {
+    tmp.append(", PRIMARY KEY (");
+    tmp.append(first_columns);
+    tmp.append(")");
   }
   tmp.append(")");
   int result= copy_of_parent->real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */

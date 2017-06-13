@@ -2247,7 +2247,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     if (hparse_f_data_type() == -1) hparse_f_error();
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_is_equal(opd, "CHAR"))
+  else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "CHAR"))
   {
     do
     {
@@ -2358,7 +2358,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   {
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
-  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
 }
 
 void MainWindow::hparse_f_expression_list(int who_is_calling)

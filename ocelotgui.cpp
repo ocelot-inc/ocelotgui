@@ -4021,6 +4021,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
 */
 int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int dbms_query_len)
 {
+  log("make_statement_ready_to_send start", 80);
   int  *token_offsets;
   int  *token_lengths;
   int desired_count;
@@ -4085,6 +4086,7 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
   }
   delete [] token_offsets;
   delete [] token_lengths;
+  log("make_statement_ready_to_send end", 80);
   return (strlen(dbms_query));
 }
 
@@ -6975,6 +6977,7 @@ void MainWindow::remove_statement(QString text)
 */
 int MainWindow::action_execute_one_statement(QString text)
 {
+  log("action_execute_one_statement start", 80);
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set= NULL;
   unsigned short int is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
@@ -7285,6 +7288,7 @@ int MainWindow::action_execute_one_statement(QString text)
   }
 statement_is_over:
   /* statement is over */
+  log("action_execute_one_statement end", 80);
   if (additional_result != TOKEN_KEYWORD_SOURCE)
   {
     history_markup_append(result_set_for_history, true); /* add prompt+statement+result to history, with markup */
@@ -9397,6 +9401,10 @@ int MainWindow::token_type(QChar *token, int token_length)
   }
   if (*token == '"') return TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE;
   if ((*token >= '0') && (*token <= '9')) return TOKEN_TYPE_LITERAL_WITH_DIGIT;
+  if ((token_length > 1) && (*token == '.'))
+  {
+    if ((*(token + 1)>= '0') && (*(token + 1) <= '9')) return TOKEN_TYPE_LITERAL_WITH_DIGIT;
+  }
   //if (*token == '{') return TOKEN_TYPE_LITERAL_WITH_BRACE;
   if ((*token == '{') || (*token == '}')) return TOKEN_TYPE_OPERATOR;
   if (*token == '`') return TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK;
@@ -9966,7 +9974,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"POSITION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POSITION},
       {"POW", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POW},
       {"POWER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POWER},
-      {"PRAGMA", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_PRAGMA},
+      {"PRAGMA", 0, 0, TOKEN_KEYWORD_PRAGMA},
       {"PRECEDES", FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, 0, TOKEN_KEYWORD_PRECEDES},
       {"PRECISION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_PRECISION},
       {"PREPARE", 0, 0, TOKEN_KEYWORD_PREPARE},
@@ -10189,7 +10197,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"TABLESPACE", 0, 0, TOKEN_KEYWORD_TABLESPACE},
       {"TAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TAN},
       {"TEE", 0, 0, TOKEN_KEYWORD_TEE}, /* Ocelot keyword */
-      {"TEMP", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TEMP},
+      {"TEMP", 0, 0, TOKEN_KEYWORD_TEMP},
       {"TEMPORARY", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TEMPORARY},
       {"TERMINATED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TERMINATED},
       {"THEN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_THEN},
@@ -11387,6 +11395,10 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
   After connecting:
     -- get session.id and version
     -- todo: if version is old we shouldn't try to use SQL
+  ansi_quotes:
+    With Tarantool " can be a delimiter or it can be a quote mark,
+    and there's no easy way to signal (maybe I should add --ansi_quotes?)
+    so we guess that users are sane. I hope this becomes policy someday.
 */
 int MainWindow::connect_tarantool(unsigned int connection_number,
                                   QString port_maybe,
@@ -11543,6 +11555,8 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     return 0;
   }
 
+  hparse_sql_mode_ansi_quotes= true; /* see comment = ansi_quotes */
+
   /*
     Todo: This overrides any earlier PROMPT statements by user.
     Probably what we want is a flag: "if user did PROMPT, don't override it."
@@ -11585,7 +11599,7 @@ QString MainWindow::tarantool_internal_query(char *query,
   {
     uint32_t value_length;
     const char *value;
-    char value_as_string[64]; /* must be big enough for any sprintf() result */
+    char value_as_string[320]; /* must be big enough for any sprintf() result */
     char field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply.data);
     /* if field_type != MP_ARRAY that's an error but we just return "" */
     if (field_type == MP_ARRAY)
@@ -11736,6 +11750,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
                                      unsigned int passed_main_token_number,
                                      unsigned int passed_main_token_count_in_statement)
 {
+  log("tarantool_real_query start", 80);
   tarantool_errno[connection_number]= 10001;
   strcpy(tarantool_errmsg, "Unknown Tarantool Error");
 
@@ -11763,6 +11778,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
                           connection_number,
                           statement_type,
                           s);
+    log("tarantool_real_query end", 80);
     return tarantool_errno[connection_number];
   }
 
@@ -12180,6 +12196,7 @@ int MainWindow::tarantool_execute_sql(
 */
 QString MainWindow::tarantool_add_return(QString s)
 {
+  log("tarantool_add_return start", 80);
   int token_offsets[100]; /* Surely a single assignable target can't have more */
   int token_lengths[100];
   tokenize(s.data(),
@@ -12200,6 +12217,7 @@ QString MainWindow::tarantool_add_return(QString s)
     if ((word_2 == "") || (word_2 == "(")) break;
     if (word_2 == "=") return s;
   }
+  log("tarantool_add_return end", 80);
   return "return " + s;
 }
 
@@ -12412,7 +12430,6 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
 {
   const char *original_tarantool_tnt_reply_data= tarantool_tnt_reply_data;
   unsigned int total_length= 0;
-
   char field_type;
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   if (field_type != MP_ARRAY) return "tarantool_fetch_row: field_type != MP_ARRAY";
@@ -12426,7 +12443,7 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
     uint32_t value_length;
     const char *value;
     (void) value; /* suppress 'variable set but not used' warning */
-    char value_as_string[64]; /* must be big enough for any sprintf() result */
+    char value_as_string[320]; /* must be big enough for any sprintf() result */
     if (field_type == MP_NIL)
     {
       lmysql->ldbms_mp_decode_nil(&tarantool_tnt_reply_data);
@@ -12481,7 +12498,7 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
     if (field_type == MP_DOUBLE)
     {
       double double_value= lmysql->ldbms_mp_decode_double(&tarantool_tnt_reply_data);
-      value_length= sprintf(value_as_string, "%f", double_value);
+      value_length= sprintf(value_as_string, "%E", double_value);
     }
     if (field_type == MP_EXT)
     {
@@ -12591,14 +12608,12 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   ResultGrid *rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
 
   for (i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;
-
   /*
     First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
   */
   unsigned int total_size= 0;
   char *result_set_copy_pointer;
   tarantool_tnt_reply_data_copy= tarantool_seek_0(&returned_result_set_type); /* "seek to row 0" */
-
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                /* first loop */
   {
     int bytes;
@@ -12640,7 +12655,7 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     if (field_count > p_result_column_count) return "tarantool_scan_rows: field_count > p_result_column_count";
     const char *value;
     uint32_t value_length;
-    char value_as_string[64]; /* must be big enough for any sprintf() result */
+    char value_as_string[320]; /* must be big enough for any sprintf() result */
     /*
       Number of fields = number of names in field_name_list.
       At this point we can skip over MP_ARRAY and MP_MAP because we only care about scalars.
@@ -12751,7 +12766,7 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         else if (field_type == MP_DOUBLE)
         {
           double double_value= lmysql->ldbms_mp_decode_double(&tarantool_tnt_reply_data_copy);
-          value_length= sprintf(value_as_string, "%f", double_value);
+          value_length= sprintf(value_as_string, "%E", double_value);
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
@@ -12786,7 +12801,6 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       ++field_number_in_main_list;
     }
   }
-
   /* Now that names are sorted, we can shorten them e.g. f_0001_0007_0001_0001 becomes f_7_1_1. */
   for (unsigned int i= 0; i < p_result_column_count; ++i)
   {
@@ -12809,7 +12823,6 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       *(c + k - 2)= '\0';
     }
   }
-
   if (returned_result_set_type == 5)
   {
     QString fetch_header_row_result= tarantool_fetch_header_row(p_result_column_count);
