@@ -699,7 +699,7 @@ int MainWindow::hparse_f_collation_name()
   e.g. we might pass TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE
 */
 int MainWindow::hparse_f_qualified_name_of_object(int database_or_object_identifier, int object_identifier)
-{ 
+{
   if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
     && (object_identifier == TOKEN_REFTYPE_TABLE)
     && (hparse_token == "."))
@@ -1297,13 +1297,23 @@ int MainWindow::hparse_f_table_join_table()
 {
   if (hparse_f_table_reference(TOKEN_KEYWORD_JOIN) == 1)
   {
-    bool inner_or_cross_seen= false;
+    bool inner_or_cross_or_join_seen= false;
     for (;;)
     {
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "INNER") == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CROSS, "CROSS") == 1))
+      bool inner_seen= false;
+      bool cross_seen= false;
+      bool join_seen= false;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "INNER") == 1)
+        inner_seen= true;
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "CROSS") == 1)
+        cross_seen= true;
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "JOIN") == 1)
+        join_seen= true;
+      if (inner_seen | cross_seen | join_seen)
       {
-        inner_or_cross_seen= true;
-        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
+        inner_or_cross_or_join_seen= true;
+        if (inner_seen | cross_seen)
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
         if (hparse_errno > 0) return 0;
         if (hparse_f_table_factor() == 0)
         {
@@ -1315,7 +1325,7 @@ int MainWindow::hparse_f_table_join_table()
       }
       else break;
     }
-    if (inner_or_cross_seen == true) return 1;
+    if (inner_or_cross_or_join_seen == true) return 1;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STRAIGHT_JOIN, "STRAIGHT_JOIN") == 1)
     {
       if (hparse_f_table_factor() == 0)
@@ -1350,13 +1360,10 @@ int MainWindow::hparse_f_table_join_table()
       if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LEFT, "LEFT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RIGHT, "RIGHT") == 1))
       {
         main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+        hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER");
       }
-      else
-      {
-        hparse_f_error();
-        return 0;
-      }
-      hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OUTER, "OUTER");
+      else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "INNER") == 1) {;}
+      else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CROSS, "CROSS") == 1) {;}
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JOIN, "JOIN");
       if (hparse_errno > 0) return 0;
       if (hparse_f_table_factor() == 0)
@@ -2226,17 +2233,31 @@ int MainWindow::hparse_f_over_end()
   TODO: Recognize all 400+ built-in functions.
   Until then, we'll assume any function has a generalized comma-delimited expression list.
   But we still have to handle the ones that don't have simple lists.
+  Todo: Tarantool accepts MAX(ALL opd), but that's probably a mistake.
 */
 void MainWindow::hparse_f_function_arguments(QString opd)
 {
-  if ((hparse_f_is_equal(opd,"AVG"))
+  if ((hparse_f_is_equal(opd, "AVG"))
    || (hparse_f_is_equal(opd, "SUM"))
    || (hparse_f_is_equal(opd, "MIN"))
    || (hparse_f_is_equal(opd, "MAX")))
   {
-    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT");
-    hparse_f_opr_1(0);
-    if (hparse_errno > 0) return;
+    bool distinct_seen= false;
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)
+      distinct_seen= true;
+    if ((hparse_f_is_equal(opd, "AVG"))
+     || (hparse_f_is_equal(opd, "SUM"))
+     || ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) == 0)
+     || (distinct_seen == true))
+    {
+      hparse_f_opr_1(0);
+      if (hparse_errno > 0) return;
+    }
+    else do
+    {
+      hparse_f_opr_1(0);
+      if (hparse_errno > 0) return;
+    } while (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
   else if (hparse_f_is_equal(opd, "CAST"))
   {
@@ -2297,11 +2318,11 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   {
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1))
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1))
     {
       hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR") == 1))
+      if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR") == 1))
       {
         hparse_f_opr_1(0);
         if (hparse_errno > 0) return;
@@ -2315,7 +2336,8 @@ void MainWindow::hparse_f_function_arguments(QString opd)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRAILING") == 1)) {;}
     hparse_f_opr_1(0);
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1)
+    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1))
     {
       hparse_f_opr_1(0);
       if (hparse_errno > 0) return;
