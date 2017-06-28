@@ -4540,6 +4540,8 @@ void* debuggee_thread(void* unused)
   /* Here I am overwriting DEBUGGEE_WAIT_LOOP_ERROR / DEBUGGEE_STATE_END. Maybe they're informative but they caused trouble. */
   //debuggee_state= DEBUGGEE_STATE_0;
 
+  printf("DEBUGGEE_THREAD END\n");
+
   /* options_and_connect called mysql_init which called mysql_thread_init, so cancel it */
   lmysql->ldbms_mysql_thread_end();
   /* The thread will end. */
@@ -4712,6 +4714,7 @@ void MainWindow::debug_setup_go(QString text)
 */
 void MainWindow::debug_setup_mysql_proc_insert()
 {
+  log("debug_setup_mysql_proc_insert start", 90);
   char command[512];
   MYSQL_RES *res= NULL;
   MYSQL_ROW row= NULL;
@@ -4933,6 +4936,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
     res= NULL;
   }
 
+  log("debug_setup_mysql_proc_insert end", 90);
   lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "set session sql_mode=@xxxmdbug_saved_sql_mode");
 
   if (unexpected_error != NULL)
@@ -6061,7 +6065,6 @@ void MainWindow::debug_other_go(QString text)
   }
   q_schema_name= debug_q_schema_name_in_statement;
   q_routine_name= debug_q_routine_name_in_statement;
-
   if (debug_error((char*)"") != 0) return;
   if (debug_call_xxxmdbug_command(command_string) != 0) return;
   put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
@@ -9659,7 +9662,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"ESCAPE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ESCAPE},
       {"ESCAPED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ESCAPED},
       {"EVENT", 0, 0, TOKEN_KEYWORD_EVENT},
-      {"EXCEPT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_EXCEPT},
+      {"EXCEPT", FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_EXCEPT},
       {"EXCHANGE", 0, 0, TOKEN_KEYWORD_EXCHANGE},
       {"EXCLUSIVE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_EXCLUSIVE},
       {"EXECUTE", 0, 0, TOKEN_KEYWORD_EXECUTE},
@@ -9765,7 +9768,7 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"INT8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT8},
       {"INTEGER", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INTEGER},
       {"INTERIORRINGN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERIORRINGN}, /* deprecated in MySQL 5.7.6 */
-      {"INTERSECT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_INTERSECT},
+      {"INTERSECT", FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_INTERSECT},
       {"INTERSECTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERSECTS}, /* deprecated in MySQL 5.7.6 */
       {"INTERVAL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERVAL},
       {"INTO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INTO},

@@ -5511,28 +5511,38 @@ int MainWindow::hparse_f_values()
 
 int MainWindow::hparse_f_unionize()
 {
+  bool is_union= false;
+  bool is_except= false;
+  bool is_intersect= false;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNION") == 1)
+    is_union= true;
+  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCEPT") == 1)
+    is_except= true;
+  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
+    is_intersect= true;
+  if ((is_union == false) && (is_except == false) && (is_intersect == false))
+    return 1;
+  if (is_union == true)
   {
-    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)) {;}
-    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
-    {
-      hparse_f_values();
-      if (hparse_errno > 0) return 0;
-    }
-    else if (hparse_f_select(false) == 0)
-    {
-      hparse_f_error();
-      return 0;
-    }
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1)
+      {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)
+      {;}
   }
-  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
-   || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCEPT") == 1))
+  else /* must be except|intersect with mariadb 10.3 */
   {
-    if (hparse_f_select(false) == 0)
-    {
-      hparse_f_error();
-      return 0;
-    }
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)
+      {;}
+  }
+  if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
+  {
+    hparse_f_values();
+    if (hparse_errno > 0) return 0;
+  }
+  else if (hparse_f_select(false) == 0)
+  {
+    hparse_f_error();
+    return 0;
   }
   if (hparse_errno > 0) return 0;
   return 1;
