@@ -1,12 +1,12 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.4
-   Last modified: December 30 2016
+   Version: 1.0.5
+   Last modified: July 2 2017
 */
 
 /*
-  Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.
+  Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -357,7 +357,7 @@
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.4"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.5"; /* For --version. Make sure it's in manual too. */
 
   static unsigned short int dbms_version_mask;
 
@@ -2792,7 +2792,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2016 by Ocelot Computer Services Inc.<br>\
+<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2017 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -2833,10 +2833,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.4, December 15 2016  \
+  <BR>Version 1.0.5, July 2 2017  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2014-2016 by Ocelot Computer Services Inc. All rights reserved.  \
+  <BR>Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -4539,8 +4539,6 @@ void* debuggee_thread(void* unused)
 
   /* Here I am overwriting DEBUGGEE_WAIT_LOOP_ERROR / DEBUGGEE_STATE_END. Maybe they're informative but they caused trouble. */
   //debuggee_state= DEBUGGEE_STATE_0;
-
-  printf("DEBUGGEE_THREAD END\n");
 
   /* options_and_connect called mysql_init which called mysql_thread_init, so cancel it */
   lmysql->ldbms_mysql_thread_end();
@@ -13103,7 +13101,7 @@ QString MainWindow::tarantool_read_format(QString lua_request)
   we printf(message).
   We also fflush(stdout) which is usually unnecessary (messages
   are printed with "\n") unless stdout has been redirected to a file.
-  ocelot_log default value = 100, can be changed with --ocelot_log==N.
+  ocelot_log_level default value = 100, can be changed with --ocelot_log_level==N.
   Todo: consider using stderr or a named file.
   Todo: attach a timer or counter so printf occurs if dangers exist.
   Todo: consider using a bit mask instead of a greater-than comparison.
@@ -15455,7 +15453,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2014-2016 by Ocelot Computer Services Inc. and others\n");
+  printf("Copyright (c) 2014-2017 by Ocelot Computer Services Inc. and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");

@@ -58,5 +58,5 @@ ocelot_extra_rule_1_display_as='image'
 ocelot_dbms='mysql'
 ocelot_client_side_functions=1
 ocelot_grid_tabs=10
-
+ocelot_log_level=100
 
