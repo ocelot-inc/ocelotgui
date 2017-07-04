@@ -121,9 +121,6 @@ sudo rpm -i ocelotgui-1.0.5qt4-1.x86_64.rpm</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
 wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.5/ocelotgui-1.0.5-1.x86_64.rpm
 sudo rpm -i ocelotgui-1.0.5-1.x86_64.rpm</PRE>
-For 32-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.5/ocelotgui-1.0.5qt4-1.i686.rpm
-sudo rpm -i ocelotgui-1.0.5qt4-1.i686.rpm</PRE>
 </P>
 
 <H3 id="getting-and-using-the-ocelotgui-source">Getting and using the ocelotgui source</H3><HR>
