@@ -8822,7 +8822,9 @@ void MainWindow::hparse_f_statement(int block_top)
     if ((dbms_version_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
       if (hparse_errno > 0) return;
+#ifdef DBMS_TARANTOOL
       hparse_f_lua_blocklist(0, hparse_i);
+#endif
     }
     else hparse_f_error();
   }

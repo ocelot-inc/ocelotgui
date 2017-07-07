@@ -21,20 +21,22 @@
 #define DEBUGGER
 
 /*
-  The possible DBMS values.
-  DBMS_MYSQL must always be defined and --dbms='mysql' is default.
-  If DBMS_MARIADB is defined and --ocelot_dbms='mariadb',
-    accept existence of MariaDB 10.1 roles and compound statements.
-  If DBMS_TARANTOOL is defined and --ocelot_dbms='tarantool',
-    connection is to a Tarantool server not a MySQL/MariaDB server, but
-    won't work on Windows because Tarantool library is not available.
+  The possible DBMS values. Nowadays these are always defined,
+  except Tarantool if Windows. These are related to ocelot_dbms values.
+  --ocelot_dbms='mysql' is default.
+  --ocelot_dbms='mariadb' is non-default but officially supported.
+  --ocelot_dbms='tarantool' is non-default and experimental.
+  If we start as MySQL but then connect to MariaDB, or vice versa,
+  it's okay because we change to what we connected to.
+  If --ocelot_dbms='tarantool',
+  connection is to a Tarantool server not a MySQL/MariaDB server, but
+  wouldn't work on Windows because Tarantool library is not available.
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
 #ifdef __linux
 #define DBMS_TARANTOOL 3
 #endif
-
 #define FLAG_VERSION_MYSQL_5_5      1
 #define FLAG_VERSION_MYSQL_5_6      2
 #define FLAG_VERSION_MYSQL_5_7      4
@@ -95,6 +97,11 @@
 
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
+
+/* Strangely MYSQL_PORT might not be brought in by #include <mysql.h> */
+#ifndef MYSQL_PORT
+#define MYSQL_PORT 3306
+#endif
 
 /*
   Linux-specific:
@@ -677,7 +684,8 @@ public:
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
   bool hparse_f_is_nosql(QString);
-
+  void log(const char*,int);
+  int real_query(QString, int);
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
   void tparse_f_term();
@@ -710,8 +718,6 @@ public:
                  char **p_result_field_names);
   int create_table_server(QString, bool *, unsigned int, unsigned int);
   QString tarantool_read_format(QString);
-  void log(const char*,int);
-  int real_query(QString, int);
 #endif
   QVBoxLayout *main_layout;
 

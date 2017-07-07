@@ -1,37 +1,135 @@
-New Feature: ocelotgui will run on Microsoft Windows (32-bit)
+How to build ocelotgui on Microsoft Windows
+
 
 Although Ocelot does not supply a package for Windows,
-it can be built from source files as of 2016-06-14.
+it can be built from source files.
 You will need Qt, CMake, MySQL, and ocelotgui source.
 
-For Qt: Go to www.qt.io/download-open-source
-    Avoid/skip any suggestion to login -- there can be no special license
-    After installation is complete, you should have Qt in
-    something like C:\Qt\Qt5.6.1 and MinGW compiler gcc.exe in
-    c:\Qt\Qt5.6.1\Tools\mingw492_32\bin\gcc.
+This is a 32-bit download but it also runs on 64-bit machines.
+It has been tested with Windows 8 32-bit and with Windows 10 64-bit.
 
-For MySQL: it's simplest to install the whole package,
+These instructions work if and only if you clone the latest source, i.e.
+git clone https://github.com/ocelot-inc/ocelotgui.git c:\ocelotgui
+as instructed below. There have been fixes that were done after Release 1.0.5.
+
+For Qt:
+    Go to www.qt.io/download-open-source
+    Click "Download now" to download the Qt online installer.
+    Soon your download directory will contain a file like
+    qt-unified-windows-x86-3.0.0-online.exe
+    (The version number might be different.)
+    Skip any suggestion to login or use a special license.
+    Choose Installation Folder = C:\Qt
+    Choose Start Menu shortcuts = System Tools (doesn't matter)
+    The installer will take a while to download around 190MB.
+    After installation is complete, you should have Qt in
+    something like C:\Qt\5.9.1 and MinGW compiler gcc.exe in
+    c:\Qt\Tools\mingw530_32\bin\gcc.exe.
+    The names include version numbers and change frequently,
+    but if you see "\Qt5.x.x" (or just "\5.x.x") and
+    "\mingwxxx_32", all is well.
+    You probably will have to say SET PATH later, with the
+    correct names, as we'll see later.
+
+For MySQL: it's simplest to install the whole MySQL package,
     although the only things necessary here are the
     client shared library and the usual include files.
-    After installation is complete, you should have mysql.h in
-    C:\Program Files\MySQL\MySQL Server 5.7\include\mysql.h
+    After installation is complete, you probably have mysql.h in
+    C:\Program Files\MySQL\MySQL Server 5.7\include
+
+    Alternatively you can go to downloads.mariadb.org and
+    download MariaDB Connector/C (you have to click on the
+    file name mariadb-connector-c-3.0.1-beta-win32.msi and
+    then click save, for the "Complete" installation). See
+    mariadb.com/kb/en/mariadb/installing-mariadb-msi-packages-on-windows
+    If you do it this way, then, after installation is complete,
+    you probably have mysql.h in
+    C:\Program Files (x86)\MariaDB\MariaDB Connector C\include
 
 For CMake: go to cmake.org/download
+    When asked which installer to use, probably they all are
+    okay, but Ocelot only tested with
+    cmake-3.9.0-rc5-win32-x86.msi.
     When asked whether to add Cmake to the system path, say yes.
+    However, that might not work, so find where cmake's bin
+    directory is in case you have to use SET PATH later.
+    Probably it is C:\Program Files (x86)\CMake\bin
+
+For git: go to git-scm.com/downloads
+    Although git is not strictly necessary, it does provide an
+    easy way to download ocelotgui in the next step.
+    If you do not put git on the system path, you should make
+    its bin directory the default directory now. That is:
+    cd C:\Program Files\Git\bin
 
 For ocelotgui: go to github.com/ocelot-inc/ocelotgui
-    You need to make sure you are getting recent source
-    with the patches done on or after June 14 2016,
-    so use the more recent "release" files,
-    earlier "release" files will not work. An
-    easy choice is git clone (to install git, see git-scm.com/downloads).
+    You need to get the source files from this site.
+    First, decide where you want the download to be --
+    we'll assume it is c:\ocelotgui. Then
     git clone https://github.com/ocelot-inc/ocelotgui.git c:\ocelotgui
 
+#Make sure cmake is in the path.
+#Replace "C:\Program Files (x86)\CMake\bin" with the directory
+#where it was actually installed, in the "For Cmake:" step.
+SET PATH=C:\Program Files (x86)\CMake\bin;%path%
+
+#Make sure Qt's libraries and include files are in the path.
+#In the following, replace all occurrences of "mingw530" with
+#the actual mingw version that is in what you downloaded,
+#in the "For Qt:" step.
+SET PATH=C:\Qt\Tools\mingw530_32\bin;C:\Qt\Tools\mingw530_32\lib;%path%
+
+#Make sure Qt5WidgetsConfig.cmake is in the path.
+#This is tricky because the directory name probably does
+#not include "mingwxxx_32". Search with
+# CD C:\Qt
+# DIR /s Qt5WidgetsConfig.cmake
+#Note what directory Qt5WidgetsConfig.cmake is in.
+#If it's not the same as what's below, change what's below.
+SET PATH=C:\Qt\5.9.1\mingw53_32\lib\cmake\Qt5Widgets;%path%
+
+#Make sure qmake.exe is in the path.
+#This is tricky because the directory name probably does
+#not include "mingwxxx_32". Search with
+# CD C:\Qt
+# DIR /s qmake.exe
+#Note what directory qmake.exe is in.
+#If it's not the same as what's below, change what's below.
+SET PATH=C:\Qt\5.9.1\mingw53_32\bin;%path%
+
+#This additional path setting is probably not necessary:
+SET PATH=C:\Qt\Tools\QtCreator\bin;%path%
+
+#The default directory should be where you downloaded
+#in the "For ocelotgui:" step.
 cd c:\ocelotgui
-SET PATH=C:\Qt\qt5.6.1\Tools\mingw492_32\bin;C:\Qt\qt5.6.1\Tools\mingw492_32\lib;C:\Qt\qt5.6.1\5.6\mingw49_32\bin;%path%
+
+#Invoke cmake.
+#Replace "C:/Program Files/MySQL/MySQL Server 5.7/include" with
+#the actual MySQL-include or MariaDB-include that you downloaded,
+#in the "For MySQL:" step.
 cmake . -G "MinGW Makefiles" -DMYSQL_INCLUDE_DIR="C:/Program Files/MySQL/MySQL Server 5.7/include"
+
+#Make. The assumption is that mingw32-make is still in the path.
 mingw32-make
-And now there should be a file named c:\ocelotgui\ocelotgui.exe.
+
+Eventually -- it can take a long time -- there should be a file
+named c:\ocelotgui\ocelotgui.exe.
+
+One more SET PATH -- ocelotgui will look for a file libmysql.dll.
+If you installed MySQL, it will probably be in a default path.
+If you installed MariaDB, it's a bit more complex because the
+file that you need is named libmariadb.dll. This will fix it:
+cd c:\ocelotgui
+copy C:\Program Files (x86)\MariaDB\MariaDB Connector C\lib\libmariadb.dll libmysql.dll
+
+Now run ocelotgui.exe, just say
+ocelotgui
+
+There might be warnings about fonts, but they can be ignored.
+We recommend that whenever you run ocelotgui.exe you use the
+same SET PATH commands as you used when you did the building.
+
 This has the same functionality as the Linux ocelotgui program,
 but has not been tested on all major Windows versions.
 When connecting, use protocol=tcp.

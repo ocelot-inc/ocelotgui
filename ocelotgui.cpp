@@ -2611,8 +2611,10 @@ void MainWindow::action_exit()
   {
     /* Todo: if there was a successful connection, close it */
 #ifdef __linux
+#ifdef DBMS_TARANTOOL
     if (is_libtarantool_loaded == 1) { dlclose(libtarantool_handle); is_libtarantool_loaded= 0; }
     if (is_libtarantoolnet_loaded == 1) { dlclose(libtarantoolnet_handle); is_libtarantoolnet_loaded= 0; }
+#endif
 #endif
   }
   else
@@ -7061,8 +7063,13 @@ int MainWindow::action_execute_one_statement(QString text)
     {
       /* Look for a CREATE TABLE statement with a SERVER clause. */
       bool is_create_table_server;
+#ifdef DBMS_TARANTOOL
       int result= create_table_server(text, &is_create_table_server, main_token_number, main_token_count_in_statement);
       dbms_long_query_result= result;
+#else
+      dbms_long_query_result= 0;
+      is_create_table_server= false;
+#endif
       if (is_create_table_server == false)
         real_query(query_utf16, MYSQL_MAIN_CONNECTION);
 
@@ -12890,6 +12897,7 @@ void MainWindow::tarantool_scan_field_names(
 
 #endif
 
+#ifdef DBMS_TARANTOOL
 /*
   Handle CREATE [TEMPORARY] TABLE table-name SERVER server-name 'literal';
   We want to exeute the literal on the remote server created
@@ -13042,7 +13050,9 @@ int MainWindow::create_table_server(QString text,
   delete rg;
   return result;
 }
+#endif
 
+#ifdef DBMS_TARANTOOL
 /*
   Pass: lua_request which might contain space_name.
   Read the _space tuple for space_name. Example:
@@ -13094,6 +13104,7 @@ QString MainWindow::tarantool_read_format(QString lua_request)
   }
   return read_format_result;
 }
+#endif
 
 /*
   log() may be useful for debugging if the program is acting strangely.
