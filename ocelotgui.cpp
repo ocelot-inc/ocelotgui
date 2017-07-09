@@ -1978,6 +1978,33 @@ void MainWindow::create_menu()
   connect(menu_help_action_settings, SIGNAL(triggered()), this, SLOT(action_settings()));
 }
 
+/*
+  TO DO: In Progress
+
+  Change any shortcut with SET ocelot_shortcut_xxx = 'xxx';
+  e.g. SET ocelot_shortcut_exit = 'Ctrl+Z'; (instead of 'Ctrl"Q')
+  See also http://doc.qt.io/qt-4.8/qkeysequence.html#fromString
+  I have tested
+  SET ocelot_shortcut_exit = 'Alt+L';
+  and it works (File|Exit menu shows Alt+L, and Alt+L causes quit).
+  Thus changing what's in create_menu()
+  Todo: ensure two keys don't have the same action (error check).
+  Todo: syntax checker should see this.
+  Todo: my.cnf should allow this.
+  Todo: all the other shortcut keys.
+  Todo: also, something for "what to execute" e.g. SQL statement.
+  Todo: error checks and warnings/errors
+  Todo: The format shortcut should be Ctrl+Shift+F, but isn't.
+        See the comment about this in ocelotgui.cpp.
+  Todo: There is no GUI "shortcut editor" here, but such things exist:
+        see doc.qt.io/qt-5/qkeysequenceedit.html#details.
+        We could show a table with current settings, and let
+        users pick or type in a key sequence.
+*/
+void MainWindow::shortcut(QString type, QString ccn)
+{
+  if (type == "exit") menu_file_action_exit->setShortcut(QKeySequence(ccn));
+}
 
 /*
   Edit Menu Dispatcher
@@ -8406,6 +8433,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         int i= ccn.toInt();
         if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_raw= i;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_shortcut_exit", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        shortcut("exit", ccn);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
     }

@@ -786,6 +786,7 @@ public slots:
   void action_debug_refresh_call_stack();
   void action_debug_timer_status();
 #endif
+  void shortcut(QString,QString);
   void menu_edit_undo();
   void menu_edit_redo();
   void menu_edit_cut();
