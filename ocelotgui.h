@@ -786,7 +786,7 @@ public slots:
   void action_debug_refresh_call_stack();
   void action_debug_timer_status();
 #endif
-  void shortcut(QString,QString);
+  int shortcut(QString,QString,bool,bool);
   void menu_edit_undo();
   void menu_edit_redo();
   void menu_edit_cut();
@@ -996,6 +996,30 @@ private:
   char *tarantool_field_names;
   bool tarantool_select_nosql;
 #endif
+
+  QKeySequence ocelot_shortcut_connect_keysequence;
+  QKeySequence ocelot_shortcut_exit_keysequence;
+  QKeySequence ocelot_shortcut_undo_keysequence;
+  QKeySequence ocelot_shortcut_redo_keysequence;
+  QKeySequence ocelot_shortcut_cut_keysequence;
+  QKeySequence ocelot_shortcut_copy_keysequence;
+  QKeySequence ocelot_shortcut_paste_keysequence;
+  QKeySequence ocelot_shortcut_select_all_keysequence;
+  QKeySequence ocelot_shortcut_history_markup_previous_keysequence;
+  QKeySequence ocelot_shortcut_history_markup_next_keysequence;
+  QKeySequence ocelot_shortcut_execute_keysequence;
+  QKeySequence ocelot_shortcut_kill_keysequence;
+  QKeySequence ocelot_shortcut_breakpoint_keysequence;
+  QKeySequence ocelot_shortcut_continue_keysequence;
+  QKeySequence ocelot_shortcut_next_keysequence;
+  QKeySequence ocelot_shortcut_step_keysequence;
+  QKeySequence ocelot_shortcut_clear_keysequence;
+  QKeySequence ocelot_shortcut_debug_exit_keysequence;
+  QKeySequence ocelot_shortcut_information_keysequence;
+  QKeySequence ocelot_shortcut_refresh_server_variables_keysequence;
+  QKeySequence ocelot_shortcut_refresh_user_variables_keysequence;
+  QKeySequence ocelot_shortcut_refresh_variables_keysequence;
+  QKeySequence ocelot_shortcut_refresh_call_stack_keysequence;
 
 public:
   int tarantool_execute_sql(const char *, unsigned long, unsigned int, int, QString);
