@@ -469,7 +469,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   But QT_QPA_PLATFORMTHEME= did not solve.
   So insist that the menu goes in MainWindow.
 */
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
   ui->menuBar->setNativeMenuBar(false);
 #endif
 
@@ -1724,7 +1724,7 @@ int MainWindow::history_file_start(QString history_type, QString file_name) /* s
 
   /* If file name == "/dev/null" or something that links to "/dev/null", don't try to open. */
   if (file_name_to_open == "/dev/null") { delete []query; return 0; }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
   char tmp_link_file[9 + 1];
   if (readlink(query, tmp_link_file, 9 + 1) == 9)
   {
@@ -3005,7 +3005,7 @@ void MainWindow::action_exit()
   if (ocelot_dbms.contains("tarantool", Qt::CaseInsensitive))
   {
     /* Todo: if there was a successful connection, close it */
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
 #ifdef DBMS_TARANTOOL
     if (is_libtarantool_loaded == 1) { dlclose(libtarantool_handle); is_libtarantool_loaded= 0; }
     if (is_libtarantoolnet_loaded == 1) { dlclose(libtarantoolnet_handle); is_libtarantoolnet_loaded= 0; }
@@ -3040,7 +3040,7 @@ void MainWindow::action_exit()
     }
     /* Some code added 2015-08-25 due to valgrind */
     if (lmysql != 0) { delete lmysql; lmysql= 0; }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
     if (is_libmysqlclient_loaded == 1) { dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
     if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
 #endif
@@ -3310,7 +3310,10 @@ void MainWindow::action_libmysqlclient()
   1. Find the right libmysqlclient.so with Linux 'find' or 'locate'. \
   Suppose it is /home/jeanmartin/libmysqlclient.so.<br> \
   2. Specify the library when starting ocelotgui, thus:<br> \
-  LD_RUN_PATH=/home/jeanmartin ocelotgui";
+  LD_RUN_PATH=/home/jeanmartin ocelotgui<br> \
+  ... ocelotgui will also look for libmariadbclient.so or \
+  libmariadb.so in the same fashion but will look first for \
+  libmysqlclient.so unless one starts with ocelot_dbms='mariadb'.";
   Message_box *message_box;
   message_box= new Message_box("Help|libmysqlclient", the_text, 500, this);
   message_box->exec();
@@ -11470,23 +11473,34 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 
   ldbms_return_string= "";
 
-  /* Find libmysqlclient. Prefer ld_run_path, within that prefer libmysqlclient.so.18. */
-  if (is_libmysqlclient_loaded != 1)
+  /* Find libmysqlclient. Prefer ld_run_path, within that prefer libmysqlclient.so.18.
+    Generally libmysqlclient.so will have a symlink to libmariadb.so
+    or to libmariadbclient.so. But not always. Not on Windows.
+    And not on some MariaDB releases -- there were some renames and
+    some bugs with missing symlinks.
+    Also, if ocelot_dbms=mysql, the libmysqlclient searches come first,
+    but if ocelot_dbms=mariadb, the libmariadb searches come first.
+    So try multiple combinations. e.g. if libmysqlclient.so.18 didn't
+    get loaded, try libmysqlclient without a version number.
+  */
+  for (int i= 1; i < 12; ++i)
   {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
-  }
-  /* if libmysqlclient.so.18 didn't get loaded, try libmysqlclient without a version number */
-  if (is_libmysqlclient_loaded != 1)
-  {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
-  }
-  if (is_libmysqlclient_loaded != 1)
-  {
-    lmysql->ldbms_get_library("", &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT18);
-  }
-  if (is_libmysqlclient_loaded != 1)
-  {
-    lmysql->ldbms_get_library("", &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, WHICH_LIBRARY_LIBMYSQLCLIENT);
+    QString li_path;
+    int li_lib;
+    if (i == 1) {if (connections_dbms[0] == DBMS_MARIADB) continue; li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT18; }
+    if (i == 2) {if (connections_dbms[0] == DBMS_MARIADB) continue; li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT; }
+    if (i == 3) {                                                   li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMARIADBCLIENT; }
+    if (i == 4) {                                                   li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMARIADB; }
+    if (i == 5) {if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT18; }
+    if (i == 6) {if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT; }
+    if (i == 7) {if (connections_dbms[0] == DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT18; }
+    if (i == 8) {if (connections_dbms[0] == DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT; }
+    if (i == 9) {                                                   li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMARIADBCLIENT; }
+    if (i == 10){                                                   li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMARIADB; }
+    if (i == 11){if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT18; }
+    if (i == 12){if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT; }
+    lmysql->ldbms_get_library(li_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, li_lib);
+    if (is_libmysqlclient_loaded == 1) break;
   }
 
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
@@ -13529,7 +13543,7 @@ void MainWindow::log(const char *message, int level)
   if (level > ocelot_log_level)
   {
     printf("%s\n", message);
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
     fflush(stdout);
 #endif
   }
@@ -14238,7 +14252,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   //ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
 
   options_files_read= "";
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
   {
     struct passwd *pw;
     uid_t u;
@@ -14358,7 +14372,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     {
       char my_cnf_file[10][1024];
       int i= 0;
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       strcpy(my_cnf_file[i++], "/etc/my.cnf");
       strcpy(my_cnf_file[i++], "/etc/mysql/my.cnf");
       /* todo: think: is argv[0] what you want for SYSCONFDIR? not exact, but it's where the program is now. no, it might be a copy. */
@@ -14545,7 +14559,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   unsigned char output_buffer[65536];                    /* todo: should be dynamic size */
 
   group= "";                                             /* group identifier doesn't carry over from last .cnf file that we read */
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
   struct stat st;
   if (stat(file_name, &st) == 0)
   {
@@ -15853,7 +15867,7 @@ int MainWindow::the_connect(unsigned int connection_number)
 void MainWindow::print_version()
 {
   printf("ocelotgui version %s", ocelotgui_version);
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
   printf(", for Linux");
 #else
   printf(", for Windows");

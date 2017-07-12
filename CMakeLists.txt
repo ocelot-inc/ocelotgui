@@ -170,6 +170,12 @@ if (NOT MYSQL_INCLUDE_DIR_RESULT)
        "/usr/local/mysql/include/mysql"
        "/opt/local/include/mysql"
        "/sw/include/mysql"
+       "/usr/include/mariadb"
+       "/usr/local/include/mariadb"
+       "/usr/local/mariadb/include"
+       "/usr/local/mariadb/include/mariadb"
+       "/opt/local/include/mariadb"
+       "/sw/include/mariadb"
   )
   find_path(MYSQL_INCLUDE_DIR_RESULT mysql.h PATHS ${MYSQL_INCLUDE_DIR_SEARCH_PATH})
 endif (NOT MYSQL_INCLUDE_DIR_RESULT)
@@ -267,10 +273,10 @@ set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
 set_target_properties(ocelotgui PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
 if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
   message("-- 64-bit")
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/x86_64-linux-gnu:/usr/lib64:/usr/lib64/mysql")
+  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/x86_64-linux-gnu:/usr/lib64:/usr/lib64/mysql:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib:/usr/lib64/mariadb")
 else (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
   message("-- 32-bit")
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/i386-linux-gnu")            
+  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/i386-linux-gnu:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib")            
 endif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
 
 if (Qt5Widgets_FOUND)

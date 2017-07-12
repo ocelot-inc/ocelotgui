@@ -116,7 +116,7 @@ QString CodeEditor::prompt_translate(int line_number_x)
     Or you should calculate it only when you see \D etc., but that might cause apparent inconsistencies.
     Or you could check "Has the time already been calculated?"
   */
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
   time(&basetime);
   timeinfo= localtime(&basetime);
 #endif
@@ -142,7 +142,7 @@ QString CodeEditor::prompt_translate(int line_number_x)
       {
         s_char= QString::number(statement_count);
       }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "D")        /* \D is for full current date, e.g. "Fri May 23 14:26:18 2014" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%a %b %e %H:%M:%S %Y", timeinfo);
@@ -174,7 +174,7 @@ QString CodeEditor::prompt_translate(int line_number_x)
       {
         s_char= delimiter;
       }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "m")        /* \m is for minutes of the current time, e.g. "18" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%M", timeinfo);
@@ -186,21 +186,21 @@ QString CodeEditor::prompt_translate(int line_number_x)
       {
         s_char= "\n";
       }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "O")        /* \O is for current month in 3-letter format, e.g. "Feb" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%b", timeinfo);
         s_char= formatted_time;
       }
 #endif
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "o")        /* \o is for current month in numeric format, e.g. "12" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%m", timeinfo);
         s_char= formatted_time;
       }
 #endif
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "P")        /* \P is for am/pm, e.g. "PM" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%p", timeinfo);
@@ -210,14 +210,14 @@ QString CodeEditor::prompt_translate(int line_number_x)
       if (s_char == "p") {        /* \p is for port */
         s_char= dbms_port;
       }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "R")        /* \R is for current hour on a 24-hour clock, e.g. "19" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%H", timeinfo);
         s_char= formatted_time;
       }
 #endif
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "r")        /* \r is for current hour on a 12-hour clock, e.g. "11" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%r", timeinfo);
@@ -228,7 +228,7 @@ QString CodeEditor::prompt_translate(int line_number_x)
       {
         s_char= ";";
       }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "s")        /* \s is for seconds of the current time, e.g. "58" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%S", timeinfo);
@@ -251,21 +251,21 @@ QString CodeEditor::prompt_translate(int line_number_x)
       {
         s_char= dbms_version;
       }
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "w")        /* \w is for current day of the week in three-letter format, e.g. "Mon" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%a", timeinfo);
         s_char= formatted_time;
       }
 #endif
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "Y")        /* \Y is for current year in four-digit format, e.g. "2014" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%Y", timeinfo);
         s_char= formatted_time;
       }
 #endif
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (s_char == "y")        /* \y is for current year in 2-digit format, e.g. "14" */
       {
         strftime(formatted_time, sizeof(formatted_time) - 1, "%y", timeinfo);

@@ -21,6 +21,26 @@
 #define DEBUGGER
 
 /*
+  Predefined OS macro
+  I depend on https://sourceforge.net/p/predef/wiki/OperatingSystems/
+  Also useful are Q_OS_... declarations in http://doc.qt.io/qt-5/qtglobal.html
+  but they're not known until we do Qt includes, later.
+  (So far, only ostrings.h has been #included.)
+  See also ./CMakeFiles/2.8.12.2/CompilerIdCXX/CMakeCXXCompilerId.cpp
+  which checks for __CYGWIN__ and __MINGW32__.
+  OCELOT_OS_LINUX is for Linux-specific code, actually tested on Linux
+  OCELOT_OS_NONLINUX is for Qt-specific code, seems to work on Windows
+  The idea is that, if we support more platforms, we'll add more
+  e.g. OCELOT_OS_FREEBSD.
+  "__linux" and "linux" are obsolete, someday we'll stop looking for them
+*/
+#if defined(__linux__) || defined(__linux) || defined(linux)
+#define OCELOT_OS_LINUX
+#else
+#define OCELOT_OS_NONLINUX
+#endif
+
+/*
   The possible DBMS values. Nowadays these are always defined,
   except Tarantool if Windows. These are related to ocelot_dbms values.
   --ocelot_dbms='mysql' is default.
@@ -34,7 +54,7 @@
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
 #define DBMS_TARANTOOL 3
 #endif
 #define FLAG_VERSION_MYSQL_5_5      1
@@ -62,7 +82,7 @@
 
 /* All Qt includes go here. Most of them could be handled by just saying "#include <QtWidgets>". */
 #include <QAbstractItemView>
-#ifndef __linux
+#ifdef OCELOT_OS_NONLINUX
 #include <QApplication>
 #endif
 #include <QClipboard>
@@ -75,7 +95,7 @@
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSpinBox>
-#ifndef __linux
+#ifdef OCELOT_OS_NONLINUX
 #include <QLibrary>
 #endif
 //#include <QLibraryInfo>
@@ -110,9 +130,8 @@
   We use getpwuid() when getting password, therefore include pwd.h.
   We use pthread_create() for debug and kill, therefore include pthread.h.
   We use stat() to see if a configuration file is world-writable, therefore include stat.h.
-  Todo: Maybe we should be looking for Qt's Q_OS_LINUX etc. not __linux etc.
 */
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
 #include <dlfcn.h>
 #include <unistd.h>
 #include <pwd.h>
@@ -2862,7 +2881,8 @@ ldbms() : QWidget()
 #define WHICH_LIBRARY_LIBTARANTOOL 3
 #define WHICH_LIBRARY_LIBTARANTOOLNET 4
 #endif
-
+#define WHICH_LIBRARY_LIBMARIADBCLIENT 5
+#define WHICH_LIBRARY_LIBMARIADB 6
 
 void ldbms_get_library(QString ocelot_ld_run_path,
         int *is_library_loaded,           /* points to is_libXXX_loaded */
@@ -2875,7 +2895,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     QString error_string;
 
     /*
-      What's with all the #ifdef __linux stuff?
+      What's with all the #ifdef OCELOT_OS_LINUX stuff?
       Originally I coded for QLibrary. For reasons I couldn't figure out,
       t__mysql_real_connect crashed. So I switched to dlopen().
       I suspect the ability to say RTLD_DEEPBIND | RTLD_NOW had something to do with it.
@@ -2885,7 +2905,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       There is a description re finding libmysqlclient if one types Help | libmysqlclient.
     */
 
-#ifndef __linux
+#ifdef OCELOT_OS_NONLINUX
   QLibrary lib;
 #endif
 
@@ -2903,7 +2923,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       /* The last error was that we got the wrong library. Unrecoverable. */
       return;
     }
-#ifndef __linux
+#ifdef OCELOT_OS_NONLINUX
     /* I don't know how Windows handles shared-library version numbers */
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileNameAndVersion("libmysql", 18);
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysql");
@@ -2912,6 +2932,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
     if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
 #endif
+    if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) lib.setFileName("libmariadbclient");
+    if (which_library == WHICH_LIBRARY_LIBMARIADB) lib.setFileName("libmariadb");
 #endif
     /*
       Finding libmysqlclient
@@ -2942,7 +2964,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         ld_run_path_part= ld_run_path_part.trimmed();
         if (ld_run_path_part > "")
         {
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient.so.18");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient.so");
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto.so");
@@ -2959,7 +2981,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
           else *is_library_loaded= 1;
           *library_handle= dlopen_handle;
-#else
+#endif //#ifdef OCELOT_OS_LINUX
+#ifdef OCELOT_OS_NONLINUX
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto");
@@ -2970,7 +2993,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           lib.setFileName(ld_run_path_part);
           *is_library_loaded= lib.load();
           error_string= lib.errorString();
-#endif
+#endif //#ifdef OCELOT_OS_NONLINUX
           if (*is_library_loaded == 1) break;
         }
         if (*(ld_run_path + i) == '\0') break;
@@ -2988,7 +3011,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     /* If it wasn't found via LD_RUN_PATH, use defaults e.g. LD_LIBRARY_PATH */
     if (*is_library_loaded == 0)
     {
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) dlopen_handle= dlopen("libmysqlclient.so.18",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
@@ -2996,10 +3019,13 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL) dlopen_handle= dlopen("libtarantool.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) dlopen_handle= dlopen("libtarantoolnet.so",  RTLD_DEEPBIND | RTLD_NOW);
 #endif
+      if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) dlopen_handle= dlopen("libmariadbclient.so",  RTLD_DEEPBIND | RTLD_NOW);
+      if (which_library == WHICH_LIBRARY_LIBMARIADB) dlopen_handle= dlopen("libmariadb.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
       else *is_library_loaded= 1;
       *library_handle= dlopen_handle;
-#else
+#endif //#ifdef OCELOT_OS_LINUX
+#ifdef OCELOT_OS_NONLINUX
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysql");
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysql");
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libeay32");
@@ -3007,9 +3033,11 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
       if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
 #endif
+      if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) lib.setFileName("libmariadbclient");
+      if (which_library == WHICH_LIBRARY_LIBMARIADB) lib.setFileName("libmariadb");
       *is_library_loaded= lib.load();
       error_string= lib.errorString();
-#endif
+#endif //#ifdef OCELOT_OS_NONLINUX
     }
     if (*is_library_loaded == 0)
     {
@@ -3019,7 +3047,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     if (*is_library_loaded == 1)
     {
       QString s= "";
-#ifdef __linux
+#ifdef OCELOT_OS_LINUX
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT))
       {
         t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows"); if (dlerror() != 0) s.append("mysql_affected_rows ");
@@ -3127,7 +3155,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__tnt_update= (ttnt_update) dlsym(dlopen_handle, "tnt_update"); if (dlerror() != 0) s.append("tnt_update ");
       }
 #endif
-#else
+#endif //#ifdef OCELOT_OS_LINUX
+#ifdef OCELOT_OS_NONLINUX
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT))
       {
         if ((t__mysql_affected_rows= (tmysql_affected_rows) lib.resolve("mysql_affected_rows")) == 0) s.append("mysql_affected_rows ");
@@ -3186,7 +3215,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
          /* fill this in when you have Windows */
       }
 #endif
-#endif
+#endif //#ifdef OCELOT_OS_NONLINUX
       if (s > "")
       {
         {

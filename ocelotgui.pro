@@ -38,7 +38,7 @@ FORMS    += ocelotgui.ui
 # If build fails because mysql.h is not found:
 #   () If you installed MySQL or MariaDB from a distro repository,
 #      check that you installed the "dev" package
-#      it might be called libmysqlclient-dev
+#      it might be called libmysqlclient-dev or libmariadbclient-dev
 #   () If you can't remember whether it was installed, use
 #      sudo find / -name "mysql.h"
 #   When you find mysql.h, add its directory to this list.
@@ -48,6 +48,12 @@ INCLUDEPATH+= /usr/local/mysql/include
 INCLUDEPATH+= /usr/local/mysql/include/mysql
 INCLUDEPATH+= /opt/local/include/mysql
 INCLUDEPATH+= /sw/include/mysql
+INCLUDEPATH+= /usr/include/mariadb
+INCLUDEPATH+= /usr/local/include/mariadb
+INCLUDEPATH+= /usr/local/mariadb/include
+INCLUDEPATH+= /usr/local/mariadb/include/mariadb
+INCLUDEPATH+= /opt/local/include/mariadb
+INCLUDEPATH+= /sw/include/mariadb
 
 # ocelotgui uses dlopen + dlsym. Some linkers might demand this.
 LIBS += -ldl
@@ -70,6 +76,14 @@ contains(QMAKE_HOST.arch, x86_64) {
   QMAKE_RPATHDIR += /usr/lib64/mysql
   } else {
   QMAKE_RPATHDIR += /usr/lib/i386-linux-gnu
+  }
+QMAKE_RPATHDIR += /usr/mariadb/lib
+QMAKE_RPATHDIR += /usr/lib/mariadb
+QMAKE_RPATHDIR += /usr/local/lib/mariadb
+QMAKE_RPATHDIR += /usr/local/mariadb
+QMAKE_RPATHDIR += /usr/local/mariadb/lib
+contains(QMAKE_HOST.arch, x86_64) {
+  QMAKE_RPATHDIR += /usr/lib64/mariadb
   }
 
 # Installing by rebuilding source, with Qt Creator
