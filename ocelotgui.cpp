@@ -11500,8 +11500,12 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     if (i == 11){if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT18; }
     if (i == 12){if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT; }
     lmysql->ldbms_get_library(li_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, li_lib);
-    if (is_libmysqlclient_loaded == 1) break;
+    if (is_libmysqlclient_loaded == 1)
+    {
+      break;
+    }
   }
+
 
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
 
@@ -11545,7 +11549,17 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     }
     is_mysql_library_init_done= true;
   }
-
+  /* Mysterious crash may happen with one particular MariaDB version. */
+  {
+    QString s;
+    s= lmysql->ldbms_mysql_get_client_info();
+    if (s.contains("10.1.7", Qt::CaseInsensitive) == true)
+    {
+      QMessageBox msgbox;
+      msgbox.setText("Warning: Detected MariaDB 10.1.7 client library. This version is not compatible with ocelotgui.");
+      msgbox.exec();
+    }
+  }
   /* I decided this line is unnecessary, mysql_init is done in options_and_connect() */
   //lmysql->ldbms_mysql_init(&mysql[connection_number]);
   if (the_connect(connection_number))
@@ -15546,6 +15560,7 @@ int options_and_connect(
     lmysql->ldbms_mysql_close(&mysql[connection_number]);
   }
   lmysql->ldbms_mysql_init(&mysql[connection_number]);
+  int opt= 0;
   if (ocelot_default_auth_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_23, ocelot_default_auth_as_utf8);
   if (ocelot_enable_cleartext_plugin == true) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_36, (char *) &ocelot_enable_cleartext_plugin);
   if (ocelot_init_command_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_3, ocelot_init_command_as_utf8);
@@ -15563,7 +15578,7 @@ int options_and_connect(
   if (ocelot_protocol_as_int > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_9, (char*)&ocelot_protocol_as_int);
   if (ocelot_opt_read_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_11, (char*)&ocelot_opt_read_timeout);
   if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_20, (char*)&ocelot_opt_reconnect);
-  int opt= 0;
+
   if (ocelot_opt_ssl_mode_as_utf8[0] != '\0')
   {
     for(int i= 0; ocelot_opt_ssl_mode_as_utf8[i] != 0; ++i)
@@ -15583,7 +15598,6 @@ int options_and_connect(
       }
     }
   }
-
   /*
     If dlopen() failed for "myql_ssl_set" then ldbms_mysql_ssl_set is a no-op, which is not an error.
     For some options use mysql_ssl_set because it's in MySQL 5.5, for others use mysql_options.
@@ -15618,7 +15632,6 @@ int options_and_connect(
   if (ocelot_set_charset_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_6, ocelot_set_charset_dir_as_utf8);
   if (ocelot_set_charset_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_7, ocelot_set_charset_name_as_utf8);
   if (ocelot_shared_memory_base_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_10, ocelot_shared_memory_base_name_as_utf8);
-
   if (ocelot_safe_updates > 0)
   {
     char init_command[100]; /* todo: the size could be more dynamic here */
@@ -15627,7 +15640,6 @@ int options_and_connect(
         ocelot_select_limit, ocelot_max_join_size);
     lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_3, init_command);
   }
-
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
   unsigned long real_connect_flags= CLIENT_MULTI_RESULTS;
   if (ocelot_opt_can_handle_expired_passwords != 0)
@@ -15635,6 +15647,7 @@ int options_and_connect(
 
   MYSQL *connect_result;
   char *socket_parameter= ocelot_unix_socket_as_utf8;
+
   for (int connect_attempt= 0; connect_attempt < 6; ++connect_attempt)
   {
     connect_result= lmysql->ldbms_mysql_real_connect(&mysql[connection_number],
@@ -15645,7 +15658,7 @@ int options_and_connect(
                                                      ocelot_port,
                                                      socket_parameter,
                                                      real_connect_flags);
-     if (connect_result != 0) break;
+     if (connect_result != NULL) break;
      /* See ocelot.ca blog post = Connecting to MySQL or MariaDB with sockets on Linux */
      /* Todo: you should provide info somewhere how the connection was actually done. */
      if ((ocelot_protocol_as_int != 0) && (ocelot_protocol_as_int != PROTOCOL_SOCKET)) break;
@@ -15658,7 +15671,8 @@ int options_and_connect(
      if (connect_attempt == 3) socket_parameter= (char *) "/var/run/mysql/mysql.sock";
      if (connect_attempt == 4) socket_parameter= (char *) "/tmp/mysqld.sock";
    }
-  if (connect_result == 0)
+
+  if (connect_result == NULL)
   {
     /* connect failed. todo: better diagnostics? anyway, user can retry, a dialog box will come up. */
     return -1;					// Retryable
@@ -15679,7 +15693,6 @@ int options_and_connect(
   if (lmysql->ldbms_mysql_query(&mysql[connection_number], "set character_set_results = utf8")) printf("SET character_set_results failed\n");
 
   connected[connection_number]= 1;
-
   return 0;
 }
 
