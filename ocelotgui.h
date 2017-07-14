@@ -119,6 +119,7 @@
 #include <mysql.h>
 
 /* Strangely MYSQL_PORT might not be brought in by #include <mysql.h> */
+/* Now in MariaDB there's a MARIADB_PORT, but it's 3306 anyway. */
 #ifndef MYSQL_PORT
 #define MYSQL_PORT 3306
 #endif

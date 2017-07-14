@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: July 10 2017
+   Last modified: July 13 2017
 */
 
 /*
@@ -3184,7 +3184,11 @@ QString MainWindow::get_doc_path(QString file_name)
 }
 
 
-/* Todo: consider adding   //printf(qVersion()); */
+/* Todo: considering adding:
+         MySQL client version, MySQL server version,
+         ocelotgui version + build date,
+         qVersion(), build flags
+*/
 void MainWindow::action_about()
 {
   QString the_text= "\
@@ -3735,6 +3739,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
     If (italic match) +1
     If not ("*Webdings*" or "*Wingdings*" or "*Dingbats*") +2
   After you get it, it should determine the initial style sheets.
+  Alas: Windows would generate warnings if I didn't exclude some fonts.
   Todo: consider changing QApplication font rather than individual fonts.
   Todo: there's a memory leak, though unimportant (we only call once)
 */
@@ -3765,6 +3770,17 @@ QFont MainWindow::get_fixed_font()
   int winner_font_points= 0;
   foreach (const QString &family, database.families())
   {
+#ifdef OCELOT_OS_LINUX
+    {
+      QString f= family.toUpper();
+      if ((family == "FIXEDSYS") || (family == "MODERN")
+       || (family == "SANS SERIF") || (family == "MS SERIF")
+       || (family == "ROMAN") || (family == "SCRIPT")
+       || (family == "SMALL FONTS") || (family == "SYSTEM")
+       || (family == "TERMINAL"))
+         continue;
+    }
+#endif
     int this_points= 0;
     QFont fo1= QFont(family, point_size, weight, italic);
     fo1.setStyleHint(QFont::TypeWriter);
@@ -11556,7 +11572,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     if (s.contains("10.1.7", Qt::CaseInsensitive) == true)
     {
       QMessageBox msgbox;
-      msgbox.setText("Warning: Detected MariaDB 10.1.7 client library. This version is not compatible with ocelotgui.");
+      msgbox.setText("Warning: Detected MariaDB 10.1.7 client library. This version has been known to cause problems.");
       msgbox.exec();
     }
   }
