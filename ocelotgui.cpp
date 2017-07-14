@@ -3770,7 +3770,7 @@ QFont MainWindow::get_fixed_font()
   int winner_font_points= 0;
   foreach (const QString &family, database.families())
   {
-#ifdef OCELOT_OS_LINUX
+#ifdef OCELOT_OS_NONLINUX
     {
       QString f= family.toUpper();
       if ((family == "FIXEDSYS") || (family == "MODERN")
@@ -11566,6 +11566,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     is_mysql_library_init_done= true;
   }
   /* Mysterious crash may happen with one particular MariaDB version. */
+#ifdef OCELOT_OS_LINUX
   {
     QString s;
     s= lmysql->ldbms_mysql_get_client_info();
@@ -11576,6 +11577,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
       msgbox.exec();
     }
   }
+#endif
   /* I decided this line is unnecessary, mysql_init is done in options_and_connect() */
   //lmysql->ldbms_mysql_init(&mysql[connection_number]);
   if (the_connect(connection_number))
