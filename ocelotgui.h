@@ -858,6 +858,7 @@ private:
   void connect_set_variable(QString token0, QString token2);
   void connect_make_statement();
   long to_long(QString token);
+  QString get_version();
   void print_version();
   void print_help();
 

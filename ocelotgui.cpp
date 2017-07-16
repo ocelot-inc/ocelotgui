@@ -3184,11 +3184,6 @@ QString MainWindow::get_doc_path(QString file_name)
 }
 
 
-/* Todo: considering adding:
-         MySQL client version, MySQL server version,
-         ocelotgui version + build date,
-         qVersion(), build flags
-*/
 void MainWindow::action_about()
 {
   QString the_text= "\
@@ -3206,6 +3201,18 @@ GNU General Public License for more details.<br>\
 You should have received a copy of the GNU General Public License \
 along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 
+  the_text.append("<br><br>");
+  the_text.append(get_version());
+  if (is_mysql_library_init_done == true)
+  {
+    the_text.append("<br>using DBMS client library version ");
+    the_text.append(lmysql->ldbms_mysql_get_client_info());
+  }
+  if (statement_edit_widget->dbms_version > "")
+  {
+    the_text.append("<br>using DBMS server version ");
+    the_text.append(statement_edit_widget->dbms_version);
+  }
   QString application_dir_path= get_doc_path("ocelotgui_logo.png");
   if (application_dir_path != "")
   {
@@ -15894,22 +15901,46 @@ int MainWindow::the_connect(unsigned int connection_number)
 }
 
 
+/*
+  For telling the user version info of ocelotgui itself,
+  and of whatever it's connected to.
+  Called by action_about(), print_version().
+  qVersion() is Qt runtime, maybe != QT_VERSION_STR
+  For action_about() we go further and try to say what we're connected
+  to, but for --version, we aren't connecting so such info wouldn't be
+  available.
+*/
+QString MainWindow::get_version()
+{
+  QString s;
+  s = "\n\nocelotgui version ";
+  s.append(ocelotgui_version);
+#ifdef OCELOT_OS_LINUX
+  s.append(", for Linux");
+#endif
+#ifdef OCELOT_OS_NONLINUX
+  s.append(", for Windows");
+#endif
+#if __x86_64__
+  s.append(" (x86_64)");
+#endif
+  s.append(" using Qt version ");
+  s.append(qVersion());
+  s.append("\n");
+  return s;
+}
+
 /* --version, or version in an option file, causes version display and exit */
 void MainWindow::print_version()
 {
-  printf("ocelotgui version %s", ocelotgui_version);
-#ifdef OCELOT_OS_LINUX
-  printf(", for Linux");
-#else
-  printf(", for Windows");
-#endif
-  #if __x86_64__
-  printf(" (x86_64)");
-  #endif
-  printf(" using Qt version %s", qVersion()); /* i.e. Qt runtime, maybe != QT_VERSION_STR */
-  printf("\n");
+  QString QStr= get_version();
+  int tmp_len= QStr.toUtf8().size();
+  char *tmp= new char[tmp_len + 1];
+  memcpy(tmp, QStr.toUtf8().constData(), tmp_len + 1);
+  printf("%s", tmp);
+  delete []tmp;
+  return;
 }
-
 
 /* --help, or help in an option file, causes help display and exit */
 void MainWindow::print_help()
