@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: July 13 2017
+   Last modified: July 25 2017
 */
 
 /*
@@ -694,7 +694,7 @@ void MainWindow::initialize_widget_statement()
 
   statement_edit_widget->setLineWrapMode(QPlainTextEdit::NoWrap);
   /* statement_edit_widget->setAcceptRichText(false); */ /* Todo: test whether this works */
-  connect(statement_edit_widget->document(), SIGNAL(contentsChanged()), this, SLOT(action_statement_edit_widget_text_changed()));
+  connect(statement_edit_widget->document(), SIGNAL(contentsChange(int,int,int)), this, SLOT(action_statement_edit_widget_text_changed(int,int,int)));
   statement_edit_widget_text_changed_flag= 0;
 
   /*
@@ -1085,7 +1085,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   if (qk == ocelot_shortcut_connect_keysequence) { action_connect(); return true; }
   if (qk == ocelot_shortcut_exit_keysequence) { action_exit(); return true; }
   if (qk == ocelot_shortcut_undo_keysequence) { menu_edit_undo(); return true; }
-  //if (qk == ocelot_shortcut_redo_keysequence) { redo(); return true; } TODO: handle this, eh?
+  if (qk == ocelot_shortcut_redo_keysequence) { menu_edit_redo(); return true; }
   if (qk == ocelot_shortcut_history_markup_previous_keysequence) { history_markup_previous(); return true; }
   if (qk == ocelot_shortcut_history_markup_next_keysequence) { history_markup_next(); return true; }
   if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
@@ -1158,6 +1158,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
       }
     }
   }
+
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
   if (key->modifiers() & Qt::ControlModifier)
@@ -2393,6 +2394,8 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
           int z= y->size();
           if (z > 0) menu_edit_action_paste->setEnabled();                 << wrong, you only know if paste is possible
         If something is selected and focus changes: de-select      
+  TODO: I have no idea what "else if (strcmp(class_name, "+") == 0)"
+        is for, maybe it's a bug. Compare menu_edit_redo().
 */
 void MainWindow::menu_edit_undo()
 {
@@ -2412,7 +2415,7 @@ void MainWindow::menu_edit_redo()
   QWidget* focus_widget= QApplication::focusWidget();
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
-    qobject_cast<CodeEditor*>(focus_widget)->redo();
+    action_redo();
   else if (strcmp(class_name, "TextEditWidget") == 0)
     qobject_cast<TextEditWidget*>(focus_widget)->redo();
   else if (strcmp(class_name, "TextEditHistory") == 0)
@@ -2576,22 +2579,28 @@ void MainWindow::main_token_pop()
   and we get action_statement_edit_widget_text_changed() again.
   It would be infinite. We have two ways to prevent the loop, and we
   use them both (yes it's redundant but this loop really worries me):
-    I'll exit if a global flag is on, then set it.
-    I'll ensure the document emits no signals during this routine.
+    exit if a global flag is on
+    disconnect to ensure this slot won't be activated by signals that it itself generates.
   Todo: A hang occurs sometimes, and log() suggests it's in this routine.
         That's why there are so many log() and assert() invocations.
   Until May 2017 I used blockSignals(true)+blockSignals(false) instead
   of disconnect+connect; also I set statement_edit_widget_text_changed_flag= 1;
   within the routine; I hope these changes are safe.
 */
-void MainWindow::action_statement_edit_widget_text_changed()
+void MainWindow::action_statement_edit_widget_text_changed(int position,int chars_removed,int chars_added)
 {
   log("action_statement_edit_widget_text_changed start", 90);
-  if (statement_edit_widget_text_changed_flag != 0) return;
+  if (statement_edit_widget_text_changed_flag != 0)
+  {
+    position_for_redo= position;
+    chars_removed_for_redo= chars_removed;
+    chars_added_for_redo= chars_added;
+    return;
+  }
   log("action_statement_edit_widget_text_changed after flag check", 90);
   //statement_edit_widget_text_changed_flag= 1;
   //statement_edit_widget->document()->blockSignals(true);
-  disconnect(statement_edit_widget->document(), SIGNAL(contentsChanged()), this, SLOT(action_statement_edit_widget_text_changed()));
+  disconnect(statement_edit_widget->document(), SIGNAL(contentsChange(int,int,int)), this, SLOT(action_statement_edit_widget_text_changed(int,int,int)));
 
   QString text;
   int i;
@@ -2637,7 +2646,9 @@ void MainWindow::action_statement_edit_widget_text_changed()
 
   pos= 0;
   /* cur.setPosition(pos, QTextCursor::KeepAnchor); */
-  cur.beginEditBlock();                                     /* ought to affect undo/redo stack? */
+
+  cur.joinPreviousEditBlock(); /* was cur.beginEditBlock() till 2017-07-23 */
+  /* ought to affect undo/redo stack? */
 
   {
     /* This sets everything to normal format / no underline. Gets overridden by token formats. */
@@ -2722,11 +2733,10 @@ void MainWindow::action_statement_edit_widget_text_changed()
   widget_sizer(); /* Perhaps adjust relative sizes of the main widgets. */
   log("action_statement_edit_widget_text_changed after widget_sizer", 90);
   //statement_edit_widget->document()->blockSignals(false);
-  connect(statement_edit_widget->document(), SIGNAL(contentsChanged()), this, SLOT(action_statement_edit_widget_text_changed()));
+  connect(statement_edit_widget->document(), SIGNAL(contentsChange(int,int,int)), this, SLOT(action_statement_edit_widget_text_changed(int,int,int)));
   //statement_edit_widget_text_changed_flag= 0;
   log("action_statement_edit_widget_text_changed end", 90);
 }
-
 
 /*
   For menu item "connect" we said connect(...SLOT(action_connect())));
@@ -3389,24 +3399,72 @@ void MainWindow::action_settings()
   action_statement_edit_widget_text_changed() to intercept
   every change in action_statement_edit_widget. But, when
   user chooses Undo, that interception happens again, which
-  negates the effects of undo. Also, undo has to be done
-  twice, because everythng between beginEditBlock() and
-  endEditBlock() is an undoable change. Therefore, instead
-  of getting slot() invoked directly, I get to action_undo()
-  which temporarily disables use of action_statement_edit_widget_changed()
-  and calls undo() twice.
-  Todo: consider: what if the user wants to undo with control-Z instead of menu?
+  negates the effects of undo. Therefore, instead of getting
+  slot() invoked directly, I get to action_undo() which temporarily
+  disables use of action_statement_edit_widget_changed().
+  And of course the same considerations apply for redo().
+  KLUDGE #1: In action_statement_edit_widget_changed(), change
+             cur.beginEditBlock() to cur.joinPreviousEditBlock()
+             so the syntax-highlight will be merged with the
+             content change.
+  KLUDGE #2: If a change is done via key stroke, then the stack
+             gets 2 items, one of which is junk (just moving the
+             cursor to after the first word), and wow, I wish I
+             knew why. If a change is done via cut-and-paste,
+             there's only one item. So I have to look at what
+             the change was, and discard the junk item if I find
+             it with undo, or put it back on the stack if I find
+             it with redo.
+  KLUDGE #3: Usually redo() moves the cursor the end, and wow, I
+             wish I knew why. So I calculate where it should be =
+             position of the first character that differs, plus
+             (chars added - chars removed) (if positive).
   Todo: consider: will there be a bug if syntax highlighting is disabled?
-  Todo: consider: perhaps now redo will be no good.
+        (currently it seems that disabling doesn't work so I can't test)
+  Todo: see what happens for other situations besides
+        key stroke | cut | paste. E.g. we get rid of a
+        statement at a time in multi-statement sendings.
+  Todo: menu item enable|disable -- not simple, it will
+        depend what has focus
 */
 void MainWindow::action_undo()
 {
   log("action_undo start", 90);
   statement_edit_widget_text_changed_flag= 1;
+
+  QString text_before= statement_edit_widget->toPlainText();
   statement_edit_widget->undo();
-  statement_edit_widget->undo();
+  QString text_after= statement_edit_widget->toPlainText();
+  if (text_before == text_after)
+    statement_edit_widget->undo();
   statement_edit_widget_text_changed_flag= 0;
   log("action_undo end", 90);
+}
+
+void MainWindow::action_redo()
+{
+  log("action_redo start", 90);
+  QTextCursor cur= statement_edit_widget->textCursor();
+  QString text_before= statement_edit_widget->toPlainText();
+  statement_edit_widget_text_changed_flag= 1;
+  statement_edit_widget->redo();
+  int final_pos_for_redo;
+  QString text_after_1= statement_edit_widget->toPlainText();
+  statement_edit_widget->redo();
+  QString text_after_2= statement_edit_widget->toPlainText();
+  if (text_after_2 != text_after_1)
+    statement_edit_widget->undo();
+  statement_edit_widget_text_changed_flag= 0;
+  for (final_pos_for_redo= 0; final_pos_for_redo < text_before.length(); ++final_pos_for_redo)
+  {
+    if (text_before.mid(final_pos_for_redo,1) != text_after_1.mid(final_pos_for_redo,1))
+      break;
+  }
+  if (chars_added_for_redo > chars_removed_for_redo)
+    final_pos_for_redo+= (chars_added_for_redo - chars_removed_for_redo);
+  cur.setPosition(final_pos_for_redo);
+  statement_edit_widget->setTextCursor(cur);
+  log("action_redo end", 90);
 }
 
 
@@ -3471,7 +3529,7 @@ void MainWindow::action_statement()
     //tokens_to_keywords(text);
     /* statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color); */
     statement_edit_widget->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_text_color);
-    action_statement_edit_widget_text_changed();            /* only for highlight? repaint so new highlighting will appear */
+    action_statement_edit_widget_text_changed(0, 0, 0);            /* only for highlight? repaint so new highlighting will appear */
   }
   delete(se);
 }
@@ -7334,7 +7392,7 @@ int MainWindow::action_execute(int force)
     remove_statement(text);
     statement_edit_widget_text_changed_flag= 0;
     log("after remove_statement", 90);
-    action_statement_edit_widget_text_changed();
+    action_statement_edit_widget_text_changed(0, 0, 0);
     //widget_sizer();
     /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
     history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());

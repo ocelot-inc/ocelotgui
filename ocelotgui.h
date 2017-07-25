@@ -526,6 +526,10 @@ public:
 
   CodeEditor *statement_edit_widget;
 
+  int position_for_redo;
+  int chars_added_for_redo;
+  int chars_removed_for_redo;
+
   int main_window_maximum_width;
   int main_window_maximum_height;
   void component_size_calc(int *character_height, int *borders_height);
@@ -752,8 +756,9 @@ public slots:
   void action_the_manual();
   void action_libmysqlclient();
   void action_settings();
-  void action_statement_edit_widget_text_changed();
+  void action_statement_edit_widget_text_changed(int,int,int);
   void action_undo();
+  void action_redo();
   void statement_edit_widget_formatter();
   void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
   void action_menu();
