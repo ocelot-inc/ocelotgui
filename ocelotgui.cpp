@@ -1042,6 +1042,12 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 //  }
   QString text;
 
+  if (event->type() == QEvent::FocusIn)
+  {
+    after_undo_redo();
+    return false;
+  }
+
   {
     ResultGrid* r;
     for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
@@ -1071,7 +1077,6 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
     }
   }
 #endif
-
   if (event->type() != QEvent::KeyPress) return false;
   QKeyEvent *key= static_cast<QKeyEvent *>(event);
   /* See comment with label "Shortcut Duplication" */
@@ -1402,6 +1407,7 @@ void MainWindow::initialize_widget_history()
   history_edit_widget->setReadOnly(false);       /* if history shouldn't be editable, set to "true" here */
   history_edit_widget->hide();                   /* hidden until a statement is executed */
   history_markup_make_strings();
+  history_edit_widget->installEventFilter(this); /* must catch focusIn */
   return;
 }
 
@@ -3431,13 +3437,13 @@ void MainWindow::action_undo()
 {
   log("action_undo start", 90);
   statement_edit_widget_text_changed_flag= 1;
-
   QString text_before= statement_edit_widget->toPlainText();
   statement_edit_widget->undo();
   QString text_after= statement_edit_widget->toPlainText();
   if (text_before == text_after)
     statement_edit_widget->undo();
   statement_edit_widget_text_changed_flag= 0;
+  after_undo_redo();
   log("action_undo end", 90);
 }
 
@@ -3464,7 +3470,59 @@ void MainWindow::action_redo()
     final_pos_for_redo+= (chars_added_for_redo - chars_removed_for_redo);
   cur.setPosition(final_pos_for_redo);
   statement_edit_widget->setTextCursor(cur);
+  after_undo_redo();
   log("action_redo end", 90);
+}
+
+
+/*
+  After undo | redo | focus-in, enable|disable menu items for undo|redo.
+  Inefficient, but these actions don't happen dozens of times per second.
+  Todo: Incredibly, availableRedoSteps() only works for CodeEditor i.e.
+        statement_edit_widget. I wish I knew why, but rather than spend
+        more hours, will just assume undo|redo are otherwise always okay.
+  Assume focusWidget() = statement_edit_widget, unless focus-in.
+  If focus-in happens for the menu or for something unknown, just return.
+*/
+void MainWindow::after_undo_redo()
+{
+  QWidget* focus_widget= QApplication::focusWidget();
+  const char *class_name= focus_widget->metaObject()->className();
+  if (strcmp(class_name, "CodeEditor") == 0)
+  {
+    ;
+  }
+  else if (strcmp(class_name, "TextEditWidget") == 0)
+  {
+    menu_edit_action_undo->setEnabled(true);
+    menu_edit_action_redo->setEnabled(true);
+    return;
+  }
+  else if (strcmp(class_name, "TextEditHistory") == 0)
+  {
+    menu_edit_action_undo->setEnabled(true);
+    menu_edit_action_redo->setEnabled(true);
+    return;
+  }
+  else if (strcmp(class_name, "QTextEdit") == 0)
+  {
+    menu_edit_action_undo->setEnabled(true);
+    menu_edit_action_redo->setEnabled(true);
+    return;
+  }
+  else
+  {
+    return;
+  }
+  QTextDocument *doc;
+  doc= statement_edit_widget->document();
+  int steps;
+  steps= doc->availableUndoSteps();
+  if (steps <= 0) menu_edit_action_undo->setEnabled(false);
+  else menu_edit_action_undo->setEnabled(true);
+  steps= doc->availableRedoSteps();
+  if (steps <= 0) menu_edit_action_redo->setEnabled(false);
+  else menu_edit_action_redo->setEnabled(true);
 }
 
 
@@ -4082,6 +4140,9 @@ QString MainWindow::canonical_font_style(QString font_style_string)
 /* Called from: action_statement() etc. Make a string that setStyleSheet() can use. */
 /*
   Todo: I wasn't able to figure out a simple way to emphasize widget title, for example make it bold.
+  Todo: Notice hardcoded "gray" for QMenu::item:disabled? We could have
+        more selectable options for that, and for other QMenu::item
+        pseudo- stuff, and QMenu::separator.
 */
 void MainWindow::make_style_strings()
 {
@@ -4123,13 +4184,19 @@ void MainWindow::make_style_strings()
   ocelot_history_style_string.append("pt;font-style:"); ocelot_history_style_string.append(ocelot_history_font_style);
   ocelot_history_style_string.append(";font-weight:"); ocelot_history_style_string.append(ocelot_history_font_weight);
 
-  ocelot_menu_style_string= "color:"; ocelot_menu_style_string.append(qt_color(ocelot_menu_text_color));
+  ocelot_menu_style_string="* {";
+  ocelot_menu_style_string.append("color:");
+  ocelot_menu_style_string.append(qt_color(ocelot_menu_text_color));
   ocelot_menu_style_string.append(";background-color:"); ocelot_menu_style_string.append(qt_color(ocelot_menu_background_color));
   ocelot_menu_style_string.append(";border:1px solid "); ocelot_menu_style_string.append(qt_color(ocelot_menu_border_color));
   ocelot_menu_style_string.append(";font-family:"); ocelot_menu_style_string.append(ocelot_menu_font_family);
   ocelot_menu_style_string.append(";font-size:"); ocelot_menu_style_string.append(ocelot_menu_font_size);
   ocelot_menu_style_string.append("pt;font-style:"); ocelot_menu_style_string.append(ocelot_menu_font_style);
   ocelot_menu_style_string.append(";font-weight:"); ocelot_menu_style_string.append(ocelot_menu_font_weight);
+  ocelot_menu_style_string.append("} ");
+  ocelot_menu_style_string.append("QMenu::item:disabled {");
+  ocelot_menu_style_string.append(";background-color:gray");
+  ocelot_menu_style_string.append("}");
 
   ocelot_extra_rule_1_style_string= "color:"; ocelot_extra_rule_1_style_string.append(qt_color(ocelot_extra_rule_1_text_color));
   ocelot_extra_rule_1_style_string.append(";background-color:"); ocelot_extra_rule_1_style_string.append(qt_color(ocelot_extra_rule_1_background_color));

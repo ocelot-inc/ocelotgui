@@ -759,6 +759,7 @@ public slots:
   void action_statement_edit_widget_text_changed(int,int,int);
   void action_undo();
   void action_redo();
+  void after_undo_redo();
   void statement_edit_widget_formatter();
   void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
   void action_menu();
