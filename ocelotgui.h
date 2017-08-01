@@ -759,7 +759,7 @@ public slots:
   void action_statement_edit_widget_text_changed(int,int,int);
   void action_undo();
   void action_redo();
-  void after_undo_redo();
+  void menu_activations(QObject*);
   void statement_edit_widget_formatter();
   void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
   void action_menu();
@@ -2192,6 +2192,7 @@ private:
 /*********************************************************************************************************/
 /* THE TEXTEDITWIDGET WIDGET */
 /* subclassed QTextEdit so paintEvent can be caught, for use in result_grid */
+/* also for focusoutEvent, since eventfilter use would probably cost more */
 
 #ifndef TEXTEDITWIDGET_H
 #define TEXTEDITWIDGET_H
@@ -2209,10 +2210,12 @@ public:
 protected:
   void paintEvent(QPaintEvent *event);
   void keyPressEvent(QKeyEvent *event);
+  void focusOutEvent(QFocusEvent *event);
 
   QString unstripper(QString value_to_unstrip);
 
 };
+
 #endif // TEXTEDITWIDGET_H
 
 

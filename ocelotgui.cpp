@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: July 25 2017
+   Last modified: July 31 2017
 */
 
 /*
@@ -1042,9 +1042,9 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 //  }
   QString text;
 
-  if (event->type() == QEvent::FocusIn)
+  if (event->type() == QEvent::FocusOut)
   {
-    after_undo_redo();
+    menu_activations(obj);
     return false;
   }
 
@@ -3443,7 +3443,6 @@ void MainWindow::action_undo()
   if (text_before == text_after)
     statement_edit_widget->undo();
   statement_edit_widget_text_changed_flag= 0;
-  after_undo_redo();
   log("action_undo end", 90);
 }
 
@@ -3468,61 +3467,78 @@ void MainWindow::action_redo()
   }
   if (chars_added_for_redo > chars_removed_for_redo)
     final_pos_for_redo+= (chars_added_for_redo - chars_removed_for_redo);
+  if (final_pos_for_redo > text_after_1.length())
+  {
+    log("FINAL_POS_FOR_REDO WAS ADJUSTED", 90);
+    final_pos_for_redo= text_after_1.length();
+  }
   cur.setPosition(final_pos_for_redo);
   statement_edit_widget->setTextCursor(cur);
-  after_undo_redo();
   log("action_redo end", 90);
 }
 
-
 /*
-  After undo | redo | focus-in, enable|disable menu items for undo|redo.
+  When focusOut happens for one of the main widgets (the ones that have
+  an event filter on them), we might be switching to the menu bar.
+  (I wish I knew for sure, but if it's to something else, no harm done.)
+  On the edit menu, some items should be enabled or disabled (gray).
   Inefficient, but these actions don't happen dozens of times per second.
+  Incredibly, installeventfilter for menuBar + look for focusIn or
+  focusOut on menuBar didn't work, so this will have to do.
+  Objects with event filters are: ResultGrid, CodeEditor,
+  QScrollBar, TextEditHistory, so they all cause a call to here,
+  but we only care about CodeEditor and TextEditHistory. Also we
+  call from TextEditWidget::focusOutEvent(), an override rather
+  than an editfilter event.
   Todo: Incredibly, availableRedoSteps() only works for CodeEditor i.e.
         statement_edit_widget. I wish I knew why, but rather than spend
-        more hours, will just assume undo|redo are otherwise always okay.
-  Assume focusWidget() = statement_edit_widget, unless focus-in.
-  If focus-in happens for the menu or for something unknown, just return.
+        more hours, will just assume redo is otherwise always okay.
+        Maybe someday look harder.
+  Todo: Saving the object so you'd know to setFocus to it after being on
+        the menu would be good, at the moment it isn't automatic if the
+        widget is detached.
+  Todo: Other edit menu items can be enabled|disabled:
+        previous statement, next statement, format.
 */
-void MainWindow::after_undo_redo()
+void MainWindow::menu_activations(QObject *focus_widget)
 {
-  QWidget* focus_widget= QApplication::focusWidget();
+  bool is_can_undo= true, is_can_redo= true;
+  bool is_can_copy= false, is_can_paste= false;
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
   {
-    ;
+    CodeEditor *t= qobject_cast<CodeEditor*>(focus_widget);
+    QTextDocument *doc= t->document();
+    if (doc->availableUndoSteps() <= 0) is_can_undo= false;
+    if (doc->availableRedoSteps() <= 0) is_can_redo= false;
+    is_can_copy= t->textCursor().hasSelection();
+    is_can_paste= t->canPaste();
   }
   else if (strcmp(class_name, "TextEditWidget") == 0)
   {
-    menu_edit_action_undo->setEnabled(true);
-    menu_edit_action_redo->setEnabled(true);
-    return;
+    TextEditWidget *t= qobject_cast<TextEditWidget*>(focus_widget);
+    QTextDocument *doc= t->document();
+    if (doc->availableUndoSteps() <= 0) is_can_undo= false;
+    is_can_copy= t->textCursor().hasSelection();
+    is_can_paste= t->canPaste();
   }
   else if (strcmp(class_name, "TextEditHistory") == 0)
   {
-    menu_edit_action_undo->setEnabled(true);
-    menu_edit_action_redo->setEnabled(true);
-    return;
-  }
-  else if (strcmp(class_name, "QTextEdit") == 0)
-  {
-    menu_edit_action_undo->setEnabled(true);
-    menu_edit_action_redo->setEnabled(true);
-    return;
+    TextEditHistory *t= qobject_cast<TextEditHistory*>(focus_widget);
+    QTextDocument *doc= t->document();
+    if (doc->availableUndoSteps() <= 0) is_can_undo= false;
+    is_can_copy= t->textCursor().hasSelection();
+    is_can_paste= t->canPaste();
   }
   else
   {
     return;
   }
-  QTextDocument *doc;
-  doc= statement_edit_widget->document();
-  int steps;
-  steps= doc->availableUndoSteps();
-  if (steps <= 0) menu_edit_action_undo->setEnabled(false);
-  else menu_edit_action_undo->setEnabled(true);
-  steps= doc->availableRedoSteps();
-  if (steps <= 0) menu_edit_action_redo->setEnabled(false);
-  else menu_edit_action_redo->setEnabled(true);
+  menu_edit_action_undo->setEnabled(is_can_undo);
+  menu_edit_action_redo->setEnabled(is_can_redo);
+  menu_edit_action_cut->setEnabled(is_can_copy);
+  menu_edit_action_copy->setEnabled(is_can_copy);
+  menu_edit_action_paste->setEnabled(is_can_paste);
 }
 
 
@@ -4143,6 +4159,9 @@ QString MainWindow::canonical_font_style(QString font_style_string)
   Todo: Notice hardcoded "gray" for QMenu::item:disabled? We could have
         more selectable options for that, and for other QMenu::item
         pseudo- stuff, and QMenu::separator.
+        E.g. QMenu:item:selected if you can decide on a colour.
+  TODO: Also for QTextedit we should have ...:selected because right now
+        when you select and then change focus, you lose the colour.
 */
 void MainWindow::make_style_strings()
 {
@@ -4195,7 +4214,7 @@ void MainWindow::make_style_strings()
   ocelot_menu_style_string.append(";font-weight:"); ocelot_menu_style_string.append(ocelot_menu_font_weight);
   ocelot_menu_style_string.append("} ");
   ocelot_menu_style_string.append("QMenu::item:disabled {");
-  ocelot_menu_style_string.append(";background-color:gray");
+  ocelot_menu_style_string.append("background-color:gray");
   ocelot_menu_style_string.append("}");
 
   ocelot_extra_rule_1_style_string= "color:"; ocelot_extra_rule_1_style_string.append(qt_color(ocelot_extra_rule_1_text_color));
@@ -14208,6 +14227,17 @@ QString TextEditWidget::unstripper(QString value_to_unstrip)
   s.append("'");
   return s;
 }
+
+void TextEditWidget::focusOutEvent(QFocusEvent *event)
+{
+  TextEditFrame *t= text_edit_frame_of_cell;
+  ResultGrid *r=  t->ancestor_result_grid_widget;
+  MainWindow *m= r->copy_of_parent;
+  m->menu_activations(this);
+  /* We probably don't need to say this. */
+  QTextEdit::focusOutEvent(event);
+}
+
 
 
 /*
