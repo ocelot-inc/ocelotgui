@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: July 31 2017
+   Last modified: August 1 2017
 */
 
 /*
@@ -2449,6 +2449,7 @@ void MainWindow::menu_edit_copy()
   if (strcmp(class_name, "CodeEditor") == 0)
     qobject_cast<CodeEditor*>(focus_widget)->copy();
   else if (strcmp(class_name, "TextEditWidget") == 0)
+    /* see TextEditWidget::copy() later in this file */
     qobject_cast<TextEditWidget*>(focus_widget)->copy();
   else if (strcmp(class_name, "TextEditHistory") == 0)
     qobject_cast<TextEditHistory*>(focus_widget)->copy();
@@ -3503,7 +3504,7 @@ void MainWindow::action_redo()
 void MainWindow::menu_activations(QObject *focus_widget)
 {
   bool is_can_undo= true, is_can_redo= true;
-  bool is_can_copy= false, is_can_paste= false;
+  bool is_can_copy= false, is_can_cut= false, is_can_paste= false;
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
   {
@@ -3511,7 +3512,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
     QTextDocument *doc= t->document();
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
     if (doc->availableRedoSteps() <= 0) is_can_redo= false;
-    is_can_copy= t->textCursor().hasSelection();
+    is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
   }
   else if (strcmp(class_name, "TextEditWidget") == 0)
@@ -3519,15 +3520,24 @@ void MainWindow::menu_activations(QObject *focus_widget)
     TextEditWidget *t= qobject_cast<TextEditWidget*>(focus_widget);
     QTextDocument *doc= t->document();
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
-    is_can_copy= t->textCursor().hasSelection();
-    is_can_paste= t->canPaste();
+    if (t->text_edit_frame_of_cell->is_image_flag)
+    {
+      is_can_copy= true;
+      is_can_cut= false;
+      is_can_paste= false;
+    }
+    else
+    {
+      is_can_copy= is_can_cut= t->textCursor().hasSelection();
+      is_can_paste= t->canPaste();
+    }
   }
   else if (strcmp(class_name, "TextEditHistory") == 0)
   {
     TextEditHistory *t= qobject_cast<TextEditHistory*>(focus_widget);
     QTextDocument *doc= t->document();
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
-    is_can_copy= t->textCursor().hasSelection();
+    is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
   }
   else
@@ -3536,7 +3546,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
   }
   menu_edit_action_undo->setEnabled(is_can_undo);
   menu_edit_action_redo->setEnabled(is_can_redo);
-  menu_edit_action_cut->setEnabled(is_can_copy);
+  menu_edit_action_cut->setEnabled(is_can_cut);
   menu_edit_action_copy->setEnabled(is_can_copy);
   menu_edit_action_paste->setEnabled(is_can_paste);
 }
@@ -14182,6 +14192,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
   This gets the entire unclipped image because we're reloading from the source.
   Todo: check for nulls.
   Todo: decide whether we care about select() before copy().
+        If it's an image, Copy is enabled even if there's no selection.
   Todo: although ^C seems okay, right-click and select copy does not seem okay.
   Todo: With Qt4, when program ends, if there was a copy, we might see
         "QClipboard: Unable to receive an event from the clipboard manager in a reasonable time"
@@ -14198,7 +14209,10 @@ void TextEditWidget::copy()
                        0,
                        Qt::AutoColor) == false)
     {
-      /* ?? dunno what would cause this. maybe it's null. */
+      /* Not readable as an image. Maybe text. Maybe null. */
+      QClipboard *p_clipboard= QApplication::clipboard();
+      p_clipboard->setText(QString::fromUtf8(text_edit_frame_of_cell->content_pointer,
+                           text_edit_frame_of_cell->content_length));
     }
     else
     {
