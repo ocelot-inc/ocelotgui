@@ -55,6 +55,11 @@ void MainWindow::hparse_f_nexttoken()
     {
       hparse_token_type= main_token_types[hparse_i]= TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE;
     }
+    else if ((hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
+     && (hparse_sql_mode_ansi_quotes == false))
+    {
+      hparse_token_type= main_token_types[hparse_i]= TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE;
+    }
     if ((hparse_token_type != TOKEN_TYPE_COMMENT_WITH_SLASH)
      && (hparse_token_type != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
      && (hparse_token_type != TOKEN_TYPE_COMMENT_WITH_MINUS))
@@ -72,6 +77,8 @@ void MainWindow::hparse_f_nexttoken()
   and to see whether NOT is the beginning of NOT LIKE,
   and to see whether the word following GRANT ROLE is TO,
   and to see whether the word following DATE|TIME|TIMESTAMP is a literal.
+  Todo: no conversion for identifier|literal with double quotes,
+        as is done for hparse_f_nexttoken(), maybe it doesn't matter.
 */
 void MainWindow::hparse_f_next_nexttoken()
 {
@@ -9281,9 +9288,6 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
 #ifdef DBMS_TARANTOOL
 /*
   From the Lua bnf https://www.lua.org/manual/5.1/manual.html
-
-  todo: we still consider # to be a comment rather than an operator
-
 */
 /*
   stat ::=  varlist `=´ explist |
@@ -9303,6 +9307,9 @@ static int lua_depth;
 
 void MainWindow::hparse_f_lua_blocklist(int calling_statement_type, int block_top)
 {
+  log("hparse_f_lua_blocklist start", 80);
+  bool saved_hparse_sql_mode_ansi_quotes= hparse_sql_mode_ansi_quotes;
+  hparse_sql_mode_ansi_quotes= false;
   int saved_hparse_i= hparse_i;
   unsigned short int saved_hparse_dbms_mask= hparse_dbms_mask;
   lua_depth= 0;
@@ -9311,6 +9318,8 @@ void MainWindow::hparse_f_lua_blocklist(int calling_statement_type, int block_to
   hparse_dbms_mask= saved_hparse_dbms_mask;
   if (hparse_errno > 0) return;
   main_token_flags[saved_hparse_i]|= TOKEN_FLAG_IS_LUA;
+  hparse_sql_mode_ansi_quotes= saved_hparse_sql_mode_ansi_quotes;
+  log("hparse_f_lua_blocklist start", 80);
 }
 /* 0 or more statements or blocks of statements, optional semicolons */
 void MainWindow::hparse_f_lua_blockseries(int calling_statement_type, int block_top, bool is_in_loop)
@@ -9649,7 +9658,10 @@ int MainWindow::hparse_f_lua_prefixexp()
 int MainWindow::hparse_f_lua_functioncall()
 {
   bool is_var;
-  if (hparse_f_lua_var() == 0) return 0;
+  if (hparse_f_lua_var() == 0)
+  {
+    return 0;
+  }
   if (hparse_errno > 0) return 0;
 so_far_it_is_a_var:
   if (hparse_f_lua_args() == 1) goto so_far_it_is_a_functioncall;
@@ -10280,7 +10292,9 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_text_copy= text;
     hparse_begin_seen= false;
     hparse_like_seen= false;
-    hparse_token_type= 0;
+    // 2017-08-07: "hparse_token_type= 0;" caused a Lua statement
+    //             followed by an SQL statement to fail. Star it out.
+    //hparse_token_type= 0;
     hparse_next_token= "";
     hparse_next_next_token= "";
     hparse_next_next_next_token= "";

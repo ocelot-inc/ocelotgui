@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: August 1 2017
+   Last modified: August 7 2017
 */
 
 /*
@@ -2627,7 +2627,6 @@ void MainWindow::action_statement_edit_widget_text_changed(int position,int char
   {
     hparse_f_multi_block(text); /* recognizer */
   }
-
   log("action_statement_edit_widget_text_changed after hparse_f_multi_block", 90);
   /* This "sets" the colour, it does not "merge" it. */
   /* Do not try to set underlines, they won't go away. */
@@ -4571,7 +4570,6 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
     }
   }
   if ((delimiter_seen == true) || (comment_seen == true)) ++i;
-
   return i - passed_main_token_number;
 }
 
@@ -7637,6 +7635,7 @@ int MainWindow::action_execute_one_statement(QString text)
     if (do_something == true)
     {
       /* Look for a CREATE TABLE statement with a SERVER clause. */
+      /* Todo: Make sure you only execute what's in utf16_copy */
       bool is_create_table_server;
 #ifdef DBMS_TARANTOOL
       int result= create_table_server(text, &is_create_table_server, main_token_number, main_token_count_in_statement);
@@ -9521,7 +9520,12 @@ void MainWindow::make_and_append_message_in_result(
       1: '-' is an operator, this is the norm when tokenizing SQL
       2: '-' is a token part, this is the norm when tokenizing options
 
-  If ocelot_dbms='tarantool': #... is not a comment, [[...]] is a string
+  If ocelot_dbms='tarantool':
+    #... is not a comment
+    [[...]] is a string
+    .. is an operator
+    == is an operator
+    todo: =[[...]]= and nested strings
 
   Adjusting the tokenizer for Qt:
     With tokenize(QString text, char* comment_handling) we find the tokens of a string in statement.
@@ -9993,7 +9997,11 @@ int MainWindow::token_type(QChar *token, int token_length)
       return TOKEN_TYPE_LITERAL_WITH_BRACKET;
     }
   }
-  if (*token == '"') return TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE;
+  if (*token == '"')
+  {
+    if (hparse_sql_mode_ansi_quotes) return TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE;
+    return TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE;
+  }
   if ((*token >= '0') && (*token <= '9')) return TOKEN_TYPE_LITERAL_WITH_DIGIT;
   if ((token_length > 1) && (*token == '.'))
   {
@@ -12017,9 +12025,11 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
     -- get session.id and version
     -- todo: if version is old we shouldn't try to use SQL
   ansi_quotes:
-    With Tarantool " can be a delimiter or it can be a quote mark,
-    and there's no easy way to signal (maybe I should add --ansi_quotes?)
-    so we guess that users are sane. I hope this becomes policy someday.
+    With Tarantool/SQL "x" is a string literal not a delimited
+    identifier. So we set hparse_sql_mode_ansi_quotes= true.
+    If we mix Tarantool/SQL and MySQL/MariaDB, this is still required.
+    So we guess that users are sane. I hope this becomes policy someday.
+    With Tarantool/NoSQL "x" is always a string literal.
 */
 int MainWindow::connect_tarantool(unsigned int connection_number,
                                   QString port_maybe,
@@ -12747,11 +12757,22 @@ int MainWindow::tarantool_execute_sql(
       TODO:
       The [[ ... ]] trick will fail if the string contains [[ or ]].
       So what you really want to do is change ' or " to escapes.
+      Or enclose in =[[...]]= etc. -- something that's not in the string.
+    */
+    /*
+      TODO: Instead of "char request_string[1024]" (ridiculous!), we
+            should allocate whatever we'll need, based on the maximum
+            size of request_string.
+      TODO: For TOKEN_KEYWORD_DO_LUA, if syntax_checker = 0, we'd be
+            safer with strcpy(request_string, s.toUtf8());
+      TODO: For token_KEYWORD_LUA, we should use dbms_query if we can.
+      TODO: Rely on strncpy() to add '\0'? Bad idea.
     */
     char request_string[1024];
     if (statement_type == TOKEN_KEYWORD_DO_LUA)
     {
-      strcpy(request_string, s.toUtf8());
+      strncpy(request_string, dbms_query, dbms_query_len);
+      *(request_string+dbms_query_len)= '\0';
     }
     else if (statement_type == TOKEN_KEYWORD_LUA)
     {
@@ -12765,7 +12786,7 @@ int MainWindow::tarantool_execute_sql(
        || (statement_type == TOKEN_KEYWORD_VALUES))
         strcpy(request_string, "return ocelot_sqle([[");
       else
-      strcpy(request_string, "return box.sql.execute([[");
+        strcpy(request_string, "return box.sql.execute([[");
       strncat(request_string, dbms_query, dbms_query_len);
       strcat(request_string, "]])");
     }
