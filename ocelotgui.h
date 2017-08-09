@@ -3811,6 +3811,7 @@ public:
 #define FIELD_VALUE_FLAG_IS_NUMBER 2
 #define FIELD_VALUE_FLAG_IS_STRING 4
 #define FIELD_VALUE_FLAG_IS_OTHER 8
+#define FIELD_VALUE_FLAG_IS_IMAGE 16
 
 ResultGrid(
 //        MYSQL_RES *mysql_res,
@@ -4106,20 +4107,22 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
   Return true if what's at pointer has an image signature.
   We only do this for Tarantool, we set data type = OCELOT_DATA_TYPE_BLOB
   if the length is > 100 (arbitrary) and if the signature for .jpg or
-  .png is at the start (not a reliable check but a false hit won't do a
+  .png or .gif is at the start (not a reliable check but a false hit won't do a
   lot of harm). See wikipedia article = List of file signatures.
   We don't actually care except for extra_rule_1.
   We could do this check for MySQL/MariaDB too, but for them we simply
   look at the data type.
-  Todo: check for other signatures, e.g. gif.
+  Todo: check for other signatures, e.g. bmp.
 */
 bool is_image_format(int length, char* pointer)
 {
   unsigned char *p= (unsigned char*) pointer;
   if (length <= 100) return false;
-  if ((*p = 0x89) && (*(p+1) == 0x50) && (*(p+2) == 0x4e))
+  if ((*p == 0x89) && (*(p+1) == 0x50) && (*(p+2) == 0x4e))
     return true;
-  if ((*p = 0xff) && (*(p+1) == 0xd8) && (*(p+2) == 0xff))
+  if ((*p == 0xff) && (*(p+1) == 0xd8) && (*(p+2) == 0xff))
+    return true;
+  if ((memcmp(p,"GIF87a",6) == 0) || (memcmp(p,"GIF89a",6) == 0))
     return true;
   return false;
 }
@@ -4205,7 +4208,6 @@ QString fillup(MYSQL_RES *mysql_res,
   /* Scan entire result set to determine if NUM_FLAG should go on. */
   if (connections_dbms == DBMS_TARANTOOL)
   {
-    bool is_image_seen= false;
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
       result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING;
@@ -4221,16 +4223,12 @@ QString fillup(MYSQL_RES *mysql_res,
       {
         memcpy(&v_length, pointer, sizeof(unsigned int));
         char tmp_flag= *(pointer + sizeof(unsigned int));
-        if ((tmp_flag == FIELD_VALUE_FLAG_IS_NUMBER) || (tmp_flag == FIELD_VALUE_FLAG_IS_STRING))
+        result_field_flags[i]|= tmp_flag;
+        if (tmp_flag == FIELD_VALUE_FLAG_IS_STRING)
         {
-          if (result_field_flags[i] != FIELD_VALUE_FLAG_IS_STRING)
+          if (is_image_format(v_length, pointer + sizeof(unsigned int) + sizeof(char)))
           {
-            result_field_flags[i]= tmp_flag;
-          }
-          else
-          {
-            if (is_image_format(v_length, pointer + sizeof(unsigned int) + sizeof(char)))
-              is_image_seen= true;
+            result_field_flags[i]|= FIELD_VALUE_FLAG_IS_IMAGE;
           }
         }
         pointer+= v_length + sizeof(unsigned int) + sizeof(char);
@@ -4238,16 +4236,16 @@ QString fillup(MYSQL_RES *mysql_res,
     }
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
-      if (result_field_flags[i] == FIELD_VALUE_FLAG_IS_NUMBER)
+      if ((result_field_flags[i] & (FIELD_VALUE_FLAG_IS_NUMBER | FIELD_VALUE_FLAG_IS_STRING)) == FIELD_VALUE_FLAG_IS_NUMBER)
         result_field_flags[i]= NUM_FLAG;
       else
       {
-        result_field_flags[i]= 0;
-        if (is_image_seen == true)
+        if ((result_field_flags[i] & FIELD_VALUE_FLAG_IS_IMAGE) != 0)
         {
           result_field_types[i]= OCELOT_DATA_TYPE_BLOB;
           result_field_charsetnrs[i]= 63;
         }
+        result_field_flags[i]= 0;
       }
     }
   }
