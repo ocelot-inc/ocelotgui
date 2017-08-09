@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: August 7 2017
+   Last modified: August 8 2017
 */
 
 /*
@@ -12715,6 +12715,10 @@ long unsigned int MainWindow::tarantool_num_rows(unsigned int connection_number)
   return r;
 }
 
+/*
+  Warning: do not say "delete [] request_string;" early, there
+  might be a hidden pointer to it.
+*/
 int MainWindow::tarantool_execute_sql(
             const char *dbms_query,
             unsigned long dbms_query_len,
@@ -12722,6 +12726,7 @@ int MainWindow::tarantool_execute_sql(
             int statement_type,
             QString s)
 {
+  char *request_string= new char[dbms_query_len + 256];
   tarantool_select_nosql= false;
   //if (statement_type == TOKEN_KEYWORD_SELECT)
   {
@@ -12755,20 +12760,16 @@ int MainWindow::tarantool_execute_sql(
 
     /*
       TODO:
-      The [[ ... ]] trick will fail if the string contains [[ or ]].
-      So what you really want to do is change ' or " to escapes.
-      Or enclose in =[[...]]= etc. -- something that's not in the string.
-    */
-    /*
-      TODO: Instead of "char request_string[1024]" (ridiculous!), we
-            should allocate whatever we'll need, based on the maximum
-            size of request_string.
+      The [=[ ... ]=] trick will fail if the string contains [=[ or ]=].
+      So to be really safe you should look for occurrences of [=[ in
+      dbms_query and change the count of =s until you're different.
+      TODO: Since we're inside [=[ ... ]=], do escapes still work?
       TODO: For TOKEN_KEYWORD_DO_LUA, if syntax_checker = 0, we'd be
             safer with strcpy(request_string, s.toUtf8());
-      TODO: For token_KEYWORD_LUA, we should use dbms_query if we can.
-      TODO: Rely on strncpy() to add '\0'? Bad idea.
+      TODO: For token_KEYWORD_LUA, make sure we never get extra chars.
+            Not only would that make execution fail, but also we don't
+            allocate enough space in request_string, possibly.
     */
-    char request_string[1024];
     if (statement_type == TOKEN_KEYWORD_DO_LUA)
     {
       strncpy(request_string, dbms_query, dbms_query_len);
@@ -12782,17 +12783,23 @@ int MainWindow::tarantool_execute_sql(
     }
     else
     {
+      int strcpy_len;
       if ((statement_type == TOKEN_KEYWORD_SELECT)
        || (statement_type == TOKEN_KEYWORD_VALUES))
-        strcpy(request_string, "return ocelot_sqle([[");
+      {
+        strcpy(request_string, "return ocelot_sqle([=[");
+        strcpy_len= sizeof("return ocelot_sqle([=[") - 1;
+      }
       else
-        strcpy(request_string, "return box.sql.execute([[");
-      strncat(request_string, dbms_query, dbms_query_len);
-      strcat(request_string, "]])");
+      {
+        strcpy(request_string, "return box.sql.execute([=[");
+        strcpy_len= sizeof("return box.sql.execute([=[") - 1;
+      }
+      strncpy(request_string + strcpy_len, dbms_query, dbms_query_len);
+      strcpy(request_string + strcpy_len + dbms_query_len, "]=])");
     }
     int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
     assert(m >= 0);
-
     lmysql->ldbms_tnt_request_set_tuple(req2, arg);
 
     /* uint64_t sync1 = */ lmysql->ldbms_tnt_request_compile(tnt[connection_number], req2);
@@ -12817,8 +12824,8 @@ int MainWindow::tarantool_execute_sql(
       }
       result_row_count= r;
     }
-    return tarantool_errno[connection_number];
   }
+  delete [] request_string;
   return tarantool_errno[connection_number];
 }
 
