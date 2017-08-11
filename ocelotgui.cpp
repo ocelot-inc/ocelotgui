@@ -1235,7 +1235,6 @@ bool MainWindow::is_statement_complete(QString text)
     if (i > 0) second_last_token= text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]);
     break;
   }
-
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
   /* Todo: Check: does this mean that a client statement cannot be spread over two lines? */
   if (is_client_statement(first_token_type, first_token_i, text) == true)
@@ -1261,7 +1260,6 @@ bool MainWindow::is_statement_complete(QString text)
       if (q != " ") break;
     }
   }
-
   /* if create-routine && count-of-ENDs == count-of-BEGINS then ; is the end else ; is not the end */
   if (ocelot_delimiter_str != ";") returned_begin_count= 0;
   else
@@ -1282,7 +1280,6 @@ bool MainWindow::is_statement_complete(QString text)
       }
     }
   }
-
   if (last_token != ocelot_delimiter_str)
   {
     return false;
@@ -1292,7 +1289,6 @@ bool MainWindow::is_statement_complete(QString text)
   {
     return false;
   }
-
   /* All conditions have been met. Tell caller to Execute, and eat the return key. */
   return true;
 }
@@ -4590,11 +4586,14 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
     routine will use both (original string,offset,length) and (returned string).
     Comments should be replaced with a single space.
     Do not strip comments that start with / * ! or / * M !
+  Re Tarantool comment stripping: "#" does not begin a comment,
+    and inline comments will be trouble if ocelot_comments <> 0
+    because they're not legal in Lua (we don't try to solve that).
   Todo: Tarantool comments are different, eh?
   Todo: It's silly to call this every time you call real_query.
         Do it once, and you don't even need to call tokenize() again.
 */
-int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int dbms_query_len)
+int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int dbms_query_len, int connection_number)
 {
   log("make_statement_ready_to_send start", 80);
   int  *token_offsets;
@@ -4615,7 +4614,6 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
   dbms_query[0]= '\0';
   for (i= 0; token_lengths[i] != 0; ++i)
   {
-    /* Don't send comments unless --comments or equivalent, or comment is / * special ... */
     if (ocelot_comments == 0)
     {
       /* TOKEN_TYPE_COMMENT_WITH_SLASH */
@@ -4623,7 +4621,8 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
       /* or TOKEN_TYPE_COMMENT_WITH_MINUS */
       if ((text.mid(token_offsets[i], 2) == "/*")
        || (text.mid(token_offsets[i], 2) == "--")
-       || (text.mid(token_offsets[i], 1) == "#"))
+       || ((text.mid(token_offsets[i], 1) == "#")
+           && (connections_dbms[connection_number] != DBMS_TARANTOOL)))
       {
         if ((text.mid(token_offsets[i], 3) != "/*!")
          && (text.mid(token_offsets[i], 4) != "/*M!"))
@@ -7671,12 +7670,12 @@ int MainWindow::action_execute_one_statement(QString text)
 #ifdef DBMS_TARANTOOL
         if (connections_dbms[0] == DBMS_TARANTOOL)
         {
-          int statement_type= get_statement_type(main_token_number, main_token_count_in_statement);
-          /* todo: failing to check if statement started with comment */
+          unsigned int main_token_flags_first;
+          int statement_type= get_statement_type(main_token_number, main_token_count_in_statement, &main_token_flags_first);
           if ((statement_type == TOKEN_KEYWORD_SELECT)
            || (statement_type == TOKEN_KEYWORD_VALUES)
            || (statement_type == TOKEN_KEYWORD_LUA)
-           || ((main_token_flags[main_token_number]&TOKEN_FLAG_IS_LUA) != 0))
+           || ((main_token_flags_first & TOKEN_FLAG_IS_LUA) != 0))
           {
             int result_set_type= tarantool_result_set_type(0);
             if ((result_set_type == 0) || (result_set_type == 1))
@@ -7917,7 +7916,9 @@ int MainWindow::real_query(QString query, int connection_number)
   dbms_query_len= query.toUtf8().size();           /* See comment "UTF8 Conversion" */
   dbms_query= new char[(dbms_query_len + 1) * 2];
   dbms_query_len= make_statement_ready_to_send(query,
-                                               dbms_query, dbms_query_len + 1);
+                                               dbms_query,
+                                               dbms_query_len + 1,
+                                               connection_number);
   assert(strlen(dbms_query) < ((unsigned int) dbms_query_len + 1) * 2);
   dbms_query_connection_number= connection_number;
 #ifdef DBMS_TARANTOOL
@@ -9652,17 +9653,40 @@ next_char:
     if ((char_offset + 1  < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
   }
   if (minus_behaviour != 2) {
-    if (text[char_offset] == '-')     /* - one-byte token, unless -- comment */
+    if ((dbms_version_mask&FLAG_VERSION_TARANTOOL) == 0)
     {
-      if ((char_offset + 1 < text_length) && (text[char_offset + 1]  == '-'))
+      if (text[char_offset] == '-')     /* - one-byte token, unless -- comment */
       {
-        if ((char_offset + 2 < text_length) && (text[char_offset + 2] <= ' '))
+        if ((char_offset + 1 < text_length) && (text[char_offset + 1]  == '-'))
         {
-          expected_char= '\n';
-          goto comment_start;
+          if ((char_offset + 2 < text_length) && (text[char_offset + 2] <= ' '))
+          {
+            expected_char= '\n';
+            goto comment_start;
+          }
         }
+        goto one_byte_token;
       }
-      goto one_byte_token;
+    }
+    else
+    {
+      if (text[char_offset] == '-')     /* - one-byte token, unless -- comment */
+      {
+        if ((char_offset + 1 < text_length) && (text[char_offset + 1]  == '-'))
+        {
+          if (((char_offset + 2 < text_length) && (text[char_offset + 2] == '['))
+           && ((char_offset + 3 < text_length) && (text[char_offset + 3] == '[')))
+          {
+            goto string_starting_with_bracket_start;
+          }
+          else
+          {
+            expected_char= '\n';
+            goto comment_start;
+          }
+        }
+        goto one_byte_token;
+      }
     }
   }
   if (text[char_offset] == '.')     /* . part of token if previous or following is digit. otherwise one-byte token */
@@ -12327,10 +12351,12 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
   in a better way but perhaps you haven't called hparse.
 */
 int MainWindow::get_statement_type(unsigned int passed_main_token_number,
-                                   unsigned int passed_main_token_count_in_statement)
+                                   unsigned int passed_main_token_count_in_statement,
+                                   unsigned int *main_token_flags_first)
 {
   unsigned int i;
   int token_type;
+  *main_token_flags_first= 0;
   for (i= passed_main_token_number; ; ++i)
   {
     if ((main_token_lengths[i] == 0)
@@ -12341,9 +12367,12 @@ int MainWindow::get_statement_type(unsigned int passed_main_token_number,
     }
     token_type= main_token_types[i];
     if ((token_type != TOKEN_TYPE_COMMENT_WITH_SLASH)
-     || (token_type != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-     || (token_type != TOKEN_TYPE_COMMENT_WITH_MINUS))
+     && (token_type != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+     && (token_type != TOKEN_TYPE_COMMENT_WITH_MINUS))
+    {
+      *main_token_flags_first= main_token_flags[i];
       break;
+    }
   }
   if (token_type == TOKEN_KEYWORD_WITH)
   {
@@ -12388,18 +12417,18 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   QString text= statement_edit_widget->toPlainText();
 
   int token_type= -1;
-
-  int statement_type= get_statement_type(passed_main_token_number, passed_main_token_count_in_statement);
+  unsigned int main_token_flags_first;
+  int statement_type= get_statement_type(passed_main_token_number, passed_main_token_count_in_statement, &main_token_flags_first);
 
   result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
-
   /* TODO: Make sure changing hparse_i doesn't muck up something */
   hparse_i= passed_main_token_number;
   if (hparse_f_is_nosql(text) == false)
   {
     QString s;
+
     if (statement_type == TOKEN_KEYWORD_LUA) s= text.mid(main_token_offsets[passed_main_token_number + 1], main_token_lengths[passed_main_token_number + 1]);
-    if (main_token_flags[passed_main_token_number] & TOKEN_FLAG_IS_LUA)
+    if (main_token_flags_first & TOKEN_FLAG_IS_LUA)
     {
       s= text;
       statement_type= TOKEN_KEYWORD_DO_LUA;
@@ -12412,7 +12441,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     log("tarantool_real_query end", 80);
     return tarantool_errno[connection_number];
   }
-
   tarantool_select_nosql= true;
   //int hparse_statement_type=-1, clause_type=-1;
   //QString current_token, what_we_expect, what_we_got;
@@ -12842,6 +12870,7 @@ int MainWindow::tarantool_execute_sql(
   then do not add "return "
   else add "return "
   ... Eventually we should parse Lua and then we can get rid of this.
+      Todo: now we do parse Lua, so consider how to get rid of this.
 */
 QString MainWindow::tarantool_add_return(QString s)
 {
@@ -12850,7 +12879,7 @@ QString MainWindow::tarantool_add_return(QString s)
   int token_lengths[100];
   tokenize(s.data(),
            s.size(),
-           &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 2);
+           &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 1);
   QString word_1= s.mid(token_offsets[0], token_lengths[0]);
   if ((word_1 == "and") || (word_1 == "break") || (word_1 == "do")
    || (word_1 == "else") || (word_1 == "elseif") || (word_1 == "end")

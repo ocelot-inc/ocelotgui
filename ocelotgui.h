@@ -880,7 +880,7 @@ private:
   void make_style_strings();
   //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
-  int make_statement_ready_to_send(QString, char *, int);
+  int make_statement_ready_to_send(QString, char *, int, int);
   void remove_statement(QString);
   int action_execute_one_statement(QString text);
 
@@ -926,7 +926,7 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int);
-  int get_statement_type(unsigned int, unsigned int);
+  int get_statement_type(unsigned int, unsigned int, unsigned int*);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
   QString tarantool_fetch_header_row(int);
   const char * tarantool_seek_0(int*);
