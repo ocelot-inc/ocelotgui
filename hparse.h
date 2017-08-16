@@ -707,43 +707,45 @@ int MainWindow::hparse_f_collation_name()
 */
 int MainWindow::hparse_f_qualified_name_of_object(int database_or_object_identifier, int object_identifier)
 {
-  if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
-    && (object_identifier == TOKEN_REFTYPE_TABLE)
-    && (hparse_token == "."))
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-    if (hparse_errno > 0) return 0;
-    main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-    main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return 0;
-    return 1;
-  }
-  hparse_f_next_nexttoken();
-  if (hparse_next_token == ".")
-  {
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return 0;
-    main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
-    if (hparse_errno > 0) return 0;
-    if (object_identifier == TOKEN_REFTYPE_TABLE)
+    if ((object_identifier == TOKEN_REFTYPE_TABLE)
+      && (hparse_token == "."))
     {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
+      if (hparse_errno > 0) return 0;
       main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
       main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-    }
-    hparse_f_expect(FLAG_VERSION_ALL, object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return 0;
-    return 1;
-  }
-  if (hparse_next_token == "")
-  {
-    if (hparse_f_accept(FLAG_VERSION_ALL, database_or_object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
-    {
-      main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return 0;
       return 1;
     }
-    return 0;
+    hparse_f_next_nexttoken();
+    if (hparse_next_token == ".")
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return 0;
+      main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ".");
+      if (hparse_errno > 0) return 0;
+      if (object_identifier == TOKEN_REFTYPE_TABLE)
+      {
+        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
+        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
+      }
+      hparse_f_expect(FLAG_VERSION_ALL, object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return 0;
+      return 1;
+    }
+    if (hparse_next_token == "")
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, database_or_object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+      {
+        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+        return 1;
+      }
+      return 0;
+    }
   }
   if (hparse_f_accept(FLAG_VERSION_ALL, object_identifier,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
   {
@@ -5949,14 +5951,6 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned sh
     {
       temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_SEQUENCE);
     }
-    else if ((((*hparse_flags) & (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW)) != 0) && (temporary_seen == false) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEMP") == 1))
-    {
-      temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW | HPARSE_FLAG_ROUTINE);
-    }
-    else if ((((*hparse_flags) & (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW)) != 0) && (temporary_seen == false) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEMPORARY") == 1))
-    {
-      temporary_seen= true; (*hparse_flags) &= (HPARSE_FLAG_TABLE | HPARSE_FLAG_TRIGGER | HPARSE_FLAG_VIEW | HPARSE_FLAG_ROUTINE);
-    }
     else if ((((*hparse_flags) & HPARSE_FLAG_TABLE) != 0) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ONLINE") == 1))
     {
       online_seen= true; (*hparse_flags) &= (HPARSE_FLAG_INDEX | HPARSE_FLAG_TABLE);
@@ -6593,10 +6587,17 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_SERVER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
-        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LUA, "LUA");
-        if (hparse_errno > 0) return;
-        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
-        if (hparse_errno > 0) return;
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LUA, "LUA") == 1)
+        {
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+        }
+        else
+        {
+          /* Todo: Better to call hparse_f_statement, someday */
+          hparse_f_lua_blocklist(0, hparse_i);
+          if (hparse_errno > 0) return;
+        }
         return;
       }
       else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
@@ -9319,7 +9320,7 @@ void MainWindow::hparse_f_lua_blocklist(int calling_statement_type, int block_to
   if (hparse_errno > 0) return;
   main_token_flags[saved_hparse_i]|= TOKEN_FLAG_IS_LUA;
   hparse_sql_mode_ansi_quotes= saved_hparse_sql_mode_ansi_quotes;
-  log("hparse_f_lua_blocklist start", 80);
+  log("hparse_f_lua_blocklist end", 80);
 }
 /* 0 or more statements or blocks of statements, optional semicolons */
 void MainWindow::hparse_f_lua_blockseries(int calling_statement_type, int block_top, bool is_in_loop)
@@ -10801,6 +10802,7 @@ int MainWindow::hparse_f_client_statement()
         return 0;
       }
     }
+    /* If you add to this, hparse_errmsg might not be big enough. */
     if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_TEXT_COLOR") == 1)
      || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_BACKGROUND_COLOR") == 1)
      || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_STATEMENT_BORDER_COLOR") == 1)
@@ -10856,7 +10858,31 @@ int MainWindow::hparse_f_client_statement()
      || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_BATCH") == 1)
      || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_HTML") == 1)
      || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_RAW") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_XML") == 1))
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_XML") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_CONNECT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_EXIT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_UNDO") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_REDO") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_CUT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_COPY") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_PASTE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_SELECT_ALL") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_FORMAT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_EXECUTE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_KILL") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_BREAKPOINT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_CONTINUE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_NEXT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_STEP") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_CLEAR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_DEBUG_EXIT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_INFORMATION") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_REFRESH_USER_VARIABLES") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_REFRESH_VARIABLES") == 1)
+     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "OCELOT_SHORTCUT_REFRESH_CALL_STACK") == 1))
     {
       ;
     }

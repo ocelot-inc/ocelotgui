@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: August 8 2017
+   Last modified: August 15 2017
 */
 
 /*
@@ -335,6 +335,7 @@
   static char ocelot_shortcut_select_all[80]= "default";
   static char ocelot_shortcut_history_markup_previous[80]= "default";
   static char ocelot_shortcut_history_markup_next[80]= "default";
+  static char ocelot_shortcut_format[80]= "default";
   static char ocelot_shortcut_execute[80]= "default";
   static char ocelot_shortcut_kill[80]= "default";
   static char ocelot_shortcut_breakpoint[80]= "default";
@@ -395,7 +396,7 @@
 /* Global Tarantool definitions */
   static struct tnt_stream *tnt[MYSQL_MAX_CONNECTIONS];
   static int tarantool_errno[MYSQL_MAX_CONNECTIONS];
-  static char tarantool_errmsg[1024]; /* same size as hparse_errmsg? */
+  static char tarantool_errmsg[2700]; /* same size as hparse_errmsg? */
   QString tarantool_server_name= "";
 #endif
 
@@ -413,7 +414,8 @@
   static int hparse_errno;
   static int hparse_token_type;
   static int hparse_statement_type= -1;
-  static char hparse_errmsg[1024]; /* same size as tarantool_errmsg? */
+  /* hparse_f_accept can dump many expected tokens in hparse_errmsg */
+  static char hparse_errmsg[2700]; /* same size as tarantool_errmsg? */
   static QString hparse_next_token, hparse_next_next_token;
   static int hparse_next_token_type, hparse_next_next_token_type;
   static QString hparse_next_next_next_token, hparse_next_next_next_next_token;
@@ -1094,6 +1096,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   if (qk == ocelot_shortcut_history_markup_previous_keysequence) { history_markup_previous(); return true; }
   if (qk == ocelot_shortcut_history_markup_next_keysequence) { history_markup_next(); return true; }
   if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
+  if (qk == ocelot_shortcut_format_keysequence){statement_edit_widget_formatter(); return true; }
   if (menu_run_action_kill->isEnabled() == true)
   {
     if (qk == ocelot_shortcut_kill_keysequence) { action_kill(); return true; }
@@ -1902,6 +1905,7 @@ void MainWindow::create_menu()
   shortcut("ocelot_shortcut_history_markup_next", "", false, true);
   menu_edit_action_formatter= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_FORMAT]);
   connect(menu_edit_action_formatter, SIGNAL(triggered()), this, SLOT(statement_edit_widget_formatter()));
+  shortcut("ocelot_shortcut_format", "", false, true);
   menu_run= ui->menuBar->addMenu(menu_strings[menu_off + MENU_RUN]);
   menu_run_action_execute= menu_run->addAction(menu_strings[menu_off + MENU_RUN_EXECUTE]);
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
@@ -2013,7 +2017,7 @@ void MainWindow::create_menu()
     We can change it with a setting in a .cnf file e.g. .my.cnf:
     ocelot_shortcut_key = 'Alt+L'
     We can change it with a SET statement:
-    SET ocelot_shortcut_key = 'Ctrl+q';
+    SET ocelot_shortcut_exit = 'Ctrl+q';
     or
     SET ocelot_shortcut_exit = 'default';
     or
@@ -2203,6 +2207,19 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
       else
         ocelot_shortcut_history_markup_next_keysequence= QKeySequence(ocelot_shortcut_history_markup_next);
       menu_edit_action_history_markup_next->setShortcut(ocelot_shortcut_history_markup_next_keysequence);
+    }
+    return 1;
+  }
+  if (target == "ocelot_shortcut_format")
+  {
+    if (is_set) strcpy(ocelot_shortcut_format, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_format, "default") == 0)
+        ocelot_shortcut_format_keysequence= QKeySequence("Alt+Shift+F");
+      else
+        ocelot_shortcut_format_keysequence= QKeySequence(ocelot_shortcut_format);
+      menu_edit_action_formatter->setShortcut(ocelot_shortcut_format_keysequence);
     }
     return 1;
   }
@@ -3494,12 +3511,13 @@ void MainWindow::action_redo()
         the menu would be good, at the moment it isn't automatic if the
         widget is detached.
   Todo: Other edit menu items can be enabled|disabled:
-        previous statement, next statement, format.
+        previous statement, next statement.
 */
 void MainWindow::menu_activations(QObject *focus_widget)
 {
   bool is_can_undo= true, is_can_redo= true;
   bool is_can_copy= false, is_can_cut= false, is_can_paste= false;
+  bool is_can_format= false;
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
   {
@@ -3509,6 +3527,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
     if (doc->availableRedoSteps() <= 0) is_can_redo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
+    is_can_format= !doc->isEmpty();
   }
   else if (strcmp(class_name, "TextEditWidget") == 0)
   {
@@ -3526,6 +3545,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
       is_can_copy= is_can_cut= t->textCursor().hasSelection();
       is_can_paste= t->canPaste();
     }
+    is_can_format= false;
   }
   else if (strcmp(class_name, "TextEditHistory") == 0)
   {
@@ -3534,6 +3554,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
+    is_can_format= false;
   }
   else
   {
@@ -3544,6 +3565,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
   menu_edit_action_cut->setEnabled(is_can_cut);
   menu_edit_action_copy->setEnabled(is_can_copy);
   menu_edit_action_paste->setEnabled(is_can_paste);
+  menu_edit_action_formatter->setEnabled(is_can_format);
 }
 
 
@@ -7426,9 +7448,7 @@ int MainWindow::action_execute(int force)
     */
     if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_ERRORS) != 0)
     {
-      log("FLAG_FOR_ERRORS seen. before hparse_f_multi_block", 90);
       hparse_f_multi_block(text);
-      log("FLAG_FOR_ERRORS seen. after hparse_f_multi_block", 90);
       /* TODO: QMessageBox jiggle, it displays then moves to centre */
       if (hparse_errno != 0)
       {
@@ -13569,14 +13589,17 @@ void MainWindow::tarantool_scan_field_names(
 
 #ifdef DBMS_TARANTOOL
 /*
-  Handle CREATE [TEMPORARY] TABLE table-name SERVER server-name 'literal';
-  We want to exeute the literal on the remote server created
+  Handle CREATE [TEMPORARY] TABLE table-name SERVER server-name
+   {LUA 'expression'} | {RETURN lua-expression};
+  We want to exeute the lua-expression on the remote server created
   with CREATE SERVER. This is going to be complicated.
-  The 'literal' must cause return a result set.
+  The 'expression' must cause return a result set.
   Do a fillup.
   From the result set, we can figure out field names and types.
   So that tells us how to CREATE TABLE table-name (...) on main.
   Then we can INSERT INTO table-name VALUES (result-set values);
+  Todo: There are other things we could do, e.g. SELECT from remote.
+  Todo: It would be better to check for LUA|RETURN when parsing.
 */
 int MainWindow::create_table_server(QString text,
                                          bool *is_create_table_server,
@@ -13593,6 +13616,7 @@ int MainWindow::create_table_server(QString text,
   unsigned int i_of_server_id= 0;
   unsigned int i_of_literal= 0;
   unsigned int i_of_lua= 0;
+  unsigned int i_of_return= 0;
   for (unsigned int i= passed_main_token_number; i < passed_main_token_number + passed_main_token_count_in_statement; ++i)
   {
     if ((main_token_types[i] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
@@ -13621,6 +13645,10 @@ int MainWindow::create_table_server(QString text,
       if (main_token_types[i] == TOKEN_KEYWORD_LUA)
       {
         i_of_lua= i;
+      }
+      if (main_token_types[i] == TOKEN_KEYWORD_RETURN)
+      {
+        i_of_return= i;
       }
       if ((main_token_types[i] <= TOKEN_TYPE_LITERAL)
        && (main_token_types[i] >= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE))
@@ -13652,17 +13680,49 @@ int MainWindow::create_table_server(QString text,
     return 1;
     }
   }
-  QString q;
+
+  if ((i_of_literal == 0) && (i_of_lua != 0))
   {
-    if (i_of_literal == 0)
-    {
-      /* "CREATE TABLE ... SERVER fails, blank literal\n" */
-      make_and_put_message_in_result(ER_EMPTY_LITERAL, 0, (char*)"");
-      return 1;
-    }
+    /* "CREATE TABLE ... SERVER fails, blank literal\n" */
+    make_and_put_message_in_result(ER_EMPTY_LITERAL, 0, (char*)"");
+    return 1;
   }
-  q= text.mid(main_token_offsets[i_of_lua],
-              main_token_offsets[i_of_literal] + main_token_lengths[i_of_literal] - main_token_offsets[i_of_lua]);
+
+  /* Todo: There should be a separate error message for this ... */
+  if (i_of_server_id == 0)
+  {
+    /* "CREATE TABLE ... SERVER fails, blank literal\n" */
+    make_and_put_message_in_result(ER_EMPTY_LITERAL, 0, (char*)"");
+    return 1;
+  }
+
+  /* Todo: There should be a separate error message for this ... */
+  if ((i_of_lua == 0) && (i_of_return == 0))
+  {
+    /* "CREATE TABLE ... SERVER fails, blank literal\n" */
+    make_and_put_message_in_result(ER_EMPTY_LITERAL, 0, (char*)"");
+    return 1;
+  }
+
+  QString q;
+  unsigned int new_passed_main_token_number;
+  unsigned int new_passed_main_token_count_in_statement;
+  if (i_of_lua == 0)
+  {
+    unsigned int m= passed_main_token_number + passed_main_token_count_in_statement;
+    q= text.mid(main_token_offsets[i_of_return],
+                main_token_offsets[m - 1] + main_token_lengths[m - 1] - main_token_offsets[i_of_return]);
+    new_passed_main_token_number= i_of_server_id + 1;
+    new_passed_main_token_count_in_statement= passed_main_token_count_in_statement - (i_of_return);
+  }
+  else
+  {
+    q= text.mid(main_token_offsets[i_of_lua],
+                main_token_offsets[i_of_literal] + main_token_lengths[i_of_literal] - main_token_offsets[i_of_lua]);
+    new_passed_main_token_number= i_of_lua;
+    /* Todo: Check: why i_of_literal? */
+    new_passed_main_token_count_in_statement= i_of_literal;
+  }
   QString read_format_result= tarantool_read_format(q);
   int result;
   ResultGrid *rg= new ResultGrid(lmysql, this, false);
@@ -13672,8 +13732,8 @@ int MainWindow::create_table_server(QString text,
     tarantool_real_query(q.toUtf8(),
                          q.toUtf8().size(),
                          MYSQL_REMOTE_CONNECTION,
-                         i_of_lua,
-                         i_of_literal);
+                         new_passed_main_token_number,
+                         new_passed_main_token_count_in_statement);
     if (result != 0)
     {
       put_diagnostics_in_result(MYSQL_REMOTE_CONNECTION);

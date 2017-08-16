@@ -1034,6 +1034,7 @@ private:
   QKeySequence ocelot_shortcut_select_all_keysequence;
   QKeySequence ocelot_shortcut_history_markup_previous_keysequence;
   QKeySequence ocelot_shortcut_history_markup_next_keysequence;
+  QKeySequence ocelot_shortcut_format_keysequence;
   QKeySequence ocelot_shortcut_execute_keysequence;
   QKeySequence ocelot_shortcut_kill_keysequence;
   QKeySequence ocelot_shortcut_breakpoint_keysequence;
