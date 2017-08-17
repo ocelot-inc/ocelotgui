@@ -819,6 +819,8 @@ public slots:
   void menu_edit_copy();
   void menu_edit_paste();
   void menu_edit_select_all();
+  void menu_edit_zoomin();
+  void menu_edit_zoomout();
   bool eventfilter_function(QObject *obj, QEvent *event);
 
 protected:
@@ -831,6 +833,7 @@ private:
   void initialize_widget_history();
   int result_grid_add_tab();
   void initialize_widget_statement();
+  void menu_edit_zoominorout(int);
 #ifdef DEBUGGER
   void debug_menu_enable_or_disable(int statement_type);
   void create_widget_debug();
@@ -960,6 +963,8 @@ private:
     QAction *menu_edit_action_history_markup_previous;
     QAction *menu_edit_action_history_markup_next;
     QAction *menu_edit_action_formatter;
+    QAction *menu_edit_action_zoomin;
+    QAction *menu_edit_action_zoomout;
   QMenu *menu_run;
     QAction *menu_run_action_execute;
     QAction *menu_run_action_kill;
@@ -1035,6 +1040,8 @@ private:
   QKeySequence ocelot_shortcut_history_markup_previous_keysequence;
   QKeySequence ocelot_shortcut_history_markup_next_keysequence;
   QKeySequence ocelot_shortcut_format_keysequence;
+  QKeySequence ocelot_shortcut_zoomin_keysequence;
+  QKeySequence ocelot_shortcut_zoomout_keysequence;
   QKeySequence ocelot_shortcut_execute_keysequence;
   QKeySequence ocelot_shortcut_kill_keysequence;
   QKeySequence ocelot_shortcut_breakpoint_keysequence;
@@ -7032,6 +7039,10 @@ public:
 
 /* Following might be too short for some new language in ostrings.h */
 #define MAX_COLOR_NAME_WIDTH 24
+
+#define FONT_SIZE_MAX 72
+#define FONT_SIZE_MIN 6
+#define FONT_SIZE_ZOOM_INCREMENT 1
 
 /* TODO: probably some memory is leaking. I don't say "(this)" every time I say "new". */
 public:

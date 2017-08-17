@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: August 15 2017
+   Last modified: August 16 2017
 */
 
 /*
@@ -336,6 +336,8 @@
   static char ocelot_shortcut_history_markup_previous[80]= "default";
   static char ocelot_shortcut_history_markup_next[80]= "default";
   static char ocelot_shortcut_format[80]= "default";
+  static char ocelot_shortcut_zoomin[80]= "default";
+  static char ocelot_shortcut_zoomout[80]= "default";
   static char ocelot_shortcut_execute[80]= "default";
   static char ocelot_shortcut_kill[80]= "default";
   static char ocelot_shortcut_breakpoint[80]= "default";
@@ -396,7 +398,7 @@
 /* Global Tarantool definitions */
   static struct tnt_stream *tnt[MYSQL_MAX_CONNECTIONS];
   static int tarantool_errno[MYSQL_MAX_CONNECTIONS];
-  static char tarantool_errmsg[2700]; /* same size as hparse_errmsg? */
+  static char tarantool_errmsg[3072]; /* same size as hparse_errmsg? */
   QString tarantool_server_name= "";
 #endif
 
@@ -415,7 +417,7 @@
   static int hparse_token_type;
   static int hparse_statement_type= -1;
   /* hparse_f_accept can dump many expected tokens in hparse_errmsg */
-  static char hparse_errmsg[2700]; /* same size as tarantool_errmsg? */
+  static char hparse_errmsg[3072]; /* same size as tarantool_errmsg? */
   static QString hparse_next_token, hparse_next_next_token;
   static int hparse_next_token_type, hparse_next_next_token_type;
   static QString hparse_next_next_next_token, hparse_next_next_next_next_token;
@@ -1096,7 +1098,8 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   if (qk == ocelot_shortcut_history_markup_previous_keysequence) { history_markup_previous(); return true; }
   if (qk == ocelot_shortcut_history_markup_next_keysequence) { history_markup_next(); return true; }
   if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
-  if (qk == ocelot_shortcut_format_keysequence){statement_edit_widget_formatter(); return true; }
+  if (qk == ocelot_shortcut_zoomin_keysequence){menu_edit_zoomin(); return true; }
+  if (qk == ocelot_shortcut_zoomout_keysequence){menu_edit_zoomout(); return true; }
   if (menu_run_action_kill->isEnabled() == true)
   {
     if (qk == ocelot_shortcut_kill_keysequence) { action_kill(); return true; }
@@ -1906,6 +1909,12 @@ void MainWindow::create_menu()
   menu_edit_action_formatter= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_FORMAT]);
   connect(menu_edit_action_formatter, SIGNAL(triggered()), this, SLOT(statement_edit_widget_formatter()));
   shortcut("ocelot_shortcut_format", "", false, true);
+  menu_edit_action_zoomin= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_ZOOMIN]);
+  connect(menu_edit_action_zoomin, SIGNAL(triggered()), this, SLOT(menu_edit_zoomin()));
+  shortcut("ocelot_shortcut_zoomin", "", false, true);
+  menu_edit_action_zoomout= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_ZOOMOUT]);
+  connect(menu_edit_action_zoomout, SIGNAL(triggered()), this, SLOT(menu_edit_zoomout()));
+  shortcut("ocelot_shortcut_zoomout", "", false, true);
   menu_run= ui->menuBar->addMenu(menu_strings[menu_off + MENU_RUN]);
   menu_run_action_execute= menu_run->addAction(menu_strings[menu_off + MENU_RUN_EXECUTE]);
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
@@ -2048,6 +2057,9 @@ void MainWindow::create_menu()
   Warn: Although we can handle multiple-key shortcuts,
         the workaround for the Qt/Ubuntu bug in eventfilter_function
         only looks at one key.
+  Warn: We don't say default = QKeySequence::Zoomin for zoomin, because
+        it is Ctrl++ (Qt::CTRL + Qt::Key_Plus). But + requires shift.
+        It seems more common to use without shift, which is Ctrl+=.
 */
 int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do)
 {
@@ -2220,6 +2232,32 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
       else
         ocelot_shortcut_format_keysequence= QKeySequence(ocelot_shortcut_format);
       menu_edit_action_formatter->setShortcut(ocelot_shortcut_format_keysequence);
+    }
+    return 1;
+  }
+  if (target == "ocelot_shortcut_zoomin")
+  {
+    if (is_set) strcpy(ocelot_shortcut_zoomin, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_zoomin, "default") == 0)
+        ocelot_shortcut_zoomin_keysequence= QKeySequence("Ctrl+=");
+      else
+        ocelot_shortcut_zoomin_keysequence= QKeySequence(ocelot_shortcut_zoomin);
+      menu_edit_action_zoomin->setShortcut(ocelot_shortcut_zoomin_keysequence);
+    }
+    return 1;
+  }
+  if (target == "ocelot_shortcut_zoomout")
+  {
+    if (is_set) strcpy(ocelot_shortcut_zoomout, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_zoomout, "default") == 0)
+        ocelot_shortcut_zoomout_keysequence= QKeySequence::ZoomOut;
+      else
+        ocelot_shortcut_zoomout_keysequence= QKeySequence(ocelot_shortcut_zoomout);
+      menu_edit_action_zoomout->setShortcut(ocelot_shortcut_zoomout_keysequence);
     }
     return 1;
   }
@@ -2432,6 +2470,7 @@ void MainWindow::menu_edit_undo()
 void MainWindow::menu_edit_redo()
 {
   QWidget* focus_widget= QApplication::focusWidget();
+  if (focus_widget == 0) return; /* This would be unexpected */
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
     action_redo();
@@ -2445,6 +2484,7 @@ void MainWindow::menu_edit_redo()
 void MainWindow::menu_edit_cut()
 {
   QWidget* focus_widget= QApplication::focusWidget();
+  if (focus_widget == 0) return; /* This would be unexpected */
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
     qobject_cast<CodeEditor*>(focus_widget)->cut();
@@ -2458,6 +2498,7 @@ void MainWindow::menu_edit_cut()
 void MainWindow::menu_edit_copy()
 {
   QWidget* focus_widget= QApplication::focusWidget();
+  if (focus_widget == 0) return; /* This would be unexpected */
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
     qobject_cast<CodeEditor*>(focus_widget)->copy();
@@ -2472,6 +2513,7 @@ void MainWindow::menu_edit_copy()
 void MainWindow::menu_edit_paste()
 {
   QWidget* focus_widget= QApplication::focusWidget();
+  if (focus_widget == 0) return; /* This would be unexpected */
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
     qobject_cast<CodeEditor*>(focus_widget)->paste();
@@ -2485,6 +2527,7 @@ void MainWindow::menu_edit_paste()
 void MainWindow::menu_edit_select_all()
 {
   QWidget* focus_widget= QApplication::focusWidget();
+  if (focus_widget == 0) return; /* This would be unexpected */
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
     qobject_cast<CodeEditor*>(focus_widget)->selectAll();
@@ -2495,6 +2538,60 @@ void MainWindow::menu_edit_select_all()
   else if (strcmp(class_name, "QTextEdit") == 0)
     qobject_cast<QTextEdit*>(focus_widget)->selectAll();
 }
+/*
+  zoom in/out won't work by calling default zoomIn()/zoomOut(), probably
+  because we use style sheets. So we'll get the current style
+  sheet, add an increment (currently always +1 or -1), change
+  the style sheet. This does not affect what's set with Settings.
+  That's deliberate. Zooming is temporary, setting is permanent.
+  Re extracting: Compare what we do with get_font_from_style_sheet().
+  Todo: Changing font size won't affect images, we need special handling.
+  Todo: Maybe we should qobject_cast for setStyleSheet() too.
+  Todo: BUG: If you just click on a ResultGrid cell, thinking you have
+        given it the focus, and then you click Ctrl++ or Ctrl-- i.e.
+        the shortcut not the menu item, it doesn't recognize it.
+        Click away, then come back, and it does recognize it.
+*/
+void MainWindow::menu_edit_zoominorout(int increment)
+{
+  QWidget* focus_widget= QApplication::focusWidget();
+  if (focus_widget == 0) return; /* This would be unexpected */
+  QString old_stylesheet;
+  const char *class_name= focus_widget->metaObject()->className();
+  if (strcmp(class_name, "CodeEditor") == 0)
+    old_stylesheet= qobject_cast<CodeEditor*>(focus_widget)->styleSheet();
+  else if (strcmp(class_name, "TextEditWidget") == 0)
+    old_stylesheet= qobject_cast<TextEditWidget*>(focus_widget)->styleSheet();
+  else if (strcmp(class_name, "TextEditHistory") == 0)
+    old_stylesheet= qobject_cast<TextEditHistory*>(focus_widget)->styleSheet();
+  else if (strcmp(class_name, "QTextEdit") == 0)
+    old_stylesheet= qobject_cast<QTextEdit*>(focus_widget)->styleSheet();
+  else return; /* This would be unexpected. */
+  int i= old_stylesheet.indexOf("font-size:");
+  if (i == -1) return;
+  i+= sizeof("font-size:");
+  int j= old_stylesheet.indexOf("pt", i);
+  if (j == -1) return;
+  QString old_font_size= old_stylesheet.mid(i-1, j-(i-1));
+  int font_size= old_font_size.toInt();
+  font_size+= increment;
+  if (font_size < FONT_SIZE_MIN) font_size= FONT_SIZE_MIN;
+  if (font_size > FONT_SIZE_MAX) font_size= FONT_SIZE_MAX;
+  QString new_stylesheet= old_stylesheet.mid(0, i-1);
+  new_stylesheet.append(QString::number(font_size));
+  new_stylesheet.append(old_stylesheet.mid(j,old_stylesheet.size()-j));
+  focus_widget->setStyleSheet(new_stylesheet);
+  return;
+}
+void MainWindow::menu_edit_zoomin()
+{
+  menu_edit_zoominorout(FONT_SIZE_ZOOM_INCREMENT);
+}
+void MainWindow::menu_edit_zoomout()
+{
+  menu_edit_zoominorout(-FONT_SIZE_ZOOM_INCREMENT);
+}
+
 
 /*
   The required size of main_token_offsets|lengths|types|flags is
@@ -3512,12 +3609,15 @@ void MainWindow::action_redo()
         widget is detached.
   Todo: Other edit menu items can be enabled|disabled:
         previous statement, next statement.
+  Todo: if font_size already <= FONT_SIZE_MIN, disable zoomout.
+        if font_size already >= FONT_SIZE_MAX, disable zoomout.
+        (Get the widget's ->styleSheet() as you do elsewhere.)
 */
 void MainWindow::menu_activations(QObject *focus_widget)
 {
   bool is_can_undo= true, is_can_redo= true;
   bool is_can_copy= false, is_can_cut= false, is_can_paste= false;
-  bool is_can_format= false;
+  bool is_can_format= false, is_can_zoomin= false, is_can_zoomout= false;
   const char *class_name= focus_widget->metaObject()->className();
   if (strcmp(class_name, "CodeEditor") == 0)
   {
@@ -3527,7 +3627,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
     if (doc->availableRedoSteps() <= 0) is_can_redo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
-    is_can_format= !doc->isEmpty();
+    is_can_format= is_can_zoomin= is_can_zoomout= !doc->isEmpty();
   }
   else if (strcmp(class_name, "TextEditWidget") == 0)
   {
@@ -3536,7 +3636,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
     if (t->text_edit_frame_of_cell->is_image_flag)
     {
-      is_can_copy= true;
+      /* zoomin + zoomout are already false */
       is_can_cut= false;
       is_can_paste= false;
     }
@@ -3544,6 +3644,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
     {
       is_can_copy= is_can_cut= t->textCursor().hasSelection();
       is_can_paste= t->canPaste();
+      is_can_zoomin= is_can_zoomout= !doc->isEmpty();
     }
     is_can_format= false;
   }
@@ -3555,6 +3656,7 @@ void MainWindow::menu_activations(QObject *focus_widget)
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
     is_can_format= false;
+    is_can_zoomin= is_can_zoomout= !doc->isEmpty();
   }
   else
   {
@@ -3566,6 +3668,8 @@ void MainWindow::menu_activations(QObject *focus_widget)
   menu_edit_action_copy->setEnabled(is_can_copy);
   menu_edit_action_paste->setEnabled(is_can_paste);
   menu_edit_action_formatter->setEnabled(is_can_format);
+  menu_edit_action_zoomin->setEnabled(is_can_zoomin);
+  menu_edit_action_zoomout->setEnabled(is_can_zoomout);
 }
 
 
@@ -8580,7 +8684,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
+        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         ocelot_statement_font_size= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
@@ -8738,7 +8842,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
+        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         if (ccn != ocelot_grid_font_size) is_result_grid_font_size_changed= true;
         ocelot_grid_font_size= ccn;
         is_result_grid_style_changed= true;
@@ -8871,7 +8975,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
+        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         ocelot_history_font_size= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
@@ -8940,7 +9044,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_size", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 6) || (ccn.toInt() > 72)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
+        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
         ocelot_menu_font_size= ccn;
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
