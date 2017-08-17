@@ -1046,9 +1046,15 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 //  }
   QString text;
 
+  if (event->type() == QEvent::FocusIn)
+  {
+    menu_activations(obj, QEvent::FocusIn);
+    return false;
+  }
+
   if (event->type() == QEvent::FocusOut)
   {
-    menu_activations(obj);
+    menu_activations(obj, QEvent::FocusOut);
     return false;
   }
 
@@ -1084,49 +1090,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   if (event->type() != QEvent::KeyPress) return false;
   QKeyEvent *key= static_cast<QKeyEvent *>(event);
   /* See comment with label "Shortcut Duplication" */
-  Qt::KeyboardModifiers modifiers= key->modifiers();
-  int qki= 0;
-  if ((modifiers & Qt::ControlModifier) != 0) qki= (qki | Qt::CTRL);
-  if ((modifiers & Qt::ShiftModifier) != 0) qki= (qki | Qt::SHIFT);
-  if ((modifiers & Qt::AltModifier) != 0) qki= (qki | Qt::ALT);
-  if ((modifiers & Qt::MetaModifier) != 0) qki= (qki | Qt::META);
-  QKeySequence qk= QKeySequence(key->key() | qki);
-  if (qk == ocelot_shortcut_connect_keysequence) { action_connect(); return true; }
-  if (qk == ocelot_shortcut_exit_keysequence) { action_exit(); return true; }
-  if (qk == ocelot_shortcut_undo_keysequence) { menu_edit_undo(); return true; }
-  if (qk == ocelot_shortcut_redo_keysequence) { menu_edit_redo(); return true; }
-  if (qk == ocelot_shortcut_history_markup_previous_keysequence) { history_markup_previous(); return true; }
-  if (qk == ocelot_shortcut_history_markup_next_keysequence) { history_markup_next(); return true; }
-  if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
-  if (qk == ocelot_shortcut_zoomin_keysequence){menu_edit_zoomin(); return true; }
-  if (qk == ocelot_shortcut_zoomout_keysequence){menu_edit_zoomout(); return true; }
-  if (menu_run_action_kill->isEnabled() == true)
-  {
-    if (qk == ocelot_shortcut_kill_keysequence) { action_kill(); return true; }
-  }
-  if (menu_debug_action_breakpoint->isEnabled())
-    if (qk == ocelot_shortcut_breakpoint_keysequence) { action_debug_breakpoint(); return true; }
-  if (menu_debug_action_continue->isEnabled())
-    if (qk == ocelot_shortcut_continue_keysequence) { action_debug_continue(); return true; }
-  if (menu_debug_action_next->isEnabled())
-    if (qk == ocelot_shortcut_next_keysequence) { action_debug_next(); return true; }
-  if (menu_debug_action_step->isEnabled())
-    if (qk == ocelot_shortcut_step_keysequence) { action_debug_step(); return true; }
-  if (menu_debug_action_clear->isEnabled())
-    if (qk == ocelot_shortcut_clear_keysequence) { action_debug_clear(); return true; }
-  if (menu_debug_action_exit->isEnabled())
-    if (qk == ocelot_shortcut_debug_exit_keysequence) { action_debug_exit(); return true; }
-  if (menu_debug_action_information->isEnabled())
-    if (qk == ocelot_shortcut_information_keysequence) { action_debug_information(); return true; }
-  if (menu_debug_action_refresh_server_variables->isEnabled())
-    if (qk == ocelot_shortcut_refresh_server_variables_keysequence) { action_debug_refresh_server_variables(); return true; }
-  if (menu_debug_action_refresh_user_variables->isEnabled())
-    if (qk == ocelot_shortcut_refresh_user_variables_keysequence) { action_debug_refresh_user_variables(); return true; }
-  if (menu_debug_action_refresh_variables->isEnabled())
-    if (qk == ocelot_shortcut_refresh_variables_keysequence) { action_debug_refresh_variables(); return true; }
-  if (menu_debug_action_refresh_call_stack->isEnabled())
-    if (qk == ocelot_shortcut_refresh_call_stack_keysequence) { action_debug_refresh_call_stack(); return true; }
-
+  if (keypress_shortcut_handler(key, false) == true) return true;
   if (obj != statement_edit_widget) return false;
 
   if ((key->key() == Qt::Key_Tab) && (ocelot_auto_rehash > 0))
@@ -1195,6 +1159,81 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 
   if (action_execute(0) == 1) return false;
   return true;
+}
+
+/*
+  There are two reasons for keypress_shortcut_handler() to exist:
+  1: see comment = "Shortcut duplication"
+  2: we call not only from MainWindow::eventfilter_function()
+     but also from TextEditWidget::keyPressEvent().
+  If the keypress is a shortcut, we handle it and return true.
+  If it's not, then it's probably text input, we return false.
+  There is one situation that we do not handle:
+    TextEditWidget handles ocelot_shortcut_copy_keysequence separately.
+  Todo: Maybe event->matches() is a more standard way to compare.
+  Todo: Now there's useless code -- we have setShortcut() for most of
+        these combinations, but keypress_shortcut_handler() happens
+        first (?? I think), so they're useless. But a few things are
+        still handled by shortcuts, e.g. format, which is harmless
+        because there's only one widget that format works with.
+  Todo: can we get here for a disabled menu item?
+  Todo: if e.g. menu_edit_undo() does nothing because it can't find the
+        classname, it should return false so keypress_shortcut_handler()
+        can return false. Currently these things are all void.
+  Todo: the system hasn't been tested with detached debugger widgets
+        for which we've said SET ocelot_shortcut_...='something odd'.
+*/
+bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_copy)
+{
+  Qt::KeyboardModifiers modifiers= key->modifiers();
+  int qki= 0;
+  if ((modifiers & Qt::ControlModifier) != 0) qki= (qki | Qt::CTRL);
+  if ((modifiers & Qt::ShiftModifier) != 0) qki= (qki | Qt::SHIFT);
+  if ((modifiers & Qt::AltModifier) != 0) qki= (qki | Qt::ALT);
+  if ((modifiers & Qt::MetaModifier) != 0) qki= (qki | Qt::META);
+  QKeySequence qk= QKeySequence(key->key() | qki);
+  if ((qk == ocelot_shortcut_copy_keysequence)
+   && (return_true_if_copy)) return true;
+  if (qk == ocelot_shortcut_connect_keysequence) { action_connect(); return true; }
+  if (qk == ocelot_shortcut_exit_keysequence) { action_exit(); return true; }
+  if (qk == ocelot_shortcut_undo_keysequence) { menu_edit_undo(); return true; }
+  if (qk == ocelot_shortcut_redo_keysequence) { menu_edit_redo(); return true; }
+  if (qk == ocelot_shortcut_cut_keysequence) { menu_edit_cut(); return true; }
+  if (qk == ocelot_shortcut_copy_keysequence) { menu_edit_copy(); return true; }
+  if (qk == ocelot_shortcut_paste_keysequence) { menu_edit_paste(); return true; }
+  if (qk == ocelot_shortcut_select_all_keysequence) { menu_edit_select_all(); return true; }
+  if (qk == ocelot_shortcut_history_markup_previous_keysequence) { history_markup_previous(); return true; }
+  if (qk == ocelot_shortcut_history_markup_next_keysequence) { history_markup_next(); return true; }
+  if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
+  if (qk == ocelot_shortcut_zoomin_keysequence){menu_edit_zoomin(); return true; }
+  if (qk == ocelot_shortcut_zoomout_keysequence){menu_edit_zoomout(); return true; }
+  if (menu_run_action_kill->isEnabled() == true)
+  {
+    if (qk == ocelot_shortcut_kill_keysequence) { action_kill(); return true; }
+  }
+  if (menu_debug_action_breakpoint->isEnabled())
+    if (qk == ocelot_shortcut_breakpoint_keysequence) { action_debug_breakpoint(); return true; }
+  if (menu_debug_action_continue->isEnabled())
+    if (qk == ocelot_shortcut_continue_keysequence) { action_debug_continue(); return true; }
+  if (menu_debug_action_next->isEnabled())
+    if (qk == ocelot_shortcut_next_keysequence) { action_debug_next(); return true; }
+  if (menu_debug_action_step->isEnabled())
+    if (qk == ocelot_shortcut_step_keysequence) { action_debug_step(); return true; }
+  if (menu_debug_action_clear->isEnabled())
+    if (qk == ocelot_shortcut_clear_keysequence) { action_debug_clear(); return true; }
+  if (menu_debug_action_exit->isEnabled())
+    if (qk == ocelot_shortcut_debug_exit_keysequence) { action_debug_exit(); return true; }
+  if (menu_debug_action_information->isEnabled())
+    if (qk == ocelot_shortcut_information_keysequence) { action_debug_information(); return true; }
+  if (menu_debug_action_refresh_server_variables->isEnabled())
+    if (qk == ocelot_shortcut_refresh_server_variables_keysequence) { action_debug_refresh_server_variables(); return true; }
+  if (menu_debug_action_refresh_user_variables->isEnabled())
+    if (qk == ocelot_shortcut_refresh_user_variables_keysequence) { action_debug_refresh_user_variables(); return true; }
+  if (menu_debug_action_refresh_variables->isEnabled())
+    if (qk == ocelot_shortcut_refresh_variables_keysequence) { action_debug_refresh_variables(); return true; }
+  if (menu_debug_action_refresh_call_stack->isEnabled())
+    if (qk == ocelot_shortcut_refresh_call_stack_keysequence) { action_debug_refresh_call_stack(); return true; }
+  return false;
 }
 
 
@@ -2464,6 +2503,8 @@ void MainWindow::menu_edit_undo()
     qobject_cast<TextEditWidget*>(focus_widget)->undo();
   else if (strcmp(class_name, "TextEditHistory") == 0)
     qobject_cast<TextEditHistory*>(focus_widget)->undo();
+  else if (strcmp(class_name, "QTextEdit") == 0)
+    qobject_cast<QTextEdit*>(focus_widget)->undo();
   else if (strcmp(class_name, "+") == 0)
     qobject_cast<QTextEdit*>(focus_widget)->undo();
 }
@@ -3600,6 +3641,13 @@ void MainWindow::action_redo()
   but we only care about CodeEditor and TextEditHistory. Also we
   call from TextEditWidget::focusOutEvent(), an override rather
   than an editfilter event.
+  Warn: TextEditWidget::focusInEvent() is also an override rather than
+        an editfilter event, because (I don't know why) otherwise we
+        don't see when TextEditWidget get focus or loses focus.
+        This is the only time when QEvent::focusIn matters. So usually
+        menu_activations() for menu_activations(QEvent::focusIn)
+        is a waste of time. Remember, though, that shortcuts often won't
+        work if the menu item is disabled.
   Todo: Incredibly, availableRedoSteps() only works for CodeEditor i.e.
         statement_edit_widget. I wish I knew why, but rather than spend
         more hours, will just assume redo is otherwise always okay.
@@ -3613,12 +3661,18 @@ void MainWindow::action_redo()
         if font_size already >= FONT_SIZE_MAX, disable zoomout.
         (Get the widget's ->styleSheet() as you do elsewhere.)
 */
-void MainWindow::menu_activations(QObject *focus_widget)
+void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
 {
   bool is_can_undo= true, is_can_redo= true;
   bool is_can_copy= false, is_can_cut= false, is_can_paste= false;
   bool is_can_format= false, is_can_zoomin= false, is_can_zoomout= false;
   const char *class_name= focus_widget->metaObject()->className();
+
+  if (qe == QEvent::FocusIn)
+  {
+    if (strcmp(class_name, "TextEditWidget") != 0) return;
+  }
+
   if (strcmp(class_name, "CodeEditor") == 0)
   {
     CodeEditor *t= qobject_cast<CodeEditor*>(focus_widget);
@@ -14255,7 +14309,15 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
   QString content_in_text_edit_widget;
   QString name_in_result_set;
   QString update_statement, where_clause;
-  if (event->matches(QKeySequence::Copy)) { copy(); return; }
+
+  ResultGrid *result_grid= text_edit_frame_of_cell->ancestor_result_grid_widget;
+  MainWindow *m= result_grid->copy_of_parent;
+  if (m->keypress_shortcut_handler(event, true) == true)
+  {
+    copy();
+    return;
+  }
+  if (m->keypress_shortcut_handler(event, false) == true) return;
   QString content_in_cell_before_keypress= toPlainText();
   QTextEdit::keyPressEvent(event);
   QString content_in_cell_after_keypress= toPlainText();
@@ -14274,7 +14336,6 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
     /* length = text_edit_frame_of_cell->content_length */
     /* *content = text_edit_frame_of_cell->content_pointer, which should be 0 for null */
 
-    ResultGrid *result_grid= text_edit_frame_of_cell->ancestor_result_grid_widget;
     /* result_grid->text_edit_frames[0] etc. have all the TextEditFrame widgets of the rows */
 
     /* Go up the line to find first text_edit_frame for the row */
@@ -14389,7 +14450,6 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
 
     /* We've got a string. If it's not blank, put it in the statement widget, overwriting. */
     /* It might be blank because user returned to the original values, if so wipe out. */
-    MainWindow *m= result_grid->copy_of_parent;
     CodeEditor *c= m->statement_edit_widget;
     if (update_statement != "")
     {
@@ -14468,10 +14528,21 @@ void TextEditWidget::focusOutEvent(QFocusEvent *event)
   TextEditFrame *t= text_edit_frame_of_cell;
   ResultGrid *r=  t->ancestor_result_grid_widget;
   MainWindow *m= r->copy_of_parent;
-  m->menu_activations(this);
+  m->menu_activations(this, QEvent::FocusOut);
   /* We probably don't need to say this. */
   QTextEdit::focusOutEvent(event);
 }
+
+void TextEditWidget::focusInEvent(QFocusEvent *event)
+{
+  TextEditFrame *t= text_edit_frame_of_cell;
+  ResultGrid *r=  t->ancestor_result_grid_widget;
+  MainWindow *m= r->copy_of_parent;
+  m->menu_activations(this, QEvent::FocusIn);
+  /* We probably don't need to say this. */
+  QTextEdit::focusInEvent(event);
+}
+
 
 
 

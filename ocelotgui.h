@@ -759,7 +759,7 @@ public slots:
   void action_statement_edit_widget_text_changed(int,int,int);
   void action_undo();
   void action_redo();
-  void menu_activations(QObject*);
+  void menu_activations(QObject*, QEvent::Type);
   void statement_edit_widget_formatter();
   void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
   void action_menu();
@@ -1057,6 +1057,7 @@ private:
   QKeySequence ocelot_shortcut_refresh_call_stack_keysequence;
 
 public:
+  bool keypress_shortcut_handler(QKeyEvent *, bool);
   int tarantool_execute_sql(const char *, unsigned long, unsigned int, int, QString);
   QString query_utf16;
   QString query_utf16_copy;
@@ -2200,7 +2201,7 @@ private:
 /*********************************************************************************************************/
 /* THE TEXTEDITWIDGET WIDGET */
 /* subclassed QTextEdit so paintEvent can be caught, for use in result_grid */
-/* also for focusoutEvent, since eventfilter use would probably cost more */
+/* also for focusoutEvent|focusInEvent, since eventfilter use would probably cost more */
 
 #ifndef TEXTEDITWIDGET_H
 #define TEXTEDITWIDGET_H
@@ -2219,6 +2220,7 @@ protected:
   void paintEvent(QPaintEvent *event);
   void keyPressEvent(QKeyEvent *event);
   void focusOutEvent(QFocusEvent *event);
+  void focusInEvent(QFocusEvent *event);
 
   QString unstripper(QString value_to_unstrip);
 
