@@ -546,8 +546,7 @@ public:
   int hparse_f_acceptn(int,QString,int);
   QString hparse_f_token_to_appendee(QString,int);
   int hparse_f_expect(unsigned short int,unsigned char,int,QString);
-  int hparse_f_literal();
-  int hparse_f_integer_literal();
+  int hparse_f_literal(unsigned char,unsigned short int,int);
   int hparse_f_default(int);
   int hparse_f_user_name();
   int hparse_f_character_set_name();
@@ -2023,6 +2022,34 @@ public:
     TOKEN_KEYWORD_DO_LUA,
     TOKEN_TYPE_DELIMITER
   };
+
+/*
+  TOKEN_LITERAL_FLAG is for passing required format to hparse_f_literal().
+  Example: +5 is okay if we're looking for signed integer,
+  but if we say hparse_f_literal(TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER)
+  then the only acceptable literals are unsigned integers.
+  Todo: The expected will still say "[literal]", more general than needed.
+  Todo: We aren't specific enough, we don't use this enough.
+*/
+#define TOKEN_LITERAL_FLAG_STRING               1
+#define TOKEN_LITERAL_FLAG_SIGNED_INTEGER       2
+#define TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER     4
+#define TOKEN_LITERAL_FLAG_INTEGER              (2+4)
+#define TOKEN_LITERAL_FLAG_FLOAT                8
+#define TOKEN_LITERAL_FLAG_NUMBER               (2+4+8)
+#define TOKEN_LITERAL_FLAG_CONSTANT             16
+#define TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT (1+2+4+8+16)
+#define TOKEN_LITERAL_FLAG_INTRODUCER           32
+#define TOKEN_LITERAL_FLAG_INTRODUCEABLE_STRING (1+32)
+#define TOKEN_LITERAL_FLAG_USER                 64
+#define TOKEN_LITERAL_FLAG_USER_STRING          (1+64)
+#define TOKEN_LITERAL_FLAG_HOST                 128
+#define TOKEN_LITERAL_FLAG_HOST_STRING          (1+128)
+#define TOKEN_LITERAL_FLAG_ODBC                 256
+#define TOKEN_LITERAL_FLAG_ODBC_STRING          (1+256)
+#define TOKEN_LITERAL_FLAG_DATE                 512
+#define TOKEN_LITERAL_FLAG_DATE_STRING          (1+512)
+#define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512)
 
 /*
   TOKEN_TYPE_... shows "what kind of token is it?" e.g. TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK.

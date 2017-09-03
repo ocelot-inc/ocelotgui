@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: August 16 2017
+   Last modified: September 2 2017
 */
 
 /*
@@ -514,6 +514,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   history_edit_widget->setFont(fixed_font);
   statement_edit_widget->setFont(fixed_font);
 
+
 #ifdef DEBUGGER
   create_widget_debug();
 #endif
@@ -620,7 +621,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   }
 
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
-
 }
 
 
@@ -1913,6 +1913,7 @@ void MainWindow::create_menu()
   menu_file= ui->menuBar->addMenu(menu_strings[menu_off + MENU_FILE]);
   /* Todo: consider adding fileMenu = new QMenu(tr("&File"), this); -*/
   menu_file_action_connect= menu_file->addAction(menu_strings[menu_off + MENU_FILE_CONNECT]);
+
   connect(menu_file_action_connect, SIGNAL(triggered()), this, SLOT(action_connect()));
   shortcut("ocelot_shortcut_connect", "", false, true);
   menu_file_action_exit= menu_file->addAction(menu_strings[menu_off + MENU_FILE_EXIT]);
@@ -3229,6 +3230,13 @@ void MainWindow::action_exit()
   Todo: title bar of result grid widget could show part of query and number of rows.
   Todo: Maybe these should be detached by default, or always detached.
   Todo: Check: Do you lose the parent? If that happens, there will be memory leaks.
+  Todo: Detached widgets optionally could have their own menus. Lots of work.
+        * Similar to create_menu() with all addActions() work, but mostly
+          we can (after separating actions and adding #defines) copy with
+          QAction *actionb = menu_edit->actions().at(EDIT_MENU_UNDO);
+        * In every routine that uses action_edit_menu_undo etc., pass
+          QMenu object so you can use actions().at.
+        Otherwise click on menu changes focus to undetached widget.
 */
 
 /*
