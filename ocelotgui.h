@@ -544,7 +544,7 @@ public:
   bool hparse_f_is_special_verb(int);
   int hparse_f_accept(unsigned short int,unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
-  QString hparse_f_token_to_appendee(QString,int);
+  QString hparse_f_token_to_appendee(QString,int,char);
   int hparse_f_expect(unsigned short int,unsigned char,int,QString);
   int hparse_f_literal(unsigned char,unsigned short int,int);
   int hparse_f_default(int);
@@ -743,6 +743,7 @@ public:
   QString tarantool_read_format(QString);
 #endif
   QVBoxLayout *main_layout;
+  QString token_reftype(int i, bool, int, char);
 
 public slots:
   void action_connect();
@@ -2058,6 +2059,7 @@ public:
   We only pass something specific if we are sure that is what must follow.
   Beware: A "user" might be qualified within 'user'@'host' I guess that's a form of qualifier.
   Beware: there are enum values for "x or y" e.g. "user or role", "database or table", etc.
+  TOKEN_REFTYPE_... values and must be in the same order.
   Todo: store these in main_token_reftypes[] to help hovering.
   Todo: knowing it's "column" doesn't help us yet with knowing: column of what?
         but eventually we can bring in lists of objects, and refer to them by number-within-the-list
@@ -2076,15 +2078,19 @@ public:
   and a maximum length is applicable such as MYSQL_MAX_IDENTIFIER_LENGTH.
 * There is one case where we pass "[reserved function]" instead of "[identifier]".
 */
+
 enum {
     TOKEN_REFTYPE_ANY,                 /* any kind, or it's irrelevant, or we don't care */
-    TOKEN_REFTYPE_ALIAS, /* or correlation */
+    TOKEN_REFTYPE_ALIAS_OF_COLUMN, /* or correlation */
+    TOKEN_REFTYPE_ALIAS_OF_TABLE, /* or correlation */
+    TOKEN_REFTYPE_AUTO_INCREMENT,
     TOKEN_REFTYPE_CHANNEL,
     TOKEN_REFTYPE_CHARACTER_SET,
     TOKEN_REFTYPE_COLLATION,
     TOKEN_REFTYPE_COLUMN,
     TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE,
     TOKEN_REFTYPE_COLUMN_OR_VARIABLE,
+    TOKEN_REFTYPE_COMMENT,
     TOKEN_REFTYPE_CONDITION_DEFINE,
     TOKEN_REFTYPE_CONDITION_REFER,
     TOKEN_REFTYPE_CONDITION_OR_CURSOR,
@@ -2104,8 +2110,10 @@ enum {
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
     TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
     TOKEN_REFTYPE_DATABASE_OR_VIEW,
+    TOKEN_REFTYPE_DIRECTORY,
     TOKEN_REFTYPE_ENGINE,
     TOKEN_REFTYPE_EVENT,
+    TOKEN_REFTYPE_FILE,
     TOKEN_REFTYPE_FUNCTION,
     TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE,
     TOKEN_REFTYPE_FUNCTION_OR_VARIABLE,
@@ -2116,16 +2124,21 @@ enum {
     TOKEN_REFTYPE_KEY_CACHE,
     TOKEN_REFTYPE_LABEL_DEFINE,
     TOKEN_REFTYPE_LABEL_REFER,
+    TOKEN_REFTYPE_LENGTH,
     TOKEN_REFTYPE_PARAMETER,
     TOKEN_REFTYPE_PARSER,
     TOKEN_REFTYPE_PLUGIN,
     TOKEN_REFTYPE_PROCEDURE,
     /* plus TOKEN_REFTYPE_RESERVED_FUNCTION */
     TOKEN_REFTYPE_PARTITION,
+    TOKEN_REFTYPE_PARTITION_NUMBER,
+    TOKEN_REFTYPE_PASSWORD,
     TOKEN_REFTYPE_ROLE,
     TOKEN_REFTYPE_SAVEPOINT,
+    TOKEN_REFTYPE_SCALE,
     TOKEN_REFTYPE_SEQUENCE,
     TOKEN_REFTYPE_SERVER,
+    TOKEN_REFTYPE_SQLSTATE,
     TOKEN_REFTYPE_STATEMENT,
     TOKEN_REFTYPE_SUBPARTITION,
     TOKEN_REFTYPE_TABLE,
@@ -2144,6 +2157,7 @@ enum {
     TOKEN_REFTYPE_WRAPPER,
     TOKEN_REFTYPE_MAX
   };
+
 
 };
 
@@ -6895,43 +6909,9 @@ void mouseMoveEvent(QMouseEvent *event)
       int offset= main_window->main_token_offsets[i];
       if (offset > p) break;
       int length= main_window->main_token_lengths[i];
-      int token_flag= main_window->main_token_flags[i];
       if ((offset <= p) && ((offset+length) > p))
       {
-        int token_type= main_window->main_token_types[i];
-        if ((token_flag & TOKEN_FLAG_IS_ERROR) != 0) s= "(error) ";
-        if ((token_flag & TOKEN_FLAG_IS_FUNCTION) != 0) s= "(function) ";
-        if ((token_type >= MainWindow::TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-         && (token_type <= MainWindow::TOKEN_TYPE_LITERAL))
-        {
-          s.append("literal");
-        }
-        else if ((token_type >= MainWindow::TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
-         && (token_type <= MainWindow::TOKEN_TYPE_IDENTIFIER))
-        {
-          s.append(main_window->hparse_f_token_to_appendee("[identifier]", main_window->main_token_reftypes[i]));
-        }
-        else if ((token_type >= MainWindow::TOKEN_TYPE_COMMENT_WITH_SLASH)
-         && (token_type <= MainWindow::TOKEN_TYPE_COMMENT_WITH_MINUS))
-        {
-          s.append("comment");
-        }
-        else if (token_type == MainWindow::TOKEN_TYPE_OPERATOR)
-        {
-          s.append("operator");
-        }
-        else if (token_type == MainWindow::TOKEN_TYPE_OTHER)
-        {
-          s.append("[identifier or keyword]");
-        }
-        else
-        {
-          if ((token_flag & TOKEN_FLAG_IS_RESERVED) != 0)
-          {
-            s.append("reserved ");
-          }
-          s.append("keyword");
-        }
+        s= main_window->token_reftype(i, true, main_window->main_token_types[i], main_window->main_token_reftypes[i]);
         break;
       }
     }

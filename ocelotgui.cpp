@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: September 2 2017
+   Last modified: September 8 2017
 */
 
 /*
@@ -10248,7 +10248,7 @@ int MainWindow::token_type(QChar *token, int token_length)
   Upper case is reserved, lower case is unreserved, we search both ways.
 */
 /* Todo: use "const" and "static" more often */
-#define MAX_KEYWORD_LENGTH 34
+
 void MainWindow::tokens_to_keywords(QString text, int start)
 {
   log("tokens_to_keywords start", 80);
@@ -10258,14 +10258,14 @@ void MainWindow::tokens_to_keywords(QString text, int start)
     We consider introducers e.g. _UTF8 to be equivalent to reserved words.
   */
 
-    struct keywords {
-       char  chars[MAX_KEYWORD_LENGTH];
-       unsigned short int reserved_flags;
-       unsigned short int built_in_function_flags;
-       unsigned short int token_keyword;
-    };
-
-    const keywords strvalues[]=
+#define MAX_KEYWORD_LENGTH 34
+struct keywords {
+   char  chars[MAX_KEYWORD_LENGTH];
+   unsigned short int reserved_flags;
+   unsigned short int built_in_function_flags;
+   unsigned short int token_keyword;
+};
+const keywords strvalues[]=
     {
       {"?", 0, 0, TOKEN_KEYWORD_QUESTIONMARK}, /* Ocelot keyword, although tokenize() regards it as an operator */
       {"ABORT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ABORT},
@@ -11142,6 +11142,8 @@ void MainWindow::tokens_to_keywords(QString text, int start)
       {"_UTF8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF8},
       {"_UTF8MB4", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF8MB4}
     };
+
+
   //QString text;
   QString s= "";
   int t;
@@ -11857,6 +11859,150 @@ int MainWindow::next_token(int i)
   return i2;
 }
 
+/*
+  Called by mouseMoveEvent for hovering in the statement widget.
+  Called from deep within hparse_f_multiblock().
+  Pass: offset in main_token lists
+  Return: information string
+*/
+QString MainWindow::token_reftype(int i, bool is_hover, int token_type, char reftype_parameter)
+{
+#define MAX_REFTYPEWORD_LENGTH 55
+struct reftypewords {
+   char  chars[MAX_REFTYPEWORD_LENGTH];
+   unsigned short int reserved_flags;
+   unsigned short int built_in_function_flags;
+   unsigned short int token_keyword;
+};
+
+    /* reftype_values strings must correspond to the order of TOKEN_REFTYPE_ #defines */
+    /* Todo: strings shouldn't be blank */
+  const reftypewords reftype_values[]=
+    {
+    {"", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ANY},
+    {"alias-of-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ALIAS_OF_COLUMN},
+    {"alias-of-table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ALIAS_OF_TABLE},
+    {"auto_increment ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_AUTO_INCREMENT},
+    {"channel ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CHANNEL},
+    {"character-set ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CHARACTER_SET},
+    {"collation ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLLATION},
+    {"column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN},
+    {"column-or-user-variable", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE},
+    {"column-or-variable", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN_OR_VARIABLE},
+    {"comment ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COMMENT},
+    {"condition-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CONDITION_DEFINE},
+    {"condition-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CONDITION_REFER},
+    {"condition-or-cursor ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CONDITION_OR_CURSOR},
+    {"constraint ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CONSTRAINT},
+    {"cursor-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CURSOR_DEFINE},
+    {"cursor-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CURSOR_REFER},
+    {"database ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE}, /* or schema */
+    {"database-or-constraint ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT},
+    {"database-or-event ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_EVENT},
+    {"database-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION},
+    {"database-or-function-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE},
+    {"database-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_PROCEDURE},
+    {"database-or-sequence ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_SEQUENCE},
+    {"database-or-table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE},
+    {"database-or-table-or-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN},
+    {"database-or-table-or-column-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION},
+    {"database-or-table-or-column-or-function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE},
+    {"database-or-trigger ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TRIGGER},
+    {"database-or-view ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_VIEW},
+    {"directory ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DIRECTORY},
+    {"engine ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ENGINE},
+    {"event ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_EVENT},
+    {"file ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_FILE},
+    {"function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_FUNCTION},
+    {"function-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE},
+    {"function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_FUNCTION_OR_VARIABLE},
+    {"handler-alias ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_HANDLER_ALIAS},
+    {"host ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_HOST},
+    {"index ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_INDEX},
+    {"introducer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_INTRODUCER},
+    {"key_cache ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_KEY_CACHE},
+    {"label-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LABEL_DEFINE},
+    {"label-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LABEL_REFER},
+    {"length ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LENGTH},
+    {"parameter ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARAMETER},
+    {"parser ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARSER},
+    {"plugin ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PLUGIN},
+    {"procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PROCEDURE},
+    /* plus {"", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_RESERVED_FUNCTION */
+    {"partition ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARTITION},
+    {"partition-number ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARTITION_NUMBER},
+    {"password ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PASSWORD},
+    {"role ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ROLE},
+    {"savepoint ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SAVEPOINT},
+    {"scale ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SCALE},
+    {"sequence ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SEQUENCE},
+    {"server ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SERVER},
+    {"sqlstate ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SQLSTATE},
+    {"statement ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_STATEMENT},
+    {"subpartition ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SUBPARTITION},
+    {"table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE},
+    {"table-or-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_COLUMN},
+    {"table-or-column-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION},
+    {"tablespace ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLESPACE},
+    {"transaction ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TRANSACTION},
+    {"trigger ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TRIGGER},
+    {"user ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_USER},
+    {"user-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_USER_VARIABLE},
+    {"variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_VARIABLE},         /* i.e. either USER_VARIABLE or DECLARED VARIABLE */
+    {"variable-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_VARIABLE_DEFINE},
+    {"variable-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_VARIABLE_REFER},
+    {"view ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_VIEW},
+    {"with-table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_WITH_TABLE},
+    {"wrapper ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_WRAPPER},
+    {"", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_MAX}
+  };
+
+  QString s= "";
+  int token_flag= main_token_flags[i];
+
+  if (is_hover)
+  {
+    if ((token_flag & TOKEN_FLAG_IS_ERROR) != 0) s= "(error) ";
+    if ((token_flag & TOKEN_FLAG_IS_FUNCTION) != 0) s= "(function) ";
+  }
+  if ((token_type >= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+   && (token_type <= TOKEN_TYPE_LITERAL))
+  {
+    int array_subscript= reftype_parameter;
+    s.append((char*)reftype_values[array_subscript].chars);
+    s.append("literal");
+  }
+  else if ((token_type >= TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+   && (token_type <= TOKEN_TYPE_IDENTIFIER))
+  {
+    s.append("[");
+    int array_subscript= reftype_parameter;
+    s.append((char*)reftype_values[array_subscript].chars);
+    s.append("identifier]");
+  }
+  else if ((token_type >= TOKEN_TYPE_COMMENT_WITH_SLASH)
+   && (token_type <= TOKEN_TYPE_COMMENT_WITH_MINUS))
+  {
+    s.append("comment");
+  }
+  else if (token_type == TOKEN_TYPE_OPERATOR)
+  {
+    s.append("operator");
+  }
+  else if (token_type == TOKEN_TYPE_OTHER)
+  {
+    s.append("[identifier or keyword]");
+  }
+  else
+  {
+    if ((token_flag & TOKEN_FLAG_IS_RESERVED) != 0)
+    {
+      s.append("reserved ");
+    }
+    s.append("keyword");
+  }
+  return s;
+}
 
 /*
   Todo: disconnect old if already connected.
