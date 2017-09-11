@@ -821,6 +821,8 @@ public slots:
   void menu_edit_select_all();
   void menu_edit_zoomin();
   void menu_edit_zoomout();
+  void menu_edit_autocomplete_via_menu();
+  bool menu_edit_autocomplete();
   bool eventfilter_function(QObject *obj, QEvent *event);
 
 protected:
@@ -965,6 +967,7 @@ private:
     QAction *menu_edit_action_formatter;
     QAction *menu_edit_action_zoomin;
     QAction *menu_edit_action_zoomout;
+    QAction *menu_edit_action_autocomplete;
   QMenu *menu_run;
     QAction *menu_run_action_execute;
     QAction *menu_run_action_kill;
@@ -1042,6 +1045,7 @@ private:
   QKeySequence ocelot_shortcut_format_keysequence;
   QKeySequence ocelot_shortcut_zoomin_keysequence;
   QKeySequence ocelot_shortcut_zoomout_keysequence;
+  QKeySequence ocelot_shortcut_autocomplete_keysequence;
   QKeySequence ocelot_shortcut_execute_keysequence;
   QKeySequence ocelot_shortcut_kill_keysequence;
   QKeySequence ocelot_shortcut_breakpoint_keysequence;
@@ -4191,7 +4195,8 @@ QString fillup(MYSQL_RES *mysql_res,
             unsigned short int ocelot_html,
             unsigned short int ocelot_raw,
             unsigned short int ocelot_xml,
-            unsigned int connection_number)
+            unsigned int connection_number,
+            bool is_for_display)
 {
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
   lmysql= passed_lmysql;
@@ -4322,8 +4327,7 @@ QString fillup(MYSQL_RES *mysql_res,
     From now on there should be no need to call mysql_ functions again for this result set.
   */
 
-  /* todo: gotta use MYSQL_REMOTE_CONNECTION rather than 3 someday. */
-  if (connection_number == 3) return "OK";
+  if (is_for_display == false) return "OK";
   copy_result_to_gridx(connections_dbms);
   /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
      said what gridx_row_count is. */
@@ -4343,9 +4347,7 @@ QString fillup(MYSQL_RES *mysql_res,
   grid_column_widths= new unsigned int[gridx_column_count];
   grid_column_heights= new unsigned int[gridx_column_count];
   grid_column_dbms_sources= new unsigned char[gridx_column_count];
-
   dbms_set_grid_column_sources();                 /* Todo: this could return an error? */
-
   /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
   copy_of_connections_dbms= connections_dbms;
   copy_of_ocelot_result_grid_vertical= ocelot_result_grid_vertical;

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: September 8 2017
+   Last modified: September 10 2017
 */
 
 /*
@@ -338,6 +338,7 @@
   static char ocelot_shortcut_format[80]= "default";
   static char ocelot_shortcut_zoomin[80]= "default";
   static char ocelot_shortcut_zoomout[80]= "default";
+  static char ocelot_shortcut_autocomplete[80]= "default";
   static char ocelot_shortcut_execute[80]= "default";
   static char ocelot_shortcut_kill[80]= "default";
   static char ocelot_shortcut_breakpoint[80]= "default";
@@ -1092,48 +1093,6 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   /* See comment with label "Shortcut Duplication" */
   if (keypress_shortcut_handler(key, false) == true) return true;
   if (obj != statement_edit_widget) return false;
-
-  if ((key->key() == Qt::Key_Tab) && (ocelot_auto_rehash > 0))
-  {
-    if (hparse_line_edit->isHidden() == false)
-    {
-      if (statement_edit_widget->hasFocus() == true)
-      {
-        QString s= hparse_line_edit->text();
-        int word_start= s.indexOf(": ", 0);
-        int word_end= s.indexOf(" ", word_start + 2);
-        if (word_end == -1) word_end= s.size();
-        QString word= s.mid(word_start + 2, (word_end - word_start) - 1);
-        int i;
-        for (i= 0; main_token_lengths[i] != 0; ++i)
-        {
-          if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) != 0) break;
-        }
-        if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) == 0) return true;
-        text= statement_edit_widget->toPlainText();
-        if (word.left(1) != "[")
-        {
-          int offset;
-          if (main_token_lengths[i] == 0)
-          {
-            offset= text.size();
-            word= " " + word;
-          }
-          else offset= main_token_offsets[i];
-          QString new_text= text.left(offset);
-          new_text.append(word);
-          int rest_start= offset + main_token_lengths[i];
-          new_text.append(text.right(text.size() - rest_start));
-          statement_edit_widget->setPlainText(new_text);
-          QTextCursor c= statement_edit_widget->textCursor();
-          c.movePosition(QTextCursor::End);
-          statement_edit_widget->setTextCursor(c);
-          return true;
-        }
-      }
-    }
-  }
-
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
   if (key->modifiers() & Qt::ControlModifier)
@@ -1207,6 +1166,11 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
   if (qk == ocelot_shortcut_zoomin_keysequence){menu_edit_zoomin(); return true; }
   if (qk == ocelot_shortcut_zoomout_keysequence){menu_edit_zoomout(); return true; }
+  if (menu_edit_action_autocomplete->isEnabled() == true)
+  {
+    if (qk == ocelot_shortcut_autocomplete_keysequence) {
+      return menu_edit_autocomplete(); }
+  }
   if (menu_run_action_kill->isEnabled() == true)
   {
     if (qk == ocelot_shortcut_kill_keysequence) { action_kill(); return true; }
@@ -1955,6 +1919,9 @@ void MainWindow::create_menu()
   menu_edit_action_zoomout= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_ZOOMOUT]);
   connect(menu_edit_action_zoomout, SIGNAL(triggered()), this, SLOT(menu_edit_zoomout()));
   shortcut("ocelot_shortcut_zoomout", "", false, true);
+  menu_edit_action_autocomplete= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_AUTOCOMPLETE]);
+  connect(menu_edit_action_autocomplete, SIGNAL(triggered()), this, SLOT(menu_edit_autocomplete_via_menu()));
+  shortcut("ocelot_shortcut_autocomplete", "", false, true);
   menu_run= ui->menuBar->addMenu(menu_strings[menu_off + MENU_RUN]);
   menu_run_action_execute= menu_run->addAction(menu_strings[menu_off + MENU_RUN_EXECUTE]);
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
@@ -2301,6 +2268,20 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
+  /* Todo: Tab is like mysql but a poor default choice. Try Ctrl+Space? */
+  if (target == "ocelot_shortcut_autocomplete")
+  {
+    if (is_set) strcpy(ocelot_shortcut_autocomplete, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_autocomplete, "default") == 0)
+        ocelot_shortcut_autocomplete_keysequence= QKeySequence("Tab");
+      else
+        ocelot_shortcut_autocomplete_keysequence= QKeySequence(ocelot_shortcut_autocomplete);
+      menu_edit_action_autocomplete->setShortcut(ocelot_shortcut_autocomplete_keysequence);
+    }
+    return 1;
+  }
   if (target == "ocelot_shortcut_execute")
   {
     if (is_set) strcpy(ocelot_shortcut_execute, source_as_utf8);
@@ -2632,6 +2613,71 @@ void MainWindow::menu_edit_zoomin()
 void MainWindow::menu_edit_zoomout()
 {
   menu_edit_zoominorout(-FONT_SIZE_ZOOM_INCREMENT);
+}
+
+/*
+  The autocomplete shortcut is handled by event filter which
+  calls keypress_shortcut_handler() which calls menu_edit_autocomplete()
+  directly. Therefore we can only get here if the user chooses
+  the autocomplete menu item rather than press a shortcut key.
+  And in that case we don't care if the return is false.
+*/
+void MainWindow::menu_edit_autocomplete_via_menu()
+{
+  menu_edit_autocomplete();
+}
+
+/*
+  Called from edit menu choice = autocomplete or keypress_shortcut_handler().
+  Depends on rehash, ocelot_auto_rehash etc. e.g. was REHASH called.
+  The extra checking here applies because default key is Tab Qt::Key_Tab,
+  we want to return false if we don't handle it as a shortcut,
+  so that it will simply be added to the widget contents.
+*/
+bool MainWindow::menu_edit_autocomplete()
+{
+  QString text;
+  if (ocelot_auto_rehash > 0)
+  {
+    if (hparse_line_edit->isHidden() == false)
+    {
+      if (statement_edit_widget->hasFocus() == true)
+      {
+        QString s= hparse_line_edit->text();
+        int word_start= s.indexOf(": ", 0);
+        int word_end= s.indexOf(" ", word_start + 2);
+        if (word_end == -1) word_end= s.size();
+        QString word= s.mid(word_start + 2, (word_end - word_start) - 1);
+        int i;
+        for (i= 0; main_token_lengths[i] != 0; ++i)
+        {
+          if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) != 0) break;
+        }
+        if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) == 0) return true;
+        text= statement_edit_widget->toPlainText();
+        if (word.left(1) != "[")
+        {
+          int offset;
+          if (main_token_lengths[i] == 0)
+          {
+            offset= text.size();
+            word= " " + word;
+          }
+          else offset= main_token_offsets[i];
+          QString new_text= text.left(offset);
+          new_text.append(word);
+          int rest_start= offset + main_token_lengths[i];
+          new_text.append(text.right(text.size() - rest_start));
+          statement_edit_widget->setPlainText(new_text);
+          QTextCursor c= statement_edit_widget->textCursor();
+          c.movePosition(QTextCursor::End);
+          statement_edit_widget->setTextCursor(c);
+          return true;
+        }
+      }
+    }
+  }
+  return false;
 }
 
 
@@ -3674,13 +3720,12 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
   bool is_can_undo= true, is_can_redo= true;
   bool is_can_copy= false, is_can_cut= false, is_can_paste= false;
   bool is_can_format= false, is_can_zoomin= false, is_can_zoomout= false;
+  bool is_can_autocomplete= false;
   const char *class_name= focus_widget->metaObject()->className();
-
   if (qe == QEvent::FocusIn)
   {
     if (strcmp(class_name, "TextEditWidget") != 0) return;
   }
-
   if (strcmp(class_name, "CodeEditor") == 0)
   {
     CodeEditor *t= qobject_cast<CodeEditor*>(focus_widget);
@@ -3690,6 +3735,16 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
     is_can_format= is_can_zoomin= is_can_zoomout= !doc->isEmpty();
+    if (ocelot_auto_rehash > 0)
+    {
+      if (hparse_line_edit->isHidden() == false)
+      {
+        if (statement_edit_widget->hasFocus() == true)
+        {
+          is_can_autocomplete= true;
+        }
+      }
+    }
   }
   else if (strcmp(class_name, "TextEditWidget") == 0)
   {
@@ -3732,6 +3787,7 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
   menu_edit_action_formatter->setEnabled(is_can_format);
   menu_edit_action_zoomin->setEnabled(is_can_zoomin);
   menu_edit_action_zoomout->setEnabled(is_can_zoomout);
+  menu_edit_action_autocomplete->setEnabled(is_can_autocomplete);
 }
 
 
@@ -7934,7 +7990,8 @@ int MainWindow::action_execute_one_statement(QString text)
                       is_vertical, ocelot_result_grid_column_names,
                       lmysql, ocelot_client_side_functions,
                       ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
-                      MYSQL_MAIN_CONNECTION);
+                      MYSQL_MAIN_CONNECTION,
+                      true);
             if (fillup_result != "OK")
             {
               /* fillup() failure is unexpected so this is crude */
@@ -8033,7 +8090,8 @@ int MainWindow::action_execute_one_statement(QString text)
                           lmysql,
                           ocelot_client_side_functions,
                           ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
-                          MYSQL_MAIN_CONNECTION);
+                          MYSQL_MAIN_CONNECTION,
+                          true);
                 /* next line redundant? display() ends with show() */
                 r->show();
 
@@ -9220,8 +9278,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     This affects unsigned short ocelot_auto_rehash.
   When is rehash_search() called:
     When user hits ` i.e. backtick show the choices.
-    When user hits \t i.e. tab, if there's an unambiguous name, fill it in
-    (don't worry about what happens if user hits tab twice).
+    When user hits ocelot_shortcut_autocomplete_keysequence which by
+    default is \t i.e. tab Qt::Key_Tab, if there's an unambiguous name,
+    fill it in (don't worry about what happens if user hits tab twice).
   Why we do a single unioned search with unnecessary columns:
     If we did multiple searches, we would affect MAX_QUERIES_PER_HOUR
     more. But this means there could be thousands of entries
@@ -9248,81 +9307,142 @@ int MainWindow::rehash_scan()
     make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
     return 0;
   }
-#ifdef DBMS_TARANTOOL
+  char query[1024];
+
   if (connections_dbms[0] == DBMS_TARANTOOL)
   {
-    make_and_put_message_in_result(ER_REHASH_IS_NOT_SUPPORTED, 0, (char*)"");
-    return 0;
-  }
-#endif
-  char query[1024];
-  sprintf(query, "select 'D',database(),'' "
-                 "union all "
-                 "select 'C',table_name,column_name "
-                 "from information_schema.columns "
-                 "where table_schema = database() "
-                 "union all "
-                 "select 'T',table_name,table_type "
-                 "from information_schema.tables "
-                 "where table_schema = database() "
-                 "union all "
-                 "select 'F',routine_name,routine_type "
-                 "from information_schema.routines "
-                 "where routine_schema = database() and routine_type = 'FUNCTION' "
-                 "union all "
-                 "select 'P',routine_name,routine_type "
-                 "from information_schema.routines "
-                 "where routine_schema = database() and routine_type = 'PROCEDURE' "
-                 "union all "
-                 "select 't',trigger_name,'' "
-                 "from information_schema.triggers "
-                 "where trigger_schema = database() "
-                 "union all "
-                 "select 'E',event_name,'' "
-                 "from information_schema.events "
-                 "where event_schema = database() "
-                 "union all "
-                 "select 'I',table_name,index_name "
-                 "from information_schema.statistics "
-                 "where table_schema = database() "
-         );
-  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION],query))
+    int result;
+    sprintf(query, "select 'T', name,'T' "
+                   "from _space "
+                   "union all "
+                   "select 't', name,'' "
+                   "from _trigger "
+                   "union all "
+                   "select 'I', name,name "
+                   "from _index;"
+
+           );
+    result=
+    tarantool_execute_sql(query,
+                          strlen(query),
+                          MYSQL_MAIN_CONNECTION,
+                          TOKEN_KEYWORD_SELECT,
+                          "");
+    if (result != 0)
     {
       make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
       return 0;
     }
-  res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
-  if (res == NULL)
-  {
-    make_and_put_message_in_result(ER_MYSQL_STORE_RESULT_FAILED, 0, (char*)"");
-    return 0;
+    /* Todo: Memory leak here */
+    ResultGrid *rg= new ResultGrid(lmysql, this, false);
+    MYSQL_RES *mysql_res_for_new_result_set= NULL;
+    rg->fillup(mysql_res_for_new_result_set,
+              //&tarantool_tnt_reply,
+              connections_dbms[MYSQL_MAIN_CONNECTION],
+              //this,
+              false, ocelot_result_grid_column_names,
+              lmysql, ocelot_client_side_functions,
+              ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
+              MYSQL_MAIN_CONNECTION,
+              false);
+    rehash_result_column_count= tarantool_num_fields();
+    rehash_result_row_count= tarantool_num_rows(MYSQL_MAIN_CONNECTION);
+    if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
+    {
+      make_and_put_message_in_result(ER_0_ROWS_RETURNED, 0, (char*)"");
+      return 0;
+    }
   }
-  rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
-  rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
-  if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
+  else
   {
-    make_and_put_message_in_result(ER_0_ROWS_RETURNED, 0, (char*)"");
-    return 0;
+    sprintf(query, "select 'D',database(),'' "
+                   "union all "
+                   "select 'C',table_name,column_name "
+                     "from information_schema.columns "
+                   "where table_schema = database() "
+                   "union all "
+                   "select 'T',table_name,table_type "
+                   "from information_schema.tables "
+                   "where table_schema = database() "
+                   "union all "
+                   "select 'F',routine_name,routine_type "
+                   "from information_schema.routines "
+                   "where routine_schema = database() and routine_type = 'FUNCTION' "
+                   "union all "
+                   "select 'P',routine_name,routine_type "
+                   "from information_schema.routines "
+                   "where routine_schema = database() and routine_type = 'PROCEDURE' "
+                   "union all "
+                   "select 't',trigger_name,'' "
+                   "from information_schema.triggers "
+                   "where trigger_schema = database() "
+                   "union all "
+                   "select 'E',event_name,'' "
+                   "from information_schema.events "
+                   "where event_schema = database() "
+                   "union all "
+                   "select 'I',table_name,index_name "
+                   "from information_schema.statistics "
+                   "where table_schema = database() "
+           );
+    if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], query))
+      {
+        make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
+        return 0;
+      }
+
+    res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+    if (res == NULL)
+    {
+      make_and_put_message_in_result(ER_MYSQL_STORE_RESULT_FAILED, 0, (char*)"");
+      return 0;
+    }
+    rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
+    rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
+    if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
+    {
+      make_and_put_message_in_result(ER_0_ROWS_RETURNED, 0, (char*)"");
+      return 0;
+    }
   }
   result_max_column_widths= new unsigned int[rehash_result_column_count];
   ResultGrid* result_grid;
   result_grid= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
-  result_grid->scan_rows(
-          rehash_result_column_count, /* result_column_count, */
-          rehash_result_row_count, /* result_row_count, */
-          res, /* grid_mysql_res, */
-          &rehash_result_set_copy,
-          &rehash_result_set_copy_rows,
-          &result_max_column_widths);
-  lmysql->ldbms_mysql_free_result(res);
+
+  if (connections_dbms[0] == DBMS_TARANTOOL)
+  {
+    tarantool_scan_rows(
+            rehash_result_column_count, /* result_column_count, */
+            rehash_result_row_count, /* result_row_count, */
+            res, /* grid_mysql_res, */
+            &rehash_result_set_copy,
+            &rehash_result_set_copy_rows,
+            &result_max_column_widths);
+    /* Todo: another leak (?) -- we don't free the result set */
+  }
+  else
+  {
+    result_grid->scan_rows(
+            rehash_result_column_count, /* result_column_count, */
+            rehash_result_row_count, /* result_row_count, */
+            res, /* grid_mysql_res, */
+            &rehash_result_set_copy,
+            &rehash_result_set_copy_rows,
+            &result_max_column_widths);
+    lmysql->ldbms_mysql_free_result(res);
+  }
   delete [] result_max_column_widths;
   /* First set of rows is 'D',database(),''. If it's null, error. */
   char database_name[512];
-  rehash_get_database_name(database_name);
-  if (database_name[0] == '\0')
+  if (connections_dbms[0] == DBMS_TARANTOOL) strcpy(database_name, "main");
+  else
   {
-    make_and_put_message_in_result(ER_NO_DATABASE_SELECTED, 0, (char*)"");
-    return 0;
+    rehash_get_database_name(database_name);
+    if (database_name[0] == '\0')
+    {
+      make_and_put_message_in_result(ER_NO_DATABASE_SELECTED, 0, (char*)"");
+      return 0;
+    }
   }
   long unsigned int r;
   int count_of_columns= 0;
@@ -10304,7 +10424,7 @@ const keywords strvalues[]=
       {"ASYMMETRIC_VERIFY", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ASYMMETRIC_VERIFY},
       {"ATAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ATAN},
       {"ATAN2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ATAN2},
-      {"ATTACH", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ATTACH},
+      {"ATTACH", 0, 0, TOKEN_KEYWORD_ATTACH},
       {"AUTOINCREMENT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_AUTOINCREMENT},
       {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
       {"BEFORE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BEFORE},
@@ -13084,7 +13204,7 @@ int MainWindow::tarantool_execute_sql(
             unsigned long dbms_query_len,
             unsigned int connection_number,
             int statement_type,
-            QString s)
+            QString ssm)
 {
   char *request_string= new char[dbms_query_len + 256];
   tarantool_select_nosql= false;
@@ -13105,7 +13225,6 @@ int MainWindow::tarantool_execute_sql(
     //    If s is passed as NULL, then the object is allocated. Otherwise, the allocated object is initialized.
     struct tnt_stream *arg;
     arg = lmysql->ldbms_tnt_object(NULL);
-
     //int tnt_object_reset(struct tnt_stream *s)
     //    Reset a stream object to the basic state.
     lmysql->ldbms_tnt_object_reset(arg);
@@ -13114,7 +13233,6 @@ int MainWindow::tarantool_execute_sql(
     //    The header’s size is in bytes.
     //    If TNT_SBO_SPARSE or TNT_SBO_PACKED is set as container type, then size is ignored.
     lmysql->ldbms_tnt_object_add_array(arg, 0);
-
     struct tnt_request *req2 = lmysql->ldbms_tnt_request_eval(NULL);
     //   int m= tnt_request_set_exprz(req2,"return box.space.tester:select()");
 
@@ -13137,9 +13255,9 @@ int MainWindow::tarantool_execute_sql(
     }
     else if (statement_type == TOKEN_KEYWORD_LUA)
     {
-      s= connect_stripper(s, false);
-      s= tarantool_add_return(s);
-      strcpy(request_string, s.toUtf8());
+      ssm= connect_stripper(ssm, false);
+      ssm= tarantool_add_return(ssm);
+      strcpy(request_string, ssm.toUtf8());
     }
     else
     {
@@ -13161,12 +13279,10 @@ int MainWindow::tarantool_execute_sql(
     int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
     assert(m >= 0);
     lmysql->ldbms_tnt_request_set_tuple(req2, arg);
-
     /* uint64_t sync1 = */ lmysql->ldbms_tnt_request_compile(tnt[connection_number], req2);
     tarantool_flush_and_save_reply(connection_number);
     if (tarantool_errno[connection_number] != 0) return tarantool_errno[connection_number];
     /* The return should be an array of arrays of scalars. */
-
     /* If there are no rows, then there are no fields, so we cannot put up a grid. */
     /* Todo: don't forget to free if there are zero rows. */
     /* Todo: Maybe that's not true now? look at result[0] for field names. */
@@ -14062,7 +14178,8 @@ int MainWindow::create_table_server(QString text,
               false, ocelot_result_grid_column_names,
               lmysql, ocelot_client_side_functions,
               ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
-              MYSQL_REMOTE_CONNECTION);
+              MYSQL_REMOTE_CONNECTION,
+              false);
 
     /* TODO: Get field names and data types from fillup!! */
     QString create_table_statement=
