@@ -54,9 +54,7 @@
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
-#ifdef OCELOT_OS_LINUX
 #define DBMS_TARANTOOL 3
-#endif
 #define FLAG_VERSION_MYSQL_5_5      1
 #define FLAG_VERSION_MYSQL_5_6      2
 #define FLAG_VERSION_MYSQL_5_7      4
@@ -76,6 +74,22 @@
 #define FLAG_VERSION_ALL_OR_LUA (FLAG_VERSION_ALL | FLAG_VERSION_LUA)
 
 #include <assert.h>
+#include <stdint.h>
+
+/*
+  Decide whether to #include third_party.h for use with Tarantool.
+  Builders can say cmake . -DTHIRD_PARTY=1 to include and maybe use.
+  Otherwise THIRD_PARTY=0 on Linux, THIRD_PARTY=1 on Windows.
+  Since third_party.h has tarantool-c source, we can build on
+  Windows without trying to figure out how to create a DLL.
+*/
+#ifndef THIRD_PARTY
+#ifdef OCELOT_OS_LINUX
+#define THIRD_PARTY 0
+#else
+#define THIRD_PARTY 1
+#endif
+#endif
 
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
@@ -141,7 +155,10 @@
 #endif
 
 #ifdef DBMS_TARANTOOL
-#include <stdint.h>
+
+#if (THIRD_PARTY==1)
+#include "third_party.h"
+#else
 /*
   Definitions of tnt_opt_type and tnt_reply are taken from tarantool-c.
   Although there is no copyright, there is a request for an AS IS notice (which is done)
@@ -171,6 +188,10 @@
           const char *error_end;
           const char *data;
           const char *data_end;
+          const char *metadata; /* new */
+          const char *metadata_end; /* new */
+          const char *sqlinfo; /* new */
+          const char *sqlinfo_end; /* new */
   };
   /* Amazing but true: write_request was silently added after release! */
   struct tnt_stream {
@@ -261,6 +282,7 @@
       int index_base; /*!< field offset for UPDATE */
       int alloc; /*!< allocation mark */
   };
+#endif
 
 #endif
 
@@ -772,6 +794,8 @@ public slots:
   void action_option_detach_history_widget(bool checked);
   void action_option_detach_result_grid_widget(bool checked);
   void action_option_detach_debug_widget(bool checked);
+  void action_option_next_window();
+  void action_option_previous_window();
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -981,6 +1005,8 @@ private:
     QAction *menu_options_action_option_detach_history_widget;
     QAction *menu_options_action_option_detach_result_grid_widget;
     QAction *menu_options_action_option_detach_debug_widget;
+    QAction *menu_options_action_next_window;
+    QAction *menu_options_action_previous_window;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -1026,9 +1052,10 @@ private:
   /* MYSQL mysql; */
   MYSQL_RES *mysql_res;
   /* MYSQL_FIELD *fields; */
+
 #ifdef DBMS_TARANTOOL
   struct tnt_reply tarantool_tnt_reply;
-  char *tarantool_field_names;
+  char * tarantool_field_names;
   bool tarantool_select_nosql;
 #endif
 
@@ -1048,6 +1075,8 @@ private:
   QKeySequence ocelot_shortcut_autocomplete_keysequence;
   QKeySequence ocelot_shortcut_execute_keysequence;
   QKeySequence ocelot_shortcut_kill_keysequence;
+  QKeySequence ocelot_shortcut_next_window_keysequence;
+  QKeySequence ocelot_shortcut_previous_window_keysequence;
   QKeySequence ocelot_shortcut_breakpoint_keysequence;
   QKeySequence ocelot_shortcut_continue_keysequence;
   QKeySequence ocelot_shortcut_next_keysequence;
@@ -2161,11 +2190,10 @@ enum {
     TOKEN_REFTYPE_WRAPPER,
     TOKEN_REFTYPE_MAX
   };
-
-
 };
 
 #endif // MAINWINDOW_H
+
 
 #ifdef DBMS_TARANTOOL
 /*
@@ -2751,6 +2779,7 @@ class ldbms : public QWidget
 {
 public:
 
+
   void *dlopen_handle;
 
   /* For Qt typedef example see http://doc.qt.io/qt-4.8/qlibrary.html#fileName-prop */
@@ -2956,6 +2985,68 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         QString *return_string,
         int which_library)                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
   {
+
+#if (THIRD_PARTY==1)
+    /* If Tarantool we can use third_party.h we don't need to load. */
+    /* THIRD_PARTY=1 is what's on for Windows but not (for now) Linux. */
+    /* TODO: This should be controlled by ocelot_third_party = 1 */
+    if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
+    {
+      t__mp_decode_array= (tmp_decode_array) &mp_decode_array;
+      t__mp_decode_bin= (tmp_decode_bin) &mp_decode_bin;
+      //t__mp_decode_binl= (tmp_decode_binl) ;
+      t__mp_decode_bool= (tmp_decode_bool) &mp_decode_bool;
+      t__mp_decode_float= (tmp_decode_float) &mp_decode_float;
+      t__mp_decode_double= (tmp_decode_double) &mp_decode_double;
+      t__mp_decode_int= (tmp_decode_int) &mp_decode_int;
+      t__mp_decode_map= (tmp_decode_map) &mp_decode_map;
+      t__mp_decode_nil= (tmp_decode_nil) &mp_decode_nil;
+      t__mp_decode_uint= (tmp_decode_uint) &mp_decode_uint;
+      t__mp_decode_str= (tmp_decode_str) &mp_decode_str;
+      t__mp_decode_strl= (tmp_decode_strl) &mp_decode_strl;
+      t__mp_next= (tmp_next) &mp_next;
+      t__mp_typeof= (tmp_typeof) &mp_typeof;
+      t__tnt_auth= (ttnt_auth) &tnt_auth;
+      t__tnt_call= (ttnt_call) &tnt_call;
+      t__tnt_close= (ttnt_close) &tnt_close;
+      t__tnt_connect= (ttnt_connect) &tnt_connect;
+      t__tnt_delete= (ttnt_delete) &tnt_delete;
+      t__tnt_eval= (ttnt_eval) &tnt_eval;
+      t__tnt_flush= (ttnt_flush) &tnt_flush;
+      t__tnt_get_indexno= (ttnt_get_indexno) &tnt_get_indexno;
+      t__tnt_get_spaceno= (ttnt_get_spaceno) &tnt_get_spaceno;
+      t__tnt_stream_free= (ttnt_stream_free) &tnt_stream_free;
+      t__tnt_insert= (ttnt_insert) &tnt_insert;
+      t__tnt_net= (ttnt_net) &tnt_net;
+      t__tnt_object= (ttnt_object) &tnt_object;
+      t__tnt_object_add_array= (ttnt_object_add_array) &tnt_object_add_array;
+      t__tnt_object_add_nil= (ttnt_object_add_nil) &tnt_object_add_nil;
+      t__tnt_object_add_int= (ttnt_object_add_int) &tnt_object_add_int;
+      t__tnt_object_add_str= (ttnt_object_add_str) &tnt_object_add_str;
+      t__tnt_object_add_bin= (ttnt_object_add_bin) &tnt_object_add_bin;
+      t__tnt_object_add_bool= (ttnt_object_add_bool) &tnt_object_add_bool;
+      t__tnt_object_add_float= (ttnt_object_add_float) &tnt_object_add_float;
+      t__tnt_object_add_double= (ttnt_object_add_double) &tnt_object_add_double;
+      t__tnt_object_container_close= (ttnt_object_container_close) &tnt_object_container_close;
+      t__tnt_object_format= (ttnt_object_format) &tnt_object_format;
+      t__tnt_object_reset= (ttnt_object_reset) &tnt_object_reset;
+      t__tnt_reload_schema= (ttnt_reload_schema) &tnt_reload_schema;
+      t__tnt_replace= (ttnt_replace) &tnt_replace;
+      t__tnt_reply= (ttnt_reply) &xtnt_reply;
+      t__tnt_reply_free= (ttnt_reply_free) &tnt_reply_free;
+      t__tnt_request_compile= (ttnt_request_compile) &tnt_request_compile;
+      t__tnt_request_eval= (ttnt_request_eval) &tnt_request_eval;
+      t__tnt_request_set_exprz= (ttnt_request_set_exprz) &tnt_request_set_exprz;
+      t__tnt_request_set_tuple= (ttnt_request_set_tuple) &tnt_request_set_tuple;
+      t__tnt_reply_init= (ttnt_reply_init) &tnt_reply_init;
+      t__tnt_select= (ttnt_select) &tnt_select;
+      t__tnt_set= (ttnt_set) &tnt_set;
+      t__tnt_update= (ttnt_update) &tnt_update;
+      *is_library_loaded= 1;
+      return;
+    }
+#endif /* THIRD_PARTY==1 */
+
     char *query;
     int query_len;
     QString error_string;
@@ -3105,6 +3196,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       error_string= lib.errorString();
 #endif //#ifdef OCELOT_OS_NONLINUX
     }
+
     if (*is_library_loaded == 0)
     {
       *return_string= error_string;

@@ -213,6 +213,9 @@ include(GNUInstallDirs)
 #Help|Manual will look at this path
 add_definitions(-DOCELOTGUI_DOCDIR="${CMAKE_INSTALL_FULL_DOCDIR}")
 
+#If cmake . -DTHIRD_PARTY=0 then #include third_party.h won't happen
+add_definitions(-DTHIRD_PARTY=${THIRD_PARTY})
+
 if (NOT QT_VERSION EQUAL "4")
   if (QT_VERSION EQUAL "5")
     find_package(Qt5Widgets REQUIRED)

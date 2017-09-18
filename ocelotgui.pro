@@ -30,6 +30,7 @@ HEADERS += codeeditor.h
 HEADERS += install_sql.cpp
 HEADERS += hparse.h
 HEADERS += ostrings.h
+HEADERS += third_party.h
 
 FORMS    += ocelotgui.ui
 

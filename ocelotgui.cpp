@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: September 10 2017
+   Last modified: September 18 2017
 */
 
 /*
@@ -341,6 +341,8 @@
   static char ocelot_shortcut_autocomplete[80]= "default";
   static char ocelot_shortcut_execute[80]= "default";
   static char ocelot_shortcut_kill[80]= "default";
+  static char ocelot_shortcut_next_window[80]= "default";
+  static char ocelot_shortcut_previous_window[80]= "default";
   static char ocelot_shortcut_breakpoint[80]= "default";
   static char ocelot_shortcut_continue[80]= "default";
   static char ocelot_shortcut_next[80]= "default";
@@ -1175,6 +1177,8 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   {
     if (qk == ocelot_shortcut_kill_keysequence) { action_kill(); return true; }
   }
+  if (qk == ocelot_shortcut_next_window_keysequence){action_option_next_window(); return true; }
+  if (qk == ocelot_shortcut_previous_window_keysequence){action_option_previous_window(); return true; }
   if (menu_debug_action_breakpoint->isEnabled())
     if (qk == ocelot_shortcut_breakpoint_keysequence) { action_debug_breakpoint(); return true; }
   if (menu_debug_action_continue->isEnabled())
@@ -1954,6 +1958,12 @@ void MainWindow::create_menu()
   menu_options_action_option_detach_debug_widget->setCheckable(true);
   menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
   connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
+  menu_options_action_next_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
+  connect(menu_options_action_next_window, SIGNAL(triggered(bool)), this, SLOT(action_option_next_window()));
+  shortcut("ocelot_shortcut_next_window", "", false, true);
+  menu_options_action_previous_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
+  connect(menu_options_action_previous_window, SIGNAL(triggered(bool)), this, SLOT(action_option_previous_window()));
+  shortcut("ocelot_shortcut_previous_window", "", false, true);
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(menu_strings[menu_off + MENU_DEBUG]);
 //  menu_debug_action_install= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
@@ -2305,6 +2315,32 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
       else
         ocelot_shortcut_kill_keysequence= QKeySequence(ocelot_shortcut_kill);
       menu_run_action_kill->setShortcut(ocelot_shortcut_kill_keysequence);
+    }
+    return 1;
+  }
+  if (target == "ocelot_shortcut_next_window")
+  {
+    if (is_set) strcpy(ocelot_shortcut_next_window, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_next_window, "default") == 0)
+        ocelot_shortcut_next_window_keysequence= QKeySequence::NextChild;
+      else
+        ocelot_shortcut_next_window_keysequence= QKeySequence(ocelot_shortcut_next_window);
+      menu_options_action_next_window->setShortcut(ocelot_shortcut_next_window_keysequence);
+    }
+    return 1;
+  }
+  if (target == "ocelot_shortcut_previous_window")
+  {
+    if (is_set) strcpy(ocelot_shortcut_previous_window, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_previous_window, "default") == 0)
+        ocelot_shortcut_previous_window_keysequence= QKeySequence::PreviousChild;
+      else
+        ocelot_shortcut_previous_window_keysequence= QKeySequence(ocelot_shortcut_previous_window);
+      menu_options_action_previous_window->setShortcut(ocelot_shortcut_previous_window_keysequence);
     }
     return 1;
   }
@@ -3351,6 +3387,35 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
     debug_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) debug_tab_widget->show();
+}
+
+/*
+  Next/Prev focus widget. Qt hardcodes tab | Shift+Tab (backtab) see
+  http://www.vikingsoft.eu/keyboard-navigation-and-the-event-system/
+  but we want to allow putting tab in any editable window, that is,
+  we hardcode autocomplete shortcut = tab but allow it to go in.
+  I'm confused about whether the window manager e.g. KDE always will
+  override (as it does for Alt+Tab), but I know that if I try
+  SET ocelot_shortcut_autocomplete = 'Alt+Tab';
+  I get an error message = Illegal value.
+  Row_form_box uses setTabChangesFocus() but nothing else does.
+  In result grid, maybe we could have Tab for "next cell" and
+  shift+tab for "next window". and something else for "Next Tab".
+  But, mainly: next/prev is done with a customizable shortcut
+  associated with QKeySequence::NextChild / QKeySequence::PreviousChild
+  focusNextPrevChild(true) focusNextPrevChild(false).
+  See also "Navigating Between Window Panes" according to Microsoft
+  https://msdn.microsoft.com/en-us/library/ms971323.aspx
+*/
+
+void MainWindow::action_option_next_window()
+{
+  focusNextPrevChild(true);
+}
+
+void MainWindow::action_option_previous_window()
+{
+  focusNextPrevChild(false);
 }
 
 /*
@@ -16775,3 +16840,10 @@ void MainWindow::print_help()
 */
 
 #include "install_sql.cpp"
+
+#ifdef DBMS_TARANTOOL
+#if (THIRD_PARTY==1)
+#define THIRD_PARTY_CODE
+  #include "third_party.h"
+#endif
+#endif
