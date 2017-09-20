@@ -5,8 +5,8 @@
   
   This code is not required. It is not used for Ocelot's default
   configuration as a MySQL/MariaDB client.
-  With Linux it will only be included if cmake . -DTHIRD_PARTY=1
-  With Windows it will be included unless cmake . -DTHIRD_PARTY=0
+  With Linux it will only be included if cmake . -DOCELOT_THIRD_PARTY=1
+  With Windows it will be included unless cmake . -DOCELOT_THIRD_PARTY=0
   
   The contents of this file are copied from files in
   https://github.com/tarantool/tarantool-c
@@ -3831,7 +3831,7 @@ mp_check(const char **data, const char *end)
  */
 
 #include <stddef.h>
-#include <netdb.h> /* NI_MAXHOST, NI_MAXSERV */
+//#include <netdb.h> /* NI_MAXHOST, NI_MAXSERV */
 #include <limits.h> /* _POSIX_PATH_MAX */
 
 #if defined(__cplusplus)
@@ -6931,7 +6931,7 @@ tnt_get_index(struct tnt_stream *s);
 
 #endif /* TNT_SCHEMA_H_INCLUDED */
 
-#ifdef THIRD_PARTY_CODE
+#ifdef OCELOT_THIRD_PARTY_CODE
 
 /*
    COPY: file name = third_party/base64.c.
@@ -18381,6 +18381,7 @@ int tnt_object_reset(struct tnt_stream *s)
    COPY: file name = tnt/tnt_io.c.
    Copying Date = 2017-09-14.
    Changes: added #ifndef...#endif. commented out #includes.
+            Removed reference to <netdb.h>.
 */
 #ifndef TNT_IO_C_INCLUDED
 
@@ -18431,7 +18432,7 @@ int tnt_object_reset(struct tnt_stream *s)
 #include <netinet/in.h>
 #include <sys/un.h>
 #include <netinet/tcp.h>
-#include <netdb.h>
+//#include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
@@ -19645,7 +19646,7 @@ tnt_select(struct tnt_stream *s, uint32_t space, uint32_t index,
 
 #endif /* TNT_SELECT_C_INCLUDED */
 
-#endif /* THIRD_PARTY_CODE */
+#endif /* OCELOT_THIRD_PARTY_CODE */
 
 #pragma GCC diagnostic pop
 

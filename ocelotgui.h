@@ -78,16 +78,18 @@
 
 /*
   Decide whether to #include third_party.h for use with Tarantool.
-  Builders can say cmake . -DTHIRD_PARTY=1 to include and maybe use.
-  Otherwise THIRD_PARTY=0 on Linux, THIRD_PARTY=1 on Windows.
+  Builders can say cmake . -DOCELOT_THIRD_PARTY=1 to include and maybe use.
+  Otherwise OCELOT_THIRD_PARTY=0 on Linux, OCELOT_THIRD_PARTY=1 on Windows.
   Since third_party.h has tarantool-c source, we can build on
   Windows without trying to figure out how to create a DLL.
+  TODO: OOPS, IT FAILS ON WINDOWS. TEMPORARILY REMOVING CAPABILITY.
 */
-#ifndef THIRD_PARTY
+#ifndef OCELOT_THIRD_PARTY
 #ifdef OCELOT_OS_LINUX
-#define THIRD_PARTY 0
-#else
-#define THIRD_PARTY 1
+#define OCELOT_THIRD_PARTY 0
+#endif
+#ifdef OCELOT_OS_NONLINUX
+#define OCELOT_THIRD_PARTY 0
 #endif
 #endif
 
@@ -156,7 +158,7 @@
 
 #ifdef DBMS_TARANTOOL
 
-#if (THIRD_PARTY==1)
+#if (OCELOT_THIRD_PARTY==1)
 #include "third_party.h"
 #else
 /*
@@ -2986,9 +2988,9 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         int which_library)                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
   {
 
-#if (THIRD_PARTY==1)
+#if (OCELOT_THIRD_PARTY==1)
     /* If Tarantool we can use third_party.h we don't need to load. */
-    /* THIRD_PARTY=1 is what's on for Windows but not (for now) Linux. */
+    /* OCELOT_THIRD_PARTY=1 should be on for Windows but not (for now) Linux. */
     /* TODO: This should be controlled by ocelot_third_party = 1 */
     if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
     {
@@ -3045,7 +3047,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       *is_library_loaded= 1;
       return;
     }
-#endif /* THIRD_PARTY==1 */
+#endif /* OCELOT_THIRD_PARTY==1 */
 
     char *query;
     int query_len;

@@ -16842,8 +16842,8 @@ void MainWindow::print_help()
 #include "install_sql.cpp"
 
 #ifdef DBMS_TARANTOOL
-#if (THIRD_PARTY==1)
-#define THIRD_PARTY_CODE
+#if (OCELOT_THIRD_PARTY==1)
+#define OCELOT_THIRD_PARTY_CODE
   #include "third_party.h"
 #endif
 #endif
