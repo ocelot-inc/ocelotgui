@@ -3551,7 +3551,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   }
 
 #ifdef DBMS_TARANTOOL
-  u_int32_t ldbms_mp_decode_array(const char **data)
+  uint32_t ldbms_mp_decode_array(const char **data)
   {
     return t__mp_decode_array(data);
   }
@@ -3579,7 +3579,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     return t__mp_decode_int(data);
   }
-  u_int32_t ldbms_mp_decode_map(const char **data)
+  uint32_t ldbms_mp_decode_map(const char **data)
   {
     return t__mp_decode_map(data);
   }
@@ -3587,7 +3587,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     return t__mp_decode_nil(data);
   }
-  u_int64_t ldbms_mp_decode_uint(const char **data)
+  uint64_t ldbms_mp_decode_uint(const char **data)
   {
     return t__mp_decode_uint(data);
   }

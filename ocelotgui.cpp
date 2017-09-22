@@ -438,11 +438,11 @@
 
 int main(int argc, char *argv[])
 {
-    QApplication main_application(argc, argv);
-    MainWindow w(argc, argv);
-    /* We depend on w being maximized in resizeEvent() */
-    w.showMaximized();
-    return main_application.exec();
+  QApplication main_application(argc, argv);
+  MainWindow w(argc, argv);
+  /* We depend on w being maximized in resizeEvent() */
+  w.showMaximized();
+  return main_application.exec();
 }
 
 

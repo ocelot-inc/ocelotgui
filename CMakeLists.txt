@@ -72,6 +72,15 @@
 # MYSQL_INCLUDE_DIR=<string>
 # Directory to search first for mysql.h.
 
+# CMAKE_BUILD_TYPE=<string>
+# Typical alternatives: Debug, RelWithDebInfo, Release.
+# If -DCMAKE_BUILD_TYPE=... is not specified, then probably it's blank, and in
+# that case we set it to RelWithDebInfo, and the main effect of that is that
+# CXXFLAGS will have "-O2" added to it.
+
+# OCELOT_THIRD_PARTY=n
+# Say -DOCELOT_THIRD_PARTY=0 if you do not want to include third_party.h
+
 # QT_VERSION=4 or QT_VERSION=5
 # If -DQT_VERSION=4: Search only for Qt4, do not search for Qt5 first.
 # If -DQT_VERSION=5: Search only for Qt5, do not search for Qt4 afterwards.
@@ -127,6 +136,11 @@
 message("-- CmakeLists.txt for ocelotgui 1.0.5")
 message("-- see comments in CMakeLists.txt for special instructions")
 message("-- see README.md for general instructions for building")
+
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
+  message("-- Setting CMAKE_BUILD_TYPE RelWithDebInfo")
+  set(CMAKE_BUILD_TYPE "RelWithDebInfo")
+endif ("${CMAKE_BUILD_TYPE}" STREQUAL "")
 
 cmake_minimum_required(VERSION 2.8.11)
 
@@ -213,8 +227,10 @@ include(GNUInstallDirs)
 #Help|Manual will look at this path
 add_definitions(-DOCELOTGUI_DOCDIR="${CMAKE_INSTALL_FULL_DOCDIR}")
 
-#If cmake . -DTHIRD_PARTY=0 then #include third_party.h won't happen
-add_definitions(-DTHIRD_PARTY=${THIRD_PARTY})
+#If cmake . -DOCELOT_THIRD_PARTY=0 then #include third_party.h won't happen
+if (DEFINED OCELOT_THIRD_PARTY)
+add_definitions(-DOCELOT_THIRD_PARTY=${OCELOT_THIRD_PARTY})
+endif(DEFINED OCELOT_THIRD_PARTY)
 
 if (NOT QT_VERSION EQUAL "4")
   if (QT_VERSION EQUAL "5")
@@ -240,6 +256,8 @@ endif (NOT QT_VERSION EQUAL "4")
 if (Qt5Widgets_FOUND)
   message("-- found Qt5")
   # -fPIE, but nobody has checked whether other flags are better
+  # (some other flags depend on CMAKE_BUILD_TYPE)
+  # (Ocelot developers use ocelotgui.pro which has -Wall -O2)
   set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
   #Produce ui_ocelotgui.h from ocelotgui.ui
   qt5_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
@@ -252,6 +270,11 @@ else (Qt5Widgets_FOUND)
     message(FATAL_ERROR "Qt5 not found, Qt4 not found")
   endif (Qt4_FOUND)
 endif (Qt5Widgets_FOUND)
+
+#MinGW ignores #pragmas in third_party.h
+if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
+ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -Wno-nonnull -Wno-pointer-arith -Wno-conversion")
+endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
 if (NOT UI_OCELOTGUI)
   message(FATAL_ERROR "uic did not produce ui_ocelotgui.h")

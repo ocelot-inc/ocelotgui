@@ -35,6 +35,9 @@
    following #pragmas because our compiler is not basic C and
    our assumption is not permissive. There is a "diagnostic pop"
    at the end of this file.
+   MinGW ignores #pragma
+   https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53431
+   but for MinGW we changed CMakeLists.txt.
 */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic warning "-fpermissive"
@@ -44,7 +47,39 @@
 #pragma GCC diagnostic ignored "-Wall"
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 
-
+/* COPY:
+   Changes: Windows doesn't have the same #includes as Linux.
+   We commented out these #includes for all file copies in this file.
+   We added these definitions in our attempts to work around.
+   This is only for MinGW.
+   See also https://msdn.microsoft.com/en-us/library/windows/desktop/ms737593(v=vs.85).aspx
+   and https://stackoverflow.com/questions/4243027/winsock-compiling-error-it-cant-find-the-addrinfo-structures-and-some-relating
+*/
+#ifndef WINDOWS_KLUDGE_H
+#define WINDOWS_KLUDGE_H
+#ifdef WIN32
+#define _WIN32_WINNT 0x501
+#include <ws2tcpip.h>
+#include <Winsock2.h>
+struct iovec {
+   void *iov_base;
+   unsigned long iov_len;
+};
+#define _POSIX_PATH_MAX  256 /* as in ./bits/posix1_lim.h */
+#define NI_MAXHOST      1025 /* as in netdb.h *
+struct sockaddr_un {
+  unsigned short sun_family;
+  char	         sun_path[108];
+};
+#else
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <sys/uio.h>
+#include <sys/un.h>
+#include <netinet/tcp.h>
+#endif
+#endif
 
 /*
    COPY: file name = third_party/base64.h.
@@ -17353,7 +17388,7 @@ tnt_delete(struct tnt_stream *s, uint32_t space, uint32_t index,
 #include <string.h>
 #include <stdbool.h>
 
-#include <msgpuck.h>
+//#include <msgpuck.h>
 
 //#include <tarantool/tnt_reply.h>
 //#include <tarantool/tnt_stream.h>
@@ -18381,7 +18416,7 @@ int tnt_object_reset(struct tnt_stream *s)
    COPY: file name = tnt/tnt_io.c.
    Copying Date = 2017-09-14.
    Changes: added #ifndef...#endif. commented out #includes.
-            Removed reference to <netdb.h>.
+   Added #define IOV_MAX 1024 because limits.h is already included.
 */
 #ifndef TNT_IO_C_INCLUDED
 
@@ -18427,11 +18462,11 @@ int tnt_object_reset(struct tnt_stream *s)
 
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/socket.h>
+//#include <sys/socket.h>
 #include <sys/uio.h>
-#include <netinet/in.h>
-#include <sys/un.h>
-#include <netinet/tcp.h>
+//#include <netinet/in.h>
+//#include <sys/un.h>
+//#include <netinet/tcp.h>
 //#include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -18441,6 +18476,10 @@ int tnt_object_reset(struct tnt_stream *s)
 //#include <tarantool/tnt_io.h>
 
 //#include <uri.h>
+
+#ifndef IOV_MAX
+#define IOV_MAX 1024
+#endif
 
 #if !defined(MIN)
 #	define MIN(a, b) (a) < (b) ? (a) : (b)
