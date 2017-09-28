@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: September 18 2017
+   Last modified: September 28 2017
 */
 
 /*
@@ -370,9 +370,9 @@
   static void *libcrypto_handle= NULL;
 #ifdef DBMS_TARANTOOL
   static int is_libtarantool_loaded= 0;
-  static int is_libtarantoolnet_loaded= 0;
+  //static int is_libtarantoolnet_loaded= 0;
   static void *libtarantool_handle= 0;
-  static void *libtarantoolnet_handle= 0;
+  //static void *libtarantoolnet_handle= 0;
   /* Todo: these shouldn't be global */
   tnt_reply *tarantool_tnt_for_new_result_set;
 
@@ -436,8 +436,27 @@
   static bool hparse_sql_mode_ansi_quotes= false;
   static unsigned short int hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
 
+/* Suppress useless messages that appear on startup if Windows. */
+/* https://bugreports.qt.io/browse/QTBUG-57180 */
+#if (defined(_WIN32) && (QT_VERSION >= 0x50000))
+void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QString &msg)
+{
+  if (type == QtWarningMsg)
+  {
+    if (msg.contains("CreateFontFaceFromHDC")) return;
+  }
+  printf("Qt message: ");
+  QByteArray localMsg = msg.toLocal8Bit();
+  printf("%u: %s.\n", context.line, localMsg.constData());
+  if (type == QtFatalMsg) abort();
+}
+#endif
+
 int main(int argc, char *argv[])
 {
+#if (defined(_WIN32) && (QT_VERSION >= 0x50000))
+  qInstallMessageHandler(dump_qtmessage);
+#endif
   QApplication main_application(argc, argv);
   MainWindow w(argc, argv);
   /* We depend on w being maximized in resizeEvent() */
@@ -3257,8 +3276,10 @@ void MainWindow::action_exit()
     /* Todo: if there was a successful connection, close it */
 #ifdef OCELOT_OS_LINUX
 #ifdef DBMS_TARANTOOL
+#if (OCELOT_THIRD_PARTY != 1)
     if (is_libtarantool_loaded == 1) { dlclose(libtarantool_handle); is_libtarantool_loaded= 0; }
-    if (is_libtarantoolnet_loaded == 1) { dlclose(libtarantoolnet_handle); is_libtarantoolnet_loaded= 0; }
+    //if (is_libtarantoolnet_loaded == 1) { dlclose(libtarantoolnet_handle); is_libtarantoolnet_loaded= 0; }
+#endif
 #endif
 #endif
   }
@@ -16847,3 +16868,4 @@ void MainWindow::print_help()
   #include "third_party.h"
 #endif
 #endif
+

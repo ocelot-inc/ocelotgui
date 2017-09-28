@@ -290,6 +290,10 @@ endif (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 # ocelotgui uses pthread. Some linkers might demand this.
 target_link_libraries(ocelotgui pthread)
 
+if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
+target_link_libraries(ocelotgui ws2_32)
+endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
+
 # QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time,
 # and CMAKE_INSTALL_RPATH is apparently the CMake translation of QMAKE_RPATHDIR,
 # but first it will try several other ways.

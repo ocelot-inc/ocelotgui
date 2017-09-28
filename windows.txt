@@ -124,9 +124,12 @@ cd c:\ocelotgui
 copy C:\Program Files (x86)\MariaDB\MariaDB Connector C\lib\libmariadb.dll libmysql.dll
 
 Now run ocelotgui.exe, just say
-ocelotgui
+ocelotgui [--port=x --host=x --user=x --password=x etc.]
 
-There might be warnings about fonts, but they can be ignored.
+Sometimes the program might not start in full-screen mode,
+but an icon appears in the task bar. Click the icon, and
+the program will enter full-screen mode.
+
 We recommend that whenever you run ocelotgui.exe you use the
 same SET PATH commands as you used when you did the building.
 

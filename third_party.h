@@ -18,8 +18,8 @@
   are removals of #includes since now there is only one file).
   Then the file contents.
   
-  Ocelot Computer Services Inc. had no part in the creation
-  of any of the code in this file and has no rights to it.
+  Ocelot Computer Services Inc. is not the primary author of the
+  code in this file, and only claims rights to the changes it wrote.
   It was copied to make builds of ocelotgui on non-Linux platforms
   easier. Anyone who wishes to use the code for any other purpose
   should go to the current upstream github repository.
@@ -33,8 +33,8 @@
 /* COPY:
    Changes: All THIRD_PARTY functions are affected by the
    following #pragmas because our compiler is not basic C and
-   our assumption is not permissive. There is a "diagnostic pop"
-   at the end of this file.
+   our usual assumption is that -fpermissive is on.
+   There is a "diagnostic pop" at the end of this file.
    MinGW ignores #pragma
    https://gcc.gnu.org/bugzilla/show_bug.cgi?id=53431
    but for MinGW we changed CMakeLists.txt.
@@ -66,7 +66,7 @@ struct iovec {
    unsigned long iov_len;
 };
 #define _POSIX_PATH_MAX  256 /* as in ./bits/posix1_lim.h */
-#define NI_MAXHOST      1025 /* as in netdb.h *
+#define NI_MAXHOST      1025 /* as in netdb.h */
 struct sockaddr_un {
   unsigned short sun_family;
   char	         sun_path[108];
@@ -122,7 +122,7 @@ struct sockaddr_un {
  * http://sourceforge.net/projects/libb64
  */
 #ifdef __cplusplus
-extern "C" {
+//extern "C" {
 #endif
 
 #define BASE64_CHARS_PER_LINE 72
@@ -173,7 +173,7 @@ int base64_decode(const char *in_base64, int in_len,
           char *out_bin, int out_len);
 
 #ifdef __cplusplus
-} /* extern "C" */
+//} /* extern "C" */
 #endif
 #endif /* BASE64_H */
 
@@ -236,7 +236,7 @@ int base64_decode(const char *in_base64, int in_len,
 /* Prototypes */
 
 #ifdef __cplusplus
-extern "C" {
+//extern "C" {
 #endif
 
 void PMurHash32_Process(MH_UINT32 *ph1, MH_UINT32 *pcarry, const void *key, int len);
@@ -246,7 +246,7 @@ MH_UINT32 PMurHash32(MH_UINT32 seed, const void *key, int len);
 void PMurHash32_test(const void *key, int len, MH_UINT32 seed, void *out);
 
 #ifdef __cplusplus
-}
+//}
 #endif
 
 #endif
@@ -821,7 +821,7 @@ tnt_mem_free(void *ptr);
 #ifndef TS_ASSOC_H_INCLUDED
 #define TS_ASSOC_H_INCLUDED
 #if defined(__cplusplus)
-extern "C" {
+//extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct assoc_key {
@@ -1591,7 +1591,7 @@ _mh(dump)(struct _mh(t) *h)
 /*! \def mh_foreach(hash, iter) */
 
 #if defined(__cplusplus)
-}
+//}
 #endif /* defined(__cplusplus) */
 
 #endif /* TNT_ASSOC_H_INCLUDED */
@@ -1630,7 +1630,7 @@ void SHA1Final(unsigned char digest[20], SHA1_CTX* context);
 /*
    COPY: file name = msgpuck.h.
    Copying Date = 2017-09-14.
-   Changes: none.
+   Changes: Commented out "extern" wherever possible.
 */
 
 #ifndef MSGPUCK_H_INCLUDED
@@ -1743,7 +1743,7 @@ void SHA1Final(unsigned char digest[20], SHA1_CTX* context);
 #include <stdio.h>
 
 #if defined(__cplusplus)
-extern "C" {
+//extern "C" {
 #endif /* defined(__cplusplus) */
 
 /*
@@ -1764,8 +1764,8 @@ extern "C" {
 
 #if defined(__GNUC__) && !defined(__GNUC_STDC_INLINE__)
 #if !defined(MP_LIBRARY)
-#define MP_PROTO extern inline
-#define MP_IMPL extern inline
+#define MP_PROTO /* extern */ inline
+#define MP_IMPL /* extern */ inline
 #else /* defined(MP_LIBRARY) */
 #define MP_PROTO
 #define MP_IMPL
@@ -1776,7 +1776,7 @@ extern "C" {
 #define MP_PROTO inline
 #define MP_IMPL inline
 #else /* defined(MP_LIBRARY) */
-#define MP_PROTO extern inline
+#define MP_PROTO /* extern */ inline
 #define MP_IMPL inline
 #endif
 #define MP_ALWAYSINLINE __attribute__((always_inline))
@@ -3818,7 +3818,7 @@ mp_check(const char **data, const char *end)
  */
 
 #if defined(__cplusplus)
-} /* extern "C" */
+//} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #undef MP_LIBRARY
@@ -3870,7 +3870,7 @@ mp_check(const char **data, const char *end)
 #include <limits.h> /* _POSIX_PATH_MAX */
 
 #if defined(__cplusplus)
-extern "C" {
+//extern "C" {
 #endif /* defined(__cplusplus) */
 
 struct uri {
@@ -3911,7 +3911,7 @@ enum uri_host_hint {
 };
 
 #if defined(__cplusplus)
-} /* extern "C" */
+//} /* extern "C" */
 #endif /* defined(__cplusplus) */
 
 #endif /* TARANTOOL_URI_H_INCLUDED */
@@ -5508,7 +5508,7 @@ tnt_deauth(struct tnt_stream *s);
  */
 
 #include <sys/types.h>
-#include <sys/uio.h>
+//#include <sys/uio.h>
 
 //#include <tarantool/tnt_reply.h>
 //#include <tarantool/tnt_request.h>
@@ -5663,7 +5663,7 @@ tnt_iob_free(struct tnt_iob *iob);
  */
 
 #ifdef __cplusplus
-extern "C" {
+//extern "C" {
 #endif
 
 #include <stdint.h>
@@ -5863,7 +5863,7 @@ int tnt_get_indexno(struct tnt_stream *s, int spaceno, const char *index,
             size_t index_len);
 
 #ifdef __cplusplus
-}
+//}
 #endif
 
 #endif /* TNT_NET_H_INCLUDED */
@@ -6407,7 +6407,7 @@ atomic_flag_clear(volatile atomic_flag *__object)
  * SUCH DAMAGE.
  */
 
-#include <sys/uio.h>
+//#include <sys/uio.h>
 //#include <tarantool/tnt_net.h>
 
 /**
@@ -16125,7 +16125,7 @@ void tnt_mem_free(void *ptr) {
 #include <stdbool.h>
 
 #include <unistd.h>
-#include <sys/uio.h>
+//#include <sys/uio.h>
 
 //#include <tarantool/tnt_mem.h>
 //#include <tarantool/tnt_iob.h>
@@ -17450,6 +17450,7 @@ tnt_replace(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)
    Changes: added #ifndef...#endif. commented out #includes.
 */
 #ifndef TNT_OPT_C_INCLUDED
+#define TNT_OPT_C_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -17485,7 +17486,7 @@ tnt_replace(struct tnt_stream *s, uint32_t space, struct tnt_stream *tuple)
 #include <string.h>
 #include <stdbool.h>
 
-#include <sys/uio.h>
+//#include <sys/uio.h>
 
 #include <sys/types.h>
 #include <sys/time.h>
@@ -17580,6 +17581,7 @@ tnt_opt_set(struct tnt_opt *opt, enum tnt_opt_type name, va_list args)
             "error: crosses initialization".
 */
 #ifndef TNT_SCHEMA_C_INCLUDED
+#define TNT_SCHEMA_C_INCLUDED
 #include <stdio.h>
 #include <string.h>
 #include <stddef.h>
@@ -17931,6 +17933,7 @@ tnt_get_index(struct tnt_stream *s)
             "error: crosses initialization".
 */
 #ifndef TNT_OBJECT_C_INCLUDED
+#define TNT_OBJECT_C_INCLUDED
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
@@ -18417,9 +18420,23 @@ int tnt_object_reset(struct tnt_stream *s)
    Copying Date = 2017-09-14.
    Changes: added #ifndef...#endif. commented out #includes.
    Added #define IOV_MAX 1024 because limits.h is already included.
+   BIG Change: tnt_io_nonblock() had to be rewritten because MinGW
+   won't handle fcntl at all. The stuff inside #ifdef _WIN32 ... #else
+   is my best guess, but I really don't know this stuff very well.
+   And "s->errno_ = WSAGetLastError();" is almost certainly the
+   wrong value -- I'm just hoping nobody cares about result details.
+   Re setsockopt|getsockopt: Microsoft has const char* but POSIX
+   usually has void*, so for all getsockopt|setsockopt calls:
+     &avg to static_cast<void*>(&avg)
+     &opt to static_cast<*void*>(&opt)
+     &s->opt.tmout_send to static_cast<void*>(&s->opt.tmout_send)
+     &s->opt.tmout_recv to static_cast<void*>(&s->opt.tmout_recv)
+   Re writev: I didn't know what to do, I hope it's unnecessary for us.
+   Anything inside #ifdef WIN32 ... #endif is added by Ocelot.
+   Todo: We call WSAStartup every time we connect, never WSACleanup.
 */
 #ifndef TNT_IO_C_INCLUDED
-
+#define TNT_IO_C_INCLUDED
 /*
  * Redistribution and use in source and binary forms, with or
  * without modification, are permitted provided that the following
@@ -18463,7 +18480,7 @@ int tnt_object_reset(struct tnt_stream *s)
 #include <sys/time.h>
 #include <sys/types.h>
 //#include <sys/socket.h>
-#include <sys/uio.h>
+//#include <sys/uio.h>
 //#include <netinet/in.h>
 //#include <sys/un.h>
 //#include <netinet/tcp.h>
@@ -18509,6 +18526,17 @@ tnt_io_resolve(struct sockaddr_in *addr,
 static enum tnt_error
 tnt_io_nonblock(struct tnt_stream_net *s, int set)
 {
+#ifdef _WIN32
+   unsigned long mode;
+   if (set) mode = 1;
+   else mode = 0;
+   if (ioctlsocket(s->fd, FIONBIO, &mode) != 0)
+   {
+       s->errno_ = WSAGetLastError();
+       return TNT_ESYSTEM;
+   }
+   return TNT_EOK;
+#else
     int flags = fcntl(s->fd, F_GETFL);
     if (flags == -1) {
         s->errno_ = errno;
@@ -18523,6 +18551,7 @@ tnt_io_nonblock(struct tnt_stream_net *s, int set)
         return TNT_ESYSTEM;
     }
     return TNT_EOK;
+#endif
 }
 
 static enum tnt_error
@@ -18536,7 +18565,14 @@ tnt_io_connect_do(struct tnt_stream_net *s, struct sockaddr *addr,
 
     if (connect(s->fd, (struct sockaddr*)addr, addr_size) != -1)
         return TNT_EOK;
+#ifdef _WIN32
+    errno = WSAGetLastError();
+#endif
+#ifdef _WIN32
+    if ((errno == WSAEINPROGRESS) || (errno == WSAEWOULDBLOCK)) {
+#else
     if (errno == EINPROGRESS) {
+#endif
         /** waiting for connection while handling signal events */
         const int64_t micro = 1000000;
         int64_t tmout_usec = s->opt.tmout_connect.tv_sec * micro;
@@ -18555,7 +18591,14 @@ tnt_io_connect_do(struct tnt_stream_net *s, struct sockaddr *addr,
             FD_SET(s->fd, &fds);
             int ret = select(s->fd + 1, NULL, &fds, NULL, &tmout);
             if (ret == -1) {
+#ifdef _WIN32
+                errno = WSAGetLastError();
+#endif
+#ifdef _WIN32
+                if ((errno == WSAEINTR) || (errno == WSATRY_AGAIN)) {
+#else
                 if (errno == EINTR || errno == EAGAIN) {
+#endif
                     /* get current time */
                     struct timeval curr;
                     if (gettimeofday(&curr, NULL) == -1) {
@@ -18587,9 +18630,16 @@ tnt_io_connect_do(struct tnt_stream_net *s, struct sockaddr *addr,
         /* checking error status */
         int opt = 0;
         socklen_t len = sizeof(opt);
+#ifdef _WIN32
+        if ((getsockopt(s->fd, SOL_SOCKET, SO_ERROR,
+                static_cast<void*>(&opt), &len) == -1) || opt) {
+            errno = WSAGetLastError();
+            s->errno_ = (opt) ? opt : errno;
+#else
         if ((getsockopt(s->fd, SOL_SOCKET, SO_ERROR,
                 &opt, &len) == -1) || opt) {
             s->errno_ = (opt) ? opt : errno;
+#endif
             return TNT_ESYSTEM;
         }
     } else {
@@ -18625,6 +18675,9 @@ tnt_io_connect_unix(struct tnt_stream_net *s, const char *path)
     strcpy(addr.sun_path, path);
     if (connect(s->fd, (struct sockaddr*)&addr, sizeof(addr)) != -1)
         return TNT_EOK;
+#ifdef _WIN32
+    errno = WSAGetLastError();
+#endif
     s->errno_ = errno;
     return TNT_ESYSTEM;
 }
@@ -18636,8 +18689,13 @@ static enum tnt_error tnt_io_xbufmax(struct tnt_stream_net *s, int opt, int min)
     unsigned int avg = 0;
     while (min <= max) {
         avg = ((unsigned int)(min + max)) / 2;
+#ifdef _WIN32
+        if (setsockopt(s->fd, SOL_SOCKET, opt, static_cast<void*>(&avg), sizeof(avg)) == 0)
+            min = avg + 1;
+#else
         if (setsockopt(s->fd, SOL_SOCKET, opt, &avg, sizeof(avg)) == 0)
             min = avg + 1;
+#endif
         else
             max = avg - 1;
     }
@@ -18647,21 +18705,38 @@ static enum tnt_error tnt_io_xbufmax(struct tnt_stream_net *s, int opt, int min)
 static enum tnt_error tnt_io_setopts(struct tnt_stream_net *s) {
     int opt = 1;
     if (s->opt.uri->host_hint != URI_UNIX) {
+#ifdef _WIN32
+        if (setsockopt(s->fd, IPPROTO_TCP, TCP_NODELAY, static_cast<void*>(&opt), sizeof(opt)) == -1)
+            goto error;
+#else
         if (setsockopt(s->fd, IPPROTO_TCP, TCP_NODELAY, &opt, sizeof(opt)) == -1)
             goto error;
+#endif
     }
 
     tnt_io_xbufmax(s, SO_SNDBUF, s->opt.send_buf);
     tnt_io_xbufmax(s, SO_RCVBUF, s->opt.recv_buf);
-
+#ifdef _WIN32
+    if (setsockopt(s->fd, SOL_SOCKET, SO_SNDTIMEO,
+               static_cast<void*>(&s->opt.tmout_send), sizeof(s->opt.tmout_send)) == -1)
+#else
     if (setsockopt(s->fd, SOL_SOCKET, SO_SNDTIMEO,
                &s->opt.tmout_send, sizeof(s->opt.tmout_send)) == -1)
-        goto error;
+#endif
+    goto error;
+#ifdef _WIN32
+    if (setsockopt(s->fd, SOL_SOCKET, SO_RCVTIMEO,
+               static_cast<void*>(&s->opt.tmout_recv), sizeof(s->opt.tmout_recv)) == -1)
+#else
     if (setsockopt(s->fd, SOL_SOCKET, SO_RCVTIMEO,
                &s->opt.tmout_recv, sizeof(s->opt.tmout_recv)) == -1)
-        goto error;
+#endif
+    goto error;
     return TNT_EOK;
 error:
+#ifdef _WIN32
+    errno = WSAGetLastError();
+#endif
     s->errno_ = errno;
     return TNT_ESYSTEM;
 }
@@ -18683,9 +18758,21 @@ static int tnt_io_htopf(int host_hint) {
 enum tnt_error
 tnt_io_connect(struct tnt_stream_net *s)
 {
+#ifdef _WIN32
+  WSADATA wsadata;
+  int iresult = WSAStartup(MAKEWORD(2, 2), &wsadata);
+  if(iresult != 0)
+  {
+     printf("WSAStartup failed.\n");
+     exit(0);
+  }
+#endif
     struct uri *uri = s->opt.uri;
     s->fd = socket(tnt_io_htopf(uri->host_hint), SOCK_STREAM, 0);
     if (s->fd < 0) {
+#ifdef _WIN32
+        errno = WSAGetLastError();
+#endif
         s->errno_ = errno;
         return TNT_ESYSTEM;
     }
@@ -18754,10 +18841,17 @@ tnt_io_send_raw(struct tnt_stream_net *s, const char *buf, size_t size, int all)
         } else {
             do {
                 r = send(s->fd, buf + off, size - off, 0);
+#ifdef _WIN32
+            } while (r == -1 && (WSAGetLastError() == WSAEINTR));
+#else
             } while (r == -1 && (errno == EINTR));
+#endif
         }
         if (r <= 0) {
             s->error = TNT_ESYSTEM;
+#ifdef _WIN32
+            errno = WSAGetLastError();
+#endif
             s->errno_ = errno;
             return -1;
         }
@@ -18776,11 +18870,20 @@ tnt_io_sendv_raw(struct tnt_stream_net *s, struct iovec *iov, int count, int all
             r = s->sbuf.txv(&s->sbuf, iov, MIN(count, IOV_MAX));
         } else {
             do {
+#ifdef _WIN32
+                printf("** Unexpected writev call.\n");
+                printf("   (Ocelot didn't translate this for Windows.\n");
+                exit(1);
+#else
                 r = writev(s->fd, iov, count);
+#endif
             } while (r == -1 && (errno == EINTR));
         }
         if (r <= 0) {
             s->error = TNT_ESYSTEM;
+#ifdef _WIN32
+            errno = WSAGetLastError();
+#endif
             s->errno_ = errno;
             return -1;
         }
@@ -18871,10 +18974,17 @@ tnt_io_recv_raw(struct tnt_stream_net *s, char *buf, size_t size, int all)
         } else {
             do {
                 r = recv(s->fd, buf + off, size - off, 0);
+#ifdef _WIN32
+            } while (r == -1 && (WSAGetLastError() == WSAEINTR));
+#else
             } while (r == -1 && (errno == EINTR));
+#endif
         }
         if (r <= 0) {
             s->error = TNT_ESYSTEM;
+#ifdef _WIN32
+            errno = WSAGetLastError();
+#endif
             s->errno_ = errno;
             return -1;
         }
@@ -18906,6 +19016,9 @@ tnt_io_recv(struct tnt_stream_net *s, char *buf, size_t size)
         s->rbuf.off = 0;
         ssize_t top = tnt_io_recv_raw(s, s->rbuf.buf, s->rbuf.size, 0);
         if (top <= 0) {
+#ifdef _WIN32
+            errno = WSAGetLastError();
+#endif
             s->errno_ = errno;
             s->error = TNT_ESYSTEM;
             return -1;
@@ -18968,7 +19081,7 @@ tnt_io_recv(struct tnt_stream_net *s, char *buf, size_t size)
 #include <stdint.h>
 #include <stdbool.h>
 
-#include <sys/uio.h>
+//#include <sys/uio.h>
 
 //#include <uri.h>
 
@@ -19688,4 +19801,5 @@ tnt_select(struct tnt_stream *s, uint32_t space, uint32_t index,
 #endif /* OCELOT_THIRD_PARTY_CODE */
 
 #pragma GCC diagnostic pop
+
 

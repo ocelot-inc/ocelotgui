@@ -80,16 +80,14 @@
   Decide whether to #include third_party.h for use with Tarantool.
   Builders can say cmake . -DOCELOT_THIRD_PARTY=1 to include and maybe use.
   Otherwise OCELOT_THIRD_PARTY=0 on Linux, OCELOT_THIRD_PARTY=1 on Windows.
-  Since third_party.h has tarantool-c source, we can build on
-  Windows without trying to figure out how to create a DLL.
-  TODO: OOPS, IT FAILS ON WINDOWS. TEMPORARILY REMOVING CAPABILITY.
+  Mostly third_party.h has tarantool-c source modified for Windows.
 */
 #ifndef OCELOT_THIRD_PARTY
 #ifdef OCELOT_OS_LINUX
 #define OCELOT_THIRD_PARTY 0
 #endif
 #ifdef OCELOT_OS_NONLINUX
-#define OCELOT_THIRD_PARTY 0
+#define OCELOT_THIRD_PARTY 1
 #endif
 #endif
 
@@ -2976,7 +2974,7 @@ ldbms() : QWidget()
 #define WHICH_LIBRARY_LIBMYSQLCLIENT18 2
 #ifdef DBMS_TARANTOOL
 #define WHICH_LIBRARY_LIBTARANTOOL 3
-#define WHICH_LIBRARY_LIBTARANTOOLNET 4
+//#define WHICH_LIBRARY_LIBTARANTOOLNET 4
 #endif
 #define WHICH_LIBRARY_LIBMARIADBCLIENT 5
 #define WHICH_LIBRARY_LIBMARIADB 6
@@ -3089,7 +3087,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libeay32");
 #ifdef DBMS_TARANTOOL
     if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
-    if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
+    //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
 #endif
     if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) lib.setFileName("libmariadbclient");
     if (which_library == WHICH_LIBRARY_LIBMARIADB) lib.setFileName("libmariadb");
@@ -3129,7 +3127,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto.so");
 #ifdef DBMS_TARANTOOL
           if (which_library == WHICH_LIBRARY_LIBTARANTOOL) ld_run_path_part.append("/libtarantool.so");
-          if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet.so");
+          //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet.so");
 #endif
           query_len= ld_run_path_part.toUtf8().size();         /* See comment "UTF8 Conversion" */
           query= new char[query_len + 1];
@@ -3147,7 +3145,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto");
 #ifdef DBMS_TARANTOOL
           if (which_library == WHICH_LIBRARY_LIBTARANTOOL) ld_run_path_part.append("/libtarantool");
-          if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet");
+          //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet");
 #endif
           lib.setFileName(ld_run_path_part);
           *is_library_loaded= lib.load();
@@ -3176,7 +3174,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL) dlopen_handle= dlopen("libtarantool.so",  RTLD_DEEPBIND | RTLD_NOW);
-      if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) dlopen_handle= dlopen("libtarantoolnet.so",  RTLD_DEEPBIND | RTLD_NOW);
+      //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) dlopen_handle= dlopen("libtarantoolnet.so",  RTLD_DEEPBIND | RTLD_NOW);
 #endif
       if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) dlopen_handle= dlopen("libmariadbclient.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBMARIADB) dlopen_handle= dlopen("libmariadb.so",  RTLD_DEEPBIND | RTLD_NOW);
@@ -3190,7 +3188,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libeay32");
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
-      if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
+      //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
 #endif
       if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) lib.setFileName("libmariadbclient");
       if (which_library == WHICH_LIBRARY_LIBMARIADB) lib.setFileName("libmariadb");
@@ -7141,6 +7139,7 @@ public:
   /* current_widget = MAIN_WIDGET | HISTORY_WIDGET | GRID_WIDGET | STATEMENT_WIDGET | etc. */
   int current_widget;
 
+  QString menu_strings_menu_font_copy; /* Kludge, see Settings() comment */
 
 /* Following might be too short for some new language in ostrings.h */
 #define MAX_COLOR_NAME_WIDTH 24
@@ -7153,6 +7152,17 @@ public:
 public:
 Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 {
+  /*
+    KLUDGE ALERT: menu_strings_menu_font_copy is a kludge.
+    Windows build fails if menu_strings[menu_off + MENU_FONT] appears
+    in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
+    Change the assert if MENU_FONT changes in ostrings.h.
+  */
+#ifdef OS_LINUX
+  assert(MENU_FONT == 80);
+#endif
+  menu_strings_menu_font_copy= menu_strings[menu_off + 80];
+
   int settings_width, settings_height;
 
   /* settings = new QWidget(this); ... this might come later */
@@ -7717,7 +7727,7 @@ void handle_combo_box_1(int i)
 
 void label_for_font_dialog_set_text()
 {
-  QString s_for_label_for_font_dialog= menu_strings[menu_off + MENU_FONT];
+  QString s_for_label_for_font_dialog= menu_strings_menu_font_copy;
   if (current_widget == STATEMENT_WIDGET)
   {
     s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_statement_font_family);
