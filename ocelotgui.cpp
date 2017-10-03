@@ -445,9 +445,8 @@ void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QSt
   {
     if (msg.contains("CreateFontFaceFromHDC")) return;
   }
-  printf("Qt message: ");
   QByteArray localMsg = msg.toLocal8Bit();
-  printf("%u: %s.\n", context.line, localMsg.constData());
+  printf("Qt message: %u: %s.\n", context.line, localMsg.constData());
   if (type == QtFatalMsg) abort();
 }
 #endif
@@ -471,6 +470,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
   assert(sizeof(int) >= 4);
+
+#ifdef OCELOT_OS_LINUX
+  assert(MENU_FONT == 80); /* See kludge alert in ocelotgui.h Settings() */
+#endif
 
   /* Initialization */
 
@@ -4213,7 +4216,8 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
     If (italic match) +1
     If not ("*Webdings*" or "*Wingdings*" or "*Dingbats*") +2
   After you get it, it should determine the initial style sheets.
-  Alas: Windows would generate warnings if I didn't exclude some fonts.
+  Windows generates warnings if I don't exclude some fonts,
+  but I suppress some of the warnings.
   Todo: consider changing QApplication font rather than individual fonts.
   Todo: there's a memory leak, though unimportant (we only call once)
 */
@@ -16505,6 +16509,9 @@ int options_and_connect(
      /* See ocelot.ca blog post = Connecting to MySQL or MariaDB with sockets on Linux */
      /* Todo: you should provide info somewhere how the connection was actually done. */
      if ((ocelot_protocol_as_int != 0) && (ocelot_protocol_as_int != PROTOCOL_SOCKET)) break;
+#ifdef _WIN32
+     break;
+#endif
      if ((ocelot_unix_socket_as_utf8 != 0) && (strcmp(ocelot_unix_socket_as_utf8, "") != 0)) break;
      if ((ocelot_host_as_utf8 != 0) && (strcmp(ocelot_host_as_utf8,"") != 0) && (strcmp(ocelot_host_as_utf8, "localhost") != 0)) break;
      if (lmysql->ldbms_mysql_errno(&mysql[connection_number]) != 2002) break; /* 2002 == CR_CONNECTION_ERROR */

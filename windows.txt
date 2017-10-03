@@ -31,13 +31,10 @@ For Qt:
     You probably will have to say SET PATH later, with the
     correct names, as we'll see later.
 
-For MySQL: it's simplest to install the whole MySQL package,
-    although the only things necessary here are the
-    client shared library and the usual include files.
-    After installation is complete, you probably have mysql.h in
-    C:\Program Files\MySQL\MySQL Server 5.7\include
+For MySQL: you need the usual include files and the 32-bit
+    client shared library.
 
-    Alternatively you can go to downloads.mariadb.org and
+    You can go to downloads.mariadb.org and
     download MariaDB Connector/C (you have to click on the
     file name mariadb-connector-c-3.0.1-beta-win32.msi and
     then click save, for the "Complete" installation). See
@@ -45,6 +42,19 @@ For MySQL: it's simplest to install the whole MySQL package,
     If you do it this way, then, after installation is complete,
     you probably have mysql.h in
     C:\Program Files (x86)\MariaDB\MariaDB Connector C\include
+
+    Alternatively, you can go to https://dev.mysql.com/downloads/connector/c/ and
+    download MySQL Connector/C, and follow similar steps.
+    If you do it this way, then, after installation is complete,
+    you probably have mysql.h in
+    C:\Program Files (x86)\MySQL\MySQL Connector C 6.1\include
+
+    Alternatively, you can install the whole MySQL package,
+    although the only things necessary here are the
+    client shared library and the usual include files.
+    If you do it this way, then, after installation is complete,
+    you probably have mysql.h in
+    C:\Program Files\MySQL\MySQL Server 5.7\include
 
 For CMake: go to cmake.org/download
     When asked which installer to use, probably they all are
@@ -68,60 +78,62 @@ For ocelotgui: go to github.com/ocelot-inc/ocelotgui
     we'll assume it is c:\ocelotgui. Then
     git clone https://github.com/ocelot-inc/ocelotgui.git c:\ocelotgui
 
-#Make sure cmake is in the path.
-#Replace "C:\Program Files (x86)\CMake\bin" with the directory
-#where it was actually installed, in the "For Cmake:" step.
+::Make sure cmake is in the path.
+::Replace "C:\Program Files (x86)\CMake\bin" with the directory
+::where it was actually installed, in the "For Cmake:" step.
 SET PATH=C:\Program Files (x86)\CMake\bin;%path%
 
-#Make sure Qt's libraries and include files are in the path.
-#In the following, replace all occurrences of "mingw530" with
-#the actual mingw version that is in what you downloaded,
-#in the "For Qt:" step.
+::Make sure Qt's libraries and include files are in the path.
+::In the following, replace all occurrences of "mingw530" with
+::the actual mingw version that is in what you downloaded,
+::in the "For Qt:" step.
 SET PATH=C:\Qt\Tools\mingw530_32\bin;C:\Qt\Tools\mingw530_32\lib;%path%
 
-#Make sure Qt5WidgetsConfig.cmake is in the path.
-#This is tricky because the directory name probably does
-#not include "mingwxxx_32". Search with
-# CD C:\Qt
-# DIR /s Qt5WidgetsConfig.cmake
-#Note what directory Qt5WidgetsConfig.cmake is in.
-#If it's not the same as what's below, change what's below.
+::Make sure Qt5WidgetsConfig.cmake is in the path.
+::This is tricky because the directory name probably does
+::not include "mingwxxx_32". Search with
+:: CD C:\Qt
+:: DIR /s Qt5WidgetsConfig.cmake
+::Note what directory Qt5WidgetsConfig.cmake is in.
+::If it's not the same as what's below, change what's below.
 SET PATH=C:\Qt\5.9.1\mingw53_32\lib\cmake\Qt5Widgets;%path%
 
-#Make sure qmake.exe is in the path.
-#This is tricky because the directory name probably does
-#not include "mingwxxx_32". Search with
-# CD C:\Qt
-# DIR /s qmake.exe
-#Note what directory qmake.exe is in.
-#If it's not the same as what's below, change what's below.
+::Make sure qmake.exe is in the path.
+::This is tricky because the directory name probably does
+::not include "mingwxxx_32". Search with
+:: CD C:\Qt
+:: DIR /s qmake.exe
+::Note what directory qmake.exe is in.
+::If it's not the same as what's below, change what's below.
 SET PATH=C:\Qt\5.9.1\mingw53_32\bin;%path%
 
-#This additional path setting is probably not necessary:
-SET PATH=C:\Qt\Tools\QtCreator\bin;%path%
+::This additional path setting is no longer recommended due to link troubles:
+::SET PATH=C:\Qt\Tools\QtCreator\bin;%path%
 
-#The default directory should be where you downloaded
-#in the "For ocelotgui:" step.
+::The default directory should be where you downloaded
+::in the "For ocelotgui:" step.
 cd c:\ocelotgui
 
-#Invoke cmake.
-#Replace "C:/Program Files/MySQL/MySQL Server 5.7/include" with
-#the actual MySQL-include or MariaDB-include that you downloaded,
-#in the "For MySQL:" step.
-cmake . -G "MinGW Makefiles" -DMYSQL_INCLUDE_DIR="C:/Program Files/MySQL/MySQL Server 5.7/include"
+::Invoke cmake.
+::Replace "C:/Program Files/MySQL/MySQL Server 5.7/include" with
+::the actual MySQL-include or MariaDB-include that you downloaded,
+::in the "For MySQL:" step.
+cmake . -G "MinGW Makefiles" -DMYSQL_INCLUDE_DIR="C:/Program Files/MySQL/MySQL Connector 6.1/include"
 
-#Make. The assumption is that mingw32-make is still in the path.
+::Make. The assumption is that mingw32-make is still in the path.
+del ocelotgui.exe
 mingw32-make
 
-Eventually -- it can take a long time -- there should be a file
-named c:\ocelotgui\ocelotgui.exe.
+::Eventually -- it can take a long time -- there should be a file
+::named c:\ocelotgui\ocelotgui.exe.
 
-One more SET PATH -- ocelotgui will look for a file libmysql.dll.
-If you installed MySQL, it will probably be in a default path.
-If you installed MariaDB, it's a bit more complex because the
-file that you need is named libmariadb.dll. This will fix it:
+::One more SET PATH (maybe), or just move the client library (file libmysql.dll)
+::to the default c:\ocelotgui directory -- ocelotgui will look for a file libmysql.dll.
+::If you installed MySQL, it will probably be in a default path.
+::If you installed MariaDB, it's a bit more complex because the
+::file that you need is named libmariadb.dll. This will fix it:
 cd c:\ocelotgui
-copy C:\Program Files (x86)\MariaDB\MariaDB Connector C\lib\libmariadb.dll libmysql.dll
+copy "C:\Program Files (x86)\MariaDB\MariaDB Connector C\lib\libmariadb.dll" libmysql.dll
 
 Now run ocelotgui.exe, just say
 ocelotgui [--port=x --host=x --user=x --password=x etc.]

@@ -9898,7 +9898,7 @@ int MainWindow::hparse_f_lua_number()
 {
   if (main_token_types[hparse_i] == TOKEN_TYPE_LITERAL_WITH_DIGIT)
   {
-    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_LUA, TOKEN_LITERAL_FLAG_NUMBER) == 1) hparse_f_error(); /* guaranteed to succeed */
+    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_LUA, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error(); /* guaranteed to succeed */
     if (hparse_errno > 0) return 0;
     return 1;
   }

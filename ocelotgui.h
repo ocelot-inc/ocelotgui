@@ -7156,11 +7156,8 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     KLUDGE ALERT: menu_strings_menu_font_copy is a kludge.
     Windows build fails if menu_strings[menu_off + MENU_FONT] appears
     in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
-    Change the assert if MENU_FONT changes in ostrings.h.
+    Change the assert in ocelotgui.cpp if MENU_FONT changes in ostrings.h.
   */
-#ifdef OS_LINUX
-  assert(MENU_FONT == 80);
-#endif
   menu_strings_menu_font_copy= menu_strings[menu_off + 80];
 
   int settings_width, settings_height;
