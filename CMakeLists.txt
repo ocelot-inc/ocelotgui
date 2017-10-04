@@ -1,4 +1,4 @@
- # Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.
+# Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -76,7 +76,9 @@
 # Typical alternatives: Debug, RelWithDebInfo, Release.
 # If -DCMAKE_BUILD_TYPE=... is not specified, then probably it's blank, and in
 # that case we set it to RelWithDebInfo, and the main effect of that is that
-# CXXFLAGS will have "-O2" added to it.
+# CXXFLAGS will have "-O2" added to it. We do not do that for Windows though.
+# For Windows, i.e. if MinGW, we say it's Debug no matter what the user passes,
+# because otherwise ocelotgui will crash. Call it a kludge because we don't know why.
 
 # OCELOT_THIRD_PARTY=n
 # Say -DOCELOT_THIRD_PARTY=0 if you do not want to include third_party.h
@@ -137,10 +139,17 @@ message("-- CmakeLists.txt for ocelotgui 1.0.5")
 message("-- see comments in CMakeLists.txt for special instructions")
 message("-- see README.md for general instructions for building")
 
+if (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
   message("-- Setting CMAKE_BUILD_TYPE RelWithDebInfo")
   set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 endif ("${CMAKE_BUILD_TYPE}" STREQUAL "")
+endif (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
+
+if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
+  message("-- Setting CMAKE_BUILD_TYPE Debug")
+  set(CMAKE_BUILD_TYPE "Debug")
+endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
 cmake_minimum_required(VERSION 2.8.11)
 
