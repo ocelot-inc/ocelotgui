@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: September 28 2017
+   Last modified: October 5 2017
 */
 
 /*

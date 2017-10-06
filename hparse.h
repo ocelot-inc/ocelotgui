@@ -697,8 +697,8 @@ int MainWindow::hparse_f_character_set_name()
 /* Todo: someday check collation names the way we check character set names. */
 int MainWindow::hparse_f_collation_name()
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_COLLATION,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
-  if (hparse_f_literal(TOKEN_REFTYPE_COLLATION, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) return 1;
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLLATION,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
+  if (hparse_f_literal(TOKEN_REFTYPE_COLLATION, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) return 1;
   return 0;
 }
 
@@ -1930,9 +1930,9 @@ void MainWindow::hparse_f_opr_16(int who_is_calling, int allow_flags) /* Precede
       return;
     }
   }
-  while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
+  while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
   {
-    hparse_f_opr_17(who_is_calling, 0);
+    if (hparse_f_collation_name() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
 }
@@ -3195,7 +3195,7 @@ void MainWindow::hparse_f_character_set_or_collate()
     if (hparse_errno > 0) return;
   }
   else if (hparse_errno > 0) return;
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
   {
     if (hparse_f_collation_name() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
@@ -3629,7 +3629,7 @@ int MainWindow::hparse_f_data_type()
      || (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_TARANTOOL, TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT) == 1))
     {
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-      hparse_f_length(false, false, false);
+      hparse_f_length(false, false, true);
       if (hparse_errno > 0) return 0;
       return TOKEN_KEYWORD_ALL;
     }
