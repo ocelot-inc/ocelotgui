@@ -157,7 +157,8 @@ static const char *string_languages[]=
 #define ER_CREATE_SERVER                  80
 #define ER_EMPTY_LITERAL                  81
 #define ER_START_OF_SESSION               82
-#define ER_END                            83
+#define ER_CREATE_SERVER_SYNTAX           83
+#define ER_END                            84
 #define ER_MAX_LENGTH       1024
 static const char *er_strings[]=
 {
@@ -245,7 +246,8 @@ static const char *er_strings[]=
   "No", /* ER_NO */
   "CREATE SERVER not done for this name", /* ER_CREATE_SERVER */
   "Empty literal", /* ER_EMPTY_LITERAL */
-  "/* Start of Session */" /* ER_START_OF_SESSION */
+  "/* Start of Session */", /* ER_START_OF_SESSION */
+  "CREATE SERVER syntax", /* ER_CREATE_SERVER_SYNTAX */
   /* FRENCH */
     "OK",                           /* ER_OK */
     "Erreur non connecté",          /* ER_NOT_CONNECTED */
@@ -329,7 +331,8 @@ static const char *er_strings[]=
     "Non", /* ER_NO */
     "CREATE SERVER pas fait pour ce nom", /* ER_CREATE_SERVER */
     "Vide constant", /* ER_EMPTY_LITERAL */
-    "/* Début de Session */" /* ER_START_OF_SESSION */
+    "/* Début de Session */", /* ER_START_OF_SESSION */
+    "CREATE SERVER syntaxe" /* ER_CREATE_SERVER_SYNTAX */
 };
 
 /*

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: October 5 2017
+   Last modified: October 10 2017
 */
 
 /*
@@ -8334,7 +8334,7 @@ QString MainWindow::get_delimiter(QString token, QString text, int offset)
         and "q| is case sensitive.
 */
 
-#define MAX_SUB_TOKENS 20
+#define MAX_SUB_TOKENS 22
 int MainWindow::execute_client_statement(QString text, int *additional_result)
 {
 //  int i= 0;
@@ -8457,7 +8457,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       {
         if ((i >= MAX_SUB_TOKENS) || (sub_token_lengths[i] == 0))
         {
-          make_and_put_message_in_result(ER_USE, 0, (char*)"");
+          make_and_put_message_in_result(ER_CREATE_SERVER_SYNTAX, 0, (char*)"");
           return 1;
         }
         curr= text.mid(sub_token_offsets[i], sub_token_lengths[i]);
@@ -12706,6 +12706,13 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   tnt[connection_number] = lmysql->ldbms_tnt_net(NULL);
   lmysql->ldbms_tnt_set(tnt[connection_number], (int)TNT_OPT_URI, connection_string);
 
+  if (ocelot_opt_connect_timeout > 0)
+  {
+    struct timeval tvp;
+    tvp.tv_sec= ocelot_opt_connect_timeout;
+    tvp.tv_usec= 0;
+    lmysql->ldbms_tnt_set(tnt[connection_number], (int)TNT_OPT_TMOUT_CONNECT, (char*)&tvp);
+  }
   if (lmysql->ldbms_tnt_connect(tnt[connection_number]) < 0) {
       tarantool_errno[connection_number]= 9999;
       strcpy(tarantool_errmsg, "Connection refused for ");
@@ -12835,7 +12842,7 @@ QString MainWindow::tarantool_internal_query(char *query,
 
 #ifdef DBMS_TARANTOOL
 /*
-  Call tarantool_initialize() from tarantool_connect() if successful.
+  Call tarantool_initialize() from connect_tarantool() if successful.
   The main task is to create a function that wraps box.sql.execute()
   so we can get column names -- a temporary thing that will have to
   be changed when Tarantool itself has a good way to do such a return.
