@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: October 10 2017
+   Last modified: October 13 2017
 */
 
 /*
@@ -438,6 +438,7 @@
 
 /* Suppress useless messages that appear on startup if Windows. */
 /* https://bugreports.qt.io/browse/QTBUG-57180 */
+/* Todo: consider also suppressing "OpenType support missing for script" */
 #if (defined(_WIN32) && (QT_VERSION >= 0x50000))
 void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
@@ -8684,7 +8685,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     make_and_put_message_in_result(ER_GO, 0, (char*)"");
   }
-  if (statement_type == TOKEN_KEYWORD_HELP)
+  if (statement_type == TOKEN_KEYWORD_HELP_IN_CLIENT)
   {
     make_and_put_message_in_result(ER_HELP, 0, (char*)"");
     return 1;
@@ -11521,7 +11522,7 @@ const keywords strvalues[]=
     if (s == QString("\\e")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_EDIT;
     if (s == QString("\\G")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_EGO;
     if (s == QString("\\g")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_GO;
-    if (s == QString("\\h")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_HELP;
+    if (s == QString("\\h")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_HELP_IN_CLIENT;
     if (s == QString("\\n")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_NOPAGER;
     if (s == QString("\\t")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_NOTEE;
     if (s == QString("\\w")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_NOWARNING;
@@ -11554,7 +11555,7 @@ bool MainWindow::is_client_statement(int token, int i,QString text)
   ||  (token == TOKEN_KEYWORD_EGO)
   ||  (token == TOKEN_KEYWORD_EXIT)
   ||  (token == TOKEN_KEYWORD_GO)
-  ||  (token == TOKEN_KEYWORD_HELP)
+  ||  (token == TOKEN_KEYWORD_HELP_IN_CLIENT)
   ||  (token == TOKEN_KEYWORD_NOPAGER)
   ||  (token == TOKEN_KEYWORD_NOTEE)
   ||  (token == TOKEN_KEYWORD_NOWARNING)
@@ -12658,53 +12659,13 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     return 1;
   }
 
-  /* todo: same checking for tarantoolnet.so (no longer necessary) */
-
-  /* TEST! this is from the sample program in the manual */
-
   /* Todo: this should have been done already; we must be calling from the wrong place. */
   copy_connect_strings_to_utf8();
 
   /* CONNECT. URI = port, host:port, or username:password@host:port */
-  char connection_string[1024];
-
-  char connection_port[128];
-  char connection_host[128];
-  char connection_password[128];
-  char connection_user[128];
-  if (port_maybe != "DEFAULT") strcpy(connection_port, port_maybe.toUtf8());
-  else sprintf(connection_port, "%d", ocelot_port);
-  if (host_maybe != "DEFAULT") strcpy(connection_host, host_maybe.toUtf8());
-  else strcpy(connection_host,ocelot_host_as_utf8);
-  if (password_maybe != "DEFAULT") strcpy(connection_password, password_maybe.toUtf8());
-  else strcpy(connection_password,ocelot_password_as_utf8);
-  if (user_maybe != "DEFAULT") strcpy(connection_user, user_maybe.toUtf8());
-  else strcpy(connection_user, ocelot_user_as_utf8);
-
-  strcpy(connection_string, "");
-
-  /* TODO
-  > I assume that after connect() succeeds I'm user = guest,
-  > and after authenticate() succeeds I'm the user specified
-  > in the arguments.
-  Yes.
-  */
-
-  if (strcmp(connection_user, "guest") != 0)
-  {
-    strcat(connection_string, connection_user);
-    strcat(connection_string, ":");
-    strcat(connection_string, connection_password);
-    strcat(connection_string, "@");
-  }
-  strcat(connection_string, connection_host);
-  strcat(connection_string, ":");
-
-  strcat(connection_string, connection_port);
 
   /* tnt[] is static global */
-  tnt[connection_number] = lmysql->ldbms_tnt_net(NULL);
-  lmysql->ldbms_tnt_set(tnt[connection_number], (int)TNT_OPT_URI, connection_string);
+  tnt[connection_number]= lmysql->ldbms_tnt_net(NULL);
 
   if (ocelot_opt_connect_timeout > 0)
   {
@@ -12713,15 +12674,54 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     tvp.tv_usec= 0;
     lmysql->ldbms_tnt_set(tnt[connection_number], (int)TNT_OPT_TMOUT_CONNECT, (char*)&tvp);
   }
-  if (lmysql->ldbms_tnt_connect(tnt[connection_number]) < 0) {
+  if (ocelot_net_buffer_length != 16384)
+  {
+    /* in ocelotgui.h I said third arg is char*, so casting is goofy */
+    /* warning: 16384 is MySQL's default, maybe not Tarantool's */
+    /* warning: ocelot_net_buffer_length is long */
+    lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_SEND_BUF, (char*)ocelot_net_buffer_length);
+    lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_RECV_BUF, (char*)ocelot_net_buffer_length);
+  }
+  {
+    char connection_string[1024];
+    char connection_port[128];
+    char connection_host[128];
+    char connection_password[128];
+    char connection_user[128];
+    if (port_maybe != "DEFAULT") strcpy(connection_port, port_maybe.toUtf8());
+    else sprintf(connection_port, "%d", ocelot_port);
+    if (host_maybe != "DEFAULT") strcpy(connection_host, host_maybe.toUtf8());
+    else strcpy(connection_host,ocelot_host_as_utf8);
+    if (password_maybe != "DEFAULT") strcpy(connection_password, password_maybe.toUtf8());
+    else strcpy(connection_password,ocelot_password_as_utf8);
+    if (user_maybe != "DEFAULT") strcpy(connection_user, user_maybe.toUtf8());
+    else strcpy(connection_user, ocelot_user_as_utf8);
+    strcpy(connection_string, "");
+    /* guest has no password
+       after connect() succeeds user = guest,
+       after authenticate() succeeds user = arg
+    */
+    if (strcmp(connection_user, "guest") != 0)
+    {
+      strcat(connection_string, connection_user);
+      strcat(connection_string, ":");
+      strcat(connection_string, connection_password);
+      strcat(connection_string, "@");
+    }
+    strcat(connection_string, connection_host);
+    strcat(connection_string, ":");
+    strcat(connection_string, connection_port);
+    lmysql->ldbms_tnt_set(tnt[connection_number], (int)TNT_OPT_URI, connection_string);
+    if (lmysql->ldbms_tnt_connect(tnt[connection_number]) < 0) {
       tarantool_errno[connection_number]= 9999;
       strcpy(tarantool_errmsg, "Connection refused for ");
       strcat(tarantool_errmsg, connection_string);
-  }
-  else
-  {
-    tarantool_errno[connection_number]= 0;
-    strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
+    }
+    else
+    {
+      tarantool_errno[connection_number]= 0;
+      strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
+    }
   }
 
   if (tarantool_errno[connection_number] != 0)
