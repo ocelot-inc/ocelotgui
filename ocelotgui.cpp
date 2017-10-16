@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: October 13 2017
+   Last modified: October 16 2017
 */
 
 /*
@@ -12098,8 +12098,8 @@ struct reftypewords {
     {"character-set ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CHARACTER_SET},
     {"collation ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLLATION},
     {"column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN},
-    {"column-or-user-variable", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE},
-    {"column-or-variable", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN_OR_VARIABLE},
+    {"column-or-user-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE},
+    {"column-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COLUMN_OR_VARIABLE},
     {"comment ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_COMMENT},
     {"condition-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CONDITION_DEFINE},
     {"condition-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CONDITION_REFER},
@@ -12135,7 +12135,8 @@ struct reftypewords {
     {"label-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LABEL_DEFINE},
     {"label-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LABEL_REFER},
     {"length ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LENGTH},
-    {"parameter ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARAMETER},
+    {"parameter-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARAMETER_DEFINE},
+    {"parameter-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARAMETER_REFER},
     {"parser ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARSER},
     {"plugin ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PLUGIN},
     {"procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PROCEDURE},

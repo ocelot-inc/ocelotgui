@@ -1104,6 +1104,7 @@ public:
   unsigned int main_token_max_count;
   unsigned int main_token_count_in_all;
   unsigned int main_token_count_in_statement;
+  /* todo: is main_token_number obsolete? does it do anything? */
   unsigned int main_token_number;      /* = offset within main_token_offsets, e.g. 0 if currently at first token */
 
   int  *saved_main_token_offsets;
@@ -2159,7 +2160,8 @@ enum {
     TOKEN_REFTYPE_LABEL_DEFINE,
     TOKEN_REFTYPE_LABEL_REFER,
     TOKEN_REFTYPE_LENGTH,
-    TOKEN_REFTYPE_PARAMETER,
+    TOKEN_REFTYPE_PARAMETER_DEFINE,
+    TOKEN_REFTYPE_PARAMETER_REFER,
     TOKEN_REFTYPE_PARSER,
     TOKEN_REFTYPE_PLUGIN,
     TOKEN_REFTYPE_PROCEDURE,

@@ -853,6 +853,7 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
   bool m= false;
   bool s= false;
   bool v= false;
+  int specific_type= 0;
   if (hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) m= true;
   if ((hparse_statement_type == TOKEN_KEYWORD_INSERT)
    || (hparse_statement_type == TOKEN_KEYWORD_DELETE)
@@ -865,7 +866,8 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
    || (hparse_statement_type == TOKEN_KEYWORD_SELECT)) s= true;
   if (m)
   {
-    if (hparse_f_variables(false) > 0) v= true;
+    specific_type= hparse_f_variables(false);
+    if (specific_type > 0) v= true;
   }
   hparse_f_next_nexttoken();
   if (m & s)
@@ -1135,14 +1137,14 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
   if (m & o & v & s)
   {
     {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_COLUMN_OR_VARIABLE;
+      main_token_reftypes[hparse_i_of_last_accepted]= specific_type;
       return 1;
     }
   }
   if (m & o & v)
   {
     {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_VARIABLE;
+      main_token_reftypes[hparse_i_of_last_accepted]= specific_type;
       return 1;
     }
   }
@@ -2500,7 +2502,7 @@ void MainWindow::hparse_f_parameter_list(int routine_type)
         in_seen= true;
       }
     }
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_PARAMETER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_PARAMETER_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
     {
 
       if (routine_type != TOKEN_KEYWORD_LUA)
@@ -4991,7 +4993,6 @@ void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen, bool role
 }
 
 
-/* TODO: This is okay for MySQL but MariaDB has more syntax options. */
 void MainWindow::hparse_f_user_specification_list()
 {
   do
@@ -5013,11 +5014,14 @@ void MainWindow::hparse_f_user_specification_list()
           if (hparse_errno > 0) return;
         }
       }
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1)
+      else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1)
+        || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIA") == 1))
       {
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
-        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)
+        if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USING") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY") == 1))
         {
           if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
           if (hparse_errno > 0) return;
@@ -6894,7 +6898,7 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         for (;;)
         {
-          if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_PARAMETER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+          if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_PARAMETER_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
           if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1) continue;
           else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 1) break;
           else hparse_f_error();
@@ -10266,7 +10270,8 @@ void MainWindow::hparse_f_cursors(int block_top)
 
 /*
   Called from hparse_f_block() for FETCH x cursor INTO variable.
-  Also called just to count candidates, in which case is_mandatory=false.
+  Also called just to see whether there's a parameter or variable
+  definition for what's at hparse_i, in which case if mandatory==false.
   Search method is similar to the one in hparse_f_labels(),
   but we go as far as statement start rather than block_top,
   because parameter declarations precede block top.
@@ -10292,14 +10297,24 @@ int MainWindow::hparse_f_variables(bool is_mandatory)
     if (main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
     {
       if ((main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE)
-       || (main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER))
+       || (main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER_DEFINE))
       {
-        ++candidate_count;
         if (is_mandatory)
         {
+          ++candidate_count;
           QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
           if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return candidate_count;
           ++count_of_accepts;
+        }
+        else
+        {
+          QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+          QString t= hparse_text_copy.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
+          if (QString::compare(s, t, Qt::CaseInsensitive) == 0)
+          {
+            if (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE) return TOKEN_REFTYPE_VARIABLE_REFER;
+            return TOKEN_REFTYPE_PARAMETER_REFER;
+          }
         }
       }
     }
@@ -10309,7 +10324,7 @@ int MainWindow::hparse_f_variables(bool is_mandatory)
     if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
     else hparse_f_error();
   }
-  return candidate_count;
+  return 0;
 }
 
 
