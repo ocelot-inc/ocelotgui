@@ -14,5 +14,37 @@ One of the ocelotgui source files, codeeditor.h, is
 distributed according to BSD.
 The text of the license is in file COPYING.thirdparty.
 
+On Windows, ocelotgui.exe was statically linked with
+Qt, which is distributed according
+to GPL 2. Notice in windows.txt that we configure Qt
+so that only qtbase is available and we specify in
+ocelotgui.pro "QT = core gui widgets", because we
+want no add-on components that come only with LGPL 3.
+The text of the license is in file COPYING.thirdparty.
+
+On Windows, ocelotgui.exe was statically linked with
+MariaDB Connector C, which is distributed according
+to LGPL 2. Ocelot has an option to convey as LGPL 2
+as GPL 2, but did not since GPL v2 is compatible.
+Ocelot was forced to change one (1) line of the source.
+The text of the license is in file COPYING.thirdparty.
+
+On Windows, ocelotgui includes the source code file
+third_party.h, which is distributed according to BSD.
+Almost all code in this file is copied from Tarantool
+connector-c, and is used only for connecting to that.
+The text of the license is in file COPYING.thirdparty.
+Copyright and acknowledgments are inside third_party.h.
+
+The GPL site showing GPL-license compatibility
+https://www.gnu.org/licenses/gpl-faq.html#AllCompatibility
+shows that GPL 2 is compatible with GPLv2 and LGPL 2.
+Since ocelotgui is GPL 2, and the MDBug code is GPL 2,
+and Qt core+gui is optionally GPL 2, and MariaDB
+Connector C is LGPL 2, and all other non-Ocelot
+components are BSD, okay.
+
+
+
 
 

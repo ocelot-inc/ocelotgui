@@ -25,6 +25,8 @@ The ocelotgui program will look in these option files:
 Within option files, the ocelotgui program will look
 in these groups: [client] [mysql] [ocelot], as well
 as groups specified by MYSQL_GROUP_SUFFIX.
+On Windows, the order is different: %system, %windir,
+[application-directory], %MYSQL_HOME%, [defaults-extra-file].
 
 Command Line
 

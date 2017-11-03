@@ -50,8 +50,11 @@ All rights reserved.</P>
 
 <H3 id="prerequisites">Prerequisites</H3><HR>
 
-<P>The basic prerequisites for installation are Linux, and the Qt library.
-(Read the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A> if it is absolutely necessary to run on Windows.)
+<P>The instructions in this file are for Linux.
+Read the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A>
+if you prefer to run on Windows.
+
+The basic prerequisites for installation are Linux, and the Qt library.
 The libmysqlclient library will also be necessary, at runtime.</P>
 
 <H3 id="getting-the-qt-library">Getting the Qt library</H3><HR>

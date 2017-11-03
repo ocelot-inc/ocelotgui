@@ -77,6 +77,22 @@
 #include <stdint.h>
 
 /*
+  Decide whether to use static-linked library for use with MySQL/MariaDB.
+  Builders can say cmake . -DOCELOT_STATIC_LIBRARY=1 to use.
+  They will have to deliberately add an appropriate library when they
+  build, probably libmariadb.a.
+  Otherwise OCELOT_STATIC_LIBRARY=0 on Linux, OCELOT_STATIC_LIBRARY=1 on Windows.
+*/
+#ifndef OCELOT_STATIC_LIBRARY
+#ifdef OCELOT_OS_LINUX
+#define OCELOT_STATIC_LIBRARY 0
+#endif
+#ifdef OCELOT_OS_NONLINUX
+#define OCELOT_STATIC_LIBRARY 1
+#endif
+#endif
+
+/*
   Decide whether to #include third_party.h for use with Tarantool.
   Builders can say cmake . -DOCELOT_THIRD_PARTY=1 to include and maybe use.
   Otherwise OCELOT_THIRD_PARTY=0 on Linux, OCELOT_THIRD_PARTY=1 on Windows.
@@ -2987,7 +3003,47 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         void **library_handle,            /* points to libXXX_handle */
         QString *return_string,
         int which_library)                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
-  {
+{
+#if (OCELOT_STATIC_LIBRARY==1)
+    if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
+    {
+      /* If we static-linked to .lib or .a we don't need to load. */
+      /* OCELOT_STATIC_LIBRARY should be on for Windows but not (for now) Linux. */
+      /* TODO: This should be controlled by ocelot_static_library = 1 */
+      t__mysql_affected_rows= (tmysql_affected_rows) &mysql_affected_rows;
+      t__mysql_close= (tmysql_close)  &mysql_close;
+      t__mysql_data_seek= (tmysql_data_seek) &mysql_data_seek;
+      t__mysql_errno= (tmysql_errno) &mysql_errno;
+      t__mysql_error= (tmysql_error) &mysql_error;
+      t__mysql_fetch_fields= (tmysql_fetch_fields) &mysql_fetch_fields;
+      t__mysql_fetch_lengths= (tmysql_fetch_lengths) &mysql_fetch_lengths;
+      t__mysql_fetch_row= (tmysql_fetch_row) &mysql_fetch_row;
+      t__mysql_free_result= (tmysql_free_result) &mysql_free_result;
+      t__mysql_get_client_info= (tmysql_get_client_info) &mysql_get_client_info;
+      t__mysql_get_host_info= (tmysql_get_host_info) &mysql_get_host_info;
+      t__mysql_info= (tmysql_info) &mysql_info;
+      t__mysql_init= (tmysql_init) &mysql_init;
+      t__mysql_library_end= (tmysql_library_end) &mysql_library_end;
+      t__mysql_library_init= (tmysql_library_init) &mysql_library_init;
+      t__mysql_more_results= (tmysql_more_results) &mysql_more_results;
+      t__mysql_next_result= (tmysql_next_result) &mysql_next_result;
+      t__mysql_num_fields= (tmysql_num_fields) &mysql_num_fields;
+      t__mysql_num_rows= (tmysql_num_rows) &mysql_num_rows;
+      t__mysql_options= (tmysql_options) &mysql_options;
+      t__mysql_ping= (tmysql_ping) &mysql_ping;
+      t__mysql_query= (tmysql_query) &mysql_query;
+      t__mysql_real_connect= (tmysql_real_connect) &mysql_real_connect;
+      t__mysql_real_query= (tmysql_real_query) &mysql_real_query;
+      t__mysql_select_db= (tmysql_select_db) &mysql_select_db;
+      t__mysql_sqlstate= (tmysql_sqlstate) &mysql_sqlstate;
+      t__mysql_ssl_set= (tmysql_ssl_set) &mysql_ssl_set;
+      t__mysql_store_result= (tmysql_store_result) &mysql_store_result;
+      t__mysql_thread_end= (tmysql_thread_end) &mysql_thread_end;
+      t__mysql_warning_count= (tmysql_warning_count) &mysql_warning_count;
+      *is_library_loaded= 1;
+      return;
+    }
+#endif
 
 #if (OCELOT_THIRD_PARTY==1)
     /* If Tarantool we can use third_party.h we don't need to load. */

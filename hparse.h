@@ -1439,7 +1439,12 @@ void MainWindow::hparse_f_table_index_hint_list()
     {
       hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "BY");
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_INDEX, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
+    else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "NOT") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "INDEXED");
       if (hparse_errno > 0) return;
     }
     return;
@@ -6921,8 +6926,6 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELETE, "DELETE"))
   {
     /* todo: look up how partitions are supposed to be handled */
-    /* todo: this won't catch Tarantool INDEXED BY */
-    if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_DELETE;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_subquery_is_allowed= true;
@@ -6942,6 +6945,11 @@ void MainWindow::hparse_f_statement(int block_top)
       bool multi_seen= false;
       if (hparse_f_qualified_name_with_star() == 0) hparse_f_error();
       if (hparse_errno > 0) return;
+      if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+      {
+        hparse_f_table_index_hint_list();
+        if (hparse_errno > 0) return;
+      }
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","))
       {
         multi_seen= true;
@@ -8805,9 +8813,19 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_errno > 0) return;
     }
     hparse_subquery_is_allowed= true;
-    /* todo: this sees some choices that are only valid with SELECT */
-    if (hparse_f_table_reference(0) == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      if (hparse_f_qualified_name_with_star() == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+      hparse_f_table_index_hint_list();
+      if (hparse_errno > 0) return;
+    }
+    else
+    {
+      /* todo: this sees some choices that are only valid with SELECT */
+      if (hparse_f_table_reference(0) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
     bool multi_seen= false;
     while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
     {

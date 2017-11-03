@@ -50,8 +50,11 @@ All rights reserved.</P>
 
 <H3 id="prerequisites">Prerequisites</H3><HR>
 
-<P>The basic prerequisites for installation are Linux, and the Qt library.
-(Read the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A> if it is absolutely necessary to run on Windows.)
+<P>The instructions in this file are for Linux.
+Read the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A>
+if you prefer to run on Windows.
+
+The basic prerequisites for installation are Linux, and the Qt library.
 The libmysqlclient library will also be necessary, at runtime.</P>
 
 <H3 id="getting-the-qt-library">Getting the Qt library</H3><HR>
@@ -157,17 +160,26 @@ wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.5/ocelotgui-1
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
 and click ocelotgui-1.0.5.tar.gz.</P>
 
-<P>A tip for SUSE 42.1: do the following install instructions in advance.
-If the packages already exist, then there will be harmless error messages.<BR>
- sudo zypper install git<BR>
- sudo zypper install gcc<BR>
- sudo zypper install gcc-c++<BR>
- sudo zypper install make
-</P>
-
-<P>A tip for Ubuntu 15.04:<PRE>
- #Get Qt libraries. The message "already installed" might appear.
+<P>On Debian-like systems some packages must be installed first.
+For example on Ubuntu:<PRE>
+ sudo apt-get install gcc cmake make
+ sudo apt-get install libmysqlclient-dev
+ #Do the following if and only if build is for use with Qt4
+ sudo apt-get install qt4-dev-tools
+ #Do the following if and only if build is for use with Qt5
  sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools</PRE></P>
+
+<P>On RPM-like systems some packages must be installed first.
+For example on Mageia:<PRE>
+ urpmi gcc gcc-c++ make cmake git
+ #The name of the following package (containing mysql.h) varies,
+ #it might be lib64mariadb-devel or libmysqlclient-devel
+ urpmi mysql-devel
+ urpmi rpm-build       
+ #Do the following if and only if build is for use with Qt4
+ urpmi libqt4-devel
+ #Do the following if and only if build is for use with Qt5
+ urpmi libqt5-devel</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
  tar -zxvf ocelotgui-1.0.5.tar.gz

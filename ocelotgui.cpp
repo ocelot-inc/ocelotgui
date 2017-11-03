@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: October 16 2017
+   Last modified: November 2 2017
 */
 
 /*
@@ -104,6 +104,11 @@
   carries forward this exception.
 */
 #endif
+
+/*
+  On Windows, ocelotgui is statically linked with libraries
+  MariaDB Connector C and Qt. See COPYING.thirdparty.
+*/
 
 /*
   General comments
@@ -3524,6 +3529,14 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
     the_text.append("<br>using DBMS server version ");
     the_text.append(statement_edit_widget->dbms_version);
   }
+  the_text.append("<br>Some source code related to the debugger feature is ");
+  the_text.append("<br>(c) Copyright 2012 Hewlett-Packard Development Company, L.P.");
+#if (OCELOT_STATIC_LIBRARY == 1)
+  the_text.append("<br>Static-linked to MariaDB Connector C library");
+  the_text.append("<br>Copyright (C) 2000 MySQL AB & MySQL Finland AB & TCX DataKonsult AB");
+  the_text.append("<br>Static-linked to Qt's GUI library");
+  the_text.append("<br>Copyright 2008-2014 Digia Plc. All rights reserved.");
+#endif
   QString application_dir_path= get_doc_path("ocelotgui_logo.png");
   if (application_dir_path != "")
   {
@@ -15226,6 +15239,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   /*
     Options files i.e. Configuration files i.e. my_cnf files
     Don't read option files if ocelot_no_defaults==1 (which is true if --no-defaults was specified on command line).
+    For Tarantool, we look in the same places as for MariaDB.
+    MariaDB's mysql client wouldn't read .mylogin.cnf, but we do.
     Todo: check: does MariaDB read mylogin.cnf even if ocelot_no_defaults==1?
     Todo: put mycnf_file list somewhere where ocelotgui --help can see
   */
@@ -15264,6 +15279,17 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
         strcat(my_cnf_file[i++], "/.mylogin.cnf");
       }
 #else
+      /* Todo: %PROGRAMDATA%... (MySQL) */
+      if ((hparse_dbms_mask & (FLAG_VERSION_MARIADB_ALL|FLAG_VERSION_TARANTOOL)) != 0)
+      {
+        if (getenv("SYSTEM") != 0)
+        {
+          strcpy(my_cnf_file[i], getenv("SYSTEM"));
+          strcat(my_cnf_file[i++], "\\my.ini");
+          strcpy(my_cnf_file[i], getenv("SYSTEM"));
+          strcat(my_cnf_file[i++], "\\my.cnf");
+        }
+      }
       if (getenv("WINDIR") != 0)
       {
         strcpy(my_cnf_file[i], getenv("WINDIR")); /* e.g. c:\windows */
@@ -15273,7 +15299,24 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
       }
       strcpy(my_cnf_file[i++], "c:\\my.ini");
       strcpy(my_cnf_file[i++], "c:\\my.cnf");
-      /* Todo: INSTALLDIR\my.ini, INSTALLDIR\my.cnf */
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
+      {
+        /* Todo: This should be BASEDIR | INSTALLDIR. Close enough? */
+        strcpy(my_cnf_file[i], QCoreApplication::applicationDirPath().toUtf8());
+        strcat(my_cnf_file[i++], "\\my.ini");
+        strcpy(my_cnf_file[i], QCoreApplication::applicationDirPath().toUtf8());
+        strcat(my_cnf_file[i++], "\\my.cnf");
+      }
+      if ((hparse_dbms_mask & (FLAG_VERSION_MARIADB_ALL|FLAG_VERSION_TARANTOOL)) != 0)
+      {
+        if (getenv("MYSQL_HOME") != 0)
+        {
+          strcpy(my_cnf_file[i], getenv("MYSQL_HOME"));
+          strcat(my_cnf_file[i++], "\\my.ini");
+          strcpy(my_cnf_file[i], getenv("MYSQL_HOME"));
+          strcat(my_cnf_file[i++], "\\my.cnf");
+        }
+      }
       if (QString::compare(ocelot_defaults_extra_file, " ") > 0)
       {
         strcpy(my_cnf_file[i++], ocelot_defaults_extra_file.toUtf8());
@@ -15281,6 +15324,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
       if (getenv("APPDATA") != 0)
       {
         strcpy(my_cnf_file[i], getenv("APPDATA"));
+        strcat(my_cnf_file[i], "\\MYSQL");
         strcat(my_cnf_file[i++], "\\.mylogin.cnf");
       }
 #endif
@@ -16414,7 +16458,14 @@ int options_and_connect(
     connected[connection_number]= 0;
     lmysql->ldbms_mysql_close(&mysql[connection_number]);
   }
+#ifdef _WIN32
+  /* Actually this has no effect in my tests. Maybe just superstition. */
+  /* But it's harmless. See https://bugs.mysql.com/bug.php?id=8059 */
+  int padding= 42;
+  mysql_init(&mysql[connection_number]);
+#else
   lmysql->ldbms_mysql_init(&mysql[connection_number]);
+#endif
   int opt= 0;
   if (ocelot_default_auth_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_23, ocelot_default_auth_as_utf8);
   if (ocelot_enable_cleartext_plugin == true) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_36, (char *) &ocelot_enable_cleartext_plugin);
