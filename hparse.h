@@ -3768,7 +3768,7 @@ int MainWindow::hparse_f_create_definition()
   }
   hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT);
   if (hparse_errno > 0) return 2;
-  hparse_f_index_columns(TOKEN_KEYWORD_TABLE, fulltext_seen, foreign_seen);
+  hparse_f_index_columns(TOKEN_KEYWORD_TABLE, fulltext_seen, foreign_seen, primary_seen);
   if (hparse_errno > 0) return 2;
 
   if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
@@ -4628,8 +4628,62 @@ void MainWindow::hparse_f_create_database()
   }
 }
 
+/*
+  During CREATE TABLE ... (..., PRIMARY|UNIQUE(...)) we know what
+  the preceding column names are, so expect them.
+  In Tarantool this is compulsory. In MySQL|MariaDB this is optional.
+  Return: hparse_i of the column's data type word, or 0
+  TODO: This stops showing expecteds as soon as I type the first letter.
+  TODO: The comparison to "INTEGER" is redundant if data type flag is okay.
+*/
+int MainWindow::hparse_f_index_column_expecter()
+{
+  int i= hparse_i;
+  for (;;)
+  {
+    if (i == 0) break; /* Actually this must be an error */
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_START_IN_COLUMN_LIST) != 0) break;
+    --i;
+  }
+  if (i > 0)
+  {
+    for (;i < hparse_i; ++i)
+    {
+      if (hparse_errno > 0) return 0;
+      if (main_token_reftypes[i] == TOKEN_REFTYPE_COLUMN)
+      {
+        QString column_name;
+        column_name= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, column_name) == 1)
+        {
+          QString token;
+          for (;;)
+          {
+            if (i == hparse_i) return 0;
+            if ((main_token_flags[i] & TOKEN_FLAG_IS_DATA_TYPE) != 0)
+            {
+              return i;
+            }
+            token= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+            if (token == ",")
+            {
+              return 0;
+            }
+//            if (QString::compare(token, "INTEGER", Qt::CaseInsensitive) == 0) return i;
+            ++i;
+          }
+          return 0;
+        }
+      }
+    }
+  }
+  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) hparse_f_error();
+  else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  return 0;
+}
+
 /* (index_col_name,...) [index_option] for both CREATE INDEX and CREATE TABLE */
-void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, bool foreign_seen)
+void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, bool foreign_seen, bool primary_seen)
 {
   if ((fulltext_seen == false) && (foreign_seen == false))
   {
@@ -4651,9 +4705,27 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
   }
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
   if (hparse_errno > 0) return;
+  int index_column_number= 0;
   do                                                             /* index_col_name, ... */
   {
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    ++index_column_number;
+    if (index_or_table == TOKEN_KEYWORD_TABLE)
+    {
+      int i_of_data_type= hparse_f_index_column_expecter();
+      if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+       && (index_column_number == 1)
+       && (primary_seen == true))
+      {
+        QString token;
+        token= hparse_text_copy.mid(main_token_offsets[i_of_data_type], main_token_lengths[i_of_data_type]);
+        if (QString::compare(token, "INTEGER", Qt::CaseInsensitive) == 0)
+        {
+          hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTOINCREMENT");
+          if (hparse_errno > 0) return;
+        }
+      }
+    }
+    else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
     {
@@ -6585,7 +6657,7 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_INDEX, TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;                                    /* index_name */
-      hparse_f_index_columns(TOKEN_KEYWORD_INDEX, fulltext_seen, false);
+      hparse_f_index_columns(TOKEN_KEYWORD_INDEX, fulltext_seen, false, false);
       if (hparse_errno > 0) return;
       if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
       {

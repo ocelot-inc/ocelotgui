@@ -669,7 +669,8 @@ public:
   void hparse_f_require(int,bool,bool);
   void hparse_f_user_specification_list();
   void hparse_f_create_database();
-  void hparse_f_index_columns(int,bool,bool);
+  int hparse_f_index_column_expecter();
+  void hparse_f_index_columns(int,bool,bool,bool);
   void hparse_f_alter_or_create_view();
   int hparse_f_analyze_or_optimize(int,int*);
   void hparse_f_call();
@@ -1187,6 +1188,7 @@ public:
       TOKEN_KEYWORD_ALWAYS,
       TOKEN_KEYWORD_ANALYZE,
       TOKEN_KEYWORD_AND,
+      TOKEN_KEYWORD_ANY,
       TOKEN_KEYWORD_ANY_VALUE,
       TOKEN_KEYWORD_AREA,
       TOKEN_KEYWORD_AS,
@@ -1748,6 +1750,7 @@ public:
       TOKEN_KEYWORD_ROLLBACK,
       TOKEN_KEYWORD_ROUND,
       TOKEN_KEYWORD_ROW,
+      TOKEN_KEYWORD_ROWS,
       TOKEN_KEYWORD_ROW_COUNT,
       TOKEN_KEYWORD_ROW_NUMBER,
       TOKEN_KEYWORD_RPAD,
@@ -1987,6 +1990,7 @@ public:
       TOKEN_KEYWORD_WEEKOFYEAR,
       TOKEN_KEYWORD_WEIGHT_STRING,
       TOKEN_KEYWORD_WHEN,
+      TOKEN_KEYWORD_WHENEVER,
       TOKEN_KEYWORD_WHERE,
       TOKEN_KEYWORD_WHILE,
       TOKEN_KEYWORD_WITH,
