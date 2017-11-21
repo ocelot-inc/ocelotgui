@@ -568,6 +568,8 @@ public:
   int chars_added_for_redo;
   int chars_removed_for_redo;
 
+  QStringList tarantool_statements_in_begin;
+
   int main_window_maximum_width;
   int main_window_maximum_height;
   void component_size_calc(int *character_height, int *borders_height);
@@ -619,7 +621,7 @@ public:
   int hparse_f_over_start(int);
   int hparse_f_over_end();
   void hparse_f_function_arguments(QString);
-  void hparse_f_expression_list(int);
+  int hparse_f_expression_list(int);
   void hparse_f_parenthesized_value_list();
   void hparse_f_parameter_list(int);
   void hparse_f_parenthesized_expression();
@@ -686,7 +688,7 @@ public:
   void hparse_f_with_clause(int);
   int hparse_f_values();
   int hparse_f_unionize();
-  int hparse_f_select(bool);
+  int hparse_f_select(bool,bool);
   void hparse_f_where();
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
@@ -761,8 +763,9 @@ public:
 #endif
 #ifdef DBMS_TARANTOOL
   QString tarantool_add_return(QString);
-  int tarantool_result_set_type(int);
+  const char *tarantool_result_set_init(int,long unsigned int *,int *);
   long unsigned int tarantool_num_rows(unsigned int connection_number);
+  QString tarantool_sql_to_lua(QString,int,int);
   unsigned int tarantool_num_fields();
   int tarantool_num_fields_recursive(const char **tarantool_tnt_reply_data,
                                      char *field_name,
@@ -1108,7 +1111,7 @@ private:
 
 public:
   bool keypress_shortcut_handler(QKeyEvent *, bool);
-  int tarantool_execute_sql(const char *, unsigned long, unsigned int, int, QString);
+  int tarantool_execute_sql(QString, unsigned int, int);
   QString query_utf16;
   QString query_utf16_copy;
   /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
@@ -2068,6 +2071,7 @@ public:
 #endif
     TOKEN_TYPE_KEYWORD,  /* generic, lots of keywords have this */
     TOKEN_KEYWORD_BEGIN_WORK,         /* some non-reserved keywords */
+    TOKEN_KEYWORD_ROLLBACK_IN_ROLLBACK_TO,
     TOKEN_KEYWORD_BEGIN_XA,
     TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION,
     TOKEN_KEYWORD_END_IN_CASE_EXPRESSION,

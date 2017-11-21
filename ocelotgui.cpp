@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: November 11 2017
+   Last modified: November 20 2017
 */
 
 /*
@@ -380,7 +380,7 @@
   //static void *libtarantoolnet_handle= 0;
   /* Todo: these shouldn't be global */
   tnt_reply *tarantool_tnt_for_new_result_set;
-
+  bool tarantool_begin_seen= false;
 #endif
 
   static  unsigned int rehash_result_column_count= 0;
@@ -8016,14 +8016,17 @@ int MainWindow::action_execute_one_statement(QString text)
 #ifdef DBMS_TARANTOOL
         if (connections_dbms[0] == DBMS_TARANTOOL)
         {
-          unsigned int main_token_flags_first;
-          int statement_type= get_statement_type(main_token_number, main_token_count_in_statement, &main_token_flags_first);
-          if ((statement_type == TOKEN_KEYWORD_SELECT)
-           || (statement_type == TOKEN_KEYWORD_VALUES)
-           || (statement_type == TOKEN_KEYWORD_LUA)
-           || ((main_token_flags_first & TOKEN_FLAG_IS_LUA) != 0))
+          mysql_res_for_new_result_set= 0;
+//          unsigned int main_token_flags_first;
+//          int statement_type= get_statement_type(main_token_number, main_token_count_in_statement, &main_token_flags_first);
+//          if ((statement_type == TOKEN_KEYWORD_SELECT)
+//           || (statement_type == TOKEN_KEYWORD_VALUES)
+//           || (statement_type == TOKEN_KEYWORD_LUA)
+//           || ((main_token_flags_first & TOKEN_FLAG_IS_LUA) != 0))
           {
-            int result_set_type= tarantool_result_set_type(0);
+            long unsigned int tmp_row_count;
+            int result_set_type;
+            tarantool_result_set_init(0,&tmp_row_count,&result_set_type);
             if ((result_set_type == 0) || (result_set_type == 1))
               mysql_res_for_new_result_set= 0;
             else
@@ -8035,7 +8038,6 @@ int MainWindow::action_execute_one_statement(QString text)
               }
             }
           }
-          else mysql_res_for_new_result_set= 0;
         }
         if (connections_dbms[0] != DBMS_TARANTOOL)
 #endif
@@ -9426,12 +9428,12 @@ int MainWindow::rehash_scan()
                    "from _index;"
 
            );
+
+    QString s= query;
+    s= tarantool_sql_to_lua(s, TOKEN_KEYWORD_SELECT, 0);
+
     result=
-    tarantool_execute_sql(query,
-                          strlen(query),
-                          MYSQL_MAIN_CONNECTION,
-                          TOKEN_KEYWORD_SELECT,
-                          "");
+    tarantool_execute_sql(s, MYSQL_MAIN_CONNECTION, 1);
     if (result != 0)
     {
       make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
@@ -12971,6 +12973,9 @@ int MainWindow::get_statement_type(unsigned int passed_main_token_number,
          but:
            should use [[...]] or escapes
            should not depend later on looking at TOKEN_KEYWORD_LUA
+   Because Tarantool-style transactions require us to send all requests
+   as a single send, we have to combine them -- which is sad because we
+   spent time earlier in splitting them apart. We use a QStringList.
 */
 int MainWindow::tarantool_real_query(const char *dbms_query,
                                      unsigned long dbms_query_len,
@@ -12982,33 +12987,176 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   tarantool_errno[connection_number]= 10001;
   strcpy(tarantool_errmsg, "Unknown Tarantool Error");
 
-  QString text= statement_edit_widget->toPlainText();
+  /*
+    DESPERATION
+    We are passing dbms_query + dbms_query_len, which might not be the
+    same as a subset of main_token globals. We just need to know what
+    are the first two tokens, we're looking for BEGIN, COMMIT, ROLLBACK
+    but not ROLLBACK TO, LUA '...'. We have to skip comments, and we
+    assume that there aren't more than 98 comments at statement start.
+    If first word is not an SQL statement-start word, or LUA.
+    turn on the Lua flag.
+    ALSO: make_statement_ready_to_send() happened recently, and we could
+          have used it to know the first words, would have been faster
+    ALSO: hparse_f_multi_block() turned on TOKEN_FLAG_IS_LUA, and we
+          could have used it to know if it's Lua, would have been faster
+    TODO: return error if too many initial comments, or retry with more
+  */
+  QString q_dbms_query= QString::fromUtf8(dbms_query, dbms_query_len);
+  int token_offsets[100]; /* Surely a single assignable target can't have more */
+  int token_lengths[100];
+  tokenize(q_dbms_query.data(),
+           q_dbms_query.size(),
+           &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 1);
+  int word_number= 0;
+  QString word0= "", word1= "";
+  for (int i= 0; i < 100; ++i)
+  {
+    if (token_lengths[i] == 0) break;
+    if ((q_dbms_query.mid(token_offsets[i], 2) == "/*")
+     || (q_dbms_query.mid(token_offsets[i], 2) == "--"))
+      continue;
+    if (word_number == 0)
+    {
+      word0= q_dbms_query.mid(token_offsets[i], token_lengths[i]);
+    }
+    if (word_number == 1)
+    {
+      word1= q_dbms_query.mid(token_offsets[i], token_lengths[i]);
+      break;
+    }
+    ++word_number;
+  }
+  word0= word0.toUpper();
+
+  /* TODO: Get fussier about what you'll accept is SQL. */
+  int statement_type= TOKEN_KEYWORD_DO_LUA;
+  if (word0 == "ALTER")
+  {
+    if (QString::compare(word1, "TABLE", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_ALTER;
+  }
+  else if (word0 == "BEGIN")
+  {
+    if ((QString::compare(word1, "TRANSACTION", Qt::CaseInsensitive) == 0)
+     || (word1 == ";")
+     || (word1 == ""))
+      statement_type= TOKEN_KEYWORD_BEGIN_WORK;
+  }
+  else if (word0 == "COMMIT")
+  {
+    if ((word1 == ";") || (word1 == "")) statement_type= TOKEN_KEYWORD_COMMIT;
+  }
+  else if (word0 == "CREATE")
+  {
+    if ((QString::compare(word1, "UNIQUE", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "INDEX", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "TABLE", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "TRIGGER", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "VIEW", Qt::CaseInsensitive) == 0))
+      statement_type= TOKEN_KEYWORD_CREATE;
+  }
+  else if (word0 == "DELETE")
+  {
+    if (QString::compare(word1, "FROM", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_DELETE;
+  }
+  else if (word0 == "DROP")
+  {
+    if ((QString::compare(word1, "INDEX", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "TABLE", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "TRIGGER", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "VIEW", Qt::CaseInsensitive) == 0))
+      statement_type= TOKEN_KEYWORD_DROP;
+  }
+  else if (word0 == "EXPLAIN") { statement_type= TOKEN_KEYWORD_EXPLAIN; }
+  else if (word0 == "INSERT")
+  {
+    if (QString::compare(word1, "INTO", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_INSERT;
+  }
+  else if (word0 == "LUA") { statement_type= TOKEN_KEYWORD_LUA; }
+  else if (word0 == "PRAGMA") { statement_type= TOKEN_KEYWORD_PRAGMA; }
+  else if (word0 == "REINDEX") { statement_type= TOKEN_KEYWORD_REINDEX; }
+  else if (word0 == "RELEASE") { statement_type= TOKEN_KEYWORD_RELEASE;  }
+  else if (word0 == "REPLACE")
+  {
+    if (QString::compare(word1, "INTO", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_REPLACE;
+  }
+  else if (word0 == "ROLLBACK")
+  {
+    if (QString::compare(word1, "TO", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_ROLLBACK_IN_ROLLBACK_TO;
+    else
+    {
+      if ((word1 == ";") || (word1 == "")) statement_type= TOKEN_KEYWORD_ROLLBACK;
+    }
+  }
+  else if (word0 == "SELECT") { statement_type= TOKEN_KEYWORD_SELECT; }
+  else if (word0 == "UPDATE") { statement_type= TOKEN_KEYWORD_UPDATE; }
+  else if (word0 == "VALUES")
+  {
+    if (word1 == "(") statement_type= TOKEN_KEYWORD_VALUES;
+  }
+  else { statement_type= TOKEN_KEYWORD_DO_LUA; }
 
   int token_type= -1;
-  unsigned int main_token_flags_first;
-  int statement_type= get_statement_type(passed_main_token_number, passed_main_token_count_in_statement, &main_token_flags_first);
 
-  result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
-  /* TODO: Make sure changing hparse_i doesn't muck up something */
-  hparse_i= passed_main_token_number;
-  if (hparse_f_is_nosql(text) == false)
+  //int result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
+
   {
-    QString s;
+    /* If it is LUA 'x'; we only want to pass the 'x' */
+    if (statement_type == TOKEN_KEYWORD_LUA) q_dbms_query= word1;
 
-    if (statement_type == TOKEN_KEYWORD_LUA) s= text.mid(main_token_offsets[passed_main_token_number + 1], main_token_lengths[passed_main_token_number + 1]);
-    if (main_token_flags_first & TOKEN_FLAG_IS_LUA)
+    int statement_number= tarantool_statements_in_begin.size();
+
+    if (statement_number > 0) q_dbms_query= q_dbms_query.append(" ");
+    q_dbms_query= tarantool_sql_to_lua(q_dbms_query, statement_type, statement_number);
+
+    tarantool_statements_in_begin.append(q_dbms_query);
+  }
+  if (statement_type == TOKEN_KEYWORD_BEGIN_WORK)
+  {
+    tarantool_begin_seen= true;
+  }
+  if ((statement_type == TOKEN_KEYWORD_COMMIT)
+   || (statement_type == TOKEN_KEYWORD_ROLLBACK))
+  {
+    tarantool_begin_seen= false;
+  }
+  if (tarantool_begin_seen == true)
+  {
+    strcpy(tarantool_errmsg, "Deferred till commit|rollback");
+    tarantool_errno[connection_number]= 8372;
+    return tarantool_errno[connection_number];
+  }
+  if (hparse_f_is_nosql(q_dbms_query) == false)
+  {
+    QString s= "";
+    QString s2;
+    int statement_return_count= 0;
+
+    for (int i= 0; i < tarantool_statements_in_begin.size(); ++i)
     {
-      s= text;
-      statement_type= TOKEN_KEYWORD_DO_LUA;
+      s2= tarantool_statements_in_begin.at(i);
+      if (s2.mid(0, 13) == "ocelot_return") ++statement_return_count;
+      s.append(s2);
     }
-    tarantool_execute_sql(dbms_query,
-                          dbms_query_len,
-                          connection_number,
-                          statement_type,
-                          s);
+
+    tarantool_execute_sql(s, connection_number, statement_return_count);
+
+    printf("result = %d\n", tarantool_errno[connection_number]);
+
+    while (tarantool_statements_in_begin.isEmpty() == false)
+      tarantool_statements_in_begin.removeAt(0);
     log("tarantool_real_query end", 80);
     return tarantool_errno[connection_number];
   }
+
+  /* If something is NoSQL, transactions don't work. */
+  /* This section is rarely tested, I'm thinking of abandoning it. */
+  /* It might be saved if I could push + pop main_tokens. */
+
+  strcpy(tarantool_errmsg, "/* NOSQL */ is temporarily disabled");
+  tarantool_errno[connection_number]= 8373;
+  return tarantool_errno[connection_number];
+
   tarantool_select_nosql= true;
   //int hparse_statement_type=-1, clause_type=-1;
   //QString current_token, what_we_expect, what_we_got;
@@ -13045,6 +13193,8 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
       break;
     }
   }
+
+  QString text= q_dbms_query; /* REALLY DUBIOUS */
 
   int spaceno= -1;
   {
@@ -13196,8 +13346,15 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   return tarantool_errno[connection_number];
 }
 
-
 /*
+  We call this to get basic information about a Tarantool return;
+  if it is a result set we get type + row count + return pointer to
+  the first row.
+  TODO: There might be multiple result sets, for example if there were
+        multiple selects inside begin ... commit|rollback. We only look
+        at the first. What we should be doing is: pass "selection number"
+        and skip till we get to it.
+  Todo: The calculation of data_length might be buggy.
   What is in tarantool_tnt_reply.data?
   LUA '"a"'         ... dd 0 0 0 1 a1 61
   LUA '15'          ... dd 0 0 0 1 f
@@ -13211,20 +13368,24 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   So return:
   0 == there is no result set because we don't understand ... error?
   1 == there is no result set because we start with fixarray-32 == 0
+       or we get dd 0 0 0 1 c0 (nil)
   2 == array-32 == field count, then fields. so assume row_count == 1
   3 == array-32 == 1, array-x = row count, array-x == field count
   4 == array-32 == row count, then array-x == field count
   5 == same as 3, but first row is 0xa1 0x08 then column names.
 */
-int MainWindow::tarantool_result_set_type(int connection_number)
+const char *MainWindow::tarantool_result_set_init(
+        int connection_number,
+        long unsigned int *result_row_count,
+        int *result_set_type)
 {
   const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
   char field_type;
-  long unsigned int r;
+  long unsigned int r= 0;
   int data_length;
 
   ///* TEST!! start */
-  //printf("tarantool_result_set_type\n");
+  //printf("tarantool_result_set_init\n");
   //int mm= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
   //printf("  mm=%d\n", mm);
   //for (int i= 0; i < mm; ++i)
@@ -13244,15 +13405,55 @@ int MainWindow::tarantool_result_set_type(int connection_number)
     goto erret;
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   if (field_type != MP_ARRAY) goto erret;
-  if (tarantool_select_nosql == true) return 4;
+  if (tarantool_select_nosql == true) {*result_set_type= 4; goto return_point; }
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  if (r == 0) { return 1; }
-  if (r != 1) { return 2; }
+
+  if (r > 0) /* Check if it's nil or a series of nothing but nils */
+  {
+    long unsigned int q;
+    for (q= 0; q < r; ++q)
+    {
+      if ((unsigned char)*(tarantool_tnt_reply_data + q) != 0xc0) break;
+    }
+    if (q == r)
+    {
+      *result_set_type= 1;
+      goto return_point;
+    }
+  }
+
+  /* TEST: ANOTHER EL GRANDE KLUDGE */
+  if ((r > 1) && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data) == MP_NIL))
+  {
+    const char *tarantool_tnt_reply_data2= tarantool_tnt_reply_data;
+    long r2;
+    for (r2= r; r2 != 0; --r2)
+    {
+      if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data2) == MP_NIL)
+      {
+        ++tarantool_tnt_reply_data2;
+        continue;
+      }
+      break;
+    }
+    if (r2 == 0)
+    {
+    }
+    else if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data2) == MP_ARRAY)
+    {
+      r= 1;
+      tarantool_tnt_reply_data= tarantool_tnt_reply_data2;
+    }
+  }
+
+  if (r == 0) { *result_set_type= 1; goto return_point; }
+  if (r != 1) { *result_set_type= 2; goto return_point; }
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY) { return 2; }
+
+  if (field_type != MP_ARRAY) { *result_set_type= 2; goto return_point; }
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY) { return 2; }
+  if (field_type != MP_ARRAY) { *result_set_type= 2; goto return_point; }
   {
     /* Look for the signature of the ocelot_sqle function */
     data_length= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
@@ -13262,11 +13463,27 @@ int MainWindow::tarantool_result_set_type(int connection_number)
       if (((unsigned char)*(tarantool_tnt_reply_data + ik) == 0xa1)
        && (*(tarantool_tnt_reply_data + ik + 1) == 0x08))
       {
-        return 5;
+        *result_set_type= 5; goto return_point;
       }
     }
   }
-  return 3;
+  *result_set_type= 3; goto return_point;
+
+return_point:
+  if (*result_set_type == 0) *result_row_count= 0;
+  else if (*result_set_type == 2) *result_row_count= 1;
+//  if (*result_set_type != 4)
+//  {
+//    lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+//  }
+//  long unsigned int r;
+  else
+  {
+//  r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+    if (*result_set_type == 5) --r;
+    *result_row_count= r;
+  }
+  return tarantool_tnt_reply_data;
 erret:
   tarantool_errno[connection_number]= 10008;
   strcpy(tarantool_errmsg, "Error: did not understand received data. ");
@@ -13286,112 +13503,117 @@ erret:
     }
     strcat(tarantool_errmsg, ".");
   }
+  *result_row_count= 0;
   return 0;
 }
 
 /*
   Given tarantool_tnt_reply, return number of rows from a SELECT.
   Used by result grid.
-  Some of this code is nearly duplicated in tarantool_num_fields.
 */
 long unsigned int MainWindow::tarantool_num_rows(unsigned int connection_number)
 {
-  const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
-
-  int result_set_type= tarantool_result_set_type(connection_number);
-  if (result_set_type == 0) return 0;
-  if (result_set_type == 2) return 1;
-  if (result_set_type != 4)
-  {
-    lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  }
   long unsigned int r;
-  r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  if (result_set_type == 5) --r;
+  int result_set_type;
+  tarantool_result_set_init(connection_number, &r, &result_set_type);
   return r;
+}
+
+/* Given a single SQL or Lua request, make something executable in Lua.
+   If LUA 'xxx', strip the quotes.
+   If SQL statement, put it in box.sql.execute().
+   If Lua statement, return as is.
+   Later we hope to "return ocelot_result"
+  TODO:
+  The [=[ ... ]=] trick will fail if the string contains [=[ or ]=].
+  So to be really safe you should look for occurrences of [=[ in
+  s_in and change the count of =s until you're different.
+  TODO: Since we're inside [=[ ... ]=], do escapes still work?
+  TODO: For token_KEYWORD_LUA, make sure we never get extra chars
+        after the string literal. That would make execution fail.
+*/
+QString MainWindow::tarantool_sql_to_lua(
+        QString s_in,
+        int statement_type,
+        int statement_number)
+{
+  QString s_out;
+  if (statement_type == TOKEN_KEYWORD_DO_LUA)
+  {
+    s_out= s_in;
+  }
+  else if (statement_type == TOKEN_KEYWORD_LUA)
+  {
+    s_out= connect_stripper(s_in, false);
+  }
+  else
+  {
+    s_out= "ocelot_return";
+    s_out.append(QString::number(statement_number));
+    s_out.append(" = ");
+    if ((statement_type == TOKEN_KEYWORD_SELECT)
+     || (statement_type == TOKEN_KEYWORD_VALUES))
+      s_out.append("ocelot_sqle");
+    else
+      s_out.append("box.sql.execute");
+    s_out.append("([=[");
+    s_out.append(s_in);
+    s_out.append("]=])");
+  }
+  return s_out;
 }
 
 /*
   Warning: do not say "delete [] request_string;" early, there
   might be a hidden pointer to it.
+
+  TODO: Remove the giant kludge here. Instead of skipping nulls till
+        we can return the first thing that's not null, we should
+        "return ocelot_return0,ocelot_return1,..." and if there are
+        2 or more result sets, then handle them with tabs the same way
+        we do for MySQL/MariaDB.
 */
 int MainWindow::tarantool_execute_sql(
-            const char *dbms_query,
-            unsigned long dbms_query_len,
+            QString dbms_query,
             unsigned int connection_number,
-            int statement_type,
-            QString ssm)
+            int statement_return_count)
 {
-  char *request_string= new char[dbms_query_len + 256];
-  tarantool_select_nosql= false;
-  //if (statement_type == TOKEN_KEYWORD_SELECT)
+  QString dbms_query_plus_return= dbms_query;
+
+  if (statement_return_count > 0)
   {
-    /*
-      This gives me "dd ..." i.e. an array result. At last.
-    */
-     //struct tnt_stream *tnt = lmysql->ldbms_tnt_net(NULL);          /* See note = SETUP */
-    //lmysql->ldbms_tnt_set(tnt, TNT_OPT_URI, (char*)"192.168.1.67:3301");
-    //if (lmysql->ldbms_tnt_connect(tnt) < 0) {                      /* See note = CONNECT */
-    //  printf("Connection refused\n");
-    //  exit(-1);
-    //}
-    //struct tnt_stream *tuple = lmysql->ldbms_tnt_object(NULL);     /* See note = MAKE REQUEST */
-     //struct tnt_stream *tnt_object(struct tnt_stream *s)
+    dbms_query_plus_return.append(" return");
+    for (int i= 0; i < statement_return_count; ++i)
+    {
+      if (i > 0) dbms_query_plus_return.append(",");
+      dbms_query_plus_return.append(" ");
+      dbms_query_plus_return.append("ocelot_return");
+      dbms_query_plus_return.append(QString::number(i));
+    }
+  }
+
+  int dbms_query_len= dbms_query_plus_return.toUtf8().size();
+
+  char *request_string= new char[dbms_query_len + 1];
+
+  strcpy(request_string, dbms_query_plus_return.toUtf8());
+  *(request_string + dbms_query_len)= '\0';
+
+  tarantool_select_nosql= false;
+
+  {
     //    Create an empty MsgPack object.
     //    If s is passed as NULL, then the object is allocated. Otherwise, the allocated object is initialized.
     struct tnt_stream *arg;
     arg = lmysql->ldbms_tnt_object(NULL);
-    //int tnt_object_reset(struct tnt_stream *s)
     //    Reset a stream object to the basic state.
     lmysql->ldbms_tnt_object_reset(arg);
-    //ssize_t tnt_object_add_array(struct tnt_stream *s, uint32_t size)
     //    Append an array header to a stream object.
     //    The header’s size is in bytes.
     //    If TNT_SBO_SPARSE or TNT_SBO_PACKED is set as container type, then size is ignored.
     lmysql->ldbms_tnt_object_add_array(arg, 0);
     struct tnt_request *req2 = lmysql->ldbms_tnt_request_eval(NULL);
-    //   int m= tnt_request_set_exprz(req2,"return box.space.tester:select()");
 
-    /*
-      TODO:
-      The [=[ ... ]=] trick will fail if the string contains [=[ or ]=].
-      So to be really safe you should look for occurrences of [=[ in
-      dbms_query and change the count of =s until you're different.
-      TODO: Since we're inside [=[ ... ]=], do escapes still work?
-      TODO: For TOKEN_KEYWORD_DO_LUA, if syntax_checker = 0, we'd be
-            safer with strcpy(request_string, s.toUtf8());
-      TODO: For token_KEYWORD_LUA, make sure we never get extra chars.
-            Not only would that make execution fail, but also we don't
-            allocate enough space in request_string, possibly.
-    */
-    if (statement_type == TOKEN_KEYWORD_DO_LUA)
-    {
-      strncpy(request_string, dbms_query, dbms_query_len);
-      *(request_string+dbms_query_len)= '\0';
-    }
-    else if (statement_type == TOKEN_KEYWORD_LUA)
-    {
-      ssm= connect_stripper(ssm, false);
-      ssm= tarantool_add_return(ssm);
-      strcpy(request_string, ssm.toUtf8());
-    }
-    else
-    {
-      int strcpy_len;
-      if ((statement_type == TOKEN_KEYWORD_SELECT)
-       || (statement_type == TOKEN_KEYWORD_VALUES))
-      {
-        strcpy(request_string, "return ocelot_sqle([=[");
-        strcpy_len= sizeof("return ocelot_sqle([=[") - 1;
-      }
-      else
-      {
-        strcpy(request_string, "return box.sql.execute([=[");
-        strcpy_len= sizeof("return box.sql.execute([=[") - 1;
-      }
-      strncpy(request_string + strcpy_len, dbms_query, dbms_query_len);
-      strcpy(request_string + strcpy_len + dbms_query_len, "]=])");
-    }
     int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
     assert(m >= 0);
     lmysql->ldbms_tnt_request_set_tuple(req2, arg);
@@ -13409,7 +13631,8 @@ int MainWindow::tarantool_execute_sql(
       tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
       if ((r == 0)
        && (tarantool_select_nosql == false)
-       && (statement_type == TOKEN_KEYWORD_SELECT))
+//       && (statement_type == TOKEN_KEYWORD_SELECT)
+       )
       {
         strcpy(tarantool_errmsg, "Zero rows.");
         tarantool_errno[connection_number]= 10027;
@@ -13435,6 +13658,7 @@ int MainWindow::tarantool_execute_sql(
   else add "return "
   ... Eventually we should parse Lua and then we can get rid of this.
       Todo: now we do parse Lua, so consider how to get rid of this.
+  TODO: Nothing calls this, we can get rid of it.
 */
 QString MainWindow::tarantool_add_return(QString s)
 {
@@ -13470,6 +13694,7 @@ QString MainWindow::tarantool_add_return(QString s)
   Todo: shouldn't map fields be arranged so new map value = new field?
   Due to flattening, field_count is count of scalars not count of arrays and maps.
   For example, array[2] X Y array[3] A B C has 5 scalars.
+  Todo: Check is it ok to pass connection_number==0 to tarantool_result_set_init
 */
 unsigned int MainWindow::tarantool_num_fields()
 {
@@ -13482,21 +13707,22 @@ unsigned int MainWindow::tarantool_num_fields()
 
   /* See tarantool_num_rows for pretty well the same code as this */
   /* Todo: this is wrong, connection_number might not be 0 */
-  int result_set_type= tarantool_result_set_type(0);
+  int result_set_type;
+  *tarantool_tnt_reply_data= tarantool_result_set_init(0, &result_row_count, &result_set_type);
   if ((result_set_type == 0) || (result_set_type == 1))
   {
-    result_row_count= 0;
+//    result_row_count= 0;
     return 0;
   }
-  if (result_set_type == 2) result_row_count= 1;
-  else
-  {
-    if (result_set_type != 4)
-    {
-      lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
-    }
-    result_row_count= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
-  }
+//  if (result_set_type == 2) result_row_count= 1;
+//  else
+//  {
+//    if (result_set_type != 4)
+//    {
+//      lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+//    }
+//    result_row_count= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+//  }
   if (result_set_type == 5)
   {
     int bytes;
@@ -13504,7 +13730,7 @@ unsigned int MainWindow::tarantool_num_fields()
     QString fetch_row_result= tarantool_fetch_row(*tarantool_tnt_reply_data, &bytes, &row_size_1);
     //if (fetch_row_result != "OK") return fetch_row_result;
     *(tarantool_tnt_reply_data)+= bytes;
-    --result_row_count;
+//    --result_row_count;
   }
 
   strcpy(field_name, TARANTOOL_FIELD_NAME_BASE);
@@ -13624,27 +13850,30 @@ int MainWindow::tarantool_num_fields_recursive(const char **tarantool_tnt_reply_
 
 /* To "seek to row zero", start with the initial pointer and skip over the row count. */
 /* Also skip field names if result_set_type == 5. */
-/* Todo: there's similar code in multiple places now. */
+/* Todo: Check is it ok to pass connection_number==0 to tarantool_result_set_init */
 const char * MainWindow::tarantool_seek_0(int *returned_result_set_type)
 {
   uint32_t row_count;
   const char *tarantool_tnt_reply_data;
-  tarantool_tnt_reply_data= tarantool_tnt_reply.data;
+  //tarantool_tnt_reply_data= tarantool_tnt_reply.data;
 
-  int result_set_type= tarantool_result_set_type(0);
+  long unsigned int tmp_row_count;
+  int result_set_type;
+  tarantool_tnt_reply_data= tarantool_result_set_init(0, &tmp_row_count, &result_set_type);
+  row_count= tmp_row_count;
   if ((result_set_type == 0) || (result_set_type == 1))
   {
     assert(result_set_type > 1);
   }
-  if (result_set_type == 2) row_count= 1;
-  else
-  {
-    if (result_set_type != 4)
-    {
-      lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-    }
-    row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  }
+//  if (result_set_type == 2) row_count= 1;
+//  else
+//  {
+//    if (result_set_type != 4)
+//    {
+//      lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+//    }
+//    row_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+//  }
   if (result_set_type == 5)
   {
     int bytes;
@@ -13652,7 +13881,7 @@ const char * MainWindow::tarantool_seek_0(int *returned_result_set_type)
     QString fetch_row_result= tarantool_fetch_row(tarantool_tnt_reply_data, &bytes, &row_size_1);
     //if (fetch_row_result != "OK") return fetch_row_result;
     tarantool_tnt_reply_data+= bytes;
-    --row_count;
+//    --row_count;
   }
   assert(row_count == result_row_count);
   *returned_result_set_type= result_set_type;
@@ -13767,18 +13996,24 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
    replacing "f_n" section, i.e. as far as the second "_", if any.
    replacing "f_1..." with name#1..., "f_2..." with name#2..., etc.
   Todo: finding "f_n" is inefficient, memcmp etc. should be avoided.
+  Todo: Check is it ok to pass connection_number==0 to tarantool_result_set_init
 */
 QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
 {
   const char *tarantool_tnt_reply_data;
   tarantool_tnt_reply_data= tarantool_tnt_reply.data;
 
-  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+//  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+//  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
 
   char field_type;
-  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY) return "tarantool_fetch_header_row: field_type != MP_ARRAY";
+//  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+//  if (field_type != MP_ARRAY) return "tarantool_fetch_header_row: field_type != MP_ARRAY";
+
+  long unsigned int tmp_row_count;
+  int result_set_type;
+  tarantool_tnt_reply_data= tarantool_result_set_init(0, &tmp_row_count, &result_set_type);
+
   uint32_t field_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   if (field_count == 0) return "tarantool_fetch_header_row: field_count == 0";
 
