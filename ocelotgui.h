@@ -975,7 +975,8 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int);
-  int get_statement_type(unsigned int, unsigned int, unsigned int*);
+  QString get_statement_type(QString, int *);
+  int get_statement_type_low(QString, QString, QString);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
   QString tarantool_fetch_header_row(int);
   const char * tarantool_seek_0(int*);
@@ -1439,6 +1440,7 @@ public:
       TOKEN_KEYWORD_GLENGTH,
       TOKEN_KEYWORD_GLOB,
       TOKEN_KEYWORD_GO,
+      TOKEN_KEYWORD_GOTO,
       TOKEN_KEYWORD_GRANT,
       TOKEN_KEYWORD_GREATEST,
       TOKEN_KEYWORD_GROUP,

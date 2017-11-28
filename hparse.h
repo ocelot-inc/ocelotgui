@@ -9412,8 +9412,9 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0);
+    if (hparse_errno > 0) return;
     hparse_subquery_is_allowed= false;
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END");
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END");
     if (hparse_errno > 0) return;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
@@ -9535,6 +9536,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   local function Name funcbody |
   local namelist [`=´ explist]
 */
+/* TODO: We haven't paid much attention to TOKEN_REFTYPE */
 static int lua_calling_statement_type, lua_block_top;
 static int lua_depth;
 
@@ -9640,6 +9642,14 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top, bo
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_FUNCTION;
   }
+  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GOTO, "goto") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
+    hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    return TOKEN_KEYWORD_GOTO;
+  }
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "if") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
@@ -9732,8 +9742,6 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top, bo
     hparse_f_lua_exp();
     if (hparse_errno > 0) return 0;
     hparse_subquery_is_allowed= false;
-    hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "end");
-    if (hparse_errno > 0) return 0;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     if (hparse_errno > 0) return 0;
@@ -9766,6 +9774,15 @@ int MainWindow::hparse_f_lua_block(int calling_statement_type, int block_top, bo
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_WHILE;
+  }
+  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "::") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_LABEL_DEFINE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "::");
+    if (hparse_errno > 0) return 0;
+    return TOKEN_TYPE_OPERATOR;
   }
   int result_of_functioncall= hparse_f_lua_functioncall();
   if (hparse_errno > 0) return 0;
@@ -9949,7 +9966,7 @@ int MainWindow::hparse_f_lua_args()
 /* function ::= function funcbody */
 int MainWindow::hparse_f_lua_function()
 {
-  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_FUNCTION, "function") == 0)
+  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_FUNCTION, "function") == 1)
   {
     if (hparse_f_lua_funcbody() == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
@@ -9985,9 +10002,12 @@ int MainWindow::hparse_f_lua_tableconstructor()
 {
   if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "{") == 0)
     return 0;
-  if (hparse_f_lua_fieldlist() == 0) hparse_f_error();
-  hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "}");
-  if (hparse_errno > 0) return 0;
+  if (hparse_f_accept(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "}") == 0)
+  {
+    if (hparse_f_lua_fieldlist() == 0) hparse_f_error();
+    hparse_f_expect(FLAG_VERSION_LUA, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "}");
+    if (hparse_errno > 0) return 0;
+  }
   return 1;
 }
 /* fieldlist ::= field {fieldsep field} [fieldsep] */
@@ -10321,6 +10341,9 @@ void MainWindow::hparse_f_lua_opr_18(int who_is_calling, int allow_flags) /* Pre
     if (hparse_errno > 0) return;
     return;
   }
+  /* functions as operands e.g. "f = function () x = x + 1 end" */
+  if (hparse_f_lua_function() == 1) return;
+  if (hparse_errno > 0) return;
   hparse_f_error();
   return;
 }

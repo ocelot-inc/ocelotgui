@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: November 20 2017
+   Last modified: November 28 2017
 */
 
 /*
@@ -4787,6 +4787,30 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   else
   {
     bool is_maybe_in_compound_statement= 0;
+    bool is_create_trigger= false;
+    int statement_type= -1;
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      QString word0= "", word1= "", word2= "";
+      int word_number= 0;
+      for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
+      {
+        if ((main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_SLASH)
+         || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+         || (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_MINUS))
+          continue;
+        if (word_number == 0) word0= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        if (word_number == 1) word1= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        if (word_number == 2)
+        {
+          word2= text.mid(main_token_offsets[i], main_token_lengths[i]);
+          break;
+        }
+        ++word_number;
+      }
+      statement_type= get_statement_type_low(word0, word1, word2);
+    }
+
     last_token= "";
     for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
     {
@@ -4818,29 +4842,32 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           ||  (main_token_types[i] == TOKEN_KEYWORD_EVENT))
           {
             is_maybe_in_compound_statement= 1;
+            is_create_trigger= true;
           }
         }
       }
-
       if (i_of_first_non_comment_seen == -1)
       {
-#ifdef DBMS_MARIADB
-        if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_CASE)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_LOOP)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_WHILE))
+        if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
         {
-          is_maybe_in_compound_statement= 1;
+          if (statement_type == TOKEN_KEYWORD_DO_LUA)
+          {
+            is_maybe_in_compound_statement= 1;
+          }
         }
-#endif
-#ifdef DBMS_TARANTOOL
-        if (main_token_types[i] == TOKEN_KEYWORD_DO_LUA)
+        else
         {
-          is_maybe_in_compound_statement= 1;
+          /* Following should only occur if we're sure it's MariaDB */
+          if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_CASE)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_LOOP)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_WHILE))
+          {
+            is_maybe_in_compound_statement= 1;
+          }
         }
-#endif
         if ((main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
          && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
          && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_MINUS))
@@ -4848,23 +4875,53 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           i_of_first_non_comment_seen= i;
         }
       }
-
       /* For some reason the following was checking TOKEN_KEYWORD_ELSEIF too. Removed. */
       if (is_maybe_in_compound_statement == 1)
       {
-        if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
-        ||  (main_token_types[i] == TOKEN_KEYWORD_DO_LUA)
-        ||  ((main_token_types[i] == TOKEN_KEYWORD_CASE)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-        ||  ((main_token_types[i] == TOKEN_KEYWORD_IF)     && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-        ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-        ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-        ||  ((main_token_types[i] == TOKEN_KEYWORD_WHILE)  && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END))))
+        if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
         {
-          ++begin_count;
+          if (statement_type == TOKEN_KEYWORD_DO_LUA)
+          {
+            if ((main_token_types[i] == TOKEN_KEYWORD_DO_LUA)
+            ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
+            ||  (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
+            ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT))
+            {
+              ++begin_count;
+            }
+            if ((main_token_types[i] == TOKEN_KEYWORD_END)
+            ||  (main_token_types[i] == TOKEN_KEYWORD_UNTIL))
+            {
+              --begin_count;
+            }
+          }
+          else if (is_create_trigger == true)
+          {
+            if (main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+            {
+              ++begin_count;
+            }
+            if (main_token_types[i] == TOKEN_KEYWORD_END)
+            {
+              --begin_count;
+            }
+          }
         }
-        if (main_token_types[i] == TOKEN_KEYWORD_END)
+        else
         {
-          --begin_count;
+          if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+          ||  ((main_token_types[i] == TOKEN_KEYWORD_CASE)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+          ||  ((main_token_types[i] == TOKEN_KEYWORD_IF)     && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+          ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+          ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+          ||  ((main_token_types[i] == TOKEN_KEYWORD_WHILE)  && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END))))
+          {
+            ++begin_count;
+          }
+          if (main_token_types[i] == TOKEN_KEYWORD_END)
+          {
+            --begin_count;
+          }
         }
       }
     }
@@ -10127,7 +10184,8 @@ next_char:
   if ((text[char_offset] >= '0') && (text[char_offset] <= '9')) goto part_of_token; /* digit part of token */
   if (text[char_offset] == ':')    /* : might be start of := otherwise one-byte token */
   {
-    expected_char= '=';
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) expected_char= ':';
+    else expected_char= '=';
     if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
     goto one_byte_token;
   }
@@ -10211,7 +10269,17 @@ next_char:
     goto one_byte_token;
   }
   if (text[char_offset] == '}') goto one_byte_token; /* } one-byte token which is never used */
-  if (text[char_offset] == '~') goto one_byte_token; /* ~ one-byte token */
+  if (text[char_offset] == '~') /* ~ one-byte token unless Tarantool+Lua */
+  {
+#ifdef DBMS_TARANTOOL
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      expected_char= '=';
+      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == expected_char)) goto skip_till_expected_char;
+    }
+#endif
+   goto one_byte_token;
+  }
   /* Remaining possibilities are:
      $, 0 to 9, A to Z, a to z
      >127 (top-bit-on is probably a continuation byte of a utf-8 character)
@@ -10229,6 +10297,12 @@ white_space:
   ++char_offset;
   goto next_token;
 string_starting_with_bracket_start:
+  if (token_lengths[token_number] > 0)
+  {
+    ++token_number;
+    token_lengths[token_number]= 0;
+    token_offsets[token_number]= char_offset;
+  }
   for (;;)
   {
     if (char_offset >= text_length) goto string_end;
@@ -10760,6 +10834,7 @@ const keywords strvalues[]=
       {"GLENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GLENGTH}, /* deprecated in MySQL 5.7.6 */
       {"GLOB", FLAG_VERSION_TARANTOOL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_GLOB},
       {"GO", 0, 0, TOKEN_KEYWORD_GO}, /* Ocelot keyword */
+      {"GOTO", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_GOTO},
       {"GRANT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GRANT},
       {"GREATEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GREATEST},
       {"GROUP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GROUP},
@@ -11399,25 +11474,25 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "877" */
+      /* If the following assert happens, you inserted/removed something without changing "878" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (877 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (878 - 1));
 
-      /* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 877; ++ii)
+      ///* Test strvalues is ordered by bsearching for every item. */
+      //for (int ii= 0; ii < 878; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 877, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 878, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
-      ////  printf("ii=%d, index=%d, k=%s.\n", ii, index, k);
+      //  //printf("ii=%d, index=%d, k=%s.\n", ii, index, k);
       //  assert(index == strvalues[ii].token_keyword);
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 877 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 877, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 878 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 878, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -12916,100 +12991,38 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
 
 /*
   Return statement type = first keyword = TOKEN_KEYWORD_SELECT etc.
-  If it's WITH, search for INSERT|DELETE|UPDATE and if that fails
-  assume it's SELECT. Probably hparse has already found the facts
-  in a better way but perhaps you haven't called hparse.
+  Probably hparse has already found the facts in a better way but
+  perhaps you haven't called hparse.
+  Currently this is only being used to guess whether it's Lua.
 */
-int MainWindow::get_statement_type(unsigned int passed_main_token_number,
-                                   unsigned int passed_main_token_count_in_statement,
-                                   unsigned int *main_token_flags_first)
-{
-  unsigned int i;
-  int token_type;
-  *main_token_flags_first= 0;
-  for (i= passed_main_token_number; ; ++i)
-  {
-    if ((main_token_lengths[i] == 0)
-     || (i == passed_main_token_number + passed_main_token_count_in_statement))
-    {
-      token_type= -1;
-      break;
-    }
-    token_type= main_token_types[i];
-    if ((token_type != TOKEN_TYPE_COMMENT_WITH_SLASH)
-     && (token_type != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-     && (token_type != TOKEN_TYPE_COMMENT_WITH_MINUS))
-    {
-      *main_token_flags_first= main_token_flags[i];
-      break;
-    }
-  }
-  if (token_type == TOKEN_KEYWORD_WITH)
-  {
-    for (; ; ++i)
-    {
-      if ((main_token_lengths[i] == 0)
-       || (i == passed_main_token_number + passed_main_token_count_in_statement))
-      {
-        token_type= TOKEN_KEYWORD_SELECT;
-        break;
-      }
-      token_type= main_token_types[i];
-      if ((token_type == TOKEN_KEYWORD_INSERT)
-       || (token_type == TOKEN_KEYWORD_UPDATE)
-       || (token_type == TOKEN_KEYWORD_DELETE))
-        break;
-    }
-  }
-  return token_type;
-}
-
-
-/* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
 /*
-   Todo: we shouldn't be calling tparse_f_program() yet again!
-   Todo: I succeeded in making this work
-           lua 'return box.space.t:select()';
-         but:
-           should use [[...]] or escapes
-           should not depend later on looking at TOKEN_KEYWORD_LUA
-   Because Tarantool-style transactions require us to send all requests
-   as a single send, we have to combine them -- which is sad because we
-   spent time earlier in splitting them apart. We use a QStringList.
+  DESPERATION -- for tarantool_real_query() ...
+  We are passing dbms_query + dbms_query_len, which might not be the
+  same as a subset of main_token globals. We just need to know what
+  are the first two tokens, we're looking for BEGIN, COMMIT, ROLLBACK
+  but not ROLLBACK TO, LUA '...'. We have to skip comments, and we
+  assume that there aren't more than 98 comments at statement start.
+  If first word is not an SQL statement-start word, or LUA.
+  turn on the Lua flag.
+  ALSO: make_statement_ready_to_send() happened recently, and we could
+        have used it to know the first words, would have been faster
+  ALSO: hparse_f_multi_block() turned on TOKEN_FLAG_IS_LUA, and we
+        could have used it to know if it's Lua, would have been faster
+  TODO: return error if too many initial comments, or retry with more
+  TODO: if we get WITH, we'd like to know if it's SELECT|INSERT|UPDATE
+        (which requires going ahead many more words)
+  Warn: only works for Tarantool at the moment, e.g.
+        wouldn't recognize MySQL/MariaDB comments starting with #
 */
-int MainWindow::tarantool_real_query(const char *dbms_query,
-                                     unsigned long dbms_query_len,
-                                     unsigned int connection_number,
-                                     unsigned int passed_main_token_number,
-                                     unsigned int passed_main_token_count_in_statement)
+QString MainWindow::get_statement_type(QString q_dbms_query, int *statement_type)
 {
-  log("tarantool_real_query start", 80);
-  tarantool_errno[connection_number]= 10001;
-  strcpy(tarantool_errmsg, "Unknown Tarantool Error");
-
-  /*
-    DESPERATION
-    We are passing dbms_query + dbms_query_len, which might not be the
-    same as a subset of main_token globals. We just need to know what
-    are the first two tokens, we're looking for BEGIN, COMMIT, ROLLBACK
-    but not ROLLBACK TO, LUA '...'. We have to skip comments, and we
-    assume that there aren't more than 98 comments at statement start.
-    If first word is not an SQL statement-start word, or LUA.
-    turn on the Lua flag.
-    ALSO: make_statement_ready_to_send() happened recently, and we could
-          have used it to know the first words, would have been faster
-    ALSO: hparse_f_multi_block() turned on TOKEN_FLAG_IS_LUA, and we
-          could have used it to know if it's Lua, would have been faster
-    TODO: return error if too many initial comments, or retry with more
-  */
-  QString q_dbms_query= QString::fromUtf8(dbms_query, dbms_query_len);
   int token_offsets[100]; /* Surely a single assignable target can't have more */
   int token_lengths[100];
   tokenize(q_dbms_query.data(),
            q_dbms_query.size(),
            &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 1);
   int word_number= 0;
-  QString word0= "", word1= "";
+  QString word0= "", word1= "", word2= "";
   for (int i= 0; i < 100; ++i)
   {
     if (token_lengths[i] == 0) break;
@@ -13023,13 +13036,23 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     if (word_number == 1)
     {
       word1= q_dbms_query.mid(token_offsets[i], token_lengths[i]);
+    }
+    if (word_number == 2)
+    {
+      word2= q_dbms_query.mid(token_offsets[i], token_lengths[i]);
       break;
     }
     ++word_number;
   }
+  *statement_type= get_statement_type_low(word0, word1, word2);
+  return word1;
+}
+
+/* TODO: Get fussier about what you'll accept is SQL. */
+int MainWindow::get_statement_type_low(QString word0, QString word1, QString word2)
+{
   word0= word0.toUpper();
 
-  /* TODO: Get fussier about what you'll accept is SQL. */
   int statement_type= TOKEN_KEYWORD_DO_LUA;
   if (word0 == "ALTER")
   {
@@ -13094,8 +13117,39 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   {
     if (word1 == "(") statement_type= TOKEN_KEYWORD_VALUES;
   }
+  else if (word0 == "WITH")
+  {
+    if (QString::compare(word2, "AS", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_WITH;
+  }
   else { statement_type= TOKEN_KEYWORD_DO_LUA; }
+  return statement_type;
+}
 
+/* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
+/*
+   Todo: we shouldn't be calling tparse_f_program() yet again!
+   Todo: I succeeded in making this work
+           lua 'return box.space.t:select()';
+         but:
+           should use [[...]] or escapes
+           should not depend later on looking at TOKEN_KEYWORD_LUA
+   Because Tarantool-style transactions require us to send all requests
+   as a single send, we have to combine them -- which is sad because we
+   spent time earlier in splitting them apart. We use a QStringList.
+*/
+int MainWindow::tarantool_real_query(const char *dbms_query,
+                                     unsigned long dbms_query_len,
+                                     unsigned int connection_number,
+                                     unsigned int passed_main_token_number,
+                                     unsigned int passed_main_token_count_in_statement)
+{
+  log("tarantool_real_query start", 80);
+  tarantool_errno[connection_number]= 10001;
+  strcpy(tarantool_errmsg, "Unknown Tarantool Error");
+
+  QString q_dbms_query= QString::fromUtf8(dbms_query, dbms_query_len);
+  int statement_type;
+  QString word1= get_statement_type(q_dbms_query, &statement_type);
   int token_type= -1;
 
   //int result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
