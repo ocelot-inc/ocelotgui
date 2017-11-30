@@ -749,7 +749,7 @@ public:
   void hparse_f_parse_hint_line_create();
   bool hparse_f_is_nosql(QString);
   void log(const char*,int);
-  int real_query(QString, int);
+  int execute_real_query(QString, int);
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
   void tparse_f_term();
@@ -4369,8 +4369,13 @@ QString fillup(MYSQL_RES *mysql_res,
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
   {
-    result_column_count= copy_of_parent->tarantool_num_fields();
     result_row_count= copy_of_parent->tarantool_num_rows(connection_number);
+    if (result_row_count == 0)
+    {
+      /* Tarantool has no columns if there are no rows. */
+      return "OK";
+    }
+    result_column_count= copy_of_parent->tarantool_num_fields();
   }
   else
 #endif
@@ -5405,7 +5410,7 @@ int creates(QString create_table_statement, int connections_dbms_0, QString read
     tmp.append(")");
   }
   tmp.append(")");
-  int result= copy_of_parent->real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
+  int result= copy_of_parent->execute_real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
   if (result != 0) return result;
   return result;
 }
@@ -5462,7 +5467,7 @@ int inserts(QString temporary_table_name)
       pointer+= v_length;
     }
     tmp.append(");");
-    int result= copy_of_parent->real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
+    int result= copy_of_parent->execute_real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
     if (result != 0) return result;
   }
   return 0;

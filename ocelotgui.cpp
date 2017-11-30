@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: November 28 2017
+   Last modified: November 29 2017
 */
 
 /*
@@ -408,6 +408,7 @@
   static int tarantool_errno[MYSQL_MAX_CONNECTIONS];
   static char tarantool_errmsg[3072]; /* same size as hparse_errmsg? */
   QString tarantool_server_name= "";
+  static long unsigned int tarantool_row_count[MYSQL_MAX_CONNECTIONS];
 #endif
 
   static ldbms *lmysql= 0;
@@ -8047,7 +8048,7 @@ int MainWindow::action_execute_one_statement(QString text)
       is_create_table_server= false;
 #endif
       if (is_create_table_server == false)
-        real_query(query_utf16, MYSQL_MAIN_CONNECTION);
+        execute_real_query(query_utf16, MYSQL_MAIN_CONNECTION);
 
       if (dbms_long_query_result)
       {
@@ -8081,9 +8082,8 @@ int MainWindow::action_execute_one_statement(QString text)
 //           || (statement_type == TOKEN_KEYWORD_LUA)
 //           || ((main_token_flags_first & TOKEN_FLAG_IS_LUA) != 0))
           {
-            long unsigned int tmp_row_count;
             int result_set_type;
-            tarantool_result_set_init(0,&tmp_row_count,&result_set_type);
+            tarantool_result_set_init(0,&tarantool_row_count[MYSQL_MAIN_CONNECTION],&result_set_type);
             if ((result_set_type == 0) || (result_set_type == 1))
               mysql_res_for_new_result_set= 0;
             else
@@ -8296,7 +8296,7 @@ statement_is_over:
   mysql or tarantool.
   Todo: Tarantool can't be killed so easily. Make a fiber?
 */
-int MainWindow::real_query(QString query, int connection_number)
+int MainWindow::execute_real_query(QString query, int connection_number)
 {
   /*
     If the last error was CR_SERVER_LOST 2013 or CR_SERVER_GONE_ERROR 2006,
@@ -9830,7 +9830,13 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
   if (connections_dbms[connection_number] == DBMS_TARANTOOL)
   {
     /* todo: show elapsed time */
-    if (tarantool_errno[connection_number] == 0) s1= er_strings[er_off + ER_OK];
+    if (tarantool_errno[connection_number] == 0)
+    {
+      s1= er_strings[er_off + ER_OK];
+      s1.append(" ");
+      s1.append(QString::number(tarantool_row_count[connection_number]));
+      s1.append(" rows affected");
+    }
     else
     {
       s1= s1= er_strings[er_off + ER_ERROR];
@@ -12963,7 +12969,15 @@ const char *my_string= "function ocelot_sqle(p)"
 #endif
 
 #ifdef DBMS_TARANTOOL
-/* tnt_flush() sends a request to the server. after every tnt_flush, save reply */
+/*
+  tnt_flush() sends a request to the server.
+  after every tnt_flush, save reply.
+  TODO: KLUDGE: (I wonder many times have I used that word.)
+        When I entered [[return box.schema.space.create('T8');]] I got
+        error = unsupported Lua type 'function' but the space was
+        created. There are github.com/tarantool issues that mention
+        this message. I don't understand them. So I'll cancel the error.
+*/
 
 void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
 {
@@ -12987,6 +13001,11 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
     *x2= '\0';
   }
   else strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
+  if (strcmp(tarantool_errmsg, "unsupported Lua type 'function'") == 0)
+  {
+    tarantool_errno[connection_number]= 0;
+    strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
+  }
 }
 
 /*
@@ -13195,8 +13214,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
 
     tarantool_execute_sql(s, connection_number, statement_return_count);
 
-    printf("result = %d\n", tarantool_errno[connection_number]);
-
     while (tarantool_statements_in_begin.isEmpty() == false)
       tarantool_statements_in_begin.removeAt(0);
     log("tarantool_real_query end", 80);
@@ -13385,13 +13402,13 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     /* Todo: don't forget to free if there are zero rows. */
     {
       const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
-      unsigned long r= tarantool_num_rows(connection_number);
+//      unsigned long r= tarantool_num_rows(connection_number);
       tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
-      if (r == 0)
-      {
-        strcpy(tarantool_errmsg, "Zero rows.");
-        tarantool_errno[connection_number]= 10027;
-      }
+//      if (r == 0)
+//      {
+//        strcpy(tarantool_errmsg, "Zero rows.");
+//        tarantool_errno[connection_number]= 10027;
+//      }
     }
 
     return tarantool_errno[connection_number];
@@ -13438,8 +13455,7 @@ const char *MainWindow::tarantool_result_set_init(
   long unsigned int r= 0;
   int data_length;
 
-  ///* TEST!! start */
-  //printf("tarantool_result_set_init\n");
+  ///* TEST!! start (todo: maybe we should log with low priority) */
   //int mm= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
   //printf("  mm=%d\n", mm);
   //for (int i= 0; i < mm; ++i)
@@ -13459,7 +13475,10 @@ const char *MainWindow::tarantool_result_set_init(
     goto erret;
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
   if (field_type != MP_ARRAY) goto erret;
-  if (tarantool_select_nosql == true) {*result_set_type= 4; goto return_point; }
+  if (tarantool_select_nosql == true)
+  {
+    *result_set_type= 4; goto return_point;
+  }
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
 
   if (r > 0) /* Check if it's nil or a series of nothing but nils */
@@ -13500,14 +13519,29 @@ const char *MainWindow::tarantool_result_set_init(
     }
   }
 
-  if (r == 0) { *result_set_type= 1; goto return_point; }
-  if (r != 1) { *result_set_type= 2; goto return_point; }
+  if (r == 0)
+  {
+    *result_set_type= 1; goto return_point;
+  }
+  if (r != 1)
+  {
+    tarantool_tnt_reply_data= tarantool_tnt_reply.data;
+    *result_set_type= 2; goto return_point;
+  }
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
 
-  if (field_type != MP_ARRAY) { *result_set_type= 2; goto return_point; }
+  if (field_type != MP_ARRAY)
+  {
+    tarantool_tnt_reply_data= tarantool_tnt_reply.data;
+    *result_set_type= 2; goto return_point;
+  }
   r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-  if (field_type != MP_ARRAY) { *result_set_type= 2; goto return_point; }
+  if (field_type != MP_ARRAY)
+  {
+    tarantool_tnt_reply_data= tarantool_tnt_reply.data;
+    *result_set_type= 2; goto return_point;
+  }
   {
     /* Look for the signature of the ocelot_sqle function */
     data_length= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
@@ -13673,7 +13707,10 @@ int MainWindow::tarantool_execute_sql(
     lmysql->ldbms_tnt_request_set_tuple(req2, arg);
     /* uint64_t sync1 = */ lmysql->ldbms_tnt_request_compile(tnt[connection_number], req2);
     tarantool_flush_and_save_reply(connection_number);
-    if (tarantool_errno[connection_number] != 0) return tarantool_errno[connection_number];
+    if (tarantool_errno[connection_number] != 0)
+    {
+      return tarantool_errno[connection_number];
+    }
     /* The return should be an array of arrays of scalars. */
     /* If there are no rows, then there are no fields, so we cannot put up a grid. */
     /* Todo: don't forget to free if there are zero rows. */
@@ -13683,14 +13720,14 @@ int MainWindow::tarantool_execute_sql(
       const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
       unsigned long r= tarantool_num_rows(connection_number);
       tarantool_tnt_reply.data= tarantool_tnt_reply_data_copy;
-      if ((r == 0)
-       && (tarantool_select_nosql == false)
-//       && (statement_type == TOKEN_KEYWORD_SELECT)
-       )
-      {
-        strcpy(tarantool_errmsg, "Zero rows.");
-        tarantool_errno[connection_number]= 10027;
-      }
+//      if ((r == 0)
+//       && (tarantool_select_nosql == false)
+////       && (statement_type == TOKEN_KEYWORD_SELECT)
+//       )
+//      {
+//        strcpy(tarantool_errmsg, "Zero rows.");
+//        tarantool_errno[connection_number]= 10027;
+//      }
       result_row_count= r;
     }
   }
@@ -13915,6 +13952,7 @@ const char * MainWindow::tarantool_seek_0(int *returned_result_set_type)
   int result_set_type;
   tarantool_tnt_reply_data= tarantool_result_set_init(0, &tmp_row_count, &result_set_type);
   row_count= tmp_row_count;
+
   if ((result_set_type == 0) || (result_set_type == 1))
   {
     assert(result_set_type > 1);
@@ -14377,7 +14415,6 @@ void MainWindow::tarantool_scan_field_names(
 {
   unsigned int i;
   unsigned int v_lengths;
-
   /*
     First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
   */
