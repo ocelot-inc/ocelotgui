@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.5
-   Last modified: November 29 2017
+   Last modified: December 4 2017
 */
 
 /*
@@ -12694,8 +12694,8 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
     -- get session.id and version
     -- todo: if version is old we shouldn't try to use SQL
   ansi_quotes:
-    With Tarantool/SQL "x" is a string literal not a delimited
-    identifier. So we set hparse_sql_mode_ansi_quotes= true.
+    With Tarantool/SQL "x" is a delimited identifier not a string
+    literal. So we set hparse_sql_mode_ansi_quotes= true.
     If we mix Tarantool/SQL and MySQL/MariaDB, this is still required.
     So we guess that users are sane. I hope this becomes policy someday.
     With Tarantool/NoSQL "x" is always a string literal.
@@ -13077,6 +13077,16 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
   {
     if (QString::compare(word1, "TABLE", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_ALTER;
   }
+  else if (word0 == "ANALYZE")
+  {
+    if (word1 > "")
+    {
+      QChar w1c1= word1.at(0);
+      if ((w1c1.isLetter() == true)
+       || (w1c1 == '\"'))
+        statement_type= TOKEN_KEYWORD_ANALYZE;
+    }
+  }
   else if (word0 == "BEGIN")
   {
     if ((QString::compare(word1, "TRANSACTION", Qt::CaseInsensitive) == 0)
@@ -13112,12 +13122,26 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
   else if (word0 == "EXPLAIN") { statement_type= TOKEN_KEYWORD_EXPLAIN; }
   else if (word0 == "INSERT")
   {
-    if (QString::compare(word1, "INTO", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_INSERT;
+    if ((QString::compare(word1, "INTO", Qt::CaseInsensitive) == 0)
+     || (QString::compare(word1, "OR", Qt::CaseInsensitive) == 0))
+      statement_type= TOKEN_KEYWORD_INSERT;
   }
   else if (word0 == "LUA") { statement_type= TOKEN_KEYWORD_LUA; }
   else if (word0 == "PRAGMA") { statement_type= TOKEN_KEYWORD_PRAGMA; }
-  else if (word0 == "REINDEX") { statement_type= TOKEN_KEYWORD_REINDEX; }
-  else if (word0 == "RELEASE") { statement_type= TOKEN_KEYWORD_RELEASE;  }
+  else if (word0 == "REINDEX")
+  {
+    if (word1 > "")
+    {
+      QChar w1c1= word1.at(0);
+      if ((w1c1.isLetter() == true)
+       || (w1c1 == '\"'))
+        statement_type= TOKEN_KEYWORD_REINDEX;
+    }
+  }
+  else if (word0 == "RELEASE")
+  {
+    if (QString::compare(word1, "SAVEPOINT", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_RELEASE;
+  }
   else if (word0 == "REPLACE")
   {
     if (QString::compare(word1, "INTO", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_REPLACE;
@@ -13131,7 +13155,16 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
     }
   }
   else if (word0 == "SELECT") { statement_type= TOKEN_KEYWORD_SELECT; }
-  else if (word0 == "UPDATE") { statement_type= TOKEN_KEYWORD_UPDATE; }
+  else if (word0 == "UPDATE")
+  {
+    if (word1 > "")
+    {
+      QChar w1c1= word1.at(0);
+      if ((w1c1.isLetter() == true)
+       || (w1c1 == '\"'))
+        statement_type= TOKEN_KEYWORD_UPDATE;
+    }
+  }
   else if (word0 == "VALUES")
   {
     if (word1 == "(") statement_type= TOKEN_KEYWORD_VALUES;

@@ -1300,8 +1300,17 @@ int MainWindow::hparse_f_table_factor()
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
       if (hparse_errno > 0) return 0;
-      hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS");
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS_OF_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      bool is_alias_of_table_compulsory= true;
+      if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+        is_alias_of_table_compulsory= false;
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
+          is_alias_of_table_compulsory= true;
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS_OF_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+        {
+          if (is_alias_of_table_compulsory == true) hparse_f_error();
+        }
+      }
       if (hparse_errno > 0) return 0;
       return 1;
     }
@@ -1593,15 +1602,21 @@ void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION, "CASE") == 1)
   {
     int when_count= 0;
+    bool is_case_type_1= false;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 0)
     {
       hparse_f_opr_1(who_is_calling);
       if (hparse_errno > 0) return;
     }
-    else when_count= 1;
+    else
+    {
+      when_count= 1;
+      is_case_type_1= true;
+    }
     for (;;)
     {
-      if ((when_count == 1) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1))
+      if (((when_count == 1) && (is_case_type_1 == true))
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1))
       {
         ++when_count;
         hparse_f_opr_1(who_is_calling);
@@ -1614,7 +1629,10 @@ void MainWindow::hparse_f_opr_6(int who_is_calling) /* Precedence = 6 */
         else hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      else break;
+      else
+      {
+        break;
+      }
     }
     if (when_count == 0)
     {
@@ -3918,7 +3936,7 @@ void MainWindow::hparse_f_column_definition()
       hparse_f_conflict_clause();
       if (hparse_errno > 0) return;
     }
-    else if ((generated_seen == false) && (default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT") == 1))
+    else if ((generated_seen == false) && (default_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT") == 1))
     {
       main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
       if (((data_type == TOKEN_KEYWORD_DATETIME) || (data_type == TOKEN_KEYWORD_TIMESTAMP))
@@ -9551,9 +9569,9 @@ void MainWindow::hparse_f_lua_blocklist(int calling_statement_type, int block_to
   hparse_dbms_mask= FLAG_VERSION_LUA;
   hparse_f_lua_blockseries(calling_statement_type, block_top, false);
   hparse_dbms_mask= saved_hparse_dbms_mask;
-  if (hparse_errno > 0) return;
+  if (hparse_errno > 0) goto e;
   main_token_flags[saved_hparse_i]|= TOKEN_FLAG_IS_LUA;
-  hparse_sql_mode_ansi_quotes= saved_hparse_sql_mode_ansi_quotes;
+e:hparse_sql_mode_ansi_quotes= saved_hparse_sql_mode_ansi_quotes;
   log("hparse_f_lua_blocklist end", 80);
 }
 /* 0 or more statements or blocks of statements, optional semicolons */
