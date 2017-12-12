@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # rpm_build.sh -- used by Ocelot to produce .rpm file for release 1.0.6
 
 # We produced ocelotgui-1.0.6-1.x86_64.rpm with Fedora Release 26 64-bit thus:
@@ -44,6 +45,11 @@
 
 cd ~/ocelotgui
 tar -czvf ocelotgui-1.0.6-for-rpm.tar.gz ocelotgui-1.0.6/
+=======
+# WARNING: This destroys ~/.rpmmacros if such a file already exists.
+cd ~/ocelotgui
+tar -czvf ocelotgui-1.0.5.tar.gz ocelotgui-1.0.5/
+>>>>>>> 4361611a1d70d98a1431161aff4f09517d206cf3
 rm -r rp
 mkdir rp
 cd rp
@@ -53,8 +59,13 @@ cat <<EOF > ~/.rpmmacros
 %_ocelotguidir $HOME/ocelotgui
 EOF
 mkdir -p rpmbuild/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
+<<<<<<< HEAD
 cp ~/ocelotgui/ocelotgui-1.0.6-for-rpm.tar.gz ocelotgui-1.0.6-for-rpm.tar.gz
 cp ocelotgui-1.0.6-for-rpm.tar.gz rpmbuild/SOURCES/ocelotgui-1.0.6-for-rpm.tar.gz
+=======
+cp ~/ocelotgui/ocelotgui-1.0.5.tar.gz ocelotgui-1.0.5.tar.gz
+cp ocelotgui-1.0.5.tar.gz rpmbuild/SOURCES/ocelotgui-1.0.5.tar.gz
+>>>>>>> 4361611a1d70d98a1431161aff4f09517d206cf3
 cp ~/ocelotgui/ocelotgui.spec ocelotgui.spec
 rpmbuild -ba ocelotgui.spec
 
