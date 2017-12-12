@@ -698,7 +698,14 @@ int MainWindow::hparse_f_character_set_name()
 int MainWindow::hparse_f_collation_name()
 {
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLLATION,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
-  if (hparse_f_literal(TOKEN_REFTYPE_COLLATION, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) return 1;
+  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+  {
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLLATION,TOKEN_TYPE_KEYWORD, "BINARY") == 1) return 1;
+  }
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+  {
+    if (hparse_f_literal(TOKEN_REFTYPE_COLLATION, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) return 1;
+  }
   return 0;
 }
 
@@ -7232,12 +7239,12 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_INDEX,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON");
+      if (hparse_errno > 0) return;
+      if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
       if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
       {
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON");
-        if (hparse_errno > 0) return;
-        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
-        if (hparse_errno > 0) return;
         hparse_f_algorithm_or_lock();
       }
     }

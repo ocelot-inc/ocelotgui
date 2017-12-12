@@ -1,3 +1,5 @@
+* Tue Dec 12 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.6-1
+- Some bug fixes.
 * Sun Jul 02 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.5-1
 - Syntax checker understands more dialects.
 * Mon Dec 12 2016 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.4-1

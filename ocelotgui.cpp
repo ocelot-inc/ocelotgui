@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.5
-   Last modified: December 4 2017
+   Version: 1.0.6
+   Last modified: December 12 2017
 */
 
 /*
@@ -391,7 +391,7 @@
   int options_and_connect(unsigned int connection_number);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.5"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.6"; /* For --version. Make sure it's in manual too. */
 
   static unsigned short int dbms_version_mask;
 
@@ -442,15 +442,17 @@
   static bool hparse_sql_mode_ansi_quotes= false;
   static unsigned short int hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
 
-/* Suppress useless messages that appear on startup if Windows. */
-/* https://bugreports.qt.io/browse/QTBUG-57180 */
-/* Todo: consider also suppressing "OpenType support missing for script" */
-#if (defined(_WIN32) && (QT_VERSION >= 0x50000))
+/* Suppress useless messages
+   https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
+   https://github.com/MartinBriza/QGnomePlatform/issues/23 (Fedora)
+   Todo: consider also suppressing "OpenType support missing for script" */
+#if (QT_VERSION >= 0x50000)
 void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
   if (type == QtWarningMsg)
   {
     if (msg.contains("CreateFontFaceFromHDC")) return;
+    if (msg.contains("GtkDialog mapped without a transient parent")) return;
   }
   QByteArray localMsg = msg.toLocal8Bit();
   printf("Qt message: %u: %s.\n", context.line, localMsg.constData());
@@ -2126,7 +2128,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
       if ((k.count() < 1) || (k.count() > 4)) return -1;
       if (k.isEmpty()) return -1;
       if (k.toString() < " ") return -1;
-      for (int i= 0; i < k.count(); ++i)
+      for (unsigned int i= 0; i < (unsigned) k.count(); ++i)
       {
         int qi= k.operator[](i);
         qi= (qi & ~(Qt::CTRL | Qt::SHIFT | Qt::ALT | Qt::META));
@@ -3566,7 +3568,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.5, July 2 2017  \
+  <BR>Version 1.0.6, December 12 2017  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -13246,7 +13248,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     }
 
     tarantool_execute_sql(s, connection_number, statement_return_count);
-
     while (tarantool_statements_in_begin.isEmpty() == false)
       tarantool_statements_in_begin.removeAt(0);
     log("tarantool_real_query end", 80);
@@ -13266,7 +13267,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   //QString current_token, what_we_expect, what_we_got;
 
   //tparse_f_program(text); /* syntax check; get offset_of_identifier,statement_type, number_of_literals */
-
   if (hparse_errno > 0)
   {
     strcpy(tarantool_errmsg, hparse_errmsg);
@@ -14138,7 +14138,6 @@ QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
   long unsigned int tmp_row_count;
   int result_set_type;
   tarantool_tnt_reply_data= tarantool_result_set_init(0, &tmp_row_count, &result_set_type);
-
   uint32_t field_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
   if (field_count == 0) return "tarantool_fetch_header_row: field_count == 0";
 
@@ -14510,7 +14509,6 @@ int MainWindow::create_table_server(QString text,
                                          unsigned int passed_main_token_count_in_statement)
 {
   *is_create_table_server= false;
-
   /* Quick search -- if there is no SERVER id clause, get out now. */
 
   bool is_create= false;
@@ -14571,7 +14569,6 @@ int MainWindow::create_table_server(QString text,
     make_and_put_message_in_result(ER_CREATE_SERVER, 0, (char*)"");
     return 1;
   }
-
   {
     QString s;
     if (i_of_server_id == 0) s= "";
@@ -14642,6 +14639,28 @@ int MainWindow::create_table_server(QString text,
       put_diagnostics_in_result(MYSQL_REMOTE_CONNECTION);
       break;
     }
+    /* CREATE TABLE y4 SERVER id LUA 'box.space._space:select()'; crashed */
+    {
+      long unsigned int r;
+      int result_set_type;
+      tarantool_result_set_init(MYSQL_REMOTE_CONNECTION, &r, &result_set_type);
+      if ((result_set_type) == 0 || (result_set_type == 1))
+      {
+        tarantool_errno[MYSQL_MAIN_CONNECTION]= 9999;
+        result= 9999;
+        strcpy(tarantool_errmsg, "No result set");
+        put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+        break;
+      }
+      if (r == 0)
+      {
+        tarantool_errno[MYSQL_MAIN_CONNECTION]= 9999;
+        result= 9999;
+        strcpy(tarantool_errmsg, "Empty result set");
+        put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+        break;
+      }
+    }
 
     /* TODO: I'd be much happier if we didn't fool with existing grid */
     /* TODO: Check for an error return from fillup(). */
@@ -14655,12 +14674,10 @@ int MainWindow::create_table_server(QString text,
               ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
               MYSQL_REMOTE_CONNECTION,
               false);
-
     /* TODO: Get field names and data types from fillup!! */
     QString create_table_statement=
     text.mid(main_token_offsets[passed_main_token_number],
              main_token_offsets[i_of_server] - main_token_offsets[passed_main_token_number]);
-
     /* Pass "CREATE TABLE table-name", fill in (field-names) + execute */
     result= rg->creates(create_table_statement, connections_dbms[MYSQL_MAIN_CONNECTION], read_format_result);
     if (result != 0)
