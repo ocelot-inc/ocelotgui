@@ -265,17 +265,17 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="some-screenshots">Some screenshots</H2><HR>
 
-<A href="shot1"><img src="shot1.jpg" alt="shot1.jpg" align="left" height="150"></A>
-<A href="shot2"><img src="shot2.jpg" alt="shot2.jpg" height="150"></A> 
-<A href="shot3"><img src="shot3.png" alt="shot3.png" height="150"></A> 
-<A href="shot4"><img src="shot4.jpg" alt="shot4.png" height="150"></A> 
-<A href="shot5"><img src="shot5.jpg" alt="shot5.png" height="150"></A> 
-<A href="shot6"><img src="shot6.jpg" alt="shot6.png" height="150"></A> 
-<A href="shot7"><img src="shot7.jpg" alt="shot7.png" height="150"></A> 
-<A href="shot8"><img src="shot8.jpg" alt="shot8.png" height="150"></A> 
-<A href="shot9"><img src="shot9.jpg" alt="shot9.png" height="150"></A> 
-<A href="shot10"><img src="shot10.jpg" alt="shot10.jpg" height="150"></A> 
-<A href="shot11"><img src="shot11.png" alt="shot11.jpg" height="150"></A> 
+<A href="shot1.jpg"><img src="shot1.jpg" alt="shot1.jpg" align="left" height="150"></A>
+<A href="shot2.jpg"><img src="shot2.jpg" alt="shot2.jpg" height="150"></A>
+<A href="shot3.png"><img src="shot3.png" alt="shot3.png" height="150"></A>
+<A href="shot4.jpg"><img src="shot4.jpg" alt="shot4.jpg" height="150"></A>
+<A href="shot5.jpg"><img src="shot5.jpg" alt="shot5.jpg" height="150"></A>
+<A href="shot6.jpg"><img src="shot6.jpg" alt="shot6.jpg" height="150"></A>
+<A href="shot7.jpg"><img src="shot7.jpg" alt="shot7.jpg" height="150"></A>
+<A href="shot8.jpg"><img src="shot8.jpg" alt="shot8.jpg" height="150"></A>
+<A href="shot9.jpg"><img src="shot9.jpg" alt="shot9.jpg" height="150"></A>
+<A href="shot10.jpg"><img src="shot10.jpg" alt="shot10.jpg" height="150"></A>
+<A href="shot11.png"><img src="shot11.png" alt="shot11.png" height="150"></A>
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
@@ -352,7 +352,7 @@ ocelotgui [--option [--option...]]
 For a description of options see <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt</A>.
 </P>
 <P>
-<A href="starting-dialog"><img src="starting-dialog.png" alt="starting-dialog.png" align="right" height="128"></A>
+<A href="starting-dialog.png"><img src="starting-dialog.png" alt="starting-dialog.png" align="right" height="128"></A>
 If a password is required but not supplied, a dialog box will appear.
 Or, if the initial attempt to connect fails, an error message will appear
 saying it is necessary to choose File|Connect, which will cause the dialog
@@ -365,7 +365,7 @@ but only non-DBMS tasks such as screen customizing will be possible.
 <BR clear="all">
 </P>
 <P>
-<A href="starting"><img src="starting.png" alt="starting.png" align="right" height="256"></A>
+<A href="starting.png"><img src="starting.png" alt="starting.png" align="right" height="256"></A>
 In any case, an initial screen will appear. After some activity has
 taken place, the screen will have four parts, from top to bottom:<BR>
 menu <BR>
@@ -400,7 +400,7 @@ but this can be changed, see the later description of
 Client Statements: Prompt.  
 </P>
 <P>
-<A href="statement-widget-example"><img src="statement-widget-example.png" alt="statement-widget-example.png" align="right" height="82"></A>
+<A href="statement-widget-example.png"><img src="statement-widget-example.png" alt="statement-widget-example.png" align="right" height="82"></A>
 For example, this screenshot shows the statement widget
 after the user has changed the default prompt and
 entered an SQL statement.
@@ -497,7 +497,7 @@ a scroll bar to appear.
 <BR clear="all">
 </P>
 <P>
-<A href="result-widget-example"><img src="result-widget-example.png" alt="result-widget-example.png" height="460"></A>
+<A href="result-widget-example.png"><img src="result-widget-example.png" alt="result-widget-example.png" height="460"></A>
 <BR clear="all">
 </P>
 <BR><BR>
@@ -508,13 +508,13 @@ a scroll bar to appear.
 Options, Debug and Help.</P>
 
 <P>
-<A href="menu-file"><img src="menu-file.png" alt="menu-file.png" align="right" height="48"></A>
+<A href="menu-file.png"><img src="menu-file.png" alt="menu-file.png" align="right" height="48"></A>
 File|Connect, or Ctrl+O, starts the Connect dialog box.  
 File|Exit, or Ctrl+Q, stops the program.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-edit"><img src="menu-edit.png" alt="menu-edit.png" align="right" height="192"></A>
+<A href="menu-edit.png"><img src="menu-edit.png" alt="menu-edit.png" align="right" height="192"></A>
 Edit|Undo or Ctrl+Z, Edit|Redo or Ctrl+Shift+Z, Edit|Cut or Ctrl+X,
 Edit|Cut or Ctrl+X, Edit|Copy or Ctrl+C, Edit|Paste or Ctrl+V,
 and Edit|Select or Ctrl+A, all work in the conventional manner.
@@ -526,7 +526,7 @@ or Ctrl+E.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-run"><img src="menu-run.png" alt="menu-run.png" align="right" height="48"></A>
+<A href="menu-run.png"><img src="menu-run.png" alt="menu-run.png" align="right" height="48"></A>
 Run|Execute or Ctrl+E or Ctrl+Enter causes execution of whatever is in the
 statement widget.  
 Run|Kill or Ctrl+C tries to stop execution -- this
@@ -535,7 +535,7 @@ needs to be aborted by user intervention.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-settings"><img src="menu-settings.png" alt="menu-settings.png" align="right" height="120"></A>
+<A href="menu-settings.png"><img src="menu-settings.png" alt="menu-settings.png" align="right" height="120"></A>
 Settings|Menu, Settings|History Widget, Settings|Grid Widget,
 Settings|Statement, and Settings|Extra Rule 1 are
 items which affect the behavior of each
@@ -554,7 +554,7 @@ set Grid Background Color Pink, set Condition = data_type LIKE
 <BR clear="all">
 </P>
 <P>
-<A href="menu-options"><img src="menu-options.png" alt="menu-options.png" align="right" height="72"></A>
+<A href="menu-options.png"><img src="menu-options.png" alt="menu-options.png" align="right" height="72"></A>
 Options|detach history widget,
 Options|detach result grid widget,
 Options|detach debug widget are
@@ -567,7 +567,7 @@ and clicking it will put the widget back in its original position.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-debug"><img src="menu-debug.png" alt="menu-debug.png" align="right" height="132"></A>
+<A href="menu-debug.png"><img src="menu-debug.png" alt="menu-debug.png" align="right" height="132"></A>
 The items on the Debug menu are enabled only when a debug session
 is in progress. The way to debug SQL stored procedures or functions
 will be explained in a later section.
@@ -575,7 +575,7 @@ will be explained in a later section.
 </P>
   
 <P>
-<A href="menu-help"><img src="menu-help.png" alt="menu-help.png" align="right" height="96"></A>
+<A href="menu-help.png"><img src="menu-help.png" alt="menu-help.png" align="right" height="96"></A>
 Help|About will show the license and copyright and version.
 Help|The Manual will show the contents of README.md (the manual that you are reading) if README.md is on the same path as
 the ocelotgui program; otherwise it will show a copyright, a GPL license, and a pointer to README.md.
@@ -588,7 +588,7 @@ Help|settings will advise about how to use the Settings menu items.
 <H3 id="debugger">Debugger</H3><HR>
 
 <P>
-<A href="menu-options"><img src="debugger.png" alt="debugger.png" align="right" height="384"></A>
+<A href="menu-options.png"><img src="debugger.png" alt="debugger.png" align="right" height="384"></A>
 It is possible to debug stored procedures and functions.  
 This version of ocelotgui incorporates MDBug
 (read about MDBug at <A HREF="http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt">http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt</A>).  
@@ -619,14 +619,14 @@ For reference, read: <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/maste
 <H3 id="special-effects">Special Effects</H3><HR>
 
 <P>
-<A href="special-vertical"><img src="special-vertical.png" alt="special-vertical.png" align="right" height="256"></A>
+<A href="special-vertical.png"><img src="special-vertical.png" alt="special-vertical.png" align="right" height="256"></A>
 Vertical: If a user starts the program with ocelotgui --vertical=1
 or ends a statement with backslash G, results come up with one column per row.  
 <BR clear="all"> 
 </P>
   
 <P>
-<A href="special-images"><img src="special-images.png" alt="special-images.png" align="right" height="256"></A>
+<A href="special-images.png"><img src="special-images.png" alt="special-images.png" align="right" height="256"></A>
 Images: If a user chooses Settings | Extra Rule 1 from the menu,
 and sets the Condition and Display As boxes as described earlier,
 and selects rows which contain LONGBLOB columns, and the column values are
@@ -644,14 +644,14 @@ statement widget will show UPDATE t SET column2 = 'AB' WHERE column1 = 5 AND col
 The user then has the choice of ignoring the update statement or executing it.  
 </P>
 <P>
-<A href="special-detach"><img src="special-detach.png" alt="special-detach.png" align="right" height="256"></A>
+<A href="special-detach.png"><img src="special-detach.png" alt="special-detach.png" align="right" height="256"></A>
 Detaching: If a user chooses Options | detach history widget or
 Options | detach result grid widget, then the widget will become a separate window
 which can be moved or resized.  
 <BR clear="all">
 </P>
 <P>
-<A href="special-settings"><img src="special-settings.png" alt="special-settings.png" align="right" height="512"></A>
+<A href="special-settings.png"><img src="special-settings.png" alt="special-settings.png" align="right" height="512"></A>
 Colors: The Colors and fonts dialog boxes have a simple way to choose
 colors, by selecting from a choice of 148 color names / color icons. Users can also
 change colors by saying SET object_name_color = color-name | hex-rgb-value.  
