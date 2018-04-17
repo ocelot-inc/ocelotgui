@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: December 12 2017
+   Last modified: April 16 2018
 */
 
 /*
@@ -10934,7 +10934,7 @@ const keywords strvalues[]=
       {"KEY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_KEY},
       {"KEYS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KEYS},
       {"KILL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KILL},
-      {"LAG", 0, 0, TOKEN_KEYWORD_LAG}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
+      {"LAG", FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LAG}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"LANGUAGE", 0, 0, TOKEN_KEYWORD_LANGUAGE},
       {"LAST", 0, 0, TOKEN_KEYWORD_LAST}, /* MariaDB 10.2 nonreserved */
       {"LASTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LASTVAL},
@@ -10942,7 +10942,7 @@ const keywords strvalues[]=
       {"LAST_INSERT_ID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LAST_INSERT_ID},
       {"LAST_VALUE", 0, 0, TOKEN_KEYWORD_LAST_VALUE}, /* MariaDB 10.2 nonreserved */
       {"LCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LCASE},
-      {"LEAD", 0, 0, TOKEN_KEYWORD_LEAD}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
+      {"LEAD", FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LEAD}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"LEADING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LEADING},
       {"LEAST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LEAST},
       {"LEAVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LEAVE},
@@ -11000,6 +11000,7 @@ const keywords strvalues[]=
       {"MBRTOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRTOUCHES},
       {"MBRWITHIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRWITHIN},
       {"MD5", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MD5},
+      {"MEDIAN", FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_MEDIAN}, /* MariaDB 10.3.3 */
       {"MEDIUMBLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MEDIUMBLOB},
       {"MEDIUMINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MEDIUMINT},
       {"MEDIUMTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MEDIUMTEXT},
@@ -11043,7 +11044,7 @@ const keywords strvalues[]=
       {"NOW", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NOW},
       {"NOWARNING", 0, 0, TOKEN_KEYWORD_NOWARNING}, /* Ocelot keyword */
       {"NO_WRITE_TO_BINLOG", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_NO_WRITE_TO_BINLOG},
-      {"NTH_VALUE", 0, 0, TOKEN_KEYWORD_NTH_VALUE}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
+      {"NTH_VALUE", FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NTH_VALUE}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"NTILE", 0, FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_NTILE},
       {"NULL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NULL},
       {"NULLIF", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_NULLIF},
@@ -11079,6 +11080,8 @@ const keywords strvalues[]=
       {"PARTIAL", 0, 0, TOKEN_KEYWORD_PARTIAL},
       {"PARTITION", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MARIADB_10_0, 0, TOKEN_KEYWORD_PARTITION},
       {"PASSWORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PASSWORD}, /* deprecated in MySQL 5.7.6 */
+      {"PERCENTILE_CONT", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_CONT}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
+      {"PERCENTILE_DISC", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_DISC}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"PERCENT_RANK", 0, FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_PERCENT_RANK},
       {"PERIOD_ADD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PERIOD_ADD},
       {"PERIOD_DIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PERIOD_DIFF},
@@ -11482,15 +11485,15 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "878" */
+      /* If the following assert happens, you inserted/removed something without changing "881" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (878 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (881 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 878; ++ii)
+      //for (int ii= 0; ii < 881; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 878, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 881, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -11499,8 +11502,8 @@ const keywords strvalues[]=
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 878 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 878, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 881 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 881, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */

@@ -41,16 +41,15 @@
 #endif
 
 /*
-  The possible DBMS values. Nowadays these are always defined,
-  except Tarantool if Windows. These are related to ocelot_dbms values.
+  The possible DBMS values.
+  These are related to ocelot_dbms values.
   --ocelot_dbms='mysql' is default.
   --ocelot_dbms='mariadb' is non-default but officially supported.
   --ocelot_dbms='tarantool' is non-default and experimental.
   If we start as MySQL but then connect to MariaDB, or vice versa,
   it's okay because we change to what we connected to.
-  If --ocelot_dbms='tarantool',
-  connection is to a Tarantool server not a MySQL/MariaDB server, but
-  wouldn't work on Windows because Tarantool library is not available.
+  If --ocelot_dbms='tarantool', connection must be to a Tarantool server.
+  Before defining for a new version, check set_dbms_version_mask().
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -604,8 +603,8 @@ public:
   void hparse_f_table_index_hint_list();
   int hparse_f_table_index_hint();
   int hparse_f_table_index_list();
-  void hparse_f_opr_1(int),hparse_f_opr_2(int),hparse_f_opr_3(int),hparse_f_opr_4(int);
-  void hparse_f_opr_5(int),hparse_f_opr_6(int),hparse_f_opr_7(int);
+  void hparse_f_opr_1(int,int),hparse_f_opr_2(int,int),hparse_f_opr_3(int,int),hparse_f_opr_4(int,int);
+  void hparse_f_opr_5(int,int),hparse_f_opr_6(int,int),hparse_f_opr_7(int,int);
   void hparse_f_opr_8(int,int);
   void hparse_f_opr_9(int,int);
   void hparse_f_opr_10(int,int);
@@ -636,7 +635,7 @@ public:
   int hparse_f_semicolon_and_or_delimiter(int);
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
-  void hparse_f_assignment(int);
+  void hparse_f_assignment(int,int);
   void hparse_f_alter_table();
   int hparse_f_character_set();
   void hparse_f_alter_database();
@@ -1598,6 +1597,7 @@ public:
       TOKEN_KEYWORD_MBRTOUCHES,
       TOKEN_KEYWORD_MBRWITHIN,
       TOKEN_KEYWORD_MD5,
+      TOKEN_KEYWORD_MEDIAN,
       TOKEN_KEYWORD_MEDIUMBLOB,
       TOKEN_KEYWORD_MEDIUMINT,
       TOKEN_KEYWORD_MEDIUMTEXT,
@@ -1677,6 +1677,8 @@ public:
       TOKEN_KEYWORD_PARTIAL,
       TOKEN_KEYWORD_PARTITION,
       TOKEN_KEYWORD_PASSWORD,
+      TOKEN_KEYWORD_PERCENTILE_CONT,
+      TOKEN_KEYWORD_PERCENTILE_DISC,
       TOKEN_KEYWORD_PERCENT_RANK,
       TOKEN_KEYWORD_PERIOD_ADD,
       TOKEN_KEYWORD_PERIOD_DIFF,
