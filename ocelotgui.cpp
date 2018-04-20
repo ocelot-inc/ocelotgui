@@ -932,6 +932,7 @@ void MainWindow::statement_edit_widget_formatter()
         token_type= 1;
         if ((token == TOKEN_KEYWORD_BEGIN)
         || (token == TOKEN_KEYWORD_CASE)
+        || ((((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0) && token == TOKEN_KEYWORD_FOR))
         || (token == TOKEN_KEYWORD_IF)
         || (token == TOKEN_KEYWORD_LOOP)
         || (token == TOKEN_KEYWORD_REPEAT)
@@ -4863,6 +4864,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           /* Following should only occur if we're sure it's MariaDB */
           if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
           ||  (main_token_types[i] == TOKEN_KEYWORD_CASE)
+          ||  ((((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0) && main_token_types[i] == TOKEN_KEYWORD_FOR))
           ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
           ||  (main_token_types[i] == TOKEN_KEYWORD_LOOP)
           ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
@@ -4914,6 +4916,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
         {
           if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
           ||  ((main_token_types[i] == TOKEN_KEYWORD_CASE)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+          ||  (((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0) && (main_token_types[i] == TOKEN_KEYWORD_FOR)    && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
           ||  ((main_token_types[i] == TOKEN_KEYWORD_IF)     && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
           ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
           ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
@@ -10179,6 +10182,15 @@ next_char:
           if (text[j] > '9') goto one_byte_token;
         }
         goto part_of_token;
+      }
+    }
+    /* .. is an operator in Lua and in MariaDB 10.3 */
+    if ((hparse_dbms_mask & (FLAG_VERSION_MARIADB_10_3|FLAG_VERSION_LUA)) != 0)
+    {
+      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == '.'))
+      {
+        n= 2;
+        goto n_byte_token;
       }
     }
     goto one_byte_token;

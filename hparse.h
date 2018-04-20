@@ -9399,6 +9399,55 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
+  else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR, "FOR") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
+    /* ???? This should be "integer-variable or record-variable or cursor" */
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_CURSOR_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    //int hparse_i_of_identifier= hparse_i_of_last_accepted;
+    if (hparse_errno > 0) return;
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN");
+    if (hparse_errno > 0) return;
+    {
+      hparse_f_next_nexttoken();
+      if ((hparse_token == "(")
+       && (hparse_next_token.toUpper() == "SELECT"))
+      {
+        if (hparse_f_select(false, false) == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+      }
+      else if (hparse_next_token.toUpper() == "DO")
+      {
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_CURSOR_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        if (hparse_errno > 0) return;
+      }
+      else
+      {
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "..");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+        if (hparse_errno > 0) return;
+      }
+    }
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DO");
+    if (hparse_errno > 0) return;
+    for (;;)
+    {
+      hparse_f_block(calling_statement_type, block_top);
+      if (hparse_errno > 0) return;
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
+    }
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR, "FOR");
+    if (hparse_errno > 0) return;
+    hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_LABEL_REFER,TOKEN_TYPE_IDENTIFIER, label);
+    if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
+    if (hparse_errno > 0) return;
+  }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
