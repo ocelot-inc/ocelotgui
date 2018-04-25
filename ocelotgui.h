@@ -646,7 +646,7 @@ public:
   void hparse_f_character_set_or_collate();
   void hparse_f_length(bool, bool,bool);
   void hparse_f_enum_or_set();
-  int hparse_f_data_type();
+  int hparse_f_data_type(int);
   void hparse_f_reference_option();
   void hparse_f_reference_definition();
   int hparse_f_create_definition();

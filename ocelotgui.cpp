@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: April 16 2018
+   Last modified: April 25 2018
 */
 
 /*
@@ -10171,7 +10171,17 @@ next_char:
   }
   if (text[char_offset] == '.')     /* . part of token if previous or following is digit. otherwise one-byte token */
   {
-    if ((char_offset + 1 < text_length) && (text[char_offset + 1] >= '0') && (text[char_offset + 1] <= '9')) goto part_of_token;
+    if (char_offset + 1 < text_length)
+    {
+      if ((text[char_offset + 1] >= '0') && (text[char_offset + 1] <= '9')) goto part_of_token;
+      /* .. is an operator in MariaDB 10.3 for ... end for */
+      if ((text[char_offset + 1] == '.')
+       && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0))
+      {
+        n= 2;
+        goto n_byte_token;
+      }
+    }
     if (token_lengths[token_number] > 0)
     {
       if ((text[char_offset - 1] >= '0') && (text[char_offset - 1] <= '9'))
@@ -10182,15 +10192,6 @@ next_char:
           if (text[j] > '9') goto one_byte_token;
         }
         goto part_of_token;
-      }
-    }
-    /* .. is an operator in Lua and in MariaDB 10.3 */
-    if ((hparse_dbms_mask & (FLAG_VERSION_MARIADB_10_3|FLAG_VERSION_LUA)) != 0)
-    {
-      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == '.'))
-      {
-        n= 2;
-        goto n_byte_token;
       }
     }
     goto one_byte_token;

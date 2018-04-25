@@ -883,6 +883,11 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
    || (hparse_statement_type == TOKEN_KEYWORD_HANDLER)
    || (hparse_statement_type == TOKEN_KEYWORD_LOAD)
    || (hparse_statement_type == TOKEN_KEYWORD_SELECT)) s= true;
+  if (hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3)
+  {
+    /* MariaDB allows row-variable-name . field-name */
+    if (hparse_statement_type == TOKEN_KEYWORD_SET) s= true;
+  }
   if (m)
   {
     specific_type= hparse_f_variables(false);
@@ -2357,7 +2362,7 @@ void MainWindow::hparse_f_function_arguments(QString opd)
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
     if (hparse_errno > 0) return;
-    if (hparse_f_data_type() == -1) hparse_f_error();
+    if (hparse_f_data_type(TOKEN_KEYWORD_CAST) == -1) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "CHAR"))
@@ -2599,6 +2604,7 @@ void MainWindow::hparse_f_parenthesized_value_list()
   if (hparse_errno > 0) return;
 }
 
+/* routine_type = procedure, function, lua, or row */
 void MainWindow::hparse_f_parameter_list(int routine_type)
 {
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
@@ -2618,10 +2624,9 @@ void MainWindow::hparse_f_parameter_list(int routine_type)
     }
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_PARAMETER_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
     {
-
       if (routine_type != TOKEN_KEYWORD_LUA)
       {
-        if (hparse_f_data_type() == -1) hparse_f_error();
+        if (hparse_f_data_type(routine_type) == -1) hparse_f_error();
         if (hparse_errno > 0) return;
       }
     }
@@ -2691,11 +2696,15 @@ void MainWindow::hparse_f_assignment(int statement_type, int clause_type)
       if (hparse_errno > 0) return;
     }
     if (hparse_errno > 0) return;
-    if ((statement_type == TOKEN_KEYWORD_SET) || (statement_type == TOKEN_KEYWORD_PRAGMA))
+    if ((statement_type == TOKEN_KEYWORD_SET) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) == 0))
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     }
-    else /* TOKEN_KEYWORD_INSERT | UPDATE | LOAD */
+    else if (statement_type == TOKEN_KEYWORD_PRAGMA)
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    }
+     else /* TOKEN_KEYWORD_INSERT | UPDATE | LOAD */
     {
       if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
     }
@@ -3382,13 +3391,17 @@ void MainWindow::hparse_f_enum_or_set()
 }
 
 /*
+  Called for column_definition (context=TOKEN_KEYWORD_COLUMN), casting
+  (TOKEN_KEYWORD_CAST), declared-variable definition (TOKEN_KEYWORD_DECLARE),
+  function-return (TOKEN_KEYWORD_RETURNS), and parameter-definition
+  in either create-function of create-procedure (TOKEN_KEYWORD_PROCEDURE).
   Todo: we are not distinguishing for the different data-type syntaxes,
   for example in CAST "UNSIGNED INT" is okay but "INT UNSIGNED" is illegal,
   while in CREATE "UNSIGNED INT" is illegal but "UNSIGNED INT" is okay.
   We allow any combination.
   Todo: also, in CAST, only DOUBLE is okay, not DOUBLE PRECISION.
 */
-int MainWindow::hparse_f_data_type()
+int MainWindow::hparse_f_data_type(int context)
 {
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BIT") == 1)
   {
@@ -3753,6 +3766,31 @@ int MainWindow::hparse_f_data_type()
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_BOOLEAN;
   }
+  if (context == TOKEN_KEYWORD_DECLARE)
+  {
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROW") == 1)
+    {
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TYPE") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF");
+        if (hparse_errno > 0) return -1;
+        /* Actually, following could be either table or cursor */
+        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
+        {
+          hparse_f_error();
+          return -1;
+        }
+        return TOKEN_KEYWORD_ROW;
+      }
+      else
+      {
+        hparse_f_parameter_list(TOKEN_KEYWORD_ROW);
+        if (hparse_errno > 0) return -1;
+      }
+      return TOKEN_KEYWORD_ROW;
+    }
+  }
   /* If SQLite-style column definition, anything unreserved is acceptable. */
   /* In fact even nothing-at-all is acceptable, and some reserved words. */
   /* We already accepted BLOB INTEGER NUMERIC REAL TEXT. */
@@ -3939,7 +3977,7 @@ int MainWindow::hparse_f_current_timestamp()
 */
 void MainWindow::hparse_f_column_definition()
 {
-  int data_type= hparse_f_data_type();
+  int data_type= hparse_f_data_type(TOKEN_KEYWORD_COLUMN);
   if (data_type == -1) hparse_f_error();
   if (hparse_errno > 0) return;
   bool generated_seen= false;
@@ -6772,7 +6810,7 @@ void MainWindow::hparse_f_statement(int block_top)
         if (hparse_errno > 0) return;
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RETURNS");
         if (hparse_errno > 0) return;
-        if (hparse_f_data_type() == -1) hparse_f_error();
+        if (hparse_f_data_type(TOKEN_KEYWORD_RETURNS) == -1) hparse_f_error();
         if (hparse_errno > 0) return;
         hparse_f_characteristics();
         if (hparse_errno > 0) return;
@@ -9310,7 +9348,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
         else if (cursor_seen == true) {;}
         else
         {
-          if (hparse_f_data_type() == -1) hparse_f_error();
+          if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1) hparse_f_error();
           if (hparse_errno > 0) return;
           if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT") == 1)
           {
@@ -9403,8 +9441,8 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
-    /* ???? This should be "integer-variable or record-variable or cursor" */
-    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_CURSOR_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    /* Todo: Find out later if integer-variable or record-variable" */
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     //int hparse_i_of_identifier= hparse_i_of_last_accepted;
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN");
@@ -9424,11 +9462,12 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       }
       else
       {
-        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+        hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REVERSE");
+        hparse_f_opr_1(0, 0);
         if (hparse_errno > 0) return;
         hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "..");
         if (hparse_errno > 0) return;
-        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+        hparse_f_opr_1(0, 0);
         if (hparse_errno > 0) return;
       }
     }
@@ -10474,6 +10513,7 @@ void MainWindow::hparse_f_lua_opr_18(int who_is_calling, int allow_flags) /* Pre
   return;
 }
 /* tokenize() treats every "." as a separate token, work around that */
+/* Todo: We could change tokenize() instead. */
 int MainWindow::hparse_f_lua_accept_dotted(unsigned short int flag_version, unsigned char reftype, int proposed_type, QString token)
 {
   if (hparse_errno > 0) return 0;
@@ -10573,6 +10613,7 @@ void MainWindow::hparse_f_cursors(int block_top)
   Todo: For a parameter, make sure it's an OUT parameter.
   TODO: Finding variables could be useful in lots more places.
   TODO: Check: what if there are 1000 variables, does anything overflow?
+  Todo: No need for this to be legal: begin declare x int; select y; end;
 */
 int MainWindow::hparse_f_variables(bool is_mandatory)
 {
