@@ -915,6 +915,7 @@ private:
   QString get_version();
   void print_version();
   void print_help();
+  void setup_stub();
 
   void copy_options_to_main_window();
   void delete_utf8_copies();

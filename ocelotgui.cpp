@@ -8873,12 +8873,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)
   {
-    debug_setup_go(text);
+    if (hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) setup_stub();
+    else debug_setup_go(text);
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_INSTALL)
   {
-    debug_install_go();
+    if (hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) setup_stub();
+    else debug_install_go();
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_EXIT)
@@ -17241,6 +17243,23 @@ void MainWindow::print_help()
   printf("Option                            Value\n");
   printf("--------------------------------- ----------------------------------------\n");
   action_connect_once("Print");
+}
+
+
+/*
+  Routines that start with "setup_*" are a work in progress for the new
+  way that we must do debugger $setup. The old way will no longer work.
+  So far all we have is a stub, which we reach if $setup from mysql 8.0.
+*/
+
+void MainWindow::setup_stub()
+{
+  QMessageBox msgbox;
+  QString s= "Sorry, the ocelotgui debugger won't work with MySQL 8.0. ";
+  s.append("For explanation read https://ocelot.ca/blog/blog/2017/08/22/no-more-mysql-proc-in-mysql-8-0/");
+  s.append("We are working on it and hope to have a new version in a few months.");
+  msgbox.setText(s);
+  msgbox.exec();
 }
 
 /*
