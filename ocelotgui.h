@@ -543,6 +543,7 @@ public:
   QString canonical_font_weight(QString);
   QString canonical_font_style(QString);
   QString connect_stripper(QString value_to_strip, bool strip_doublets_flag);
+  QString connect_unstripper(QString value_to_unstrip);
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
 
   QString ocelot_dbms;                    /* for CONNECT */
@@ -635,6 +636,7 @@ public:
   int hparse_f_semicolon_and_or_delimiter(int);
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
+  void hparse_f_pseudo_statement(int);
   void hparse_f_assignment(int,int);
   void hparse_f_alter_table();
   int hparse_f_character_set();
@@ -687,11 +689,13 @@ public:
   void hparse_f_with_clause(int);
   int hparse_f_values();
   int hparse_f_unionize();
-  int hparse_f_select(bool,bool);
+  int hparse_f_select(bool,bool,bool);
   void hparse_f_where();
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
+  void hparse_f_declare(int, int);
+  int hparse_f_recover();
   void hparse_f_lua_blocklist(int,int);
   void hparse_f_lua_blockseries(int,int,bool);
   int hparse_f_lua_block(int,int,bool);
@@ -915,8 +919,32 @@ private:
   QString get_version();
   void print_version();
   void print_help();
-  void setup_stub();
-
+  int setup_mysql_real_query(char*,char*);
+  int setup_routine_list(QString);
+  int setup_find(QString,QString);
+  int setup_generate(int);
+  int setup_generate_icc_process_user_command_r_server_variables();
+  int setup_append(QString, QString, int);
+  int setup_generate_routine_entry_parameter(QString);
+  int setup_generate_starter(QString, QString, QString, QString);
+  int setup_generate_statements(int, QString, int);
+  int setup_initialize_variables();
+  int setup_get_setup_group_name();
+  QString setup_add_delimiters(QString);
+  int setup_insert_into_statements(QString,int);
+  int setup_insert_into_variables_user_variables(QString,int);
+  int setup_create_setup_log_table();
+  int setup_internal(QString);
+  int setup_drop_routines();
+  void setup_cleanup();
+  int setup_set_session_sql_mode(QString);
+  int setup_generate_icc_core();
+  int setup_generate_statements_debuggable(int, int, int, QString, int, int);
+  int setup_generate_label(int, QString, int);
+  int setup_row_type(int);
+  int setup_determine_what_variables_are_in_scope(int, QString);
+  int setup_generate_statement_text(int, QString, int, int);
+  int setup_generate_statement_text_as_is(int, QString, int);
   void copy_options_to_main_window();
   void delete_utf8_copies();
   void copy_connect_strings_to_utf8(); /* in effect, copy options from main_window */
@@ -1139,7 +1167,7 @@ public:
   unsigned int saved_main_token_count_in_statement;
   unsigned int saved_main_token_number;
 
-  /* main_token_flags[] values. so far there are only twelve but we expect there will be more. */
+  /* main_token_flags[] values. so far there are only sixteen but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
   #define TOKEN_FLAG_IS_BLOCK_END 2
   #define TOKEN_FLAG_IS_ERROR 4
@@ -1154,6 +1182,9 @@ public:
   #define TOKEN_FLAG_IS_NOT_AFTER_SPACE 2048
   #define TOKEN_FLAG_IS_MAYBE_LUA 4096
   #define TOKEN_FLAG_IS_LUA 8192
+  #define TOKEN_FLAG_IS_FLOW_CONTROL 16384
+  #define TOKEN_FLAG_IS_DEBUGGABLE 32768
+  #define TOKEN_FLAG_IS_DECLARE 65536
 
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
@@ -1211,6 +1242,7 @@ public:
       TOKEN_KEYWORD_ASYMMETRIC_VERIFY,
       TOKEN_KEYWORD_ATAN,
       TOKEN_KEYWORD_ATAN2,
+      TOKEN_KEYWORD_ATOMIC,
       TOKEN_KEYWORD_ATTACH,
       TOKEN_KEYWORD_AUTOINCREMENT,
       TOKEN_KEYWORD_AVG,
@@ -1947,6 +1979,7 @@ public:
       TOKEN_KEYWORD_TRIM,
       TOKEN_KEYWORD_TRUE,
       TOKEN_KEYWORD_TRUNCATE,
+      TOKEN_KEYWORD_TYPE,
       TOKEN_KEYWORD_TYPEOF,
       TOKEN_KEYWORD_UCASE,
       TOKEN_KEYWORD_UNBOUNDED,
@@ -2085,6 +2118,7 @@ public:
     TOKEN_KEYWORD_REPEAT_IN_REPEAT_EXPRESSION,
     TOKEN_KEYWORD_HELP_IN_CLIENT,
     TOKEN_KEYWORD_DO_LUA,
+    TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT,
     TOKEN_TYPE_DELIMITER
   };
 
@@ -2206,6 +2240,7 @@ enum {
     TOKEN_REFTYPE_SQLSTATE,
     TOKEN_REFTYPE_STATEMENT,
     TOKEN_REFTYPE_SUBPARTITION,
+    TOKEN_REFTYPE_SWITCH_NAME,
     TOKEN_REFTYPE_TABLE,
     TOKEN_REFTYPE_TABLE_OR_COLUMN,
     TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,

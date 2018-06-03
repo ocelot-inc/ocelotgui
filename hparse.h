@@ -361,7 +361,6 @@ int MainWindow::hparse_f_accept(unsigned short int flag_version, unsigned char r
       equality= true;
     }
   }
-
   if (equality == true)
   {
     /*
@@ -552,6 +551,11 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned short int flag_
     {
       possible= true;
     }
+    if ((hparse_token_type == TOKEN_TYPE_LITERAL_WITH_DIGIT)
+     && (hparse_token.left(2) == "0x"))
+    {
+      possible= true;
+    }
   }
   if (possible)
   {
@@ -700,6 +704,7 @@ int MainWindow::hparse_f_character_set_name()
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_KEYWORD, "UTF16LE") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_KEYWORD, "UTF32") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_KEYWORD, "UTF8") == 1)
+   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_KEYWORD, "UTF8MB3") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_KEYWORD, "UTF8MB4") == 1))
     return 1;
   if (hparse_f_literal(TOKEN_REFTYPE_CHARACTER_SET, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) return 1;
@@ -1320,7 +1325,7 @@ int MainWindow::hparse_f_table_factor()
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
   {
-    if (hparse_f_select(false, false) == 1)
+    if (hparse_f_select(false, false, false) == 1)
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
       if (hparse_errno > 0) return 0;
@@ -1750,7 +1755,7 @@ void MainWindow::hparse_f_opr_7(int who_is_calling, int allow_flags) /* Preceden
   {
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
     if (hparse_errno > 0) return;
-    if (hparse_f_select(false, false) == 0) hparse_f_error();
+    if (hparse_f_select(false, false, false) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return;
@@ -1829,7 +1834,7 @@ void MainWindow::hparse_f_opr_7(int who_is_calling, int allow_flags) /* Preceden
           /* todo: what if some mad person has created a function named any or some? */
           hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
           if (hparse_errno > 0) return;
-          if (hparse_f_select(false, false) == 0) hparse_f_error();
+          if (hparse_f_select(false, false, false) == 0) hparse_f_error();
           if (hparse_errno > 0) return;
           hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
           if (hparse_errno > 0) return;
@@ -2167,7 +2172,7 @@ void MainWindow::hparse_f_opr_18(int who_is_calling, int allow_flags) /* Precede
     if ((hparse_subquery_is_allowed == true)
      && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT") == 1))
     {
-      hparse_f_select(true, false);
+      hparse_f_select(true, false, false);
       if (hparse_errno > 0) return;
     }
     else if ((allow_flags & ALLOW_FLAG_IS_MULTI) != 0)
@@ -2369,14 +2374,14 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   {
     do
     {
+      hparse_f_opr_1(0, 0);
+      if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USING") == 1)
       {
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
         break;
       }
-      hparse_f_opr_1(0, 0);
-      if (hparse_errno > 0) return;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
   else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "CONVERT"))
@@ -2664,7 +2669,7 @@ void MainWindow::hparse_f_parenthesized_multi_expression(int *expression_count)
   //if (hparse_errno > 0) return;
   if ((hparse_subquery_is_allowed == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT") == 1))
   {
-    hparse_f_select(true, false);
+    hparse_f_select(true, false, false);
     if (hparse_errno > 0) return;
     (*expression_count)= 2;          /* we didn't really count, but guess it's more than 1 */
   }
@@ -3768,29 +3773,38 @@ int MainWindow::hparse_f_data_type(int context)
   }
   if (context == TOKEN_KEYWORD_DECLARE)
   {
-    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROW") == 1)
+    bool is_row_seen= false;
+    bool is_type_seen= false;
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW, "ROW") == 1)
     {
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-      if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TYPE") == 1)
+      is_row_seen= true;
+    }
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TYPE, "TYPE") == 1)
+    {
+      if (is_row_seen == false) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+      is_type_seen= true;
+    }
+    if (is_type_seen == true)
+    {
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF");
+      if (hparse_errno > 0) return -1;
+      /* Actually, following could be either table or cursor */
+      if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
       {
-        hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF");
-        if (hparse_errno > 0) return -1;
-        /* Actually, following could be either table or cursor */
-        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
-        {
-          hparse_f_error();
-          return -1;
-        }
-        return TOKEN_KEYWORD_ROW;
-      }
-      else
-      {
-        hparse_f_parameter_list(TOKEN_KEYWORD_ROW);
-        if (hparse_errno > 0) return -1;
+        hparse_f_error();
+        return -1;
       }
       return TOKEN_KEYWORD_ROW;
     }
+    if ((is_row_seen == true) && (is_type_seen == false))
+    {
+      hparse_f_parameter_list(TOKEN_KEYWORD_ROW);
+      if (hparse_errno > 0) return -1;
+      return TOKEN_KEYWORD_ROW;
+    }
   }
+
   /* If SQLite-style column definition, anything unreserved is acceptable. */
   /* In fact even nothing-at-all is acceptable, and some reserved words. */
   /* We already accepted BLOB INTEGER NUMERIC REAL TEXT. */
@@ -5278,7 +5292,7 @@ void MainWindow::hparse_f_alter_or_create_view()
   if (hparse_errno > 0) return;
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
   if (hparse_errno > 0) return;
-  if (hparse_f_select(false, false) == 0) hparse_f_error();
+  if (hparse_f_select(false, false, false) == 0) hparse_f_error();
   if (hparse_errno > 0) return;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1)
   {
@@ -5665,7 +5679,7 @@ void MainWindow::hparse_f_insert_or_replace()
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 0) break;
     }
   }
-  else if (hparse_f_select(false, false) == 1)
+  else if (hparse_f_select(false, false, false) == 1)
   {
     return;
   }
@@ -5788,6 +5802,8 @@ int MainWindow::hparse_f_into()
   Todo: A problem with WITH is that it makes it hard to know what the true
   statement type is. Perhaps we should change main_token_flags?
   See also get_statement_type().
+  For the statement that follows WITH, turn off TOKEN_FLAG_IS_START_STATEMENT
+  because that wrecks the debugger. But it starts a clause, perhaps.
 */
 void MainWindow::hparse_f_with_clause(int block_top)
 {
@@ -5807,13 +5823,13 @@ void MainWindow::hparse_f_with_clause(int block_top)
   }
   else
   {
-    hparse_f_select(false, false);
+    hparse_f_select(false, false, false);
     if (hparse_errno > 0) return;
   }
   hparse_f_expect(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
   if (hparse_f_is_special_verb(TOKEN_KEYWORD_WITH) == false) return;
-  hparse_f_statement(block_top);
+  hparse_f_pseudo_statement(block_top);
   return;
 }
 
@@ -5859,7 +5875,7 @@ int MainWindow::hparse_f_unionize()
     hparse_f_values();
     if (hparse_errno > 0) return 0;
   }
-  else if (hparse_f_select(false, false) == 0)
+  else if (hparse_f_select(false, false, false) == 0)
   {
     hparse_f_error();
     return 0;
@@ -5871,8 +5887,11 @@ int MainWindow::hparse_f_unionize()
 
 /*
   "SELECT ..." or "(SELECT ...)"
+  Todo: For a SELECT statement (not a subquery) that starts with "(",
+        TOKEN_FLAG_IS_START_STATEMENT should go on for the "(" rather
+        than for the "SELECT". Otherwise the debugger might choke (?).
 */
-int MainWindow::hparse_f_select(bool select_is_already_eaten, bool is_statement)
+int MainWindow::hparse_f_select(bool select_is_already_eaten, bool is_statement, bool is_top)
 {
   if ((hparse_statement_type == 0)
    || (hparse_statement_type == TOKEN_KEYWORD_WITH))
@@ -5885,7 +5904,7 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten, bool is_statement)
     /* (SELECT is the only statement that can be in parentheses, eh?) */
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
     {
-      if (hparse_f_select(false, is_statement) == 0)
+      if (hparse_f_select(false, is_statement, false) == 0)
       {
         hparse_f_error();
         return 0;
@@ -5896,7 +5915,7 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten, bool is_statement)
       {
         main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
         if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)) {;}
-        int return_value= hparse_f_select(false, is_statement);
+        int return_value= hparse_f_select(false, is_statement, false);
         if (hparse_errno > 0) return 0;
         if (return_value == 0)
         {
@@ -5911,7 +5930,15 @@ int MainWindow::hparse_f_select(bool select_is_already_eaten, bool is_statement)
       return 1;
     }
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT") == 0) return 0;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    /*
+      The formatter would be happy if we considered this SELECT to be
+      a statement start, but the debugger would get horribly confused,
+      unless of course it really is a SELECT statement not part of one.
+    */
+    if (is_top == false)
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+    else
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
   }
   for (;;)
   {
@@ -6337,7 +6364,7 @@ int MainWindow::hparse_f_explainable_statement(int block_top)
      || (hparse_token_upper == "SELECT")
      || (hparse_token_upper == "UPDATE"))
     {
-      hparse_f_statement(block_top);
+      hparse_f_pseudo_statement(block_top);
       if (hparse_errno > 0) return 0;
       return 1;
     }
@@ -6354,7 +6381,7 @@ int MainWindow::hparse_f_explainable_statement(int block_top)
      || (hparse_token_upper == "SELECT")
      || (hparse_token_upper == "UPDATE"))
     {
-      hparse_f_statement(block_top);
+      hparse_f_pseudo_statement(block_top);
       if (hparse_errno > 0) return 0;
       return 1;
     }
@@ -6365,7 +6392,7 @@ int MainWindow::hparse_f_explainable_statement(int block_top)
   }
   else if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
   {
-    hparse_f_statement(block_top);
+    hparse_f_pseudo_statement(block_top);
     if (hparse_errno > 0) return 0;
     return 1;
   }
@@ -6388,7 +6415,7 @@ void MainWindow::hparse_f_statement(int block_top)
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALTER"))
   {
     hparse_statement_type= TOKEN_KEYWORD_ALTER;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     unsigned short int hparse_flags; bool fulltext_seen;
     hparse_f_alter_or_create_clause(TOKEN_KEYWORD_ALTER, &hparse_flags, &fulltext_seen);
     if ((((hparse_flags) & HPARSE_FLAG_DATABASE) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1))
@@ -6472,7 +6499,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ANALYZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     int table_or_view;
     if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_ANALYZE, &table_or_view) == 1)
     {
@@ -6533,7 +6560,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN_WORK, "BEGIN") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_BEGIN_WORK; /* don't confuse with BEGIN for compound */
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WORK") == 1) {;}
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
@@ -6547,14 +6574,14 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINLOG") == 1)
   {
     //hparse_statement_type= TOKEN_KEYWORD_BINLOG;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CACHE") == 1)
   {
     //hparse_statement_type= TOKEN_KEYWORD_CACHE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX");
     if (hparse_errno > 0) return;
     do
@@ -6598,7 +6625,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CALL") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_CALL;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_call();
     if (hparse_errno > 0) return;
     return;
@@ -6606,7 +6633,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHANGE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_CHANGE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MASTER") == 1)
     {
       if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING);
@@ -6699,7 +6726,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_CHECK;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") == 1)
     {
       if (hparse_errno > 0) return;
@@ -6734,7 +6761,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECKSUM") == 1)
   {
     //hparse_statement_type= TOKEN_KEYWORD_CHECKSUM;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
     if (hparse_errno > 0) return;
     do
@@ -6749,7 +6776,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COMMIT") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_COMMIT;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WORK") == 1) {;}
     hparse_f_commit_or_rollback();
     return;
@@ -6757,13 +6784,13 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONNECT"))
   {
     hparse_statement_type= TOKEN_KEYWORD_CONNECT;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     return;
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CREATE, "CREATE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_CREATE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     unsigned short int hparse_flags;
     bool fulltext_seen;
     hparse_f_alter_or_create_clause(TOKEN_KEYWORD_CREATE, &hparse_flags, &fulltext_seen);
@@ -6984,14 +7011,14 @@ void MainWindow::hparse_f_statement(int block_top)
         bool select_is_seen= false;
         if (ignore_or_as_seen == true)
         {
-          if (hparse_f_select(false, false) == 0)
+          if (hparse_f_select(false, false, false) == 0)
           {
             hparse_f_error();
             return;
           }
           select_is_seen= true;
         }
-        else if (hparse_f_select(false, false) != 0) select_is_seen= true;
+        else if (hparse_f_select(false, false, false) != 0) select_is_seen= true;
         if (hparse_errno > 0) return;
         if ((element_is_seen == false) && (select_is_seen == false))
         {
@@ -7155,7 +7182,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEALLOCATE, "DEALLOCATE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_DEALLOCATE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PREPARE");
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_STATEMENT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -7166,7 +7193,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     /* todo: look up how partitions are supposed to be handled */
     hparse_statement_type= TOKEN_KEYWORD_DELETE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_subquery_is_allowed= true;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOW_PRIORITY")) {;}
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "QUICK")) {;}
@@ -7247,21 +7274,21 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DESC, "DESC") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_DESC;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_explain_or_describe(block_top);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DESCRIBE, "DESCRIBE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_DESCRIBE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_explain_or_describe(block_top);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DETACH, "DETACH") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_DETACH;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1) {;}
     hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
@@ -7269,7 +7296,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO, "DO"))
   {
     hparse_statement_type= TOKEN_KEYWORD_DO;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_subquery_is_allowed= true;
     do
     {
@@ -7282,7 +7309,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_DROP;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     bool temporary_seen= false, online_seen= false;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEMPORARY") == 1) temporary_seen= true;
     if ((temporary_seen == false) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0))
@@ -7481,7 +7508,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END"))
   {
     hparse_statement_type= TOKEN_KEYWORD_COMMIT;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_commit_or_rollback();
     return;
   }
@@ -7489,7 +7516,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXECUTE, "EXECUTE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_EXECUTE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MARIADB_10_2_3, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_IMMEDIATE, "IMMEDIATE") == 1)
     {
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MARIADB_10_2_3, TOKEN_LITERAL_FLAG_STRING) == 0)
@@ -7509,7 +7536,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXPLAIN, "EXPLAIN"))
   {
     hparse_statement_type= TOKEN_KEYWORD_EXPLAIN;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXPLAIN, "QUERY") == 1)
     {
       hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXPLAIN, "PLAN");
@@ -7521,7 +7548,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FLUSH, "FLUSH") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_FLUSH;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NO_WRITE_TO_BINLOG") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOCAL") == 1)) {;}
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLES") == 1)
@@ -7608,7 +7635,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GET, "GET"))
   {
     hparse_statement_type= TOKEN_KEYWORD_GET;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT");
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DIAGNOSTICS");
     if (hparse_errno > 0) return;
@@ -7639,7 +7666,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GRANT, "GRANT"))
   {
     hparse_statement_type= TOKEN_KEYWORD_GRANT;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     bool proxy_seen= false;
     bool role_name_seen= false;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PROXY") == 1)
@@ -7667,7 +7694,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HANDLER, "HANDLER"))
   {
     hparse_statement_type= TOKEN_KEYWORD_HANDLER;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPEN") == 1)
@@ -7716,7 +7743,7 @@ void MainWindow::hparse_f_statement(int block_top)
       not documented, we would treat it as an error.
     */
     hparse_statement_type= TOKEN_KEYWORD_HELP;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
@@ -7724,7 +7751,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_INSERT;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
     hparse_subquery_is_allowed= true;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOW_PRIORITY") == 1) {;}
@@ -7748,7 +7775,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSTALL, "INSTALL") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_INSTALL;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN");
@@ -7772,7 +7799,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_KILL, "KILL"))
   {
     hparse_statement_type= TOKEN_KEYWORD_KILL;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HARD") == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SOFT");
@@ -7790,7 +7817,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOAD, "LOAD"))
   {
     hparse_statement_type= TOKEN_KEYWORD_LOAD;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATA") == 1)
     {
       if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOW_PRIORITY") == 1)
@@ -7945,7 +7972,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOCK, "LOCK"))
   {
     hparse_statement_type= TOKEN_KEYWORD_LOCK;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLES"); /* TABLE is undocumented */
     if (hparse_errno > 0) return;
     do
@@ -7979,7 +8006,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LUA, "LUA"))
   {
     hparse_statement_type= TOKEN_KEYWORD_LUA;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     return;
@@ -7987,7 +8014,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OPTIMIZE, "OPTIMIZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_OPTIMIZE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     int table_or_view;
     if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_OPTIMIZE, &table_or_view) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
@@ -7995,7 +8022,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRAGMA, "PRAGMA") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_PRAGMA;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
     bool is_parenthesis_seen= false;
@@ -8016,7 +8043,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PREPARE, "PREPARE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_PREPARE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_STATEMENT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
@@ -8028,7 +8055,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PURGE, "PURGE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_PURGE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MASTER");
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOGS");
@@ -8050,7 +8077,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RELEASE, "RELEASE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_RELEASE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SAVEPOINT");
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SAVEPOINT");
@@ -8062,7 +8089,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REINDEX, "REINDEX") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_REINDEX;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE);
     if (hparse_errno > 0) return;
   }
@@ -8070,7 +8097,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_RENAME;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USER"))
     {
       do
@@ -8102,7 +8129,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPAIR, "REPAIR") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_REPAIR;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     int table_or_view;
     if (hparse_f_analyze_or_optimize(TOKEN_KEYWORD_REPAIR, &table_or_view) == 1)
     {
@@ -8129,7 +8156,7 @@ void MainWindow::hparse_f_statement(int block_top)
     if (hparse_errno > 0) return;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
     hparse_statement_type= TOKEN_KEYWORD_REPLACE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     //hparse_statement_type= TOKEN_KEYWORD_INSERT;
     hparse_subquery_is_allowed= true;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOW_PRIORITY") == 1) {;}
@@ -8140,7 +8167,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RESET, "RESET"))
   {
     hparse_statement_type= TOKEN_KEYWORD_RESET;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     do
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MASTER") == 1)
@@ -8171,7 +8198,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RESIGNAL, "RESIGNAL"))
   {
     hparse_statement_type= TOKEN_KEYWORD_RESIGNAL;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     /* We accept RESIGNAL even if we're not in a condition handler; we're just a recognizer. */
     hparse_f_signal_or_resignal(TOKEN_KEYWORD_RESIGNAL, block_top);
     if (hparse_errno > 0) return;
@@ -8179,7 +8206,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REVOKE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_REVOKE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     bool role_name_seen= false;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PROXY") == 1)
     {
@@ -8205,7 +8232,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     int saved_hparse_i_of_last_accepted= hparse_i_of_last_accepted;
     hparse_statement_type= TOKEN_KEYWORD_ROLLBACK;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WORK");
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO") == 1)
     {
@@ -8222,19 +8249,19 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SAVEPOINT, "SAVEPOINT") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_SAVEPOINT;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_SAVEPOINT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
     return;
   }
-  else if (hparse_f_select(false, true) == 1)
+  else if (hparse_f_select(false, true, true) == 1)
   {
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET"))
   {
     hparse_statement_type= TOKEN_KEYWORD_SET;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_subquery_is_allowed= true;
     bool global_seen= false;
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GLOBAL") == 1)
@@ -8370,7 +8397,7 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
       if (hparse_errno > 0) return;
-      hparse_f_statement(block_top);
+      hparse_f_pseudo_statement(block_top);
       if (hparse_errno > 0) return;
       return;
     }
@@ -8382,7 +8409,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_SHOW;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SLAVES");
@@ -8842,27 +8869,27 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHUTDOWN, "SHUTDOWN"))
   {
     hparse_statement_type= TOKEN_KEYWORD_SHUTDOWN;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SIGNAL, "SIGNAL"))
   {
     hparse_statement_type= TOKEN_KEYWORD_SIGNAL;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_signal_or_resignal(TOKEN_KEYWORD_SIGNAL, block_top) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SONAME, "SONAME") == 1))
   {
     hparse_statement_type= TOKEN_KEYWORD_SONAME;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_START, "START"))
   {
     hparse_statement_type= TOKEN_KEYWORD_START;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRANSACTION") == 1)
     {
       if (hparse_errno > 0) return;
@@ -8987,7 +9014,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STOP, "STOP") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_STOP;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GROUP_REPLICATION") == 1) {;}
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1)
     {
@@ -9014,7 +9041,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_TRUNCATE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
     if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
@@ -9023,7 +9050,7 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNINSTALL, "UNINSTALL") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_UNINSTALL;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -9040,14 +9067,14 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNLOCK, "UNLOCK"))
   {
     hparse_statement_type= TOKEN_KEYWORD_UNLOCK;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLES"); /* TABLE is undocumented */
     return;
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UPDATE, "UPDATE"))
   {
     hparse_statement_type= TOKEN_KEYWORD_UPDATE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OR") == 1)
     {
       hparse_f_conflict_algorithm();
@@ -9099,26 +9126,26 @@ void MainWindow::hparse_f_statement(int block_top)
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VACUUM, "VACUUM"))
   {
     hparse_statement_type= TOKEN_KEYWORD_VACUUM;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     return;
   }
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES"))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_values();
     return;
   }
   else if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH"))
   {
     hparse_statement_type= TOKEN_KEYWORD_WITH;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_with_clause(block_top);
     return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_XA, "XA"))
   {
     hparse_statement_type= TOKEN_KEYWORD_XA;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "START") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN_XA, "BEGIN") == 1))
     {
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT) == 0) hparse_f_error();
@@ -9183,6 +9210,24 @@ void MainWindow::hparse_f_statement(int block_top)
 
 
 /*
+  ANALYZE, EXPLAIN, SET STATEMENT, and WITH can contain sub-statements
+  that syntactically are complete, and that's okay, but we don't want to
+  turn on the is_start_statement flag for sub-statements. We would
+  confuse the debugger.
+*/
+void MainWindow::hparse_f_pseudo_statement(int block_top)
+{
+  int hparse_j= hparse_i;
+  hparse_f_statement(block_top);
+  if ((main_token_flags[hparse_j] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+  {
+    main_token_flags[hparse_j] &= (~TOKEN_FLAG_IS_START_STATEMENT);
+    main_token_flags[hparse_j] &= (~TOKEN_FLAG_IS_DEBUGGABLE);
+    main_token_flags[hparse_j] |= TOKEN_FLAG_IS_START_CLAUSE;
+  }
+}
+
+/*
   compound statement, or statement
   Pass: calling_statement_type = 0 (top level) | TOKEN_KEYWORD_FUNCTION/PROCEDURE/EVENT/TRIGGER
 */
@@ -9217,7 +9262,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     {
       label= hparse_token;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
       hparse_i_of_block= hparse_i_of_last_accepted;
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
@@ -9244,11 +9289,11 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   {
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_statement_type= TOKEN_KEYWORD_BEGIN;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     hparse_begin_seen= true;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ATOMIC");
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ATOMIC, "ATOMIC");
       if (hparse_errno > 0) return;
     }
     else
@@ -9266,101 +9311,18 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DECLARE") == 1)
       {
-        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
-        if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONTINUE") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXIT") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNDO") == 1))
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DECLARE;
+        hparse_f_declare(calling_statement_type, block_top);
+        if (hparse_errno > 0)
         {
-          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HANDLER");
+          if (hparse_f_recover() == 2) return;
+          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
           if (hparse_errno > 0) return;
-          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
-          if (hparse_errno > 0) return;
-          do
-          {
-            if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLSTATE") == 1)
-            {
-              hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUE");
-              if (hparse_f_literal(TOKEN_REFTYPE_SQLSTATE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
-              if (hparse_errno > 0) return;
-            }
-            else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLWARNING") == 1) {;}
-            else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
-            {
-              hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOUND");
-              if (hparse_errno > 0) return;
-            }
-            else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLEXCEPTION") == 1) {;}
-            else if (hparse_f_conditions(block_top) == 1) {;}
-            else
-            {
-              if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
-            }
-            if (hparse_errno > 0) return;
-          } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-          hparse_f_block(calling_statement_type, block_top);
-          continue;
         }
-        int identifier_count= 0;
-        bool condition_seen= false;
-        bool cursor_seen= false;
-        do
-        {
-          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_OR_CURSOR,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-          int hparse_i_of_identifier= hparse_i_of_last_accepted;
-          if (hparse_errno > 0) return;
-          ++identifier_count;
-          if ((identifier_count == 1) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONDITION") == 1))
-          {
-            main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_CONDITION_DEFINE;
-            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
-            if (hparse_errno > 0) return;
-            if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLSTATE") == 1)
-            {
-              hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUE");
-              if (hparse_f_literal(TOKEN_REFTYPE_SQLSTATE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
-            }
-            else
-            {
-              if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
-            }
-            if (hparse_errno > 0) return;
-            condition_seen= true;
-            break;
-          }
-          if ((identifier_count == 1) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURSOR") == 1))
-          {
-            main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_CURSOR_DEFINE;
-            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
-            if (hparse_errno > 0) return;
-            if (hparse_f_select(false, false) == 0)
-            {
-              hparse_f_error();
-              return;
-            }
-            cursor_seen= true;
-          }
-          else
-          {
-            main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_VARIABLE_DEFINE;
-          }
-        } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-        if (condition_seen == true) {;}
-        else if (cursor_seen == true) {;}
-        else
-        {
-          if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1) hparse_f_error();
-          if (hparse_errno > 0) return;
-          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT") == 1)
-          {
-            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error(); /* todo: must it really be a literal? */
-            if (hparse_errno > 0) return;
-          }
-        }
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
-        if (hparse_errno > 0) return;
       }
       else break;
     }
+
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 0)
     {
       for (;;)
@@ -9378,7 +9340,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE, "CASE") == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     int when_count= 0;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 0)
@@ -9419,8 +9381,13 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
         }
       }
       if (break_word == TOKEN_KEYWORD_END) break;
-      if (break_word == TOKEN_KEYWORD_WHEN) continue;
+      if (break_word == TOKEN_KEYWORD_WHEN)
+      {
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
+        continue;
+      }
       assert(break_word == TOKEN_KEYWORD_ELSE);
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
       for (;;)
       {
         hparse_f_block(calling_statement_type, block_top);
@@ -9437,22 +9404,22 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR, "FOR") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT, "FOR") == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     /* Todo: Find out later if integer-variable or record-variable" */
     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     //int hparse_i_of_identifier= hparse_i_of_last_accepted;
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN");
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IN, "IN");
     if (hparse_errno > 0) return;
     {
       hparse_f_next_nexttoken();
       if ((hparse_token == "(")
        && (hparse_next_token.toUpper() == "SELECT"))
       {
-        if (hparse_f_select(false, false) == 0) hparse_f_error();
+        if (hparse_f_select(false, false, false) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
       else if (hparse_next_token.toUpper() == "DO")
@@ -9481,7 +9448,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     }
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
-    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR, "FOR");
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT, "FOR");
     if (hparse_errno > 0) return;
     hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_LABEL_REFER,TOKEN_TYPE_IDENTIFIER, label);
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
@@ -9489,7 +9456,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF") == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
     for (;;)
@@ -9500,7 +9467,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "THEN");
       if (hparse_errno > 0) return;
-      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
       int break_word= 0;
       for (;;)
       {
@@ -9525,11 +9492,11 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       }
       if (break_word == TOKEN_KEYWORD_ELSEIF)
       {
-        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
         continue;
       }
       assert(break_word == TOKEN_KEYWORD_ELSE);
-      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
       for (;;)
       {
         hparse_f_block(calling_statement_type, block_top);
@@ -9548,7 +9515,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOOP, "LOOP") == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
@@ -9566,7 +9533,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPEAT, "REPEAT") == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
@@ -9585,13 +9552,13 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPEAT, "REPEAT");
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER,TOKEN_TYPE_IDENTIFIER, label)) return;
+    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER,TOKEN_TYPE_IDENTIFIER, label);
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ITERATE, "ITERATE") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEAVE") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_labels(block_top);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
@@ -9599,7 +9566,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLOSE, "CLOSE") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_cursors(block_top);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
@@ -9607,7 +9574,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FETCH, "FETCH") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NEXT") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
@@ -9629,7 +9596,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OPEN, "OPEN") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_cursors(block_top);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
@@ -9638,7 +9605,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   else if ((calling_statement_type == TOKEN_KEYWORD_FUNCTION)
         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RETURN, "RETURN") == 1))
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0, 0);
     if (hparse_errno > 0) return;
@@ -9647,7 +9614,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "WHILE") == 1)
   {
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0, 0);
@@ -9673,16 +9640,181 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   else
   {
     hparse_f_statement(block_top);
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0)
+    {
+      if (hparse_f_recover() == 2) return;
+    }
     /* This kludge occurs more than once. */
     if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
     {
-      if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
+      if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0)
+      {
+        hparse_f_error();
+      }
     }
     if (hparse_errno > 0) return;
     return;
   }
 }
+
+void MainWindow::hparse_f_declare(int calling_statement_type, int block_top)
+{
+  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONTINUE") == 1)
+   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXIT") == 1)
+   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNDO") == 1))
+  {
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HANDLER");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
+    if (hparse_errno > 0) return;
+    do
+    {
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLSTATE") == 1)
+      {
+        hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUE");
+        if (hparse_f_literal(TOKEN_REFTYPE_SQLSTATE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+      }
+      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLWARNING") == 1) {;}
+      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOUND");
+        if (hparse_errno > 0) return;
+      }
+      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLEXCEPTION") == 1) {;}
+      else if (hparse_f_conditions(block_top) == 1) {;}
+      else
+      {
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
+      }
+      if (hparse_errno > 0) return;
+    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+    hparse_f_block(calling_statement_type, block_top);
+    return;
+  }
+  int identifier_count= 0;
+  bool condition_seen= false;
+  bool cursor_seen= false;
+  do
+  {
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_OR_CURSOR,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    int hparse_i_of_identifier= hparse_i_of_last_accepted;
+    if (hparse_errno > 0) return;
+    ++identifier_count;
+    if ((identifier_count == 1) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONDITION") == 1))
+    {
+      main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_CONDITION_DEFINE;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
+      if (hparse_errno > 0) return;
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLSTATE") == 1)
+      {
+        hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUE");
+        if (hparse_f_literal(TOKEN_REFTYPE_SQLSTATE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+      }
+      else
+      {
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
+      }
+      if (hparse_errno > 0) return;
+      condition_seen= true;
+      break;
+    }
+    if ((identifier_count == 1) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURSOR") == 1))
+    {
+      main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_CURSOR_DEFINE;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
+      if (hparse_errno > 0) return;
+      if (hparse_f_select(false, false, false) == 0)
+      {
+        hparse_f_error();
+        return;
+      }
+      cursor_seen= true;
+    }
+    else
+    {
+      main_token_reftypes[hparse_i_of_identifier]= TOKEN_REFTYPE_VARIABLE_DEFINE;
+    }
+  } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  if (condition_seen == true) {;}
+  else if (cursor_seen == true) {;}
+  else
+  {
+    if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1) hparse_f_error();
+    if (hparse_errno > 0) return;
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT") == 1)
+    {
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error(); /* todo: must it really be a literal? */
+      if (hparse_errno > 0) return;
+    }
+  }
+  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
+  if (hparse_errno > 0) return;
+}
+
+
+/*
+  Recovery
+  Sometimes parse errors happen because we missed some new|unknown
+  MySQL/MariaDB syntax. Since the debugger depends on hparse now, we'll
+  try to recover (and may as well do so even if it's not debugger), thus:
+  In hparse_f_block(), if hparse_f_statement() fails, or if
+  hparse_f_declare() fails, instead of return
+  with error, call hparse_f_recover() and proceed. In hparse_f_recover()
+  we skip ahead to the next ";" (or next delimiter) and carry on.
+  (We don't carry on if hparse_f_recover() returns 2, though.)
+  Todo: There are other spots inside hparse_f_block() where we could try
+        to recover: e.g. in ITERATE or RETURN statements. But failure to
+        see "END" is not recoverable.
+  Todo: maybe hparse_f_recover() should handle all hparse_f_opr1() fails
+        especially failure of hparse_f_opr_1() in a loop condition so
+        skip to end of the operand not to the next ";"
+  Todo: The error message must refer to the first error, right now we've
+        got it pointing to the last error.
+  Todo: there might be references to functions that we could try to
+        parse anyway -- missing token_reftype is bad for debugging.
+        So the skipping should be: "if identifier followed by ( ...
+        else if ; ... else anything else" but you have to be sure
+        it's not "create table x (" and maybe other false markers exist
+        e.g.
+          hparse_f_accept("[identifier]")
+          else hparse_f_accept("[literal]")
+          else hparse_f_accept(';")
+          else
+            main_token_reftypes[hparse_i]= reftype;
+            hparse_expected= "";
+            hparse_i_of_last_accepted= hparse_i;
+            hparse_f_nexttoken();
+            ++hparse_count_of_accepts;
+  Todo: save the error count, it is needed later for "Warning: some statements skipped".
+        at the end, you still have to return an error, or errors  Todo: document this behaviour
+  Todo: this doesn't mean you can get away with failing to recognize good syntax forever
+  Todo: ideally we could have recoveries inside individual statements
+*/
+int MainWindow::hparse_f_recover()
+{
+  QString token;
+  int i;
+  for (i= hparse_i;; ++i)
+  {
+    if (main_token_lengths[i] == 0) return 2;
+    token= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+    {
+      if ((token == ";")
+       || (token.toUpper() == "\\G")
+       || (token == hparse_delimiter_str))
+        break;
+    }
+  }
+  if (main_token_lengths[i + 1] == 0) return 2;
+  hparse_errno= 0;
+  ++hparse_errno_count;
+  hparse_i= i - 1;
+  hparse_token= hparse_prev_token= "";
+  hparse_f_nexttoken(); /* so we're pointing at ";" again, I hope */
+  return 0;
+}
+
 
 #ifdef DBMS_TARANTOOL
 /*
@@ -10720,6 +10852,7 @@ void MainWindow::hparse_f_multi_block(QString text)
   else hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
   hparse_i= -1;
   hparse_delimiter_str= ocelot_delimiter_str;
+  hparse_errno_count= 0;
   for (;;)
   {
     hparse_statement_type= -1;
@@ -11436,6 +11569,7 @@ int MainWindow::hparse_f_client_statement()
             if (hparse_errno > 0) return 0;
           } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
         }
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ")");
       }
     }
      //|| (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_DELETE, "$DELETE") == 1)
@@ -11465,6 +11599,7 @@ int MainWindow::hparse_f_client_statement()
     {
       if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BREAKPOINTS") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CALL_STACK") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PREPARED_STATEMENTS") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SERVER_VARIABLES") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USER_VARIABLES") == 1)
        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARIABLES") == 1))
@@ -11484,6 +11619,20 @@ int MainWindow::hparse_f_client_statement()
     }
     else if (hparse_f_acceptn(TOKEN_KEYWORD_DEBUG_SETUP, "$SETUP", 5) == 1)
     {
+      while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1)
+      {
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_SWITCH_NAME,TOKEN_TYPE_IDENTIFIER, "TRACK_STATEMENTS") == 1) {;}
+        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_SWITCH_NAME,TOKEN_TYPE_IDENTIFIER, "TRACK_USER_VARIABLES") == 1) {;}
+        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_SWITCH_NAME,TOKEN_TYPE_IDENTIFIER, "TRACK_DECLARED_VARIABLES") == 1) {;}
+        else hparse_f_error();
+        if (hparse_errno > 0) return 0;
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "0") == 1) {;}
+        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "1") == 1) {;}
+        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "2") == 1) {;}
+        else hparse_f_error();
+        if (hparse_errno > 0) return 0;
+      }
       do
       {
         if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE, TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE) == 0) hparse_f_error();

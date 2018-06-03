@@ -6,6 +6,10 @@ become familiar with the ocelotgui client and try out the
 simple demonstration on the ocelot.ca blog
 http://ocelot.ca/blog/blog/2015/03/02/the-ocelotgui-debugger/.
 
+Temporary warning: for debugging MySQL version 8.0 routines,
+you need a recent ocelotgui version as pushed to source on
+or after June 2018.
+
 Statements
 ----------
 
@@ -94,7 +98,7 @@ $information status
   What it's for: showing information about debugger status
   Syntax:        $inf[ormation status]
   Shortcuts:     Alt+8, or via menu: Debug|Information
-                 (At time of writing, Menu does not work properly.)
+                 (Choosing from the menu may not work on some platforms.)
   Example:       $information status;
                  select * from xxxmdbug.information_status;
   Remarks:       The $information status statement will populate a table
@@ -131,8 +135,9 @@ $leave
                  loop.
   Example:       Suppose this routine is being debugged:
                  begin
+                   declare x int;
                    set x = 0;
-                   while x > 5 do
+                   while x < 5 do
                      set x = x + 0;
                      end while;
                    end
@@ -140,6 +145,8 @@ $leave
                  program running -- in an infinite loop.
                  One way to break out of the loop is with
                  "$set x = 6;", another way is with $leave.
+                 ($leave will also continue, so if you want
+                 to stop after leaving you must set a brekapoint.)
   Remarks:       If the $leave statement is used when the
                  routine is not in a loop, consequences are
                  undefined -- this is not recommended. 
@@ -151,7 +158,7 @@ $next
   Requirements:  The debugger must be running (see $debug).
   Examples:      Suppose that the current line in procedure p is
                  select f() from t;
-                 After $step, the current line changes to
+                 After $next, the current line changes to
                  the line following the select statement,
                  or (if this was the last line) routine exit.
   Remarks:       $next is different from $step because $step
@@ -163,7 +170,7 @@ $refresh breakpoints
   Example:       $refresh breakpoints;
                  select * from xxxmdbug.breakpoints;
   Remarks:       The $refresh breakpoints statement will populate a table
-                 named xxxmdbug.server_breakpoints, which contains
+                 named xxxmdbug.breakpoints, which contains
                  breakpoint_identifier, schema_identifier,
                  routine_identifier, routine_type, line_number_minimum,
                  line_number_maximum, condition_identifier,
@@ -178,7 +185,7 @@ $refresh call_stack
   What it's for: showing what the routines are that got us here.
   Syntax:        $refresh call_stack
   Shortcuts:     Alt+B, or via menu: Debug|Refresh call_stack
-                 (At time of writing, Menu does not work properly.)
+                 (Choosing from the menu may not work on some platforms.)
   Example:       $refresh call_stack;
                  select * from xxxmdbug.call_stack;
   Remarks:       Using menu Debug | Refresh call_stack will
@@ -194,7 +201,7 @@ $refresh server variables
   What it's for: showing the contents of server variables.
   Syntax:        $refresh server_variables
   Shortcuts:     Alt+9, or via menu: Debug|Refresh server_variables
-                 (At time of writing, Menu does not work properly.)
+                 (Choosing from the menu may not work on some platforms.)
   Example:       $refresh server_variables;
                  select * from xxxmdbug.server_variables;
   Remarks:       Using menu Debug | Refresh server_variables will
@@ -214,7 +221,7 @@ $refresh user variables
   Shortcuts:     Alt+A, or via menu: Debug|Refresh user_variables
   Example:       $refresh user_variables;
                  select * from xxxmdbug.user_variables;
-                 (At time of writing, Menu does not work properly.)
+                 (Choosing from the menu may not work on some platforms.)
   Remarks:       Using menu Debug | Refresh user_variables will
                  cause two statements: $refresh and select.
                  The $refresh statement will populate a table
@@ -276,7 +283,7 @@ $set
 $setup
   Requirements:  The debugger must be installed (see $install).
   Syntax:        $setu[p] [schema_identifier.]routine_identifier
-                 [... [schema_identifier.]routine_identifier]
+                 [, [schema_identifier.]routine_identifier ...]
   Shortcuts:     None, $setup is not on the Debug menu.
   Requirements:  An $install must be done first.
                  Only procedures and functions may be listed,
@@ -295,7 +302,7 @@ $setup
                  The maximum number of routines per setup is 10.
                  The $setup statement makes copies of routines,
                  but never never changes the original routines.
-                 The default schema is "test".
+                 The default schema is what "select database();" returns.
 $step
   What it's for: Making the program go to the next statement
                  in the current routine or a subroutine.
@@ -312,7 +319,7 @@ $tbreakpoint
   What it's for: specifying a line where execution must stop, once.
   Syntax:        $t[breakpoint [schema_identifier.]routine_identifier
                  line_number
-  Shortcuts:     None, $set is not on the Debug menu.
+  Shortcuts:     None, $tbreakpoint is not on the Debug menu.
   Requirements:  The debugger must be running (see $debug).
   Example:       $tbreakpoint test.p 5;
   Remarks:       The effect is the same as for ordinary breakpoints,

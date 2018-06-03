@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: April 25 2018
+   Last modified: June 2 2018
 */
 
 /*
@@ -388,7 +388,7 @@
   static char *rehash_result_set_copy= 0;       /* gets a copy of mysql_res contents, if necessary */
   static char **rehash_result_set_copy_rows= 0; /* dynamic-sized list of result_set_copy row offsets, if necessary */
 
-  int options_and_connect(unsigned int connection_number);
+  int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
   static const char ocelotgui_version[]="1.0.6"; /* For --version. Make sure it's in manual too. */
@@ -422,7 +422,8 @@
   static QString hparse_token;
   static int hparse_i;
   static QString hparse_expected;
-  static int hparse_errno;
+  static int hparse_errno; /* 0=ok, 1=error, 2=error-unrecoverable */
+  static int hparse_errno_count;
   static int hparse_token_type;
   static int hparse_statement_type= -1;
   /* hparse_f_accept can dump many expected tokens in hparse_errmsg */
@@ -932,7 +933,7 @@ void MainWindow::statement_edit_widget_formatter()
         token_type= 1;
         if ((token == TOKEN_KEYWORD_BEGIN)
         || (token == TOKEN_KEYWORD_CASE)
-        || ((((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0) && token == TOKEN_KEYWORD_FOR))
+        || (token == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT) /* will only be true if MariaDB 10.3 */
         || (token == TOKEN_KEYWORD_IF)
         || (token == TOKEN_KEYWORD_LOOP)
         || (token == TOKEN_KEYWORD_REPEAT)
@@ -1149,7 +1150,6 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
       if (plain_text.mid(i, 1) > " ") return false;
     }
   }
-
   if (action_execute(0) == 1) return false;
   return true;
 }
@@ -2783,11 +2783,13 @@ void MainWindow::main_token_new(int text_size)
   }
 }
 
+/* I'm now defining HAVE_PUSH_AND_POP for the debugger stub */
+#define HAVE_PUSH_AND_POP 1
 #ifdef HAVE_PUSH_AND_POP
 /*
   Saving and restoring the main_token variables.
   This was conceived for a trick with subqueries that I didn't do,
-  but could be useful someday. The problem is that main_token_*
+  but $setup uses it now. The problem is that main_token_*
   variables are global (okay, bad early laziness, but refactoring
   now would be hard). So save them when you're about to parse
   something else e.g. a local subquery, and restore when the
@@ -4864,7 +4866,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           /* Following should only occur if we're sure it's MariaDB */
           if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
           ||  (main_token_types[i] == TOKEN_KEYWORD_CASE)
-          ||  ((((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0) && main_token_types[i] == TOKEN_KEYWORD_FOR))
+          ||  (main_token_types[i] == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
           ||  (main_token_types[i] == TOKEN_KEYWORD_IF)
           ||  (main_token_types[i] == TOKEN_KEYWORD_LOOP)
           ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
@@ -4916,7 +4918,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
         {
           if ((main_token_types[i] == TOKEN_KEYWORD_BEGIN)
           ||  ((main_token_types[i] == TOKEN_KEYWORD_CASE)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
-          ||  (((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0) && (main_token_types[i] == TOKEN_KEYWORD_FOR)    && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
+          ||  ((main_token_types[i] == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
           ||  ((main_token_types[i] == TOKEN_KEYWORD_IF)     && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
           ||  ((main_token_types[i] == TOKEN_KEYWORD_LOOP)   && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
           ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
@@ -5207,6 +5209,7 @@ char debuggee_information_status_stack_depth[8];
 char debuggee_information_status_last_command[256];
 char debuggee_information_status_last_command_result[256];
 char debuggee_information_status_commands_count[8];
+char debuggee_database[256];
 
 QString debug_routine_schema_name[DEBUG_TAB_WIDGET_MAX + 1];
 QString debug_routine_name[DEBUG_TAB_WIDGET_MAX + 1];
@@ -5326,13 +5329,12 @@ void* debuggee_thread(void* unused)
       Todo: the_connect() could easily fail: parameters are changed, # of connections = max, password no longer works, etc.
             ... so you should try to pass back a better explanation if the_connect() fails here.
     */
-    if (options_and_connect(MYSQL_DEBUGGER_CONNECTION))
+    if (options_and_connect(MYSQL_DEBUGGER_CONNECTION, debuggee_database))
     {
        debuggee_state= DEBUGGEE_STATE_CONNECT_FAILED;
        strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
        break;
     }
-
     is_connected= 1;
 
     /* Get connection_id(). This is only in case regular "exit" fails and we have to issue a kill statement. */
@@ -5371,7 +5373,6 @@ void* debuggee_thread(void* unused)
       strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
       break;
     }
-
     /*
       Originally we just had debuggee_wait_loop here.
       Then the PREPARE+EXECUTE failed because of a procedure that contained a SELECT.
@@ -5380,7 +5381,6 @@ void* debuggee_thread(void* unused)
       Todo: Replace all debuggee_wait_loop() with a C routine.
       Todo: Catch errors -- debuggee_wait_loop() didn't necessarily end via LEAVE x.
     */
-
     strcpy(call_statement, "call xxxmdbug.debuggee_wait_loop();");
     debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP;
     if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
@@ -5458,7 +5458,6 @@ void* debuggee_thread(void* unused)
     }
     strcpy(call_statement, debug_row[0]);
     lmysql->ldbms_mysql_free_result(debug_res);
-
     if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_DEBUGGER_CONNECTION], call_statement, strlen(call_statement)))
     {
       debuggee_state= DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR;
@@ -5492,7 +5491,6 @@ void* debuggee_thread(void* unused)
             }
           }
         }
-
       debuggee_state= DEBUGGEE_STATE_END;
     }
     break;
@@ -5515,7 +5513,6 @@ void* debuggee_thread(void* unused)
   {
     strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
   }
-
   /* Cleanup */
   /* Shut the connection, which seems to cause disconnect automatically. */
   if (is_connected == 1) lmysql->ldbms_mysql_close(&mysql[MYSQL_DEBUGGER_CONNECTION]);
@@ -5524,7 +5521,6 @@ void* debuggee_thread(void* unused)
 
   /* Here I am overwriting DEBUGGEE_WAIT_LOOP_ERROR / DEBUGGEE_STATE_END. Maybe they're informative but they caused trouble. */
   //debuggee_state= DEBUGGEE_STATE_0;
-
   /* options_and_connect called mysql_init which called mysql_thread_init, so cancel it */
   lmysql->ldbms_mysql_thread_end();
   /* The thread will end. */
@@ -5588,55 +5584,43 @@ void debug_mdbug_install()
 
 /*
   Debug|Setup
+  Format =  $setup [options] object-name-list;
+  debug|setup menu item is removed, one must say $SETUP ...
+
   Todo: This should put up a list box with the routines which the user can execute. No hard coding of test.p8 and test.p9.
         Or, it should look in the log for the last setup by this user, and re-do it.
   Todo: Shortcut = Same as last time.
   Todo: Search for schema name not just routine name.
-  Todo: We require SELECT access on mysql.proc. We could change the install_sql.cpp routines so that $setup accesses
-        a view of mysql.proc, and have a WHERE clause that restricts to only some procedures.
-  Format =  CALL xxxmdbug.setup('[option] object name list');
-  debug|setup menu item is removed, one must say $SETUP ...
+  Todo: $setup does a GET_LOCK() so that two users won't do $setup at
+        the same time. Figure out a better way.
+  Todo: Check that 'install' has happened -- but for now it's OK, at least we return some sort of error.
+
+  May 2018: $setup had to be totally rewritten, because it wouldn't work
+  with MySQL 8.0. For explanation read
+  https://ocelot.ca/blog/blog/2017/08/22/no-more-mysql-proc-in-mysql-8-0
+  So the old unused code in install_sql.cpp still exists, and if we say
+  #define NEW_SETUP 0 then it will still be invoked for test purposes,
+  but now $setup code is entirely in ocelotgui.cpp (and incidentally
+  is entirely written by Ocelot Computer Services, only the old
+  code in install_sql.cpp was written for HP).
 */
-//void MainWindow::action_debug_setup()
-//{
-//  char call_statement[512]; /* Todo: this is dangerously small. */
-//  int debug_widget_index;
-//  QString routine_schema_name[DEBUG_TAB_WIDGET_MAX + 1];
-//  QString routine_name[DEBUG_TAB_WIDGET_MAX + 1];
-//
-//  /*
-//    TODO: Put up a list box with the routines that the user has a right to execute.
-//    Allow user to pick which ones will go in routine_names[], which will be what is used for setup().
-//    Max = DEBUG_TAB_WIDGET_MAX.
-//  */
-//
-//  routine_schema_name[0]= "test";
-//  routine_schema_name[1]= "test";
-//  routine_name[0]= "p8";
-//  routine_name[1]= "p9";
-//  routine_name[2]= "";
-//
-//  /* Make a setup statement. Example possibility = CALL xxxmdbug.setup('test.p8',test.p9'). */
-//  strcpy(call_statement, "CALL xxxmdbug.setup('");
-//  for (debug_widget_index= 0; ; ++debug_widget_index)
-//  {
-//    if (strcmp(routine_name[debug_widget_index].toUtf8(), "") == 0) break;
-//    if (debug_widget_index > 0) strcat(call_statement, ",");
-//    strcat(call_statement, routine_schema_name[debug_widget_index].toUtf8());
-//    strcat(call_statement, ".");
-//    strcat(call_statement, routine_name[debug_widget_index].toUtf8());
-//  }
-//  strcat(call_statement, "');");
-//  call_statement=%s\n", call_statement);
-//
-//  statement_edit_widget->setPlainText(call_statement);
-//  action_execute(1);
-//}
+#define NEW_SETUP 1
 
-
-/* Todo: $setup does a GET_LOCK() so that two users won't do $setup at the same time. Figure out a better way. */
+#if (NEW_SETUP == 0)
 void MainWindow::debug_setup_go(QString text)
 {
+  if (hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0)
+  {
+    QMessageBox msgbox;
+     QString s= "Sorry, the ocelotgui debugger won't work with MySQL 8.0. ";
+     s.append("For explanation read https://ocelot.ca/blog/blog/2017/08/22/no-more-mysql-proc-in-mysql-8-0/");
+     s.append("We have replacement code that we believe will work -- ");
+     s.append("try rebuilding ocelotgui after changing the line saying ");
+     s.append("#define NEW_SETUP 0 to #define NEW_SETUP 1.");
+     msgbox.setText(s);
+     msgbox.exec();
+     return;
+  }
   char command_string[512];
   int index_of_number_1, index_of_number_2;
   QString qstring_error_message;
@@ -5670,6 +5654,7 @@ void MainWindow::debug_setup_go(QString text)
       result_string= select_1_row("SELECT release_lock('xxxmdbug_lock')");
     }
   }
+
   /* Throw away the first word i.e. "$setup" and execute "call xxxmdbug.setup('...')". */
   char call_statement[512 + 128];
   strcpy(call_statement, "call xxxmdbug.setup('");
@@ -5684,6 +5669,7 @@ void MainWindow::debug_setup_go(QString text)
   }
   debug_setup_mysql_proc_insert();
 }
+#endif
 
 
 /*
@@ -5695,6 +5681,7 @@ void MainWindow::debug_setup_go(QString text)
         I could execute them all at once, but prefer to separate. Assume original name didn't contain ;.
         ... For icc_core routines the SET statement might be missing, I don't know why.
 */
+/* TODO: THIS IS NO GOOD! YOU DO NOT WANT TO INSERT INTO MYSQL.PROC! */
 void MainWindow::debug_setup_mysql_proc_insert()
 {
   log("debug_setup_mysql_proc_insert start", 90);
@@ -6109,8 +6096,11 @@ QString MainWindow::debug_privilege_check(int statement_type)
                 delete breakpoint number
   This does not detect syntax errors, we assume xxxmdbug.command() will return an error immediately for a syntax error.
   So it's not really a parse, but should find the tokens that matter.
+  (Of course, hparse code is called by default, so parsing will happen.)
   Todo: see if confusion happens if there's condition information, or parameters enclosed inside ''s.
   If there is clearly an error, debug_parse_statement() returns -1 and command_string has an error message.
+  We pass text, but we tokenized, so we have main_token_* tables and
+  main_token_number and main_token_count_in_statement.
 */
 int MainWindow::debug_parse_statement(QString text,
                            char *command_string,
@@ -6134,7 +6124,10 @@ int MainWindow::debug_parse_statement(QString text,
   *index_of_number_1= -1;
   *index_of_number_2= -1;
   strcpy(command_string, "");
-  for (i= 0; main_token_lengths[i] != 0; ++i)
+  int last_token= main_token_number + main_token_count_in_statement;
+  for (i= main_token_number;
+       ((main_token_lengths[i] != 0) && (i < last_token));
+       ++i)
   {
     token_type= main_token_types[i];
     if ((token_type == TOKEN_TYPE_COMMENT_WITH_SLASH)
@@ -6233,6 +6226,14 @@ int MainWindow::debug_parse_statement(QString text,
           strcpy(tmp_schema_name, default_schema_name);
         }
         name_is_expected= false;
+
+        QString aa= tmp_schema_name;
+        aa= connect_stripper(aa, true);
+        strcpy(tmp_schema_name, aa.toUtf8());
+        aa= tmp_routine_name;
+        aa= connect_stripper(aa, true);
+        strcpy(tmp_routine_name, aa.toUtf8());
+
         strcpy(token, tmp_schema_name);
         strcat(token, ".");
         strcat(token, tmp_routine_name);
@@ -6351,6 +6352,7 @@ int MainWindow::debug_error(char *text)
 /* $DEBUG [schema.]routine [(parameters)] */
 void MainWindow::debug_debug_go(QString text) /* called from execute_client_statement() or action_debug_debug() */
 {
+  log("debug_debug_go", 90);
   char routine_schema[512];
   char routine_name[512];
   char call_statement[512];
@@ -6360,9 +6362,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   QString q_routine_schema, q_routine_name;
   char command_string[2048];
   int index_of_number_1, index_of_number_2;
-
   /* Todo: Check that 'debug' has not happened */
-
   if (debug_parse_statement(text, command_string, &index_of_number_1, &index_of_number_2) < 0)
   {
     if (debug_error(command_string) != 0) return;
@@ -6405,14 +6405,13 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     strcpy(command_string, qstring_error_message.toUtf8());
     if (debug_error(command_string) != 0) return; /* debuggee wouldn't be able to operate so fail */
   }
-
   /* Call xxxmdbug.debuggee_get_surrogate_name */
   strcpy(call_statement, "CALL xxxmdbug.debuggee_get_surrogate_name('");
   strcat(call_statement, routine_name);
   strcat(call_statement, "','");
   strcat(call_statement, routine_schema);
   strcat(call_statement, "',@schema_identifier,@surrogate_routine_identifier,@routine_type,@remainder_of_original_name)");
-  if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
+if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     if (debug_error((char*)er_strings[er_off + ER_SURROGATE]) != 0) return;
   }
@@ -6431,25 +6430,23 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     if (debug_error((char*)er_strings[er_off + ER_SURROGATE_NOT_FOUND]) != 0) return;
   }
 
-  QString routine_schema_name_for_search= select_1_row_result_1;
+  //QString routine_schema_name_for_search= select_1_row_result_1;
   QString routine_name_for_search= select_1_row_result_2;
-
   /*
     This will find all surrogate routines which have the same prefix, xxxmdbug___
     That means they're in the same group. Ignore icc_core.
     Get only the part that's not part of the prefix.
+    Don't ask for schema name, group's routines can be in different schema.
     Interesting idea: you could have a way to show both the surrogate and the original.
   */
   int i, j;
   char i_as_string[10];
   /* Todo: n should not be hard-coded here, it limits us to only 10 routines can be searched */
-  for (i= 0, j= 0; i < DEBUG_TAB_WIDGET_MAX; ++i)
+  for (i= 0, j= 0; j < DEBUG_TAB_WIDGET_MAX; ++i)
   {
     sprintf(i_as_string, "%d", i);
     strcpy(call_statement, "select routine_schema, right(routine_name,length(routine_name)-12) from information_schema.routines ");
-    strcat(call_statement, "where routine_schema = '");
-    strcat(call_statement, routine_schema_name_for_search.toUtf8());
-    strcat(call_statement, "' and routine_name like '");
+    strcat(call_statement, "where routine_name like '");
     strcat(call_statement, routine_name_for_search.toUtf8());
     strcat(call_statement, "' order by routine_name limit 1 offset ");
     strcat(call_statement, i_as_string);
@@ -6480,9 +6477,7 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   {
     debug_widget[debug_widget_index]= 0;
   }
-
   /* After this point, some items that get created are persistent, so be sure to clear them if there's an error. */
-
   //MYSQL_RES *debug_res;
   //MYSQL_ROW row;
   QString routine_definition;
@@ -6529,7 +6524,6 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
       }
       if (debug_error(call_statement)) return;
     }
-
     debug_widget[debug_widget_index]= new CodeEditor(this);
     debug_widget[debug_widget_index]->is_debug_widget= true;
     debug_widget[debug_widget_index]->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
@@ -6554,13 +6548,11 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
       current_widget_index= debug_widget_index;
     }
   }
-
   if (current_widget_index == -1)
   {
     debug_delete_tab_widgets();
     if (debug_error((char*)er_strings[er_off + ER_ROUTINE_IS_MISSING])) return;
   }
-
   debug_tab_widget->setCurrentIndex(current_widget_index);
 
   /* Getting ready to create a separate thread for the debugger and 'attach' to it */
@@ -6568,6 +6560,15 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   char error_message[512];
 
   debuggee_state= DEBUGGEE_STATE_0;
+
+  /*
+    We want the debuggee default database to be the main default
+    database, but that's not necessarily ocelot_database_as_utf8
+    because maybe we had a USE statement.
+    Todo: I'm a bit unclear what to do if this fails.
+  */
+  if (select_1_row("select database()") != 0) debuggee_database[0]= '\0';
+  else strcpy(debuggee_database, select_1_row_result_1.toUtf8());
 
   /*
     We want a channel name that will differ from what others might choose.
@@ -6582,7 +6583,6 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   int pthread_create_result= pthread_create(&debug_thread_id, NULL, &debuggee_thread, NULL);
   assert(pthread_create_result == 0);
   debug_thread_exists= true;
-
   /*
     Wait till debuggee has indicated that it is about to call debuggee_wait_loop().
     Todo: Give a better diagnostic if this doesn't happen.
@@ -6607,11 +6607,9 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     Todo: Check: is it possible for this to fail because thread has not connected yet? If so, sleep + repeat?
     Todo: Check: why use insertPlainText not setPlainText?
   */
-
   strcpy(call_statement, "call xxxmdbug.command('");
   strcat(call_statement, debuggee_channel_name);
   strcat(call_statement, "', 'attach');\n");
-
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Attach failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
@@ -6619,7 +6617,6 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     debug_exit_go(1); /* This tries to tell the debuggee to stop, because we're giving up. */
     return;
   }
-
   debug_timer_old_line_number= -1;
   debug_timer_old_schema_identifier[0]= '\0';
   debug_timer_old_routine_identifier[0]= '\0';
@@ -6639,27 +6636,6 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   //}
   //strcat(call_statement, routine_name);
 
-  /*
-    To work around a flaw in MDBug, convert all ' to ''.
-    Todo: This does not solve for $debug var_proc(''a''bc'');
-    so the manual should recommend: use an escape for '.
-    Todo: Check if other debug commands containing ', e.g. conditional breakpoints, work.
-  */
-  if (strchr(command_string, 0x27) != NULL)
-  {
-    char command_string_2[2048];
-    char *iptr, *optr;
-    for (iptr= command_string, optr= command_string_2;;)
-      {
-      if (*iptr == 0x27) { *optr= 0x27; ++optr; }
-      *optr= *iptr;
-      if (*iptr == '\0') break;
-      ++iptr;
-      ++optr;
-    }
-    strcpy(command_string, command_string_2);
-  }
-
   if (debug_call_xxxmdbug_command(command_string) != 0)
   {
     /* Debug failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
@@ -6668,11 +6644,9 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
     return;
   }
   put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
-
   /* TODO: next line was removed TEMPORARILY. But maybe highlighting will occur due to temporary breakpoint? */
   //debug_highlight_line(); /* highlight the first line. todo: should be the first executable line, no? */
   debug_top_widget->show(); /* Is this necessary? I think so because initially debug_window should be hidden. */
-
   debug_menu_enable_or_disable(TOKEN_KEYWORD_DEBUG_DEBUG);             /* Until now most debug menu items were gray. */
 }
 
@@ -6732,6 +6706,7 @@ void MainWindow::debug_maintain_prompt(int action, int debug_widget_index, int l
 */
 void MainWindow::action_debug_breakpoint()
 {
+  log("action_debug_breakpoint", 90);
   char command[512];
   int line_number;
   char line_number_as_string[10];
@@ -6871,6 +6846,7 @@ void MainWindow::debug_delete_go()
 */
 void MainWindow::action_debug_mousebuttonpress(QEvent *event, int which_debug_widget_index)
 {
+  log("action_debug_mousebutonpress", 90);
   int line_number;
   char command[512];
   char schema_name[512];
@@ -6892,7 +6868,6 @@ void MainWindow::action_debug_mousebuttonpress(QEvent *event, int which_debug_wi
   strcpy(routine_name, debug_routine_name[debug_widget_index].toUtf8());
 
   sprintf(command, "$breakpoint %s.%s %d", schema_name, routine_name, line_number);
-
   statement_edit_widget->setPlainText(command);                           /* Execute "$breakpoint ..." */
   action_execute(1);
 }
@@ -6906,6 +6881,7 @@ void MainWindow::action_debug_mousebuttonpress(QEvent *event, int which_debug_wi
 */
 void MainWindow::action_debug_clear()
 {
+  log("action_debug_clear", 90);
   char command[512];
   int line_number;
   char line_number_as_string[10];
@@ -6921,7 +6897,6 @@ void MainWindow::action_debug_clear()
   strcat(command, debug_routine_name[debug_widget_index].toUtf8());
   strcat(command, " ");
   strcat(command, line_number_as_string);
-
   statement_edit_widget->setPlainText(command);
   action_execute(1);
 }
@@ -6932,6 +6907,7 @@ void MainWindow::action_debug_clear()
 */
 void MainWindow::action_debug_continue()
 {
+  log("action_debug_continue", 90);
   statement_edit_widget->setPlainText("$CONTINUE");
   action_execute(1);
 }
@@ -6942,6 +6918,7 @@ void MainWindow::action_debug_continue()
 */
 void MainWindow::action_debug_step()
 {
+  log("action_debug_step", 90);
   statement_edit_widget->setPlainText("$STEP");
   action_execute(1);
 }
@@ -7031,6 +7008,8 @@ void MainWindow::debug_execute_go()
 /* The following could be used for all the $... statements where one merely passes the command on to the debuggee */
 /* We strip the comments and the ; but if there's junk after the first word it will cause an error, as it should. */
 /* Todo: Should you add a semicolon? */
+/* Todo: For some reason "$refresh variables;" returns a message with
+   ok, 40 rows affected", I don't know where the 40 came from. */
 void MainWindow::debug_other_go(QString text)
 {
   char command_string[512];
@@ -7059,6 +7038,7 @@ void MainWindow::debug_other_go(QString text)
 */
 void MainWindow::action_debug_next()
 {
+ log("action_debug_next", 90);
  statement_edit_widget->setPlainText("$NEXT");
  action_execute(1);
 }
@@ -7110,7 +7090,7 @@ void MainWindow::debug_highlight_line()
     /* I think it's impossible that routine won't be there, but if it isn't, do nothing. */
     /* Well, not quite impossible -- schema or routine might be "unknown" or "". That's probably harmless. */
     /* Todo: Change status line, on supposition that the routine has not started or has ended. */
-    return;
+      return;
   }
 
   debug_tab_widget->setCurrentWidget(debug_widget[debug_widget_index]);
@@ -7202,14 +7182,16 @@ void MainWindow::debug_highlight_line()
 */
 void MainWindow::action_debug_exit()
 {
-    statement_edit_widget->setPlainText("$EXIT");
-    action_execute(1);
+  log("action_debug_exit", 90);
+  statement_edit_widget->setPlainText("$EXIT");
+  action_execute(1);
 }
 
 
 /* flagger == 0 means this is a regular $exit; flagger == 1 means we're getting rid of stuff due to a severe severe error */
 void MainWindow::debug_exit_go(int flagger)
 {
+  log("debug_exit_go", 90);
   char call_statement[512];
 
   if (flagger == 0)
@@ -7306,6 +7288,7 @@ void MainWindow::debug_delete_tab_widgets()
 */
 void MainWindow::action_debug_information()
 {
+  log("action_debug_information", 90);
   if (debug_call_xxxmdbug_command("information status") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.information_status;");
   action_execute(1);
@@ -7317,6 +7300,7 @@ void MainWindow::action_debug_information()
 */
 void MainWindow::action_debug_refresh_server_variables()
 {
+  log("action_debug_refresh_server_variables", 90);
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
     if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
@@ -7332,6 +7316,7 @@ void MainWindow::action_debug_refresh_server_variables()
 */
 void MainWindow::action_debug_refresh_user_variables()
 {
+  log("action_debug_refresh_user_variables", 90);
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
     if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
@@ -7347,6 +7332,7 @@ void MainWindow::action_debug_refresh_user_variables()
 */
 void MainWindow::action_debug_refresh_variables()
 {
+  log("action_debug_refresh_variables", 90);
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
     if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
@@ -7362,6 +7348,7 @@ void MainWindow::action_debug_refresh_variables()
 */
 void MainWindow::action_debug_refresh_call_stack()
 {
+  log("action_debug_refresh_call_stack", 90);
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
     if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
@@ -7380,16 +7367,24 @@ void MainWindow::action_debug_refresh_call_stack()
   the details by showing it. For example, if the user said "$DEBUG test.p8", we
   execute "call xxxmdbug.command('channel#...','debug test.p8')" and return the
   result from that.
+  Todo: unstripper might be okay but if the command has ''s within ''s
+        then converting to 0x... and hex bytes would maybe be better
+        (I decided against connect_unstripper since it's not a QString.)
 */
 int MainWindow::debug_call_xxxmdbug_command(const char *command)
 {
   char call_statement[512];
 
+  char command_unstripped[512];
+  QString s= command;
+  s= connect_unstripper(s);
+  strcpy(command_unstripped, s.toUtf8());
+
   strcpy(call_statement, "call xxxmdbug.command('");
   strcat(call_statement, debuggee_channel_name);
-  strcat(call_statement, "', '");
-  strcat(call_statement, command);
-  strcat(call_statement, "');\n");
+  strcat(call_statement, "', ");
+  strcat(call_statement, command_unstripped);
+  strcat(call_statement, ");\n");
 
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
@@ -7474,16 +7469,15 @@ int MainWindow::debug_information_status(char *last_command)
         Hmm, why is this a worry, since we're doing the searching on main connection not debuggee connection?
   Todo: I have seen the xxxmdbug.command() cause "send+receive error" meaning a change to init_connect failed.
         Maybe xxxmdbug.commnd() shouldn't try to change init_connect -- after all, we're not trying to send, only receive.
-
 */
 void MainWindow::action_debug_timer_status()
 {
+  log("action_debug_timer_status", 20);
   char call_statement[512];
   MYSQL_RES *debug_res= NULL;
   MYSQL_ROW row= NULL;
   char unexpected_error[512];
   int unexpected_new_error= 0;
-
   /*
     DANGER
     When the main line is running SQL statements, it calls
@@ -7492,8 +7486,11 @@ void MainWindow::action_debug_timer_status()
     Either we must disable the Run|Kill feature, or disable
     the timer. Here, we've chosen to disable the timer.
   */
-  if (dbms_long_query_state == LONG_QUERY_STATE_STARTED) return;
-
+  if (dbms_long_query_state == LONG_QUERY_STATE_STARTED)
+  {
+    log("action_debug_timer_status return", 20);
+    return;
+  }
   unexpected_error[0]= '\0';
   strcpy(call_statement, "call xxxmdbug.command('");
   strcat(call_statement, debuggee_channel_name);
@@ -7503,7 +7500,12 @@ void MainWindow::action_debug_timer_status()
   {
     if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR)
     {
-      sprintf(unexpected_error, er_strings[er_off + ER_DEBUGGEE_WAIT_LOOP], debuggee_state_error);
+      char tmp[256];
+      int l= strlen(debuggee_state_error);
+      if (l > 255) l= 255;
+      memcpy(tmp, debuggee_state_error, l);
+      tmp[l]= '\0';
+      sprintf(unexpected_error, er_strings[er_off + ER_DEBUGGEE_WAIT_LOOP], tmp);
     }
     else
     {
@@ -7511,7 +7513,6 @@ void MainWindow::action_debug_timer_status()
       else strcpy(unexpected_error, er_strings[er_off + ER_DEBUGGEE_WAIT_LOOP_IS_NOT]);
     }
   }
-
   if (unexpected_error[0] == '\0')
   {
     if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
@@ -7520,7 +7521,6 @@ void MainWindow::action_debug_timer_status()
       strcpy(unexpected_error, er_strings[er_off + ER_I_STATUS_FAILED]);
     }
   }
-
   if (unexpected_error[0]== '\0')
   {
     const char *query= "select * from xxxmdbug.information_status";
@@ -7529,7 +7529,6 @@ void MainWindow::action_debug_timer_status()
       strcpy(unexpected_error, er_strings[er_off + ER_I_STATUS_FAILED_NOT_SEVERE]);
     }
   }
-
   if (unexpected_error[0] == '\0')
   {
     debug_res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
@@ -7538,7 +7537,6 @@ void MainWindow::action_debug_timer_status()
       strcpy(unexpected_error, er_strings[er_off + ER_MYSQL_STORE_RESULT_FAILED]);
     }
   }
-
   if (unexpected_error[0] == '\0')
   {
     row= lmysql->ldbms_mysql_fetch_row(debug_res);
@@ -7589,34 +7587,34 @@ void MainWindow::action_debug_timer_status()
       }
     }
   }
-
   if (debug_res != NULL) lmysql->ldbms_mysql_free_result(debug_res);
-
   if (unexpected_error[0] != '\0')
   {
     if (strcmp(debuggee_information_status_last_command_result, unexpected_error) != 0)
     {
       /* This should be considered as a status change, as if it's a new i status message */
       unexpected_new_error= 1;
-      strcpy(debuggee_information_status_last_command_result, unexpected_error);
+      int l= strlen(unexpected_error);
+      if (l > 255) l= 255;
+      memcpy(debuggee_information_status_last_command_result, unexpected_error, l);
+      debuggee_information_status_last_command_result[l]= '\0';
     }
   }
-
-  //  printf("debuggee_information_status_debugger_name=%s.\n", debuggee_information_status_debugger_name);
-  //  printf("debuggee_information_status_debugger_version=%s.\n", debuggee_information_status_debugger_version);
-  //  printf("debuggee_information_status_timestamp_of_status_message=%s.\n", debuggee_information_status_timestamp_of_status_message);
-  //  printf("debuggee_information_status_number_of_status_message=%s.\n", debuggee_information_status_number_of_status_message);
-  //  printf("debuggee_information_status_icc_count=%s.\n", debuggee_information_status_icc_count);
-  //  printf("debuggee_information_status_schema_identifier=%s.\n", debuggee_information_status_schema_identifier);
-  //  printf("debuggee_information_status_routine_identifier=%s.\n", debuggee_information_status_routine_identifier);
-  //  printf("debuggee_information_status_line_number=%s.\n", debuggee_information_status_line_number);
-  //  printf("debuggee_information_status_is_at_breakpoint=%s.\n", debuggee_information_status_is_at_breakpoint);
-  //  printf("debuggee_information_status_is_at_tbreakpoint=%s.\n", debuggee_information_status_is_at_tbreakpoint);
-  //  printf("debuggee_information_status_is_at_routine_exit=%s.\n", debuggee_information_status_is_at_routine_exit);
-  //  printf("debuggee_information_status_stack_depth=%s.\n", debuggee_information_status_stack_depth);
-  //  printf("debuggee_information_status_last_command=%s.\n", debuggee_information_status_last_command);
-  //  printf("debuggee_information_status_last_command_result=%s.\n", debuggee_information_status_last_command_result);
-  //  printf("debuggee_information_status_commands_count=%s.\n", debuggee_information_status_commands_count);
+    //printf("debuggee_information_status_debugger_name=%s.\n", debuggee_information_status_debugger_name);
+    //printf("debuggee_information_status_debugger_version=%s.\n", debuggee_information_status_debugger_version);
+    //printf("debuggee_information_status_timestamp_of_status_message=%s.\n", debuggee_information_status_timestamp_of_status_message);
+    //printf("debuggee_information_status_number_of_status_message=%s.\n", debuggee_information_status_number_of_status_message);
+    //printf("debuggee_information_status_icc_count=%s.\n", debuggee_information_status_icc_count);
+    //printf("debuggee_information_status_schema_identifier=%s.\n", debuggee_information_status_schema_identifier);
+    //printf("debuggee_information_status_routine_identifier=%s.\n", debuggee_information_status_routine_identifier);
+    //printf("debuggee_information_status_line_number=%s.\n", debuggee_information_status_line_number);
+    //printf("debuggee_information_status_is_at_breakpoint=%s.\n", debuggee_information_status_is_at_breakpoint);
+    //printf("debuggee_information_status_is_at_tbreakpoint=%s.\n", debuggee_information_status_is_at_tbreakpoint);
+    //printf("debuggee_information_status_is_at_routine_exit=%s.\n", debuggee_information_status_is_at_routine_exit);
+    //printf("debuggee_information_status_stack_depth=%s.\n", debuggee_information_status_stack_depth);
+    //printf("debuggee_information_status_last_command=%s.\n", debuggee_information_status_last_command);
+    //printf("debuggee_information_status_last_command_result=%s.\n", debuggee_information_status_last_command_result);
+    //printf("debuggee_information_status_commands_count=%s.\n", debuggee_information_status_commands_count);
 
   /* If a status message would probably confuse a rational user, change it. */
     if (strstr(debuggee_information_status_last_command_result, "completed CALL") != NULL)
@@ -7638,7 +7636,6 @@ void MainWindow::action_debug_timer_status()
     strcpy(debuggee_information_status_last_command, debug_statement.toUtf8());
     /* todo: what about debuggee_information_status_last_command_result? */
   }
-
   /*
     Change line_edit i.e. status widget, and maybe change highlight, if there's a new message.
     It would be extremely wasteful to update every time, i.e. every 1/10 second, if there's no change.
@@ -7652,7 +7649,6 @@ void MainWindow::action_debug_timer_status()
   ||  (unexpected_new_error == 1))
   {
     char result[2048];
-
     strcpy(result, "Debugger status = ");
     if (strcmp(debuggee_information_status_schema_identifier, "unknown") != 0)
     {
@@ -7679,9 +7675,7 @@ void MainWindow::action_debug_timer_status()
     {
       strcat(result, "(STOPPED AT ROUTINE EXIT)");
     }
-
     debug_line_widget->setText(result);
-
     /*
       If and only if the line number or routine name or schema name has changed,
       highlight i.e. change background color in order to show where we're at now.
@@ -7702,6 +7696,7 @@ void MainWindow::action_debug_timer_status()
     debug_timer_old_number_of_status_message= atoi(debuggee_information_status_last_command);
     debug_timer_old_icc_count= atoi(debuggee_information_status_icc_count);
   }
+  log("action_debug_timer_status end", 20);
 }
 #endif
 
@@ -7722,7 +7717,7 @@ void* kill_thread(void* unused)
   kill_state= KILL_STATE_CONNECT_THREAD_STARTED;
   for (;;)
   {
-    if (options_and_connect(MYSQL_KILL_CONNECTION))
+    if (options_and_connect(MYSQL_KILL_CONNECTION, ocelot_database_as_utf8))
     {
       kill_state= KILL_STATE_CONNECT_FAILED;
       break;
@@ -7839,7 +7834,7 @@ int MainWindow::action_execute(int force)
     {
       hparse_f_multi_block(text);
       /* TODO: QMessageBox jiggle, it displays then moves to centre */
-      if (hparse_errno != 0)
+      if ((hparse_errno != 0) || (hparse_errno_count != 0))
       {
         QString s;
         QMessageBox *msgbox= new QMessageBox(this);
@@ -7961,7 +7956,7 @@ void MainWindow::remove_statement(QString text)
 */
 int MainWindow::action_execute_one_statement(QString text)
 {
-  log("action_execute_one_statement start", 80);
+  log("action_execute_one_statement", 80);
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set= NULL;
   unsigned short int is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
@@ -8017,7 +8012,6 @@ int MainWindow::action_execute_one_statement(QString text)
   statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch(); /* will be used for elapsed-time display */
   int additional_result= 0;
   int ecs= execute_client_statement(text, &additional_result);
-
   QString result_set_for_history= "";
 
   if (ecs != 1)
@@ -8415,6 +8409,7 @@ QString MainWindow::get_delimiter(QString token, QString text, int offset)
 #define MAX_SUB_TOKENS 22
 int MainWindow::execute_client_statement(QString text, int *additional_result)
 {
+  log("execute_client_statement", 70);
 //  int i= 0;
   int i2= 0;
   int  sub_token_offsets[MAX_SUB_TOKENS + 2];
@@ -8873,14 +8868,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)
   {
-    if (hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) setup_stub();
-    else debug_setup_go(text);
+    debug_setup_go(text);
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_INSTALL)
   {
-    if (hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) setup_stub();
-    else debug_install_go();
+    debug_install_go();
     return 1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_EXIT)
@@ -10028,7 +10021,7 @@ void MainWindow::tokenize(QChar *text, int text_length, int *token_lengths,
                            int *token_offsets, int max_tokens, QChar *version,
                            int passed_comment_behaviour, QString special_token, int minus_behaviour)
 {
-  log("tokenize start", 80);
+  log("tokenize start", 50);
   int token_number;
   QChar expected_char;
   int char_offset;
@@ -10313,7 +10306,7 @@ part_of_token:
   goto next_char;
 string_end:
   if (token_lengths[token_number] > 0) token_lengths[token_number + 1]= 0;
-  log("tokenize end", 80);
+  log("tokenize end", 50);
   return;
 white_space:
   if (token_lengths[token_number] > 0) ++token_number;
@@ -10522,9 +10515,11 @@ int MainWindow::token_type(QChar *token, int token_length)
   if (*token == 39) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
   if (token_length > 1)
   {
-    if ((*token == 'N') && (*(token + 1) == 39)) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
-    if ((*token == 'X') && (*(token + 1) == 39)) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
-    if ((*token == 'B') && (*(token + 1) == 39)) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
+    if ((*token == 'N') || (*token == 'X') || (*token == 'B')
+     || (*token == 'n') || (*token == 'x') || (*token == 'b'))
+    {
+     if (*(token + 1) == 39) return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
+    }
     if ((*token == '[') && (*(token + 1) == '['))
     {
       return TOKEN_TYPE_LITERAL_WITH_BRACKET;
@@ -10628,6 +10623,7 @@ const keywords strvalues[]=
       {"ASYMMETRIC_VERIFY", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ASYMMETRIC_VERIFY},
       {"ATAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ATAN},
       {"ATAN2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ATAN2},
+      {"ATOMIC", 0, 0, TOKEN_KEYWORD_ATOMIC},
       {"ATTACH", 0, 0, TOKEN_KEYWORD_ATTACH},
       {"AUTOINCREMENT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_AUTOINCREMENT},
       {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
@@ -11364,6 +11360,7 @@ const keywords strvalues[]=
       {"TRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TRIM},
       {"TRUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_TRUE},
       {"TRUNCATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRUNCATE},
+      {"TYPE", 0, 0, TOKEN_KEYWORD_TYPE},
       {"TYPEOF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_TYPEOF},
       {"UCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UCASE},
       {"UNBOUNDED", 0, 0, TOKEN_KEYWORD_UNBOUNDED},
@@ -11500,15 +11497,15 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "881" */
+      /* If the following assert happens, you inserted/removed something without changing "883" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (881 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (883 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 881; ++ii)
+      //for (int ii= 0; ii < 883; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 881, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 883, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -11517,8 +11514,8 @@ const keywords strvalues[]=
       //}
 
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 881 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 881, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 883 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 883, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -12550,13 +12547,18 @@ void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_num
 }
 
 /*
- We call set_dbms_version_mask(ocelot_dbms) from MainWindow() after calling mysql_options_2(),
- in which case the pass should be the original default ("mysql") or something the user
- specified with --ocelot_dbms (probably "mysql" or "mariadb" but could contain version
+ We call set_dbms_version_mask(ocelot_dbms) from MainWindow() after
+ calling mysql_options_2(),in which case the pass should be the original
+ default ("mysql") or something the user specified with --ocelot_dbms
+ (probably "mysql" or "mariadb" but could contain version
  before or after and we don't check validity).
- We call set_dbms_version_mask(statement_edit_widget->dbms_version) from connect_mysql()
- after connection succeeds, in which case the pass would be what "select version()"
- returns, such as 10.2.0-MariaDB.
+ We call set_dbms_version_mask(statement_edit_widget->dbms_version)
+ from connect_mysql() after connection succeeds, in which case the
+ pass would be what "select version()" returns, such as 10.2.0-MariaDB,
+ or 8.0.11 (MySQL might not say 'mysql'). Assume Percona is like MySQL.
+ If you must know the vendor, then maybe select @@version_comment
+ is good, but I don't know if @@version_comment was in old versions.
+ Todo: a message like "Don't recognize MySQL/MariaDB version" would be nice.
 */
 void MainWindow::set_dbms_version_mask(QString version)
 {
@@ -12583,7 +12585,14 @@ void MainWindow::set_dbms_version_mask(QString version)
       dbms_version_mask= FLAG_VERSION_MARIADB_ALL;
     }
   }
-  else if (version.contains("mysql", Qt::CaseInsensitive) == true)
+#ifdef DBMS_TARANTOOL
+  else if (version.contains("tarantool", Qt::CaseInsensitive) == true)
+  {
+    dbms_version_mask= FLAG_VERSION_TARANTOOL;
+  }
+#endif
+  /* MySQL's version string might not contain 'mysql */
+  else /* if (version.contains("mysql", Qt::CaseInsensitive) == true) */
   {
     if ((version.contains("5.6") == true)
      && (version.contains("5.5.6") == false))
@@ -12595,18 +12604,16 @@ void MainWindow::set_dbms_version_mask(QString version)
     {
       dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7);
     }
-    else
+    else if (version.contains("8.0") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0);
+    }
+    else if (version.contains("mysql", Qt::CaseInsensitive) == true)
     {
       dbms_version_mask= FLAG_VERSION_MYSQL_ALL;
     }
+    else dbms_version_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
   }
-#ifdef DBMS_TARANTOOL
-  else if (version.contains("tarantool", Qt::CaseInsensitive) == true)
-  {
-    dbms_version_mask= FLAG_VERSION_TARANTOOL;
-  }
-#endif
-  else dbms_version_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
 }
 
 /*
@@ -14785,6 +14792,8 @@ QString MainWindow::tarantool_read_format(QString lua_request)
   Todo: consider using stderr or a named file.
   Todo: attach a timer or counter so printf occurs if dangers exist.
   Todo: consider using a bit mask instead of a greater-than comparison.
+        or, a system with definitions, e.g. 10=trivial, 20=unusual,
+        30=surprising, 200=pseudo-assertion
   Todo: consider making this a macro so invocation is easier.
 */
 void MainWindow::log(const char *message, int level)
@@ -16195,6 +16204,38 @@ QString MainWindow::connect_stripper(QString value_to_strip, bool strip_doublets
   return s;
 }
 
+/* Add ' at start and end of a string.
+   Change ' to '' within string. Compare connect_stripper().
+   with string literals inside single quotes. Need doublets.
+   Todo: This is the same code as TextEditWidget::unstripper(),
+         see whether you can reduce the duplication.
+   Todo: Consider:
+         if (co.contains("''")) co= co.replace("''", "'");
+         Would surely be faster?
+   Todo: We also have something in debug_debug_go for changing ' to '',
+         maybe there's code duplication
+   Todo: Maybe something in setup_generate_routine_entry_parameter
+         has something similar too, maybe there's code duplication.
+   Todo: debugger routines should call this when we generate statements
+         but so far it's not happening
+*/
+QString MainWindow::connect_unstripper(QString value_to_unstrip)
+{
+  QString s;
+  QString c;
+
+  s= "'";
+  for (int i= 0; i < value_to_unstrip.count(); ++i)
+  {
+    c= value_to_unstrip.mid(i, 1);
+    s.append(c);
+    if (c == "'") s.append(c);
+  }
+  s.append("'");
+  return s;
+}
+
+
 
 /*
   Given token0=option-name [token1=equal-sign token2=value],
@@ -16850,7 +16891,8 @@ unsigned int MainWindow::get_ocelot_protocol_as_int(QString ocelot_protocol)
   It should mean we don't try to use --ssl, but we don't anyway.
 */
 int options_and_connect(
-    unsigned int connection_number)
+    unsigned int connection_number,
+    char *database_as_utf8)
 {
   if (connected[connection_number] != 0)
   {
@@ -16959,7 +17001,7 @@ int options_and_connect(
                                                      ocelot_host_as_utf8,
                                                      ocelot_user_as_utf8,
                                                      ocelot_password_as_utf8,
-                                                     ocelot_database_as_utf8,
+                                                     database_as_utf8,
                                                      ocelot_port,
                                                      socket_parameter,
                                                      real_connect_flags);
@@ -17178,7 +17220,7 @@ int MainWindow::the_connect(unsigned int connection_number)
   /* options_and_connect() cannot use QStrings because it is not in MainWindow */
   copy_connect_strings_to_utf8();
 
-  x= options_and_connect(connection_number);
+  x= options_and_connect(connection_number, ocelot_database_as_utf8);
 
   return x;
 }
@@ -17245,21 +17287,2152 @@ void MainWindow::print_help()
   action_connect_once("Print");
 }
 
+QStringList debug_routine_list_schemas;
+QStringList debug_routine_list_names;
+QStringList debug_routine_list_types;
+QStringList debug_routine_list_sql_modes;
+QStringList debug_routine_list_surrogates;
+QStringList debug_routine_list_texts;
+int debug_v_statement_number; /* the number for all routines */
+QString debug_xxxmdbug_icc_core_surrogate_name;
+QStringList c_variable_names;  /* (declared) in reverse order */
+QStringList c_variable_tokens; /* (declared) in reverse order */
+QStringList debug_tmp_user_variables;
+QString debug_v_g;
+QString debug_xxxmdbug_debugger_name;
+QString debug_xxxmdbug_debugger_version;
+int debug_xxxmdbug_signal_errno;
+QString debug_xxxmdbug_timestamp;
+QString debug_xxxmdbug_setup_group_name;
+int i_of_start_of_parameters, i_of_end_of_parameters;
+QStringList debug_label_list;
+QString debug_xxxmdbug_default_schema;
+int debug_track_statements;
+int debug_track_user_variables;
+int debug_track_declared_variables;
+bool debug_ansi_quotes;
+QString debug_lf;
+QString debug_plugins;
+QString debug_session_sql_mode_original;
+QString debug_session_sql_mode_after_last_change;
+int debug_routine_list_size;
 
 /*
-  Routines that start with "setup_*" are a work in progress for the new
-  way that we must do debugger $setup. The old way will no longer work.
-  So far all we have is a stub, which we reach if $setup from mysql 8.0.
+  When NEW_SETUP == 1, which is default since May 2018,
+  we handle $setup from new code in ocelotgui.cpp due to the
+  changes in MySQL 8.0. Except for debug_setup_go, all the new
+  routines begin with "setup_".
+  All setup_* functions, on error, should call debug_error() and return <> 0.
 */
 
-void MainWindow::setup_stub()
+#if (NEW_SETUP == 1)
+/*
+  We expect hparse to catch syntax errors so checks here are minimal.
+*/
+/* The 'track' switches exist so that one can reduce the amount of instrumenting,
+   for space or speed reasons.
+   @xxxmdbug_track_statements:            0=none, 1=base set, 2=+iterate/leave/set. default: 2.
+   @xxxmdbug_track_user_variables:        0=none, 1=in same routine, 2=all (todo: allow 2). default=1.
+   @xxxmdbug_track_declared_variables     0=none, 1=since last declare, 2=all. default: 2.
+   Future switch: overwrite
+   We are parsing these switches, but they are undocumented.
+*/
+/*
+  Todo: New syntax: $SETUP ... [procedure|function|trigger|event] name.
+                    and LIKE | = 'name'
+  Todo: Are you sure $setup is starting at 0??
+  Todo: Are you okay if there's a delimiter?
+  Todo: I do case-insensitive comparisons. That's always okay for
+        routine | declared variable | event, but not if
+        @@lower_case_table_names == 0 and database | trigger | table.
+*/
+/*
+  Todo: get_lock('xxxmdbug_lock') -- but in the past this has failed.
+        Anyway conflict is unlikely unless two users get the same
+        group name.
+  Todo: I don't think locking is necessary. But check at the end, or
+        even at $debug time, whether all routines are current.
+        That is: did anyone change or drop a routine that's in the log?
+                 or change our access rights to the surrogate routines?
+        If so, $setup is probably invalid, return "failed".
+  Todo: debug_privilege_check() should include whether we can read the
+        information_schema.routines table for MySQL 8.0, but if we can't
+        then that will be clear because setting up routine lists fails.
+*/
+void MainWindow::debug_setup_go(QString text)
 {
-  QMessageBox msgbox;
-  QString s= "Sorry, the ocelotgui debugger won't work with MySQL 8.0. ";
-  s.append("For explanation read https://ocelot.ca/blog/blog/2017/08/22/no-more-mysql-proc-in-mysql-8-0/");
-  s.append("We are working on it and hope to have a new version in a few months.");
-  msgbox.setText(s);
-  msgbox.exec();
+  if (ocelot_statement_syntax_checker.toInt() < 1)
+  {
+    debug_error((char*)"Before running $setup you must say 'set ocelot_statement_syntax_checker=1;' or 'set ocelot_statement_syntax_checker=3;'");
+    return;
+  }
+  if (hparse_errno != 0)
+  {
+    char copy_of_hparse_errmsg[1024];
+    strcpy(copy_of_hparse_errmsg, "$setup cannot proceed due to syntax error: ");
+    strcat(copy_of_hparse_errmsg, hparse_errmsg);
+    debug_error((char*)copy_of_hparse_errmsg);
+    return;
+  }
+  if (setup_initialize_variables()) return;
+  /* parse the switches */
+  debug_track_statements= 2;                        /* default */
+  debug_track_user_variables= 1;                    /* default */
+  debug_track_declared_variables= 2;                /* default */
+  QString switch_name= "";
+  bool is_switch= false;
+
+  int last_token= main_token_number + main_token_count_in_statement;
+  for (int i= main_token_number;
+       ((main_token_lengths[i] != 0) && (i < last_token));
+       ++i)
+  {
+    QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    if (s == "-")
+    {
+      is_switch= true;
+      continue;
+    }
+    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER) && (is_switch))
+    {
+      switch_name= s;
+      continue;
+    }
+    if (is_switch)
+    {
+      if ((main_token_types[i] == TOKEN_TYPE_LITERAL_WITH_DIGIT)
+       || (main_token_types[i] == TOKEN_TYPE_LITERAL))
+      {
+        QString p= switch_name.toUpper();
+        int j= s.toInt();
+        if (p == "TRACK_STATEMENTS") debug_track_statements= j;
+        else if (p == "TRACK_USER_VARIABLES") debug_track_user_variables= j;
+        else if (p == "TRACK_DECLARED_VARIABLES") debug_track_declared_variables= j;
+        is_switch= false;
+      }
+    }
+  }
+
+  QString qstring_error_message;
+  //QString command_string;
+  /* Todo: use debug_error instead, provided debug_error gets rid of any problematic ''s */
+  qstring_error_message= debug_privilege_check(TOKEN_KEYWORD_DEBUG_SETUP);
+  if (qstring_error_message != "")
+  {
+    char command_string[512];
+    strcpy(command_string, qstring_error_message.toUtf8());
+    if (debug_error(command_string) != 0) return; /* setup wouldn't be able to operate so fail */
+  }
+  int r= setup_internal(text);
+  if (r == 1)
+  {
+    setup_cleanup();
+    /* I assume debug_error() has set up a good error message. */
+    return;
+  }
+  /* Todo: Return how many routines you found. */
+
+  /* Repetition of some code in put_diagnostics_in_result */
+  char elapsed_time_string[50];
+  {
+    qint64 statement_end_time= QDateTime::currentMSecsSinceEpoch();
+    qint64 elapsed_time= statement_end_time - statement_edit_widget->start_time;
+    long int elapsed_time_as_long_int= (long int) elapsed_time;
+    float elapsed_time_as_float= (float) elapsed_time_as_long_int / 1000;
+    sprintf(elapsed_time_string, " (%.1f seconds)", elapsed_time_as_float);
+  }
+  QString s1= QString("OK ");
+  s1.append(QString::number(debug_routine_list_size));
+  s1.append(" surrogate routines. ");
+  s1.append(elapsed_time_string);
+  statement_edit_widget->result= s1;
+  setup_cleanup();
+  return;
+}
+#endif
+
+
+/*
+  $setup should call this wrapper when it needs mysql_real_query(),
+  so that if there is a failure it can find it, prefix it with the
+  error_prefix string, put it in the result, and erturn 1.
+  We also put it in the log what the query was, with a low number.
+  Todo: Error strings should be in ostrings.h.
+*/
+int MainWindow::setup_mysql_real_query(char *statement,
+                                             char *error_prefix)
+{
+  int statement_len= strlen(statement);
+  if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], statement, statement_len))
+  {
+    QString e= error_prefix;
+    char debuggee_state_error[STRING_LENGTH_512];
+    strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_MAIN_CONNECTION]), STRING_LENGTH_512 - 1);
+    e= e + debuggee_state_error;
+    put_message_in_result(e);
+    log(error_prefix, 60);
+    log(statement, 60);
+    return 1;
+  }
+  return 0;
+}
+
+/*
+  Make the routine_list_* QStringlists from the $SETUP arguments.
+  Todo: This won't work for names that contain 's.
+  Exclude if:
+  * Language <> 'SQL'
+    That's mysql.proc.language, an approximation is external_language.
+    This might be important if external languages become okay.
+    But it won't help with MariaDB, PL/SQL doesn't seem to be flagged.
+    In MySQL expect 'SQL', in MariaDB expect NULL.
+  * % wildcard for schema, and system database
+    That is, mysql, information_schema, performance_schema, xxxmdbug.
+  * % wildcard for name, and name like 'xxxmdbug___%'
+    Quis custodiet ipsos debuggeros?
+*/
+/*
+  We use COLLATE utf8_general_ci clauses in some comparisons, to avoid
+  incompatible-mix-of-collations errors due to a MySQL 8.0 change.
+  In MySQL 8.0: routine_catalog and routine_schema are utf8_tolower_ci,
+  routine_name is utf8_general_ci. In earlier versions and in
+  MariaDB 10.3: they are all utf8_general_ci.
+*/
+/* Todo:
+   Ignore routines whose surrogate names would be too long.
+   Todo: put a notice in setup_log.
+   IF LENGTH(mysql_proc_name)+LENGTH('xxxmdbugxxxP')>64 THEN ITERATE x1; END IF;
+*/
+/*
+  Todo: DEBUG_TAB_WIDGET_MAX is a maximum caused by our desire not to
+  have too many tabs when $debug happens. But you could try to fix that
+  some other way, e.g. allow users to change the maximum, or dynamically
+  shift tabs in and out from the front on a last-seen basis.
+*/
+
+int MainWindow::setup_routine_list(QString text)
+{
+  debug_routine_list_schemas.clear();
+  debug_routine_list_names.clear();
+  debug_routine_list_types.clear();
+  debug_routine_list_sql_modes.clear();
+  debug_routine_list_surrogates.clear();
+  debug_routine_list_texts.clear();
+  debug_tmp_user_variables.clear();
+  debug_routine_list_size= 0;
+  QString s;
+  QString token;
+  QString schema_name= debug_xxxmdbug_default_schema;
+  QString routine_name= "";
+  char select_statement[2048];
+  int i;
+  for (i= 0; main_token_lengths[i] != 0; ++i)
+  {
+    if (main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+    {
+      token= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (main_token_reftypes[i] == TOKEN_REFTYPE_DATABASE)
+      {
+        schema_name= token.replace("_", "\\_");
+      }
+      else if (main_token_reftypes[i] == TOKEN_REFTYPE_SWITCH_NAME) {;}
+      else
+      {
+        routine_name= token.replace("_", "\\_"); /* _ is a wildcard so escape it */
+        s= "SELECT routine_schema,routine_name,routine_type,sql_mode " ;
+        s= s + "FROM information_schema.routines WHERE ";
+        s= s + "routine_schema COLLATE utf8_general_ci LIKE '" + connect_stripper(schema_name, false) + "' ";
+        s= s + "AND routine_name LIKE '" + connect_stripper(routine_name, false) + "'";
+        s= s + " AND (external_language IS NULL OR external_language='SQL')";
+        if (schema_name.contains("%"))
+        {
+          s= s + " AND routine_schema COLLATE utf8_general_ci <> 'information_schema'"
+               + " AND routine_schema COLLATE utf8_general_ci <> 'performance_schema'"
+               + " AND routine_schema COLLATE utf8_general_ci <> 'mysql'"
+               + " AND routine_schema COLLATE utf8_general_ci <> 'xxxmdbug'";
+        }
+        if (routine_name.contains("%"))
+        {
+          s= s + " AND routine_name NOT LIKE 'xxxmdbug___%'";
+        }
+        s= s + ";";
+        strcpy(select_statement, s.toUtf8());
+        MYSQL_RES *res= NULL;
+        MYSQL_ROW row= NULL;
+        if (setup_mysql_real_query(select_statement,
+                                   (char*)"FAILED. Cannot make a list of routines. ") == 1)
+          return 1;
+        res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+        if (res == NULL)
+        {
+          debug_error((char*)"mysql_store_result -- FAILED. Cannot make a list of routines.");
+          return 1;
+        }
+        int counter= 0;
+        {
+          for (;;)
+          {
+            row= lmysql->ldbms_mysql_fetch_row(res);
+            if (row == NULL) break;
+            /* TODO: connect_stripper()? */
+            QString t_schema= QString::fromUtf8(row[0]);
+            QString t_name= QString::fromUtf8(row[1]);
+            QString t_type= QString::fromUtf8(row[2]);
+            QString t_sql_mode= QString::fromUtf8(row[3]);
+            int name_offset= setup_find(t_schema, t_name);
+            if (name_offset >= 0)
+            {
+              if (debug_routine_list_types.at(name_offset) != t_type)
+              {
+                debug_error((char*)"Two routines have the same name but different types");
+                if (res != NULL) lmysql->ldbms_mysql_free_result(res);
+                return 1;
+              }
+              continue; /* ignore duplicates of the same type */
+            }
+            /* Todo: Check you don't make the name too long */
+            debug_routine_list_schemas << t_schema;
+            debug_routine_list_names << t_name;
+            debug_routine_list_types << t_type;
+            debug_routine_list_sql_modes << t_sql_mode;
+            QString v_routine_identifier_of_surrogate;
+            v_routine_identifier_of_surrogate= "xxxmdbug"
+                    + debug_xxxmdbug_setup_group_name
+                    + t_type.mid(0,1)
+                    + connect_stripper(t_name, false);
+            debug_routine_list_surrogates << v_routine_identifier_of_surrogate;
+            ++counter;
+          }
+        }
+        if (res != NULL) lmysql->ldbms_mysql_free_result(res);
+        if (counter == 0)
+        {
+          char c_schema_name[256];
+          strcpy(c_schema_name, schema_name.toUtf8());
+          char c_routine_name[256];
+          strcpy(c_routine_name, routine_name.toUtf8());
+          char q[512];
+          strcpy(q, "FAILED. Could not find routine ");
+          strcat(q, c_schema_name);
+          strcat(q, ".");
+          strcat(q, c_routine_name);
+          debug_error(q);
+          return 1;
+        }
+        schema_name= debug_xxxmdbug_default_schema;
+      }
+    }
+  }
+  debug_routine_list_size= debug_routine_list_names.count();
+  if (debug_routine_list_size > DEBUG_TAB_WIDGET_MAX)
+  {
+    char q[256];
+    sprintf(q, "Error: Number of routines = %d. The maximum number of routines in a single $setup is %d", debug_routine_list_size, DEBUG_TAB_WIDGET_MAX);
+    debug_error((char*)q);
+    return 1;
+  }
+  return 0;
+}
+
+/*
+  Pass: schema+name.
+  Return: offset of schema+name (both must match) in QStringLists.
+          or -1 if not found.
+  This is an odd case where "return 1" does not mean "error".
+  Todo: test with delimited names.
+*/
+int MainWindow::setup_find(QString t_schema, QString t_name)
+{
+  int i= 0;
+  for (; i < debug_routine_list_schemas.count(); ++i)
+  {
+    if (QString::compare(debug_routine_list_names.at(i), t_name, Qt::CaseInsensitive) == 0)
+    {
+      if (QString::compare(debug_routine_list_schemas.at(i), t_schema, Qt::CaseInsensitive) == 0)
+        return i;
+    }
+  }
+  return -1;
+}
+
+/*
+  Generate the surrogate for one routine, specified by routine_number.
+  Todo: Make sure that any global checks/setups come before this.
+*/
+/*
+   Todo: see if this is happening ...
+   Reset tokens+variables+statements tables for each routine.
+   One effect is that @user_variables are only tracked in routines where
+   they are mentioned, and we might want to change that if a non-default
+   setup switch value is used i.e. track_user_variables=2.
+*/
+
+int MainWindow::setup_generate(int routine_number)
+{
+  debug_label_list.clear();
+  if (debug_track_user_variables == 1) debug_tmp_user_variables.clear();
+  QString s;
+  bool pushed_hparse_sql_mode_ansi_quotes;
+  QString routine_schema= debug_routine_list_schemas.at(routine_number);
+  QString routine_name= debug_routine_list_names.at(routine_number);
+  QString routine_type= debug_routine_list_types.at(routine_number);
+  QString routine_sql_mode= debug_routine_list_sql_modes.at(routine_number);
+  QString routine_surrogate= debug_routine_list_surrogates.at(routine_number);
+
+  /* Todo: Put the names inside ``s. */
+  /* Todo: check: what if there are nulls, will select_1_row() fail? */
+  {
+    char select_1_row_arg[1024];
+    strcpy(select_1_row_arg, "SHOW CREATE ");
+    strcat(select_1_row_arg, routine_type.toUtf8());
+    strcat(select_1_row_arg, " `");
+    strcat(select_1_row_arg, routine_schema.toUtf8());
+    strcat(select_1_row_arg,"`.`");
+    strcat(select_1_row_arg, routine_name.toUtf8());
+    strcat(select_1_row_arg,"`;");
+    s= select_1_row(select_1_row_arg);
+    if (s != "")
+    {
+      strcat(select_1_row_arg, "-- FAILED so cannot generate surrogates");
+      debug_error((char*)select_1_row_arg);
+      return 1;
+    }
+  }
+  /* Now select_1_row_result_3 has the procedure text. */
+  /* Todo: this duplicates stuff in action_statement_edit_widget_text_changed */
+  debug_v_g= "";
+  QString text;
+  int i;
+  QString mysql_proc_db= routine_schema;
+  QString p_routine_identifier= routine_name;
+  bool is_schema_seen= false;
+
+  /* NB: after this push do not "return 1" without popping */
+  main_token_push();
+  pushed_hparse_sql_mode_ansi_quotes= hparse_sql_mode_ansi_quotes;
+
+  if (routine_sql_mode.contains("ANSI_QUOTES",Qt::CaseInsensitive))
+  {
+    debug_ansi_quotes= true;
+  }
+  else
+  {
+    debug_ansi_quotes= false;
+  }
+  hparse_sql_mode_ansi_quotes= debug_ansi_quotes;
+
+  /* Todo: There's no need to copy, we could use select_1_row_result_3 */
+  text= select_1_row_result_3;
+  /* SHOW CREATE doesn't show ; but maybe I can't depend on that. */
+  if (text.right(1) != ";") text= text + ";";
+
+  main_token_new(text.size());
+  tokenize(text.data(),
+           text.size(),
+           main_token_lengths, main_token_offsets, main_token_max_count, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
+  tokens_to_keywords(text, 0);
+  hparse_f_multi_block(text); /* recognizer */
+  /* Todo: We only check hparse_errno. hparse_errno_count maybe > 0. */
+  if (hparse_errno != 0)
+  {
+    debug_error((char*)"ocelotgui failed to parse the routine body");
+    goto pop_and_return_error;
+  }
+  /* Successful parse. Now we can start the fiddling. */
+  i= 0;
+
+  /* Copy CREATE DEFINER ... PROCEDURE|FUNCTION name, maybe add schema */
+  for (; main_token_lengths[i] != 0; ++i)
+  {
+    QString d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    if (main_token_reftypes[i] == TOKEN_REFTYPE_DATABASE) is_schema_seen= true;
+    if ((main_token_reftypes[i] == TOKEN_REFTYPE_PROCEDURE)
+     || (main_token_reftypes[i] == TOKEN_REFTYPE_FUNCTION))
+    {
+      if (is_schema_seen == false) debug_v_g= debug_v_g + routine_schema + ".";
+      if (setup_append(routine_surrogate, text, i)) goto pop_and_return_error;
+      break;
+    }
+    else if (setup_append(d, text, i)) goto pop_and_return_error;
+  }
+  ++i;
+  /* Todo: error if main_token_lengths[i] == 0 */
+  /* Todo: call find_start_of_body() to find where routine really starts? */
+  /* TODO: Assumption is wrong,
+     CREATE TRIGGER or CREATE EVENT do not have parameter lists. */
+  /* Assume always there is (parameter list). Where does it end? */
+  {
+    int parentheses_count= 0;
+    bool is_parenthesis_seen= false;
+    QString token;
+    int j;
+    for (j= i; main_token_lengths[j] != 0; ++j)
+    {
+      if (main_token_types[j] == TOKEN_TYPE_OPERATOR)
+      {
+        token= text.mid(main_token_offsets[j], main_token_lengths[j]);
+        if (token == "(")
+        {
+          if (is_parenthesis_seen == false) i_of_start_of_parameters= j + 1;
+          ++parentheses_count;
+          is_parenthesis_seen= true;
+        }
+        if (token == ")")
+        {
+          --parentheses_count;
+          if (parentheses_count == 0) break;
+        }
+      }
+    }
+    i_of_end_of_parameters= j;
+  }
+  if (setup_insert_into_variables_user_variables(text, i_of_end_of_parameters) == 1) return 1;
+  /* Skip past the parameter list. */
+  /* In fact skip all the way till the first real statement appears. */
+  {
+    int i_of_statement;
+    for (i_of_statement= i_of_end_of_parameters;
+         (main_token_flags[i_of_statement] & TOKEN_FLAG_IS_START_STATEMENT) == 0;
+         ++i_of_statement)
+    {
+      if (main_token_lengths[i_of_statement] == 0)
+      {
+        debug_error((char*)"found no statements"); /* pseudo-assertion */
+        goto pop_and_return_error;
+      }
+    }
+
+    int j= main_token_offsets[i];
+    QString d= text.mid(j, main_token_offsets[i_of_statement] - j);
+    if (setup_append(d, text, i)) goto pop_and_return_error;
+    i= i_of_statement;
+  }
+
+  if (setup_generate_starter(mysql_proc_db,
+                         p_routine_identifier,
+                         routine_type,
+                         text)) goto pop_and_return_error;
+  if (setup_generate_statements(i,
+                            text,
+                            routine_number)) goto pop_and_return_error;
+  /*
+     "Generate: ender": Called from generate(). Was: generate_ender().
+     We call this for the last line of a routine.
+     We also change call stack (without calling this) for special handling of RETURN.
+     routine_exit() should cause "Delete From Call Stack" */
+  debug_v_g= debug_v_g
+             + "\nCALL xxxmdbug.routine_exit();" + debug_lf
+             + "END;" + debug_lf;
+  /* Now you have a new CREATE statement in debug_v_g for a surrogate. */
+  debug_routine_list_texts << debug_v_g;
+  main_token_pop();
+  hparse_sql_mode_ansi_quotes= pushed_hparse_sql_mode_ansi_quotes;
+  return 0;
+pop_and_return_error:
+  main_token_pop();
+  hparse_sql_mode_ansi_quotes= pushed_hparse_sql_mode_ansi_quotes;
+  return 1;
+}
+
+int MainWindow::setup_append(QString d, QString text, int i)
+{
+  debug_v_g.append(d);
+  int j= main_token_offsets[i] + main_token_lengths[i];
+  assert(main_token_offsets[i + 1] >= j);
+  debug_v_g.append(text.mid(j, main_token_offsets[i + 1] - j));
+  return 0;
+}
+
+/* called from generate_starter().
+   Job: make a string from the variables table.
+   For example: '2,a. int;13,b. int;'
+   Todo: don't need to start at 0, could start after routine name.
+   Todo: This should be useful when creating the variables table.
+   Todo: Actually the variables table can include @variables!
+         Data type will not be known.
+   Todo: You have to get the WHOLE data type, but replace 's in ENUM
+         or SET with ''s.
+   Todo: No idea how to handle MariaDB 10's ROW TYPE OF.
+*/
+int MainWindow::setup_generate_routine_entry_parameter(QString text)
+{
+  int v_token_number_of_declare= 0;
+  QString v_variable_identifier;
+  QString v_data_type;
+  int i;
+  for (i= 0; main_token_lengths[i] != 0; ++i)
+  {
+    if (main_token_types[i] == TOKEN_KEYWORD_DECLARE)
+    {
+      v_token_number_of_declare= i - i_of_start_of_parameters;
+    }
+    if ((main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE)
+     || (main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER_DEFINE))
+    {
+      if (setup_row_type(i) == TOKEN_KEYWORD_ROW) continue;
+      v_variable_identifier= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      v_data_type= "";
+      for (int j= i + 1; main_token_lengths[j] != 0; ++j)
+      {
+        /* Todo: Add error check: no data type, or unknown data type */
+        if ((main_token_flags[j] & TOKEN_FLAG_IS_DATA_TYPE) != 0)
+        {
+          v_data_type= "";
+          int parentheses_count= 0;
+          for (int k= j; main_token_lengths[k] != 0; ++k)
+          {
+            QString s= text.mid(main_token_offsets[k], main_token_lengths[k]);
+            if (s == "(") ++parentheses_count;
+            if (s == ")")
+            {
+              --parentheses_count;
+              if (parentheses_count < 0) break;
+            }
+            if (parentheses_count == 0)
+            {
+              if ((s == ";")
+               || (s == ",")
+               || (QString::compare(s, "DEFAULT", Qt::CaseInsensitive) == 0))
+                break;
+            }
+            if (v_data_type != "") v_data_type= v_data_type + " ";
+            if (s.mid(0,1) == "'") s= "'" + s + "'";
+            v_data_type= v_data_type + s;
+          }
+          break;
+        }
+      }
+      debug_v_g= debug_v_g
+              + QString::number(v_token_number_of_declare)
+              + "*"
+              + setup_add_delimiters(v_variable_identifier)
+              + "*"
+              + v_data_type
+              + ";";
+    }
+  }
+  return 0;
+}
+
+int MainWindow::setup_generate_starter(QString mysql_proc_db,
+                                        QString p_routine_identifier,
+                                        QString mysql_proc_type,
+                                        QString text)
+{
+  QString debug_v_generated_time= debug_xxxmdbug_timestamp;
+  /* We will use the contents of xxxmdbug_comment to find surrogates, or to check version number. So do not change here! */
+  debug_v_g= debug_v_g + debug_lf + "BEGIN ";
+  debug_v_g= debug_v_g + debug_lf + "DECLARE xxxmdbug_comment VARCHAR(1000) DEFAULT";
+  debug_v_g= debug_v_g + debug_lf + "'Surrogate routine for `" + mysql_proc_db + "`.`" + p_routine_identifier + "`";
+  debug_v_g= debug_v_g + debug_lf + "Generated by " + debug_xxxmdbug_debugger_name + " Version " + debug_xxxmdbug_debugger_version;
+  debug_v_g= debug_v_g + debug_lf + "Generated on " + debug_v_generated_time + "';";
+  /* Handling the signal number */
+  debug_v_g= debug_v_g + debug_lf + "DECLARE EXIT HANDLER FOR " + QString::number(debug_xxxmdbug_signal_errno) + " BEGIN CALL xxxmdbug.routine_exit(); RESIGNAL; END;";
+  debug_v_g= debug_v_g + debug_lf + "DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN CALL xxxmdbug.routine_exit(); RESIGNAL; END;";
+  /* "call routine_entry(variable-list,command-list)". includes "Insert Into Call stack". */
+  debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.routine_entry("
+                  + "'`" + mysql_proc_db + "`',"
+                  + "'`" + p_routine_identifier + "`',"
+                  + "'" + mysql_proc_type + "',"
+                  + "'" + debug_xxxmdbug_debugger_version + "',"
+                  + "'" + debug_v_generated_time + "','";
+  if (setup_generate_routine_entry_parameter(text)) return 1;
+  debug_v_g= debug_v_g + "');" + debug_lf;
+  /* TODO: routine_entry() should have another parameter for pre-set commands. */
+
+  /* A breakpoint on line 0 is possible. There are no settable variables,
+     but the user can see what the routine is, and can set breakpoints."
+     breakpoint_check() always stops for line 0 right after 'debug' command. */
+  debug_v_g= debug_v_g + debug_lf + "IF xxxmdbug.is_debuggee_and_is_attached()=1 THEN CALL xxxmdbug."
+                  + debug_xxxmdbug_icc_core_surrogate_name
+                  + "(0);"
+                  + "END IF;" + debug_lf;
+  return 0;
+}
+
+
+/*
+  Find statements and generate for them.
+  Beware, sometimes flow-control statements start with labels.
+  Actually I think start_statement flag is on if it's label_define.
+  Todo: some of the parameters can be calculated from routine_number.
+*/
+int MainWindow::setup_generate_statements(int i,
+                                           QString text,
+                                           int routine_number)
+{
+  int v_statement_number_within_routine= 0;
+  int v_line_number_of_start_of_first_token;
+  int v_token_number_of_last_token;
+  for (; main_token_lengths[i] != 0; ++i)
+  {
+    QString d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT)
+     || (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL_DEFINE))
+    {
+      ++debug_v_statement_number;
+      ++v_statement_number_within_routine;
+      if (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL_DEFINE)
+      {
+        int j= main_token_offsets[i];
+        ++i;
+        for (; ; ++i)
+        {
+          if (main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) break;
+        }
+        QString s= text.mid(j, main_token_offsets[i] - j);
+        debug_v_g.append(s);
+      }
+      {
+        int j= main_token_offsets[i_of_end_of_parameters];
+        int k= main_token_offsets[i];
+        QString s= QString::number(i) + "*" + text.mid(j, k - j);
+        v_line_number_of_start_of_first_token= s.count(debug_lf);
+      }
+      //v_character_number_of_start_of_first_token= main_token_offsets[i];
+      for (int j= i + 1; ; ++j)
+      {
+        if ((main_token_flags[j] & TOKEN_FLAG_IS_START_STATEMENT)
+         || (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL_DEFINE)
+         || (main_token_lengths[j] == 0))
+        {
+          v_token_number_of_last_token= j - 1;
+          break;
+        }
+      }
+      if (setup_generate_label(i, text, v_statement_number_within_routine)) return 1;
+
+      if (main_token_flags[i] & TOKEN_FLAG_IS_DEBUGGABLE)
+      {
+        /* Todo: generate per-statement stuff, this is executable */
+        /* We'll set is_leave_possible later. */
+        if (setup_generate_statements_debuggable(i,
+                                             v_line_number_of_start_of_first_token,
+                                             v_statement_number_within_routine,
+                                             text,
+                                             v_token_number_of_last_token,
+                                             routine_number)) return 1;
+      }
+      else
+      {
+        if (setup_generate_statement_text(i,
+                                      text,
+                                      v_token_number_of_last_token,
+                                      routine_number)) return 1;
+      }
+      i= v_token_number_of_last_token;
+    }
+  }
+  return 0;
+}
+
+/*
+   Initialize some variables. Called from setup(), command(), and become_debuggee_connection().
+   Start with some error checks.
+   Any names that start with @xxxmdbug are reserved.
+   Some of the variables set in this procedure are "constants".
+   In debug_parse_statement() there is also some initialization,
+   but $setup no longer calls that.
+*/
+/* For debugger purposes, the pipe prefix forms are:
+   'xxxmdbug_' + @xxxmdbug_prefix_endxxx e.g. 'B '
+   The 'R ' messages are status sendings which the debugger may or may not choose to receive (the debuggee may overwrite them).
+   The @xxxmdbug_prefix_end_for_rxxx messages are responses to specific questions which the debugger is expecting.
+*/
+/* Todo: why not find out current sql_mode too? */
+int MainWindow::setup_initialize_variables()
+{
+  debug_lf = "\n"; /* constant: Line Feed. add carriage return if desired */
+  debug_xxxmdbug_debugger_name= "OCELOTGUI";
+  debug_xxxmdbug_debugger_version= ocelotgui_version;
+  debug_xxxmdbug_signal_errno= 5678;
+
+  /* Todo: make this call along with other things you need server for. */
+  /* Todo: watch out re group_concat_max_len */
+  char query[]="SELECT current_timestamp(),database(),group_concat(plugin_name ORDER BY plugin_name), @@session.sql_mode FROM information_schema.plugins;";
+  QString s= select_1_row(query);
+  if (s != "")
+  {
+    char error_message[1024];
+    strcpy(error_message, "Failed to execute: ");
+    strcat(error_message, query);
+    debug_error(error_message);
+    return 1;
+  }
+
+  debug_xxxmdbug_timestamp= select_1_row_result_1;
+  debug_xxxmdbug_default_schema= select_1_row_result_2;
+  debug_plugins= select_1_row_result_3;
+  debug_session_sql_mode_original= select_1_row_result_4;
+  debug_session_sql_mode_after_last_change= debug_session_sql_mode_original;
+  return 0;
+}
+
+/*
+   routine_identifier_of_surrogate = xxxmdbug xxx type routine_identifier
+   where xxx = set name = a 3-character value with character set { 0-9 A-Z },
+   up to 36 * 36 * 36 = 46656 possibilities, and it goes up every time we call setup().
+   where type = first letter of mysql.proc.type so 'P' for procedure and 'F' for function.
+   This format is expected by debuggee_wait_loop().
+   In get_set_setup_group_name() all we do is get the 3-character string, @xxxmdbug_setup_group_name
+   Todo: explain what to do if set name reaches 'ZZZ'.
+   Todo: Get group name again when you're ready to write.
+         If it's not the same, debug_error("Concurrency error").
+*/
+int MainWindow::setup_get_setup_group_name()
+{
+  int vxxx_as_number;
+  int v_digit1,v_digit2,v_digit3;
+  QString v_max_name= "";
+  QString v_max_name_in_setup_log= "";
+  QString s;
+  s= select_1_row("SELECT MAX(routine_name) FROM information_schema.routines WHERE routine_name LIKE 'xxxmdbug____%';");
+  if (s != "")
+  {
+    debug_error((char*)"Failed to read information_schema.routines");
+    return 1;
+  }
+  v_max_name= select_1_row_result_1.toUpper();
+  s= select_1_row("SELECT MAX(surrogate_routine_identifier) FROM xxxmdbug.setup_log WHERE surrogate_routine_identifier LIKE 'xxxmdbug____%';");
+  if (s != "")
+  {
+    debug_error((char*)"Failed to read xxxmdbug.setup_log");
+    return 1;
+  }
+  v_max_name_in_setup_log= select_1_row_result_1.toUpper();
+  if ((v_max_name_in_setup_log > v_max_name)
+   || (v_max_name == ""))
+    v_max_name= v_max_name_in_setup_log;
+  if (v_max_name == "") debug_xxxmdbug_setup_group_name= "000";
+  else
+  {
+    debug_xxxmdbug_setup_group_name= v_max_name.mid(strlen("xxxmdbug"), 3);
+    if (debug_xxxmdbug_setup_group_name == "ZZZ")
+    {
+      debug_error((char*)"Too many sets of surrogates, cleanup necessary");
+      return 1;
+    }
+    char digits[4];
+    strcpy(digits, debug_xxxmdbug_setup_group_name.mid(0, 1).toUtf8());
+    v_digit1= (int)digits[0];
+    if (v_digit1 <= 57) v_digit1-= 48; else v_digit1 -= (65 - 10);
+    strcpy(digits, debug_xxxmdbug_setup_group_name.mid(1, 1).toUtf8());
+    v_digit2= (int)digits[0];
+    if (v_digit2 <= 57) v_digit2-= 48; else v_digit2 -= (65 - 10);
+    strcpy(digits, debug_xxxmdbug_setup_group_name.mid(2, 1).toUtf8());
+    v_digit3= (int)digits[0];
+    if (v_digit3 <= 57) v_digit3-= 48; else v_digit3 -= (65 - 10);
+    vxxx_as_number= ((v_digit1 * 36 * 36) + (v_digit2 * 36) + v_digit3) + 1;
+    v_digit3= vxxx_as_number % 36;
+    v_digit2= ((vxxx_as_number - v_digit3)/36) %36;
+    v_digit1= ((vxxx_as_number-(v_digit3+v_digit2*36))/(36*36)) %36;
+    if (v_digit1 <= 9) v_digit1= v_digit1 + 48; else v_digit1= v_digit1 + (65-10);
+    if (v_digit2 <= 9) v_digit2= v_digit2 + 48; else v_digit2= v_digit2 + (65-10);
+    if (v_digit3 <= 9) v_digit3= v_digit3 + 48; else v_digit3= v_digit3 + (65-10);
+    digits[0]= v_digit1;
+    digits[1]= v_digit2;
+    digits[2]= v_digit3;
+    digits[3]= '\0';
+    debug_xxxmdbug_setup_group_name= digits;
+  }
+  return 0;
+}
+
+
+/*
+  Identifiers in routines might be "delimited" or `delimited` or bare.
+  We usually want `delimited` for consistent comparisons.
+  Todo: Convert to upper because, even if variable-name is delimited,
+        it is not case sensitive? Well, let's cancel that for a while.
+        If we don't send it as lower case, IT DOESN'T WORK.
+  Todo: This doesn't handle names that have ` or " inside them.
+  Todo: Test with @`var` etc.
+*/
+QString MainWindow::setup_add_delimiters(QString name)
+{
+  QString n= name;
+  if (n.mid(0,1) == "@") return n;
+  if ((debug_ansi_quotes) && (n.mid(0,1) == "\""))
+  {
+    n= connect_stripper(n, true);
+    return "`" + n + "`";
+  }
+  if (n.mid(0,1) != "`")
+  {
+    n= "`" + n + "`";
+  }
+  return n;
+}
+
+
+/* We finished with declared variables.
+   Now user variables, that is, any token that starts with '@'.
+   Here we dump names that start with '@' into a variables list.
+   Later we select from the list and use the result as input for
+   generate_icc_core().
+   In the end the user sees these variables with command 'refresh user_variables'.
+   If the user said call setup('-track_user_variables=0 ...') then we do nothing.
+   todo: this is not handling already-delimited user variables correctly.
+   todo: check: do we need to check for TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE?
+   todo: I would much prefer to look for TOKEN_REFTYPE_USER_VARIABLE, but
+         for some reason hparse isn't generating it. Have a look there.
+*/
+int MainWindow::setup_insert_into_variables_user_variables(QString text, int i_of_end_of_parameters)
+{
+  if (debug_track_user_variables > 0)
+  {
+    for (int i= i_of_end_of_parameters; main_token_lengths[i] != 0; ++i)
+    {
+      if (main_token_types[i] == TOKEN_TYPE_IDENTIFIER_WITH_AT)
+      {
+        QString v_value= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        if ((v_value.mid(0,1) == "@") && (v_value.mid(1,1) != "@"))
+        {
+          v_value= setup_add_delimiters(v_value);
+          /* don't insert duplicates. */
+          if (debug_tmp_user_variables.contains(v_value)) continue;
+          debug_tmp_user_variables << v_value;
+        }
+      }
+    }
+  }
+  debug_tmp_user_variables.sort(); /* I'm not sure this is necessary */
+  return 0;
+}
+
+
+int MainWindow::setup_create_setup_log_table()
+{
+  char statement[]=
+  "CREATE TABLE IF NOT EXISTS xxxmdbug.setup_log (\
+   group_name VARCHAR(3) CHARACTER SET utf8,\
+   user VARCHAR(80) CHARACTER SET utf8,\
+   version_number_of_debugger CHAR(5) CHARACTER SET utf8,\
+   timestamp_when_setup_procedure_was_run DATETIME,\
+   arguments_passed_to_setup VARCHAR(8192) CHARACTER SET utf8,\
+   routine_type VARCHAR(10) CHARACTER SET utf8, /* procedure|function. not event|trigger yet. */\
+   schema_identifier VARCHAR(66) CHARACTER SET utf8,\
+   original_routine_identifier VARCHAR(66) CHARACTER SET utf8,\
+   surrogate_routine_identifier VARCHAR(66) CHARACTER SET utf8,\
+   outcome VARCHAR(66) CHARACTER SET utf8, /* Made surrogate, Overwrote, or Failed */\
+   invocations_of_routines_in_same_group INT,\
+   invocations_of_routines_in_any_group INT,\
+   comment_based_on_generate VARCHAR(66) CHARACTER SET utf8,\
+   comment_based_on_readme VARCHAR(66) CHARACTER SET utf8) engine=myisam;\
+  ";
+
+  if (setup_mysql_real_query(statement,
+                             (char*)"FAILED. Cannot create setup_log table.") == 1)
+    return 1;
+  return 0;
+}
+
+/* We need to use information_schema.routines and SHOW CREATE.
+   todo: decide whether to use body or body_utf8 from mysql.proc.
+         it's impossible in MySQL but still possible in MariaDB.
+   todo: we could have an additional parameter for extra diagnostics from debug
+   Todo: Although I don't trust get_lock any more, I suppose that we
+         could lock an xxxmdbug table during this routine. */
+int MainWindow::setup_internal(QString command_string)
+{
+  QString object_name_list= command_string;
+  /* Make sure object_name_list is schema_identifier.routine_identifier
+    or schema_identifier.% or %.%. Default is %.%.
+    (Well, no it is not, the comments here are a bit obsolete.)
+    TODO: re-examine whether default schema identifier should be current database or %.
+    TODO: re-examine whether wildcarding should be (% and _) or with *."
+    Output is a temporary list of schemas and objects. */
+  {
+    /* CALL xxxmdbug.privilege_checks(); */
+    if (setup_create_setup_log_table() == 1) return 1;
+    if (setup_get_setup_group_name()) return 1; /* returns @xxxmdbug_setup_group_name = 3-character string for new set name. */
+    if (debug_track_user_variables > 0)
+      debug_xxxmdbug_icc_core_surrogate_name=
+          "xxxmdbug"
+          + debug_xxxmdbug_setup_group_name
+          + "P"
+          + "icc_core";
+    else
+      debug_xxxmdbug_icc_core_surrogate_name= "icc_core";
+  }
+
+  if (setup_routine_list(command_string)) return 1;
+  debug_v_statement_number= 0;
+  for (int i= 0; i < debug_routine_list_names.count(); ++i)
+  {
+    if (setup_generate(i)) return 1;
+    QString s_insert=
+      QString("INSERT INTO xxxmdbug.setup_log VALUES (")
+      +  "'" + debug_xxxmdbug_setup_group_name + "'," /* group_name */
+      +  "'" + ocelot_user + "'," /* user. ?? maybe statement_edit_widget->dbms_current_user is better? */
+      +  "'" + debug_xxxmdbug_debugger_version + "'," /* version_number_of_debugger */
+      +  "'" + debug_xxxmdbug_timestamp + "'," /* timestamp_when_setup_procedure_was_run */
+      +  "'" + object_name_list + "'," /* arguments_passed_to_setup */
+      +  "'" + debug_routine_list_types.at(i) + "'," /* routine_type */
+      +  "'" + debug_routine_list_schemas.at(i) + "'," /* schema_identifier */
+      +  "'" + debug_routine_list_names.at(i) + "'," /* original_routine_identifier */
+      +  "'" + debug_routine_list_surrogates.at(i) + "'," /* surrogate_routine_identifier */
+      +  "'done'," /* outcome */ /* todo: something informative, eh? */
+      +  "0," /* @xxxmdbug_invocations_of_routines_in_same_group,"*/ /* invocations_of_routines_in_same_group */
+      +  "0," /* @xxxmdbug_invocations_of_routines_in_any_group,"*/ /* invocations_of_routines_in_any_group */
+      + "NULL," /* comment_based_on_generate */
+      + "'thanks. copyright. gpl');"; /* comment_based_on_readme */
+    char s_utf8[2048]; /* Todo: this should be dynamically allocated */
+    strcpy(s_utf8, s_insert.toUtf8());
+    if (setup_mysql_real_query(s_utf8,
+                               (char*)"FAILED. Cannot insert into xxxmdbug.setup_log. ") == 1)
+      return 1;
+  }
+
+  if (debug_track_user_variables > 0)
+  {
+    if (setup_generate_icc_core() == 1) return 1;
+  }
+
+  if (setup_generate_icc_process_user_command_r_server_variables() == 1) return 1;
+
+  /* This is blank: CALL xxxmdbug.view_and_trigger_and_event_check(); */
+  /* This is blank: CALL xxxmdbug.checks_and_warnings(mysql_proc_db); */
+
+  /*
+    Now routine_lists_* has a bunch of CREATE PROCEDURE|FUNCTION,
+    ready to be executed.
+    TODO: If there were no @variables you can change calls to the
+          generated icc_core back to the regular icc_core, it's a
+          simple search-and-replace now.
+  */
+
+  if (setup_drop_routines() == 1) return 1;
+  /* Create all the routines that are to be created. */
+  /* If one of the creates fails, undo all previous creates. */
+  /* Todo: change sql_mode before you call. Definer too? */
+  for (int i= 0; i < debug_routine_list_surrogates.count(); ++i)
+  {
+    QString s;
+    s= debug_routine_list_texts.at(i);
+    {
+      setup_set_session_sql_mode(debug_routine_list_sql_modes.at(i));
+      int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
+      char *query= new char[query_len + 1];
+      memcpy(query, s.toUtf8().constData(), query_len + 1);
+      if (setup_mysql_real_query(query,
+                                 (char*)"FAILED. Cannot create a routine. ") == 1)
+      {
+        setup_drop_routines();
+        delete []query;
+        return 1;
+      }
+      delete []query;
+    }
+  }
+  return 0;
+}
+
+/*
+  Drop all routines in debug_routine_list_surrogates.
+  We call this before we try to create those routines.
+  Or we call this if any create fails.
+  Todo: Think: why return if drop fails, instead of going to next?
+*/
+int MainWindow::setup_drop_routines()
+{
+  for (int i= 0; i < debug_routine_list_surrogates.count(); ++i)
+  {
+    QString s;
+    s= "DROP "
+            + debug_routine_list_types.at(i)
+            + " IF EXISTS "
+            + debug_routine_list_schemas.at(i)
+            + "."
+            + debug_routine_list_surrogates.at(i)
+            + ";" + debug_lf;
+    {
+      int query_len= s.toUtf8().size();                  /* See comment "UTF8 Conversion" */
+      char *query= new char[query_len + 1];
+      memcpy(query, s.toUtf8().constData(), query_len + 1);
+
+      if (setup_mysql_real_query(query,
+                                 (char*)"FAILED. Cannot drop.") == 1)
+      {
+        delete []query;
+        return 1;
+      }
+    }
+  }
+  return 0;
+}
+
+/*
+  At the end of the $setup process, whether or not it succeeded:
+  Possibly temporary tables were created, now drop them (no, gone now).
+  Possibly some QStringLists were filled, now clear them.
+  This is not a complete list, just the most likely to be big.
+  Do not call before setup_initialize() where got debug_session_sql_mode.
+*/
+void MainWindow::setup_cleanup()
+{
+  debug_routine_list_schemas.clear();
+  debug_routine_list_names.clear();
+  debug_routine_list_types.clear();
+  debug_routine_list_sql_modes.clear();
+  debug_routine_list_surrogates.clear();
+  debug_routine_list_texts.clear();
+  debug_tmp_user_variables.clear();
+  setup_set_session_sql_mode(debug_session_sql_mode_original);
+}
+
+/*
+  Called from setup_internal() when we're about to create a routine.
+  Called from setup_cleanup() when we want to restore the original.
+  We execute SET SESSION_SQL_MODE=... so that, if sql_mode when the
+  original routine was created is different from sql_mode now, we
+  won't get in trouble because ""s were used for names, or due to
+  pipes_as_concat, or in future something to do with sql_mode='oracle'.
+  Actually we've probably changed ""s to ``s but that's not enough.
+  Todo: Not much we can do about failure. But return an error if fail.
+*/
+int MainWindow::setup_set_session_sql_mode(QString s)
+{
+  if (s != debug_session_sql_mode_after_last_change)
+  {
+    char query[1024];
+    strcpy(query, "SET SESSION SQL_MODE='");
+    strcat(query, s.toUtf8());
+    strcat(query, "';");
+    if (setup_mysql_real_query(query,
+                               (char*)"FAILED. Cannot change sql_mode.") == 1)
+      return 1;
+    debug_session_sql_mode_after_last_change= s;
+  }
+  return 0;
+}
+
+/* This generates the debuggee procedure that will handle the 'refresh server_variables'
+   command. It is better to generate rather than have a fixed set of
+   statements, because the server variables depend on the version and
+   on what engines or plugins are installed. An example first line:
+   SET v_ret=CONCAT(v_ret,'"@@ARIA_BLOCK_SIZE",','"',@@ARIA_BLOCK_SIZE,'";');
+   todo: watch for v_ret overflow
+   Perhaps performance_schema.session_variables won't exist,
+   so we don't abort on failure.
+   Todo: Nowadays MariaDB information_schema.server_variables has
+         data-type and read-only columns, so most of this effort is not
+         necessary! But we still need it because MySQL won't have them:
+         https://dev.mysql.com/doc/refman/8.0/en/performance-schema-system-variable-tables.html
+*/
+/* Code from setup_generate_icc_process_user_command_set_server_variables
+   has been added, it will use QString v_g_2 instead of QString v_g.
+   This generates the debuggee procedure that will handle the 'set @@server_variable=...'
+   command. An example first line:
+   IF @token_value_2 = '@@ARIA_BLOCK_SIZE' THEN SET @@ARIA_BLOCK_SIZE=@xxxmdbug_token_value_4a; END IF;
+   Wrong type or wrong value will cause a severe error, we handle it, but the warning list is cleared.*/
+int MainWindow::setup_generate_icc_process_user_command_r_server_variables()
+{
+  QString mysql_proc_name;
+  QString mysql_proc_db;
+  QString mysql_proc_type;
+  QString v_variable_name;
+  QString v_g, v_g_2;
+  QStringList c_variable_names; /* not the global with the same name */
+  QStringList c_variable_types;
+  {
+    /* Skip if we did it before and server version + plugins unchanged */
+    /* (Maybe 'settable' differs due to privileges, I don't care.) */
+    QString s=
+      QString("SELECT COUNT(*) ")
+      + "FROM information_schema.routines "
+      + "WHERE routine_name = 'icc_process_user_command_r_server_variables' "
+      + "AND routine_schema COLLATE utf8_general_ci = 'xxxmdbug' "
+      + "AND routine_definition LIKE '%" + statement_edit_widget->dbms_version + "%' "
+      + "AND routine_definition LIKE '%" + debug_plugins + "%';";
+    int query_len= s.toUtf8().size(); /* See comment "UTF8 Conversion" */
+    char *query= new char[query_len + 1];
+    memcpy(query, s.toUtf8().constData(), query_len + 1);
+    QString s2= select_1_row(query);
+    delete []query;
+    if ((s2 == "") && (select_1_row_result_1.toInt() == 1)) return 0;
+  }
+
+  {
+    /* Todo: Make sure big enough. Restore to original value. */
+    int max_len= 100000;
+    char query[256];
+    sprintf(query, "SET SESSION GROUP_CONCAT_MAX_LEN=%d;", max_len);
+    if (setup_mysql_real_query(query,
+                               (char*)"FAILED. Cannot change group_concat_maxlen.") == 1)
+      return 1;
+  }
+  c_variable_names.clear();
+  c_variable_types.clear();
+  {
+    QString s;
+    /* todo: maybe for MariaDB I should look first at information_schema */
+    s= select_1_row("select group_concat('/*@@',variable_name) from performance_schema.session_variables;");
+    if (s != "")
+    {
+      s= select_1_row("select group_concat('/*@@',variable_name) from information_schema.session_variables;");
+      if (s != "")
+      {
+        debug_error((char*)"select from session_variables failed");
+        return 1;
+      }
+    }
+    int j, k;
+    j= 0;
+    for (int i= 0; ; ++i)
+    {
+      if (j == select_1_row_result_1.length()) break;
+      k= select_1_row_result_1.indexOf("/*@@", j + 1);
+      if (k == -1)
+      {
+        k= select_1_row_result_1.length();
+        s= select_1_row_result_1.mid(j + 2, k - (j + 2));
+      }
+      else s= select_1_row_result_1.mid(j + 2, k - (j + 2 + 1));
+      c_variable_names << s;
+      j= k;
+    }
+  }
+
+  if (c_variable_names.count()== 0) /* pseudo-assertion */
+  {
+    debug_error((char*)"c_variable_names.count() == 0");
+    return 1;
+  }
+  c_variable_names.sort();
+
+  /* Determine the types. Since we're calling from C, we
+     have a way that doesn't involve trips to xxxmdbug.uvar.
+     More exact too, but we throw away the exactness. */
+  {
+    MYSQL_RES *res= NULL;
+    QString s= "SELECT ";
+    for (int i= 0; i < c_variable_names.count(); ++i)
+    {
+      if (i != 0) s= s + QString(",");
+      s= s + c_variable_names.at(i);
+    }
+    s= s + QString(";");
+    int query_len= s.toUtf8().size(); /* See comment "UTF8 Conversion" */
+    char *query= new char[query_len + 1];
+    memcpy(query, s.toUtf8().constData(), query_len + 1);
+
+    if (setup_mysql_real_query(query,
+                               (char*)"FAILED. While selecting variable names.") == 1)
+    {
+      delete []query;
+      return 1;
+    }
+    delete []query;
+    res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+    if (res != NULL)
+    {
+      int num_fields= lmysql->ldbms_mysql_num_fields(res);
+      assert(num_fields == c_variable_names.count());
+      MYSQL_FIELD *fields;
+      fields= lmysql->ldbms_mysql_fetch_fields(res);
+      int t;
+      QString v_data_type;
+      for (int i= 0; i < num_fields; ++i)
+      {
+        t= fields[i].type;
+        if ((t == MYSQL_TYPE_LONGLONG)
+         || (t == MYSQL_TYPE_TINY)
+         || (t == MYSQL_TYPE_SHORT)
+         || (t == MYSQL_TYPE_LONG)
+         || (t == MYSQL_TYPE_INT24))
+         v_data_type= "BIGINT";
+        else if ((t == MYSQL_TYPE_LONG_BLOB)
+              || (t == MYSQL_TYPE_VAR_STRING)
+              || (t == MYSQL_TYPE_TIMESTAMP)
+              || (t == MYSQL_TYPE_SET)
+              || (t == MYSQL_TYPE_ENUM)
+              || (t == MYSQL_TYPE_STRING))
+        {
+          if (fields[i].charsetnr == 63) v_data_type= "LONGBLOB";
+          else v_data_type= "LONGTEXT";
+        }
+        else if (t == MYSQL_TYPE_DECIMAL) v_data_type= "DECIMAL";
+        else if ((t == MYSQL_TYPE_FLOAT)
+              || (t == MYSQL_TYPE_DOUBLE))
+                v_data_type= "DOUBLE";
+        else v_data_type= "UNKNOWN";
+        c_variable_types << v_data_type;
+      }
+    }
+    if (res != NULL) lmysql->ldbms_mysql_free_result(res);
+  }
+
+  mysql_proc_name= "icc_process_user_command_r_user_variables"; /* todo: this is a lie. the original is for server_variables. */
+  QString v_g_surrogate_routine_identifier= "icc_process_user_command_r_server_variables";
+  QString v_g_2_surrogate_routine_identifier= "icc_process_user_command_set_server_variables";
+
+  QString xxxmdbug_comment;
+  {
+    QString xxxmdbug_comment_string=
+            debug_lf + "Routine for debugger tracking server variables"
+            + debug_lf + "Generated by " + debug_xxxmdbug_debugger_name + " Version " + debug_xxxmdbug_debugger_version
+            + debug_lf + "Generated on " + debug_xxxmdbug_timestamp
+            + debug_lf + "Generated from " + statement_edit_widget->dbms_version
+            + debug_lf + "Plugins: " + debug_plugins;
+    xxxmdbug_comment=
+          debug_lf
+          + "DECLARE xxxmdbug_comment VARCHAR("
+          + QString::number(xxxmdbug_comment_string.length() + 1)
+          + ") DEFAULT '"
+          + xxxmdbug_comment_string
+          + "';" + debug_lf;
+  }
+  mysql_proc_db= "xxxmdbug";
+  mysql_proc_type= "PROCEDURE";
+
+  /* For ..._r_... Opening matches what is in generate(). */
+
+  v_g = "CREATE "
+          + mysql_proc_type
+          + " "
+          + mysql_proc_db
+          + "."
+          + v_g_surrogate_routine_identifier
+          + "()" + debug_lf;
+  //v_g_offset_of_begin= v_g.length() + debug_lf.length();
+  v_g= v_g
+          + "BEGIN"
+          + xxxmdbug_comment
+          + "DECLARE v_ret MEDIUMTEXT CHARACTER SET utf8 DEFAULT '';" + debug_lf
+          /* todo: try TEXT */
+          + "DECLARE v_prefix VARCHAR(128) CHARACTER SET utf8;" + debug_lf;
+
+  /* For ..._set_... Opening matches what is in generate(). */
+  v_g_2= v_g_2
+          + "CREATE "
+          + mysql_proc_type
+          + " "
+          + mysql_proc_db
+          + "."
+          + v_g_2_surrogate_routine_identifier
+          + "()" + debug_lf;
+  //v_g_2_offset_of_begin= v_g_2.length() + debug_lf.length();
+  v_g_2= v_g_2
+        + "BEGIN"
+        + xxxmdbug_comment
+        + "DECLARE EXIT HANDLER FOR SQLEXCEPTION CALL xxxmdbug.icc_change_statement_status('Fail');" + debug_lf
+        + "SET @xxxmdbug_tmp_for_set = 'Fail';" + debug_lf;
+
+  for (int i= 0; i < c_variable_names.count(); ++i)
+  {
+    /* Test whether one can assign to the variable. If an exception happens,
+       it is almost certainly because the variable is read-only.
+       ERROR 1238 (HY000): Variable 'warning_count' is a read only variable.
+       In that case 'refresh server_variables' will show that is_settable = 0.
+       Do not check @@timestamp because SET TIMESTAMP freezes the clock.
+       Todo: actually a new column 'read only' would be smarter, here and for parameters. */
+    //QString xxxmdbug_test_setting;
+    v_variable_name= c_variable_names.at(i);
+    int v_is_settable= 1;
+    if (v_variable_name  != "@@TIMESTAMP")
+    {
+      char xxxmdbug_test_setting[256];
+      strcpy(xxxmdbug_test_setting, "SET ");
+      strcat(xxxmdbug_test_setting, v_variable_name.toUtf8());
+      strcat(xxxmdbug_test_setting, "=");
+      strcat(xxxmdbug_test_setting, v_variable_name.toUtf8());
+      strcat(xxxmdbug_test_setting, ";");
+      /* Not a call to setup_mysql_query because failure is okay. */
+      if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], xxxmdbug_test_setting, strlen(xxxmdbug_test_setting)))
+      {
+        v_is_settable= 0;
+      }
+    }
+
+    v_g= v_g +
+            + "SET v_ret=CONCAT(v_ret,'\""
+            + v_variable_name
+            + "\",','\"',HEX(IFNULL(LEFT("
+            + v_variable_name
+            + ",66),'NULL')),'\","
+            + QString::number(v_is_settable)
+            + ",\""
+            + c_variable_types.at(i)
+            + "\";');" + debug_lf;
+
+    if (v_is_settable != 0)
+    {
+      v_g_2= v_g_2
+             + "IF @xxxmdbug_token_value_2 = '"
+             + v_variable_name
+             + "' THEN SET "
+             + v_variable_name
+             + "= @xxxmdbug_token_value_4a; SET @xxxmdbug_tmp_for_set = 'OK'; END IF;" + debug_lf;
+    }
+  }
+
+  v_g= v_g
+       + "SET v_prefix = CONCAT('xxxmdbug_',@xxxmdbug_channel,@xxxmdbug_prefix_end_for_r_server_variables);\n"
+       + "CALL xxxmdbug.dbms_pipe_send(v_prefix,v_ret);" + debug_lf
+       + "CALL xxxmdbug.icc_change_statement_status('OK');" + debug_lf
+       + "END;" + debug_lf;
+
+  v_g_2= v_g_2
+           + "CALL xxxmdbug.icc_change_statement_status(@xxxmdbug_tmp_for_set);" + debug_lf
+           + "END;" + debug_lf;
+
+  /*
+    When setup_internals() sees what you add here,
+    it will actually execute the creates. That is:
+    drop + create icc_process_user_command_r_server_variables
+    drop + create icc_process_user_command_set_server_variables
+    update xxxmdbug.routines
+  */
+  debug_routine_list_schemas << "xxxmdbug";
+  debug_routine_list_names << "";
+  debug_routine_list_types << "PROCEDURE";
+  debug_routine_list_sql_modes << debug_session_sql_mode_original;
+  debug_routine_list_surrogates << v_g_surrogate_routine_identifier;
+  debug_routine_list_texts << v_g;
+
+  debug_routine_list_schemas << "xxxmdbug";
+  debug_routine_list_names << "";
+  debug_routine_list_types << "PROCEDURE";
+  debug_routine_list_sql_modes << debug_session_sql_mode_original;
+  debug_routine_list_surrogates << v_g_2_surrogate_routine_identifier;
+  debug_routine_list_texts << v_g_2;
+  return 0;
+}
+
+/* This generates a variant icc_core that can handle 'refresh user_variables'..
+   Any changes to icc_core() should be made here too.
+   Comments are stripped so see the original icc_core() above.
+   The tmp_user_variables list was populated with @user-variable-names while we were generating.
+     Although it is easy to assign to a user variable or server variable by
+     preparing and executing a SET statement, it is unreliable because we
+     might be in a function rather than in a procedure. So, for 'set', we
+     generate fixed SET statements for the user variables that we know of.
+   Use the base icc_core if track_user_variables=0.
+   Todo: probably this would be faster if it was smaller. */
+int MainWindow::setup_generate_icc_core()
+{
+  QString v_g;
+  /* we already know icc_core_surrogate_name */
+  v_g= "CREATE PROCEDURE xxxmdbug."
+          + debug_xxxmdbug_icc_core_surrogate_name
+          + "(line_number INT) "
+          + debug_lf;
+
+/* part 1 -- as far as the first 'call xxxmdbug.process_user_command'."
+   v_ret and v_prefix are part of the variant. */
+/* todo: as far as I can tell, the initial label 'z:' is not needed */
+  v_g= v_g
+          + "z:BEGIN" + debug_lf
+          + "DECLARE v_ret MEDIUMTEXT CHARACTER SET utf8;" + debug_lf
+          + "DECLARE v_prefix VARCHAR(128) CHARACTER SET utf8;" + debug_lf
+          + "DECLARE sleep_result INT;" + debug_lf
+          + "DECLARE v_n INT;" + debug_lf
+          + "DECLARE v_flags INT;"
+          + "DECLARE v_table_is_temporary_and_to_be_cleared INT;" + debug_lf
+          + "SET @xxxmdbug_token_value_1 = '';"
+          + "SET @xxxmdbug_icc_count=@xxxmdbug_icc_count+1;" + debug_lf
+          + "x1: LOOP" + debug_lf
+          + "  CALL xxxmdbug.icc_get_user_command(0);" + debug_lf
+          + "  IF @xxxmdbug_message <= 0x20 THEN LEAVE x1; END IF;" + debug_lf
+          + "  IF @xxxmdbug_token_value_1 IN ('continue','exit','leave','next','execute','skip','step') THEN LEAVE x1; END IF;"
+          + "  IF @xxxmdbug_token_value_2 = 'user_variables' THEN" + debug_lf
+          + "    SET v_ret='';" + debug_lf;
+/* part 1 end */
+  for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
+  {
+    QString v_variable_name= debug_tmp_user_variables.at(i);
+    v_g= v_g
+          + "SET @xxxmdbug_uvar="
+          + v_variable_name
+          + ";"
+          + "SET @xxxmdbug_old_uvar="
+          + "@xxxmdbug_old_"
+          + v_variable_name.mid(1, v_variable_name.length() - 1)
+          + ";";
+    v_g= v_g
+          + "CALL xxxmdbug.uvar(v_ret,'"
+          + v_variable_name
+          + "');" + debug_lf;
+  }
+
+  v_g= v_g + "SET v_prefix = CONCAT('xxxmdbug_',@xxxmdbug_channel,@xxxmdbug_prefix_end_for_r_user_variables);" + debug_lf
+                       + "CALL xxxmdbug.dbms_pipe_send(v_prefix,v_ret);" + debug_lf
+                       + "CALL xxxmdbug.icc_change_statement_status('OK');" + debug_lf
+                       + "ELSE" + debug_lf
+                       + "CALL xxxmdbug.icc_process_user_command();" + debug_lf
+                       + "END IF;" + debug_lf;
+
+  v_g= v_g + "IF @xxxmdbug_token_value_1 = 'set' AND LEFT(@xxxmdbug_token_value_2,1) = '@' AND LEFT(@xxxmdbug_token_value_2,2) <> '@@' THEN" + debug_lf
+                       + "  SET @xxxmdbug_status_last_command = 'set';" + debug_lf
+                       + "  SET @xxxmdbug_tmp_for_set='Fail';" + debug_lf;
+  for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
+  {
+    QString v_variable_name= debug_tmp_user_variables.at(i);
+    v_g= v_g
+                       + "  IF @xxxmdbug_token_value_2 = '"
+                       +    v_variable_name
+                       +    "' THEN CALL xxxmdbug.retype(); SET "
+                       +    v_variable_name
+                       +    "= @xxxmdbug_token_value_4a; SET @xxxmdbug_tmp_for_set='OK'; END IF;" + debug_lf;
+  }
+  v_g= v_g + "CALL xxxmdbug.icc_change_statement_status(@xxxmdbug_tmp_for_set);" + debug_lf;
+  v_g= v_g + "END IF;" + debug_lf;
+  /* part 2 */
+  v_g= v_g
+                       + "END LOOP;" + debug_lf
+                       + "SET @xxxmdbug_status_line_number = line_number;" + debug_lf
+                       + "CALL xxxmdbug.icc_breakpoint_check(line_number,@xxxmdbug_breakpoint_check_result);" + debug_lf
+                       + "SET @xxxmdbug_status_breakpoint_check_result = @xxxmdbug_breakpoint_check_result;" + debug_lf
+                       + "CALL xxxmdbug.icc_send_statement_status('icc_core');" + debug_lf
+                       + "IF @xxxmdbug_breakpoint_check_result > 0 THEN" + debug_lf
+                       + "x2: LOOP" + debug_lf
+                       + "IF @xxxmdbug_token_value_1 IN ('continue','exit','leave','next','execute','skip','step') THEN" + debug_lf
+                       + "LEAVE x2;" + debug_lf
+                       + "END IF;" + debug_lf
+                       + "CALL xxxmdbug.icc_get_user_command(1);" + debug_lf
+                       + "IF @xxxmdbug_token_value_1 IN ('next','step') THEN CALL xxxmdbug.icc_process_user_command_step_or_next(); END IF;" + debug_lf
+                       + "IF @xxxmdbug_token_value_1 IN ('continue','exit','leave','next','execute','skip','step') THEN" + debug_lf
+                       + "LEAVE x2;" + debug_lf
+                       + "END IF;" + debug_lf
+                       + "IF @xxxmdbug_token_value_2 = 'user_variables' THEN" + debug_lf
+                       + "SET v_ret='';" + debug_lf;
+/* part2 end */
+  for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
+  {
+    QString v_variable_name= debug_tmp_user_variables.at(i);
+    v_g= v_g
+                        + "SET @xxxmdbug_uvar="
+                        + v_variable_name
+                        + ";"
+                        + "SET @xxxmdbug_old_uvar=@xxxmdbug_old_"
+                        + v_variable_name.mid(1,v_variable_name.length() - 1)
+                        + ";"
+                        + "CALL xxxmdbug.uvar(v_ret,'"
+                        + v_variable_name
+                        + "');" + debug_lf;
+  }
+  v_g= v_g
+                        + "SET v_prefix = CONCAT('xxxmdbug_',@xxxmdbug_channel,@xxxmdbug_prefix_end_for_r_user_variables);" + debug_lf
+                        + "CALL xxxmdbug.dbms_pipe_send(v_prefix,v_ret);" + debug_lf
+                        + "CALL xxxmdbug.icc_change_statement_status('OK');" + debug_lf
+                        + "ELSE "
+                        + "CALL xxxmdbug.icc_process_user_command();" + debug_lf
+                        + "END IF;" + debug_lf;
+  v_g= v_g
+                        + "IF @xxxmdbug_token_value_1 = 'set' AND LEFT(@xxxmdbug_token_value_2,1) = '@'  AND LEFT(@xxxmdbug_token_value_2,2) <> '@@' THEN" + debug_lf
+                        + "SET @xxxmdbug_status_last_command = 'set';" + debug_lf
+                        + "SET @xxxmdbug_tmp_for_set = 'Fail';" + debug_lf;
+  for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
+  {
+    QString v_variable_name= debug_tmp_user_variables.at(i);
+    v_g= v_g
+                        + "IF @xxxmdbug_token_value_2 = '"
+                        + v_variable_name
+                        + "' THEN CALL xxxmdbug.retype(); SET "
+                        + v_variable_name
+                        + "= @xxxmdbug_token_value_4a; SET @xxxmdbug_tmp_for_set = 'OK'; END IF;" + debug_lf;
+  }
+  v_g= v_g + "CALL xxxmdbug.icc_change_statement_status(@xxxmdbug_tmp_for_set);" + debug_lf;
+  v_g= v_g + "END IF;" + debug_lf;
+/* part 3 start */
+  v_g= v_g + "CALL xxxmdbug.icc_send_statement_status('icc_core');\n"
+                       + "END LOOP;" + debug_lf
+                       + "CALL xxxmdbug.icc_send_statement_status('icc_core');\n"
+                       + "END IF;" + debug_lf;
+/* part 3 end */
+/* part 4 */
+/* Copy all user variables to old user variables. For example, if there is
+   a user variable @a, this will generate \"SET @xxxmdbug_old_a=@a;\".
+   Results should show up in user_variables.old_value column.
+   Todo: check for too-long variable names.
+   Todo: there has to be some way to clean up all the @xxxmdbug_old_ variables. */
+  for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
+  {
+    QString v_variable_name= debug_tmp_user_variables.at(i);
+    v_g= v_g
+            + "SET @xxxmdbug_old_"
+            + v_variable_name.mid(1, v_variable_name.length() - 1)
+            + "="
+            + v_variable_name
+            + ";" + debug_lf;
+  }
+  v_g= v_g + "END;" + debug_lf;
+
+  debug_routine_list_schemas << "xxxmdbug";
+  debug_routine_list_names << debug_xxxmdbug_icc_core_surrogate_name;
+  debug_routine_list_types << "PROCEDURE";
+  debug_routine_list_sql_modes << debug_session_sql_mode_original;
+  debug_routine_list_surrogates << debug_xxxmdbug_icc_core_surrogate_name;
+  debug_routine_list_texts << v_g;
+
+  return 0;
+}
+
+/* Todo: "    IF v_statement_type = 'debuggable' THEN" ... */
+int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
+                                                      int v_line_number_of_start_of_first_token,
+                                                      int v_statement_number_within_routine,
+                                                      QString text,
+                                                      int v_token_number_of_last_token,
+                                                      int routine_number)
+{
+  /* starts "if statement is being debugged" */
+  debug_v_g= debug_v_g + "IF xxxmdbug.is_debuggee_and_is_attached()=1 THEN " + debug_lf;
+  /* inner_loop: generate 'xxxmdbug_inner_loop_x: LOOP' */
+  QString inner_loop_label= "xxxmdbug_inner_loop_label_" + QString::number(v_statement_number_within_routine);
+  debug_v_g= debug_v_g
+          + inner_loop_label
+          + ": LOOP" + debug_lf;
+//  /* Save @@warning_count. */
+//  int v_verb= i; /* == token_number_of_first_token?? */
+//  /* TODO: Find out previous_statement_type */
+  /* Find out if previous_statement_type was nothing | DECLARE HANDLER */
+  QString v_previous_statement_type= "not declare_handler";
+  bool handler_seen= false;
+  for (int i= i_of_statement_start; i >= 0; --i)
+  {
+    if (main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT)
+    {
+      if ((main_token_types[i] == TOKEN_KEYWORD_DECLARE)
+       && (handler_seen == true))
+        v_previous_statement_type= "declare_handler";
+      break;
+    }
+    if (main_token_types[i] == TOKEN_KEYWORD_HANDLER) handler_seen= true;
+  }
+  int is_first_statement_in_a_declare_handler;
+  if (v_previous_statement_type == "declare_handler")
+    is_first_statement_in_a_declare_handler= 1;
+  else
+    is_first_statement_in_a_declare_handler= 0;
+  debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.icc_start("
+           + QString::number(v_line_number_of_start_of_first_token)
+           + ","
+           + QString::number(is_first_statement_in_a_declare_handler)
+           + ");"  + debug_lf;
+  if (setup_determine_what_variables_are_in_scope(i_of_statement_start, text)) return 1; /* result=c_variables */
+
+  for (int i= c_variable_names.count() - 1; i >= 0; --i)
+  {
+    QString v_variable_identifier= c_variable_names.at(i);
+    QString v_token_number_of_declare= c_variable_tokens.at(i);
+    //"          CALL xxxmdbug.overflow_check(debug_v_g);
+    debug_v_g= debug_v_g + debug_lf
+         + "CALL xxxmdbug.icc_copy_variable_to_table_row('"
+         + v_variable_identifier
+         + "',"
+         + v_token_number_of_declare
+         + ","
+         + v_variable_identifier
+         + ");" + debug_lf;
+  }
+  /* generate 'call icc_core' */
+  debug_v_g= debug_v_g + "CALL xxxmdbug."
+           + debug_xxxmdbug_icc_core_surrogate_name
+           + "("
+           + QString::number(v_line_number_of_start_of_first_token)
+           + ");" + debug_lf;
+
+  /* Generate: "if (exit) signal" */
+  /* todo: consider doing the signal in icc_core or icc_process_user_command but maybe then it won't be handled. */
+  debug_v_g= debug_v_g + "IF @xxxmdbug_token_value_1 = 'exit' THEN SIGNAL sqlstate '56780' SET mysql_errno = @xxxmdbug_signal_errno; END IF;";
+  for (int i= c_variable_names.count() - 1; i >= 0; --i)
+  {
+    QString v_variable_identifier= c_variable_names.at(i);
+    QString v_token_number_of_declare= c_variable_tokens.at(i);
+    //"          CALL xxxmdbug.overflow_check(debug_v_g);
+    debug_v_g= debug_v_g + debug_lf
+         + "CALL xxxmdbug.icc_copy_table_row_to_variable('"
+         + v_variable_identifier
+         + "',"
+         + v_token_number_of_declare
+         + ","
+         + v_variable_identifier
+         + ");" + debug_lf;
+  }
+  /* inner_loop: 'SET' and 'EXECUTE' might change variables that we're watching.
+     So if they happened, go back and copy the variables again.
+     Todo: think: should this happen after non-debuggable statements too? */
+  debug_v_g= debug_v_g + "IF @xxxmdbug_breakpoint_check_result>0 AND (@xxxmdbug_token_value_1 = 'set' OR @xxxmdbug_token_value_1 = 'execute') THEN ITERATE "
+             + inner_loop_label
+             + "; END IF;" + debug_lf;
+  /* Check @@warning_count. */
+  debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.icc_end();" + debug_lf;
+  /* Generate: "if (leave) leave" i.e. leave outer loop */
+  /* Sometimes LEAVE is illegal, see insert_into_statements comments.
+     If so act as if 'leave' is 'skip'. */
+  bool is_leave_possible;
+  for (int j= i_of_statement_start - 1;; --j)
+  {
+    if (j <= i_of_end_of_parameters)
+    {
+      is_leave_possible= false;
+      break;
+    }
+    if (main_token_types[j] == TOKEN_KEYWORD_END)
+    {
+      int k= main_token_pointers[j];
+      if ((k >= j) || (k < 1))
+      {
+        is_leave_possible= false;  /* should be an assert */
+        break;
+      }
+      j= main_token_pointers[j];
+      continue;
+    }
+    if (main_token_flags[j] & TOKEN_FLAG_IS_START_STATEMENT)
+    {
+      if ((main_token_types[j] == TOKEN_KEYWORD_BEGIN)
+       || (main_token_types[j] == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
+       || (main_token_types[j] == TOKEN_KEYWORD_LOOP)
+       || (main_token_types[j] == TOKEN_KEYWORD_REPEAT)
+       || (main_token_types[j] == TOKEN_KEYWORD_WHILE))
+      {
+        is_leave_possible= true;
+        break;
+      }
+    }
+    else
+      if (main_token_types[j] == TOKEN_KEYWORD_HANDLER)
+    {
+      is_leave_possible= false;
+      break;
+    }
+  }
+  if (is_leave_possible == true)
+  {
+    if (debug_label_list.count() == 0) /* pseudo-assert */
+    {
+      debug_error((char*)"debug_label_list.count() == 0");
+      return 1;
+    }
+    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN LEAVE "
+             + debug_label_list.at(debug_label_list.count() - 1)
+             + "; END IF;" + debug_lf;
+  }
+  else
+  {
+    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN LEAVE "
+             + inner_loop_label
+             + "; END IF;" + debug_lf;
+  }
+  /* inner_loop: by leaving inner_loop before doing the instruction, we "skip over" it */
+  debug_v_g= debug_v_g + "IF @xxxmdbug_token_value_1 = 'skip' THEN LEAVE "
+           + inner_loop_label
+           + "; END IF;" + debug_lf;
+  /* If the original routine contained only one statement which was not compound and which
+     did not end with ';', add ';'.
+     Todo: Check: isn't this impossible? Didn't we add ";" earlier?
+           I've assumed it's impossible, but statement ends with ";".
+  */
+  QString v_statement_end_character= ";";
+  /* generate: handlers */
+  /* removed. see notes before generate_handlers(). CALL xxxmdbug.generate_handlers(debug_v_g,v_line_number_of_start_of_first_token); */
+//"  CALL xxxmdbug.overflow_check(debug_v_g);"
+  /* todo: we got sql_mode earlier but we don't seem to be using it! */
+  if (setup_generate_statement_text(i_of_statement_start, text, v_token_number_of_last_token, routine_number)) return 1;
+  /* END the BEGIN that generate_handlers() generated */
+  /* removed. see notes before generate_handlers(). SET debug_v_g = CONCAT(debug_v_g,@xxxmdbug_lf,'END;'); */
+
+  /* generate something to insert if statement is 'prepare' or delete if statement is 'deallocate' */
+  /* todo: think about the execution path if there is a user-written warning */
+  int statement_type= main_token_types[i_of_statement_start];
+  if ((statement_type == TOKEN_KEYWORD_PREPARE)
+   || (statement_type == TOKEN_KEYWORD_DROP)
+   || (statement_type == TOKEN_KEYWORD_DEALLOCATE))
+  {
+    QString v_value_of_second_token= "";
+    QString v_value_of_third_token= "";
+    QString v_value_of_fourth_token= "";
+    for (int i= i_of_statement_start + 1; main_token_lengths[i] != 0; ++i)
+    {
+      if ((main_token_types[i] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
+       && (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_MINUS))
+        continue;
+      QString n= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (v_value_of_second_token == "") v_value_of_second_token= n;
+      else if (v_value_of_third_token == "") v_value_of_third_token= n;
+      else
+      {
+        v_value_of_fourth_token= n;
+        break;
+      }
+    }
+    if (statement_type == TOKEN_KEYWORD_PREPARE)
+    {
+      /* I think v_value_of_fourth_token has ''s already, correctly */
+      debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.insert_into_prepared_statements('"
+               + v_value_of_second_token
+               + "',"
+               + v_value_of_fourth_token
+               + ");";
+    }
+    if (statement_type ==  TOKEN_KEYWORD_DROP)
+    {
+      /* A little-known alternative syntax for DEALLOCATE PREPARE is DROP PREPARE. */
+      if (QString::compare(v_value_of_second_token, "PREPARE", Qt::CaseInsensitive) == 0)
+      {
+        statement_type= TOKEN_KEYWORD_DEALLOCATE;
+      }
+    }
+    if (statement_type ==  TOKEN_KEYWORD_DEALLOCATE)
+    {
+      debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.delete_from_prepared_statements('"
+               + v_value_of_third_token
+               + "');";
+    }
+  }
+  /* generate 'update statements_executed' */
+  debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.update_statements_executed(0);";
+  /* inner_loop: leave the loop after doing the original statement once */
+  debug_v_g= debug_v_g + debug_lf + "LEAVE "
+          + inner_loop_label
+          + ";" + debug_lf;
+  /* inner loop: ends */
+  debug_v_g= debug_v_g + "END LOOP;" + debug_lf;
+  debug_v_g= debug_v_g + debug_lf + "ELSE"; /* terminates "if statement is being debugged" */
+  /* "generate the statement text" for when we're not debugging */
+//"      CALL xxxmdbug.overflow_check(debug_v_g);"
+  if (setup_generate_statement_text_as_is(i_of_statement_start, text, v_token_number_of_last_token)) return 1;
+  //"      SET debug_v_g = CONCAT(debug_v_g,v_statement_end_character);"
+  debug_v_g= debug_v_g + debug_lf + "END IF;";
+  return 0;
+}
+
+/* "Generate: label": Called from generate()
+   Whenever you see WHILE or LOOP or BEGIN or REPEAT, make|copy a label and add to label list
+   Whenever you see END (but not END IF or END CASE), remove last item in label list
+   LEAVE will use the latest item in label list.
+*/
+int MainWindow::setup_generate_label(int i_of_start_of_statement, QString text, int v_statement_number)
+{
+  QString v_label;
+  QString v_token_value_of_previous_token;
+  int token_type;
+  token_type= main_token_types[i_of_start_of_statement];
+  if ((token_type == TOKEN_KEYWORD_BEGIN)
+   || (token_type == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
+   || (token_type == TOKEN_KEYWORD_LOOP)
+   || (token_type == TOKEN_KEYWORD_REPEAT)
+   || (token_type == TOKEN_KEYWORD_WHILE))
+  {
+    int j;
+    for (j= i_of_start_of_statement - 1; j > i_of_end_of_parameters; --j)
+    {
+      token_type= main_token_types[j];
+      if ((main_token_types[j] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
+       && (main_token_types[j] <= TOKEN_TYPE_COMMENT_WITH_MINUS))
+        continue;
+      v_token_value_of_previous_token= text.mid(main_token_offsets[j], main_token_lengths[j]);
+      break;
+    }
+    if (v_token_value_of_previous_token == ":")
+    {
+      v_label= text.mid(main_token_offsets[j-1], main_token_lengths[j-1]);
+    }
+    else
+    {
+      v_label= " xxxmdbug_label_" + QString::number(v_statement_number);
+      /* the ' ' is necessary if the while/loop/begin/repeat is not at start of line */
+      debug_v_g= debug_v_g + " " + v_label + ":" + debug_lf;
+    }
+    debug_label_list << v_label;
+  }
+  if (token_type == TOKEN_KEYWORD_END)
+  {
+    int j;
+    for (j= i_of_start_of_statement + 1; main_token_lengths[j] != 0; ++j)
+    {
+      if ((main_token_types[j] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
+       && (main_token_types[j] <= TOKEN_TYPE_COMMENT_WITH_MINUS))
+        continue;
+      break;
+    }
+    if ((main_token_types[j] != TOKEN_KEYWORD_IF)
+     && (main_token_types[j] != TOKEN_KEYWORD_CASE))
+    {
+      if (debug_label_list.count() == 0) /* pseudo-assert */
+      {
+        debug_error((char*)"label_list.count() == 0");
+        return 1;
+      }
+      debug_label_list.removeAt(debug_label_list.count() - 1);
+    }
+  }
+  return 0;
+}
+
+/* Todo: I'm excluding MariaDB variables defined as row type or
+   within FOR var-name IN, since $debug can't handle them.
+   It's probably fixable -- we don't absolutely have to have the
+   data type (we get along without it for $user-variables); we
+   should be able to recognize `row`.`scalar` names even if we
+   have to lie to install_sql.cpp.
+*/
+int MainWindow::setup_row_type(int i_of_variable)
+{
+  for (int i= i_of_variable; main_token_lengths[i] != 0; ++i)
+  {
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_DATA_TYPE) != 0)
+    {
+      if ((main_token_types[i] == TOKEN_KEYWORD_ROW)
+       || (main_token_types[i] == TOKEN_KEYWORD_TYPE))
+        return TOKEN_KEYWORD_ROW;
+      return main_token_types[i];
+    }
+    if (main_token_types[i] == TOKEN_KEYWORD_IN) return TOKEN_KEYWORD_ROW;
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+      break; /* reached next statement without seeing data type? impossible */
+  }
+  return 0;
+}
+
+/* Make c_variables = a list of in-scope variables. */
+/* Use the same trick that was used for hparse_f_label */
+/* token_number_of_declare starts at 1 after end of (parameter list)
+   (or maybe it's 2 after start of parameter list?) */
+/* Todo: Something can be in scope but shadowed. Look for duplicates! */
+/* Todo: You're not handling identifiers that need delimiting */
+/* Warning: Since search is from end to start, list is backwards.
+   Therefore, when searching or copying, go in reverse order. */
+/* Somewhere in some install_sql.cpp routine is an expectation that
+   variables are inside ``s. So we add ``s if they're absent. */
+/* Todo: Preserve the case of the original, not the reference (?).
+   Todo: See what happens if it's in ""s or in ''s. */
+int MainWindow::setup_determine_what_variables_are_in_scope(
+            int i_of_statement_start,
+            QString text)
+{
+  c_variable_names.clear();
+  c_variable_tokens.clear();
+  int v_token_number_of_declare= 0;
+  bool is_identifier;
+  for (int i= i_of_statement_start - 1; i >= 0; --i)
+  {
+    if (main_token_types[i] == TOKEN_KEYWORD_END)
+    {
+      int j= main_token_pointers[i];
+      if ((j >= i) || (j < 1)) break; /* should be an assert */
+      i= main_token_pointers[i];
+      continue;
+    }
+    QString v_variable_identifier= "";
+    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+     || (main_token_types[i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+     || (main_token_types[i] == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE))
+      is_identifier= true;
+    else is_identifier= false;
+    if ((is_identifier)
+     && (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE))
+    {
+      v_variable_identifier= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      /* s = the var! */
+      int k;
+      for (k= i - 1; k >= 0; --k)
+      {
+        if ((main_token_flags[k] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+          break;
+      }
+      v_token_number_of_declare= k - i_of_start_of_parameters;
+    }
+    if ((is_identifier)
+     && (i < i_of_end_of_parameters)
+     && (main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER_DEFINE))
+    {
+      v_variable_identifier= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      v_token_number_of_declare= 0;
+    }
+    if (v_variable_identifier != "")
+    {
+      v_variable_identifier= setup_add_delimiters(v_variable_identifier);
+      bool is_shadow= false;
+      /* todo: variable_names.contains() would do this faster, I think. */
+      for (int m= 0; m < c_variable_names.count(); ++m)
+      {
+        if (QString::compare(c_variable_names.at(m), v_variable_identifier, Qt::CaseInsensitive) == 0)
+        {
+          is_shadow= true;
+          break;
+        }
+      }
+      if (is_shadow == false)
+      {
+        c_variable_names << v_variable_identifier;
+        if (setup_row_type(i) == TOKEN_KEYWORD_ROW)
+          c_variable_tokens << QString::number(-1);
+        else
+          c_variable_tokens << QString::number(v_token_number_of_declare);
+      }
+    }
+  }
+  for (int k= c_variable_tokens.count() - 1; k >= 0; --k)
+  {
+    int k2= c_variable_tokens.at(k).toInt();
+    if (k2 == -1)
+    {
+      c_variable_names.removeAt(k);
+      c_variable_tokens.removeAt(k);
+    }
+  }
+  return 0;
+}
+
+/*
+  Generate the statement text, but replace routine names
+  with surrogate routine names if they are in the $setup list,
+  and being invoked.
+  Beware: spaces after function names matter
+  Todo: DO NOT necessarily replace with surrogate routine name. We might have put it in directly."
+  Todo: check that argument count = parameter count."
+  Todo: handle possible qualifier."
+  Todo: handle possible delimiter."
+  Todo: check that function name <> built-in name,
+        in that case it's ignored (detectable at CREATE time).
+  Todo: skip if CREATE? I forget why we substitute for CREATE.
+  Todo: call this for flow-control statements, but they must end
+        after the expression, e.g. WHILE (expr) DO ends with DO.
+        (This also applies for DECLARE HANDLER.)
+  Todo: call this for DECLARE because DEFAULT clauses can have (expr).
+  Todo: I don't know how to handle PREPARE or EXECUTE IMMEDIATE yet,
+        but if they have literal arguments there is hope.
+  Todo: watch out for routine characteristic = ansi_quotes.
+        (we've used debug_ansi_quotes elsewhere)
+  Todo: Flow-control is not debuggable but might contain function calls.
+  Warning: We're preserving comments because if they start with / * !
+           they are not stripped, but we don't see inside them.
+*/
+int MainWindow::setup_generate_statement_text(int i_of_statement_start,
+                                               QString text,
+                                               int v_token_number_of_last_token,
+                                               int routine_number
+                                              )
+{
+  //bool statement_might_contain_routine_invocation= false;
+  int statement_type= main_token_types[i_of_statement_start];
+
+  /*
+     special handling of RETURN -- remove the function name from the call stack before returning.
+     we also do delete from call stack at the end of the routine, due to generate_ender.
+     todo: more special handling of RETURN: we pointlessly generate
+           CALL xxxmdbug.update_statements_executed(0);
+           LEAVE xxxmdbug_inner_loop_label_2;
+  */
+  if (statement_type == TOKEN_KEYWORD_RETURN)
+    debug_v_g= debug_v_g + "CALL xxxmdbug.routine_exit();" + debug_lf;
+  /*
+    TOKEN_KEYWORD_CREATE used to be in this list, but I removed it.
+    Todo: Perhaps CREATE TABLE AS SELECT could be okay though.
+    Currently it doesn't matter because we check everything.
+  */
+  //if ((statement_type == TOKEN_KEYWORD_CALL)
+  // || (statement_type == TOKEN_KEYWORD_CASE)
+  // || (statement_type == TOKEN_KEYWORD_DECLARE)
+  // || (statement_type == TOKEN_KEYWORD_DELETE)
+  // || (statement_type == TOKEN_KEYWORD_DO)
+  // || (statement_type == TOKEN_KEYWORD_ELSEIF)
+  // || (statement_type == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
+  // || (statement_type == TOKEN_KEYWORD_IF)
+  // || (statement_type == TOKEN_KEYWORD_INSERT)
+  // || (statement_type == TOKEN_KEYWORD_REPLACE)
+  // || (statement_type == TOKEN_KEYWORD_RETURN)
+  // || (statement_type == TOKEN_KEYWORD_SELECT)
+  // || (statement_type == TOKEN_KEYWORD_SET)
+  // || (statement_type == TOKEN_KEYWORD_UNTIL)
+  // || (statement_type == TOKEN_KEYWORD_WHILE))
+  //  statement_might_contain_routine_invocation= true;
+  for (int i= i_of_statement_start; main_token_lengths[i] != 0; ++i)
+  {
+    QString d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+
+    /*
+      special handling of BEGIN NOT ATOMIC -- only output BEGIN
+      looks like MariaDB has a bug with "label: BEGIN NOT ATOMIC"
+    */
+    if (statement_type == TOKEN_KEYWORD_BEGIN)
+    {
+      int m;
+      for (m= i_of_statement_start; m <= v_token_number_of_last_token; ++m)
+      {
+        if (main_token_lengths[m] == 0) break; /* should be an assert? */
+        if (main_token_types[m] == TOKEN_KEYWORD_ATOMIC)
+        {
+
+          if (setup_append(d, text, i)) return 1;
+          return 0;
+        }
+      }
+    }
+
+    int reftype= main_token_reftypes[i];
+    if ((reftype == TOKEN_REFTYPE_FUNCTION)
+     || (reftype == TOKEN_REFTYPE_PROCEDURE)
+     || (reftype == TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE))
+    {
+      QString tmp_schema_name= "";
+      if (i > 2)
+      {
+        QString d= text.mid(main_token_offsets[i-1], main_token_lengths[i-1]);
+        if (d == ".")
+        {
+          if (main_token_reftypes[i-2] == TOKEN_REFTYPE_DATABASE)
+          {
+            tmp_schema_name= text.mid(main_token_offsets[i-2], main_token_lengths[i-2]);
+          }
+        }
+      }
+      if (tmp_schema_name == "")
+      {
+        if (routine_number >= debug_routine_list_schemas.count()) /* pseudo-assert */
+        {
+          debug_error((char*)"bad routine_number");
+          return 1;
+        }
+        tmp_schema_name= debug_routine_list_schemas.at(routine_number);
+      }
+
+      QString c_routine_name= setup_add_delimiters(d);
+      QString c_schema_name= setup_add_delimiters(tmp_schema_name);
+
+      /* Todo: What about TOKEN_REFTYPE_FUNCTION_OR_VARIABLE? */
+      /* Todo: Are you sure hparse is catching this? */
+      /* Todo: you're failing to check whether it's 'P' or 'F' */
+      for (int i= 0; i < debug_routine_list_names.count(); ++i)
+      {
+        QString d_routine_name= debug_routine_list_names.at(i);
+        QString d_schema_name= debug_routine_list_schemas.at(i);
+        d_routine_name= setup_add_delimiters(d_routine_name);
+        d_schema_name= setup_add_delimiters(d_schema_name);
+        if ((QString::compare(c_routine_name, d_routine_name, Qt::CaseInsensitive) == 0)
+         && (QString::compare(c_schema_name, d_schema_name, Qt::CaseInsensitive) == 0))
+        {
+          d= debug_routine_list_surrogates.at(i);
+        }
+      }
+    }
+    /* Todo: Why are you dumping d but not schema? */
+    if (setup_append(d, text, i)) return 1;
+    if (i == v_token_number_of_last_token) break;
+  }
+  return 0;
+}
+
+/* Generate: "statement text" but without any changes or special handling.
+   This is for "if (statement is being debugged) is false" */
+/* Todo: an assert that v_token_number_of_last_token is reasonable. */
+/* Todo: copy line feeds and indentation of the original */
+int MainWindow::setup_generate_statement_text_as_is(int i_of_statement_start,
+                                                     QString text,
+                                                     int v_token_number_of_last_token)
+{
+  int i;
+  QString d;
+  debug_v_g= debug_v_g + debug_lf;
+  i= v_token_number_of_last_token;
+  d= text.mid(main_token_offsets[i_of_statement_start],
+              (main_token_offsets[i] - main_token_offsets[i_of_statement_start]) + main_token_lengths[i]);
+  if (setup_append(d, text, i)) return 1;
+  return 0;
 }
 
 /*

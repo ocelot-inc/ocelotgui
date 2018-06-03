@@ -615,6 +615,11 @@ For a walk through a debugger example, with screenshots, see
 this blog post: <A HREF="http://ocelot.ca/blog/the-ocelotgui-debugger">http://ocelot.ca/blog/the-ocelotgui-debugger</A>.  
 For reference, read: <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/debugger_reference.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/debugger_reference.txt</A>.
 </P>
+<P>
+Temporary warning: for debugging MySQL version 8.0 routines,
+you need a recent ocelotgui version as pushed to source on
+or after June 2018.
+</P>
 
 <H3 id="special-effects">Special Effects</H3><HR>
 
