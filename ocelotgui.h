@@ -50,6 +50,9 @@
   it's okay because we change to what we connected to.
   If --ocelot_dbms='tarantool', connection must be to a Tarantool server.
   Before defining for a new version, check set_dbms_version_mask().
+  In set_dbms_version_mask we set for the version and for lower versions,
+  e.g. if it's MySQL 5.6 we set both FLAG_VERSION_MYSQL_5_5 and
+  FLAG_VERSION_MYSQL_5_6.
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -637,7 +640,7 @@ public:
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
   void hparse_f_pseudo_statement(int);
-  void hparse_f_assignment(int,int);
+  void hparse_f_assignment(int,int,bool,bool);
   void hparse_f_alter_table();
   int hparse_f_character_set();
   void hparse_f_alter_database();
@@ -1331,6 +1334,7 @@ public:
       TOKEN_KEYWORD_CREATE_DIGEST,
       TOKEN_KEYWORD_CROSS,
       TOKEN_KEYWORD_CROSSES,
+      TOKEN_KEYWORD_CUBE,
       TOKEN_KEYWORD_CUME_DIST,
       TOKEN_KEYWORD_CURDATE,
       TOKEN_KEYWORD_CURRENT,
@@ -1398,6 +1402,7 @@ public:
       TOKEN_KEYWORD_ELSE,
       TOKEN_KEYWORD_ELSEIF,
       TOKEN_KEYWORD_ELT,
+      TOKEN_KEYWORD_EMPTY,
       TOKEN_KEYWORD_ENABLE,
       TOKEN_KEYWORD_ENCLOSED,
       TOKEN_KEYWORD_ENCODE,
@@ -1476,6 +1481,8 @@ public:
       TOKEN_KEYWORD_GRANT,
       TOKEN_KEYWORD_GREATEST,
       TOKEN_KEYWORD_GROUP,
+      TOKEN_KEYWORD_GROUPING,
+      TOKEN_KEYWORD_GROUPS,
       TOKEN_KEYWORD_GROUP_CONCAT,
       TOKEN_KEYWORD_GTID_SUBSET,
       TOKEN_KEYWORD_GTID_SUBTRACT,
@@ -1556,6 +1563,7 @@ public:
       TOKEN_KEYWORD_JSON_REPLACE,
       TOKEN_KEYWORD_JSON_SEARCH,
       TOKEN_KEYWORD_JSON_SET,
+      TOKEN_KEYWORD_JSON_TABLE,
       TOKEN_KEYWORD_JSON_TYPE,
       TOKEN_KEYWORD_JSON_UNQUOTE,
       TOKEN_KEYWORD_JSON_VALID,
@@ -1715,6 +1723,8 @@ public:
       TOKEN_KEYWORD_PERCENT_RANK,
       TOKEN_KEYWORD_PERIOD_ADD,
       TOKEN_KEYWORD_PERIOD_DIFF,
+      TOKEN_KEYWORD_PERSIST,
+      TOKEN_KEYWORD_PERSIST_ONLY,
       TOKEN_KEYWORD_PI,
       TOKEN_KEYWORD_PLAN,
       TOKEN_KEYWORD_POINT,
@@ -1760,6 +1770,7 @@ public:
       TOKEN_KEYWORD_REAL,
       TOKEN_KEYWORD_REBUILD,
       TOKEN_KEYWORD_RECURSIVE,
+      TOKEN_KEYWORD_REDOFILE,
       TOKEN_KEYWORD_REDUNDANT,
       TOKEN_KEYWORD_REFERENCES,
       TOKEN_KEYWORD_REGEXP,
@@ -2034,6 +2045,7 @@ public:
       TOKEN_KEYWORD_WHENEVER,
       TOKEN_KEYWORD_WHERE,
       TOKEN_KEYWORD_WHILE,
+      TOKEN_KEYWORD_WINDOW,
       TOKEN_KEYWORD_WITH,
       TOKEN_KEYWORD_WITHIN,
       TOKEN_KEYWORD_WITHOUT,
@@ -2062,6 +2074,7 @@ public:
       TOKEN_KEYWORD__EUCJPMS,
       TOKEN_KEYWORD__EUCKR,
       TOKEN_KEYWORD__FILENAME,
+      TOKEN_KEYWORD__GB18030,
       TOKEN_KEYWORD__GB2312,
       TOKEN_KEYWORD__GBK,
       TOKEN_KEYWORD__GEOSTD8,
