@@ -591,7 +591,7 @@ public:
   int hparse_f_expect(unsigned short int,unsigned char,int,QString);
   int hparse_f_literal(unsigned char,unsigned short int,int);
   int hparse_f_default(int);
-  int hparse_f_user_name();
+  int hparse_f_user_or_role_name(int);
   int hparse_f_character_set_name();
   int hparse_f_collation_name();
   int hparse_f_qualified_name_with_star();
@@ -681,6 +681,7 @@ public:
   int hparse_f_analyze_or_optimize(int,int*);
   void hparse_f_call();
   void hparse_f_commit_or_rollback();
+  int is_token_priv(int);
   void hparse_f_explain_or_describe(int);
   void hparse_f_grant_or_revoke(int,bool*);
   void hparse_f_insert_or_replace();
@@ -694,6 +695,7 @@ public:
   int hparse_f_unionize();
   int hparse_f_select(bool,bool,bool);
   void hparse_f_where();
+  void hparse_f_window_spec(bool);
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
@@ -1249,6 +1251,7 @@ public:
       TOKEN_KEYWORD_ATTACH,
       TOKEN_KEYWORD_AUTOINCREMENT,
       TOKEN_KEYWORD_AVG,
+      TOKEN_KEYWORD_BACKUP_ADMIN,
       TOKEN_KEYWORD_BEFORE,
       TOKEN_KEYWORD_BEGIN,
       TOKEN_KEYWORD_BENCHMARK,
@@ -1260,6 +1263,7 @@ public:
       TOKEN_KEYWORD_BINARY_DOUBLE,
       TOKEN_KEYWORD_BINARY_FLOAT,
       TOKEN_KEYWORD_BINLOG,
+      TOKEN_KEYWORD_BINLOG_ADMIN,
       TOKEN_KEYWORD_BINLOG_GTID_POS,
       TOKEN_KEYWORD_BIT,
       TOKEN_KEYWORD_BIT_AND,
@@ -1315,6 +1319,7 @@ public:
       TOKEN_KEYWORD_CONDITION,
       TOKEN_KEYWORD_CONFLICT,
       TOKEN_KEYWORD_CONNECT,
+      TOKEN_KEYWORD_CONNECTION_ADMIN,
       TOKEN_KEYWORD_CONNECTION_ID,
       TOKEN_KEYWORD_CONSTRAINT,
       TOKEN_KEYWORD_CONTAINS,
@@ -1407,6 +1412,7 @@ public:
       TOKEN_KEYWORD_ENCLOSED,
       TOKEN_KEYWORD_ENCODE,
       TOKEN_KEYWORD_ENCRYPT,
+      TOKEN_KEYWORD_ENCRYPTION_KEY_ADMIN,
       TOKEN_KEYWORD_END,
       TOKEN_KEYWORD_ENDPOINT,
       TOKEN_KEYWORD_ENUM,
@@ -1435,6 +1441,8 @@ public:
       TOKEN_KEYWORD_FIELD,
       TOKEN_KEYWORD_FILE,
       TOKEN_KEYWORD_FIND_IN_SET,
+      TOKEN_KEYWORD_FIREWALL_ADMIN,
+      TOKEN_KEYWORD_FIREWALL_USER,
       TOKEN_KEYWORD_FIRST,
       TOKEN_KEYWORD_FIRST_VALUE,
       TOKEN_KEYWORD_FIXED,
@@ -1484,6 +1492,7 @@ public:
       TOKEN_KEYWORD_GROUPING,
       TOKEN_KEYWORD_GROUPS,
       TOKEN_KEYWORD_GROUP_CONCAT,
+      TOKEN_KEYWORD_GROUP_REPLICATION_ADMIN,
       TOKEN_KEYWORD_GTID_SUBSET,
       TOKEN_KEYWORD_GTID_SUBTRACT,
       TOKEN_KEYWORD_HANDLER,
@@ -1725,6 +1734,7 @@ public:
       TOKEN_KEYWORD_PERIOD_DIFF,
       TOKEN_KEYWORD_PERSIST,
       TOKEN_KEYWORD_PERSIST_ONLY,
+      TOKEN_KEYWORD_PERSIST_RO_VARIABLES_ADMIN,
       TOKEN_KEYWORD_PI,
       TOKEN_KEYWORD_PLAN,
       TOKEN_KEYWORD_POINT,
@@ -1786,10 +1796,13 @@ public:
       TOKEN_KEYWORD_REPEAT,
       TOKEN_KEYWORD_REPLACE,
       TOKEN_KEYWORD_REPLICATION,
+      TOKEN_KEYWORD_REPLICATION_SLAVE_ADMIN,
       TOKEN_KEYWORD_REQUIRE,
       TOKEN_KEYWORD_RESET,
       TOKEN_KEYWORD_RESETCONNECTION,
       TOKEN_KEYWORD_RESIGNAL,
+      TOKEN_KEYWORD_RESOURCE_GROUP_ADMIN,
+      TOKEN_KEYWORD_RESOURCE_GROUP_USER,
       TOKEN_KEYWORD_RESTRICT,
       TOKEN_KEYWORD_RETURN,
       TOKEN_KEYWORD_RETURNS,
@@ -1798,6 +1811,7 @@ public:
       TOKEN_KEYWORD_RIGHT,
       TOKEN_KEYWORD_RLIKE,
       TOKEN_KEYWORD_ROLE,
+      TOKEN_KEYWORD_ROLE_ADMIN,
       TOKEN_KEYWORD_ROLLBACK,
       TOKEN_KEYWORD_ROUND,
       TOKEN_KEYWORD_ROW,
@@ -1823,6 +1837,7 @@ public:
       TOKEN_KEYWORD_SESSION_USER,
       TOKEN_KEYWORD_SET,
       TOKEN_KEYWORD_SETVAL,
+      TOKEN_KEYWORD_SET_USER_ID,
       TOKEN_KEYWORD_SHA,
       TOKEN_KEYWORD_SHA1,
       TOKEN_KEYWORD_SHA2,
@@ -1960,6 +1975,7 @@ public:
       TOKEN_KEYWORD_SYSDATE,
       TOKEN_KEYWORD_SYSTEM,
       TOKEN_KEYWORD_SYSTEM_USER,
+      TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN,
       TOKEN_KEYWORD_TABLE,
       TOKEN_KEYWORD_TABLESPACE,
       TOKEN_KEYWORD_TAN,
@@ -2032,6 +2048,7 @@ public:
       TOKEN_KEYWORD_VAR_POP,
       TOKEN_KEYWORD_VAR_SAMP,
       TOKEN_KEYWORD_VERSION,
+      TOKEN_KEYWORD_VERSION_TOKEN_ADMIN,
       TOKEN_KEYWORD_VIEW,
       TOKEN_KEYWORD_VIRTUAL,
       TOKEN_KEYWORD_WAIT_FOR_EXECUTED_GTID_SET,
@@ -2052,6 +2069,7 @@ public:
       TOKEN_KEYWORD_WRITE,
       TOKEN_KEYWORD_X,
       TOKEN_KEYWORD_XA,
+      TOKEN_KEYWORD_XA_RECOVER_ADMIN,
       TOKEN_KEYWORD_XOR,
       TOKEN_KEYWORD_Y,
       TOKEN_KEYWORD_YEAR,
@@ -2266,6 +2284,8 @@ enum {
     TOKEN_REFTYPE_VARIABLE_DEFINE,
     TOKEN_REFTYPE_VARIABLE_REFER,
     TOKEN_REFTYPE_VIEW,
+    TOKEN_REFTYPE_WINDOW_DEFINE,
+    TOKEN_REFTYPE_WINDOW_REFER,
     TOKEN_REFTYPE_WITH_TABLE,
     TOKEN_REFTYPE_WRAPPER,
     TOKEN_REFTYPE_MAX
