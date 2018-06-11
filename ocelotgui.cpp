@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: June 8 2018
+   Last modified: June 11 2018
 */
 
 /*
@@ -10860,6 +10860,7 @@ const keywords strvalues[]=
       {"GET_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GET_LOCK},
       {"GLENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GLENGTH}, /* deprecated in MySQL 5.7.6 */
       {"GLOB", FLAG_VERSION_TARANTOOL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_GLOB},
+      {"GLOBAL", 0, 0, TOKEN_KEYWORD_GLOBAL},
       {"GO", 0, 0, TOKEN_KEYWORD_GO}, /* Ocelot keyword */
       {"GOTO", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_GOTO},
       {"GRANT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GRANT},
@@ -11055,6 +11056,7 @@ const keywords strvalues[]=
       {"MULTIPOLYGON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGON},
       {"MULTIPOLYGONFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGONFROMTEXT}, /* deprecated in MySQL 5.7.6 */
       {"MULTIPOLYGONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGONFROMWKB}, /* deprecated in MySQL 5.7.6 */
+      {"NAMES", 0, 0, TOKEN_KEYWORD_NAMES},
       {"NAME_CONST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NAME_CONST},
       {"NATURAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NATURAL},
       {"NEXTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NEXTVAL},
@@ -11246,6 +11248,7 @@ const keywords strvalues[]=
       {"START", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_START},
       {"STARTING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_STARTING},
       {"STARTPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STARTPOINT}, /* deprecated in MySQL 5.7.6 */
+      {"STATEMENT", 0, 0, TOKEN_KEYWORD_STATEMENT},
       {"STATUS", 0, 0, TOKEN_KEYWORD_STATUS}, /* Ocelot keyword */
       {"STD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STD},
       {"STDDEV", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV},
@@ -11523,25 +11526,24 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "909" */
+      /* If the following assert happens, you inserted/removed something without changing "912" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (909 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (912 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 909; ++ii)
+      //for (int ii= 0; ii < 912; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 909, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 912, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
       //  printf("ii=%d, index=%ld, k=%s.\n", ii, index, k);
       //  assert(index == strvalues[ii].token_keyword);
       //}
-
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 909 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 909, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 912 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 912, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -12643,70 +12645,133 @@ void MainWindow::set_dbms_version_mask(QString version)
 }
 
 /*
+  Pass: i_start = where we are now, i_increment = +1 or -1
+  Go forward | backward skipping comments
+  Stop if end or start of all input (we pay no attention to statement
+  start|end).
+  Todo: this could be useful in other places where we currently
+        are making temporary copies that don't contain comments.
+*/
+int MainWindow::next_i(int i_start, int i_increment)
+{
+  int i= i_start;
+  for (;;)
+  {
+    if (i == 0) break;
+    if (main_token_lengths[i] == 0) break;
+    i= i + i_increment;
+    if ((main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
+      && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+      && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_MINUS))
+     break;
+  }
+  return i;
+}
+
+/*
   We use sql_mode to decide whether "..." is an identifier or a literal.
   So we try to get its value at connect time or if user says
   SET SESSION SQL_MODE ... or SET @@session.sql_mode
-  TODO: This only works if sql_mode is the first variable to be set.
-  TODO: You're forgetting SET LOCAL sql_mode and SET @@local.sql_mode
+  This might fail if (ocelot_statement_syntax_checker.toInt() < 1
+  but I'm not expecting people will set that and then expect recognizing.
+  We do not try to handle the undocumented syntax SET @@sql_mode=ANSI,
+  if we did we'd have to ensure that we're not in a block.
+  Todo: track global value too so we can handle sql_mode=default.
+  Todo: try to do this while parsing, before you can ask the server.
+  Todo: check: did the server return a warning for this statement?
 */
 void MainWindow::get_sql_mode(int who_is_calling, QString text)
 {
   QString sql_mode_string;
   bool sql_mode_string_seen= false;
   bool must_ask_server= false;
-  int i2= 0;
-  int  sub_token_offsets[10];
-  int  sub_token_lengths[10];
-  int  sub_token_types[10];
-
+  QString token;
+  bool default_is_session= true;
+  bool immediate_is_session= true;
+  QString var_name;
   if (who_is_calling == TOKEN_KEYWORD_SET)
   {
     int i;
-    /* Make a copy of the first few tokens, ignoring comments. */
-    /* This is a duplication of code in execute_client_statement(). */
+    int t;
     for (i= main_token_number; main_token_lengths[i] != 0; ++i)
     {
-      int t= main_token_types[i];
-      if (t == TOKEN_TYPE_COMMENT_WITH_SLASH
-      ||  t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE
-      ||  t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
-      sub_token_offsets[i2]= main_token_offsets[i];
-      sub_token_lengths[i2]= main_token_lengths[i];
-      sub_token_types[i2]= main_token_types[i];
-      ++i2;
-      if (i2 > 8) break;
-    }
-    sub_token_offsets[i2]= 0;
-    sub_token_lengths[i2]= 0;
-    sub_token_types[i2]= 0;
-    if (text.mid(sub_token_offsets[1], 7).toUpper() == "SESSION")
-    {
-      i= 2;
-    }
-    else if (text.mid(sub_token_offsets[1], 9).toUpper() == "@@SESSION")
-    {
-      if (text.mid(sub_token_offsets[2], 1).toUpper() != ".") return;
-      i= 3;
-    }
-    else return;
-    if (text.mid(sub_token_offsets[i], 8).toUpper() != "SQL_MODE") return;
-    ++i;
-    if (sub_token_lengths[i] == 0) return;
-    if ((text.mid(sub_token_offsets[i], 1) != "=")
-     && (text.mid(sub_token_offsets[i], 2) != ":=")) return;
-    ++i;
-    if ((sub_token_types[i] != TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-     && (sub_token_types[i] != TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
-     && (sub_token_types[i] != TOKEN_TYPE_LITERAL))
-    {
-      /* User has said SET SESSION sql_mode = not-literal which server can interpret */
-      must_ask_server= true;
-    }
-    else
-    {
-      /* Uer has said SET SESSION sql_mode = literal which we can interpret as client */
-      sql_mode_string= text.mid(sub_token_offsets[i], sub_token_lengths[i]);
-      sql_mode_string_seen= true;
+      t= main_token_types[i];
+      if ((t == TOKEN_KEYWORD_SESSION)
+      || (t == TOKEN_KEYWORD_LOCAL))
+      {
+        default_is_session= true;
+        continue;
+      }
+      if ((t == TOKEN_KEYWORD_GLOBAL)
+        || (t == TOKEN_KEYWORD_PERSIST)
+        || (t == TOKEN_KEYWORD_PERSIST_ONLY))
+      {
+        default_is_session= false;
+        continue;
+      }
+      var_name= text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper();
+      if ((connect_stripper(var_name, false) == "SQL_MODE")
+       || (var_name == "@@SQL_MODE"))
+      {
+        int i_minus_1= next_i(i, -1);
+        int i_minus_2= next_i(i_minus_1, -1);
+        int i_plus_1= next_i(i, +1);
+        int i_plus_2= next_i(i_plus_1, +1);
+        int i_plus_3= next_i(i_plus_2, +1);
+        if (var_name == "@@SQL_MODE") immediate_is_session= true;
+        else
+        {
+          immediate_is_session= default_is_session;
+          token= text.mid(main_token_offsets[i_minus_1], main_token_lengths[i_minus_1]);
+          if (token == ".")
+          {
+            token= text.mid(main_token_offsets[i_minus_2], main_token_lengths[i_minus_2]).toUpper();
+            if ((token == "@@SESSION")
+             || (token == "@@LOCAL"))
+            {
+              immediate_is_session= true;
+            }
+            if ((token == "@@GLOBAL")
+             || (token == "@@PERSIST")
+             || (token == "@@PERSIST_ONLY"))
+            {
+              immediate_is_session= false;
+            }
+          }
+          if (immediate_is_session == false) continue;
+        }
+        token= text.mid(main_token_offsets[i_plus_1], main_token_lengths[i_plus_1]);
+        if ((token == "=") || (token == ":="))
+        {
+          bool is_simple_literal= true;
+          t= main_token_types[i_plus_2];
+          if ((t != TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+           && (t != TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
+           && (t != TOKEN_TYPE_LITERAL))
+            is_simple_literal= false;
+          else
+          {
+            QString token3= text.mid(main_token_offsets[i_plus_3], main_token_lengths[i_plus_3]);
+            if ((token3 != ",")
+             && (token3 != ";")
+             && (token3 != ocelot_delimiter_str))
+            is_simple_literal= false;
+          }
+          if (is_simple_literal == false)
+          {
+            /* User has said SET SESSION sql_mode = not-literal which server can interpret */
+            sql_mode_string_seen= false;
+            must_ask_server= true;
+          }
+          else
+          {
+            /* User has said SET SESSION sql_mode = literal which we can interpret as client */
+            sql_mode_string= text.mid(main_token_offsets[i_plus_2], main_token_lengths[i_plus_2]);
+            sql_mode_string_seen= true;
+            must_ask_server= false;
+          }
+        }
+      }
     }
   }
   if ((who_is_calling == TOKEN_KEYWORD_CONNECT) || (must_ask_server == true))
@@ -12729,7 +12794,10 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
     {
       hparse_sql_mode_ansi_quotes= true;
     }
-    else hparse_sql_mode_ansi_quotes= false;
+    else
+    {
+      hparse_sql_mode_ansi_quotes= false;
+    }
   }
 }
 

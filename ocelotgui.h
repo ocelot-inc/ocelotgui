@@ -578,6 +578,7 @@ public:
   void component_size_calc(int *character_height, int *borders_height);
   QFont get_font_from_style_sheet(QString style_string);
   void set_dbms_version_mask(QString);
+  int next_i(int, int);
   void get_sql_mode(int who_is_calling, QString text);
   QString get_doc_path(QString);
   void hparse_f_nexttoken();
@@ -590,7 +591,7 @@ public:
   QString hparse_f_token_to_appendee(QString,int,char);
   int hparse_f_expect(unsigned short int,unsigned char,int,QString);
   int hparse_f_literal(unsigned char,unsigned short int,int);
-  int hparse_f_default(int);
+  int hparse_f_default(int,bool);
   int hparse_f_user_or_role_name(int);
   int hparse_f_character_set_name();
   int hparse_f_collation_name();
@@ -640,6 +641,7 @@ public:
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
   void hparse_f_pseudo_statement(int);
+  void hparse_f_is_global_or_persist(bool *,bool *);
   void hparse_f_assignment(int,int,bool,bool);
   void hparse_f_alter_table();
   int hparse_f_character_set();
@@ -1484,6 +1486,7 @@ public:
       TOKEN_KEYWORD_GET_LOCK,
       TOKEN_KEYWORD_GLENGTH,
       TOKEN_KEYWORD_GLOB,
+      TOKEN_KEYWORD_GLOBAL,
       TOKEN_KEYWORD_GO,
       TOKEN_KEYWORD_GOTO,
       TOKEN_KEYWORD_GRANT,
@@ -1679,6 +1682,7 @@ public:
       TOKEN_KEYWORD_MULTIPOLYGON,
       TOKEN_KEYWORD_MULTIPOLYGONFROMTEXT,
       TOKEN_KEYWORD_MULTIPOLYGONFROMWKB,
+      TOKEN_KEYWORD_NAMES,
       TOKEN_KEYWORD_NAME_CONST,
       TOKEN_KEYWORD_NATURAL,
       TOKEN_KEYWORD_NEXTVAL,
@@ -1870,6 +1874,7 @@ public:
       TOKEN_KEYWORD_START,
       TOKEN_KEYWORD_STARTING,
       TOKEN_KEYWORD_STARTPOINT,
+      TOKEN_KEYWORD_STATEMENT,
       TOKEN_KEYWORD_STATUS,
       TOKEN_KEYWORD_STD,
       TOKEN_KEYWORD_STDDEV,
