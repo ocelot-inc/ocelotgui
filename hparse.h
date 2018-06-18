@@ -852,6 +852,115 @@ int MainWindow::hparse_f_qualified_name_of_object_with_star(int database_or_obje
   return 0;
 }
 
+/*
+  These are the flags for possible parts of a qualified name.
+  Translate them to equivalent TOKEN_REFTYPE_... values.
+  We don't try to be precise and say TOKEN_REFTYPE_PARAMETER_REFER.
+  We assume TOKEN_REFTYPE_VARIABLE_REFER not TOKEN_REFTYPE_VARIABLE.
+*/
+#define F_DB    1
+#define F_TBL   2
+#define F_ROW   4
+#define F_FUNC  8
+#define F_COL  16
+#define F_VAR  32
+int MainWindow::hparse_f_e_to_reftype(int e)
+{
+  if (e == F_DB) return TOKEN_REFTYPE_DATABASE;
+  if (e == F_TBL) return TOKEN_REFTYPE_TABLE;
+  if (e == F_FUNC) return TOKEN_REFTYPE_FUNCTION;
+  if (e == F_ROW) return TOKEN_REFTYPE_ROW;
+  if (e == F_COL) return TOKEN_REFTYPE_COLUMN;
+  if (e == F_VAR) return TOKEN_REFTYPE_VARIABLE_REFER;
+  if (e == (F_DB | F_FUNC)) return TOKEN_REFTYPE_DATABASE_OR_FUNCTION;
+  if (e == (F_DB | F_TBL)) return TOKEN_REFTYPE_DATABASE_OR_TABLE;
+  if (e == (F_DB | F_TBL | F_ROW)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW;
+  if (e == (F_DB | F_TBL | F_COL)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN;
+  if (e == (F_DB | F_TBL | F_FUNC | F_COL)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION;
+  if (e == (F_DB | F_TBL | F_FUNC | F_VAR)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_VARIABLE_OR_FUNCTION;
+  if (e == (F_DB | F_TBL | F_FUNC | F_COL | F_VAR)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE;
+  if (e == (F_DB | F_TBL | F_ROW | F_FUNC | F_COL)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_COLUMN;
+  if (e == (F_DB | F_TBL | F_ROW | F_FUNC | F_VAR)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_VARIABLE;
+  if (e == (F_DB | F_TBL | F_ROW | F_FUNC | F_COL | F_VAR)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE;
+  if (e == (F_TBL | F_COL | F_FUNC)) return TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION;
+  if (e == (F_TBL | F_COL | F_FUNC | F_VAR)) return TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE;
+  if (e == (F_TBL | F_ROW)) return TOKEN_REFTYPE_TABLE_OR_ROW;
+  if (e == (F_TBL | F_COL)) return TOKEN_REFTYPE_TABLE_OR_COLUMN;
+  if (e == (F_ROW | F_VAR)) return TOKEN_REFTYPE_ROW_OR_VARIABLE;
+  if (e == (F_COL | F_VAR)) return TOKEN_REFTYPE_COLUMN_OR_VARIABLE;
+  if (e == (F_FUNC | F_VAR)) return TOKEN_REFTYPE_FUNCTION_OR_VARIABLE;
+  /* TODO: More combinations possible, especially if rows are possible */
+  /* If it fails, the hovering display will just be "identifier" */
+  return 0;
+}
+
+/* In MySQL/MariaDB a qualified identifier can be a reserved word. */
+int MainWindow::hparse_f_accept_qualifier(unsigned short int flag_version, unsigned char reftype, int proposed_type, QString token)
+{
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) == 0)
+    return hparse_f_expect(flag_version, reftype, proposed_type, token);
+  int saved_token_flags= main_token_flags[hparse_i];
+  main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
+  main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
+  if (hparse_f_accept(flag_version, reftype, proposed_type, token) == 0)
+  {
+    main_token_flags[hparse_i]= saved_token_flags;
+    return 0;
+  }
+  return 1;
+}
+
+/*
+  If an identifier has not been declared earlier, then it can't be
+  a row variable or a variable.
+  This doesn't look for system variables, only for defined variables.
+  If keyword_row == TOKEN_KEYWORD_ROW, we look for row variables.
+  Assume: it is a row variable if the word ROW follows, or if
+          it's in FOR ... END FOR. We do not check "what are the
+          fields of the row", which often depends on table lookup.
+  Luckily row-variables and scalar-variables can't have same names.
+  Todo: We should be distinguishing row-variable from variable.
+  Todo: Is there a quick way to check "are we in begin|end"?
+*/
+bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
+{
+  int i_of_define;
+  bool true_or_false= false;
+  int saved_hparse_i= hparse_i;
+  hparse_i= i;
+  if (hparse_f_variables(false, &i_of_define) == 0) true_or_false= false;
+  else true_or_false= true;
+  hparse_i= saved_hparse_i;
+  if (true_or_false == true)
+  {
+    bool is_row_variable= false;
+    int next_word, prev_word;
+     next_word= next_i(i_of_define, +1);
+     if (main_token_types[next_word] == TOKEN_KEYWORD_ROW)
+    {
+      is_row_variable= true;
+    }
+    else if (main_token_types[next_word] == TOKEN_KEYWORD_IN)
+    {
+      prev_word= next_i(i_of_define, -1);
+      if (main_token_types[prev_word] == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
+      {
+        is_row_variable= true;
+      }
+    }
+    if (keyword_row == TOKEN_KEYWORD_ROW)
+    {
+      if (is_row_variable) return true;
+      else return false;
+    }
+    if (keyword_row != TOKEN_KEYWORD_ROW)
+    {
+      if (is_row_variable) return false;
+      else return true;
+    }
+  }
+  return true_or_false;
+}
 
 /*
   We're looking for a site identifier, but wow it gets complicated.
@@ -863,23 +972,25 @@ int MainWindow::hparse_f_qualified_name_of_object_with_star(int database_or_obje
   "Expect" is what we pass to hparse_f_expect() if Situation is true.
   Situation                                Expect
   ---------                                ------
+  EOF                                      ?? not handled
   .           (MySQL)                 (s)  . table . column
-  @@X EOF     (MySQL) (operand)            variable
-  @@X . EOF   (MySQL) (operand)            variable . variable
-  @@X . X .   (MySQL) (operand)            variable . variable . variable
-  @@X . X     (MySQL) (operand)            variable . variable
-  @X          (MySQL) (operand)            variable
-  X EOF       (MySQL) (operand) (v)   (s)  database|table|column|function|variable
-  X EOF       (MySQL) (operand) (v)        function|variable
-  X EOF               (operand)       (s)  database|table|column|function
+  @@X EOF     (MySQL) (operand) (v)        variable
+  @@X . EOF   (MySQL) (operand) (v)        variable . variable
+  @@X . X .   (MySQL) (operand) (v)        variable . variable . variable
+  @@X . X     (MySQL) (operand) (v)        variable . variable
+  @X          (MySQL) (operand) (v)        variable
+  X EOF       (MySQL) (operand) (v)(f)(s)  database|table|column|function|variable
+  X EOF       (MySQL) (operand) (v)(f)     function|variable
+  X EOF               (operand)    (f)(s)  database|table|column|function
   X EOF                               (s)  database|table|column
-  X EOF       (MySQL) (operand)            function
-  X (                 (operand)            function
-  X . EOF     (MySQL) (operand)       (s)  database|table . table|column|function
+  X EOF       (MySQL) (operand)    (f)     function
+  X (                 (operand)    (f)     function
+  X . EOF     (MySQL) (operand)    (f)(s)  database|table . table|column|function
   X . EOF                             (s)  database|table . table|column
-  X . X EOF   (MySQL) (operand)       (s)  database|table . table|column|function
+  X . X EOF   (MySQL) (operand)    (f)(s)  database|table . table|column|function
   X . X EOF                           (s)  database|table . table|column
   X . X .                             (s)  database . table . column
+  X . X (                          (f)     database . function
   X . X other                         (s)  table . column
   X other     (MySQL) (operand) (v)   (s)  column|variable
   X other     (MySQL) (operand) (v)        variable
@@ -888,54 +999,44 @@ int MainWindow::hparse_f_qualified_name_of_object_with_star(int database_or_obje
   And in MySQL, if X is qualified, it's okay even if it's reserved.
   Todo: "drop table .www;" is legal but you don't allow it (that's for object names).
   We set v iff MySQL/MariaDB AND there might be parameters or variables.
+  If we find a declaration then it's a declared variable but if we don't
+  then we aren't sure: it might be either column or server server variable.
+  We change main_token_pointers[] if SET ...=...variable_name... so that
+  get_sql_mode will know if SET sql_mode=ORACLE is to a variable or not.
+  Todo: The above table doesn't show effect of MariaDB 10.3 row.x vars.
+  Todo: one too many kludges. rewrite?
+  TODO: We need a different kind of accept() if "." follows:
+        (if MySQL|MariaDB)
+        save
+        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
+        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
+        hparse_f_accept()
+        if fails anyway, restore
+        ... Use it when you know you're looking at MySQL qualifier.
 */
-int MainWindow::hparse_f_qualified_name_of_operand(bool o)
+int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
 {
   bool m= false;
-  bool s= false;
-  bool v= false;
-  int specific_type= 0;
   if (hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) m= true;
-  if ((hparse_statement_type == TOKEN_KEYWORD_INSERT)
-   || (hparse_statement_type == TOKEN_KEYWORD_DELETE)
-   || (hparse_statement_type == TOKEN_KEYWORD_UPDATE)
-   || (hparse_statement_type == TOKEN_KEYWORD_REPLACE)
-   || (hparse_statement_type == TOKEN_KEYWORD_CREATE)
-   || (hparse_statement_type == TOKEN_KEYWORD_ALTER)
-   || (hparse_statement_type == TOKEN_KEYWORD_HANDLER)
-   || (hparse_statement_type == TOKEN_KEYWORD_LOAD)
-   || (hparse_statement_type == TOKEN_KEYWORD_SELECT)) s= true;
-  if (hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3)
+
+  if (v & f & s)
   {
-    /* MariaDB allows row-variable-name . field-name */
-    if (hparse_statement_type == TOKEN_KEYWORD_SET) s= true;
+    /* hparse_f_opd_18() passes true,true,true = anything goes,
+       but statements that don't have tables don't have columns.
+       Todo: check: what if we're inside a subquery? */
+    if ((hparse_statement_type == TOKEN_KEYWORD_INSERT)
+     || (hparse_statement_type == TOKEN_KEYWORD_DELETE)
+     || (hparse_statement_type == TOKEN_KEYWORD_UPDATE)
+     || (hparse_statement_type == TOKEN_KEYWORD_REPLACE)
+     || (hparse_statement_type == TOKEN_KEYWORD_CREATE)
+     || (hparse_statement_type == TOKEN_KEYWORD_ALTER)
+     || (hparse_statement_type == TOKEN_KEYWORD_HANDLER)
+     || (hparse_statement_type == TOKEN_KEYWORD_LOAD)
+     || (hparse_statement_type == TOKEN_KEYWORD_SELECT)) {;}
+    else s= false;
   }
-  if (m)
-  {
-    specific_type= hparse_f_variables(false);
-    if (specific_type > 0) v= true;
-  }
-  hparse_f_next_nexttoken();
-  if (m & s)
-  {
-    if (hparse_token == ".")
-    {
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-      main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-      main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
-    }
-  }
-  if (m & o)
+
+  if (m & v)
   {
     if ((hparse_token.left(2) == "@@")
      && (hparse_next_token == ""))
@@ -945,7 +1046,7 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
       return 1;
     }
   }
-  if (m & o)
+  if (m & v)
   {
     if ((hparse_token.left(2) == "@@")
      && (hparse_next_token == ".")
@@ -965,7 +1066,7 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
       return 1;
     }
   }
-  if (m & o)
+  if (m & v)
   {
     if ((hparse_token.left(2) == "@@")
      && (hparse_next_token == ".")
@@ -980,7 +1081,7 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
       return 1;
     }
   }
-  if (m & o)
+  if (m & v)
   {
     if (hparse_token.left(1) == "@")
     {
@@ -989,219 +1090,189 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool o)
       return 1;
     }
   }
-  /* If hparse_f_accept() succeeds, we have "X" and it's not blank.
-     We might change reftype later in this function. */
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
-    return 0;
-  main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-  if (m & o & v & s)
+
+  int i_plus[5]= {0,0,0,0,0};
+  i_plus[0]= hparse_i;
+  QString q_plus[5];
   {
-    if (hparse_next_token == "")
+    int token_type;
+    QString token= "So far nothing has been seen";
+    for (int i= 0; i < 5; ++i)
     {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE;
-      return 1;
-    }
-  }
-  if (m & o & v)
-  {
-    if (hparse_next_token == "")
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_FUNCTION_OR_VARIABLE;
-      return 1;
-    }
-  }
-  if (o & s)
-  {
-    if (hparse_next_token == "")
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]=  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION;
-      return 1;
-    }
-  }
-  if (s)
-  {
-    if (hparse_next_token == "")
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN;
-      return 1;
-    }
-  }
-  if (m & o)
-  {
-    if (hparse_next_token == "")
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_FUNCTION;
-      return 1;
-    }
-  }
-  {
-    if (hparse_next_token == "(")
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_FUNCTION;
-      return 1;
-    }
-  }
-  if (m & o & s)
-  {
-    if ((hparse_next_token == ".")
-     && (hparse_next_next_token == ""))
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE_OR_TABLE;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
+      if (i == 0)   i_plus[0]= hparse_i;
+      else i_plus[i]= next_i(i_plus[i - 1], +1);
+      if ((token != "/*Other*/") && (token != ""))
       {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
+        if (main_token_lengths[i_plus[i]] == 0) token= "";
+        else
+        {
+          token_type= main_token_types[i_plus[i]];
+          token= hparse_text_copy.mid(main_token_offsets[i_plus[i]], main_token_lengths[i_plus[i]]);
+          if ((token != ".")
+           && (token != "(")
+           && ((token_type == TOKEN_TYPE_OPERATOR) || (i == 1) || (i == 3)))
+             token= "/*Other*/";
+        }
       }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
+      q_plus[i]= token;
     }
   }
-  if (s)
+
+  /* Start with: possibles are database|table|column|var|func
+  Eliminate as you go along.
+  We never use e[1] or e[3] they would correspond to "."s. */
+  int e[5]= {0,0,0,0,0};
+
+  int qualifiers= 0;
+
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0)
   {
-    if ((hparse_next_token == ".")
-     && (hparse_next_next_token == ""))
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE_OR_TABLE;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
-      {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
-    }
+    if (f) { e[0]|= F_DB|F_FUNC; e[2]= F_FUNC; }
+    if (v) { e[0]|= F_ROW | F_VAR; e[2]|= F_VAR; }
+    if (s) { e[0]|= F_DB|F_TBL|F_COL; e[2]|= F_TBL|F_COL; e[4]|= F_COL; }
   }
-  if (m & o & s)
+  else if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
-    if ((hparse_next_token == ".")
-     && (hparse_next_next_token != "")
-     && (hparse_next_next_next_token == ""))
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE_OR_TABLE;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
-      {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
-    }
+    if (f) { e[0]|= F_DB|F_FUNC; e[2]|= F_FUNC; }
+    if (v) { e[0]|= F_VAR; e[2]|= F_VAR; }
+    if (s) { e[0]|= F_DB|F_TBL|F_COL; e[2]|= F_TBL|F_COL; e[4]|= F_COL; }
   }
-  if (s)
+  else /* if Tarantool */
   {
-    if ((hparse_next_token == ".")
-     && (hparse_next_next_token != "")
-     && (hparse_next_next_next_token == ""))
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE_OR_TABLE;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
-      {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE_OR_COLUMN, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
-    }
+    if (f) { e[0]|= F_FUNC; }
+    if (v) { ; }
+    if (s) { e[0]|= F_TBL | F_COL; e[2]|= F_COL; }
   }
-  if (s)
+  if (q_plus[0] == ".")
   {
-    if ((hparse_next_token == ".")
-     && (hparse_next_next_token != "")
-     && (hparse_next_next_next_token == "."))
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
-      {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
-      {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
-    }
+    /* hparse_f_accept the . !! but redo! MOVE THIS UP! */
+    e[0]&= F_TBL;
+    e[0]&= F_COL;
   }
-  if (m & o)
+
+  /* Todo: Don't look for "." if e[2]&(F_VAR|F_COL|F_FUNC) == 0 */
+  if (q_plus[1] == ".")
   {
-    if ((hparse_next_token == ".")
-     && (hparse_next_next_token != "")
-     && (hparse_next_next_next_token == "("))
+    ++qualifiers;
+    e[0]&= (~(F_FUNC|F_VAR|F_COL));
+    /* Todo: don't look for "." if e[4]&F_COL == 0 */
+    if (q_plus[3] == ".")
     {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_DATABASE;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
-      {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_FUNCTION, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
+      ++qualifiers;
+      e[0]&= F_DB; e[2]&= F_TBL; e[4]&= F_COL;
     }
+    else if (q_plus[3] == "(") e[2]&= F_FUNC;
+    else if (q_plus[3] == "") e[4]= 0;
+    else /* other */ { e[2]&= (~F_FUNC); }
   }
-  if (s)
+  else if (q_plus[1] == "(") e[0]&= F_FUNC;
+  else if (q_plus[1] == "") { e[2]= 0; e[4]= 0; }
+  else /* other */ e[0]&= (~F_FUNC);
+
+  for (int i= 0; i < 5; ++i)
   {
-    if ((hparse_next_token == ".")
-     && (hparse_next_next_token != ""))
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_TABLE;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
-      if (hparse_errno > 0) return 0;
-      if (m)
-      {
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
-        main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-      }
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      return 1;
-    }
+    if ((q_plus[i] == "") || (q_plus[i] == "/*Other*/"))
+      e[i]= 0;
   }
-  if (m & o & v & s)
+
+  for (int i= 0; i < 4; ++i)
   {
+    if (q_plus[i+1] == "/*Other*/")
     {
-      main_token_reftypes[hparse_i_of_last_accepted]= specific_type;
-      return 1;
+      e[i]&= (~(F_DB | F_TBL | F_ROW | F_FUNC));
+    }
+    else if (q_plus[i+1] == "(")
+    {
+      e[i]&= F_FUNC;
+      if (i == 2) e[0]&= F_DB;
     }
   }
-  if (m & o & v)
+
+  if (q_plus[3] == "/*Other*/") e[0]&= (~F_DB);
+
+  /*
+     Looking for var, or row.member (where we label member as var)
+     Todo: We don't distinguish var from var-member-of-row
+     Todo: Last time I looked, row-var-name trumps table-name
+           so if you find row-var you can turn off F_TBL.
+           But I'm not sure whether that's a permanent feature.
+     Todo: We're not looking for system variables, which could
+           exist without starting with @@ in SET statements (targets).
+           Ideally: select them when you connect, binary-search them
+           here. Currently for SET sql_mode='' we say sql_mode is
+           a generic identifier.
+  */
+
+  if ((e[0]&F_VAR) != 0)
   {
-    {
-      main_token_reftypes[hparse_i_of_last_accepted]= specific_type;
-      return 1;
-    }
+    if (hparse_f_is_variable(i_plus[0], 0) == false) e[0]&= (~F_VAR);
+    else  e[0]&= (~F_COL);
   }
-  if (s)
+
+  if ((e[0]&F_ROW) != 0)
   {
+    if (hparse_f_is_variable(i_plus[0], TOKEN_KEYWORD_ROW) == false)
     {
-      main_token_reftypes[hparse_i_of_last_accepted]= TOKEN_REFTYPE_COLUMN;
-      return 1;
+      e[0]&= (~F_ROW);
     }
   }
-  return 1;
+
+  if ((e[2]&F_VAR) != 0)
+  {
+    if ((e[0] & F_ROW) == 0)
+    {
+      e[2]&= (~F_VAR);
+    }
+  }
+
+  if (e[2] == F_COL) e[0]= F_TBL; /* kludge. What turned off F_TBL? */
+
+  if (q_plus[0] == "")
+  {
+    /* Immediate EOF or token_type is operator other than "." or "(".
+     . Therefore this accept() will fail, okay. */
+    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[0]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    /* maybe assert if you get here */
+  }
+
+  /* Perhaps e[0] == 0 at this point i.e. nothing is legal.
+     But accept an identifier anyway, if it's followed by a ".".
+     (The problem is the "." not the identifier.)
+     Use a saved copy of e[0].
+     Same applies if qualifiers == 2. */
+
+  /* Todo: It's possible that at this point e[0]==0 i.e. nothing legal */
+  /* Todo: I dunno, maybe hparse_f_expect is better sometimes? */
+  if (qualifiers == 2)
+  {
+    if (hparse_f_accept_qualifier(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[0]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    if (hparse_f_accept(FLAG_VERSION_ALL,TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 0) return 0;
+    if (hparse_f_accept_qualifier(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[2]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    if (hparse_f_accept(FLAG_VERSION_ALL,TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 0) return 0;
+    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[4]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    return 1;
+  }
+  if (qualifiers == 1)
+  {
+    /* Todo: eliminate F_ROW if it isn't declared earlier */
+    if (hparse_f_accept_qualifier(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[0]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    if (hparse_f_accept(FLAG_VERSION_ALL,TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 0) return 0;
+    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[2]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    return 1;
+  }
+  if (qualifiers == 0)
+  {
+    /* if ep[2]==0 and F_VAR|F_COL, see if F_COL is declared earlier.
+       if it is, eliminate F_COL. if it isn't, eliminate F_VAR
+       (?? but maybe it is a system variable?) */
+    ; /* Todo: eliminate F_ROW if it isn't declared earlier */
+    ; /* Todo: eliminate F_VAR if it isn't declared earlier */
+    ; /*       but if it IS declared earlier, eliminate F_COL */
+    if (q_plus[1] == "/*Other*/") e[0]&= (~(F_DB | F_TBL | F_ROW));
+    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[0]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    return 1;
+  }
+  return 0;
 }
 
 int MainWindow::hparse_f_qualified_name_with_star() /* like hparse_f_qualified_name but may end with * */
@@ -2155,7 +2226,7 @@ void MainWindow::hparse_f_opr_18(int who_is_calling, int allow_flags) /* Precede
     }
   }
   if ((identifier_seen == true)
-   || (hparse_f_qualified_name_of_operand(true) == 1))
+   || (hparse_f_qualified_name_of_operand(true,true,true) == 1))
   {
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1) /* identifier followed by "(" must be a function name */
@@ -2597,6 +2668,14 @@ void MainWindow::hparse_f_parenthesized_value_list()
 /* routine_type = procedure, function, lua, or row */
 void MainWindow::hparse_f_parameter_list(int routine_type)
 {
+  if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+  {
+    if ((routine_type == TOKEN_KEYWORD_PROCEDURE) || (routine_type == TOKEN_KEYWORD_FUNCTION))
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") != 1)
+        return;
+    }
+  }
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
   if (hparse_errno > 0) return;
   do
@@ -2740,9 +2819,13 @@ void MainWindow::hparse_f_assignment(int statement_type,
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     }
-     else /* TOKEN_KEYWORD_INSERT | UPDATE | LOAD */
+    else if (statement_type == TOKEN_KEYWORD_SET)
     {
-      if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+      if (hparse_f_qualified_name_of_operand(true,false,false) == 0) hparse_f_error();
+    }
+    else /* TOKEN_KEYWORD_INSERT | UPDATE | LOAD */
+    {
+      if (hparse_f_qualified_name_of_operand(true,false,true) == 0) hparse_f_error();
     }
     if (hparse_errno > 0) return;
 
@@ -2815,7 +2898,7 @@ void MainWindow::hparse_f_alter_specification()
       {
         do
         {
-          if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+          if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
           if (hparse_errno > 0) return;
           hparse_f_column_definition();
           if (hparse_errno > 0) return;
@@ -2825,7 +2908,7 @@ void MainWindow::hparse_f_alter_specification()
       }
       else
       {
-        if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+        if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
         hparse_f_column_definition();
         if (hparse_errno > 0) return;
@@ -2847,7 +2930,7 @@ void MainWindow::hparse_f_alter_specification()
   if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALTER") == 1))
   {
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN");
-    if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+    if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
     {
@@ -2876,9 +2959,9 @@ void MainWindow::hparse_f_alter_specification()
   if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHANGE") == 1))
   {
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN");
-    if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+    if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
-    if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+    if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     hparse_f_column_definition();
     if (hparse_errno > 0) return;
@@ -2987,7 +3070,7 @@ void MainWindow::hparse_f_alter_specification()
     else
     {
       hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN");
-      if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+      if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
     return;
@@ -3036,7 +3119,7 @@ void MainWindow::hparse_f_alter_specification()
   if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MODIFY") == 1))
   {
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN");
-    if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+    if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     hparse_f_column_definition();
     if (hparse_errno > 0) return;
@@ -3061,7 +3144,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_errno > 0) return;
     do
     {
-      if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+      if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
       if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASC") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DESC") == 1)) {;}
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
@@ -3616,7 +3699,8 @@ int MainWindow::hparse_f_data_type(int context)
     if (varying_seen == true) return TOKEN_KEYWORD_VARCHAR;
     return TOKEN_KEYWORD_CHAR;
   }
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1)
+  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1)
+   || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VARCHAR, "VARCHAR2") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     hparse_f_length(false, false, true);
@@ -4198,7 +4282,7 @@ void MainWindow::hparse_f_column_list(int is_compulsory, int is_maybe_qualified)
     }
     else
     {
-      if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+      if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
     }
     if (hparse_errno > 0) return;
   } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
@@ -5800,7 +5884,7 @@ void MainWindow::hparse_f_insert_or_replace()
   {
     do
     {
-      if (hparse_f_qualified_name_of_operand(false) == 0) hparse_f_error();
+      if (hparse_f_qualified_name_of_operand(false,false,true) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
@@ -7264,7 +7348,7 @@ void MainWindow::hparse_f_statement(int block_top)
         {
           comma_is_seen= false;
           item_is_seen= false;
-          if (hparse_f_qualified_name_of_operand(false) == 1)
+          if (hparse_f_qualified_name_of_operand(false,false,true) == 1)
           {
             hparse_f_column_definition();
             if (hparse_errno > 0) return;
@@ -8261,7 +8345,7 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         do
         {
-          if (hparse_f_qualified_name_of_operand(false) == 0)
+          if (hparse_f_qualified_name_of_operand(false,false,false) == 0)
           {
             hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER,  "[identifier]");
           }
@@ -9650,6 +9734,31 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
 {
   if (hparse_errno > 0) return;
   hparse_subquery_is_allowed= false;
+
+  if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+  {
+    if (hparse_i == block_top)
+    {
+      if ((calling_statement_type == TOKEN_KEYWORD_PROCEDURE)
+       || (calling_statement_type == TOKEN_KEYWORD_FUNCTION))
+      {
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IS, "IS") == 0)
+          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS");
+        if (hparse_errno > 0) return;
+        hparse_f_declare_plsql(TOKEN_KEYWORD_AS);
+        if (hparse_errno > 0) return;
+      }
+      if (calling_statement_type == 0)
+      {
+        if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECLARE, "DECLARE") == 1)
+        {
+          hparse_f_declare_plsql(TOKEN_KEYWORD_DECLARE);
+          if (hparse_errno > 0) return;
+        }
+      }
+    }
+  }
+
   /*
     TODO:
       For labels + conditions + local variables, you could:
@@ -9663,8 +9772,11 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     BEGIN|LOOP|WHILE|REPEAT|IF (or label that precedes that, if any).
     So when we reach END we can set main_token_pointers[] to point
     "back" to where a block started.
+    We also use main_token_pointers[] for pointing from variable_refer
+    to variable_define, but it's not compulsory, it could be unknown.
     Todo: Consider using the same technique for ()s and statements.
-    Todo: Consider pointing forward as well as backward. */
+    Todo: Consider pointing forward as well as backward.
+  */
 
   int hparse_i_of_block= -1;
   QString label= "";
@@ -9672,17 +9784,8 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   /* Todo: most checks are illegal if preceded by a label. Check for that. */
   if (hparse_count_of_accepts != 0)
   {
-    hparse_f_next_nexttoken();
-    if (hparse_next_token == ":")
-    {
-      label= hparse_token;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-      hparse_i_of_block= hparse_i_of_last_accepted;
-      if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
-      if (hparse_errno > 0) return;
-    }
+    label= hparse_f_label(&hparse_i_of_block);
+    if (hparse_errno > 0) return;
   }
   /*
     BEGIN could be the start of a BEGIN END block, but
@@ -9974,7 +10077,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ITERATE, "ITERATE") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEAVE") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    hparse_f_labels(block_top);
+    hparse_f_label_search(block_top);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
@@ -10003,7 +10106,8 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
     do
     {
-      hparse_f_variables(true);
+      int i_of_define;
+      hparse_f_variables(true, &i_of_define);
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
@@ -10054,7 +10158,29 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else
   {
-    hparse_f_statement(block_top);
+    /* Some oracle_mode statements that can only be in begin ... end */
+    bool is_statement_done= false;
+    if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+     && (hparse_begin_seen == true))
+    {
+      hparse_f_label(&hparse_i_of_block);
+      if (hparse_errno > 0) return;
+      if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1)
+      {
+        is_statement_done= true;
+      }
+      else if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+      {
+        /* todo: flag is_start_statement etc.? */
+        /* todo: check if hparse_f_assignment is better? */
+        hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=");
+        /* delay check if (hparse_errno > 0) return; */
+        if (hparse_errno == 0) hparse_f_opr_1(0, 0);
+        /* delay check if (hparse_errno > 0) return; */
+        is_statement_done= true;
+      }
+    }
+    if (is_statement_done == false) hparse_f_statement(block_top);
     if (hparse_errno > 0)
     {
       if (hparse_f_recover() == 2) return;
@@ -10167,6 +10293,26 @@ void MainWindow::hparse_f_declare(int calling_statement_type, int block_top)
   if (hparse_errno > 0) return;
 }
 
+
+/* Oracle mode, variable declares. E.g.  DECLARE a INT; b VARCHAR(10); */
+void MainWindow::hparse_f_declare_plsql(int token_type)
+{
+  for (int i= 0;; ++i)
+  {
+    if ((i != 0) || (token_type == TOKEN_KEYWORD_AS))
+    {
+      if (QString::compare(hparse_token, "BEGIN", Qt::CaseInsensitive) == 0) return;
+      /* guaranteed to fail */
+      hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BEGIN");
+    }
+    hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+    if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1) hparse_f_error();
+    if (hparse_errno > 0) return;
+    hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
+    if (hparse_errno > 0) return;
+  }
+}
 
 /*
   Recovery
@@ -11087,6 +11233,39 @@ int MainWindow::hparse_f_lua_accept_dotted(unsigned short int flag_version, unsi
 #endif
 
 /*
+  SQL/PSM label looks like "label:".
+  PL/SQL label looks like "<<label>>".
+  Todo: Check: can a label be a reserved word if Oracle?
+  Todo: Check: where should statement start be if Oracle?
+*/
+QString MainWindow::hparse_f_label(int *hparse_i_of_block)
+{
+  QString label= "";
+  if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+  {
+    if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<<") == 1)
+    {
+      label= hparse_token;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">>");
+      if (hparse_errno > 0) return "";
+    }
+  }
+  hparse_f_next_nexttoken();
+  if (hparse_next_token == ":")
+  {
+    label= hparse_token;
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
+    *hparse_i_of_block= hparse_i_of_last_accepted;
+    if (hparse_errno > 0) return "";
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
+    if (hparse_errno > 0) return "";
+  }
+  return label;
+}
+
+/*
   Called from hparse_f_block() for LEAVE label or ITERATE label.
   We go up in main_token list until we hit the top,
   skipping out-of-scope blocks.
@@ -11094,7 +11273,7 @@ int MainWindow::hparse_f_lua_accept_dotted(unsigned short int flag_version, unsi
   Todo: Make sure elsewhere that TOKEN_KEYWORD_END is always legitimate.
   Todo: This fails to match qq with `qq`. Should I strip the ``s?
 */
-void MainWindow::hparse_f_labels(int block_top)
+void MainWindow::hparse_f_label_search(int block_top)
 {
   int count_of_accepts= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
@@ -11120,7 +11299,7 @@ void MainWindow::hparse_f_labels(int block_top)
 
 /*
   Called from hparse_f_block() for OPEN or FETCH or CLOSE cursor.
-  Search method is similar to the one in hparse_f_labels().
+  Search method is similar to the one in hparse_f_label_search().
   But maybe it's not error if you can't find cursor definition?
   I forget whether that's somehow possible, so allow it.
 */
@@ -11152,7 +11331,7 @@ void MainWindow::hparse_f_cursors(int block_top)
   Called from hparse_f_block() for FETCH x cursor INTO variable.
   Also called just to see whether there's a parameter or variable
   definition for what's at hparse_i, in which case if mandatory==false.
-  Search method is similar to the one in hparse_f_labels(),
+  Search method is similar to the one in hparse_f_label_search(),
   but we go as far as statement start rather than block_top,
   because parameter declarations precede block top.
   But maybe it's not error if you can't find cursor definition?
@@ -11162,10 +11341,11 @@ void MainWindow::hparse_f_cursors(int block_top)
   TODO: Check: what if there are 1000 variables, does anything overflow?
   Todo: No need for this to be legal: begin declare x int; select y; end;
 */
-int MainWindow::hparse_f_variables(bool is_mandatory)
+int MainWindow::hparse_f_variables(bool is_mandatory, int *i_of_define)
 {
   int count_of_accepts= 0;
   int candidate_count= 0;
+  *i_of_define= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= hparse_i_of_statement)); --i)
   {
     if (main_token_types[i] == TOKEN_KEYWORD_END)
@@ -11193,6 +11373,7 @@ int MainWindow::hparse_f_variables(bool is_mandatory)
           QString t= hparse_text_copy.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
           if (QString::compare(s, t, Qt::CaseInsensitive) == 0)
           {
+            *i_of_define= i;
             if (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE) return TOKEN_REFTYPE_VARIABLE_REFER;
             return TOKEN_REFTYPE_PARAMETER_REFER;
           }
@@ -11211,7 +11392,7 @@ int MainWindow::hparse_f_variables(bool is_mandatory)
 
 /*
   Called from hparse_f_block() for SIGNAL or ... HANDLER FOR condition.
-  Search method is similar to the one in hparse_f_labels().
+  Search method is similar to the one in hparse_f_label_search().
   But maybe it's not error if you can't find condition definition?
   I forget whether that's somehow possible, so allow it.
 */

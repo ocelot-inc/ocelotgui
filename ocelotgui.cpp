@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: June 11 2018
+   Last modified: June 17 2018
 */
 
 /*
@@ -484,6 +484,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #ifdef OCELOT_OS_LINUX
   assert(MENU_FONT == 80); /* See kludge alert in ocelotgui.h Settings() */
 #endif
+
+  assert(TOKEN_REFTYPE_MAX == 87); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
 
   /* Initialization */
 
@@ -4708,7 +4710,9 @@ QFont MainWindow::get_font_from_style_sheet(QString style_string)
   Re CLIENT_MULTI_STATEMENT: this would work too, but in the long term I'll want to
      know for sure: which statement returned result set X? Since a CALL can return
      multiple result sets, I didn't see a way to figure that out.
-  Don't bother with begin_count if PROCEDURE or FUNCTION or TRIGGER or EVENT hasn't been seen.
+  Re: Don't bother with begin_count if PROCEDURE or FUNCTION or TRIGGER
+      or EVENT hasn't been seen. But sometimes BEGIN or DECLARE can be
+      starts of compound statements.
   Beware: insert into t8 values (5); prompt w (unlike mysql client we wait for ';' here)
   Beware: create procedure p () begin end// select 5//
   Beware: input might be a file dump, and statements might be long.
@@ -4722,13 +4726,13 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
                                              bool check_if_client)
 {
   int i;
-  int begin_count;
+  int begin_count= 0;
   QString last_token, second_last_token;
   QString text;
   int i_of_first_non_comment_seen= -1;
+  bool begin_seen= false;
 
   text= statement_edit_widget->toPlainText(); /* Todo: decide whether I'm doing this too often */
-  begin_count= 0;
   /*
     First, check for client statement, because the rules for client statement end are:
     ; OR delimiter OR \n OR \n\r
@@ -4792,7 +4796,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   }
   else
   {
-    bool is_maybe_in_compound_statement= 0;
+    bool is_maybe_in_compound_statement= false;
     bool is_create_trigger= false;
     int statement_type= -1;
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
@@ -4820,6 +4824,18 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
     last_token= "";
     for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
     {
+      if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+      {
+        if (main_token_types[i] == TOKEN_KEYWORD_DECLARE)
+        {
+          is_maybe_in_compound_statement= true;
+        }
+        if (main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+        {
+          begin_seen= true;
+        }
+      }
+
       second_last_token= last_token;
       last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
       if (QString::compare(ocelot_delimiter_str, ";") != 0)
@@ -4836,7 +4852,16 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
       }
       if ((QString::compare(last_token, ";") == 0) && (begin_count == 0))
       {
-        ++i; break;
+        if (((dbms_version_mask & FLAG_VERSION_PLSQL) != 0)
+         && (is_maybe_in_compound_statement == true)
+         && (begin_seen == false))
+        {
+          ; /* pl/sql: e.g. skip ; if it's between declare and begin */
+        }
+        else
+        {
+          ++i; break;
+        }
       }
       if (i_of_first_non_comment_seen != -1)
       {
@@ -4847,7 +4872,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           ||  (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)
           ||  (main_token_types[i] == TOKEN_KEYWORD_EVENT))
           {
-            is_maybe_in_compound_statement= 1;
+            is_maybe_in_compound_statement= true;
             is_create_trigger= true;
           }
         }
@@ -4858,7 +4883,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
         {
           if (statement_type == TOKEN_KEYWORD_DO_LUA)
           {
-            is_maybe_in_compound_statement= 1;
+            is_maybe_in_compound_statement= true;
           }
         }
         else
@@ -4872,7 +4897,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           ||  (main_token_types[i] == TOKEN_KEYWORD_REPEAT)
           ||  (main_token_types[i] == TOKEN_KEYWORD_WHILE))
           {
-            is_maybe_in_compound_statement= 1;
+            is_maybe_in_compound_statement= true;
           }
         }
         if ((main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
@@ -4883,7 +4908,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
         }
       }
       /* For some reason the following was checking TOKEN_KEYWORD_ELSEIF too. Removed. */
-      if (is_maybe_in_compound_statement == 1)
+      if (is_maybe_in_compound_statement == true)
       {
         if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
         {
@@ -12224,7 +12249,7 @@ int MainWindow::next_token(int i)
 */
 QString MainWindow::token_reftype(int i, bool is_hover, int token_type, char reftype_parameter)
 {
-#define MAX_REFTYPEWORD_LENGTH 55
+#define MAX_REFTYPEWORD_LENGTH 64
 struct reftypewords {
    char  chars[MAX_REFTYPEWORD_LENGTH];
    unsigned short int reserved_flags;
@@ -12261,9 +12286,14 @@ struct reftypewords {
     {"database-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_PROCEDURE},
     {"database-or-sequence ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_SEQUENCE},
     {"database-or-table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE},
+    {"database-or-table-or-row ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW},
     {"database-or-table-or-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN},
     {"database-or-table-or-column-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION},
+    {"database-or-table-or-variable-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_VARIABLE_OR_FUNCTION},
+    {"database-or-table-or-row-or-function-or-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_COLUMN},
+    {"database-or-table-or-row-or-function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_VARIABLE},
     {"database-or-table-or-column-or-function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE},
+    {"database-or-table-or-row-or-column-or-function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_COLUMN_OR_FUNCTION_OR_VARIABLE},
     {"database-or-trigger ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TRIGGER},
     {"database-or-view ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_VIEW},
     {"directory ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DIRECTORY},
@@ -12291,6 +12321,8 @@ struct reftypewords {
     {"partition-number ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARTITION_NUMBER},
     {"password ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PASSWORD},
     {"role ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ROLE},
+    {"row ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ROW},
+    {"row-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ROW_OR_VARIABLE},
     {"savepoint ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SAVEPOINT},
     {"scale ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SCALE},
     {"sequence ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SEQUENCE},
@@ -12298,9 +12330,12 @@ struct reftypewords {
     {"sqlstate ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SQLSTATE},
     {"statement ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_STATEMENT},
     {"subpartition ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SUBPARTITION},
+    {"switch ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SWITCH_NAME},
     {"table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE},
     {"table-or-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_COLUMN},
     {"table-or-column-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION},
+    {"table-or-column-or-function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE},
+    {"table-or-row ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_ROW},
     {"tablespace ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLESPACE},
     {"transaction ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TRANSACTION},
     {"trigger ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TRIGGER},
@@ -12586,6 +12621,7 @@ void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_num
  or 8.0.11 (MySQL might not say 'mysql'). Assume Percona is like MySQL.
  If you must know the vendor, then maybe select @@version_comment
  is good, but I don't know if @@version_comment was in old versions.
+ Warn: get_sql_mode() might change dbms_version_mask.
  Todo: a message like "Don't recognize MySQL/MariaDB version" would be nice.
 */
 void MainWindow::set_dbms_version_mask(QString version)
@@ -12674,8 +12710,9 @@ int MainWindow::next_i(int i_start, int i_increment)
   SET SESSION SQL_MODE ... or SET @@session.sql_mode
   This might fail if (ocelot_statement_syntax_checker.toInt() < 1
   but I'm not expecting people will set that and then expect recognizing.
-  We do not try to handle the undocumented syntax SET @@sql_mode=ANSI,
-  if we did we'd have to ensure that we're not in a block.
+  Todo: Handle the undocumented syntax SET @@sql_mode=ANSI.
+        If MariaDB, we'd have to ensure that we're not in a block
+        that has DECLARE ANSI. But it's clearly used by some people.
   Todo: track global value too so we can handle sql_mode=default.
   Todo: try to do this while parsing, before you can ask the server.
   Todo: check: did the server return a warning for this statement?
@@ -12797,6 +12834,18 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
     else
     {
       hparse_sql_mode_ansi_quotes= false;
+    }
+
+    if ((sql_mode_string.contains("ORACLE", Qt::CaseInsensitive) == true)
+     && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0))
+    {
+      dbms_version_mask |= FLAG_VERSION_PLSQL;
+      hparse_dbms_mask |= FLAG_VERSION_PLSQL;
+    }
+    else
+    {
+      dbms_version_mask &= (~FLAG_VERSION_PLSQL);
+      hparse_dbms_mask &= (~FLAG_VERSION_PLSQL);
     }
   }
 }
@@ -19296,6 +19345,8 @@ int MainWindow::setup_row_type(int i_of_variable)
    variables are inside ``s. So we add ``s if they're absent. */
 /* Todo: Preserve the case of the original, not the reference (?).
    Todo: See what happens if it's in ""s or in ''s. */
+/* Todo: We plan to change hparse_f_variables() so variable_refer
+         points to variable_define. If that's done, this may be easier. */
 int MainWindow::setup_determine_what_variables_are_in_scope(
             int i_of_statement_start,
             QString text)

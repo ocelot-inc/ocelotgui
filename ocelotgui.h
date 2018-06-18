@@ -74,6 +74,7 @@
 #define FLAG_VERSION_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512 | 1024)
 #define FLAG_VERSION_LUA            2048
 #define FLAG_VERSION_ALL_OR_LUA (FLAG_VERSION_ALL | FLAG_VERSION_LUA)
+#define FLAG_VERSION_PLSQL          4096
 
 #include <assert.h>
 #include <stdint.h>
@@ -598,7 +599,10 @@ public:
   int hparse_f_qualified_name_with_star();
   int hparse_f_qualified_name_of_object(int,int);
   int hparse_f_qualified_name_of_object_with_star(int,int);
-  int hparse_f_qualified_name_of_operand(bool);
+  int hparse_f_e_to_reftype(int);
+  int hparse_f_accept_qualifier(unsigned short int,unsigned char,int,QString);
+  bool hparse_f_is_variable(int, int);
+  int hparse_f_qualified_name_of_operand(bool,bool,bool);
   int hparse_f_table_references();
   void hparse_f_table_escaped_table_reference();
   int hparse_f_table_reference(int);
@@ -702,6 +706,7 @@ public:
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
   void hparse_f_declare(int, int);
+  void hparse_f_declare_plsql(int);
   int hparse_f_recover();
   void hparse_f_lua_blocklist(int,int);
   void hparse_f_lua_blockseries(int,int,bool);
@@ -747,10 +752,11 @@ public:
   void hparse_f_lua_opr_17(int,int);
   void hparse_f_lua_opr_18(int,int);
   int hparse_f_lua_accept_dotted(unsigned short int,unsigned char,int,QString);
-  void hparse_f_labels(int);
+  QString hparse_f_label(int *);
+  void hparse_f_label_search(int);
   void hparse_f_cursors(int);
   int hparse_f_conditions(int);
-  int hparse_f_variables(bool);
+  int hparse_f_variables(bool,int*);
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
@@ -2239,9 +2245,14 @@ enum {
     TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_VARIABLE_OR_FUNCTION,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_COLUMN,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_VARIABLE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
+    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
     TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
     TOKEN_REFTYPE_DATABASE_OR_VIEW,
     TOKEN_REFTYPE_DIRECTORY,
@@ -2269,6 +2280,8 @@ enum {
     TOKEN_REFTYPE_PARTITION_NUMBER,
     TOKEN_REFTYPE_PASSWORD,
     TOKEN_REFTYPE_ROLE,
+    TOKEN_REFTYPE_ROW,
+    TOKEN_REFTYPE_ROW_OR_VARIABLE,
     TOKEN_REFTYPE_SAVEPOINT,
     TOKEN_REFTYPE_SCALE,
     TOKEN_REFTYPE_SEQUENCE,
@@ -2280,6 +2293,8 @@ enum {
     TOKEN_REFTYPE_TABLE,
     TOKEN_REFTYPE_TABLE_OR_COLUMN,
     TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,
+    TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
+    TOKEN_REFTYPE_TABLE_OR_ROW,
     TOKEN_REFTYPE_TABLESPACE,
     TOKEN_REFTYPE_TRANSACTION,
     TOKEN_REFTYPE_TRIGGER,
@@ -2294,6 +2309,12 @@ enum {
     TOKEN_REFTYPE_WITH_TABLE,
     TOKEN_REFTYPE_WRAPPER,
     TOKEN_REFTYPE_MAX
+    /*
+      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 87);".
+      If it blows, that means you changed the above enum list.
+      Which is okay, but before you change the assert, make sure
+      reftypewords list corresponds to the enum list!
+    */
   };
 };
 
