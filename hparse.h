@@ -891,6 +891,7 @@ int MainWindow::hparse_f_e_to_reftype(int e)
   if (e == (F_FUNC | F_VAR)) return TOKEN_REFTYPE_FUNCTION_OR_VARIABLE;
   /* TODO: More combinations possible, especially if rows are possible */
   /* If it fails, the hovering display will just be "identifier" */
+  log("hparse_f_e_to_reftype failed", 80);
   return 0;
 }
 
@@ -918,8 +919,8 @@ int MainWindow::hparse_f_accept_qualifier(unsigned short int flag_version, unsig
   Assume: it is a row variable if the word ROW follows, or if
           it's in FOR ... END FOR. We do not check "what are the
           fields of the row", which often depends on table lookup.
+          Exception: in FOR i IN x .. y DO, i is not a row variable.
   Luckily row-variables and scalar-variables can't have same names.
-  Todo: We should be distinguishing row-variable from variable.
   Todo: Is there a quick way to check "are we in begin|end"?
 */
 bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
@@ -928,7 +929,7 @@ bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
   bool true_or_false= false;
   int saved_hparse_i= hparse_i;
   hparse_i= i;
-  if (hparse_f_variables(false, &i_of_define) == 0) true_or_false= false;
+  if (hparse_f_variables(&i_of_define) == 0) true_or_false= false;
   else true_or_false= true;
   hparse_i= saved_hparse_i;
   if (true_or_false == true)
@@ -943,9 +944,24 @@ bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
     else if (main_token_types[next_word] == TOKEN_KEYWORD_IN)
     {
       prev_word= next_i(i_of_define, -1);
+      is_row_variable= true;
       if (main_token_types[prev_word] == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
       {
-        is_row_variable= true;
+        QString k_token;
+        for (int k= next_word + 1;; ++k)
+        {
+          k_token= hparse_text_copy.mid(main_token_offsets[k], main_token_lengths[k]);
+          if ((k_token == "")
+           || (k_token == ";")
+           || (k_token == hparse_delimiter_str)
+           || (k_token.toUpper() == "DO"))
+            break;
+          if (k_token == "..")
+          {
+            is_row_variable= false;
+            break;
+          }
+        }
       }
     }
     if (keyword_row == TOKEN_KEYWORD_ROW)
@@ -1023,8 +1039,9 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
   {
     /* hparse_f_opd_18() passes true,true,true = anything goes,
        but statements that don't have tables don't have columns.
-       Todo: check: what if we're inside a subquery? */
-    if ((hparse_statement_type == TOKEN_KEYWORD_INSERT)
+       Todo: look again at all legal commands to be sure of this. */
+    if ((hparse_is_in_subquery)
+     || (hparse_statement_type == TOKEN_KEYWORD_INSERT)
      || (hparse_statement_type == TOKEN_KEYWORD_DELETE)
      || (hparse_statement_type == TOKEN_KEYWORD_UPDATE)
      || (hparse_statement_type == TOKEN_KEYWORD_REPLACE)
@@ -1241,7 +1258,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
      Use a saved copy of e[0].
      Same applies if qualifiers == 2. */
 
-  /* Todo: It's possible that at this point e[0]==0 i.e. nothing legal */
   /* Todo: I dunno, maybe hparse_f_expect is better sometimes? */
   if (qualifiers == 2)
   {
@@ -1249,15 +1265,22 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
     if (hparse_f_accept(FLAG_VERSION_ALL,TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 0) return 0;
     if (hparse_f_accept_qualifier(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[2]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
     if (hparse_f_accept(FLAG_VERSION_ALL,TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 0) return 0;
-    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[4]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[4]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    {
+      hparse_f_error();
+      return 0;
+    }
     return 1;
   }
   if (qualifiers == 1)
   {
-    /* Todo: eliminate F_ROW if it isn't declared earlier */
     if (hparse_f_accept_qualifier(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[0]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
     if (hparse_f_accept(FLAG_VERSION_ALL,TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".") == 0) return 0;
-    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[2]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[2]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    {
+      hparse_f_error();
+      return 0;
+    }
     return 1;
   }
   if (qualifiers == 0)
@@ -2566,7 +2589,9 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   Expression list within INSERT, VALUES, SELECT, RETURNING, or HANDLER.
   column_count = number of identifiers at same level i.e. not within a
                  subquery, with reftype = column.
-                 todo: we miss if reftype = column_or_variable.
+  Todo: I think TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN  etc. is
+        impossible if we've succeeded with hparse_f_opr_1 and statement
+        is complete. But TOKEN_REFTYPE_COLUMN_OR_VARIABLE might occur.
 */
 int MainWindow::hparse_f_expression_list(int who_is_calling)
 {
@@ -2620,7 +2645,7 @@ int MainWindow::hparse_f_expression_list(int who_is_calling)
         if ((main_token_reftypes[i_of_opd] == TOKEN_REFTYPE_COLUMN)
          || (main_token_reftypes[i_of_opd] == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN)
          || (main_token_reftypes[i_of_opd] == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION))
-          ++column_count;
+            ++column_count;
       }
     }
     if (who_is_calling == TOKEN_KEYWORD_SELECT)
@@ -6120,7 +6145,6 @@ int MainWindow::hparse_f_unionize()
   return 1;
 }
 
-
 /*
   "SELECT ..." or "(SELECT ...)"
   Todo: For a SELECT statement (not a subquery) that starts with "(",
@@ -6128,6 +6152,13 @@ int MainWindow::hparse_f_unionize()
         than for the "SELECT". Otherwise the debugger might choke (?).
 */
 int MainWindow::hparse_f_select(bool select_is_already_eaten, bool is_statement, bool is_top)
+{
+  if (is_top == false) hparse_is_in_subquery= true;
+  int i= hparse_f_deep_select(select_is_already_eaten, is_statement, is_top);
+  hparse_is_in_subquery= false;
+  return i;
+}
+int MainWindow::hparse_f_deep_select(bool select_is_already_eaten, bool is_statement, bool is_top)
 {
   if ((hparse_statement_type == 0)
    || (hparse_statement_type == TOKEN_KEYWORD_WITH))
@@ -10107,7 +10138,12 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     do
     {
       int i_of_define;
-      hparse_f_variables(true, &i_of_define);
+      int reftype;
+      reftype= hparse_f_variables(&i_of_define);
+      if (reftype == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+      /* guaranteed to succeed */
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, reftype,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
@@ -11339,12 +11375,9 @@ void MainWindow::hparse_f_cursors(int block_top)
   Todo: For a parameter, make sure it's an OUT parameter.
   TODO: Finding variables could be useful in lots more places.
   TODO: Check: what if there are 1000 variables, does anything overflow?
-  Todo: No need for this to be legal: begin declare x int; select y; end;
 */
-int MainWindow::hparse_f_variables(bool is_mandatory, int *i_of_define)
+int MainWindow::hparse_f_variables(int *i_of_define)
 {
-  int count_of_accepts= 0;
-  int candidate_count= 0;
   *i_of_define= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= hparse_i_of_statement)); --i)
   {
@@ -11360,31 +11393,18 @@ int MainWindow::hparse_f_variables(bool is_mandatory, int *i_of_define)
       if ((main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE)
        || (main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER_DEFINE))
       {
-        if (is_mandatory)
+        QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+        QString t= hparse_text_copy.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
+        s= connect_stripper(s, true);
+        t= connect_stripper(t, true);
+        if (QString::compare(s, t, Qt::CaseInsensitive) == 0)
         {
-          ++candidate_count;
-          QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
-          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return candidate_count;
-          ++count_of_accepts;
-        }
-        else
-        {
-          QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
-          QString t= hparse_text_copy.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
-          if (QString::compare(s, t, Qt::CaseInsensitive) == 0)
-          {
-            *i_of_define= i;
-            if (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE) return TOKEN_REFTYPE_VARIABLE_REFER;
-            return TOKEN_REFTYPE_PARAMETER_REFER;
-          }
+          *i_of_define= i;
+          if (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE) return TOKEN_REFTYPE_VARIABLE_REFER;
+          return TOKEN_REFTYPE_PARAMETER_REFER;
         }
       }
     }
-  }
-  if (is_mandatory)
-  {
-    if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_VARIABLE_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    else hparse_f_error();
   }
   return 0;
 }

@@ -442,6 +442,7 @@
   static QString hparse_delimiter_str;
   static bool hparse_sql_mode_ansi_quotes= false;
   static unsigned short int hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
+  static bool hparse_is_in_subquery= false;
 
 /* Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -12780,13 +12781,29 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
         token= text.mid(main_token_offsets[i_plus_1], main_token_lengths[i_plus_1]);
         if ((token == "=") || (token == ":="))
         {
-          bool is_simple_literal= true;
+          bool is_simple_literal= false;
+          /* is_simple_literal=true if e.g. set sql_mode='ansi' */
           t= main_token_types[i_plus_2];
-          if ((t != TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
-           && (t != TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
-           && (t != TOKEN_TYPE_LITERAL))
-            is_simple_literal= false;
-          else
+          if ((t == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+           || (t == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
+           || (t == TOKEN_TYPE_LITERAL))
+            is_simple_literal= true;
+          /* is_simple_literal=true if e.g. set sql_mode=ansi */
+          if (is_simple_literal == false)
+          {
+            if ((t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+             || (t == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
+             || (t == TOKEN_TYPE_IDENTIFIER)
+             || (t >= TOKEN_TYPE_OTHER))
+            {
+               QString token4= text.mid(main_token_offsets[i_plus_2], main_token_lengths[i_plus_2]);
+               if ((token4.left(1) != "@")
+                && (main_token_reftypes[i_plus_2] != TOKEN_REFTYPE_VARIABLE_REFER))
+                 is_simple_literal= true;
+            }
+          }
+          /* is_simple_literal=false if not simple e.g. 'ansi,ansi' */
+          if (is_simple_literal == true)
           {
             QString token3= text.mid(main_token_offsets[i_plus_3], main_token_lengths[i_plus_3]);
             if ((token3 != ",")

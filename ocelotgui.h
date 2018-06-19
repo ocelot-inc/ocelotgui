@@ -700,6 +700,7 @@ public:
   int hparse_f_values();
   int hparse_f_unionize();
   int hparse_f_select(bool,bool,bool);
+  int hparse_f_deep_select(bool,bool,bool);
   void hparse_f_where();
   void hparse_f_window_spec(bool);
   int hparse_f_order_by(int);
@@ -756,7 +757,7 @@ public:
   void hparse_f_label_search(int);
   void hparse_f_cursors(int);
   int hparse_f_conditions(int);
-  int hparse_f_variables(bool,int*);
+  int hparse_f_variables(int*);
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
   int hparse_f_backslash_command(bool);
