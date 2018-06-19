@@ -392,7 +392,7 @@
 
   /* This should correspond to the version number in the comment at the start of this program. */
   static const char ocelotgui_version[]="1.0.6"; /* For --version. Make sure it's in manual too. */
-
+  /* Todo: initialize this as we do for hparse_dbms_mask */
   static unsigned short int dbms_version_mask;
 
 /* Global mysql definitions */
@@ -426,6 +426,7 @@
   static int hparse_errno_count;
   static int hparse_token_type;
   static int hparse_statement_type= -1;
+  static bool sql_mode_ansi_quotes= false;
   /* hparse_f_accept can dump many expected tokens in hparse_errmsg */
   static char hparse_errmsg[3072]; /* same size as tarantool_errmsg? */
   static QString hparse_next_token, hparse_next_next_token;
@@ -2891,9 +2892,10 @@ void MainWindow::action_statement_edit_widget_text_changed(int position,int char
   main_token_new(text.size());
   tokenize(text.data(),
            text.size(),
-           main_token_lengths, main_token_offsets, main_token_max_count, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
+           main_token_lengths, main_token_offsets, main_token_max_count,
+           (QChar*)"33333", 1, ocelot_delimiter_str, 1);
 
-  tokens_to_keywords(text, 0);
+  tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
   if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) != 0)
   {
     hparse_f_multi_block(text); /* recognizer */
@@ -4094,8 +4096,10 @@ void MainWindow::action_change_one_setting(QString old_setting,
     main_token_new(text.size());
     tokenize(text.data(),
              text.size(),
-             main_token_lengths, main_token_offsets, main_token_max_count, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
-   tokens_to_keywords(text, 0);
+             main_token_lengths, main_token_offsets,
+             main_token_max_count, (QChar*)"33333", 1,
+             ocelot_delimiter_str, 1);
+   tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
    action_execute_one_statement(text);
    history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
   }
@@ -5049,7 +5053,8 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
   token_lengths[0]= 0;
   tokenize(text.data(),
            text.size(),
-           &token_lengths[0], &token_offsets[0], desired_count - 1, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
+           &token_lengths[0], &token_offsets[0], desired_count - 1,
+          (QChar*)"33333", 1, ocelot_delimiter_str, 1);
   dbms_query[0]= '\0';
   for (i= 0; token_lengths[i] != 0; ++i)
   {
@@ -8130,7 +8135,7 @@ int MainWindow::action_execute_one_statement(QString text)
             Last statement did not cause a result set. We could hide the grid and shrink the
             central window with "result_grid_tab_widget[0]->hide()", but we don't.
           */
-          get_sql_mode(main_token_types[main_token_number], text);
+          get_sql_mode(main_token_types[main_token_number], text, false, main_token_number);
           put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
         }
         else
@@ -8485,7 +8490,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     /* Todo: find out why you have to figure out type again -- isn't it already known? */
     QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);
-    int t= token_type(s.data(), main_token_lengths[i]);
+    int t= token_type(s.data(), main_token_lengths[i], sql_mode_ansi_quotes);
     if (t == TOKEN_TYPE_COMMENT_WITH_SLASH
     ||  t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE
     ||  t == TOKEN_TYPE_COMMENT_WITH_MINUS) continue;
@@ -10045,7 +10050,8 @@ void MainWindow::make_and_append_message_in_result(
 
 void MainWindow::tokenize(QChar *text, int text_length, int *token_lengths,
                            int *token_offsets, int max_tokens, QChar *version,
-                           int passed_comment_behaviour, QString special_token, int minus_behaviour)
+                           int passed_comment_behaviour, QString special_token,
+                           int minus_behaviour)
 {
   log("tokenize start", 50);
   int token_number;
@@ -10516,7 +10522,7 @@ n_byte_token_skip:
   I could have figured this out during tokenize(), but didn't.
   See also tokens_to_keywords().
 */
-int MainWindow::token_type(QChar *token, int token_length)
+int MainWindow::token_type(QChar *token, int token_length, bool ansi_quotes)
 {
   if (token_length == 0) return TOKEN_TYPE_OTHER;
   /* Check whether token == delimiter_str. similar to a comparison with special_token in tokenize(). */
@@ -10553,7 +10559,7 @@ int MainWindow::token_type(QChar *token, int token_length)
   }
   if (*token == '"')
   {
-    if (hparse_sql_mode_ansi_quotes) return TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE;
+    if (ansi_quotes) return TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE;
     return TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE;
   }
   if ((*token >= '0') && (*token <= '9')) return TOKEN_TYPE_LITERAL_WITH_DIGIT;
@@ -10590,10 +10596,11 @@ int MainWindow::token_type(QChar *token, int token_length)
   so switched to maintaining a permanent list.
   Two compiler-dependent assumptions: bsearch() exists, and char* can be converted to unsigned long.
   Upper case is reserved, lower case is unreserved, we search both ways.
+  Warning: We can call this from hparse routines.
 */
 /* Todo: use "const" and "static" more often */
 
-void MainWindow::tokens_to_keywords(QString text, int start)
+void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
 {
   log("tokens_to_keywords start", 80);
   /*
@@ -11539,7 +11546,7 @@ const keywords strvalues[]=
   {
     /* Get the next word. */
     s= text.mid(main_token_offsets[i2], main_token_lengths[i2]);
-    t= token_type(s.data(), main_token_lengths[i2]);
+    t= token_type(s.data(), main_token_lengths[i2], ansi_quotes);
     main_token_types[i2]= t;
     main_token_flags[i2]= 0;
     main_token_pointers[i2]= 0;
@@ -12588,7 +12595,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_host= s;
   lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
-  get_sql_mode(TOKEN_KEYWORD_CONNECT, "");
+  get_sql_mode(TOKEN_KEYWORD_CONNECT, "", false, main_token_number);
   connections_is_connected[0]= 1;
   set_dbms_version_mask(statement_edit_widget->dbms_version);
   return 0;
@@ -12717,8 +12724,12 @@ int MainWindow::next_i(int i_start, int i_increment)
   Todo: track global value too so we can handle sql_mode=default.
   Todo: try to do this while parsing, before you can ask the server.
   Todo: check: did the server return a warning for this statement?
+  Warning: We might call this from within hparse_f_multi_block().
 */
-void MainWindow::get_sql_mode(int who_is_calling, QString text)
+bool MainWindow::get_sql_mode(int who_is_calling,
+                              QString text,
+                              bool is_in_hparse,
+                              int start_token_number)
 {
   QString sql_mode_string;
   bool sql_mode_string_seen= false;
@@ -12727,12 +12738,18 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
   bool default_is_session= true;
   bool immediate_is_session= true;
   QString var_name;
+  bool old_hparse_sql_mode_ansi_quotes= hparse_sql_mode_ansi_quotes;
   if (who_is_calling == TOKEN_KEYWORD_SET)
   {
     int i;
     int t;
-    for (i= main_token_number; main_token_lengths[i] != 0; ++i)
+    for (i= start_token_number; main_token_lengths[i] != 0; ++i)
     {
+      {
+        QString token3= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        if ((token3 == ";")
+         || (token3 == ocelot_delimiter_str)) break;
+      }
       t= main_token_types[i];
       if ((t == TOKEN_KEYWORD_SESSION)
       || (t == TOKEN_KEYWORD_LOCAL))
@@ -12787,7 +12804,9 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
           if ((t == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
            || (t == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE)
            || (t == TOKEN_TYPE_LITERAL))
+          {
             is_simple_literal= true;
+          }
           /* is_simple_literal=true if e.g. set sql_mode=ansi */
           if (is_simple_literal == false)
           {
@@ -12809,7 +12828,9 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
             if ((token3 != ",")
              && (token3 != ";")
              && (token3 != ocelot_delimiter_str))
-            is_simple_literal= false;
+            {
+              is_simple_literal= false;
+            }
           }
           if (is_simple_literal == false)
           {
@@ -12828,8 +12849,10 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
       }
     }
   }
-  if ((who_is_calling == TOKEN_KEYWORD_CONNECT) || (must_ask_server == true))
+  if ((who_is_calling == TOKEN_KEYWORD_CONNECT)
+   || (must_ask_server == true))
   {
+    if (is_in_hparse) return false;
     QString s= select_1_row("select @@session.sql_mode");
     if (s == "")
     {
@@ -12846,25 +12869,68 @@ void MainWindow::get_sql_mode(int who_is_calling, QString text)
      || (sql_mode_string.contains("ORACLE", Qt::CaseInsensitive) == true)
      || (sql_mode_string.contains("POSTGRESQL", Qt::CaseInsensitive) == true))
     {
+      if (is_in_hparse == false) sql_mode_ansi_quotes= true;
       hparse_sql_mode_ansi_quotes= true;
     }
     else
     {
+      if (is_in_hparse)
+      {
+        /*
+           We'll decide it's false if it contains some valid setting.
+           We'll decide it's unknown (and return unchanged) otherwise.
+           Obviously this is unreliable, but what else can I do?
+        */
+        sql_mode_string= sql_mode_string.toUpper();
+        if ((sql_mode_string == "")
+           || (sql_mode_string.contains("ALLOW_INVALID_DATES"))
+           || (sql_mode_string.contains("EMPTY_STRING_IS_NULL"))
+           || (sql_mode_string.contains("ERROR_FOR_DIVISION_BY_ZERO"))
+           || (sql_mode_string.contains("HIGH_NOT_PRECEDENCE"))
+           || (sql_mode_string.contains("IGNORE_BAD_TABLE_OPTIONS"))
+           || (sql_mode_string.contains("IGNORE_SPACE"))
+           || (sql_mode_string.contains("MYSQL323"))
+           || (sql_mode_string.contains("MYSQL40"))
+           || (sql_mode_string.contains("NO_AUTO_CREATE_USER"))
+           || (sql_mode_string.contains("NO_AUTO_VALUE_ON_ZERO"))
+           || (sql_mode_string.contains("NO_BACKSLASH_ESCAPES"))
+           || (sql_mode_string.contains("NO_DIR_IN_CREATE"))
+           || (sql_mode_string.contains("NO_ENGINE_SUBSTITUTION"))
+           || (sql_mode_string.contains("NO_FIELD_OPTIONS"))
+           || (sql_mode_string.contains("NO_KEY_OPTIONS"))
+           || (sql_mode_string.contains("NO_TABLE_OPTIONS"))
+           || (sql_mode_string.contains("NO_UNSIGNED_SUBTRACTION"))
+           || (sql_mode_string.contains("NO_ZERO_DATE"))
+           || (sql_mode_string.contains("NO_ZERO_IN_DATE"))
+           || (sql_mode_string.contains("ONLY_FULL_GROUP_BY"))
+           || (sql_mode_string.contains("PAD_CHAR_TO_FULL_LENGTH"))
+           || (sql_mode_string.contains("PIPES_AS_CONCAT"))
+           || (sql_mode_string.contains("REAL_AS_FLOAT"))
+           || (sql_mode_string.contains("SIMULTANEOUS_ASSIGNMENT"))
+           || (sql_mode_string.contains("STRICT_ALL_TABLES"))
+           || (sql_mode_string.contains("STRICT_TRANS_TABLES"))
+           || (sql_mode_string.contains("TIME_TRUNCATE_FRACTIONAL"))
+           || (sql_mode_string.contains("TRADITIONAL")))
+          {;}
+        else return false; /* This has no effect */
+      }
+      if (is_in_hparse == false)  sql_mode_ansi_quotes= false;
       hparse_sql_mode_ansi_quotes= false;
     }
-
     if ((sql_mode_string.contains("ORACLE", Qt::CaseInsensitive) == true)
      && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) != 0))
     {
-      dbms_version_mask |= FLAG_VERSION_PLSQL;
+      if (is_in_hparse == false) dbms_version_mask |= FLAG_VERSION_PLSQL;
       hparse_dbms_mask |= FLAG_VERSION_PLSQL;
     }
     else
     {
-      dbms_version_mask &= (~FLAG_VERSION_PLSQL);
+      if (is_in_hparse == false) dbms_version_mask &= (~FLAG_VERSION_PLSQL);
       hparse_dbms_mask &= (~FLAG_VERSION_PLSQL);
     }
   }
+  if (hparse_sql_mode_ansi_quotes == old_hparse_sql_mode_ansi_quotes) return false;
+  else return true;
 }
 
 /* 20160915: moved hparse_* and tparse_* routines to a new file. */
@@ -13050,7 +13116,8 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     return 0;
   }
 
-  hparse_sql_mode_ansi_quotes= true; /* see comment = ansi_quotes */
+  sql_mode_ansi_quotes= true;        /* see comment = ansi_quotes */
+  hparse_sql_mode_ansi_quotes= true; /* probably not necessary */
 
   /*
     Todo: This overrides any earlier PROMPT statements by user.
@@ -13228,7 +13295,8 @@ QString MainWindow::get_statement_type(QString q_dbms_query, int *statement_type
   int token_lengths[100];
   tokenize(q_dbms_query.data(),
            q_dbms_query.size(),
-           &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 1);
+           &token_lengths[0], &token_offsets[0], 100 - 1,
+          (QChar*)"33333", 2, "", 1);
   int word_number= 0;
   QString word0= "", word1= "", word2= "";
   for (int i= 0; i < 100; ++i)
@@ -13978,7 +14046,8 @@ QString MainWindow::tarantool_add_return(QString s)
   int token_lengths[100];
   tokenize(s.data(),
            s.size(),
-           &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 1);
+           &token_lengths[0], &token_offsets[0], 100 - 1,
+          (QChar*)"33333", 2, "", 1);
   QString word_1= s.mid(token_offsets[0], token_lengths[0]);
   if ((word_1 == "and") || (word_1 == "break") || (word_1 == "do")
    || (word_1 == "else") || (word_1 == "elseif") || (word_1 == "end")
@@ -16172,7 +16241,8 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     /* tokenize, ignore # comments or / * comments * /, treat '-' as part of token not operator */
     tokenize(s.data(),
              s.size(),
-             &token_lengths[0], &token_offsets[0], 100 - 1, (QChar*)"33333", 2, "", 2);
+             &token_lengths[0], &token_offsets[0], 100 - 1,
+            (QChar*)"33333", 2, "", 2);
     /* Ignore blank lines and lines that start with ';' */
     if (token_lengths[0] == 0) continue;
     if (QString::compare(s.mid(token_offsets[0], token_lengths[0]), ";", Qt::CaseInsensitive) == 0) continue;
@@ -17834,6 +17904,7 @@ int MainWindow::setup_generate(int routine_number)
   debug_label_list.clear();
   if (debug_track_user_variables == 1) debug_tmp_user_variables.clear();
   QString s;
+  bool pushed_sql_mode_ansi_quotes;
   bool pushed_hparse_sql_mode_ansi_quotes;
   QString routine_schema= debug_routine_list_schemas.at(routine_number);
   QString routine_name= debug_routine_list_names.at(routine_number);
@@ -17871,6 +17942,7 @@ int MainWindow::setup_generate(int routine_number)
 
   /* NB: after this push do not "return 1" without popping */
   main_token_push();
+  pushed_sql_mode_ansi_quotes= sql_mode_ansi_quotes;
   pushed_hparse_sql_mode_ansi_quotes= hparse_sql_mode_ansi_quotes;
 
   if (routine_sql_mode.contains("ANSI_QUOTES",Qt::CaseInsensitive))
@@ -17891,8 +17963,9 @@ int MainWindow::setup_generate(int routine_number)
   main_token_new(text.size());
   tokenize(text.data(),
            text.size(),
-           main_token_lengths, main_token_offsets, main_token_max_count, (QChar*)"33333", 1, ocelot_delimiter_str, 1);
-  tokens_to_keywords(text, 0);
+           main_token_lengths, main_token_offsets, main_token_max_count,
+           (QChar*)"33333", 1, ocelot_delimiter_str, 1);
+  tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
   hparse_f_multi_block(text); /* recognizer */
   /* Todo: We only check hparse_errno. hparse_errno_count maybe > 0. */
   if (hparse_errno != 0)
@@ -17988,10 +18061,12 @@ int MainWindow::setup_generate(int routine_number)
   /* Now you have a new CREATE statement in debug_v_g for a surrogate. */
   debug_routine_list_texts << debug_v_g;
   main_token_pop();
+  sql_mode_ansi_quotes= pushed_sql_mode_ansi_quotes;
   hparse_sql_mode_ansi_quotes= pushed_hparse_sql_mode_ansi_quotes;
   return 0;
 pop_and_return_error:
   main_token_pop();
+  sql_mode_ansi_quotes= pushed_sql_mode_ansi_quotes;
   hparse_sql_mode_ansi_quotes= pushed_hparse_sql_mode_ansi_quotes;
   return 1;
 }

@@ -580,7 +580,7 @@ public:
   QFont get_font_from_style_sheet(QString style_string);
   void set_dbms_version_mask(QString);
   int next_i(int, int);
-  void get_sql_mode(int who_is_calling, QString text);
+  bool get_sql_mode(int who_is_calling, QString text, bool is_in_hparse, int start_token_number);
   QString get_doc_path(QString);
   void hparse_f_nexttoken();
   void hparse_f_next_nexttoken();
@@ -1002,10 +1002,8 @@ private:
 #define FLAG_FOR_ERRORS     2
 
   void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
-
-  int token_type(QChar *token, int token_length);
-
-  void tokens_to_keywords(QString text, int start);
+  int token_type(QChar *token, int token_length, bool ansi_quotes);
+  void tokens_to_keywords(QString text, int start, bool ansi_quotes);
   void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text, int start);
   int next_token(int i);
   bool is_client_statement(int, int, QString);

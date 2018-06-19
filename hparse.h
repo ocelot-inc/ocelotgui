@@ -157,6 +157,7 @@ void MainWindow::hparse_f_error()
 
 /*
   Merely saying "if (hparse_token == 'x') ..." till we saw delimiter usually is not =.
+  Warning: We can call this without going via hparse_f_multi_block()
 */
 bool MainWindow::hparse_f_is_equal(QString hparse_token_copy, QString token)
 {
@@ -8704,6 +8705,7 @@ void MainWindow::hparse_f_statement(int block_top)
     hparse_statement_type= TOKEN_KEYWORD_SET;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_subquery_is_allowed= true;
+    int hparse_i_of_set_statement= hparse_i_of_last_accepted;
     bool global_seen= false;
     bool persist_seen= false;
     bool equal_seen= false;
@@ -8904,6 +8906,20 @@ void MainWindow::hparse_f_statement(int block_top)
     /* TODO: This fails to take "set sql_log_bin = {0 | 1}" into account as special. */
     hparse_f_assignment(TOKEN_KEYWORD_SET, 0, global_seen, persist_seen);
     if (hparse_errno > 0) return;
+    /* SET sql_mode=... can change how we parse further statements,
+       if SET is top level (within a stored procedure, we don't care).
+       Re-tokenize as we do for delimiters is not necessary,
+       but tokens_to_keywords() will be redone so we can say whether
+       "x" is a literal or an identifier.
+       Not always reliable, see get_sql_mode() for details.
+    */
+    if (hparse_i_of_set_statement == block_top)
+    {
+      if (get_sql_mode(TOKEN_KEYWORD_SET, hparse_text_copy, true, hparse_i_of_set_statement) == true)
+      {
+        tokens_to_keywords(hparse_text_copy, hparse_i, hparse_sql_mode_ansi_quotes);
+      }
+    }
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW") == 1)
   {
@@ -9727,7 +9743,7 @@ void MainWindow::hparse_f_statement(int block_top)
   }
   else
   {
-    if ((dbms_version_mask & FLAG_VERSION_TARANTOOL) != 0)
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
       if (hparse_errno > 0) return;
 #ifdef DBMS_TARANTOOL
@@ -11455,6 +11471,7 @@ int MainWindow::hparse_f_conditions(int block_top)
     statement_edit_widget->dbms_version, will include the string "MariaDB".
     If we are not connected, the default is "mysql" but the user can start with
     ocelotgui --ocelot_dbms=mariadb, and we store that in ocelot_dbms.
+    Todo: see whether set_dbms_version() handles all this nowadays.
 */
 void MainWindow::hparse_f_multi_block(QString text)
 {
@@ -11467,6 +11484,7 @@ void MainWindow::hparse_f_multi_block(QString text)
   else if (ocelot_dbms == "tarantool") hparse_dbms_mask= FLAG_VERSION_TARANTOOL;
 #endif
   else hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
+  hparse_sql_mode_ansi_quotes= sql_mode_ansi_quotes;
   hparse_i= -1;
   hparse_delimiter_str= ocelot_delimiter_str;
   hparse_errno_count= 0;
@@ -11664,6 +11682,7 @@ error:
 }
 
 #ifdef DBMS_TARANTOOL
+/* Warning: We can call this without going via hparse_f_multi_block() */
 bool MainWindow::hparse_f_is_nosql(QString text)
 {
   QString s= text.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
@@ -11896,7 +11915,7 @@ int MainWindow::hparse_f_client_statement()
         {
           main_token_offsets[ix]+= offset_of_rest;
         }
-        tokens_to_keywords(hparse_text_copy, hparse_i);
+        tokens_to_keywords(hparse_text_copy, hparse_i, hparse_sql_mode_ansi_quotes);
       }
     }
     else hparse_f_other(1);
@@ -12287,6 +12306,7 @@ int MainWindow::hparse_f_client_statement()
   The hint line that appears underneath the statement widget if syntax error,
   which probably means that the user is typing and hasn't finished a word.
   This is somewhat like a popup but using "Qt::Popup" caused trouble.
+  Warning: We can call this without going via hparse_f_multi_block()
 */
 void MainWindow::hparse_f_parse_hint_line_create()
 {
