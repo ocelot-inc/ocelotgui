@@ -2700,6 +2700,20 @@ void MainWindow::hparse_f_parameter_list(int routine_type)
     {
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") != 1)
         return;
+      do
+      {
+        hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_PARAMETER_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        if (hparse_errno > 0) return;
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN") == 1)
+          hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OUT");
+        else hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OUT");
+        if (hparse_errno > 0) return;
+        if (hparse_f_data_type(routine_type) == -1) hparse_f_error();
+        if (hparse_errno > 0) return;
+      } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+      if (hparse_errno > 0) return;
+      return;
     }
   }
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
@@ -9781,7 +9795,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
 {
   if (hparse_errno > 0) return;
   hparse_subquery_is_allowed= false;
-
+  int hparse_i_of_start= hparse_i;
   if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
   {
     if (hparse_i == block_top)
@@ -9897,6 +9911,32 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
         if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
       }
     }
+    if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+     && (hparse_i_of_start == block_top))
+    {
+      if ((calling_statement_type == TOKEN_KEYWORD_PROCEDURE)
+       || (calling_statement_type == TOKEN_KEYWORD_FUNCTION))
+      {
+        int j;
+        bool is_routine_name_seen= false;
+        for (j= hparse_i_of_start; j != 0; --j)
+        {
+          if ((main_token_reftypes[j] == TOKEN_REFTYPE_PROCEDURE)
+           || (main_token_reftypes[j] == TOKEN_REFTYPE_FUNCTION))
+          {
+            is_routine_name_seen= true;
+            break;
+          }
+          if ((main_token_flags[j] & TOKEN_FLAG_IS_START_STATEMENT) != 0) break;
+        }
+        QString routine_name= "[identifier]";
+        if (is_routine_name_seen)
+          routine_name= hparse_text_copy.mid(main_token_offsets[j], main_token_lengths[j]);
+        /* Todo: find out why "Expecting:" doesn't show for this accept */
+        hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE,TOKEN_TYPE_IDENTIFIER, routine_name);
+      }
+    }
+
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER,TOKEN_TYPE_IDENTIFIER, label);
