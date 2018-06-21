@@ -874,6 +874,7 @@ int MainWindow::hparse_f_e_to_reftype(int e)
   if (e == F_COL) return TOKEN_REFTYPE_COLUMN;
   if (e == F_VAR) return TOKEN_REFTYPE_VARIABLE_REFER;
   if (e == (F_DB | F_FUNC)) return TOKEN_REFTYPE_DATABASE_OR_FUNCTION;
+  if (e == (F_DB | F_FUNC | F_VAR)) return TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_VARIABLE;
   if (e == (F_DB | F_TBL)) return TOKEN_REFTYPE_DATABASE_OR_TABLE;
   if (e == (F_DB | F_TBL | F_ROW)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW;
   if (e == (F_DB | F_TBL | F_COL)) return TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN;
@@ -9790,6 +9791,9 @@ void MainWindow::hparse_f_pseudo_statement(int block_top)
 /*
   compound statement, or statement
   Pass: calling_statement_type = 0 (top level) | TOKEN_KEYWORD_FUNCTION/PROCEDURE/EVENT/TRIGGER
+  Todo: for plsql, we still don't accept "begin procname; ...". I'm
+        uncertain whether "if ... then ... procname; ..." is okay too.
+        Luckily "v := funcname;" is something MariaDB can't handle.
 */
 void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
 {
@@ -10261,16 +10265,39 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       {
         is_statement_done= true;
       }
-      else if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+      else
       {
-        /* todo: flag is_start_statement etc.? */
-        /* todo: check if hparse_f_assignment is better? */
-        hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=");
-        /* delay check if (hparse_errno > 0) return; */
-        if (hparse_errno == 0) hparse_f_opr_1(0, 0);
-        /* delay check if (hparse_errno > 0) return; */
-        is_statement_done= true;
+        /* if token is identifier: "x :=" means it's a variable,
+           "x;" or "x(" or "x." means it's a procedure,
+           "x eof" means it's either variable or procedure,
+           "x other" means error */
+        int r= hparse_f_qualified_name_of_operand(true, true, false);
+        if (hparse_errno > 0) is_statement_done= true;
+        if (r == 1)
+        {
+          int reftype= main_token_reftypes[hparse_i_of_last_accepted];
+          if (reftype == TOKEN_REFTYPE_VARIABLE_REFER)
+          {
+            /* todo: flag is_start_statement etc.? */
+            /* todo: check if hparse_f_assignment is better? */
+            hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=");
+            /* delay check if (hparse_errno > 0) return; */
+            if (hparse_errno == 0) hparse_f_opr_1(0, 0);
+            /* delay check if (hparse_errno > 0) return; */
+            is_statement_done= true;
+          }
+          else if (reftype == TOKEN_REFTYPE_FUNCTION)
+          {
+            hparse_statement_type= TOKEN_KEYWORD_CALL;
+            main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
+            hparse_f_parameter_list(TOKEN_KEYWORD_PROCEDURE);
+            /* delay check if (hparse_errno > 0) return; */
+            is_statement_done= true;
+          }
+          else hparse_f_error();
+        }
       }
+      if (hparse_errno > 0) is_statement_done= true;
     }
     if (is_statement_done == false) hparse_f_statement(block_top);
     if (hparse_errno > 0)

@@ -487,7 +487,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   assert(MENU_FONT == 80); /* See kludge alert in ocelotgui.h Settings() */
 #endif
 
-  assert(TOKEN_REFTYPE_MAX == 87); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
+  assert(TOKEN_REFTYPE_MAX == 88); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
 
   /* Initialization */
 
@@ -12291,6 +12291,7 @@ struct reftypewords {
     {"database-or-event ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_EVENT},
     {"database-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION},
     {"database-or-function-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE},
+    {"database-or-function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_VARIABLE},
     {"database-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_PROCEDURE},
     {"database-or-sequence ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_SEQUENCE},
     {"database-or-table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE},
@@ -12882,7 +12883,7 @@ bool MainWindow::get_sql_mode(int who_is_calling,
            Obviously this is unreliable, but what else can I do?
         */
         sql_mode_string= sql_mode_string.toUpper();
-        if ((sql_mode_string == "")
+        if ((connect_stripper(sql_mode_string, false) == "")
            || (sql_mode_string.contains("ALLOW_INVALID_DATES"))
            || (sql_mode_string.contains("EMPTY_STRING_IS_NULL"))
            || (sql_mode_string.contains("ERROR_FOR_DIVISION_BY_ZERO"))

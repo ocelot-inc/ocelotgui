@@ -2241,6 +2241,7 @@ enum {
     TOKEN_REFTYPE_DATABASE_OR_EVENT,
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION,
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE,
+    TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_VARIABLE,
     TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE,
@@ -2309,7 +2310,7 @@ enum {
     TOKEN_REFTYPE_WRAPPER,
     TOKEN_REFTYPE_MAX
     /*
-      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 87);".
+      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 88);".
       If it blows, that means you changed the above enum list.
       Which is okay, but before you change the assert, make sure
       reftypewords list corresponds to the enum list!
