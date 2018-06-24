@@ -6021,7 +6021,7 @@ int MainWindow::hparse_f_signal_or_resignal(int who_is_calling, int block_top)
     if (hparse_f_literal(TOKEN_REFTYPE_SQLSTATE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
   }
-  else if (hparse_f_conditions(block_top) == 1) {;}
+  else if (hparse_f_find_define(block_top, TOKEN_REFTYPE_CONDITION_DEFINE, TOKEN_REFTYPE_CONDITION_REFER, false) == 1) {;}
   else if (who_is_calling == TOKEN_KEYWORD_SIGNAL) return 0;
   if (hparse_errno > 0) return 0;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
@@ -10015,6 +10015,8 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT, "FOR") == 1)
   {
+    QString do_or_loop= "DO";
+    if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0) do_or_loop= "LOOP";
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     /* Todo: Find out later if integer-variable or record-variable" */
@@ -10031,7 +10033,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
         if (hparse_f_select(false, false, false) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      else if (hparse_next_token.toUpper() == "DO")
+      else if (hparse_next_token.toUpper() == do_or_loop)
       {
         hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_CURSOR_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
@@ -10047,7 +10049,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
         if (hparse_errno > 0) return;
       }
     }
-    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DO");
+    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO, do_or_loop);
     if (hparse_errno > 0) return;
     for (;;)
     {
@@ -10057,7 +10059,10 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     }
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
-    hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT, "FOR");
+    if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+      hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT, "LOOP");
+    else
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT, "FOR");
     if (hparse_errno > 0) return;
     hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_LABEL_REFER,TOKEN_TYPE_IDENTIFIER, label);
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
@@ -10165,10 +10170,26 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
-  else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ITERATE, "ITERATE") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEAVE") == 1))
+  else if ((hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONTINUE, "CONTINUE") == 1)
+       || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXIT, "EXIT") == 1)
+       || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_GOTO, "GOTO") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ITERATE, "ITERATE") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LEAVE") == 1))
   {
+    hparse_statement_type= main_token_types[hparse_i_of_last_accepted];
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    hparse_f_label_search(block_top);
+    if ((hparse_statement_type == TOKEN_KEYWORD_CONTINUE)
+     || (hparse_statement_type == TOKEN_KEYWORD_EXIT))
+    {
+      hparse_f_find_define(block_top, TOKEN_REFTYPE_LABEL_DEFINE, TOKEN_REFTYPE_LABEL_REFER, false);
+      if (hparse_errno > 0) return;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1)
+      {
+        hparse_f_opr_1(hparse_statement_type, 0);
+        if (hparse_errno > 0) return;
+      }
+    }
+    else hparse_f_find_define(block_top, TOKEN_REFTYPE_LABEL_DEFINE, TOKEN_REFTYPE_LABEL_REFER, true);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
@@ -10176,7 +10197,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLOSE, "CLOSE") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DEBUGGABLE;
-    hparse_f_cursors(block_top);
+    hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
@@ -10190,7 +10211,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       if (hparse_errno > 0) return;
     }
     else hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
-    hparse_f_cursors(block_top);
+    hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
     if (hparse_errno > 0) return;
@@ -10212,7 +10233,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OPEN, "OPEN") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    hparse_f_cursors(block_top);
+    hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
     if (hparse_errno > 0) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return;
@@ -10229,13 +10250,15 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "WHILE") == 1)
   {
+    QString do_or_loop= "DO";
+    if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0) do_or_loop= "LOOP";
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0, 0);
     hparse_subquery_is_allowed= false;
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DO");
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO, do_or_loop);
     if (hparse_errno > 0) return;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     for (;;)
@@ -10246,7 +10269,10 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     }
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "WHILE");
+    if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "LOOP");
+    else
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "WHILE");
     if (hparse_errno > 0) return;
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER,TOKEN_TYPE_IDENTIFIER, label);
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
@@ -10342,7 +10368,7 @@ void MainWindow::hparse_f_declare(int calling_statement_type, int block_top)
         if (hparse_errno > 0) return;
       }
       else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQLEXCEPTION") == 1) {;}
-      else if (hparse_f_conditions(block_top) == 1) {;}
+      else if (hparse_f_find_define(block_top, TOKEN_REFTYPE_CONDITION_DEFINE, TOKEN_REFTYPE_CONDITION_REFER, false) == 1) {;}
       else
       {
         if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
@@ -11385,16 +11411,34 @@ QString MainWindow::hparse_f_label(int *hparse_i_of_block)
 }
 
 /*
-  Called from hparse_f_block() for LEAVE label or ITERATE label.
-  We go up in main_token list until we hit the top,
-  skipping out-of-scope blocks.
-  If we pass a label, accept it, it's a legitimate target.
+  Some compound-statement items have definitions and references. E.g.
+  DECLARE abc CURSOR ... OPEN abc ... We're looking at the "refer",
+  we want to find the "define". We search backwards (going up in
+  main_token_list until we hit the top) because later defines can hide
+  earlier ones. Skip out-of-scope blocks (ENDs will have pointers to
+  BEGINs etc.) During the search we might find candidates, i.e. it's
+  a "define", and by passing them to hparse_f_accept we ensure
+  hparse_expected.append() happens even if it's not a match
+  so they're seen during hovering. If you go all the way up (which
+  means there was no exact match) and there were no candidates to
+  pass to hparse_f_accept, then call hparse_f_accept to ensure it's
+  an identifier but don't force an error unless is_compulsory is true.
+  (E.g. maybe it's not an error if cursor isn't found because it's in
+  a calling routine? I forget.)
+  Called for LEAVE|ITERATE|GOTO|CONTINUE|EXIT label.
+  Called for OPEN|FETCH|CLOSE cursor.
+  Called for SIGNAL | HANDLER FOR condition.
   Todo: Make sure elsewhere that TOKEN_KEYWORD_END is always legitimate.
-  Todo: This fails to match qq with `qq`. Should I strip the ``s?
+  Todo: Try this for aliases (block_top would be statement|subquery start).
+  Todo: This works poorly for `...``...` and "...""...". I suppose we'll
+        succeed with hparse_f_accept(..."[identifier]") eventually but
+        we won't match defines with refers (I guess).
 */
-void MainWindow::hparse_f_label_search(int block_top)
+int MainWindow::hparse_f_find_define(int block_top,
+                                      int reftype_define,
+                                      int reftype_refer,
+                                      bool is_compulsory)
 {
-  int count_of_accepts= 0;
   for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
   {
     if (main_token_types[i] == TOKEN_KEYWORD_END)
@@ -11405,52 +11449,34 @@ void MainWindow::hparse_f_label_search(int block_top)
       continue;
     }
     if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
-     && (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL_DEFINE))
+     && (main_token_reftypes[i] == reftype_define))
     {
       QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return;
-      ++count_of_accepts;
+      s= connect_stripper(s, true);
+      if (hparse_token.left(1) == "`")
+      {
+        s= "`" + s;
+        if (hparse_token.right(1) == "`") s= s + "`";
+      }
+      else if ((hparse_token.left(1) == "\"") && (hparse_sql_mode_ansi_quotes == true))
+      {
+        s= "\"" + s;
+        if (hparse_token.right(1) == "\"") s= s + "\"";
+      }
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, reftype_refer, TOKEN_TYPE_IDENTIFIER, s) == 1) return 1;
     }
   }
-  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-  else hparse_f_error();
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, reftype_refer, TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
+  if (is_compulsory) hparse_f_error();
+  return 0;
 }
 
-/*
-  Called from hparse_f_block() for OPEN or FETCH or CLOSE cursor.
-  Search method is similar to the one in hparse_f_label_search().
-  But maybe it's not error if you can't find cursor definition?
-  I forget whether that's somehow possible, so allow it.
-*/
-void MainWindow::hparse_f_cursors(int block_top)
-{
-  int count_of_accepts= 0;
-  for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
-  {
-    if (main_token_types[i] == TOKEN_KEYWORD_END)
-    {
-      int j= main_token_pointers[i];
-      if ((j >= i) || (j < block_top)) break; /* should be an assert */
-      i= main_token_pointers[i];
-      continue;
-    }
-    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
-     && (main_token_reftypes[i] == TOKEN_REFTYPE_CURSOR_DEFINE))
-    {
-      QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CURSOR_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return;
-      ++count_of_accepts;
-    }
-  }
-  if (count_of_accepts == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CURSOR_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
-  else hparse_f_error();
-}
 
 /*
   Called from hparse_f_block() for FETCH x cursor INTO variable.
   Also called just to see whether there's a parameter or variable
   definition for what's at hparse_i, in which case if mandatory==false.
-  Search method is similar to the one in hparse_f_label_search(),
+  Search method is similar to the one in hparse_f_find_define(),
   but we go as far as statement start rather than block_top,
   because parameter declarations precede block top.
   But maybe it's not error if you can't find cursor definition?
@@ -11458,6 +11484,8 @@ void MainWindow::hparse_f_cursors(int block_top)
   Todo: For a parameter, make sure it's an OUT parameter.
   TODO: Finding variables could be useful in lots more places.
   TODO: Check: what if there are 1000 variables, does anything overflow?
+        (I guess I was thinking about how hparse_f_accept will append
+        to hparse_expected for hovering purposes.)
 */
 int MainWindow::hparse_f_variables(int *i_of_define)
 {
@@ -11489,37 +11517,6 @@ int MainWindow::hparse_f_variables(int *i_of_define)
       }
     }
   }
-  return 0;
-}
-
-
-/*
-  Called from hparse_f_block() for SIGNAL or ... HANDLER FOR condition.
-  Search method is similar to the one in hparse_f_label_search().
-  But maybe it's not error if you can't find condition definition?
-  I forget whether that's somehow possible, so allow it.
-*/
-int MainWindow::hparse_f_conditions(int block_top)
-{
-  int count_of_accepts= 0;
-  for (int i= hparse_i - 1; ((i >= 0) && (i >= block_top)); --i)
-  {
-    if (main_token_types[i] == TOKEN_KEYWORD_END)
-    {
-      int j= main_token_pointers[i];
-      if ((j >= i) || (j < block_top)) return 0; /* should be an assert */
-      i= main_token_pointers[i];
-      continue;
-    }
-    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
-     && (main_token_reftypes[i] == TOKEN_REFTYPE_CONDITION_DEFINE))
-    {
-      QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, s) == 1) return 1;
-      ++count_of_accepts;
-    }
-  }
-  if (count_of_accepts == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CONDITION_REFER, TOKEN_TYPE_IDENTIFIER, "[identifier]");
   return 0;
 }
 

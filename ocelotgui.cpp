@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: June 20 2018
+   Last modified: June 23 2018
 */
 
 /*
@@ -10703,6 +10703,7 @@ const keywords strvalues[]=
       {"CHAR_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHAR_LENGTH},
       {"CHECK", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CHECK},
       {"CLEAR", 0, 0, TOKEN_KEYWORD_CLEAR}, /* Ocelot keyword */
+      {"CLOB", 0, 0, TOKEN_KEYWORD_CLOB},
       {"CLOSE", 0, 0, TOKEN_KEYWORD_CLOSE},
       {"COALESCE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_COALESCE},
       {"COERCIBILITY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COERCIBILITY},
@@ -10815,6 +10816,7 @@ const keywords strvalues[]=
       {"EGO", 0, 0, TOKEN_KEYWORD_EGO}, /* Ocelot keyword */
       {"ELSE", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_ELSE},
       {"ELSEIF", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_ELSEIF},
+      {"ELSIF", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_ELSIF},
       {"ELT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ELT},
     {"EMPTY", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_EMPTY},
       {"ENABLE", 0, 0, TOKEN_KEYWORD_ENABLE},
@@ -10895,7 +10897,7 @@ const keywords strvalues[]=
       {"GLOB", FLAG_VERSION_TARANTOOL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_GLOB},
       {"GLOBAL", 0, 0, TOKEN_KEYWORD_GLOBAL},
       {"GO", 0, 0, TOKEN_KEYWORD_GO}, /* Ocelot keyword */
-      {"GOTO", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_GOTO},
+      {"GOTO", FLAG_VERSION_LUA|FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_GOTO},
       {"GRANT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GRANT},
       {"GREATEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GREATEST},
       {"GROUP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GROUP},
@@ -11559,15 +11561,15 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "912" */
+      /* If the following assert happens, you inserted/removed something without changing "914" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (912 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (914 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 912; ++ii)
+      //for (int ii= 0; ii < 914; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 912, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 914, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -11575,8 +11577,8 @@ const keywords strvalues[]=
       //  assert(index == strvalues[ii].token_keyword);
       //}
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 912 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 912, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 914 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 914, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */

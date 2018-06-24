@@ -754,9 +754,8 @@ public:
   void hparse_f_lua_opr_18(int,int);
   int hparse_f_lua_accept_dotted(unsigned short int,unsigned char,int,QString);
   QString hparse_f_label(int *);
-  void hparse_f_label_search(int);
+  int hparse_f_find_define(int,int,int,bool);
   void hparse_f_cursors(int);
-  int hparse_f_conditions(int);
   int hparse_f_variables(int*);
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
@@ -1301,6 +1300,7 @@ public:
       TOKEN_KEYWORD_CHAR_LENGTH,
       TOKEN_KEYWORD_CHECK,
       TOKEN_KEYWORD_CLEAR,
+      TOKEN_KEYWORD_CLOB,
       TOKEN_KEYWORD_CLOSE,
       TOKEN_KEYWORD_COALESCE,
       TOKEN_KEYWORD_COERCIBILITY,
@@ -1413,6 +1413,7 @@ public:
       TOKEN_KEYWORD_EGO,
       TOKEN_KEYWORD_ELSE,
       TOKEN_KEYWORD_ELSEIF,
+      TOKEN_KEYWORD_ELSIF,
       TOKEN_KEYWORD_ELT,
       TOKEN_KEYWORD_EMPTY,
       TOKEN_KEYWORD_ENABLE,
