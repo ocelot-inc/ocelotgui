@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: June 23 2018
+   Last modified: June 25 2018
 */
 
 /*
@@ -487,7 +487,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   assert(MENU_FONT == 80); /* See kludge alert in ocelotgui.h Settings() */
 #endif
 
-  assert(TOKEN_REFTYPE_MAX == 88); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
+  assert(TOKEN_REFTYPE_MAX == 90); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
 
   /* Initialization */
 
@@ -4736,7 +4736,6 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   QString text;
   int i_of_first_non_comment_seen= -1;
   bool begin_seen= false;
-
   text= statement_edit_widget->toPlainText(); /* Todo: decide whether I'm doing this too often */
   /*
     First, check for client statement, because the rules for client statement end are:
@@ -4825,7 +4824,6 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
       }
       statement_type= get_statement_type_low(word0, word1, word2);
     }
-
     last_token= "";
     for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
     {
@@ -4880,6 +4878,12 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
             is_maybe_in_compound_statement= true;
             is_create_trigger= true;
           }
+          if (main_token_types[i] == TOKEN_KEYWORD_PACKAGE) /* new */
+          { /* new */
+            is_maybe_in_compound_statement= true; /* new */
+            ++begin_count;       /* new */
+            begin_seen= true; /* new */
+          } /* new */
         }
       }
       if (i_of_first_non_comment_seen == -1)
@@ -4956,7 +4960,8 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           {
             ++begin_count;
           }
-          if (main_token_types[i] == TOKEN_KEYWORD_END)
+          if ((main_token_types[i] == TOKEN_KEYWORD_END)
+           || (main_token_types[i] == TOKEN_KEYWORD_END_IN_CREATE_STATEMENT)) /* new */
           {
             --begin_count;
           }
@@ -7852,7 +7857,6 @@ int MainWindow::action_execute(int force)
                                                                 &returned_begin_count,
                                                                 true);
     if (main_token_count_in_statement == 0) break;
-
     /* If the next statement is unfinished, we usually want to ignore it. */
     if ((force == 0) && (is_statement_complete(text) == false)) return 1;
 
@@ -10681,6 +10685,7 @@ const keywords strvalues[]=
       {"BIT_OR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIT_OR},
       {"BIT_XOR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIT_XOR},
       {"BLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BLOB},
+      {"BODY", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_BODY},
       {"BOOL", 0, 0, TOKEN_KEYWORD_BOOL},
       {"BOOLEAN", 0, 0, TOKEN_KEYWORD_BOOLEAN},
       {"BOTH", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BOTH},
@@ -10833,6 +10838,7 @@ const keywords strvalues[]=
       {"ESCAPED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ESCAPED},
       {"EVENT", 0, 0, TOKEN_KEYWORD_EVENT},
       {"EXCEPT", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_EXCEPT},
+      {"EXCEPTION", 0, 0, TOKEN_KEYWORD_EXCEPTION},
       {"EXCHANGE", 0, 0, TOKEN_KEYWORD_EXCHANGE},
       {"EXCLUSIVE", 0, 0, TOKEN_KEYWORD_EXCLUSIVE},
       {"EXECUTE", 0, 0, TOKEN_KEYWORD_EXECUTE},
@@ -11136,6 +11142,7 @@ const keywords strvalues[]=
       {"OUTFILE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OUTFILE},
       {"OVER", FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_TARANTOOL | FLAG_VERSION_MARIADB_10_2_2, 0, TOKEN_KEYWORD_OVER},
       {"OVERLAPS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OVERLAPS}, /* deprecated in MySQL 5.7.6 */
+      {"PACKAGE", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_PACKAGE},
       {"PAGER", 0, 0, TOKEN_KEYWORD_PAGER}, /* Ocelot keyword */
       {"PARTIAL", 0, 0, TOKEN_KEYWORD_PARTIAL},
       {"PARTITION", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MARIADB_10_0, 0, TOKEN_KEYWORD_PARTITION},
@@ -11561,15 +11568,15 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "914" */
+      /* If the following assert happens, you inserted/removed something without changing "917" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (914 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (917 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 914; ++ii)
+      //for (int ii= 0; ii < 917; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 914, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 917, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -11577,8 +11584,8 @@ const keywords strvalues[]=
       //  assert(index == strvalues[ii].token_keyword);
       //}
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 914 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 914, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 917 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 917, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -12294,6 +12301,7 @@ struct reftypewords {
     {"database-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION},
     {"database-or-function-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE},
     {"database-or-function-or-variable ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_VARIABLE},
+    {"database-or-package ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_PACKAGE},
     {"database-or-procedure ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_PROCEDURE},
     {"database-or-sequence ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_SEQUENCE},
     {"database-or-table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_DATABASE_OR_TABLE},
@@ -12322,6 +12330,7 @@ struct reftypewords {
     {"label-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LABEL_DEFINE},
     {"label-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LABEL_REFER},
     {"length ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_LENGTH},
+    {"package ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PACKAGE},
     {"parameter-define ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARAMETER_DEFINE},
     {"parameter-refer ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARAMETER_REFER},
     {"parser ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_PARSER},

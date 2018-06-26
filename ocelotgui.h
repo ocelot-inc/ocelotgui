@@ -645,6 +645,8 @@ public:
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
   void hparse_f_pseudo_statement(int);
+  void hparse_f_create_function_clauses();
+  void hparse_f_create_procedure_clauses();
   void hparse_f_is_global_or_persist(bool *,bool *);
   void hparse_f_assignment(int,int,bool,bool);
   void hparse_f_alter_table();
@@ -1278,6 +1280,7 @@ public:
       TOKEN_KEYWORD_BIT_OR,
       TOKEN_KEYWORD_BIT_XOR,
       TOKEN_KEYWORD_BLOB,
+      TOKEN_KEYWORD_BODY,
       TOKEN_KEYWORD_BOOL,
       TOKEN_KEYWORD_BOOLEAN,
       TOKEN_KEYWORD_BOTH,
@@ -1430,6 +1433,7 @@ public:
       TOKEN_KEYWORD_ESCAPED,
       TOKEN_KEYWORD_EVENT,
       TOKEN_KEYWORD_EXCEPT,
+      TOKEN_KEYWORD_EXCEPTION,
       TOKEN_KEYWORD_EXCHANGE,
       TOKEN_KEYWORD_EXCLUSIVE,
       TOKEN_KEYWORD_EXECUTE,
@@ -1733,6 +1737,7 @@ public:
       TOKEN_KEYWORD_OUTFILE,
       TOKEN_KEYWORD_OVER,
       TOKEN_KEYWORD_OVERLAPS,
+      TOKEN_KEYWORD_PACKAGE,
       TOKEN_KEYWORD_PAGER,
       TOKEN_KEYWORD_PARTIAL,
       TOKEN_KEYWORD_PARTITION,
@@ -2161,6 +2166,7 @@ public:
     TOKEN_KEYWORD_HELP_IN_CLIENT,
     TOKEN_KEYWORD_DO_LUA,
     TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT,
+    TOKEN_KEYWORD_END_IN_CREATE_STATEMENT,
     TOKEN_TYPE_DELIMITER
   };
 
@@ -2243,6 +2249,7 @@ enum {
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION,
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_VARIABLE,
+    TOKEN_REFTYPE_DATABASE_OR_PACKAGE,
     TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
     TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,
     TOKEN_REFTYPE_DATABASE_OR_TABLE,
@@ -2271,6 +2278,7 @@ enum {
     TOKEN_REFTYPE_LABEL_DEFINE,
     TOKEN_REFTYPE_LABEL_REFER,
     TOKEN_REFTYPE_LENGTH,
+    TOKEN_REFTYPE_PACKAGE,
     TOKEN_REFTYPE_PARAMETER_DEFINE,
     TOKEN_REFTYPE_PARAMETER_REFER,
     TOKEN_REFTYPE_PARSER,
@@ -2311,7 +2319,7 @@ enum {
     TOKEN_REFTYPE_WRAPPER,
     TOKEN_REFTYPE_MAX
     /*
-      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 88);".
+      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 90);".
       If it blows, that means you changed the above enum list.
       Which is okay, but before you change the assert, make sure
       reftypewords list corresponds to the enum list!
