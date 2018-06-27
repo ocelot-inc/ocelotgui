@@ -4943,7 +4943,7 @@ void MainWindow::hparse_f_alter_or_create_event(int statement_type)
   if (hparse_errno > 0) return;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DO") == 1)
   {
-    hparse_f_block(TOKEN_KEYWORD_EVENT, hparse_i);
+    hparse_f_block(TOKEN_KEYWORD_EVENT, hparse_i, 0);
     if (hparse_errno > 0) return;
   }
   else if (statement_type == TOKEN_KEYWORD_CREATE) hparse_f_error();
@@ -4985,6 +4985,118 @@ void MainWindow::hparse_f_create_database()
     }
   }
 }
+
+/*
+  We've seen CREATE PACKAGE [BODY] ... IS|AS with FLAG_VERSION_PLSQL.
+  Expect procedure|function declarations and|or definitions.
+  Problem: hparse_f_block() calls hparse_f_semicolon_and_or_delimiter(),
+           due to a kludge. This will eat the ";", so the do-loop ends.
+           We could try to stop the kludge by passing a flag to
+           hparse_f_block(). But we chose to kludge to negate the kludge
+           by saying: if last-accepted was ; then continue.
+*/
+void MainWindow::hparse_f_create_package(bool is_body)
+{
+  int i_of_start_of_create_package= hparse_i;
+  bool is_end_seen= false;
+  int first_word= 0;
+  if (is_body) first_word= hparse_f_declare_plsql(TOKEN_KEYWORD_PACKAGE);
+  if (hparse_errno > 0) return;
+  for (;;)
+  {
+    if ((first_word == TOKEN_KEYWORD_FUNCTION)
+     || ((first_word == 0)
+      && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FUNCTION, "FUNCTION") == 1)))
+    {
+      if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_FUNCTION, TOKEN_REFTYPE_FUNCTION) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+      hparse_f_create_function_clauses();
+      if (hparse_errno > 0) return;
+      if (is_body)
+      {
+        hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i, 0);
+        if (hparse_errno > 0) return;
+      }
+      first_word= 0;
+    }
+    else if ((first_word == TOKEN_KEYWORD_PROCEDURE)
+          || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PROCEDURE, "PROCEDURE") == 1))
+    {
+      hparse_f_create_procedure_clauses();
+      if (hparse_errno > 0) return;
+      if (is_body)
+      {
+        hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i, 0);
+        if (hparse_errno > 0) return;
+      }
+      first_word= 0;
+    }
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END_IN_CREATE_STATEMENT, "END") == 1)
+    {
+      is_end_seen= true;
+      break;
+    }
+    else if (hparse_token.toUpper() == "BEGIN")
+    {
+      hparse_f_block(TOKEN_KEYWORD_PROCEDURE, i_of_start_of_create_package, TOKEN_KEYWORD_PACKAGE);
+      is_end_seen= true;
+      break;
+    }
+    else
+    {
+      /* Guaranteed to fail */
+      hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN, "BEGIN");
+      hparse_f_error();
+    }
+    if (hparse_errno > 0) return;
+
+    if (is_body)
+    {
+      QString last_accepted= hparse_text_copy.mid(main_token_offsets[hparse_i_of_last_accepted], main_token_lengths[hparse_i_of_last_accepted]);
+      if (last_accepted == ";") continue;
+    }
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";")) continue;
+    break;
+  }
+  if (is_end_seen == false) hparse_f_error();
+  /* This kludge occurs more than once. */
+//  if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
+//  {
+//    {
+//      if (hparse_f_semicolon_and_or_delimiter(TOKEN_KEYWORD_PROCEDURE) == 0)
+//      {
+//        hparse_f_error();
+//      }
+//    }
+//  }
+
+}
+
+void MainWindow::hparse_f_create_function_clauses()
+{
+  hparse_f_parameter_list(TOKEN_KEYWORD_FUNCTION);
+  if (hparse_errno > 0) return;
+  if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RETURN");
+  else
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RETURNS");
+  if (hparse_errno > 0) return;
+  if (hparse_f_data_type(TOKEN_KEYWORD_RETURNS) == -1) hparse_f_error();
+  if (hparse_errno > 0) return;
+  hparse_f_characteristics();
+  if (hparse_errno > 0) return;
+}
+
+void MainWindow::hparse_f_create_procedure_clauses()
+{
+  if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_PROCEDURE, TOKEN_REFTYPE_PROCEDURE) == 0) hparse_f_error();
+  if (hparse_errno > 0) return;
+  hparse_f_parameter_list(TOKEN_KEYWORD_PROCEDURE);
+  if (hparse_errno > 0) return;
+  hparse_f_characteristics();
+  if (hparse_errno > 0) return;
+}
+
 
 /*
   During CREATE TABLE ... (..., PRIMARY|UNIQUE(...)) we know what
@@ -7284,7 +7396,7 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         hparse_f_create_function_clauses();
         if (hparse_errno > 0) return;
-        hparse_f_block(TOKEN_KEYWORD_FUNCTION, hparse_i);
+        hparse_f_block(TOKEN_KEYWORD_FUNCTION, hparse_i, 0);
         if (hparse_errno > 0) return;
       }
     }
@@ -7305,6 +7417,9 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else if (((hparse_flags & HPARSE_FLAG_PACKAGE) != 0) && (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PACKAGE") == 1))
     {
+      bool is_body= false;
+      if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BODY, "BODY") == 1)
+        is_body= true;
       hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_PACKAGE, TOKEN_REFTYPE_PACKAGE) == 0) hparse_f_error();
@@ -7313,30 +7428,7 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IS, "IS") == 0)
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS");
       if (hparse_errno > 0) return;
-      bool is_end_seen= false;
-      do
-      {
-        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FUNCTION, "FUNCTION") == 1)
-        {
-          if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_FUNCTION, TOKEN_REFTYPE_FUNCTION) == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-          hparse_f_create_function_clauses();
-          if (hparse_errno > 0) return;
-        }
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PROCEDURE, "PROCEDURE") == 1)
-        {
-          hparse_f_create_procedure_clauses();
-          if (hparse_errno > 0) return;
-        }
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END_IN_CREATE_STATEMENT, "END") == 1)
-        {
-          is_end_seen= true;
-          break;
-        }
-        else hparse_f_error();
-        if (hparse_errno > 0) return;
-      } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";"));
-      if (is_end_seen == false) hparse_f_error();
+      hparse_f_create_package(is_body);
       if (hparse_errno > 0) return;
     }
     else if (((hparse_flags & HPARSE_FLAG_ROUTINE) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PROCEDURE, "PROCEDURE") == 1))
@@ -7345,7 +7437,7 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_errno > 0) return;
       hparse_f_create_procedure_clauses();
       if (hparse_errno > 0) return;
-      hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i);
+      hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i, 0);
       if (hparse_errno > 0) return;
     }
     else if (((hparse_dbms_mask & (FLAG_VERSION_MARIADB_ALL | FLAG_VERSION_MYSQL_8_0)) != 0) && ((hparse_flags & HPARSE_FLAG_USER) != 0) && (hparse_f_accept(FLAG_VERSION_MARIADB_ALL | FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROLE, "ROLE") == 1))
@@ -7612,7 +7704,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       else
       {
-        hparse_f_block(TOKEN_KEYWORD_TRIGGER, hparse_i);
+        hparse_f_block(TOKEN_KEYWORD_TRIGGER, hparse_i, 0);
         if (hparse_errno > 0) return;
       }
     }
@@ -7846,6 +7938,7 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PACKAGE")))
     {
+      hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BODY, "BODY");
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF_IN_IF_EXISTS, "IF") == 1)
       {
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
@@ -9083,8 +9176,9 @@ void MainWindow::hparse_f_statement(int block_top)
         if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_FUNCTION, TOKEN_REFTYPE_FUNCTION) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      else if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PACKAGE") == 1)
+      else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PACKAGE") == 1)
       {
+        hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BODY, "BODY");
         if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_PACKAGE, TOKEN_REFTYPE_PACKAGE) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
@@ -9845,30 +9939,6 @@ void MainWindow::hparse_f_pseudo_statement(int block_top)
   }
 }
 
-void MainWindow::hparse_f_create_function_clauses()
-{
-  hparse_f_parameter_list(TOKEN_KEYWORD_FUNCTION);
-  if (hparse_errno > 0) return;
-  if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RETURN");
-  else
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RETURNS");
-  if (hparse_errno > 0) return;
-  if (hparse_f_data_type(TOKEN_KEYWORD_RETURNS) == -1) hparse_f_error();
-  if (hparse_errno > 0) return;
-  hparse_f_characteristics();
-  if (hparse_errno > 0) return;
-}
-
-void MainWindow::hparse_f_create_procedure_clauses()
-{
-  if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_PROCEDURE, TOKEN_REFTYPE_PROCEDURE) == 0) hparse_f_error();
-  if (hparse_errno > 0) return;
-  hparse_f_parameter_list(TOKEN_KEYWORD_PROCEDURE);
-  if (hparse_errno > 0) return;
-  hparse_f_characteristics();
-  if (hparse_errno > 0) return;
-}
 
 /*
   compound statement, or statement
@@ -9877,7 +9947,9 @@ void MainWindow::hparse_f_create_procedure_clauses()
         uncertain whether "if ... then ... procname; ..." is okay too.
         Luckily "v := funcname;" is something MariaDB can't handle.
 */
-void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
+void MainWindow::hparse_f_block(int calling_statement_type,
+                                int block_top,
+                                int outer_calling_statement_type)
 {
   if (hparse_errno > 0) return;
   hparse_subquery_is_allowed= false;
@@ -9948,7 +10020,6 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
   {
     next_is_semicolon_or_work= true;
   }
-
   //int hparse_i_of_start= hparse_i;
   if ((next_is_semicolon_or_work == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN, "BEGIN") == 1))
   {
@@ -9992,7 +10063,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     {
       for (;;)
       {
-        hparse_f_block(calling_statement_type, block_top);
+        hparse_f_block(calling_statement_type, block_top, 0);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
       }
@@ -10056,7 +10127,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       int break_word= 0;
       for (;;)
       {
-        hparse_f_block(calling_statement_type, block_top);
+        hparse_f_block(calling_statement_type, block_top, 0);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1)
         {
@@ -10081,7 +10152,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
       for (;;)
       {
-        hparse_f_block(calling_statement_type, block_top);
+        hparse_f_block(calling_statement_type, block_top, 0);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
       }
@@ -10135,7 +10206,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_errno > 0) return;
     for (;;)
     {
-      hparse_f_block(calling_statement_type, block_top);
+      hparse_f_block(calling_statement_type, block_top, 0);
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
@@ -10167,7 +10238,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       int break_word= 0;
       for (;;)
       {
-        hparse_f_block(calling_statement_type, block_top);
+        hparse_f_block(calling_statement_type, block_top, 0);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1)
         {
@@ -10197,7 +10268,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
       for (;;)
       {
-        hparse_f_block(calling_statement_type, block_top);
+        hparse_f_block(calling_statement_type, block_top, 0);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
       }
@@ -10217,7 +10288,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
-      hparse_f_block(calling_statement_type, block_top);
+      hparse_f_block(calling_statement_type, block_top, 0);
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
@@ -10235,7 +10306,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
-      hparse_f_block(calling_statement_type, block_top);
+      hparse_f_block(calling_statement_type, block_top, 0);
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNTIL") == 1) break;
     }
@@ -10347,7 +10418,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     for (;;)
     {
-      hparse_f_block(calling_statement_type, block_top);
+      hparse_f_block(calling_statement_type, block_top, 0);
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
@@ -10385,7 +10456,7 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
       if (hparse_errno > 0) return;
       hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_THEN, "THEN");
       if (hparse_errno > 0) return;
-      hparse_f_block(calling_statement_type, block_top);
+      hparse_f_block(calling_statement_type, block_top, 0);
       if (hparse_errno > 0) return;
     }
   }
@@ -10444,9 +10515,11 @@ void MainWindow::hparse_f_block(int calling_statement_type, int block_top)
     /* This kludge occurs more than once. */
     if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
     {
-      if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0)
       {
-        hparse_f_error();
+        if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0)
+        {
+          hparse_f_error();
+        }
       }
     }
     if (hparse_errno > 0) return;
@@ -10486,7 +10559,7 @@ void MainWindow::hparse_f_declare(int calling_statement_type, int block_top)
       }
       if (hparse_errno > 0) return;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-    hparse_f_block(calling_statement_type, block_top);
+    hparse_f_block(calling_statement_type, block_top, 0);
     return;
   }
   int identifier_count= 0;
@@ -10550,24 +10623,51 @@ void MainWindow::hparse_f_declare(int calling_statement_type, int block_top)
 }
 
 
-/* Oracle mode, variable declares. E.g.  DECLARE a INT; b VARCHAR(10); */
-void MainWindow::hparse_f_declare_plsql(int token_type)
+/*
+  Oracle mode, variable declares. E.g.  DECLARE a INT; b VARCHAR(10);
+  In compounds it's DECLARE variable-declares BEGIN
+  In routines it's IS|AS variable-declares AS BEGIN ...
+  In packages it's variable-declares PROCEDURE|FUNCTION ...
+  Regrettably, FUNCTION and END are not reserved words.
+*/
+int MainWindow::hparse_f_declare_plsql(int token_type)
 {
+  if (token_type == TOKEN_KEYWORD_PACKAGE)
+  {
+    for (;;)
+    {
+      if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_KEYWORD_FUNCTION, "FUNCTION") == 1)
+        return TOKEN_KEYWORD_FUNCTION;
+      else if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_KEYWORD_PROCEDURE, "PROCEDURE") == 1)
+        return TOKEN_KEYWORD_PROCEDURE;
+      else if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
+      {
+        if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1) hparse_f_error();
+        if (hparse_errno > 0) return -1;
+        hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
+        if (hparse_errno > 0) return -1;
+      }
+      else hparse_f_error();
+      if (hparse_errno > 0) return -1;
+    }
+  }
+  /* We won't reach here if token_type == TOKEN_KEYWORD_PACKAGE. */
   for (int i= 0;; ++i)
   {
     if ((i != 0) || (token_type == TOKEN_KEYWORD_AS))
     {
-      if (QString::compare(hparse_token, "BEGIN", Qt::CaseInsensitive) == 0) return;
+      if (QString::compare(hparse_token, "BEGIN", Qt::CaseInsensitive) == 0) return 0;
       /* guaranteed to fail */
       hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BEGIN");
     }
     hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
     if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1) hparse_f_error();
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
   }
+  return 0;
 }
 
 /*
@@ -11711,7 +11811,7 @@ void MainWindow::hparse_f_multi_block(QString text)
 #ifdef DBMS_MARIADB
     if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
     {
-      hparse_f_block(0, hparse_i);
+      hparse_f_block(0, hparse_i, 0);
     }
     else
 #endif

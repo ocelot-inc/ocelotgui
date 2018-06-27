@@ -645,8 +645,6 @@ public:
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
   void hparse_f_pseudo_statement(int);
-  void hparse_f_create_function_clauses();
-  void hparse_f_create_procedure_clauses();
   void hparse_f_is_global_or_persist(bool *,bool *);
   void hparse_f_assignment(int,int,bool,bool);
   void hparse_f_alter_table();
@@ -683,6 +681,9 @@ public:
   void hparse_f_require(int,bool,bool);
   void hparse_f_user_specification_list();
   void hparse_f_create_database();
+  void hparse_f_create_package(bool);
+  void hparse_f_create_function_clauses();
+  void hparse_f_create_procedure_clauses();
   int hparse_f_index_column_expecter();
   void hparse_f_index_columns(int,bool,bool,bool);
   void hparse_f_alter_or_create_view();
@@ -707,9 +708,9 @@ public:
   void hparse_f_window_spec(bool);
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
-  void hparse_f_block(int, int);
+  void hparse_f_block(int, int, int);
   void hparse_f_declare(int, int);
-  void hparse_f_declare_plsql(int);
+  int hparse_f_declare_plsql(int);
   int hparse_f_recover();
   void hparse_f_lua_blocklist(int,int);
   void hparse_f_lua_blockseries(int,int,bool);

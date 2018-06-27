@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: June 25 2018
+   Last modified: June 26 2018
 */
 
 /*
@@ -4718,6 +4718,11 @@ QFont MainWindow::get_font_from_style_sheet(QString style_string)
   Re: Don't bother with begin_count if PROCEDURE or FUNCTION or TRIGGER
       or EVENT hasn't been seen. But sometimes BEGIN or DECLARE can be
       starts of compound statements.
+  Re: package_executable_section_begin_seen. CREATE PACKAGE BODY can end
+      with END, or with BEGIN END. In the latter case we have too many
+      BEGINs because we count CREATE PACKAGE as equivalent to BEGIN.
+      So anything associated with this variable is an attempt to avoid
+      the miscount.
   Beware: insert into t8 values (5); prompt w (unlike mysql client we wait for ';' here)
   Beware: create procedure p () begin end// select 5//
   Beware: input might be a file dump, and statements might be long.
@@ -4744,6 +4749,8 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
     or next client statement? or next statement of any kind?
   */
   bool client_statement_seen= false;
+  bool create_package_seen= false;
+  bool package_executable_section_begin_seen= false;
   for (i= passed_main_token_number; main_token_lengths[i] != 0; ++i)
   {
     int token= main_token_types[i];
@@ -4883,6 +4890,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
             is_maybe_in_compound_statement= true; /* new */
             ++begin_count;       /* new */
             begin_seen= true; /* new */
+            create_package_seen= true;
           } /* new */
         }
       }
@@ -4958,12 +4966,24 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           ||  ((main_token_types[i] == TOKEN_KEYWORD_REPEAT) && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END)))
           ||  ((main_token_types[i] == TOKEN_KEYWORD_WHILE)  && ((i == i_of_first_non_comment_seen) || (main_token_types[i - 1] != TOKEN_KEYWORD_END))))
           {
+            if ((create_package_seen)
+             && (main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+             && (begin_count == 1))
+            {
+              int j= next_i(i, -1);
+              if ((main_token_types[j] != TOKEN_KEYWORD_AS)
+               && (main_token_types[j] != TOKEN_KEYWORD_IS))
+                package_executable_section_begin_seen= true;
+            }
             ++begin_count;
           }
           if ((main_token_types[i] == TOKEN_KEYWORD_END)
            || (main_token_types[i] == TOKEN_KEYWORD_END_IN_CREATE_STATEMENT)) /* new */
           {
             --begin_count;
+            if ((package_executable_section_begin_seen)
+             && (begin_count == 1))
+              --begin_count;
           }
         }
       }
