@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: June 26 2018
+   Last modified: June 27 2018
 */
 
 /*
@@ -487,7 +487,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   assert(MENU_FONT == 80); /* See kludge alert in ocelotgui.h Settings() */
 #endif
 
-  assert(TOKEN_REFTYPE_MAX == 90); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
+  assert(TOKEN_REFTYPE_MAX == 91); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
 
   /* Initialization */
 
@@ -12301,6 +12301,7 @@ struct reftypewords {
     {"", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ANY},
     {"alias-of-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ALIAS_OF_COLUMN},
     {"alias-of-table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ALIAS_OF_TABLE},
+    {"attribute ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_ATTRIBUTE},
     {"auto_increment ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_AUTO_INCREMENT},
     {"channel ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CHANNEL},
     {"character-set ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_CHARACTER_SET},

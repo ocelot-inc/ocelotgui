@@ -689,6 +689,7 @@ public:
   void hparse_f_alter_or_create_view();
   int hparse_f_analyze_or_optimize(int,int*);
   void hparse_f_call();
+  void hparse_f_call_arguments();
   void hparse_f_commit_or_rollback();
   int is_token_priv(int);
   void hparse_f_explain_or_describe(int);
@@ -708,10 +709,10 @@ public:
   void hparse_f_window_spec(bool);
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
-  void hparse_f_block(int, int, int);
+  void hparse_f_block(int, int);
   void hparse_f_declare(int, int);
   int hparse_f_declare_plsql(int);
-  int hparse_f_recover();
+  int hparse_f_recover_if_error(bool);
   void hparse_f_lua_blocklist(int,int);
   void hparse_f_lua_blockseries(int,int,bool);
   int hparse_f_lua_block(int,int,bool);
@@ -2230,6 +2231,7 @@ enum {
     TOKEN_REFTYPE_ANY,                 /* any kind, or it's irrelevant, or we don't care */
     TOKEN_REFTYPE_ALIAS_OF_COLUMN, /* or correlation */
     TOKEN_REFTYPE_ALIAS_OF_TABLE, /* or correlation */
+    TOKEN_REFTYPE_ATTRIBUTE,
     TOKEN_REFTYPE_AUTO_INCREMENT,
     TOKEN_REFTYPE_CHANNEL,
     TOKEN_REFTYPE_CHARACTER_SET,
@@ -2320,7 +2322,7 @@ enum {
     TOKEN_REFTYPE_WRAPPER,
     TOKEN_REFTYPE_MAX
     /*
-      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 90);".
+      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 91);".
       If it blows, that means you changed the above enum list.
       Which is okay, but before you change the assert, make sure
       reftypewords list corresponds to the enum list!
