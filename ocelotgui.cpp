@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: June 27 2018
+   Last modified: July 2 2018
 */
 
 /*
@@ -11206,7 +11206,7 @@ const keywords strvalues[]=
       {"QUIT", 0, 0, TOKEN_KEYWORD_QUIT}, /* Ocelot keyword */
       {"QUOTE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_QUOTE},
       {"RADIANS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RADIANS},
-      {"RAISE", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RAISE},
+      {"RAISE", FLAG_VERSION_PLSQL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RAISE},
       {"RAND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RAND},
       {"RANDOM", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RANDOM},
       {"RANDOMBLOB", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RANDOMBLOB},
@@ -17581,6 +17581,7 @@ QString debug_plugins;
 QString debug_session_sql_mode_original;
 QString debug_session_sql_mode_after_last_change;
 int debug_routine_list_size;
+bool is_plsql;
 
 /*
   When NEW_SETUP == 1, which is default since May 2018,
@@ -17999,6 +18000,50 @@ int MainWindow::setup_generate(int routine_number)
            main_token_lengths, main_token_offsets, main_token_max_count,
            (QChar*)"33333", 1, ocelot_delimiter_str, 1);
   tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
+
+  if (routine_sql_mode.contains("ORACLE",Qt::CaseInsensitive)) is_plsql= true;
+  else is_plsql= false;
+
+  /*
+    Workaround for a bug in MariaDB 10.3 / PLSQL.
+    If, before IS|AS|RETURN, you see (): remove () and try again.
+  */
+  if (is_plsql)
+  {
+    bool bug= false;
+    int offset1;
+    int offset2;
+    int i;
+    for (i= 0; main_token_lengths[i] != 0; ++i)
+    {
+      int token_type= main_token_types[i];
+      if ((token_type == TOKEN_KEYWORD_IS)
+       || (token_type == TOKEN_KEYWORD_AS)
+       || (token_type == TOKEN_KEYWORD_BEGIN)
+       || (token_type == TOKEN_KEYWORD_RETURN))
+        break;
+    }
+    for (int j= 0; j < i; ++j)
+    {
+      offset1= main_token_offsets[j];
+      offset2= main_token_offsets[j + 1];
+      QString token1= text.mid(offset1, main_token_lengths[j]);
+      QString token2= text.mid(offset2, main_token_lengths[j + 1]);
+      if ((token1 == "(") && (token2 == ")")) bug= true;
+    }
+    if (bug)
+    {
+      QString text_before_parentheses= text.mid(0, offset1 - 1);
+      QString text_after_parentheses= text.mid(offset2 - 1);
+      text= text_before_parentheses + "  " + text_after_parentheses;
+      tokenize(text.data(),
+               text.size(),
+               main_token_lengths, main_token_offsets, main_token_max_count,
+               (QChar*)"33333", 1, ocelot_delimiter_str, 1);
+      tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
+    }
+  }
+
   hparse_f_multi_block(text); /* recognizer */
   /* Todo: We only check hparse_errno. hparse_errno_count maybe > 0. */
   if (hparse_errno != 0)
@@ -18035,7 +18080,13 @@ int MainWindow::setup_generate(int routine_number)
     QString token;
     int j;
     for (j= i; main_token_lengths[j] != 0; ++j)
-    {
+    { 
+      if (is_plsql)
+      {
+        if ((main_token_types[j] == TOKEN_KEYWORD_AS)
+         || (main_token_types[j] == TOKEN_KEYWORD_IS))
+          break;
+      }
       if (main_token_types[j] == TOKEN_TYPE_OPERATOR)
       {
         token= text.mid(main_token_offsets[j], main_token_lengths[j]);
@@ -18083,14 +18134,7 @@ int MainWindow::setup_generate(int routine_number)
   if (setup_generate_statements(i,
                             text,
                             routine_number)) goto pop_and_return_error;
-  /*
-     "Generate: ender": Called from generate(). Was: generate_ender().
-     We call this for the last line of a routine.
-     We also change call stack (without calling this) for special handling of RETURN.
-     routine_exit() should cause "Delete From Call Stack" */
-  debug_v_g= debug_v_g
-             + "\nCALL xxxmdbug.routine_exit();" + debug_lf
-             + "END;" + debug_lf;
+  setup_generate_ender();
   /* Now you have a new CREATE statement in debug_v_g for a surrogate. */
   debug_routine_list_texts << debug_v_g;
   main_token_pop();
@@ -18191,14 +18235,29 @@ int MainWindow::setup_generate_starter(QString mysql_proc_db,
 {
   QString debug_v_generated_time= debug_xxxmdbug_timestamp;
   /* We will use the contents of xxxmdbug_comment to find surrogates, or to check version number. So do not change here! */
-  debug_v_g= debug_v_g + debug_lf + "BEGIN ";
-  debug_v_g= debug_v_g + debug_lf + "DECLARE xxxmdbug_comment VARCHAR(1000) DEFAULT";
+  if (is_plsql)
+  {
+    debug_v_g= debug_v_g + "xxxmdbug_5678 EXCEPTION;" + debug_lf;
+  }
+  else
+  {
+    debug_v_g= debug_v_g + debug_lf + "BEGIN ";
+    debug_v_g= debug_v_g + debug_lf + "DECLARE ";
+  }
+  debug_v_g= debug_v_g + "xxxmdbug_comment VARCHAR(1000) DEFAULT";
   debug_v_g= debug_v_g + debug_lf + "'Surrogate routine for `" + mysql_proc_db + "`.`" + p_routine_identifier + "`";
   debug_v_g= debug_v_g + debug_lf + "Generated by " + debug_xxxmdbug_debugger_name + " Version " + debug_xxxmdbug_debugger_version;
   debug_v_g= debug_v_g + debug_lf + "Generated on " + debug_v_generated_time + "';";
-  /* Handling the signal number */
-  debug_v_g= debug_v_g + debug_lf + "DECLARE EXIT HANDLER FOR " + QString::number(debug_xxxmdbug_signal_errno) + " BEGIN CALL xxxmdbug.routine_exit(); RESIGNAL; END;";
-  debug_v_g= debug_v_g + debug_lf + "DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN CALL xxxmdbug.routine_exit(); RESIGNAL; END;";
+  if (is_plsql)
+  {
+    debug_v_g= debug_v_g + debug_lf + "BEGIN " + debug_lf;
+  }
+  else
+  /* Handling the signal number. If plsql this will be done at the end. */
+  {
+    debug_v_g= debug_v_g + debug_lf + "DECLARE EXIT HANDLER FOR " + QString::number(debug_xxxmdbug_signal_errno) + " BEGIN CALL xxxmdbug.routine_exit(); RESIGNAL; END;";
+    debug_v_g= debug_v_g + debug_lf + "DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN CALL xxxmdbug.routine_exit(); RESIGNAL; END;";
+  }
   /* "call routine_entry(variable-list,command-list)". includes "Insert Into Call stack". */
   debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.routine_entry("
                   + "'`" + mysql_proc_db + "`',"
@@ -18220,6 +18279,27 @@ int MainWindow::setup_generate_starter(QString mysql_proc_db,
   return 0;
 }
 
+/*
+   "Generate: ender": Called from generate(). Was: generate_ender().
+   We call this for the last line of a routine.
+   We also change call stack (without calling this) for special handling of RETURN.
+   routine_exit() should cause "Delete From Call Stack" */
+void MainWindow::setup_generate_ender()
+{
+  debug_v_g= debug_v_g
+           + "\nCALL xxxmdbug.routine_exit();" + debug_lf;
+  /* Handling the signal number. If sql/psm this was done at the start. */
+  /* Todo: Don't generate "EXCEPTION " if EXCEPTION statement exists. */
+  if (is_plsql)
+  {
+    debug_v_g= debug_v_g
+           + "EXCEPTION "
+           + "WHEN xxxmdbug_5678 THEN BEGIN RAISE xxxmdbug_5678; END;"
+           + debug_lf;
+  }
+  debug_v_g= debug_v_g
+          + "END;" + debug_lf;
+}
 
 /*
   Find statements and generate for them.
@@ -18957,14 +19037,14 @@ int MainWindow::setup_generate_icc_process_user_command_r_server_variables()
   debug_routine_list_schemas << "xxxmdbug";
   debug_routine_list_names << "";
   debug_routine_list_types << "PROCEDURE";
-  debug_routine_list_sql_modes << debug_session_sql_mode_original;
+  debug_routine_list_sql_modes << "";
   debug_routine_list_surrogates << v_g_surrogate_routine_identifier;
   debug_routine_list_texts << v_g;
 
   debug_routine_list_schemas << "xxxmdbug";
   debug_routine_list_names << "";
   debug_routine_list_types << "PROCEDURE";
-  debug_routine_list_sql_modes << debug_session_sql_mode_original;
+  debug_routine_list_sql_modes << "";
   debug_routine_list_surrogates << v_g_2_surrogate_routine_identifier;
   debug_routine_list_texts << v_g_2;
   return 0;
@@ -19132,7 +19212,7 @@ int MainWindow::setup_generate_icc_core()
   debug_routine_list_schemas << "xxxmdbug";
   debug_routine_list_names << debug_xxxmdbug_icc_core_surrogate_name;
   debug_routine_list_types << "PROCEDURE";
-  debug_routine_list_sql_modes << debug_session_sql_mode_original;
+  debug_routine_list_sql_modes << "";
   debug_routine_list_surrogates << debug_xxxmdbug_icc_core_surrogate_name;
   debug_routine_list_texts << v_g;
 
@@ -19151,9 +19231,14 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
   debug_v_g= debug_v_g + "IF xxxmdbug.is_debuggee_and_is_attached()=1 THEN " + debug_lf;
   /* inner_loop: generate 'xxxmdbug_inner_loop_x: LOOP' */
   QString inner_loop_label= "xxxmdbug_inner_loop_label_" + QString::number(v_statement_number_within_routine);
-  debug_v_g= debug_v_g
-          + inner_loop_label
-          + ": LOOP" + debug_lf;
+  if (is_plsql)
+    debug_v_g= debug_v_g
+            + "<<" + inner_loop_label + ">> "
+            + "LOOP" + debug_lf;
+  else
+    debug_v_g= debug_v_g
+            + inner_loop_label
+            + ": LOOP" + debug_lf;
 //  /* Save @@warning_count. */
 //  int v_verb= i; /* == token_number_of_first_token?? */
 //  /* TODO: Find out previous_statement_type */
@@ -19224,7 +19309,11 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
   /* inner_loop: 'SET' and 'EXECUTE' might change variables that we're watching.
      So if they happened, go back and copy the variables again.
      Todo: think: should this happen after non-debuggable statements too? */
-  debug_v_g= debug_v_g + "IF @xxxmdbug_breakpoint_check_result>0 AND (@xxxmdbug_token_value_1 = 'set' OR @xxxmdbug_token_value_1 = 'execute') THEN ITERATE "
+  QString iterate;
+  if (is_plsql) iterate= "CONTINUE ";
+  else iterate= "ITERATE ";
+  debug_v_g= debug_v_g + "IF @xxxmdbug_breakpoint_check_result>0 AND (@xxxmdbug_token_value_1 = 'set' OR @xxxmdbug_token_value_1 = 'execute') THEN "
+             + iterate
              + inner_loop_label
              + "; END IF;" + debug_lf;
   /* Check @@warning_count. */
@@ -19270,6 +19359,9 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
       break;
     }
   }
+  QString leave;
+  if (is_plsql) leave= "EXIT ";
+  else leave= "LEAVE ";
   if (is_leave_possible == true)
   {
     if (debug_label_list.count() == 0) /* pseudo-assert */
@@ -19277,18 +19369,22 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
       debug_error((char*)"debug_label_list.count() == 0");
       return 1;
     }
-    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN LEAVE "
+    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN "
+             + "GOTO "
              + debug_label_list.at(debug_label_list.count() - 1)
+             + "_E"
              + "; END IF;" + debug_lf;
   }
   else
   {
-    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN LEAVE "
+    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN "
+             + leave
              + inner_loop_label
              + "; END IF;" + debug_lf;
   }
   /* inner_loop: by leaving inner_loop before doing the instruction, we "skip over" it */
-  debug_v_g= debug_v_g + "IF @xxxmdbug_token_value_1 = 'skip' THEN LEAVE "
+  debug_v_g= debug_v_g + "IF @xxxmdbug_token_value_1 = 'skip' THEN "
+           + leave
            + inner_loop_label
            + "; END IF;" + debug_lf;
   /* If the original routine contained only one statement which was not compound and which
@@ -19356,7 +19452,8 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
   /* generate 'update statements_executed' */
   debug_v_g= debug_v_g + debug_lf + "CALL xxxmdbug.update_statements_executed(0);";
   /* inner_loop: leave the loop after doing the original statement once */
-  debug_v_g= debug_v_g + debug_lf + "LEAVE "
+  debug_v_g= debug_v_g + debug_lf
+          + leave
           + inner_loop_label
           + ";" + debug_lf;
   /* inner loop: ends */
@@ -19367,6 +19464,18 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
   if (setup_generate_statement_text_as_is(i_of_statement_start, text, v_token_number_of_last_token)) return 1;
   //"      SET debug_v_g = CONCAT(debug_v_g,v_statement_end_character);"
   debug_v_g= debug_v_g + debug_lf + "END IF;";
+  /* in plsql LEAVE x won't work if x is a label before a BEGIN,
+     so we put a label at the end that for which we can say GOTO */
+  if (is_plsql)
+  {
+    debug_v_g= debug_v_g
+            + "<<"
+            + debug_label_list.at(debug_label_list.count() - 1)
+            + "_E"
+            + ">>"
+            + " NULL;"
+            + debug_lf;
+  }
   return 0;
 }
 
@@ -19405,7 +19514,11 @@ int MainWindow::setup_generate_label(int i_of_start_of_statement, QString text, 
     {
       v_label= " xxxmdbug_label_" + QString::number(v_statement_number);
       /* the ' ' is necessary if the while/loop/begin/repeat is not at start of line */
-      debug_v_g= debug_v_g + " " + v_label + ":" + debug_lf;
+      if (is_plsql)
+        debug_v_g= debug_v_g + " <<" + v_label + ">>";
+      else
+        debug_v_g= debug_v_g + " " + v_label + ":";
+      debug_v_g= debug_v_g + debug_lf;
     }
     debug_label_list << v_label;
   }

@@ -710,9 +710,10 @@ public:
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
+  int hparse_f_plsql_condition(int);
   void hparse_f_declare(int, int);
   int hparse_f_declare_plsql(int);
-  int hparse_f_recover_if_error(bool);
+  int hparse_f_recover_if_error(bool,QString);
   void hparse_f_lua_blocklist(int,int);
   void hparse_f_lua_blockseries(int,int,bool);
   int hparse_f_lua_block(int,int,bool);
@@ -944,6 +945,7 @@ private:
   int setup_append(QString, QString, int);
   int setup_generate_routine_entry_parameter(QString);
   int setup_generate_starter(QString, QString, QString, QString);
+  void setup_generate_ender();
   int setup_generate_statements(int, QString, int);
   int setup_initialize_variables();
   int setup_get_setup_group_name();

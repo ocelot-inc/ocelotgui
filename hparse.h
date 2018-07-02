@@ -10033,7 +10033,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
           hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS");
         if (hparse_errno > 0) return;
         hparse_f_declare_plsql(TOKEN_KEYWORD_AS);
-        if (hparse_f_recover_if_error(true) == 2) return;
+        if (hparse_f_recover_if_error(true, "") == 2) return;
       }
     }
   }
@@ -10042,7 +10042,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
   if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECLARE, "DECLARE") == 1)
   {
     hparse_f_declare_plsql(TOKEN_KEYWORD_DECLARE);
-    if (hparse_f_recover_if_error(true) == 2) return;
+    if (hparse_f_recover_if_error(true, "") == 2) return;
   }
 
   /*
@@ -10116,7 +10116,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       {
         main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DECLARE;
         hparse_f_declare(calling_statement_type, block_top);
-        if (hparse_f_recover_if_error(true) == 2) return;
+        if (hparse_f_recover_if_error(true, "") == 2) return;
       }
       else break;
     }
@@ -10183,7 +10183,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       hparse_subquery_is_allowed= true;
       hparse_f_opr_1(0, 0);
       hparse_subquery_is_allowed= false;
-      if (hparse_errno > 0) return;
+      if (hparse_f_recover_if_error(false, "THEN") == 2) return;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "THEN");
       if (hparse_errno > 0) return;
       int break_word= 0;
@@ -10264,6 +10264,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
         if (hparse_errno > 0) return;
       }
     }
+    if (hparse_f_recover_if_error(false, do_or_loop) == 2) return;
     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO, do_or_loop);
     if (hparse_errno > 0) return;
     for (;;)
@@ -10293,7 +10294,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       hparse_subquery_is_allowed= true;
       hparse_f_opr_1(0, 0);
       hparse_subquery_is_allowed= false;
-      if (hparse_errno > 0) return;
+      if (hparse_f_recover_if_error(false, "THEN") == 2) return;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "THEN");
       if (hparse_errno > 0) return;
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
@@ -10399,25 +10400,25 @@ void MainWindow::hparse_f_block(int calling_statement_type,
      || (hparse_statement_type == TOKEN_KEYWORD_EXIT))
     {
       hparse_f_find_define(block_top, TOKEN_REFTYPE_LABEL_DEFINE, TOKEN_REFTYPE_LABEL_REFER, false);
-      if (hparse_f_recover_if_error(false) == 2) return;
+      if (hparse_f_recover_if_error(false, "") == 2) return;
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1)
       {
         hparse_f_opr_1(hparse_statement_type, 0);
-        if (hparse_f_recover_if_error(false) == 2) return;
+        if (hparse_f_recover_if_error(false, "") == 2) return;
       }
     }
     else hparse_f_find_define(block_top, TOKEN_REFTYPE_LABEL_DEFINE, TOKEN_REFTYPE_LABEL_REFER, true);
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
-    if (hparse_f_recover_if_error(true) == 2) return;
+    if (hparse_f_recover_if_error(true, "") == 2) return;
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLOSE, "CLOSE") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
-    if (hparse_f_recover_if_error(true) == 2) return;
+    if (hparse_f_recover_if_error(true, "") == 2) return;
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FETCH, "FETCH") == 1))
   {
@@ -10425,13 +10426,13 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NEXT") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
-      if (hparse_f_recover_if_error(false) == 2) return;
+      if (hparse_f_recover_if_error(false, "") == 2) return;
     }
     else hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
     hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
     do
     {
@@ -10444,22 +10445,30 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, reftype,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) break;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
-    if (hparse_f_recover_if_error(true) == 2) return;
+    if (hparse_f_recover_if_error(true, "") == 2) return;
   }
   else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OPEN, "OPEN") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
     {
       hparse_f_call_arguments();
     }
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
-    if (hparse_f_recover_if_error(true) == 2) return;
+    if (hparse_f_recover_if_error(true, "") == 2) return;
+  }
+  else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RAISE, "RAISE") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
+    hparse_f_plsql_condition(block_top);
+    if (hparse_errno > 0) return;
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
+    if (hparse_f_recover_if_error(true, "") == 2) return;
   }
   else if (((calling_statement_type == TOKEN_KEYWORD_FUNCTION)
            || ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0))
@@ -10470,10 +10479,10 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     if (calling_statement_type == TOKEN_KEYWORD_FUNCTION)
     {
       hparse_f_opr_1(0, 0);
-      if (hparse_f_recover_if_error(false) == 2) return;
+      if (hparse_f_recover_if_error(false, "") == 2) return;
     }
     if (hparse_f_semicolon_and_or_delimiter(calling_statement_type) == 0) hparse_f_error();
-    if (hparse_f_recover_if_error(true) == 2) return;
+    if (hparse_f_recover_if_error(true, "") == 2) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHILE, "WHILE") == 1)
   {
@@ -10484,7 +10493,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0, 0);
     hparse_subquery_is_allowed= false;
-    if (hparse_errno > 0) return;
+    if (hparse_f_recover_if_error(false, do_or_loop)) return;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DO, do_or_loop);
     if (hparse_errno > 0) return;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
@@ -10519,13 +10528,8 @@ void MainWindow::hparse_f_block(int calling_statement_type,
         break;
       }
       ++when_count;
-      if ((hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_KEYWORD, "DUP_VAL_ON_INDEX") == 1)
-       || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_KEYWORD, "NO_DATA_FOUND") == 1)
-       || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_KEYWORD, "OTHERS") == 1)
-       || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_KEYWORD, "TOO_MANY_ROWS") == 1))
-        {;}
-      else hparse_f_error();
-      if (hparse_errno > 0) return;
+      if (hparse_f_plsql_condition(block_top) == 0) hparse_f_error();
+      if (hparse_f_recover_if_error(false, "THEN") == 2) return;
       hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_THEN, "THEN");
       if (hparse_errno > 0) return;
       hparse_f_block(calling_statement_type, block_top);
@@ -10543,6 +10547,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1)
       {
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
         is_statement_done= true;
       }
       else
@@ -10580,7 +10585,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       if (hparse_errno > 0) is_statement_done= true;
     }
     if (is_statement_done == false) hparse_f_statement(block_top);
-    if (hparse_f_recover_if_error(false) == 2) return;
+    if (hparse_f_recover_if_error(false, "") == 2) return;
     /* This kludge occurs more than once. */
     if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
     {
@@ -10594,6 +10599,22 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     if (hparse_errno > 0) return;
     return;
   }
+}
+
+/* Todo: it's a shame we must say "identifier" when we know it's keyword */
+int MainWindow::hparse_f_plsql_condition(int block_top)
+{
+  if ((hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_IDENTIFIER, "DUP_VAL_ON_INDEX") == 1)
+   || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_IDENTIFIER, "NO_DATA_FOUND") == 1)
+   || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_IDENTIFIER, "INVALID_CURSOR") == 1)
+   || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_IDENTIFIER, "OTHERS") == 1)
+   || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CONDITION_REFER,TOKEN_TYPE_IDENTIFIER, "TOO_MANY_ROWS") == 1))
+  {
+    return main_token_types[hparse_i_of_last_accepted];
+  }
+  if (hparse_f_find_define(block_top,TOKEN_REFTYPE_CONDITION_DEFINE, TOKEN_REFTYPE_CONDITION_REFER, false) == 1)
+    return TOKEN_TYPE_IDENTIFIER;
+  return 0;
 }
 
 void MainWindow::hparse_f_declare(int calling_statement_type, int block_top)
@@ -10725,7 +10746,8 @@ int MainWindow::hparse_f_declare_plsql(int token_type)
     }
   }
   /* We won't reach here if token_type == TOKEN_KEYWORD_PACKAGE. */
-  for (int i= 0;; ++i)
+  int i;
+  for (i= 0;; ++i)
   {
     if ((i != 0) || (token_type == TOKEN_KEYWORD_AS))
     {
@@ -10736,42 +10758,53 @@ int MainWindow::hparse_f_declare_plsql(int token_type)
     if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURSOR") == 1)
     {
       hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_CURSOR_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
+      if (hparse_errno > 0) goto e;
       hparse_f_parameter_list(TOKEN_KEYWORD_CURSOR);
-      if (hparse_errno > 0) return 0;
+      if (hparse_errno > 0) goto e;
       if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IS") == 0)
         hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
-      if (hparse_errno > 0) return 0;
+      if (hparse_errno > 0) goto e;
       if (hparse_f_select(false, false, false) == 0)
       {
         hparse_f_error();
-        return 0;
+        goto e;
       }
     }
     else
     {
       hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return 0;
-      if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1)
+      if (hparse_errno > 0) goto e;
+      int prev_i_of_last_accepted= hparse_i_of_last_accepted;
+      if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXCEPTION, "EXCEPTION") == 1)
       {
-        if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0)
-          hparse_f_error();
-        if (hparse_errno > 0) return 0;
-        /* What Oracle calls an "attribute" indicator */
-        hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "%");
-        if (hparse_errno > 0) return 0;
-        if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ATTRIBUTE,TOKEN_TYPE_KEYWORD, "TYPE") == 0)
-          hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ATTRIBUTE,TOKEN_TYPE_KEYWORD, "ROWTYPE");
-        if (hparse_errno > 0) return 0;
-        main_token_types[hparse_i_of_last_accepted]= TOKEN_TYPE_IDENTIFIER;
+        main_token_reftypes[prev_i_of_last_accepted]= TOKEN_REFTYPE_CONDITION_DEFINE;
       }
-      if (hparse_errno > 0) return 0;
-      if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=") == 1)
+      else
       {
-        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error(); /* todo: must it really be a literal? */
-        if (hparse_errno > 0) return 0;
+        if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1)
+        {
+          if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0)
+            hparse_f_error();
+          if (hparse_errno > 0) goto e;
+          /* What Oracle calls an "attribute" indicator */
+          hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "%");
+          if (hparse_errno > 0) goto e;
+          if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ATTRIBUTE,TOKEN_TYPE_KEYWORD, "TYPE") == 0)
+            hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ATTRIBUTE,TOKEN_TYPE_KEYWORD, "ROWTYPE");
+          if (hparse_errno > 0) goto e;
+          main_token_types[hparse_i_of_last_accepted]= TOKEN_TYPE_IDENTIFIER;
+        }
+        if (hparse_errno > 0) goto e;
+        if ((hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT") == 1))
+        {
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error(); /* todo: must it really be a literal? */
+          if (hparse_errno > 0) goto e;
+        }
       }
     }
+e:  if (hparse_errno > 0)
+      if (hparse_f_recover_if_error(false, "AS") == 2) return 0;
     hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return 0;
   }
@@ -10788,6 +10821,7 @@ int MainWindow::hparse_f_declare_plsql(int token_type)
   hparse_f_recover_if_error() and proceed. In hparse_f_recover_if_error()
   we skip ahead to the next ";" (or next delimiter) and carry on.
   (We don't carry on if hparse_f_recover_if_error() returns 2, though.)
+  (Semicolon is always a stopper, we might pass an extra one e.g. THEN.)
   Todo: There are other spots inside hparse_f_block() where we could try
         to recover: e.g. in ITERATE or RETURN statements. But failure to
         see "END" is not recoverable.
@@ -10817,15 +10851,19 @@ int MainWindow::hparse_f_declare_plsql(int token_type)
   Todo: ideally we could have recoveries inside individual statements
   Warning: We can get an error at ";" because it comes too early.
            To avoid an ugly loop where we never move past the ";",
-           call with eat_the_semicolon == true if you were expecting
+           call with eat_the_stopper == true if you were expecting
            to eat a semicolon anyway.
            We should try to think of a real solution.
   Todo: If you are calling from inside a loop, you will never get
-           out of the loop. That's why we should have a comparison whether
-           we've called twice with the same hparse_i value.
-           We should return 2 if it happens.
+        out of the loop. That's why we should have a comparison whether
+        we've called twice with the same hparse_i value.
+        We should return 2 if it happens.
+  Todo: The extra stopper might not really end the phrase:
+        THEN might be in a CASE expression, DO might be a variable,
+        IS might be part of IS NULL within a subquery.
+        I'm hoping that's rare, but we could try to catch the rare stuff.
 */
-int MainWindow::hparse_f_recover_if_error(bool eat_the_semicolon)
+int MainWindow::hparse_f_recover_if_error(bool eat_the_stopper, QString extra_stopper)
 {
   if (hparse_errno == 0) return 0;
   QString token;
@@ -10836,6 +10874,7 @@ int MainWindow::hparse_f_recover_if_error(bool eat_the_semicolon)
     token= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
     {
       if ((token == ";")
+       || ((extra_stopper != "") && (token.toUpper() == extra_stopper))
        || (token.toUpper() == "\\G")
        || (token == hparse_delimiter_str))
         break;
@@ -10847,9 +10886,12 @@ int MainWindow::hparse_f_recover_if_error(bool eat_the_semicolon)
   hparse_i= i - 1;
   hparse_token= hparse_prev_token= "";
   hparse_f_nexttoken(); /* so we're pointing at ";" again, I hope */
-  if (eat_the_semicolon)
+  if (eat_the_stopper)
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
+    if ((extra_stopper != "") && (token.toUpper() == extra_stopper))
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, extra_stopper);
+    else
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     /* a failure would mean we hit a delimiter which is not ; */
     if (hparse_errno > 0) return 2;
   }
