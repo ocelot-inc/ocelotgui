@@ -18284,8 +18284,12 @@ int MainWindow::setup_generate_starter(QString mysql_proc_db,
    We call this for the last line of a routine.
    We also change call stack (without calling this) for special handling of RETURN.
    routine_exit() should cause "Delete From Call Stack" */
+/* in plsql LEAVE x won't work if x is a label before a BEGIN,
+   so we put a label at the end for which we can say GOTO */
 void MainWindow::setup_generate_ender()
 {
+  if (is_plsql)
+    debug_v_g= debug_v_g + "<<xxxmdbug_routine_exit>>";
   debug_v_g= debug_v_g
            + "\nCALL xxxmdbug.routine_exit();" + debug_lf;
   /* Handling the signal number. If sql/psm this was done at the start. */
@@ -18305,6 +18309,8 @@ void MainWindow::setup_generate_ender()
   Find statements and generate for them.
   Beware, sometimes flow-control statements start with labels.
   Actually I think start_statement flag is on if it's label_define.
+  If i_end_of_parameters is at ")" then it won't be shown, but if it
+  is at "AS" (as happens with plsql) then it will be shown so ++count.
   Todo: some of the parameters can be calculated from routine_number.
 */
 int MainWindow::setup_generate_statements(int i,
@@ -18338,6 +18344,9 @@ int MainWindow::setup_generate_statements(int i,
         int k= main_token_offsets[i];
         QString s= QString::number(i) + "*" + text.mid(j, k - j);
         v_line_number_of_start_of_first_token= s.count(debug_lf);
+        int t= main_token_types[i_of_end_of_parameters];
+        if ((t == TOKEN_KEYWORD_AS) || (t == TOKEN_KEYWORD_IS))
+          ++v_line_number_of_start_of_first_token;
       }
       //v_character_number_of_start_of_first_token= main_token_offsets[i];
       for (int j= i + 1; ; ++j)
@@ -19342,7 +19351,9 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
     }
     if (main_token_flags[j] & TOKEN_FLAG_IS_START_STATEMENT)
     {
-      if ((main_token_types[j] == TOKEN_KEYWORD_BEGIN)
+      bool is_begin_ok= true;
+      if ((is_plsql) && (debug_label_list.count() != 1)) is_begin_ok= false;
+      if (((main_token_types[j] == TOKEN_KEYWORD_BEGIN) && (is_begin_ok))
        || (main_token_types[j] == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
        || (main_token_types[j] == TOKEN_KEYWORD_LOOP)
        || (main_token_types[j] == TOKEN_KEYWORD_REPEAT)
@@ -19369,10 +19380,18 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
       debug_error((char*)"debug_label_list.count() == 0");
       return 1;
     }
-    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN "
-             + "GOTO "
-             + debug_label_list.at(debug_label_list.count() - 1)
-             + "_E"
+    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN ";
+    if ((is_plsql) && (debug_label_list.count() == 1))
+    {
+      debug_v_g= debug_v_g +"GOTO xxxmdbug_routine_exit";
+    }
+    else
+    {
+      debug_v_g= debug_v_g
+             + "LEAVE "
+             + debug_label_list.at(debug_label_list.count() - 1);
+    }
+    debug_v_g= debug_v_g
              + "; END IF;" + debug_lf;
   }
   else
@@ -19464,18 +19483,6 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
   if (setup_generate_statement_text_as_is(i_of_statement_start, text, v_token_number_of_last_token)) return 1;
   //"      SET debug_v_g = CONCAT(debug_v_g,v_statement_end_character);"
   debug_v_g= debug_v_g + debug_lf + "END IF;";
-  /* in plsql LEAVE x won't work if x is a label before a BEGIN,
-     so we put a label at the end that for which we can say GOTO */
-  if (is_plsql)
-  {
-    debug_v_g= debug_v_g
-            + "<<"
-            + debug_label_list.at(debug_label_list.count() - 1)
-            + "_E"
-            + ">>"
-            + " NULL;"
-            + debug_lf;
-  }
   return 0;
 }
 

@@ -10563,7 +10563,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
           int reftype= main_token_reftypes[hparse_i_of_last_accepted];
           if (reftype == TOKEN_REFTYPE_VARIABLE_REFER)
           {
-            /* todo: flag is_start_statement etc.? */
+            main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
             /* todo: check if hparse_f_assignment is better? */
             hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=");
             /* delay check if (hparse_errno > 0) return; */
