@@ -1202,6 +1202,7 @@ public:
   #define TOKEN_FLAG_IS_FLOW_CONTROL 16384
   #define TOKEN_FLAG_IS_DEBUGGABLE 32768
   #define TOKEN_FLAG_IS_DECLARE 65536
+  #define TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON 131072
 
   enum {                                      /* possible returns from token_type() */
     TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */

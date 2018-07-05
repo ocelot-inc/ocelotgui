@@ -1309,16 +1309,32 @@ bool MainWindow::is_statement_complete(QString text)
       if (q != " ") break;
     }
   }
+
   /* if create-routine && count-of-ENDs == count-of-BEGINS then ; is the end else ; is not the end */
   if (ocelot_delimiter_str != ";") returned_begin_count= 0;
   else
   {
-    get_next_statement_in_string(0, &returned_begin_count, false);
+    int token_count= get_next_statement_in_string(0, &returned_begin_count, false);
     if (returned_begin_count == 0)
     {
       if (QString::compare(last_token, ";", Qt::CaseInsensitive) == 0)
       {
-        return true;
+        /* Warning: this only works if we've gone through hparse */
+        /* plsql routines might have var|cursor|condition before begin */
+        if ((main_token_flags[token_count - 1] & TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON) != 0)
+        {
+          for (int k= token_count - 1;;--k)
+          {
+            if (main_token_types[k] == TOKEN_KEYWORD_BEGIN) break;
+            if (k == 0)
+            {
+              /* saw no begin but flag counts as a begin */
+              ++returned_begin_count;
+              break;
+            }
+          }
+        }
+        if (returned_begin_count == 0) return true;
       }
       if (QString::compare(last_token, "G", Qt::CaseInsensitive) == 0)
       {

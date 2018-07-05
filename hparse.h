@@ -2757,6 +2757,8 @@ void MainWindow::hparse_f_parameter_list(int routine_type)
     {
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") != 1)
         return;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")") == 1)
+        return;
       do
       {
         hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_PARAMETER_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -10807,6 +10809,8 @@ e:  if (hparse_errno > 0)
       if (hparse_f_recover_if_error(false, "AS") == 2) return 0;
     hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_errno > 0) return 0;
+    /* This flag is checked in is_statement_complete() */
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON;
   }
   return 0;
 }
