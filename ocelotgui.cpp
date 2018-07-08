@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: July 2 2018
+   Last modified: July 8 2018
 */
 
 /*
@@ -433,7 +433,9 @@
   static int hparse_next_token_type, hparse_next_next_token_type;
   static QString hparse_next_next_next_token, hparse_next_next_next_next_token;
   static int hparse_next_next_next_token_type, hparse_next_next_next_next_token_type;
-  static bool hparse_begin_seen;
+  static int hparse_begin_count;
+  static bool hparse_as_seen;
+  static bool hparse_create_trigger_seen;
   static int hparse_count_of_accepts;
   static int hparse_i_of_statement;
   static int hparse_i_of_last_accepted;

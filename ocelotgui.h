@@ -710,6 +710,7 @@ public:
   int hparse_f_order_by(int);
   void hparse_f_limit(int);
   void hparse_f_block(int, int);
+  bool hparse_f_is_in_compound();
   int hparse_f_plsql_condition(int);
   void hparse_f_declare(int, int);
   int hparse_f_declare_plsql(int);

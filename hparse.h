@@ -926,10 +926,17 @@ int MainWindow::hparse_f_accept_qualifier(unsigned short int flag_version, unsig
           fields of the row", which often depends on table lookup.
           Exception: in FOR i IN x .. y DO, i is not a row variable.
   Luckily row-variables and scalar-variables can't have same names.
-  Todo: Is there a quick way to check "are we in begin|end"?
+  Assume: If it's not within begin...end, or following is|as in plsql,
+          there can't have been any variable declarations, so jump
+          out fast if hparse_f_is_in_compound() is false.
+  Warning: in plsql we count sqlcode + sqlerrm as variables, but
+           main_token_pointers is 0 (if it was > 0 it would be a
+           shadowing declared variable). Maybe they're really system
+           variables, or functions that happen to lack ()s.
 */
 bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
 {
+  if (hparse_f_is_in_compound() == false) return false;
   int i_of_define;
   bool true_or_false= false;
   int saved_hparse_i= hparse_i;
@@ -980,6 +987,14 @@ bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
       else return true;
     }
   }
+  else
+  {
+    if (hparse_dbms_mask & FLAG_VERSION_PLSQL)
+    {
+      QString token= hparse_text_copy.mid(main_token_offsets[saved_hparse_i], main_token_lengths[saved_hparse_i]).toUpper();
+      if ((token == "SQLCODE") || (token == "SQLERRM")) return true;
+    }
+  }
   return true_or_false;
 }
 
@@ -1024,6 +1039,8 @@ bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
   then we aren't sure: it might be either column or server server variable.
   We change main_token_pointers[] if SET ...=...variable_name... so that
   get_sql_mode will know if SET sql_mode=ORACLE is to a variable or not.
+  Todo: We can call this while we're looking at an unqualified literal.
+        Probably it's harmless (slight time waste?), but make sure.
   Todo: The above table doesn't show effect of MariaDB 10.3 row.x vars.
   Todo: one too many kludges. rewrite?
   TODO: We need a different kind of accept() if "." follows:
@@ -1039,7 +1056,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
 {
   bool m= false;
   if (hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) m= true;
-
   if (v & f & s)
   {
     /* hparse_f_opd_18() passes true,true,true = anything goes,
@@ -1056,6 +1072,23 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
      || (hparse_statement_type == TOKEN_KEYWORD_LOAD)
      || (hparse_statement_type == TOKEN_KEYWORD_SELECT)) {;}
     else s= false;
+  }
+  /* plsql triggers can have new|old . column-name */
+  if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
+   && ((v) || (s))
+   && (hparse_create_trigger_seen))
+  {
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_OPERATOR, ":") == 1)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "NEW") == 0)
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "OLD");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return 0;
+      return 1;
+    }
   }
 
   if (m & v)
@@ -7772,7 +7805,9 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       else
       {
+        hparse_create_trigger_seen= true;
         hparse_f_block(TOKEN_KEYWORD_TRIGGER, hparse_i);
+        hparse_create_trigger_seen= false;
         if (hparse_errno > 0) return;
       }
     }
@@ -10034,6 +10069,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
         if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IS, "IS") == 0)
           hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS");
         if (hparse_errno > 0) return;
+        hparse_as_seen= true;
         hparse_f_declare_plsql(TOKEN_KEYWORD_AS);
         if (hparse_f_recover_if_error(true, "") == 2) return;
       }
@@ -10095,7 +10131,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_statement_type= TOKEN_KEYWORD_BEGIN;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
-    hparse_begin_seen= true;
+    ++hparse_begin_count;
     if (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ATOMIC, "ATOMIC");
@@ -10129,8 +10165,18 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       {
         hparse_f_block(calling_statement_type, block_top);
         if (hparse_errno > 0) return;
-        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1)
+        {
+          --hparse_begin_count;
+          if (hparse_begin_count == 0) hparse_as_seen= false;
+          break;
+        }
       }
+    }
+    else
+    {
+      --hparse_begin_count;
+      if (hparse_begin_count == 0) hparse_as_seen= false;
     }
     if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
      && (hparse_i_of_start == block_top))
@@ -10414,7 +10460,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_f_recover_if_error(true, "") == 2) return;
   }
-  else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLOSE, "CLOSE") == 1))
+  else if ((hparse_f_is_in_compound()) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CLOSE, "CLOSE") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
@@ -10422,7 +10468,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_f_recover_if_error(true, "") == 2) return;
   }
-  else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FETCH, "FETCH") == 1))
+  else if ((hparse_f_is_in_compound()) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FETCH, "FETCH") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NEXT") == 1)
@@ -10451,7 +10497,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_f_recover_if_error(true, "") == 2) return;
   }
-  else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OPEN, "OPEN") == 1))
+  else if ((hparse_f_is_in_compound()) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OPEN, "OPEN") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_find_define(block_top, TOKEN_REFTYPE_CURSOR_DEFINE, TOKEN_REFTYPE_CURSOR_REFER, true);
@@ -10464,7 +10510,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";");
     if (hparse_f_recover_if_error(true, "") == 2) return;
   }
-  else if ((hparse_begin_seen == true) && (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RAISE, "RAISE") == 1))
+  else if ((hparse_f_is_in_compound()) && (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RAISE, "RAISE") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_f_plsql_condition(block_top);
@@ -10543,7 +10589,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     /* Some oracle_mode statements that can only be in begin ... end */
     bool is_statement_done= false;
     if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
-     && (hparse_begin_seen == true))
+     && (hparse_f_is_in_compound()))
     {
       hparse_f_label(&hparse_i_of_block);
       if (hparse_errno > 0) return;
@@ -10601,6 +10647,24 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     if (hparse_errno > 0) return;
     return;
   }
+}
+
+/*
+  When we see BEGIN at start of a block, we ++begin_count.
+  When we see END that matches a BEGIN, we --begin_count.
+  So "begin_count > 00" means we're within BEGIN ... END.
+  Warning: CREATE PROCEDURE p() WHILE 0 > 1 ... doesn't
+           get counted, this only is for BEGIN ... END.
+  Knowing this is useful because if we're not within
+  BEGIN ... END there can't be any relevant SQL/PSM DECLAREs.
+  For plsql, we also flag IS|AS (but it goes off after the
+  last END is seen), we can use it to know if SQLCODE is legal.
+*/
+bool MainWindow::hparse_f_is_in_compound()
+{
+  if (hparse_as_seen) return true;
+  if (hparse_begin_count == 0) return false;
+  return true;
 }
 
 /* Todo: it's a shame we must say "identifier" when we know it's keyword */
@@ -11761,7 +11825,8 @@ int MainWindow::hparse_f_lua_accept_dotted(unsigned short int flag_version, unsi
 /*
   SQL/PSM label looks like "label:".
   PL/SQL label looks like "<<label>>".
-  Todo: Check: can a label be a reserved word if Oracle?
+  A label cannot be a reserved word.
+  It is legal to have a space e.g. "label1 :".
   Todo: Check: where should statement start be if Oracle?
 */
 QString MainWindow::hparse_f_label(int *hparse_i_of_block)
@@ -11772,21 +11837,26 @@ QString MainWindow::hparse_f_label(int *hparse_i_of_block)
     if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "<<") == 1)
     {
       label= hparse_token;
+      main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       hparse_f_expect(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, ">>");
       if (hparse_errno > 0) return "";
     }
   }
-  hparse_f_next_nexttoken();
-  if (hparse_next_token == ":")
+  else
   {
-    label= hparse_token;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    *hparse_i_of_block= hparse_i_of_last_accepted;
-    if (hparse_errno > 0) return "";
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
-    if (hparse_errno > 0) return "";
+    hparse_f_next_nexttoken();
+    if (hparse_next_token == ":")
+    {
+      label= hparse_token;
+      main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_LABEL_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
+      *hparse_i_of_block= hparse_i_of_last_accepted;
+      if (hparse_errno > 0) return "";
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
+      if (hparse_errno > 0) return "";
+    }
   }
   return label;
 }
@@ -11942,8 +12012,10 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_errno= 0;
     hparse_expected= "";
     hparse_text_copy= text;
-    hparse_begin_seen= false;
+    hparse_begin_count= 0;
+    hparse_as_seen= false;
     hparse_like_seen= false;
+    hparse_create_trigger_seen= false;
     // 2017-08-07: "hparse_token_type= 0;" caused a Lua statement
     //             followed by an SQL statement to fail. Star it out.
     //hparse_token_type= 0;
