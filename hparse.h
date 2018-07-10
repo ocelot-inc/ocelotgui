@@ -1074,18 +1074,19 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
     else s= false;
   }
   /* plsql triggers can have new|old . column-name */
+  /* todo: fix: I had to say variable_refer so it works with assignments */
   if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
    && ((v) || (s))
    && (hparse_create_trigger_seen))
   {
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_OPERATOR, ":") == 1)
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":") == 1)
     {
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "NEW") == 0)
-        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "OLD");
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ROW,TOKEN_TYPE_IDENTIFIER, "NEW") == 0)
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ROW,TOKEN_TYPE_IDENTIFIER, "OLD");
       if (hparse_errno > 0) return 0;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
       if (hparse_errno > 0) return 0;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return 0;
       return 1;
     }
