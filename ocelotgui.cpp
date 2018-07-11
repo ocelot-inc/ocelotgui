@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: July 9 2018
+   Last modified: July 10 2018
 */
 
 /*
@@ -8121,7 +8121,6 @@ int MainWindow::action_execute_one_statement(QString text)
 #endif
       if (is_create_table_server == false)
         execute_real_query(query_utf16, MYSQL_MAIN_CONNECTION);
-
       if (dbms_long_query_result)
       {
         /* beep() hasn't been tested because getting sound to work on my computer is so hard */
@@ -8244,12 +8243,14 @@ int MainWindow::action_execute_one_statement(QString text)
           /*
             Following is no-op by default because ocelot_history_max_row_count=0
           */
+          log("copy_to_history (before)", 80);
           if ((ocelot_grid_actual_tabs > 0)
            && (result_set_for_history == ""))
           {
             rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
-            result_set_for_history= rg->copy_to_history(ocelot_history_max_row_count.toLong(), is_vertical);
+            result_set_for_history= rg->copy_to_history(ocelot_history_max_row_count.toLong(), is_vertical, connections_dbms[0]);
           }
+          log("copy_to_history (after)", 80);
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(MYSQL_MAIN_CONNECTION); /* Do this while we still have number of rows */
@@ -13789,6 +13790,7 @@ const char *MainWindow::tarantool_result_set_init(
         long unsigned int *result_row_count,
         int *result_set_type)
 {
+  log("tarantool_result_set_init start", 80);
   const char *tarantool_tnt_reply_data= tarantool_tnt_reply.data;
   char field_type;
   long unsigned int r= 0;
@@ -13910,6 +13912,7 @@ return_point:
     if (*result_set_type == 5) --r;
     *result_row_count= r;
   }
+  log("tarantool_result_set_init end 1", 80);
   return tarantool_tnt_reply_data;
 erret:
   tarantool_errno[connection_number]= 10008;
@@ -13931,6 +13934,7 @@ erret:
     strcat(tarantool_errmsg, ".");
   }
   *result_row_count= 0;
+  log("tarantool_result_set_init end 0", 80);
   return 0;
 }
 

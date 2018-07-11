@@ -5744,9 +5744,16 @@ bool is_image(int col)
 #define HISTORY_MAX_COLUMN_WIDTH 65535
 #define HISTORY_MAX_COLUMN_COUNT 65535
 #define HISTORY_MAX_VERTICAL_COLUMN_WIDTH 8192
-QString copy_to_history(long int ocelot_history_max_row_count, unsigned short int is_vertical)
+QString copy_to_history(long int ocelot_history_max_row_count,
+                        unsigned short int is_vertical,
+                        int connections_dbms)
 {
   if (ocelot_history_max_row_count == 0) return "";
+
+  /* Tarantool won't have picked up column headers if there are no rows */
+  if ((result_row_count == 0) && (connections_dbms == DBMS_TARANTOOL))
+    return "";
+
   unsigned int col;
   long unsigned int r;
   unsigned int length;
@@ -5774,7 +5781,6 @@ QString copy_to_history(long int ocelot_history_max_row_count, unsigned short in
   history_max_column_widths= new unsigned int[history_result_column_count];
   history_line_width= 2;
   unsigned int column_width;
-
   {
     char *pointer_to_field_names= result_field_names;
     unsigned int column_length;
@@ -5794,7 +5800,6 @@ QString copy_to_history(long int ocelot_history_max_row_count, unsigned short in
       history_line_width+= column_width + 1 + HISTORY_COLUMN_MARGIN * 2;
     }
   }
-
   if (result_row_count > (unsigned long) ocelot_history_max_row_count) history_result_row_count= ocelot_history_max_row_count;
   else history_result_row_count= result_row_count;
 
@@ -5814,7 +5819,6 @@ QString copy_to_history(long int ocelot_history_max_row_count, unsigned short in
         pointer_to_field_names+= column_length;
       }
     }
-
     history_line= new char[HISTORY_MAX_VERTICAL_COLUMN_WIDTH + 256];
     for (r= 0; r < history_result_row_count; ++r)
     {
@@ -5861,7 +5865,6 @@ QString copy_to_history(long int ocelot_history_max_row_count, unsigned short in
     }
     return s;
   }
-
   history_line= new char[history_line_width + 2];
 
   divider_line= new char[history_line_width + 2];
@@ -5882,7 +5885,6 @@ QString copy_to_history(long int ocelot_history_max_row_count, unsigned short in
     }
     *(pointer_to_divider_line)= '\n'; *(pointer_to_divider_line + 1)= '\0';
   }
-
   if (ocelot_result_grid_column_names_copy == 1)
   {
     char *pointer_to_field_names= result_field_names;
