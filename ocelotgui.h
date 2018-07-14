@@ -5711,6 +5711,37 @@ bool is_image(int col)
   return false;
 }
 
+/*
+  Called from copy_to_history
+  Given: UTF8 string, utf8 string length in bytes, column width in characters
+  Return: QString, truncated or padded to match column_width
+  This doesn't allow for Asian double-width characters
+  (there's a Posix function for that but it might be bad on Windows).
+  This does allow for Latin and Cyrillic, with or without accents.
+  For calculating taking account of font and pixels, see
+  grid_column_size_calc().
+  Todo: What if there's a picture? Should BLOBs be shown as hex?
+  Todo: Test with vertical.
+  Todo: convert to QString, fiddle, convert back ... not a fast way, eh?
+*/
+QByteArray history_padder(char *str, int length,
+                       int column_width, unsigned int result_field_flags)
+{
+  QString s= QString::fromUtf8(str, length);
+  int space_count= column_width - s.length();
+  if (space_count <= 0) s= s.left(column_width);
+  else
+  {
+    QString spaces= " ";
+    /* Todo: for Tarantool, check (flag & FIELD_VALUE_FLAG_IS_NUMBER) */
+    if ((result_field_flags & NUM_FLAG) != 0)
+      s= spaces.repeated(space_count) + s;
+    else
+      s= s + spaces.repeated(space_count);
+  }
+  QByteArray pcv= s.toUtf8();
+  return pcv;
+}
 
 /*
   Move a limited part of a result set to history.
@@ -5767,7 +5798,6 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   QString s;
 
   s= "";
-
 
   history_max_column_widths= 0;
   history_line= 0;
@@ -5865,11 +5895,9 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     }
     return s;
   }
-  history_line= new char[history_line_width + 2];
-
+  /* Assume detail line but not divider line might contain 4-byte chars */
+  history_line= new char[(history_line_width*4) + 2];
   divider_line= new char[history_line_width + 2];
-
-
 
   {
     char *pointer_to_divider_line;
@@ -5892,23 +5920,18 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     s.append(divider_line);
     pointer_to_history_line= history_line;
     *(pointer_to_history_line++)= '|';
+    QByteArray pcv; /* padded column value */
     for (col= 0; col < history_result_column_count; ++col)
     {
       memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
       pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
       memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
       pointer_to_field_names+= sizeof(unsigned int);
-      length= column_length;
-      if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
-      memcpy(pointer_to_history_line, pointer_to_field_names, length);
+      pcv= history_padder(pointer_to_field_names, column_length,
+                     history_max_column_widths[col], 0);
+      memcpy(pointer_to_history_line, pcv, pcv.size());
       pointer_to_field_names+= column_length;
-      pointer_to_history_line+= length;
-      if (length < history_max_column_widths[col])
-      {
-        length= history_max_column_widths[col] - length;
-        memset(pointer_to_history_line, ' ', length);
-        pointer_to_history_line+= length;
-      }
+      pointer_to_history_line+= pcv.size();
       memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
       pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
       *(pointer_to_history_line++)= '|';
@@ -5924,10 +5947,10 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     unsigned int column_length;
     char flag;
     char *pointer_to_source;
-    unsigned int spaces_before, spaces_after;
     pointer_to_history_line= history_line;
     row_pointer= result_set_copy_rows[r];
     *(pointer_to_history_line++)= '|';
+    QByteArray pcv; /* padded column value */
     for (col= 0; col < history_result_column_count; ++col)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
@@ -5943,27 +5966,14 @@ QString copy_to_history(long int ocelot_history_max_row_count,
         length= column_length;
         pointer_to_source= row_pointer;
       }
-      spaces_before= spaces_after= HISTORY_COLUMN_MARGIN;
-      if (length > history_max_column_widths[col]) length= history_max_column_widths[col];
-      else
-      {
-        /* Todo: for Tarantool, check (flag & FIELD_VALUE_FLAG_IS_NUMBER) */
-        if ((result_field_flags[col] & NUM_FLAG) != 0)
-        //if (result_field_types[col] <= MYSQL_TYPE_DOUBLE)
-        {
-          spaces_before+= history_max_column_widths[col] - length;
-        }
-        else
-        {
-          spaces_after+= history_max_column_widths[col] - length;
-        }
-      }
-      memset(pointer_to_history_line, ' ', spaces_before);
-      pointer_to_history_line+= spaces_before;
-      memcpy(pointer_to_history_line, pointer_to_source, length);
-      pointer_to_history_line+= length;
-      memset(pointer_to_history_line, ' ', spaces_after);
-      pointer_to_history_line+= spaces_after;
+      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
+      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
+      pcv= history_padder(pointer_to_source, length,
+                     history_max_column_widths[col], result_field_flags[col]);
+      memcpy(pointer_to_history_line, pcv, pcv.size());
+      pointer_to_history_line+= pcv.size();
+      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
+      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
       *(pointer_to_history_line++)= '|';
       row_pointer+= column_length;
     }
