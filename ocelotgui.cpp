@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: July 13 2018
+   Last modified: July 16 2018
 */
 
 /*
@@ -1427,8 +1427,8 @@ bool MainWindow::is_statement_complete(QString text)
   Unlike statement_edit_widget, history_edit_widget is TextEditHistory
   derived from QTextEdit and allows rich text, editable, containing HTML.
   Each history entry has: prompt, statement, result, and possibly result set.
-  (Result set is unimplemented but will be mentioned in these comments;
-  eventually it will be something that appears like mysql client result set.)
+  (Result set depends on ocelot_history_max_row_count, 0 by default, and
+  see copy_to_history, it's supposed to appear like mysql client result set.)
   There are two kinds of markup:
   (1) <span style="...">...</span> for changes to color + font.
       Currently this is only used for history prompt bgcolor = statement prompt bgcolor.
@@ -1532,9 +1532,10 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
   if (result_set_for_history > "")
   {
     history_statement.append("<pre>");
-    history_statement.append(result_set_for_history);
-    history_statement.append("<//pre>");
+    history_statement.append(history_markup_copy_for_history(result_set_for_history));
+    history_statement.append("</pre>");
   }
+
   history_statement.append(history_markup_statement_end);
 
   history_edit_widget->append(history_statement);

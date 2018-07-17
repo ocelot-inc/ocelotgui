@@ -5062,6 +5062,7 @@ void frame_resize(int ki, int grid_col, int width, int height)
   Todo: allow row update. and, if there's a change in one mode, show
         the changed row when modes are switched
   Todo: xml statement="" and field name="" contents lack escaping.
+  Todo: "<" wrecks the cell, we need character entities
 */
 /*
   Eventually ...
@@ -5765,6 +5766,8 @@ QByteArray history_padder(char *str, int length,
   Defined limits on column width and on number of columns are arbitrary.
   If changing this, remember to test ^P and ^N which depend on markup.
   Todo: this could be adapted for an alternate way to display the result grid.
+  Warning: because history display is html we can show wrong for "<", so
+           later history_markup_append() will change to character entities.
   Warning: making the copy bigger would slow down the way the Previous and Next keys work.
   Remaining challenges with copy_to_history:
   * Names and max widths should depend on result_row stuff not gridx_max stuff
@@ -5809,7 +5812,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   else history_result_column_count= result_column_count;
 
   history_max_column_widths= new unsigned int[history_result_column_count];
-  history_line_width= 2;
+  history_line_width= 2; /* sizeof('|') | sizeof('\n') */
   unsigned int column_width;
   {
     char *pointer_to_field_names= result_field_names;
