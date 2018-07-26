@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: July 16 2018
+   Last modified: July 25 2018
 */
 
 /*
@@ -11146,7 +11146,7 @@ const keywords strvalues[]=
       {"NOPAGER", 0, 0, TOKEN_KEYWORD_NOPAGER}, /* Ocelot keyword */
       {"NOT", FLAG_VERSION_TARANTOOL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NOT},
       {"NOTEE", 0, 0, TOKEN_KEYWORD_NOTEE}, /* Ocelot keyword */
-      {"NOTNULL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_NOTNULL},
+      {"NOTNULL", 0, 0, TOKEN_KEYWORD_NOTNULL},
       {"NOW", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NOW},
       {"NOWARNING", 0, 0, TOKEN_KEYWORD_NOWARNING}, /* Ocelot keyword */
       {"NO_WRITE_TO_BINLOG", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_NO_WRITE_TO_BINLOG},
@@ -11526,7 +11526,7 @@ const keywords strvalues[]=
     {"WINDOW", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_WINDOW},
       {"WITH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WITH},
       {"WITHIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WITHIN}, /* deprecated in MySQL 5.7.6 */
-      {"WITHOUT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_WITHOUT},
+      {"WITHOUT", 0, 0, TOKEN_KEYWORD_WITHOUT},
       {"WRITE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_WRITE},
       {"X", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_X}, /* deprecated in MySQL 5.7.6 */
       {"XA", 0, 0, TOKEN_KEYWORD_XA},
@@ -13377,7 +13377,7 @@ QString MainWindow::get_statement_type(QString q_dbms_query, int *statement_type
   return word1;
 }
 
-/* TODO: Get fussier about what you'll accept is SQL. */
+/* TODO: Get fussier about what you'll accept is (Tarantool) SQL. */
 int MainWindow::get_statement_type_low(QString word0, QString word1, QString word2)
 {
   word0= word0.toUpper();
@@ -13389,6 +13389,7 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
   }
   else if (word0 == "ANALYZE")
   {
+    if ((word1 == ";") || (word1 == "")) statement_type= TOKEN_KEYWORD_ANALYZE;
     if (word1 > "")
     {
       QChar w1c1= word1.at(0);
@@ -13396,13 +13397,6 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
        || (w1c1 == '\"'))
         statement_type= TOKEN_KEYWORD_ANALYZE;
     }
-  }
-  else if (word0 == "BEGIN")
-  {
-    if ((QString::compare(word1, "TRANSACTION", Qt::CaseInsensitive) == 0)
-     || (word1 == ";")
-     || (word1 == ""))
-      statement_type= TOKEN_KEYWORD_BEGIN_WORK;
   }
   else if (word0 == "COMMIT")
   {
@@ -13438,16 +13432,6 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
   }
   else if (word0 == "LUA") { statement_type= TOKEN_KEYWORD_LUA; }
   else if (word0 == "PRAGMA") { statement_type= TOKEN_KEYWORD_PRAGMA; }
-  else if (word0 == "REINDEX")
-  {
-    if (word1 > "")
-    {
-      QChar w1c1= word1.at(0);
-      if ((w1c1.isLetter() == true)
-       || (w1c1 == '\"'))
-        statement_type= TOKEN_KEYWORD_REINDEX;
-    }
-  }
   else if (word0 == "RELEASE")
   {
     if (QString::compare(word1, "SAVEPOINT", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_RELEASE;
@@ -13464,7 +13448,22 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
       if ((word1 == ";") || (word1 == "")) statement_type= TOKEN_KEYWORD_ROLLBACK;
     }
   }
+  else if (word0 == "SAVEPOINT")
+  {
+    if (word1 > "")
+    {
+      QChar w1c1= word1.at(0);
+      if ((w1c1.isLetter() == true)
+       || (w1c1 == '\"'))
+        statement_type= TOKEN_KEYWORD_SAVEPOINT;
+    }
+  }
   else if (word0 == "SELECT") { statement_type= TOKEN_KEYWORD_SELECT; }
+  else if (word0 == "START")
+  {
+    if (QString::compare(word1, "TRANSACTION", Qt::CaseInsensitive) == 0)
+      statement_type= TOKEN_KEYWORD_START;
+  }
   else if (word0 == "UPDATE")
   {
     if (word1 > "")
