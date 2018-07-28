@@ -3701,12 +3701,12 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_MEDIUMINT;
   }
-  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INT4") == 1))
+  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INT") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INT4") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     hparse_f_length(false, true, false);
     if (hparse_errno > 0) return 0;
-    return TOKEN_KEYWORD_INT4;
+    return TOKEN_KEYWORD_INT;
   }
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTEGER") == 1)
   {
@@ -4082,7 +4082,7 @@ int MainWindow::hparse_f_data_type(int context)
 
   /* If SQLite-style column definition, anything unreserved is acceptable. */
   /* In fact even nothing-at-all is acceptable, and some reserved words. */
-  /* We already accepted BLOB INTEGER NUMERIC REAL TEXT. */
+  /* We already accepted BLOB INT INTEGER NUMERIC REAL TEXT. */
   if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
   {
     if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1)
@@ -4100,6 +4100,12 @@ int MainWindow::hparse_f_data_type(int context)
       hparse_f_length(false, false, true);
       if (hparse_errno > 0) return 0;
       return TOKEN_KEYWORD_ALL;
+    }
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATE") == 1)
+    {
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+      if (hparse_f_collation_name() == 0) hparse_f_error();
+      if (hparse_errno > 0) return 0;
     }
     return TOKEN_KEYWORD_ALL;
   }
@@ -4331,7 +4337,7 @@ void MainWindow::hparse_f_column_definition()
     {
       auto_increment_seen= true;
     }
-    else if ((generated_seen == false) && (auto_increment_seen == false) && (primary_seen == true) && (data_type == TOKEN_KEYWORD_INTEGER) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTOINCREMENT") == 1))
+    else if ((generated_seen == false) && (auto_increment_seen == false) && (primary_seen == true) && ((data_type == TOKEN_KEYWORD_INTEGER || data_type == TOKEN_KEYWORD_INT)) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTOINCREMENT") == 1))
     {
       auto_increment_seen= true;
     }
@@ -7652,11 +7658,7 @@ void MainWindow::hparse_f_statement(int block_top)
       if ((element_is_seen == true)
        && ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0))
       {
-        if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITHOUT") == 1)
-        {
-          main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
-          hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROWID");
-        }
+        ; /* we used to check for WITHOUT ROWID here */
       }
       else
       {
