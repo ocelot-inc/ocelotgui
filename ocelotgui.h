@@ -661,6 +661,7 @@ public:
   void hparse_f_reference_option();
   void hparse_f_reference_definition();
   int hparse_f_create_definition();
+  int hparse_f_default_clause(int,int);
   int hparse_f_current_timestamp();
   void hparse_f_column_definition();
   void hparse_f_comment();
@@ -700,11 +701,13 @@ public:
   void hparse_f_condition_information_item_name();
   int hparse_f_signal_or_resignal(int,int);
   int hparse_f_into();
-  void hparse_f_with_clause(int);
+  void hparse_f_with_clause(int,bool);
   int hparse_f_values();
   int hparse_f_unionize();
-  int hparse_f_select(bool,bool,bool);
-  int hparse_f_deep_select(bool,bool,bool);
+  bool hparse_f_is_query(bool);
+  int hparse_f_query(int,bool,bool,bool);
+  int hparse_f_select(bool,bool);
+  int hparse_f_deep_query(int,bool,bool);
   void hparse_f_where();
   void hparse_f_window_spec(bool);
   int hparse_f_order_by(int);
