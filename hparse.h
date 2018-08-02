@@ -6466,8 +6466,8 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
   if (s == "SELECT") is_query= true;
   if (s == "VALUES")
   {
-    if (is_statement) is_query= true;
-    if (hparse_dbms_mask & (FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3))
+    if (is_statement == false) is_query= true;
+    else if (hparse_dbms_mask & (FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3))
       is_query= true;
   }
   if (s == "WITH")
@@ -6480,9 +6480,11 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
     /* guaranteed to fail */
     hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SELECT");
     /* guaranteed to fail */
-    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
+    if (s != "VALUES")
+      hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
     /* guaranteed to fail */
-    hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
+    if (s != "WITH")
+      hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
   }
   return is_query;
 }
@@ -6669,7 +6671,6 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
       if (hparse_errno > 0) return 0;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
-printf("C\n");
   hparse_f_order_by(TOKEN_KEYWORD_SELECT);
   if (hparse_errno > 0) return 0;
   hparse_f_limit(TOKEN_KEYWORD_SELECT);
@@ -6734,7 +6735,6 @@ printf("C\n");
     }
     else hparse_f_accept(FLAG_VERSION_MARIADB_10_1, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOWAIT");
   }
-printf("D %d\n", hparse_errno);
   hparse_f_unionize();
   if (hparse_errno > 0) return 0;
   return 1;

@@ -2,17 +2,19 @@
 Ordinarily ocelotgui is a client for
 MySQL/MariaDB, and all documentation
 assumes that. However, it is possible
-to connect to Tarantool 1.8.1 or later (with SQL) instead.
+to connect to Tarantool 1.8.1 or Tarantool 2.0 or later (with SQL) instead.
 You get all the same features except the debugger.
 
 The ocelotgui connection to Tarantool is alpha
 and is not produced by Tarantool and has no warranty.
 
 You need the latest Tarantool "SQL" server.
-You can get the release 1.8.3 release here:
-https://github.com/tarantool/tarantool/releases
-You also might download from github.com/tarantool/tarantool:
-git clone -b 1.8 https://github.com/tarantool/tarantool.git ~/tarantool-1.8
+You can get the release 1.8.1 release here:
+https://github.com/tarantool/tarantool/releases/tag/1.8.1
+but it is obsolete.
+For a more current version, download from github.com/tarantool/tarantool:
+git clone -b 2.0 https://github.com/tarantool/tarantool.git ~/tarantool-2.0
+and build as instructed in the version-2.0 manual.
 
 On Linux you need the Tarantool client (tarantool.so) library.
 The tarantool-dev package does not have it any more.
@@ -186,7 +188,7 @@ Rules concerning ocelotgui when connecting to tarantool:
 * BUG? When ocelotgui is displaying an image, cpu time rises.
 * Decisions to right-justify, or display as images, are automatic rather than dependent on data type.
 * SQL "verbs", for example COMMIT, should not be used as Lua identifiers.
-* If you use SQL, you need Tarantool 1.8. If you only use Lua, you can use Tarantool 1.7.
+* If you use SQL, you need Tarantool 1.8 or (preferably) 2.0. If you only use Lua, you can use Tarantool 1.7 or 1.9.
 * We don't accept identifiers longer than 64 characters.
 
 
