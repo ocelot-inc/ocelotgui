@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: July 30 2018
+   Last modified: August 4 2018
 */
 
 /*
@@ -380,7 +380,7 @@
   //static void *libtarantoolnet_handle= 0;
   /* Todo: these shouldn't be global */
   tnt_reply *tarantool_tnt_for_new_result_set;
-  bool tarantool_begin_seen= false;
+  bool tarantool_start_transaction_seen= false;
 #endif
 
   static  unsigned int rehash_result_column_count= 0;
@@ -11466,7 +11466,7 @@ const keywords strvalues[]=
       {"TRIGGER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TRIGGER},
       {"TRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TRIM},
       {"TRUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_TRUE},
-      {"TRUNCATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRUNCATE},
+      {"TRUNCATE", FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRUNCATE},
       {"TYPE", 0, 0, TOKEN_KEYWORD_TYPE},
       {"TYPEOF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_TYPEOF},
       {"UCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UCASE},
@@ -13464,6 +13464,11 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
     if (QString::compare(word1, "TRANSACTION", Qt::CaseInsensitive) == 0)
       statement_type= TOKEN_KEYWORD_START;
   }
+  else if (word0 == "TRUNCATE")
+  {
+    if (QString::compare(word1, "TABLE", Qt::CaseInsensitive) == 0)
+      statement_type= TOKEN_KEYWORD_TRUNCATE;
+  }
   else if (word0 == "UPDATE")
   {
     if (word1 > "")
@@ -13497,6 +13502,8 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
    Because Tarantool-style transactions require us to send all requests
    as a single send, we have to combine them -- which is sad because we
    spent time earlier in splitting them apart. We use a QStringList.
+   Todo: We depend on commit|rollback to end a transaction but they might
+         be inside a Lua function.
 */
 int MainWindow::tarantool_real_query(const char *dbms_query,
                                      unsigned long dbms_query_len,
@@ -13526,16 +13533,16 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
 
     tarantool_statements_in_begin.append(q_dbms_query);
   }
-  if (statement_type == TOKEN_KEYWORD_BEGIN_WORK)
+  if (statement_type == TOKEN_KEYWORD_START)
   {
-    tarantool_begin_seen= true;
+    tarantool_start_transaction_seen= true;
   }
   if ((statement_type == TOKEN_KEYWORD_COMMIT)
    || (statement_type == TOKEN_KEYWORD_ROLLBACK))
   {
-    tarantool_begin_seen= false;
+    tarantool_start_transaction_seen= false;
   }
-  if (tarantool_begin_seen == true)
+  if (tarantool_start_transaction_seen == true)
   {
     strcpy(tarantool_errmsg, "Deferred till commit|rollback");
     tarantool_errno[connection_number]= 8372;

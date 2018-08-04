@@ -5788,6 +5788,10 @@ void MainWindow::hparse_f_commit_or_rollback()
   }
 }
 
+/*
+  Warning: we call hparse_f_qualified_name_of_object() while assuming
+           that any statement-starting verb in Tarantool is reserved.
+*/
 void MainWindow::hparse_f_explain_or_describe(int block_top)
 {
   bool explain_type_seen= false;
@@ -8875,7 +8879,6 @@ void MainWindow::hparse_f_statement(int block_top)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ_UNCOMMITTED") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RECURSIVE_TRIGGERS") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REVERSE_UNORDERED_SELECTS") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCHEMA_VERSION") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT_TRACE") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SHORT_COLUMN_NAMES") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL_DEFAULT_ENGINE") == 1)
@@ -10014,13 +10017,17 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else hparse_f_error();
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TRUNCATE, "TRUNCATE"))
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TRUNCATE, "TRUNCATE"))
   {
     if (hparse_errno > 0) return;
     hparse_statement_type= TOKEN_KEYWORD_TRUNCATE;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") != 1)
+    {
+      if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) hparse_f_error();
+    }
+    if (hparse_errno > 0) return;
     if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
     if ((hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DROP") == 1)
