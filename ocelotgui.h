@@ -802,7 +802,7 @@ public:
                  char **p_result_set_copy,
                  char ***p_result_set_copy_rows,
                  unsigned int **p_result_max_column_widths);
-  void tarantool_scan_field_names(
+  QString tarantool_scan_field_names(
                  const char *which_field,
                  unsigned int p_result_column_count,
                  char **p_result_field_names);
@@ -2357,7 +2357,6 @@ enum {
 #define TARANTOOL_FIELD_NAME_BASE "f"
 
 /* Names like f_1_1 are shorter than 64 characters, but we might have user-defined names. */
-
 
 #define TARANTOOL_MAX_FIELD_NAME_LENGTH 64
 #define TARANTOOL_BOX_INDEX_EQ 0
@@ -4527,7 +4526,9 @@ QString fillup(MYSQL_RES *mysql_res,
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
   {
-    copy_of_parent->tarantool_scan_field_names("name", result_column_count, &result_field_names);
+    QString r;
+    r= copy_of_parent->tarantool_scan_field_names("name", result_column_count, &result_field_names);
+    if (r != "OK") return r;
     /* Next three scan_field_names calls are only needed if user will edit the result set */
     copy_of_parent->tarantool_scan_field_names("org_name", result_column_count, &result_original_field_names);
     copy_of_parent->tarantool_scan_field_names("org_table", result_column_count, &result_original_table_names);

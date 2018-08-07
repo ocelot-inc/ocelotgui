@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.6
-   Last modified: August 4 2018
+   Last modified: August 7 2018
 */
 
 /*
@@ -14469,6 +14469,8 @@ QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
     field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
     if (field_type != MP_STR) return "tarantool_fetch_header_row: non-string field";
     value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data, &value_length);
+    if (value_length >= TARANTOOL_MAX_FIELD_NAME_LENGTH)
+      return "Field name too long";
     for (int rf= 0; rf < p_result_column_count; ++rf)
     {
       c= &tarantool_field_names[rf*TARANTOOL_MAX_FIELD_NAME_LENGTH];
@@ -14567,6 +14569,7 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       if (return_value < 0) return "tarantool_scan_rows: return_value < 0";
       tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_copy_2;
     }
+    /* At this point field_name_list is e.g. f_00001_00001 f_00001_00002 */
     char field_type;
     field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
     if (field_type != MP_ARRAY) return "tarantool_scan_rows: field_type != MP_ARRAY";
@@ -14757,7 +14760,7 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
   sizeof(TARANTOOL_FIELD_NAME_BASE) or strlen(TARANTOOL_FIELD_NAME_BASE)?
 */
 
-void MainWindow::tarantool_scan_field_names(
+QString MainWindow::tarantool_scan_field_names(
                const char *which_field,
 
         unsigned int p_result_column_count,
@@ -14789,6 +14792,7 @@ void MainWindow::tarantool_scan_field_names(
     else if (strcmp(which_field, "org_table") == 0) v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
     else /* if (strcmp(which_field, "db") == 0) */ v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
     memcpy(result_field_names_pointer, &v_lengths, sizeof(unsigned int));
+    if (v_lengths >= TARANTOOL_MAX_FIELD_NAME_LENGTH) return "Field Name Too Long";
     result_field_names_pointer+= sizeof(unsigned int);
     if (strcmp(which_field, "name") == 0) memcpy(result_field_names_pointer, &tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH], v_lengths);
     else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
@@ -14796,6 +14800,7 @@ void MainWindow::tarantool_scan_field_names(
     else /* if (strcmp(which_field, "db") == 0) */ memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
     result_field_names_pointer+= v_lengths;
   }
+  return "OK";
 }
 
 //void MainWindow::tarantool_close()

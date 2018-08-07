@@ -3015,6 +3015,21 @@ void MainWindow::hparse_f_alter_specification()
   {
     bool column_name_is_expected= false;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN") == 1) column_name_is_expected= true;
+    else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "CONSTRAINT") == 1)
+    {
+      /* some similarity to part of hparse_f_create_definition() */
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
+      if (hparse_errno > 0) return;
+      hparse_f_column_list(true, false);
+      if (hparse_errno > 0) return;
+      hparse_f_reference_definition();
+      if (hparse_errno > 0) return;
+      return;
+    }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTITION") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
@@ -3172,7 +3187,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_errno > 0) return;
     return;
   }
-  if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DROP") == 1))
+  if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DROP") == 1))
   {
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PRIMARY") == 1)
     {
@@ -3199,6 +3214,11 @@ void MainWindow::hparse_f_alter_specification()
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PARTITION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
         if (hparse_errno > 0) return;
       } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+    }
+    else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONSTRAINT") == 1)
+    {
+      if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
     }
     else
     {
@@ -8866,7 +8886,6 @@ void MainWindow::hparse_f_statement(int block_top)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATION_LIST") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COUNT_CHANGES") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFER_FOREIGN_KEYS") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN_KEY_CHECK") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN_KEY_LIST") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN_KEYS") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FULL_COLUMN_NAMES") == 1)
