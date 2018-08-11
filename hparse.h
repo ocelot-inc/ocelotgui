@@ -1496,8 +1496,16 @@ int MainWindow::hparse_f_table_factor()
     }
     else
     {
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS_OF_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
-        hparse_f_literal(TOKEN_REFTYPE_ALIAS_OF_TABLE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING);
+      if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+       && (QString::compare(hparse_token, "INDEXED", Qt::CaseInsensitive) == 0))
+      {
+        ;
+      }
+      else
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS_OF_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+          hparse_f_literal(TOKEN_REFTYPE_ALIAS_OF_TABLE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING);
+      }
     }
     hparse_f_table_index_hint_list();
     if (hparse_errno > 0) return 0;
