@@ -97,13 +97,22 @@
 
 /*
   Decide whether to #include third_party.h for use with Tarantool.
-  Builders can say cmake . -DOCELOT_THIRD_PARTY=1 to include and maybe use.
-  Otherwise OCELOT_THIRD_PARTY=0 on Linux, OCELOT_THIRD_PARTY=1 on Windows.
   Mostly third_party.h has tarantool-c source modified for Windows.
+  By default it is included for both Windows and Linux starting with ocelotgui 1.07.
+  To say it is not included, either build with cmake . -DOCELOT_THIRD_PARTY=0
+  or change the lines below to say "#define OCELOT_THIRD_PARTY 0".
+  If it is not included, then:
+  (if you only connect to MariaDB / MySQL) it doesn't matter, we never use it
+  (if you start with --ocelot_dbms=tarantool) ocelotgui will load libtarantool.so.
+  On Windows there is no libtarantool.so.
+  On Linux libtarantool.so is easily acquired by installing and building from
+  tarantool-c, and actually it's probably better to use libtarantool.so because
+  it may contain bug fixes or enhancements, so it's actually good on Linux to not include third_party.h.
+  We only include it on Linux so that the code base on Linux and Windows will be the same.
 */
 #ifndef OCELOT_THIRD_PARTY
 #ifdef OCELOT_OS_LINUX
-#define OCELOT_THIRD_PARTY 0
+#define OCELOT_THIRD_PARTY 1
 #endif
 #ifdef OCELOT_OS_NONLINUX
 #define OCELOT_THIRD_PARTY 1
@@ -661,7 +670,7 @@ public:
   void hparse_f_reference_option();
   void hparse_f_reference_definition();
   int hparse_f_create_definition();
-  int hparse_f_default_clause(int,int);
+  int hparse_f_default_clause(int);
   int hparse_f_current_timestamp();
   void hparse_f_column_definition();
   void hparse_f_comment();

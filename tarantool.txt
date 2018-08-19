@@ -45,6 +45,8 @@ Or you can add --ld_run_path=/usr/local/lib on the
 command line where you start ocelotgui.
 GOOD NEWS: On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.
+UPDATE: In ocelotgui 1.07, you will not need to install a
+Tarantool library.
 
 You need the latest ocelotgui client.
 The Release 1.06 version is okay,
@@ -96,7 +98,7 @@ The result will be tabular (rows and columns),
 even though box.space._index was created with NoSQL.
 
 Bonus feature: A client statement,
-CREATE SERVER id OPTIONS (PORT ..., HOST ..., USER ..., PASSWORD ...);
+CREATE SERVER id ... OPTIONS (PORT ..., HOST ..., USER ..., PASSWORD ...);
 allows a second connection. Usually this is a connection
 to a different server.
 Later you can use the second connection to create an SQL table

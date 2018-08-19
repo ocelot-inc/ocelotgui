@@ -3093,7 +3093,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
     {
-      if (hparse_f_default_clause(TOKEN_KEYWORD_ALTER, 0) == 0) hparse_f_error();
+      if (hparse_f_default_clause(TOKEN_KEYWORD_ALTER) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DROP") == 1)
@@ -4275,7 +4275,7 @@ int MainWindow::hparse_f_create_definition()
   Todo: Check: if PLSQL, is it true both := and DEFAULT are acceptable?
   Todo: hparse_f_opr_18 allows variables, it shouldn't
 */
-int MainWindow::hparse_f_default_clause(int who_is_calling, int data_type)
+int MainWindow::hparse_f_default_clause(int who_is_calling)
 {
   if ((who_is_calling == TOKEN_KEYWORD_DECLARE)
    && (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":=") == 1))
@@ -4295,7 +4295,7 @@ int MainWindow::hparse_f_default_clause(int who_is_calling, int data_type)
   }
   else
   {
-    if (data_type == data_type)
+    /* if (data_type == data_type) */
     {
       hparse_f_opr_18(who_is_calling, 0);
       if (hparse_errno > 0) goto e;
@@ -4395,7 +4395,7 @@ void MainWindow::hparse_f_column_definition()
       hparse_f_conflict_clause();
       if (hparse_errno > 0) return;
     }
-    else if ((generated_seen == false) && (default_seen == false) && (hparse_f_default_clause(TOKEN_KEYWORD_CREATE, data_type) == 1))
+    else if ((generated_seen == false) && (default_seen == false) && (hparse_f_default_clause(TOKEN_KEYWORD_CREATE) == 1))
     {
       if (hparse_errno > 0) return;
       default_seen= true;
@@ -10964,7 +10964,7 @@ void MainWindow::hparse_f_declare(int calling_statement_type, int block_top)
   {
     if (hparse_f_data_type(TOKEN_KEYWORD_DECLARE) == -1) hparse_f_error();
     if (hparse_errno > 0) return;
-    if (hparse_f_default_clause(TOKEN_KEYWORD_DECLARE, 0) == 1)
+    if (hparse_f_default_clause(TOKEN_KEYWORD_DECLARE) == 1)
     {
       if (hparse_errno > 0) return;
     }
@@ -11056,7 +11056,7 @@ int MainWindow::hparse_f_declare_plsql(int token_type)
           main_token_types[hparse_i_of_last_accepted]= TOKEN_TYPE_IDENTIFIER;
         }
         if (hparse_errno > 0) goto e;
-        if (hparse_f_default_clause(TOKEN_KEYWORD_DECLARE, 0) == 1)
+        if (hparse_f_default_clause(TOKEN_KEYWORD_DECLARE) == 1)
         {
           if (hparse_errno > 0) goto e;
         }
