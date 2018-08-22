@@ -3132,6 +3132,7 @@ ldbms() : QWidget()
 #define WHICH_LIBRARY_LIBMARIADBCLIENT 5
 #define WHICH_LIBRARY_LIBMARIADB 6
 
+/* Todo: suppressed unused parameter warning if OCELOT_STATIC_LIBRARY==1 */
 void ldbms_get_library(QString ocelot_ld_run_path,
         int *is_library_loaded,           /* points to is_libXXX_loaded */
         void **library_handle,            /* points to libXXX_handle */
@@ -3240,8 +3241,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     }
 #endif /* OCELOT_THIRD_PARTY==1 */
 
+#ifdef OCELOT_OS_LINUX
     char *query;
     int query_len;
+#endif
     QString error_string;
 
     /*

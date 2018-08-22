@@ -59,6 +59,7 @@
    See also https://msdn.microsoft.com/en-us/library/windows/desktop/ms737593(v=vs.85).aspx
    and https://stackoverflow.com/questions/4243027/winsock-compiling-error-it-cant-find-the-addrinfo-structures-and-some-relating
    We changed "#line ..." to "//#line ..." so we could see compiler errors more clearly.
+   Todo: "#define _WIN32_WINNT 0x0501" (Windows XP) causes warnings. Should I #undef it later?
 */
 #ifndef WINDOWS_KLUDGE_H
 #define WINDOWS_KLUDGE_H

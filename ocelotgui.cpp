@@ -487,6 +487,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
 #ifdef OCELOT_OS_LINUX
   assert(MENU_FONT == 80); /* See kludge alert in ocelotgui.h Settings() */
+#else
+  assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
 #endif
 
   assert(TOKEN_REFTYPE_MAX == 91); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
@@ -4261,6 +4263,8 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
     If (weight match) +1
     If (italic match) +1
     If not ("*Webdings*" or "*Wingdings*" or "*Dingbats*") +2
+    ... But first part of the calculation differs in Windows because we got "MS Gothic" (yuck).
+        Instead it is: If (Consolas | Lucida Console | Courier New) +3
   After you get it, it should determine the initial style sheets.
   Windows generates warnings if I don't exclude some fonts,
   but I suppress some of the warnings.
@@ -4276,11 +4280,13 @@ QFont MainWindow::get_fixed_font()
   int point_size= fi.pointSize();
   int weight= fi.weight();
   bool italic= fi.italic();
+#ifdef OCELOT_OS_LINUX
   QString first_word= fi.family();
   if (first_word.indexOf(" ") != -1)
     first_word= first_word.left(first_word.indexOf(" "));
   first_word= first_word.toUpper();
   int first_word_length= first_word.length();
+#endif
   QFontDatabase database;
   QPlainTextEdit plain;
   QFont fo3("NoSuchFont", point_size, weight, italic);
@@ -4319,8 +4325,15 @@ QFont MainWindow::get_fixed_font()
       else this_points+= 2;
       if (plain.fontInfo().family() == recommended_family)
         this_points+= 2;
+#ifdef OCELOT_OS_LINUX
       if (plain.fontInfo().family().left(first_word_length).toUpper() == first_word)
         this_points+= 3;
+#else
+      QString f= plain.fontInfo().family();
+      f= f.toUpper();
+      if ((f == "CONSOLAS") || (f == "COURIER NEW") || (f == "LUCIDA CONSOLE"))
+        this_points+= 3;
+#endif
       if (plain.fontInfo().pointSize() == point_size)
         this_points+= 1;
       if ((plain.fontInfo().pointSize() >= (point_size * 0.9))

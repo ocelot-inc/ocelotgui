@@ -69,12 +69,12 @@ the source code of Qt,
 the MinGW 32-bit compiler version 5.30 (it comes with Qt),
 the source code of MariaDB.
 Building takes 6 to 60 hours depending on hardware, and at least 40GB
-disk space. We used a 64GB USB stick.
+disk space. one can use a 64GB USB stick.
 We happened to have Microsoft's Windows SDK available when we built;
 it didn't hurt, but we do not believe it was necessary.
 We assume that %path% includes c:\windows\system32 and all other Windows
 system directories that are normally in the default Windows 10 path.
-In what follows, we assume the available space is on drive D:.
+In what follows, we assume the available space is on drive C:.
 In what follows, comment lines begin with colons.
 
 : If you are using a laptop, turn off power-saving features until this job is done.
@@ -91,38 +91,35 @@ In what follows, comment lines begin with colons.
 : When accessing Qt downloads, you should choose version 5.9.1
 : (other versions might work but 5.9.1 is the version we used).
 : You must choose "open source". It will affect directory names.
-: Go to www1.qt.io.download.
-: Get qt-unified-windows-x86-3.0.1-online.exe, put it on drive C.
+: Go to www1.qt.io/download.
+: Get qt-unified-windows-x86-3.0.5-online.exe, put it on drive C.
 : cd c:\
-: qt-unified-windows-x86-3.0.1-online.exe
+: qt-unified-windows-x86-3.0.5-online.exe
 : If the MinGW compiler is not already there, run Qt's maintenance tool.
+: If the version number is slightly different from 3.0.5, it probably is still okay.
 
 : (Unzipping Qt source)
 
 : Download http://download.qt.io/official_releases/qt/5.9/5.9.1/single/qt-everywhere-opensource-src-5.9.1.tar.xz
 : to C:\Qt\Static\src.
 : First produce a .tar from the .tar.xz file.
-"C:\Program Files (x86)\7-Zip\7z" x qt-everywhere-opensource-src-5.9.1.tar
+"C:\Program Files (x86)\7-Zip\7z" x qt-everywhere-opensource-src-5.9.1.tar.xz
 : Now you have to be in administrator mode to avoid ""ERROR: Can not create symbolic link" errors during unzip:
 :    Right-click Windows icon on bottom left of screen.
-:    Click Command Prompt(Admin)
+:    Click Command Prompt(Admin) -- not Power Shell
 :   Click yes -- notice you get to C:\Windows\system32 instead of \Users\your-name.
 cd c:\Qt\Static\Src
 "C:\Program Files (x86)\7-Zip\7z" x qt-everywhere-opensource-src-5.9.1.tar
 It went into c:\Qt\static\src\qt-everywhere-opensource-src-5.9.1
 
-: This is the point when we realized drive C: would not be large enough,
-: so we inserted the USB stick for drive D: and copied all Qt files from
-: C:\Qt to D:\Qt, using xcopy.
-
 : (Specifying qmake.conf flags)
 
-: In d:\Qt\Static\src\qt-everywhere-opensource-src-5.9.1\qtbase\mkspecs\win32-g++\qmake.conf
+: In c:\Qt\Static\src\qt-everywhere-opensource-src-5.9.1\qtbase\mkspecs\win32-g++\qmake.conf
 : add these lines after QMAKE_NM:
-: QMAKE_LFLAGS += -static -static-libgcc
-: QMAKE_CFLAGS_RELEASE -= -O2
-: QMAKE_CFLAGS_RELEASE += -Os -momit-leaf-frame-pointer
-: DEFINES += QT_STATIC_BUILD
+ QMAKE_LFLAGS += -static -static-libgcc
+ QMAKE_CFLAGS_RELEASE -= -O2
+ QMAKE_CFLAGS_RELEASE += -Os -momit-leaf-frame-pointer
+ DEFINES += QT_STATIC_BUILD
 
 : (Building Qt static libraries)
 
@@ -131,26 +128,26 @@ It went into c:\Qt\static\src\qt-everywhere-opensource-src-5.9.1
 : We are saying "opengl desktop" because it happened to work, but Qt seems
 : to recommend "opengl dynamic" nowadays.
 : The "-opensource" is necessary because ocelotgui is open source.
-: The prefix directory d:\Qt\Qt5.9.1Static is an arbitrary name, you can
+: The prefix directory c:\Qt\Qt5.9.1Static is an arbitrary name, you can
 : use a different one provided that you use the same name throughout.
 : The "-release" option is chosen because the alternative "debug"
 : is reportedly extremely large.
 : Although -qt-zlib -qt-pcre -qt-libpng -qt-libjpeg -qt-harfbuzz refer
 : to third-party components, ocelotgui does not explicitly link to them,
 : we intend to remove mention of them the next time we build Qt from source.
-: D:\Qt\Static\src\qt-everywhere-opensource-5.9.1 is the top level
+: c:\Qt\Static\src\qt-everywhere-opensource-5.9.1 is the top level
 : directory and must be the default directory -- do not shadow build.
 : Pause after configure to read any error or warning messages.
-d:
-cd d:\
-rd /s /q D:\Qt\Qt5.9.1Static
-SET PATH=d:\Qt\Tools\mingw530_32\bin;d:\Qt\Tools\mingw530_32\opt\bin;%path%
+c:
+cd c:\
+rd /s /q c:\Qt\Qt5.9.1Static
+SET PATH=c:\Qt\Tools\mingw530_32\bin;c:\Qt\Tools\mingw530_32\opt\bin;%path%
 set LANG="en"
-set QT_INSTALL_PREFIX=d:\Qt\Qt5.9.1Static
-cd d:\Qt\Static\src\qt-everywhere-opensource-src-5.9.1
+set QT_INSTALL_PREFIX=c:\Qt\Qt5.9.1Static
+cd c:\Qt\Static\src\qt-everywhere-opensource-src-5.9.1
 del /s *.o
 del /s  moc_*
-configure -opensource -confirm-license -release -platform win32-g++ -static -opengl desktop -make libs -nomake examples -nomake tests -nomake tools -prefix d:\Qt\Qt5.9.1Static -skip qt3d -skip qtactiveqt -skip qtandroidextras -skip qtcanvas3d -skip qtcharts -skip qtconnectivity -skip qtdatavis3d -skip qtdeclarative -skip qtdoc -skip qtgamepad -skip qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtmacextras -skip qtmultimedia -skip qtnetworkauth -skip qtpurchasing -skip qtquickcontrols -skip qtquickcontrols2 -skip qtremoteobjects -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech -skip qtsvg -skip qttools -skip qttranslations -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebsockets -skip qtwebview -skip qtwinextras -skip qtx11extras -skip qtxmlpatterns
+configure -opensource -confirm-license -release -platform win32-g++ -static -opengl desktop -make libs -nomake examples -nomake tests -nomake tools -prefix c:\Qt\Qt5.9.1Static -skip qt3d -skip qtactiveqt -skip qtandroidextras -skip qtcanvas3d -skip qtcharts -skip qtconnectivity -skip qtdatavis3d -skip qtdeclarative -skip qtdoc -skip qtgamepad -skip qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtmacextras -skip qtmultimedia -skip qtnetworkauth -skip qtpurchasing -skip qtquickcontrols -skip qtquickcontrols2 -skip qtremoteobjects -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech -skip qtsvg -skip qttools -skip qttranslations -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebsockets -skip qtwebview -skip qtwinextras -skip qtx11extras -skip qtxmlpatterns
 : pause
 mingw32-make
 mingw32-make install
@@ -166,9 +163,10 @@ mingw32-make install
 : a kernel32 function which isn't present before Windows Vista,
 : https://msdn.microsoft.com/en-us/library/windows/desktop/aa363808(v=vs.85).aspx,
 : and which our version of MinGW doesn't expect.
+: Never use a client library associated with MariaDB 10.1.7.
 
-: Make a directory d:\mariadb.
-d:
+: Make a directory c:\mariadb.
+c:
 cd \
 rd /s /q mariadb
 mkdir mariadb
@@ -176,14 +174,14 @@ cd mariadb
 
 : Download from
 : https://downloads.mariadb.org/connector-c/mariadb-connetor-c-2.2.3.src.tar.gz
-: to d:\mariadb -- if it does not go there directly, copy it to there.
+: to c:\mariadb -- if it does not go there directly, copy it to there.
 
 : Unzip.
 "C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-2.2.3-src.tar.gz
 "C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-2.2.3-src.tar
 
 : Now you must edit one file.
-: d:\mariadb\mariadb-connector-c-2.2.3-src\libmariadb\my_pthread.c
+: c:\mariadb\mariadb-connector-c-2.2.3-src\libmariadb\my_pthread.c
 : Change
 : #ifdef _WIN32
 : to
@@ -192,7 +190,8 @@ cd mariadb
 : + pthread_cond_wait() + pthread_cond_destroy()
 : because MinGW already has them.
 
-:Build.
+:Build. Do not worry if mingw32-make clean generates a warning the first time.
+:       If cmake is not available, get from cmake.org/download and put on system path.
 cd mariadb-connector-c-2.2.3-src
 mingw32-make clean
 cmake -G "MinGW Makefiles"
@@ -216,7 +215,7 @@ mingw32-make
 : We will not use the CMakeLists.txt file in the ocelotgui package,
 : that is for use with Linux. We will start with a modified ocelotgui.pro.
 : We will still need the MinGW bin and lib directories.
-: Earlier we said prefix is D:\Qt\Qt5.9.1static, that is the Qt directory we need.
+: Earlier we said prefix is c:\Qt\Qt5.9.1static, that is the Qt directory we need.
 : There will be an error message when you say mingw32-make the first time; we ignore it.
 : There will be warnings during compile; we ignore them.
 
@@ -250,12 +249,12 @@ HEADERS += hparse.h
 HEADERS += ostrings.h
 HEADERS += third_party.h
 FORMS += ocelotgui.ui
-INCLUDEPATH += "d:\mariadb\mariadb-connector-c-2.2.3-src\include"
-LIBS += -Ld:\mariadb\mariadb-connector-c-2.2.3-src\libmariadb -lmariadbclient
+INCLUDEPATH += "c:\mariadb\mariadb-connector-c-2.2.3-src\include"
+LIBS += -Lc:\mariadb\mariadb-connector-c-2.2.3-src\libmariadb -lmariadbclient
 
-d:
-cd d:\ocelotgui
-SET PATH=D:\Qt\Qt5.9.1Static\bin;D:\Qt\Qt5.9.1Static\lib;d:\Qt\Tools\mingw530_32\bin;d:\Qt\Tools\mingw530_32\lib;%path%
+c:
+cd c:\ocelotgui
+SET PATH=c:\Qt\Qt5.9.1Static\bin;c:\Qt\Qt5.9.1Static\lib;c:\Qt\Tools\mingw530_32\bin;c:\Qt\Tools\mingw530_32\lib;%path%
 mingw32-make clean
 qmake ocelotgui.pro
 mingw32-make
