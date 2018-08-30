@@ -11,19 +11,19 @@
 
 #%define _rpmdir %_topdir/RPMS
 #%define _srcrpmdir %_topdir/SRPMS
-#%define _rpmfilename ocelotgui-1.0.6-1.x86_64.rpm
+#%define _rpmfilename ocelotgui-1.0.7-1.x86_64.rpm
 #%define _unpackaged_files_terminate_build 0
 
-# BuildRoot:      %_topdir/ocelotgui-1.0.6-1.x86_64
+# BuildRoot:      %_topdir/ocelotgui-1.0.7-1.x86_64
 Summary:        GUI client for MySQL or MariaDB
 Name:           ocelotgui
-Version:        1.0.6
+Version:        1.0.7
 Release:        1
 License:        GPLv2
 Group:          Applications/Databases
 Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
-Source0:        ocelotgui-1.0.6-for-rpm.tar.gz
+Source0:        ocelotgui-1.0.7-for-rpm.tar.gz
 Prefix: /usr
 
 
@@ -90,10 +90,13 @@ cp -a * %{buildroot}
 %{_docdir}/ocelotgui/starting-dialog.png
 %{_docdir}/ocelotgui/starting.png
 %{_docdir}/ocelotgui/statement-widget-example.png
+%{_docdir}/ocelotgui/tarantool.txt
 /usr/share/pixmaps/ocelotgui_logo
 
 %changelog
-* Tue Dec 12 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.6-1
+* Wed Aug 29 2018 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.7-1
+- Synch with newer versions of DBMS servers.
+* Tue Dec 12 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.7-1
 - Some bug fixes.
 * Sun Jul 02 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.5-1
 - Syntax checker understands more dialects.

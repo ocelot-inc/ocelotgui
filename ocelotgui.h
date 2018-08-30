@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -3182,7 +3182,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 
 #if (OCELOT_THIRD_PARTY==1)
     /* If Tarantool we can use third_party.h we don't need to load. */
-    /* OCELOT_THIRD_PARTY=1 should be on for Windows but not (for now) Linux. */
+    /* OCELOT_THIRD_PARTY=1 should be on for Windows but maybe not for Linux. */
     /* TODO: This should be controlled by ocelot_third_party = 1 */
     if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
     {

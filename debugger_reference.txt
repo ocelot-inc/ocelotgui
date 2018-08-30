@@ -8,7 +8,7 @@ http://ocelot.ca/blog/blog/2015/03/02/the-ocelotgui-debugger/.
 
 Temporary warning: for debugging MySQL version 8.0 routines,
 you need a recent ocelotgui version as pushed to source on
-or after June 2018.
+or after June 2018. Use ocelotgui version 1.0.7 or later.
 
 Statements
 ----------

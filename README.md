@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 1.0.6</P>
+<P>Version 1.0.7</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -9,7 +9,7 @@ Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, result-set displays
 with multi-line rows and resizable columns, and a debugger.</P>
 
-<P>Copyright (c) 2014-2017, Ocelot Computer Services Inc.
+<P>Copyright (c) 2014-2018, Ocelot Computer Services Inc.
 All rights reserved.</P>
 
 <P>For the GPL license terms see <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL">https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL</A>.</P>
@@ -79,7 +79,9 @@ Alternatively it sometimes can be found with qmake -v.</P>
 <P>You may find that the libmysqlclient.so library is already installed,
 if you have used a MySQL or MariaDB client program before.
 If not, your Linux distro's repositories will contain it,
-usually with a name like "libmysqlclient-dev" or "libmysqlclient-devel".</P>
+usually with a package name like "libmysqlclient-dev" or "libmysqlclient-devel".</P>
+With Fedora the package name may be "mariadb-devel" and the library
+name may be "libmariadb.so" or "libmariadbclient.so".</P>
 <P>A tip for Mageia 5: You can use "urpmf <library name>" to find
 what packages contain libmysqlclient.so.
 If the answer is lib64mariadb18, you can install it with:
@@ -89,7 +91,7 @@ sudo urpmi lib64mariadb18.</P>
  sudo zypper install libqt4-devel
  sudo zypper install mariadb-client
  sudo zypper install libmysqlclient-devel</PRE>
-<P>The important file is named "libmysqlclient.so".
+<P>The important file is named "libmysqlclient.so" or something similar.
 If it is not already on the default path, then an error or warning
 will appear when you try to run ocelotgui. Find it, and say something like</P>
 <PRE>export LD_RUN_PATH=[path to directory that contains libmysqlclient.so]</PRE>
@@ -108,23 +110,26 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6qt4-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.6qt4-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7qt4-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.7qt4-1_i386.deb</PRE>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.6-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.7-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6qt4-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.6qt4-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7qt4-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.7qt4-1_amd64.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.6-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6qt4-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.6qt4-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7qt4-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.7qt4-1.x86_64.rpm</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.6-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm</PRE>
+For 32-bit, RPM-like, Qt5<PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.i686.rpm
+sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
 </P>
 
 <H3 id="getting-and-using-the-ocelotgui-source">Getting and using the ocelotgui source</H3><HR>
@@ -152,14 +157,14 @@ A release includes the source files as of the release time.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, it usually is more stable.
 A release file is highlighted in green
-by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.6 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6.tar.gz.
+by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.7 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui-1.0.6.tar.gz.</P>
+and click ocelotgui-1.0.7.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
@@ -174,7 +179,7 @@ For example on Ubuntu:<PRE>
 For example on Mageia:<PRE>
  urpmi gcc gcc-c++ make cmake git
  #The name of the following package (containing mysql.h) varies,
- #it might be lib64mariadb-devel or libmysqlclient-devel
+ #it might be lib64mariadb-devel or libmysqlclient-devel or mariadb-devel
  urpmi mysql-devel
  urpmi rpm-build       
  #Do the following if and only if build is for use with Qt4
@@ -183,12 +188,12 @@ For example on Mageia:<PRE>
  urpmi libqt5-devel</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui-1.0.6.tar.gz
+ tar -zxvf ocelotgui-1.0.7.tar.gz
  cd ocelotgui</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
-MYSQL_INCLUDE_DIR, WITH_QT4.
+MYSQL_INCLUDE_DIR, WITH_QT4, OCELOT_THIRD_PARTY.
 For explanation of these flags, read the comments
 in the CMakeLists.txt file.
 If no customizing is necessary,
@@ -208,17 +213,16 @@ For Debian-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="DEB"
  make
  cpack
- sudo dpkg -i ocelotgui_1.0.6-1_i386.deb
- #or sudo dpkg -i ocelotgui_1.0.6-1_amd64.deb</PRE>
+ sudo dpkg -i ocelotgui_1.0.7-1_i386.deb
+ #or sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
 For RPM-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="RPM"
  make
  cpack
- sudo rpm -i ocelotgui-1.0.6-1.x86_64.rpm
- #or sudo rpm -i ocelotgui-1.0.6-1.i686.rpm</PRE>
+ sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm
+ #or sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
-For additional cmake options see the comments in CMakeLists.txt.
 </P>
 
 <P>Some other facts about the source package, for users who
@@ -279,9 +283,9 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.0.6, December 12 2017</P>
+<P>Version 1.0.7, August 29 2018</P>
 
-<P>Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.</P>
+<P>Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.</P>
   
 <P>This program is free software; you can redistribute it and/or modify  
 it under the terms of the GNU General Public License as published by  
@@ -657,7 +661,7 @@ colors, by selecting from a choice of 148 color names / color icons. Users can a
 change colors by saying SET object_name_color = color-name | hex-rgb-value.  
 In fact ocelotgui mixes the modes: for example if a user chooses Settings | Grid Text Color,
 then clicks on the 'Red' icon, then clicks OK, ocelotgui generates a
-statement "SET ocelot_grid_text_color = 'Red'". This makes the instruction
+statement "SET ocelot_grid_text_color = 'Red';". This makes the instruction
 easy to repeat or put in a script.
 <BR clear="all">
 </P>
@@ -699,7 +703,7 @@ an options file such as my.cnf.</P>
 incompatible behavior change in version 5.7, which affects the
 debugger. The originally recommended workaround was to say
 "set global show_compatibility_56=on;". We believe we have made a
-more permanent fix for this problem in ocelotgui version 1.0.6.</P>
+more permanent fix for this problem in ocelotgui version 1.0.7.</P>
 
 <P>RE: CONNECTION DIALOG. As stated earlier, if a password is necessary
 to connect, it is sufficient to start ocelotgui with "--password=<i>password</i>"
@@ -726,6 +730,9 @@ sub-clauses or sub-statements are indented.</P>
 from result sets of previous statements. To change this, click
 Settings|History and enter a number for Max Row Count.</P>
 
+<P>RE: TARANTOOL. By default ocelotgui is a client for MySQL or MariaDB.
+To use it as a client for Tarantool, read the tarantool.txt file.</P>
+
 <H3 id="contact">Contact</H3><HR>
 
 <P>We need feedback!</P>
@@ -742,15 +749,3 @@ Or send a private note to pgulutzan at ocelot.ca.</P>
 web page (ocelot.ca) or on the employee blog (<A HREF="http://ocelot.ca/blog">http://ocelot.ca/blog</A>).</P>
 
 <P>Any contributions will be appreciated.</P>
-
-
-
-
-
-
-
-
-
-
-
-

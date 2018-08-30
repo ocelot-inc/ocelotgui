@@ -9,14 +9,17 @@ The ocelotgui connection to Tarantool is alpha
 and is not produced by Tarantool and has no warranty.
 
 You need the latest Tarantool "SQL" server.
-You can get the release 1.8.1 release here:
-https://github.com/tarantool/tarantool/releases/tag/1.8.1
-but it is obsolete.
+The official "SQL" releases are 1.8.1 and 2.0.
+Release 1.8.1 https://github.com/tarantool/tarantool/releases/tag/1.8.1 is slightly obsolete.
+Release 2.0 will be available soon, look for it on https://github.com/tarantool/tarantool/releases,
+but at time of writing is not there yet.
 For a more current version, download from github.com/tarantool/tarantool:
 git clone -b 2.0 https://github.com/tarantool/tarantool.git ~/tarantool-2.0
 and build as instructed in the version-2.0 manual.
 
-On Linux you need the Tarantool client (tarantool.so) library.
+Usually you do not need to install the Tarantool client (tarantool.so) library,
+but it is possible to use it if you build ocelotgui with "cmake -DTHIRD_PARTY=1".
+If you did that, then this is how to get tarantool.so.
 The tarantool-dev package does not have it any more.
 Clone and follow the instructions at
 github.com/tarantool/tarantool-c ...
@@ -43,13 +46,11 @@ you will have to say this before you start ocelotgui:
 export LD_RUN_PATH=/usr/local/lib
 Or you can add --ld_run_path=/usr/local/lib on the
 command line where you start ocelotgui.
-GOOD NEWS: On Windows you do not need to install a
+On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.
-UPDATE: In ocelotgui 1.07, you will not need to install a
-Tarantool library.
 
 You need the latest ocelotgui client.
-The Release 1.06 version is okay,
+The Release 1.07 version is okay,
 but some things might not be up to date.
 It is better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.
@@ -86,7 +87,8 @@ But you can't drag and resize with --html.)
 
 Now type any other SQL statements, as described
 in the tarantool manual. (At time of writing this
-manual is not available but it's similar to SQLite.)
+manual is not available but it's similar to SQLite.
+The tutorial https://www.tarantool.io/en/doc/2.0/tutorials/sql_tutorial/ SQL statements work.)
 
 Now type
 LUA 'return box.space._index:select()';
@@ -180,7 +182,7 @@ Rules concerning ocelotgui when connecting to tarantool:
 * All statements must end with ; (or something established by DELIMITER statement).
   This applies to Lua as well as SQL.
 * If you want a result set for a Lua request, you must say "return".
-  For example "return box.space.t:select();" rather than "box.space.t:select();"
+  For example "return box.space.T:select();" rather than "box.space.T:select();"
 * SQL-style comments /* ... */ will not be considered errors inside Lua statements,
   but will not be passed to the server.
 * Statements may contain [[...]] strings, but not =[[...]]= strings.

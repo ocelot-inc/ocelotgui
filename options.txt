@@ -254,7 +254,6 @@ ocelot_shortcut_connect, ocelotshortcut_exit, etc:
 you can change what the shortcut is, for any menu
 item, by specifying its name and a new keysequence.
 For example: SET ocelot_shortcut_paste = 'Ctrl+Shift+K';
-(This is not available in the version 1.05 Release.)
 
 one_database. Ignored.
 

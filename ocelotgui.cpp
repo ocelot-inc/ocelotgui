@@ -1,12 +1,12 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.6
-   Last modified: August 19 2018
+   Version: 1.0.7
+   Last modified: August 29 2018
 */
 
 /*
-  Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.
+  Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -391,7 +391,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.6"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.7"; /* For --version. Make sure it's in manual too. */
   /* Todo: initialize this as we do for hparse_dbms_mask */
   static unsigned short int dbms_version_mask;
 
@@ -3536,7 +3536,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2017 by Ocelot Computer Services Inc.<br>\
+<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2018 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -3597,10 +3597,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.6, December 12 2017  \
+  <BR>Version 1.0.7, August 29 2018  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.  \
+  <BR>Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -6528,7 +6528,7 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
     Interesting idea: you could have a way to show both the surrogate and the original.
   */
   int i, j;
-  char i_as_string[10];
+  char i_as_string[16];
   /* Todo: n should not be hard-coded here, it limits us to only 10 routines can be searched */
   for (i= 0, j= 0; j < DEBUG_TAB_WIDGET_MAX; ++i)
   {
@@ -12761,14 +12761,15 @@ void MainWindow::set_dbms_version_mask(QString version)
   start|end).
   Todo: this could be useful in other places where we currently
         are making temporary copies that don't contain comments.
+  Warning: do not put next_i in a loop without checking that it is at end.
 */
 int MainWindow::next_i(int i_start, int i_increment)
 {
   int i= i_start;
   for (;;)
   {
-    if (i == 0) break;
-    if (main_token_lengths[i] == 0) break;
+    if ((i == 0) && (i_increment <= 0)) break;
+    if ((main_token_lengths[i] == 0) && (i_increment >= 0)) break;
     i= i + i_increment;
     if ((main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
       && (main_token_types[i] != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
@@ -17585,7 +17586,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2014-2017 by Ocelot Computer Services Inc. and others\n");
+  printf("Copyright (c) 2014-2018 by Ocelot Computer Services Inc. and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");

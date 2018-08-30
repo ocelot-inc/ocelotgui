@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 1.0.6</P>
+<P>Version 1.0.7</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -9,7 +9,7 @@ Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, result-set displays
 with multi-line rows and resizable columns, and a debugger.</P>
 
-<P>Copyright (c) 2014-2017, Ocelot Computer Services Inc.
+<P>Copyright (c) 2014-2018, Ocelot Computer Services Inc.
 All rights reserved.</P>
 
 <P>For the GPL license terms see <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL">https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL</A>.</P>
@@ -79,7 +79,9 @@ Alternatively it sometimes can be found with qmake -v.</P>
 <P>You may find that the libmysqlclient.so library is already installed,
 if you have used a MySQL or MariaDB client program before.
 If not, your Linux distro's repositories will contain it,
-usually with a name like "libmysqlclient-dev" or "libmysqlclient-devel".</P>
+usually with a package name like "libmysqlclient-dev" or "libmysqlclient-devel".</P>
+With Fedora the package name may be "mariadb-devel" and the library
+name may be "libmariadb.so" or "libmariadbclient.so".</P>
 <P>A tip for Mageia 5: You can use "urpmf <library name>" to find
 what packages contain libmysqlclient.so.
 If the answer is lib64mariadb18, you can install it with:
@@ -89,7 +91,7 @@ sudo urpmi lib64mariadb18.</P>
  sudo zypper install libqt4-devel
  sudo zypper install mariadb-client
  sudo zypper install libmysqlclient-devel</PRE>
-<P>The important file is named "libmysqlclient.so".
+<P>The important file is named "libmysqlclient.so" or something similar.
 If it is not already on the default path, then an error or warning
 will appear when you try to run ocelotgui. Find it, and say something like</P>
 <PRE>export LD_RUN_PATH=[path to directory that contains libmysqlclient.so]</PRE>
@@ -108,23 +110,26 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6qt4-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.6qt4-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7qt4-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.7qt4-1_i386.deb</PRE>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.6-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.7-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6qt4-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.6qt4-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7qt4-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.7qt4-1_amd64.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui_1.0.6-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.6-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6qt4-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.6qt4-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7qt4-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.7qt4-1.x86_64.rpm</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.6-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm</PRE>
+For 32-bit, RPM-like, Qt5<PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.i686.rpm
+sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
 </P>
 
 <H3 id="getting-and-using-the-ocelotgui-source">Getting and using the ocelotgui source</H3><HR>
@@ -152,14 +157,14 @@ A release includes the source files as of the release time.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, it usually is more stable.
 A release file is highlighted in green
-by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.6 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6.tar.gz.
+by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.7 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.6/ocelotgui-1.0.6.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui-1.0.6.tar.gz.</P>
+and click ocelotgui-1.0.7.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
@@ -174,7 +179,7 @@ For example on Ubuntu:<PRE>
 For example on Mageia:<PRE>
  urpmi gcc gcc-c++ make cmake git
  #The name of the following package (containing mysql.h) varies,
- #it might be lib64mariadb-devel or libmysqlclient-devel
+ #it might be lib64mariadb-devel or libmysqlclient-devel or mariadb-devel
  urpmi mysql-devel
  urpmi rpm-build       
  #Do the following if and only if build is for use with Qt4
@@ -183,12 +188,12 @@ For example on Mageia:<PRE>
  urpmi libqt5-devel</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui-1.0.6.tar.gz
+ tar -zxvf ocelotgui-1.0.7.tar.gz
  cd ocelotgui</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
-MYSQL_INCLUDE_DIR, WITH_QT4.
+MYSQL_INCLUDE_DIR, WITH_QT4, OCELOT_THIRD_PARTY.
 For explanation of these flags, read the comments
 in the CMakeLists.txt file.
 If no customizing is necessary,
@@ -208,17 +213,16 @@ For Debian-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="DEB"
  make
  cpack
- sudo dpkg -i ocelotgui_1.0.6-1_i386.deb
- #or sudo dpkg -i ocelotgui_1.0.6-1_amd64.deb</PRE>
+ sudo dpkg -i ocelotgui_1.0.7-1_i386.deb
+ #or sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
 For RPM-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="RPM"
  make
  cpack
- sudo rpm -i ocelotgui-1.0.6-1.x86_64.rpm
- #or sudo rpm -i ocelotgui-1.0.6-1.i686.rpm</PRE>
+ sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm
+ #or sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
-For additional cmake options see the comments in CMakeLists.txt.
 </P>
 
 <P>Some other facts about the source package, for users who
@@ -265,23 +269,23 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="some-screenshots">Some screenshots</H2><HR>
 
-<A href="shot1"><img src="shot1.jpg" alt="shot1.jpg" align="left" height="150"></A>
-<A href="shot2"><img src="shot2.jpg" alt="shot2.jpg" height="150"></A> 
-<A href="shot3"><img src="shot3.png" alt="shot3.png" height="150"></A> 
-<A href="shot4"><img src="shot4.jpg" alt="shot4.png" height="150"></A> 
-<A href="shot5"><img src="shot5.jpg" alt="shot5.png" height="150"></A> 
-<A href="shot6"><img src="shot6.jpg" alt="shot6.png" height="150"></A> 
-<A href="shot7"><img src="shot7.jpg" alt="shot7.png" height="150"></A> 
-<A href="shot8"><img src="shot8.jpg" alt="shot8.png" height="150"></A> 
-<A href="shot9"><img src="shot9.jpg" alt="shot9.png" height="150"></A> 
-<A href="shot10"><img src="shot10.jpg" alt="shot10.jpg" height="150"></A> 
-<A href="shot11"><img src="shot11.png" alt="shot11.jpg" height="150"></A> 
+<A href="shot1.jpg"><img src="shot1.jpg" alt="shot1.jpg" align="left" height="150"></A>
+<A href="shot2.jpg"><img src="shot2.jpg" alt="shot2.jpg" height="150"></A>
+<A href="shot3.png"><img src="shot3.png" alt="shot3.png" height="150"></A>
+<A href="shot4.jpg"><img src="shot4.jpg" alt="shot4.jpg" height="150"></A>
+<A href="shot5.jpg"><img src="shot5.jpg" alt="shot5.jpg" height="150"></A>
+<A href="shot6.jpg"><img src="shot6.jpg" alt="shot6.jpg" height="150"></A>
+<A href="shot7.jpg"><img src="shot7.jpg" alt="shot7.jpg" height="150"></A>
+<A href="shot8.jpg"><img src="shot8.jpg" alt="shot8.jpg" height="150"></A>
+<A href="shot9.jpg"><img src="shot9.jpg" alt="shot9.jpg" height="150"></A>
+<A href="shot10.jpg"><img src="shot10.jpg" alt="shot10.jpg" height="150"></A>
+<A href="shot11.png"><img src="shot11.png" alt="shot11.png" height="150"></A>
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.0.6, December 12 2017</P>
+<P>Version 1.0.7, August 29 2018</P>
 
-<P>Copyright (c) 2014-2017 by Ocelot Computer Services Inc. All rights reserved.</P>
+<P>Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.</P>
   
 <P>This program is free software; you can redistribute it and/or modify  
 it under the terms of the GNU General Public License as published by  
@@ -352,7 +356,7 @@ ocelotgui [--option [--option...]]
 For a description of options see <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt</A>.
 </P>
 <P>
-<A href="starting-dialog"><img src="starting-dialog.png" alt="starting-dialog.png" align="right" height="128"></A>
+<A href="starting-dialog.png"><img src="starting-dialog.png" alt="starting-dialog.png" align="right" height="128"></A>
 If a password is required but not supplied, a dialog box will appear.
 Or, if the initial attempt to connect fails, an error message will appear
 saying it is necessary to choose File|Connect, which will cause the dialog
@@ -365,7 +369,7 @@ but only non-DBMS tasks such as screen customizing will be possible.
 <BR clear="all">
 </P>
 <P>
-<A href="starting"><img src="starting.png" alt="starting.png" align="right" height="256"></A>
+<A href="starting.png"><img src="starting.png" alt="starting.png" align="right" height="256"></A>
 In any case, an initial screen will appear. After some activity has
 taken place, the screen will have four parts, from top to bottom:<BR>
 menu <BR>
@@ -400,7 +404,7 @@ but this can be changed, see the later description of
 Client Statements: Prompt.  
 </P>
 <P>
-<A href="statement-widget-example"><img src="statement-widget-example.png" alt="statement-widget-example.png" align="right" height="82"></A>
+<A href="statement-widget-example.png"><img src="statement-widget-example.png" alt="statement-widget-example.png" align="right" height="82"></A>
 For example, this screenshot shows the statement widget
 after the user has changed the default prompt and
 entered an SQL statement.
@@ -497,7 +501,7 @@ a scroll bar to appear.
 <BR clear="all">
 </P>
 <P>
-<A href="result-widget-example"><img src="result-widget-example.png" alt="result-widget-example.png" height="460"></A>
+<A href="result-widget-example.png"><img src="result-widget-example.png" alt="result-widget-example.png" height="460"></A>
 <BR clear="all">
 </P>
 <BR><BR>
@@ -508,13 +512,13 @@ a scroll bar to appear.
 Options, Debug and Help.</P>
 
 <P>
-<A href="menu-file"><img src="menu-file.png" alt="menu-file.png" align="right" height="48"></A>
+<A href="menu-file.png"><img src="menu-file.png" alt="menu-file.png" align="right" height="48"></A>
 File|Connect, or Ctrl+O, starts the Connect dialog box.  
 File|Exit, or Ctrl+Q, stops the program.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-edit"><img src="menu-edit.png" alt="menu-edit.png" align="right" height="192"></A>
+<A href="menu-edit.png"><img src="menu-edit.png" alt="menu-edit.png" align="right" height="192"></A>
 Edit|Undo or Ctrl+Z, Edit|Redo or Ctrl+Shift+Z, Edit|Cut or Ctrl+X,
 Edit|Cut or Ctrl+X, Edit|Copy or Ctrl+C, Edit|Paste or Ctrl+V,
 and Edit|Select or Ctrl+A, all work in the conventional manner.
@@ -526,7 +530,7 @@ or Ctrl+E.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-run"><img src="menu-run.png" alt="menu-run.png" align="right" height="48"></A>
+<A href="menu-run.png"><img src="menu-run.png" alt="menu-run.png" align="right" height="48"></A>
 Run|Execute or Ctrl+E or Ctrl+Enter causes execution of whatever is in the
 statement widget.  
 Run|Kill or Ctrl+C tries to stop execution -- this
@@ -535,7 +539,7 @@ needs to be aborted by user intervention.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-settings"><img src="menu-settings.png" alt="menu-settings.png" align="right" height="120"></A>
+<A href="menu-settings.png"><img src="menu-settings.png" alt="menu-settings.png" align="right" height="120"></A>
 Settings|Menu, Settings|History Widget, Settings|Grid Widget,
 Settings|Statement, and Settings|Extra Rule 1 are
 items which affect the behavior of each
@@ -554,7 +558,7 @@ set Grid Background Color Pink, set Condition = data_type LIKE
 <BR clear="all">
 </P>
 <P>
-<A href="menu-options"><img src="menu-options.png" alt="menu-options.png" align="right" height="72"></A>
+<A href="menu-options.png"><img src="menu-options.png" alt="menu-options.png" align="right" height="72"></A>
 Options|detach history widget,
 Options|detach result grid widget,
 Options|detach debug widget are
@@ -567,7 +571,7 @@ and clicking it will put the widget back in its original position.
 <BR clear="all">
 </P>
 <P>
-<A href="menu-debug"><img src="menu-debug.png" alt="menu-debug.png" align="right" height="132"></A>
+<A href="menu-debug.png"><img src="menu-debug.png" alt="menu-debug.png" align="right" height="132"></A>
 The items on the Debug menu are enabled only when a debug session
 is in progress. The way to debug SQL stored procedures or functions
 will be explained in a later section.
@@ -575,7 +579,7 @@ will be explained in a later section.
 </P>
   
 <P>
-<A href="menu-help"><img src="menu-help.png" alt="menu-help.png" align="right" height="96"></A>
+<A href="menu-help.png"><img src="menu-help.png" alt="menu-help.png" align="right" height="96"></A>
 Help|About will show the license and copyright and version.
 Help|The Manual will show the contents of README.md (the manual that you are reading) if README.md is on the same path as
 the ocelotgui program; otherwise it will show a copyright, a GPL license, and a pointer to README.md.
@@ -588,7 +592,7 @@ Help|settings will advise about how to use the Settings menu items.
 <H3 id="debugger">Debugger</H3><HR>
 
 <P>
-<A href="menu-options"><img src="debugger.png" alt="debugger.png" align="right" height="384"></A>
+<A href="menu-options.png"><img src="debugger.png" alt="debugger.png" align="right" height="384"></A>
 It is possible to debug stored procedures and functions.  
 This version of ocelotgui incorporates MDBug
 (read about MDBug at <A HREF="http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt">http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt</A>).  
@@ -615,23 +619,18 @@ For a walk through a debugger example, with screenshots, see
 this blog post: <A HREF="http://ocelot.ca/blog/the-ocelotgui-debugger">http://ocelot.ca/blog/the-ocelotgui-debugger</A>.  
 For reference, read: <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/debugger_reference.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/debugger_reference.txt</A>.
 </P>
-<P>
-Temporary warning: for debugging MySQL version 8.0 routines,
-you need a recent ocelotgui version as pushed to source on
-or after June 2018.
-</P>
 
 <H3 id="special-effects">Special Effects</H3><HR>
 
 <P>
-<A href="special-vertical"><img src="special-vertical.png" alt="special-vertical.png" align="right" height="256"></A>
+<A href="special-vertical.png"><img src="special-vertical.png" alt="special-vertical.png" align="right" height="256"></A>
 Vertical: If a user starts the program with ocelotgui --vertical=1
 or ends a statement with backslash G, results come up with one column per row.  
 <BR clear="all"> 
 </P>
   
 <P>
-<A href="special-images"><img src="special-images.png" alt="special-images.png" align="right" height="256"></A>
+<A href="special-images.png"><img src="special-images.png" alt="special-images.png" align="right" height="256"></A>
 Images: If a user chooses Settings | Extra Rule 1 from the menu,
 and sets the Condition and Display As boxes as described earlier,
 and selects rows which contain LONGBLOB columns, and the column values are
@@ -649,20 +648,20 @@ statement widget will show UPDATE t SET column2 = 'AB' WHERE column1 = 5 AND col
 The user then has the choice of ignoring the update statement or executing it.  
 </P>
 <P>
-<A href="special-detach"><img src="special-detach.png" alt="special-detach.png" align="right" height="256"></A>
+<A href="special-detach.png"><img src="special-detach.png" alt="special-detach.png" align="right" height="256"></A>
 Detaching: If a user chooses Options | detach history widget or
 Options | detach result grid widget, then the widget will become a separate window
 which can be moved or resized.  
 <BR clear="all">
 </P>
 <P>
-<A href="special-settings"><img src="special-settings.png" alt="special-settings.png" align="right" height="512"></A>
+<A href="special-settings.png"><img src="special-settings.png" alt="special-settings.png" align="right" height="512"></A>
 Colors: The Colors and fonts dialog boxes have a simple way to choose
 colors, by selecting from a choice of 148 color names / color icons. Users can also
 change colors by saying SET object_name_color = color-name | hex-rgb-value.  
 In fact ocelotgui mixes the modes: for example if a user chooses Settings | Grid Text Color,
 then clicks on the 'Red' icon, then clicks OK, ocelotgui generates a
-statement "SET ocelot_grid_text_color = 'Red'". This makes the instruction
+statement "SET ocelot_grid_text_color = 'Red';". This makes the instruction
 easy to repeat or put in a script.
 <BR clear="all">
 </P>
@@ -704,7 +703,7 @@ an options file such as my.cnf.</P>
 incompatible behavior change in version 5.7, which affects the
 debugger. The originally recommended workaround was to say
 "set global show_compatibility_56=on;". We believe we have made a
-more permanent fix for this problem in ocelotgui version 1.0.6.</P>
+more permanent fix for this problem in ocelotgui version 1.0.7.</P>
 
 <P>RE: CONNECTION DIALOG. As stated earlier, if a password is necessary
 to connect, it is sufficient to start ocelotgui with "--password=<i>password</i>"
@@ -731,6 +730,9 @@ sub-clauses or sub-statements are indented.</P>
 from result sets of previous statements. To change this, click
 Settings|History and enter a number for Max Row Count.</P>
 
+<P>RE: TARANTOOL. By default ocelotgui is a client for MySQL or MariaDB.
+To use it as a client for Tarantool, read the tarantool.txt file.</P>
+
 <H3 id="contact">Contact</H3><HR>
 
 <P>We need feedback!</P>
@@ -747,15 +749,3 @@ Or send a private note to pgulutzan at ocelot.ca.</P>
 web page (ocelot.ca) or on the employee blog (<A HREF="http://ocelot.ca/blog">http://ocelot.ca/blog</A>).</P>
 
 <P>Any contributions will be appreciated.</P>
-
-
-
-
-
-
-
-
-
-
-
-
