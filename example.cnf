@@ -24,6 +24,7 @@ ocelot_history_font_family='Ubuntu'
 ocelot_history_font_size=16
 ocelot_history_font_style='normal'
 ocelot_history_font_weight='normal'
+ocelot_history_max_row_count = '0'
 
 ocelot_menu_text_color= 'skyblue'
 ocelot_menu_background_color='tomato'

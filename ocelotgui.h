@@ -5739,6 +5739,7 @@ bool is_image(int col)
   grid_column_size_calc().
   Todo: What if there's a picture? Should BLOBs be shown as hex?
   Todo: Test with vertical.
+  Todo: If there's a newline, column boundaries are smashed.
   Todo: convert to QString, fiddle, convert back ... not a fast way, eh?
 */
 QByteArray history_padder(char *str, int length,
