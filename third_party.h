@@ -1,9 +1,9 @@
 /*
   Third-party code that may optionally be included with ocelotgui
   
-  Last modified: 2018-08-19
+  Last modified: 2018-09-11
   
-  This code is not required. It is not used for Ocelot's default
+  This code is not required. It does not have to be brought in for Ocelot's default
   configuration as a MySQL/MariaDB client.
   To see if it is brought in, see comments in ocelotgui.h before
   "#ifndef OCELOT_THIRD_PARTY".
@@ -17205,7 +17205,11 @@ tnt_request_writeout(struct tnt_stream *s, struct tnt_request *req,
     size_t plen = 0;
     for (int i = 1; i < v_sz; ++i) plen += v[i].iov_len;
     size_t hlen = mp_sizeof_luint32(plen);
+#ifdef OCELOT_OS_FREEBSD
+    v[0].iov_base = (char*)(v[0].iov_base) - hlen;
+#else
     v[0].iov_base -= hlen;
+#endif
     v[0].iov_len  += hlen;
     mp_encode_luint32((char*)v[0].iov_base, plen);
     ssize_t rv = s->writev(s, v, v_sz);
@@ -18898,7 +18902,11 @@ tnt_io_sendv_raw(struct tnt_stream_net *s, struct iovec *iov, int count, int all
             break;
         while (count > 0) {
             if (iov->iov_len > (size_t)r) {
+#ifdef OCELOT_OS_FREEBSD
+                iov->iov_base = (char*)(iov->iov_base) + r;
+#else
                 iov->iov_base += r;
+#endif
                 iov->iov_len -= r;
                 break;
             } else {

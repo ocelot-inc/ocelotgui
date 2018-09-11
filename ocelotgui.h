@@ -31,13 +31,20 @@
   OCELOT_OS_LINUX is for Linux-specific code, actually tested on Linux
   OCELOT_OS_NONLINUX is for Qt-specific code, seems to work on Windows
   The idea is that, if we support more platforms, we'll add more
-  e.g. OCELOT_OS_FREEBSD.
+  e.g. OCELOT_OS_OPENBSD.
+  With OCELOT_OS_FREEBSD we can build but haven't checked all the places
+  where we check if it's nonlinux (which is also true if FreeBSD is true),
+  so runtime failures are likely.
   "__linux" and "linux" are obsolete, someday we'll stop looking for them
+  Todo: we also check Q_OS_LINUX or Q_OS_FREEBSD Qt macros. Stop doing so?
 */
 #if defined(__linux__) || defined(__linux) || defined(linux)
 #define OCELOT_OS_LINUX
 #else
 #define OCELOT_OS_NONLINUX
+#endif
+#if defined(__FreeBSD__)
+#define OCELOT_OS_FREEBSD
 #endif
 
 /*
@@ -84,13 +91,16 @@
   Builders can say cmake . -DOCELOT_STATIC_LIBRARY=1 to use.
   They will have to deliberately add an appropriate library when they
   build, probably libmariadb.a.
-  Otherwise OCELOT_STATIC_LIBRARY=0 on Linux, OCELOT_STATIC_LIBRARY=1 on Windows.
+  Otherwise OCELOT_STATIC_LIBRARY=0 on Linux|FreeBSD, OCELOT_STATIC_LIBRARY=1 on Windows.
 */
 #ifndef OCELOT_STATIC_LIBRARY
 #ifdef OCELOT_OS_LINUX
 #define OCELOT_STATIC_LIBRARY 0
 #endif
-#ifdef OCELOT_OS_NONLINUX
+#ifdef OCELOT_OS_FREEBSD
+#define OCELOT_STATIC_LIBRARY 0
+#endif
+#ifndef OCELOT_STATIC_LIBRARY
 #define OCELOT_STATIC_LIBRARY 1
 #endif
 #endif
@@ -109,13 +119,18 @@
   tarantool-c, and actually it's probably better to use libtarantool.so because
   it may contain bug fixes or enhancements, so it's actually good on Linux to not include third_party.h.
   We only include it on Linux so that the code base on Linux and Windows will be the same.
+  Todo: I've never tried to find libtarantool.so on FreeBSD.
 */
 #ifndef OCELOT_THIRD_PARTY
 #ifdef OCELOT_OS_LINUX
 #define OCELOT_THIRD_PARTY 1
 #endif
 #ifdef OCELOT_OS_NONLINUX
+#ifdef OCELOT_OS_FREEBSD
 #define OCELOT_THIRD_PARTY 1
+#else
+#define OCELOT_THIRD_PARTY 1
+#endif
 #endif
 #endif
 
@@ -173,6 +188,7 @@
   We use getpwuid() when getting password, therefore include pwd.h.
   We use pthread_create() for debug and kill, therefore include pthread.h.
   We use stat() to see if a configuration file is world-writable, therefore include stat.h.
+  Todo: There was no error when I didn't do this for FreeBSD. Is it using Qt library and surviving?
 */
 #ifdef OCELOT_OS_LINUX
 #include <dlfcn.h>
@@ -3566,7 +3582,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
       {
-         /* fill this in when you have Windows */
+         /* With Windows don't look for the Tarantool library, its code is in third_party.h */
       }
 #endif
 #endif //#ifdef OCELOT_OS_NONLINUX

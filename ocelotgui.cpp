@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: August 29 2018
+   Last modified: September 11 2018
 */
 
 /*
@@ -152,7 +152,7 @@
   The code #includes header files from MySQL/Oracle and from Qt/Digia,
   and relies on the MySQL client library and the Qt core, gui,
   and widgets libraries. Builds have been successful with several
-  Linux distros and gcc 4.6/4.7. Build instructions are in the user manual or
+  Linux distros and gcc 4.6/4.7/7.3. Build instructions are in the user manual or
   in a readme file
 
   There are many comments. Searching for the word "Todo:" in the comments
@@ -1797,7 +1797,7 @@ int MainWindow::history_file_start(QString history_type, QString file_name) /* s
 
   /* If file name == "/dev/null" or something that links to "/dev/null", don't try to open. */
   if (file_name_to_open == "/dev/null") { delete []query; return 0; }
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
   char tmp_link_file[9 + 1];
   if (readlink(query, tmp_link_file, 9 + 1) == 9)
   {
@@ -3315,7 +3315,7 @@ void MainWindow::action_exit()
   if (ocelot_dbms.contains("tarantool", Qt::CaseInsensitive))
   {
     /* Todo: if there was a successful connection, close it */
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
 #ifdef DBMS_TARANTOOL
 #if (OCELOT_THIRD_PARTY != 1)
     if (is_libtarantool_loaded == 1) { dlclose(libtarantool_handle); is_libtarantool_loaded= 0; }
@@ -3352,7 +3352,7 @@ void MainWindow::action_exit()
     }
     /* Some code added 2015-08-25 due to valgrind */
     if (lmysql != 0) { delete lmysql; lmysql= 0; }
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
     if (is_libmysqlclient_loaded == 1) { dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
     if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
 #endif
@@ -4280,7 +4280,7 @@ QFont MainWindow::get_fixed_font()
   int point_size= fi.pointSize();
   int weight= fi.weight();
   bool italic= fi.italic();
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
   QString first_word= fi.family();
   if (first_word.indexOf(" ") != -1)
     first_word= first_word.left(first_word.indexOf(" "));
@@ -4325,7 +4325,7 @@ QFont MainWindow::get_fixed_font()
       else this_points+= 2;
       if (plain.fontInfo().family() == recommended_family)
         this_points+= 2;
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
       if (plain.fontInfo().family().left(first_word_length).toUpper() == first_word)
         this_points+= 3;
 #else
@@ -12558,7 +12558,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     is_mysql_library_init_done= true;
   }
   /* Mysterious crash may happen with one particular MariaDB version. */
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
   {
     QString s;
     s= lmysql->ldbms_mysql_get_client_info();
@@ -15113,7 +15113,7 @@ void MainWindow::log(const char *message, int level)
   if (level > ocelot_log_level)
   {
     printf("%s\n", message);
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
     fflush(stdout);
 #endif
   }
@@ -15854,7 +15854,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   //ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
 
   options_files_read= "";
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
   {
     struct passwd *pw;
     uid_t u;
@@ -15976,7 +15976,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     {
       char my_cnf_file[10][1024];
       int i= 0;
-#ifdef OCELOT_OS_LINUX
+      /* Internet mentions other my.cnf locations but I'm guessing they're for examples. */
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
       strcpy(my_cnf_file[i++], "/etc/my.cnf");
       strcpy(my_cnf_file[i++], "/etc/mysql/my.cnf");
       /* todo: think: is argv[0] what you want for SYSCONFDIR? not exact, but it's where the program is now. no, it might be a copy. */
@@ -16192,7 +16193,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   unsigned char output_buffer[65536];                    /* todo: should be dynamic size */
 
   group= "";                                             /* group identifier doesn't carry over from last .cnf file that we read */
-#ifdef OCELOT_OS_LINUX
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
   struct stat st;
   if (stat(file_name, &st) == 0)
   {
@@ -16388,7 +16389,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
       for (int i= 0; i < list.size(); ++i)
       {
         QFileInfo fileInfo= list.at(i);
-#ifdef Q_OS_LINUX
+#if defined(Q_OS_LINUX) || defined(Q_OS_FREEBSD)
         QString file_name= fileInfo.fileName();
         if (file_name.right(4) == ".cnf")
 #endif
@@ -17557,7 +17558,11 @@ QString MainWindow::get_version()
   s.append(", for Linux");
 #endif
 #ifdef OCELOT_OS_NONLINUX
+#ifdef OCELOT_OS_FREEBSD
+  s.append(", for FreeBSD");
+#else
   s.append(", for Windows");
+#endif
 #endif
 #if __x86_64__
   s.append(" (x86_64)");
