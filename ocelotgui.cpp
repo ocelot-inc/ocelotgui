@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: September 11 2018
+   Last modified: September 12 2018
 */
 
 /*
@@ -392,8 +392,7 @@
 
   /* This should correspond to the version number in the comment at the start of this program. */
   static const char ocelotgui_version[]="1.0.7"; /* For --version. Make sure it's in manual too. */
-  /* Todo: initialize this as we do for hparse_dbms_mask */
-  static unsigned short int dbms_version_mask;
+  static unsigned short int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
   static MYSQL mysql[MYSQL_MAX_CONNECTIONS];
@@ -444,7 +443,7 @@
   static bool hparse_subquery_is_allowed;
   static QString hparse_delimiter_str;
   static bool hparse_sql_mode_ansi_quotes= false;
-  static unsigned short int hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
+  static unsigned short int hparse_dbms_mask= FLAG_VERSION_DEFAULT;
   static bool hparse_is_in_subquery= false;
 
 /* Suppress useless messages
@@ -12750,7 +12749,7 @@ void MainWindow::set_dbms_version_mask(QString version)
     {
       dbms_version_mask= FLAG_VERSION_MYSQL_ALL;
     }
-    else dbms_version_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
+    else dbms_version_mask= FLAG_VERSION_DEFAULT;
   }
 }
 
@@ -12792,6 +12791,7 @@ int MainWindow::next_i(int i_start, int i_increment)
   Todo: try to do this while parsing, before you can ask the server.
   Todo: check: did the server return a warning for this statement?
   Warning: We might call this from within hparse_f_multi_block().
+  Warning: if we aren't connected yet, then dbms_version_mask is default e.g. MySQL-8.0 flag is on.
 */
 bool MainWindow::get_sql_mode(int who_is_calling,
                               QString text,
@@ -12929,12 +12929,19 @@ bool MainWindow::get_sql_mode(int who_is_calling,
   }
   if (sql_mode_string_seen == true)
   {
-    if ((sql_mode_string.contains("ANSI", Qt::CaseInsensitive) == true)
-     || (sql_mode_string.contains("DB2", Qt::CaseInsensitive) == true)
-     || (sql_mode_string.contains("MAXDB", Qt::CaseInsensitive) == true)
-     || (sql_mode_string.contains("MSSQL", Qt::CaseInsensitive) == true)
-     || (sql_mode_string.contains("ORACLE", Qt::CaseInsensitive) == true)
-     || (sql_mode_string.contains("POSTGRESQL", Qt::CaseInsensitive) == true))
+    bool is_ok_combo= false;
+    if (sql_mode_string.contains("ANSI", Qt::CaseInsensitive) == true)
+      is_ok_combo= true;
+    if ((dbms_version_mask & FLAG_VERSION_MYSQL_8_0) == 0)
+    {
+      if ((sql_mode_string.contains("DB2", Qt::CaseInsensitive) == true)
+       || (sql_mode_string.contains("MAXDB", Qt::CaseInsensitive) == true)
+       || (sql_mode_string.contains("MSSQL", Qt::CaseInsensitive) == true)
+       || (sql_mode_string.contains("ORACLE", Qt::CaseInsensitive) == true)
+       || (sql_mode_string.contains("POSTGRESQL", Qt::CaseInsensitive) == true))
+        is_ok_combo= true;
+    }
+    if (is_ok_combo)
     {
       if (is_in_hparse == false) sql_mode_ansi_quotes= true;
       hparse_sql_mode_ansi_quotes= true;
@@ -12949,23 +12956,16 @@ bool MainWindow::get_sql_mode(int who_is_calling,
            Obviously this is unreliable, but what else can I do?
         */
         sql_mode_string= sql_mode_string.toUpper();
+        bool is_ok= false;
         if ((connect_stripper(sql_mode_string, false) == "")
            || (sql_mode_string.contains("ALLOW_INVALID_DATES"))
-           || (sql_mode_string.contains("EMPTY_STRING_IS_NULL"))
            || (sql_mode_string.contains("ERROR_FOR_DIVISION_BY_ZERO"))
            || (sql_mode_string.contains("HIGH_NOT_PRECEDENCE"))
-           || (sql_mode_string.contains("IGNORE_BAD_TABLE_OPTIONS"))
            || (sql_mode_string.contains("IGNORE_SPACE"))
-           || (sql_mode_string.contains("MYSQL323"))
-           || (sql_mode_string.contains("MYSQL40"))
-           || (sql_mode_string.contains("NO_AUTO_CREATE_USER"))
            || (sql_mode_string.contains("NO_AUTO_VALUE_ON_ZERO"))
            || (sql_mode_string.contains("NO_BACKSLASH_ESCAPES"))
            || (sql_mode_string.contains("NO_DIR_IN_CREATE"))
            || (sql_mode_string.contains("NO_ENGINE_SUBSTITUTION"))
-           || (sql_mode_string.contains("NO_FIELD_OPTIONS"))
-           || (sql_mode_string.contains("NO_KEY_OPTIONS"))
-           || (sql_mode_string.contains("NO_TABLE_OPTIONS"))
            || (sql_mode_string.contains("NO_UNSIGNED_SUBTRACTION"))
            || (sql_mode_string.contains("NO_ZERO_DATE"))
            || (sql_mode_string.contains("NO_ZERO_IN_DATE"))
@@ -12973,13 +12973,33 @@ bool MainWindow::get_sql_mode(int who_is_calling,
            || (sql_mode_string.contains("PAD_CHAR_TO_FULL_LENGTH"))
            || (sql_mode_string.contains("PIPES_AS_CONCAT"))
            || (sql_mode_string.contains("REAL_AS_FLOAT"))
-           || (sql_mode_string.contains("SIMULTANEOUS_ASSIGNMENT"))
            || (sql_mode_string.contains("STRICT_ALL_TABLES"))
            || (sql_mode_string.contains("STRICT_TRANS_TABLES"))
-           || (sql_mode_string.contains("TIME_TRUNCATE_FRACTIONAL"))
            || (sql_mode_string.contains("TRADITIONAL")))
-          {;}
-        else return false; /* This has no effect */
+          is_ok= true;
+        if ((dbms_version_mask & FLAG_VERSION_MYSQL_8_0) == 0)
+        {
+          if ((sql_mode_string.contains("MYSQL323"))
+           || (sql_mode_string.contains("MYSQL40"))
+           || (sql_mode_string.contains("NO_AUTO_CREATE_USER"))
+           || (sql_mode_string.contains("NO_FIELD_OPTIONS"))
+           || (sql_mode_string.contains("NO_KEY_OPTIONS"))
+           || (sql_mode_string.contains("NO_TABLE_OPTIONS")))
+            is_ok= true;
+        }
+        if ((dbms_version_mask & FLAG_VERSION_MARIADB_10_3) != 0)
+        {
+          if ((sql_mode_string.contains("EMPTY_STRING_IS_NULL"))
+           || (sql_mode_string.contains("IGNORE_BAD_TABLE_OPTIONS"))
+           || (sql_mode_string.contains("SIMULTANEOUS_ASSIGNMENT")))
+            is_ok= true;
+        }
+        if ((dbms_version_mask & FLAG_VERSION_MYSQL_8_0) != 0)
+        {
+          if (sql_mode_string.contains("TIME_TRUNCATE_FRACTIONAL"))
+            is_ok= true;
+        }
+        if (is_ok == false) return false; /* SET will fail so this has no effect */
       }
       if (is_in_hparse == false)  sql_mode_ansi_quotes= false;
       hparse_sql_mode_ansi_quotes= false;

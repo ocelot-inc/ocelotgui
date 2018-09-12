@@ -82,6 +82,7 @@
 #define FLAG_VERSION_LUA            2048
 #define FLAG_VERSION_ALL_OR_LUA (FLAG_VERSION_ALL | FLAG_VERSION_LUA)
 #define FLAG_VERSION_PLSQL          4096
+#define FLAG_VERSION_DEFAULT FLAG_VERSION_MYSQL_OR_MARIADB_ALL
 
 #include <assert.h>
 #include <stdint.h>
