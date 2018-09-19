@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: September 12 2018
+   Last modified: September 19 2018
 */
 
 /*
@@ -536,6 +536,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_grid_cell_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_grid_cell_border_size= "1";
   ocelot_grid_cell_drag_line_size= "5";
+  ocelot_grid_height= "100";
+  ocelot_grid_left= "200";
+  ocelot_grid_top= "100";
+  ocelot_grid_width= "100";
   /* Probably result_grid_table_widget_saved_font only matters if the connection dialog box has to go up. */
   QFont tmp_font;
 //  QFont *saved_font;
@@ -590,6 +594,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   ocelot_history_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_menu_border_color= s_color_list[COLOR_BLACK*2 + 1];
+  ocelot_history_height= "100";
+  ocelot_history_left= "100";
+  ocelot_history_max_row_count= "0";
+  ocelot_history_top= "100";
+  ocelot_history_width= "100";
 
   lmysql= new ldbms();                               /* lmysql will be deleted in action_exit(). */
 
@@ -1377,6 +1386,7 @@ bool MainWindow::is_statement_complete(QString text)
   ocelot_history_font_family|size|style|weight     default = system
   ocelot_history_includes_warnings                 default = 0 (no)
   ocelot_history_max_row_count                     default = 0 (suppressed)
+  ocelot_history_{left|top|width|height}           default
 
   The statement is always followed by an error message,
   but ocelot_history_includes_warnings is affected by ...
@@ -3399,6 +3409,8 @@ void MainWindow::action_option_detach_history_widget(bool checked)
     menu_options_action_option_detach_history_widget->setText("attach history widget");
     history_edit_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     history_edit_widget->setWindowTitle("history widget");
+    history_edit_widget->setGeometry(ocelot_history_top.toInt(), ocelot_history_left.toInt(),
+                                     ocelot_history_width.toInt(), ocelot_history_height.toInt());
     history_edit_widget->detach_start();
   }
   else
@@ -3420,6 +3432,8 @@ void MainWindow::action_option_detach_result_grid_widget(bool checked)
   {
     menu_options_action_option_detach_result_grid_widget->setText("attach result grid widget");
     result_grid_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
+    result_grid_tab_widget->setGeometry(ocelot_grid_top.toInt(), ocelot_grid_left.toInt(),
+                                        ocelot_grid_width.toInt(), ocelot_grid_height.toInt());
     result_grid_tab_widget->setWindowTitle("result grid widget");
   }
   else
@@ -4016,6 +4030,11 @@ void MainWindow::action_grid()
     action_change_one_setting(ocelot_grid_border_size, new_ocelot_grid_border_size, "ocelot_grid_border_size");
     action_change_one_setting(ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size, "ocelot_grid_cell_border_size");
     action_change_one_setting(ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size, "ocelot_grid_cell_drag_line_size");
+    /* Todo: check: do we need to change style sheet for this stuff? */
+    action_change_one_setting(ocelot_grid_height, new_ocelot_grid_height, "ocelot_grid_height");
+    action_change_one_setting(ocelot_grid_left, new_ocelot_grid_left, "ocelot_grid_left");
+    action_change_one_setting(ocelot_grid_top, new_ocelot_grid_top, "ocelot_grid_top");
+    action_change_one_setting(ocelot_grid_width, new_ocelot_grid_width, "ocelot_grid_width");
   }
   delete(se);
 }
@@ -4056,7 +4075,11 @@ void MainWindow::action_history()
     action_change_one_setting(ocelot_history_font_size, new_ocelot_history_font_size, "ocelot_history_font_size");
     action_change_one_setting(ocelot_history_font_style, new_ocelot_history_font_style, "ocelot_history_font_style");
     action_change_one_setting(ocelot_history_font_weight, new_ocelot_history_font_weight, "ocelot_history_font_weight");
+    action_change_one_setting(ocelot_history_height, new_ocelot_history_height, "ocelot_history_height");
+    action_change_one_setting(ocelot_history_left, new_ocelot_history_left, "ocelot_history_left");
     action_change_one_setting(ocelot_history_max_row_count, new_ocelot_history_max_row_count, "ocelot_history_max_row_count");
+    action_change_one_setting(ocelot_history_top, new_ocelot_history_top, "ocelot_history_top");
+    action_change_one_setting(ocelot_history_width, new_ocelot_history_width, "ocelot_history_width");
   }
   delete(se);
 }
@@ -4221,7 +4244,6 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   if (font.italic()) ocelot_history_font_style= "italic"; else ocelot_history_font_style= "normal";
   ocelot_history_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_history_font_weight= canonical_font_weight(QString::number(font.weight()));
-  ocelot_history_max_row_count= "0";
 
   ocelot_menu_text_color= ui->menuBar->palette().color(QPalette::WindowText).name(); /* = QPalette::Foreground */
   ocelot_menu_background_color= ui->menuBar->palette().color(QPalette::Window).name(); /* = QPalette::Background */
@@ -9277,6 +9299,34 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         }
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_height", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_grid_height= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_left", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_grid_left= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_top", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_grid_top= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_width", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_grid_width= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
       bool is_extra_rule_1_style_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_text_color", Qt::CaseInsensitive) == 0)
       {
@@ -9369,11 +9419,39 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_height", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_history_height= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_left", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_history_left= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_max_row_count", Qt::CaseInsensitive) == 0)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_max_row_count= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_top", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_history_top= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_width", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_history_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_text_color", Qt::CaseInsensitive) == 0)
@@ -16886,6 +16964,10 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "ocelot_grid_cell_border_size") == 0) { ocelot_grid_cell_border_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_size") == 0) { ocelot_grid_cell_drag_line_size= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_tabs") == 0) { ocelot_grid_tabs= to_long(token2); return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_height") == 0) { ocelot_grid_height= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_left") == 0) { ocelot_grid_left= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_top") == 0) { ocelot_grid_top= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_grid_width") == 0) { ocelot_grid_width= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_text_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_background_color") == 0)
@@ -16898,7 +16980,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_font_style(token2); if (ccn != "") ocelot_history_font_style= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_font_weight") == 0)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_history_font_weight= ccn; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_left") == 0) { ocelot_history_left= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_height") == 0) { ocelot_history_height= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_history_max_row_count") == 0) { ocelot_history_max_row_count= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_top") == 0) { ocelot_history_top= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_history_width") == 0) { ocelot_history_width= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_language") == 0) { ocelot_language= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_menu_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_text_color= ccn; return; }

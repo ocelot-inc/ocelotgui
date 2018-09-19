@@ -16,6 +16,10 @@ ocelot_grid_cell_drag_line_color='HotPink'
 ocelot_grid_border_size=5
 ocelot_grid_cell_border_size=4
 ocelot_grid_cell_drag_line_size=5
+ocelot_grid_left = '200'
+ocelot_grid_top = '300'
+ocelot_grid_width = '400'
+ocelot_grid_height = '500'
 
 ocelot_history_text_color='coral'
 ocelot_history_background_color='tan'
@@ -25,6 +29,10 @@ ocelot_history_font_size=16
 ocelot_history_font_style='normal'
 ocelot_history_font_weight='normal'
 ocelot_history_max_row_count = '0'
+ocelot_history_left = '100'
+ocelot_history_top = '200'
+ocelot_history_width = '300'
+ocelot_history_height = '400'
 
 ocelot_menu_text_color= 'skyblue'
 ocelot_menu_background_color='tomato'

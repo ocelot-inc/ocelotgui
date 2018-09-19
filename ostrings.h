@@ -886,19 +886,23 @@ static int MENU_MENU_BORDER_COLOR= 79;
 static int MENU_FONT= 80;
 static int MENU_MAX_ROW_COUNT= 81;
 static int MENU_SYNTAX_CHECKER= 82;
-static int MENU_CONDITION= 83;
-static int MENU_DISPLAY_AS= 84;
-static int MENU_CANCEL= 85;
-static int MENU_OK= 86;
-static int MENU_SETTINGS_FOR_MENU= 87;
-static int MENU_SETTINGS_FOR_HISTORY= 88;
-static int MENU_SETTINGS_FOR_GRID= 89;
-static int MENU_SETTINGS_FOR_STATEMENT= 90;
-static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 91;
-static int MENU_PICK_NEW_FONT= 92;
-#define MENU_CONNECTION_DIALOG_BOX 93
-#define MENU_FILE_CONNECT_HEADING 94
-#define MENU_END 95
+static int MENU_TOP= 83;
+static int MENU_LEFT= 84;
+static int MENU_WIDTH= 85;
+static int MENU_HEIGHT= 86;
+static int MENU_CONDITION= 87;
+static int MENU_DISPLAY_AS= 88;
+static int MENU_CANCEL= 89;
+static int MENU_OK= 90;
+static int MENU_SETTINGS_FOR_MENU= 91;
+static int MENU_SETTINGS_FOR_HISTORY= 92;
+static int MENU_SETTINGS_FOR_GRID= 93;
+static int MENU_SETTINGS_FOR_STATEMENT= 94;
+static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 95;
+static int MENU_PICK_NEW_FONT= 96;
+#define MENU_CONNECTION_DIALOG_BOX 97
+#define MENU_FILE_CONNECT_HEADING 98
+#define MENU_END 99
 
 static const char *menu_strings[]=
 {
@@ -986,6 +990,10 @@ static const char *menu_strings[]=
     "Font       ",
     "Max Row Count",
     "Syntax Checker (1=highlight,3=highlight+error dialog)",
+    "Top",
+    "Left",
+    "Width",
+    "Height",
     "Condition",
     "Display as",
     "Cancel",
@@ -1081,7 +1089,11 @@ static const char *menu_strings[]=
         "Menu Bordure Couleur",
         "Police     ",
         "Comte Max Line",
-        "Cérificateur de syntaxe (1=Surbrillance,3=Surbrillance+dialogue d'erreur)",
+        "Cértificateur de syntaxe (1=Surbrillance,3=Surbrillance+dialogue d'erreur)",
+        "Sommet",
+        "Gauche",
+        "Largeur",
+        "Taille",
         "Condition",
         "Afficher comme",
         "Annuler",
