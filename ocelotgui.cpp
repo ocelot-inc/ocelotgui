@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: September 19 2018
+   Last modified: September 20 2018
 */
 
 /*
@@ -368,6 +368,7 @@
   static bool ocelot_detach_history_widget= false;
   static bool ocelot_detach_result_grid_widget= false;
   static bool ocelot_detach_debug_widget= false;
+  static bool ocelot_detach_statement_edit_widget= false;
 
   static int is_libmysqlclient_loaded= 0;
   static int is_libcrypto_loaded= 0;
@@ -485,7 +486,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   assert(sizeof(int) >= 4);
 
 #ifdef OCELOT_OS_LINUX
-  assert(MENU_FONT == 80); /* See kludge alert in ocelotgui.h Settings() */
+  assert(MENU_FONT == 81); /* See kludge alert in ocelotgui.h Settings() */
 #else
   assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
 #endif
@@ -591,6 +592,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_format_statement_indent= "2";
   ocelot_statement_format_clause_indent= "4";
   ocelot_statement_format_keyword_case= "upper";
+  ocelot_statement_height= "300";
+  ocelot_statement_left= "300";
+  ocelot_statement_top= "100";
+  ocelot_statement_width= "300";
 
   ocelot_history_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_menu_border_color= s_color_list[COLOR_BLACK*2 + 1];
@@ -2024,6 +2029,10 @@ void MainWindow::create_menu()
   menu_options_action_option_detach_debug_widget->setCheckable(true);
   menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
   connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
+  menu_options_action_option_detach_statement_edit_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
+  menu_options_action_option_detach_statement_edit_widget->setCheckable(true);
+  menu_options_action_option_detach_statement_edit_widget->setChecked(ocelot_detach_statement_edit_widget);
+  connect(menu_options_action_option_detach_statement_edit_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_statement_edit_widget(bool)));
   menu_options_action_next_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
   connect(menu_options_action_next_window, SIGNAL(triggered(bool)), this, SLOT(action_option_next_window()));
   shortcut("ocelot_shortcut_next_window", "", false, true);
@@ -3390,6 +3399,7 @@ void MainWindow::action_exit()
         * In every routine that uses action_edit_menu_undo etc., pass
           QMenu object so you can use actions().at.
         Otherwise click on menu changes focus to undetached widget.
+  Todo: stop using setText("literal"), put translatable messages in ostrings.h
 */
 
 /*
@@ -3415,7 +3425,7 @@ void MainWindow::action_option_detach_history_widget(bool checked)
   }
   else
   {
-    menu_options_action_option_detach_history_widget->setText("detach history widget");
+    menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
     history_edit_widget->setWindowFlags(Qt::Widget);
     history_edit_widget->detach_stop();
   }
@@ -3438,7 +3448,7 @@ void MainWindow::action_option_detach_result_grid_widget(bool checked)
   }
   else
   {
-    menu_options_action_option_detach_result_grid_widget->setText("detach result grid widget");
+    menu_options_action_option_detach_result_grid_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
     result_grid_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) result_grid_tab_widget->show();
@@ -3458,11 +3468,33 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
   }
   else
   {
-    menu_options_action_option_detach_debug_widget->setText("detach debug widget");
+    menu_options_action_option_detach_debug_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
     debug_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) debug_tab_widget->show();
 }
+
+/* menu item = Options|detach statement widget */
+void MainWindow::action_option_detach_statement_edit_widget(bool checked)
+{
+  bool is_visible= statement_edit_widget->isVisible();
+  ocelot_detach_statement_edit_widget= checked;
+  if (checked)
+  {
+    menu_options_action_option_detach_statement_edit_widget->setText("attach statement widget");
+    statement_edit_widget->setWindowFlags(Qt::Window| DETACHED_WINDOW_FLAGS);
+    statement_edit_widget->setGeometry(ocelot_statement_top.toInt(), ocelot_statement_left.toInt(),
+                                       ocelot_statement_width.toInt(), ocelot_statement_height.toInt());
+    statement_edit_widget->setWindowTitle("statement widget");
+  }
+  else
+  {
+    menu_options_action_option_detach_statement_edit_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
+    statement_edit_widget->setWindowFlags(Qt::Widget);
+  }
+  if (is_visible) statement_edit_widget->show();
+}
+
 
 /*
   Next/Prev focus widget. Qt hardcodes tab | Shift+Tab (backtab) see
@@ -4001,6 +4033,11 @@ void MainWindow::action_statement()
     /* statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color); */
     statement_edit_widget->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_text_color);
     action_statement_edit_widget_text_changed(0, 0, 0);            /* only for highlight? repaint so new highlighting will appear */
+    /* Todo: Check: Do we need to change style settings for this stuff? */
+    action_change_one_setting(ocelot_statement_height, new_ocelot_statement_height, "ocelot_statement_height");
+    action_change_one_setting(ocelot_statement_left, new_ocelot_statement_left, "ocelot_statement_left");
+    action_change_one_setting(ocelot_statement_top, new_ocelot_statement_top, "ocelot_statement_top");
+    action_change_one_setting(ocelot_statement_width, new_ocelot_statement_width, "ocelot_statement_width");
   }
   delete(se);
 }
@@ -9196,6 +9233,36 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_format_keyword_case= format_case;
         make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_height", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_statement_height= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_left", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_statement_left= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_top", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_statement_top= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_width", Qt::CaseInsensitive) == 0)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_statement_width= ccn;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+
+
       bool is_result_grid_style_changed= false;
       bool is_result_grid_font_size_changed= false;
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_text_color", Qt::CaseInsensitive) == 0)
@@ -17036,6 +17103,10 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ocelot_statement_format_clause_indent= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_format_keyword_case") == 0)
   { ocelot_statement_format_keyword_case= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_height") == 0) { ocelot_statement_height= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_left") == 0) { ocelot_statement_left= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_top") == 0) { ocelot_statement_top= token2; return; }
+  if (strcmp(token0_as_utf8, "ocelot_statement_width") == 0) { ocelot_statement_width= token2; return; }
   if (strcmp(token0_as_utf8, "ocelot_client_side_functions") == 0) { ocelot_client_side_functions= is_enable; return; }
   if (strcmp(token0_as_utf8, "ocelot_log_level") == 0)
   {
