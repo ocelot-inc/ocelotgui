@@ -374,6 +374,7 @@ extern int MENU_MENU_BORDER_COLOR;
 extern int MENU_FONT;
 extern int MENU_MAX_ROW_COUNT;
 extern int MENU_SYNTAX_CHECKER;
+extern int MENU_DETACHED;
 extern int MENU_TOP;
 extern int MENU_LEFT;
 extern int MENU_WIDTH;
@@ -386,6 +387,7 @@ extern int MENU_SETTINGS_FOR_MENU;
 extern int MENU_SETTINGS_FOR_HISTORY;
 extern int MENU_SETTINGS_FOR_GRID;
 extern int MENU_SETTINGS_FOR_STATEMENT;
+extern int MENU_SETTINGS_FOR_DEBUG;
 extern int MENU_SETTINGS_FOR_EXTRA_RULE_1;
 extern int MENU_PICK_NEW_FONT;
 
@@ -490,6 +492,12 @@ public:
   QString ocelot_statement_left, new_ocelot_statement_left;
   QString ocelot_statement_top, new_ocelot_statement_top;
   QString ocelot_statement_width, new_ocelot_statement_width;
+  QString ocelot_statement_detached, new_ocelot_statement_detached;
+  QString ocelot_debug_height, new_ocelot_debug_height;
+  QString ocelot_debug_left, new_ocelot_debug_left;
+  QString ocelot_debug_top, new_ocelot_debug_top;
+  QString ocelot_debug_width, new_ocelot_debug_width;
+  QString ocelot_debug_detached, new_ocelot_debug_detached;
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
   QString ocelot_grid_border_color, new_ocelot_grid_border_color;
@@ -509,6 +517,7 @@ public:
   QString ocelot_grid_left, new_ocelot_grid_left;
   QString ocelot_grid_top, new_ocelot_grid_top;
   QString ocelot_grid_width, new_ocelot_grid_width;
+  QString ocelot_grid_detached, new_ocelot_grid_detached;
   QString ocelot_extra_rule_1_background_color, new_ocelot_extra_rule_1_background_color;
   QString ocelot_extra_rule_1_text_color, new_ocelot_extra_rule_1_text_color;
   QString ocelot_extra_rule_1_condition, new_ocelot_extra_rule_1_condition;
@@ -527,6 +536,7 @@ public:
   QString ocelot_history_top, new_ocelot_history_top;
   QString ocelot_history_width, new_ocelot_history_width;
   QString ocelot_history_max_row_count, new_ocelot_history_max_row_count;
+  QString ocelot_history_detached, new_ocelot_history_detached;
   QString ocelot_menu_text_color, new_ocelot_menu_text_color;
   QString ocelot_menu_background_color, new_ocelot_menu_background_color;
   QString ocelot_menu_border_color, new_ocelot_menu_border_color;
@@ -874,8 +884,9 @@ public slots:
   void action_menu();
   void action_history();
   void action_grid();
-  void action_extra_rule_1();
   void action_statement();
+  void action_debug();
+  void action_extra_rule_1();
   void history_markup_previous();
   void history_markup_next();
   void action_option_detach_history_widget(bool checked);
@@ -1113,12 +1124,12 @@ private:
     QAction *menu_settings_action_history;
     QAction *menu_settings_action_grid;
     QAction *menu_settings_action_statement;
+    QAction *menu_settings_action_debug;
     QAction *menu_settings_action_extra_rule_1;
   QMenu *menu_options;
     QAction *menu_options_action_option_detach_history_widget;
     QAction *menu_options_action_option_detach_result_grid_widget;
     QAction *menu_options_action_option_detach_debug_widget;
-    QAction *menu_options_action_option_detach_statement_edit_widget;
     QAction *menu_options_action_next_window;
     QAction *menu_options_action_previous_window;
 #ifdef DEBUGGER
@@ -7386,10 +7397,14 @@ public:
   QLabel *label_for_size[3];
   QComboBox *combo_box_for_size[3];
 
+  QWidget *widget_for_detached;
+  QLabel *label_for_detached;
+  QSpinBox *spin_box_for_detached;
+  QHBoxLayout *hbox_layout_for_detached;
+
   QWidget *widget_for_top, *widget_for_left, *widget_for_width, *widget_for_height;
   QLabel *label_for_top, *label_for_left, *label_for_width, *label_for_height;
   QSpinBox *spin_box_for_top, *spin_box_for_left, *spin_box_for_width, *spin_box_for_height;
-  QHBoxLayout *hbox_layout_for_top_left_width_height;
 
   QComboBox *combo_box_for_color_pick[11];
   QLabel *label_for_color_show[11];
@@ -7447,6 +7462,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_history_left= copy_of_parent->ocelot_history_left;
   copy_of_parent->new_ocelot_history_top= copy_of_parent->ocelot_history_top;
   copy_of_parent->new_ocelot_history_width= copy_of_parent->ocelot_history_width;
+  copy_of_parent->new_ocelot_history_detached= copy_of_parent->ocelot_history_detached;
 
   copy_of_parent->new_ocelot_grid_text_color= copy_of_parent->ocelot_grid_text_color;
   copy_of_parent->new_ocelot_grid_background_color= copy_of_parent->ocelot_grid_background_color;
@@ -7465,6 +7481,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_grid_left= copy_of_parent->ocelot_grid_left;
   copy_of_parent->new_ocelot_grid_top= copy_of_parent->ocelot_grid_top;
   copy_of_parent->new_ocelot_grid_width= copy_of_parent->ocelot_grid_width;
+  copy_of_parent->new_ocelot_grid_detached= copy_of_parent->ocelot_grid_detached;
 
   copy_of_parent->new_ocelot_extra_rule_1_text_color= copy_of_parent->ocelot_extra_rule_1_text_color;
   copy_of_parent->new_ocelot_extra_rule_1_background_color= copy_of_parent->ocelot_extra_rule_1_background_color;
@@ -7491,20 +7508,31 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_statement_left= copy_of_parent->ocelot_statement_left;
   copy_of_parent->new_ocelot_statement_top= copy_of_parent->ocelot_statement_top;
   copy_of_parent->new_ocelot_statement_width= copy_of_parent->ocelot_statement_width;
+  copy_of_parent->new_ocelot_statement_detached= copy_of_parent->ocelot_statement_detached;
 
+  copy_of_parent->new_ocelot_debug_height= copy_of_parent->ocelot_debug_height;
+  copy_of_parent->new_ocelot_debug_left= copy_of_parent->ocelot_debug_left;
+  copy_of_parent->new_ocelot_debug_top= copy_of_parent->ocelot_debug_top;
+  copy_of_parent->new_ocelot_debug_width= copy_of_parent->ocelot_debug_width;
+  copy_of_parent->new_ocelot_debug_detached= copy_of_parent->ocelot_debug_detached;
   {
     QString s;
     if (current_widget == MAIN_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_MENU];
     if (current_widget == HISTORY_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_HISTORY];
     if (current_widget == GRID_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_GRID];
     if (current_widget == STATEMENT_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_STATEMENT];
+    if (current_widget == DEBUG_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_DEBUG];
     if (current_widget == EXTRA_RULE_1) s= menu_strings[menu_off + MENU_SETTINGS_FOR_EXTRA_RULE_1];
     setWindowTitle(s);                                                /* affects "this"] */
   }
 
-  /* Hboxes for foreground, background, and highlights */
   /* Todo: following calculation should actually be width of largest tr(label) + approximately 5. */
   int label_for_color_width= this->fontMetrics().boundingRect("W").width();
+
+if (current_widget != DEBUG_WIDGET)
+{
+  /* Hboxes for foreground, background, and highlights */
+
   for (int ci= 0; ci < 11; ++ci)
   {
     widget_for_color[ci]= new QWidget(this);
@@ -7632,9 +7660,30 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     label_for_size[0]->hide();
     combo_box_for_size[0]->hide();
   }
-
-  if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET) || (current_widget == STATEMENT_WIDGET))
+}
+  if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET)
+   || (current_widget == STATEMENT_WIDGET) || (current_widget == DEBUG_WIDGET))
   {
+    widget_for_detached= new QWidget(this);
+    label_for_detached= new QLabel(menu_strings[menu_off + MENU_DETACHED]);
+    spin_box_for_detached= new QSpinBox();
+    spin_box_for_detached->setFixedWidth(label_for_color_width * 5);
+    spin_box_for_detached->setMaximum(1);
+    spin_box_for_detached->setMinimum(0);
+    if (current_widget == HISTORY_WIDGET)
+      spin_box_for_detached->setValue(copy_of_parent->ocelot_history_detached.toInt());
+    else if (current_widget == GRID_WIDGET)
+      spin_box_for_detached->setValue(copy_of_parent->ocelot_grid_detached.toInt());
+    else if (current_widget == STATEMENT_WIDGET)
+      spin_box_for_detached->setValue(copy_of_parent->ocelot_statement_detached.toInt());
+    else
+      spin_box_for_detached->setValue(copy_of_parent->ocelot_debug_detached.toInt());
+    spin_box_for_detached->setButtonSymbols( QAbstractSpinBox::NoButtons);
+    hbox_layout_for_detached= new QHBoxLayout();
+    hbox_layout_for_detached->addWidget(label_for_detached);
+    hbox_layout_for_detached->addWidget(spin_box_for_detached);
+    widget_for_detached->setLayout(hbox_layout_for_detached);
+    connect(spin_box_for_detached, SIGNAL(valueChanged(int)), this, SLOT(handle_spin_box_for_detached(int)));
     widget_for_top= new QWidget(this);
     label_for_top= new QLabel(menu_strings[menu_off + MENU_TOP]);
     spin_box_for_top= new QSpinBox();
@@ -7645,13 +7694,13 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       spin_box_for_top->setValue(copy_of_parent->ocelot_history_top.toInt());
     else if (current_widget == GRID_WIDGET)
       spin_box_for_top->setValue(copy_of_parent->ocelot_grid_top.toInt());
-    else
+    else if (current_widget == STATEMENT_WIDGET)
       spin_box_for_top->setValue(copy_of_parent->ocelot_statement_top.toInt());
+    else
+      spin_box_for_top->setValue(copy_of_parent->ocelot_debug_top.toInt());
     spin_box_for_top->setButtonSymbols( QAbstractSpinBox::NoButtons);
-    hbox_layout_for_top_left_width_height= new QHBoxLayout();
-    hbox_layout_for_top_left_width_height->addWidget(label_for_top);
-    hbox_layout_for_top_left_width_height->addWidget(spin_box_for_top);
-    widget_for_top->setLayout(hbox_layout_for_top_left_width_height);
+    hbox_layout_for_detached->addWidget(label_for_top);
+    hbox_layout_for_detached->addWidget(spin_box_for_top);
     connect(spin_box_for_top, SIGNAL(valueChanged(int)), this, SLOT(handle_spin_box_for_top(int)));
 
     widget_for_left= new QWidget(this);
@@ -7664,11 +7713,13 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       spin_box_for_left->setValue(copy_of_parent->ocelot_history_left.toInt());
     else if (current_widget == GRID_WIDGET)
       spin_box_for_left->setValue(copy_of_parent->ocelot_grid_left.toInt());
-    else
+    else if (current_widget == STATEMENT_WIDGET)
       spin_box_for_left->setValue(copy_of_parent->ocelot_statement_left.toInt());
+    else
+      spin_box_for_left->setValue(copy_of_parent->ocelot_debug_left.toInt());
     spin_box_for_left->setButtonSymbols( QAbstractSpinBox::NoButtons);
-    hbox_layout_for_top_left_width_height->addWidget(label_for_left);
-    hbox_layout_for_top_left_width_height->addWidget(spin_box_for_left);
+    hbox_layout_for_detached->addWidget(label_for_left);
+    hbox_layout_for_detached->addWidget(spin_box_for_left);
     connect(spin_box_for_left, SIGNAL(valueChanged(int)), this, SLOT(handle_spin_box_for_left(int)));
 
     widget_for_width= new QWidget(this);
@@ -7681,11 +7732,13 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       spin_box_for_width->setValue(copy_of_parent->ocelot_history_width.toInt());
     else if (current_widget == GRID_WIDGET)
       spin_box_for_width->setValue(copy_of_parent->ocelot_grid_width.toInt());
-    else
+    else if (current_widget == STATEMENT_WIDGET)
       spin_box_for_width->setValue(copy_of_parent->ocelot_statement_width.toInt());
+    else
+      spin_box_for_width->setValue(copy_of_parent->ocelot_debug_width.toInt());
     spin_box_for_width->setButtonSymbols( QAbstractSpinBox::NoButtons);
-    hbox_layout_for_top_left_width_height->addWidget(label_for_width);
-    hbox_layout_for_top_left_width_height->addWidget(spin_box_for_width);
+    hbox_layout_for_detached->addWidget(label_for_width);
+    hbox_layout_for_detached->addWidget(spin_box_for_width);
     connect(spin_box_for_width, SIGNAL(valueChanged(int)), this, SLOT(handle_spin_box_for_width(int)));
 
     widget_for_height= new QWidget(this);
@@ -7698,14 +7751,15 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
       spin_box_for_height->setValue(copy_of_parent->ocelot_history_height.toInt());
     else if (current_widget == GRID_WIDGET)
       spin_box_for_height->setValue(copy_of_parent->ocelot_grid_height.toInt());
-    else
+    else if (current_widget == STATEMENT_WIDGET)
       spin_box_for_height->setValue(copy_of_parent->ocelot_statement_height.toInt());
+    else
+      spin_box_for_height->setValue(copy_of_parent->ocelot_debug_height.toInt());
     spin_box_for_height->setButtonSymbols( QAbstractSpinBox::NoButtons);
-    hbox_layout_for_top_left_width_height->addWidget(label_for_height);
-    hbox_layout_for_top_left_width_height->addWidget(spin_box_for_height);
+    hbox_layout_for_detached->addWidget(label_for_height);
+    hbox_layout_for_detached->addWidget(spin_box_for_height);
     connect(spin_box_for_height, SIGNAL(valueChanged(int)), this, SLOT(handle_spin_box_for_height(int)));
   }
-
   if (current_widget == EXTRA_RULE_1)
   {
     widget_for_size[0]= new QWidget(this);
@@ -7772,7 +7826,6 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     widget_for_size[1]->setLayout(hbox_layout_for_size[1]);
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
   }
-
   /* The Cancel and OK buttons */
   widget_3= new QWidget(this);
   button_for_cancel= new QPushButton(menu_strings[menu_off + MENU_CANCEL], this);
@@ -7784,28 +7837,31 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   hbox_layout_3->addWidget(button_for_cancel);
   hbox_layout_3->addWidget(button_for_ok);
   widget_3->setLayout(hbox_layout_3);
-
   /* Put the HBoxes in a VBox */
   main_layout= new QVBoxLayout();
-  for (int ci= 0; ci < 11; ++ci) main_layout->addWidget(widget_for_color[ci]);
-  main_layout->addWidget(widget_font_label);
-  main_layout->addWidget(widget_for_font_dialog);
-  if (current_widget == STATEMENT_WIDGET) main_layout->addWidget(widget_for_syntax_checker);
-  if (current_widget == GRID_WIDGET) for (int ci= 0; ci < 3; ++ci) main_layout->addWidget(widget_for_size[ci]);
-  if (current_widget == HISTORY_WIDGET)
-    main_layout->addWidget(widget_for_max_row_count);
-  if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET) || (current_widget == STATEMENT_WIDGET))
+  if (current_widget != DEBUG_WIDGET)
   {
-    main_layout->addWidget(widget_for_top);
-    main_layout->addWidget(widget_for_left);
-    main_layout->addWidget(widget_for_width);
-    main_layout->addWidget(widget_for_height);
+    for (int ci= 0; ci < 11; ++ci) main_layout->addWidget(widget_for_color[ci]);
+    main_layout->addWidget(widget_font_label);
+    main_layout->addWidget(widget_for_font_dialog);
+    if (current_widget == STATEMENT_WIDGET) main_layout->addWidget(widget_for_syntax_checker);
+    if (current_widget == GRID_WIDGET) for (int ci= 0; ci < 3; ++ci) main_layout->addWidget(widget_for_size[ci]);
+    if (current_widget == HISTORY_WIDGET)
+      main_layout->addWidget(widget_for_max_row_count);
+  }
+  if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET)
+   || (current_widget == STATEMENT_WIDGET) || (current_widget == DEBUG_WIDGET))
+  {
+    main_layout->addWidget(widget_for_detached);
+    //main_layout->addWidget(widget_for_top);
+    //main_layout->addWidget(widget_for_left);
+    //main_layout->addWidget(widget_for_width);
+    //main_layout->addWidget(widget_for_height);
   }
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[0]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
   main_layout->addWidget(widget_3);
-
-  handle_combo_box_1(current_widget);
+  if (current_widget != DEBUG_WIDGET) handle_combo_box_1(current_widget);
   /*
     If one merely says
     this->setLayout(main_layout);
@@ -8505,8 +8561,22 @@ void handle_spin_box_for_top(int i)
     copy_of_parent->new_ocelot_history_top= QString::number(i);
   else if (current_widget == GRID_WIDGET)
     copy_of_parent->new_ocelot_grid_top= QString::number(i);
-  else
+  else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_top= QString::number(i);
+  else
+    copy_of_parent->new_ocelot_debug_top= QString::number(i);
+}
+
+void handle_spin_box_for_detached(int i)
+{
+  if (current_widget == HISTORY_WIDGET)
+    copy_of_parent->new_ocelot_history_detached= QString::number(i);
+  else if (current_widget == GRID_WIDGET)
+    copy_of_parent->new_ocelot_grid_detached= QString::number(i);
+  else if (current_widget == STATEMENT_WIDGET)
+    copy_of_parent->new_ocelot_statement_detached= QString::number(i);
+  else
+    copy_of_parent->new_ocelot_debug_detached= QString::number(i);
 }
 
 void handle_spin_box_for_left(int i)
@@ -8515,8 +8585,10 @@ void handle_spin_box_for_left(int i)
     copy_of_parent->new_ocelot_history_left= QString::number(i);
   else if (current_widget == GRID_WIDGET)
     copy_of_parent->new_ocelot_grid_left= QString::number(i);
-  else
+  else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_left= QString::number(i);
+  else
+    copy_of_parent->new_ocelot_debug_left= QString::number(i);
 }
 
 void handle_spin_box_for_width(int i)
@@ -8525,8 +8597,10 @@ void handle_spin_box_for_width(int i)
     copy_of_parent->new_ocelot_history_width= QString::number(i);
   else if (current_widget == GRID_WIDGET)
     copy_of_parent->new_ocelot_grid_width= QString::number(i);
-  else
+  else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_width= QString::number(i);
+  else
+    copy_of_parent->new_ocelot_debug_width= QString::number(i);
 }
 
 void handle_spin_box_for_height(int i)
@@ -8535,10 +8609,11 @@ void handle_spin_box_for_height(int i)
     copy_of_parent->new_ocelot_history_height= QString::number(i);
   else if (current_widget == GRID_WIDGET)
     copy_of_parent->new_ocelot_grid_height= QString::number(i);
-  else
+  else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_height= QString::number(i);
+  else
+    copy_of_parent->new_ocelot_debug_height= QString::number(i);
 }
-
 
 void handle_combo_box_for_size_0(int i)
 {

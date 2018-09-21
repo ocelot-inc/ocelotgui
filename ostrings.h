@@ -827,12 +827,13 @@ static const char *s_color_list[]=
 #define MENU_SETTINGS_HISTORY_WIDGET       21
 #define MENU_SETTINGS_GRID_WIDGET       22
 #define MENU_SETTINGS_STATEMENT_WIDGET         23
-#define MENU_SETTINGS_EXTRA_RULE_1       24
-#define MENU_OPTIONS       25
-#define MENU_OPTIONS_DETACH_HISTORY_WIDGET       26
-#define MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET       27
-#define MENU_OPTIONS_DETACH_DEBUG_WIDGET       28
-#define MENU_OPTIONS_DETACH_STATEMENT_WIDGET   29
+#define MENU_SETTINGS_DEBUG_WIDGET 24
+#define MENU_SETTINGS_EXTRA_RULE_1       25
+#define MENU_OPTIONS       26
+#define MENU_OPTIONS_DETACH_HISTORY_WIDGET       27
+#define MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET       28
+#define MENU_OPTIONS_DETACH_DEBUG_WIDGET       29
+
 #define MENU_OPTIONS_NEXT_WINDOW 30
 #define MENU_OPTIONS_PREVIOUS_WINDOW 31
 #define MENU_DEBUG       32
@@ -887,23 +888,25 @@ static int MENU_MENU_BORDER_COLOR= 80;
 static int MENU_FONT= 81;
 static int MENU_MAX_ROW_COUNT= 82;
 static int MENU_SYNTAX_CHECKER= 83;
-static int MENU_TOP= 84;
-static int MENU_LEFT= 85;
-static int MENU_WIDTH= 86;
-static int MENU_HEIGHT= 87;
-static int MENU_CONDITION= 88;
-static int MENU_DISPLAY_AS= 89;
-static int MENU_CANCEL= 90;
-static int MENU_OK= 91;
-static int MENU_SETTINGS_FOR_MENU= 92;
-static int MENU_SETTINGS_FOR_HISTORY= 93;
-static int MENU_SETTINGS_FOR_GRID= 94;
-static int MENU_SETTINGS_FOR_STATEMENT= 95;
-static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 96;
-static int MENU_PICK_NEW_FONT= 97;
-#define MENU_CONNECTION_DIALOG_BOX 98
-#define MENU_FILE_CONNECT_HEADING 99
-#define MENU_END 100
+static int MENU_DETACHED= 84;
+static int MENU_TOP= 85;
+static int MENU_LEFT= 86;
+static int MENU_WIDTH= 87;
+static int MENU_HEIGHT= 88;
+static int MENU_CONDITION= 89;
+static int MENU_DISPLAY_AS= 90;
+static int MENU_CANCEL= 91;
+static int MENU_OK= 92;
+static int MENU_SETTINGS_FOR_MENU= 93;
+static int MENU_SETTINGS_FOR_HISTORY= 94;
+static int MENU_SETTINGS_FOR_GRID= 95;
+static int MENU_SETTINGS_FOR_STATEMENT= 96;
+static int MENU_SETTINGS_FOR_DEBUG= 97;
+static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 98;
+static int MENU_PICK_NEW_FONT= 99;
+#define MENU_CONNECTION_DIALOG_BOX 100
+#define MENU_FILE_CONNECT_HEADING 101
+#define MENU_END 102
 
 static const char *menu_strings[]=
 {
@@ -932,12 +935,12 @@ static const char *menu_strings[]=
 "History Widget", /* MENU_SETTINGS_HISTORY_WIDGET */
 "Grid Widget", /* MENU_SETTINGS_GRID_WIDGET */
 "Statement Widget", /* MENU_SETTINGS_STATEMENT_WIDGET */
+"Debug Widget", /* MENU_SETTINGS_DEBUG_WIDGET */
 "Extra Rule 1", /* MENU_SETTINGS_EXTRA_RULE_1 */
 "Options", /* MENU_OPTIONS */
 "detach history widget", /* MENU_OPTIONS_DETACH_HISTORY_WIDGET */
 "detach result grid widget", /* MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET */
 "detach debug widget", /* MENU_OPTIONS_DETACH_DEBUG_WIDGET */
-"detach statement widget", /* MENU_OPTIONS_DETACH_STATEMENT_WIDGET */
 "next window", /* MENU_OPTIONS_NEXT_WINDOW */
 "previous window", /* MENU_OPTIONS_PREVIOUS_WINDOW */
 "Debug", /* MENU_DEBUG */
@@ -992,6 +995,7 @@ static const char *menu_strings[]=
     "Font       ",
     "Max Row Count",
     "Syntax Checker (1=highlight,3=highlight+error dialog)",
+    "Detached",
     "Top",
     "Left",
     "Width",
@@ -1004,6 +1008,7 @@ static const char *menu_strings[]=
     "Settings -- -- for History",
     "Settings -- -- for Grid",
     "Settings -- -- for Statement",
+    "Settings -- -- for Debug",
     "Settings -- -- for Extra Rule 1",
     "Pick new font",
     "Connection Dialog Box",
@@ -1033,12 +1038,12 @@ static const char *menu_strings[]=
     "Histoire Widget", /* MENU_SETTINGS_HISTORY_WIDGET */
     "Grille Widget", /* MENU_SETTINGS_GRID_WIDGET */
     "Instruction Widget", /* MENU_SETTINGS_STATEMENT_WIDGET */
+    "Debug Widget", /* MENU_SETTINGS_DEBUG_WIDGET */
     "Règle supplémentaire 1", /* MENU_SETTINGS_EXTRA_RULE_1 */
     "Options", /* MENU_OPTIONS */
     "Détacher history widget", /* MENU_OPTIONS_DETACH_HISTORY_WIDGET */
     "Détacher result grid widget", /* MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET */
     "Détacher debug widget", /* MENU_OPTIONS_DETACH_DEBUG_WIDGET */
-    "Détacher statement widget", /* MENU_OPTIONS_DETACH_STATEMENT_WIDGET */
     "Fenêtre prochaine ", /* MENU_OPTIONS_NEXT_WINDOW */
     "Fenêtre précédente", /* MENU_OPTIONS_PREVIOUS_WINDOW */
     "Debug", /* MENU_DEBUG */
@@ -1093,6 +1098,7 @@ static const char *menu_strings[]=
         "Police     ",
         "Comte Max Line",
         "Cértificateur de syntaxe (1=Surbrillance,3=Surbrillance+dialogue d'erreur)",
+        "Détaché",
         "Sommet",
         "Gauche",
         "Largeur",
@@ -1105,6 +1111,7 @@ static const char *menu_strings[]=
         "Réglages -- -- pour Histoire",
         "Réglages -- -- pour Grille",
         "Réglages -- -- pour Instruction",
+        "Réglages -- -- pour Debug",
         "Réglages -- -- pour Règle supplémentaire 1",
         "Choisir nouvelle police",
         "Connexion Boîte de dialogue",
