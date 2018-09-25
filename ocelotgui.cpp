@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: September 21 2018
+   Last modified: September 25 2018
 */
 
 /*
@@ -488,7 +488,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   assert(sizeof(int) >= 4);
 
 #ifdef OCELOT_OS_LINUX
-  assert(MENU_FONT == 81); /* See kludge alert in ocelotgui.h Settings() */
+  assert(MENU_FONT == 82); /* See kludge alert in ocelotgui.h Settings() */
 #else
   assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
 #endif
@@ -539,11 +539,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_grid_cell_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_grid_cell_border_size= "1";
   ocelot_grid_cell_drag_line_size= "5";
-  ocelot_grid_height= "100";
-  ocelot_grid_left= "200";
-  ocelot_grid_top= "100";
-  ocelot_grid_width= "100";
-  ocelot_grid_detached= "0";
+  ocelot_grid_height= ocelot_grid_left= ocelot_grid_top= ocelot_grid_width= "default";
+  ocelot_grid_detached= "no";
   /* Probably result_grid_table_widget_saved_font only matters if the connection dialog box has to go up. */
   QFont tmp_font;
 //  QFont *saved_font;
@@ -595,11 +592,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_format_statement_indent= "2";
   ocelot_statement_format_clause_indent= "4";
   ocelot_statement_format_keyword_case= "upper";
-  ocelot_statement_height= "300";
-  ocelot_statement_left= "300";
-  ocelot_statement_top= "100";
-  ocelot_statement_width= "300";
-  ocelot_statement_detached= "0";
+  ocelot_statement_height= ocelot_statement_left= ocelot_statement_top= ocelot_statement_width= "default";
+  ocelot_statement_detached= "no";
 
   ocelot_debug_height= ocelot_statement_height;
   ocelot_debug_left= ocelot_statement_left;
@@ -609,12 +603,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   ocelot_history_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_menu_border_color= s_color_list[COLOR_BLACK*2 + 1];
-  ocelot_history_height= "100";
-  ocelot_history_left= "100";
+  ocelot_history_height= ocelot_history_left= ocelot_history_top= ocelot_history_width= "default";
   ocelot_history_max_row_count= "0";
-  ocelot_history_top= "100";
-  ocelot_history_width= "100";
-  ocelot_history_detached= "0";
+  ocelot_history_detached= "no";
 
   lmysql= new ldbms();                               /* lmysql will be deleted in action_exit(). */
 
@@ -673,11 +664,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   create_menu();    /* Do this at a late stage because widgets must exist before we call connect() */
 
   /* If any widget is detached, there might be some blinking. Probably not worth worrying about. */
-  printf("**** %d\n", ocelot_history_detached.toInt());
-  if (ocelot_history_detached.toInt() == 1) action_option_detach_history_widget(true);
-  if (ocelot_grid_detached == "1") action_option_detach_result_grid_widget(true);
-  if (ocelot_statement_detached == "1") action_option_detach_statement_edit_widget(true);
-  if (ocelot_debug_detached == "1") action_option_detach_debug_widget(true);
+  if (ocelot_history_detached.toInt() == 1) detach_history_widget(true);
+  if (ocelot_grid_detached.toInt() == 1) detach_result_grid_widget(true);
+  if (ocelot_statement_detached.toInt() == 1) detach_statement_widget(true);
+  if (ocelot_debug_detached.toInt() == 1) detach_debug_widget(true);
 
   /*
     If the command-line option was -p but not a password, then password input is necessary
@@ -2049,6 +2039,10 @@ void MainWindow::create_menu()
   menu_options_action_option_detach_debug_widget->setCheckable(true);
   menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
   connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
+  menu_options_action_option_detach_statement_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
+  menu_options_action_option_detach_statement_widget->setCheckable(true);
+  menu_options_action_option_detach_statement_widget->setChecked(ocelot_detach_statement_edit_widget);
+  connect(menu_options_action_option_detach_statement_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_statement_widget(bool)));
   menu_options_action_next_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
   connect(menu_options_action_next_window, SIGNAL(triggered(bool)), this, SLOT(action_option_next_window()));
   shortcut("ocelot_shortcut_next_window", "", false, true);
@@ -2907,7 +2901,7 @@ void MainWindow::main_token_pop()
 /*
   action_statement_edit_widget_text_changed() is a slot.
   Actually the connect() was for statement_edit_widget->document()'s
-  contentsChanged(), rather than statement_edit_widget's textChanged(),
+  contentsChange(), rather than statement_edit_widget's textChanged(),
   but I don't see any difference.
   This routine can cause the document to change, causing a signal
   and we get action_statement_edit_widget_text_changed() again.
@@ -3402,7 +3396,9 @@ void MainWindow::action_exit()
   detach
   Would "floating" be a better word than "detached"? or "undock"? or "detachable"?
   Todo: Change border, size, title, frame width, position. Perhaps in Settings dialog.
+        Update: now Settings dialog does allow for change of size and position.
   Todo: Menu keys should be slotted to the new window as well as the main window. E.g. control-Q.
+        Update: that's what the detach is for.
   Todo: How to bring to front / bring to back? Currently it's always in front of main widget.
   Todo: title bar of result grid widget could show part of query and number of rows.
   Todo: Maybe these should be detached by default, or always detached.
@@ -3415,6 +3411,16 @@ void MainWindow::action_exit()
           QMenu object so you can use actions().at.
         Otherwise click on menu changes focus to undetached widget.
   Todo: stop using setText("literal"), put translatable messages in ostrings.h
+  If top = 'default' then shrink main and put revised widget at bottom.
+  If left|width|height = 'default' then we keep current values after detaching.
+  Remember: x is left-right axis, y is top-bottom
+  Todo: options|detach_history_widget is now useless and obsolete! SET is what matters!
+        but we keep options in case we want to make a shortcut
+  Todo: support other values: 'current', 'max', 'min', 'always on top', 'no buttons', '30%'
+  Todo: (static) main must go back to original size if 'attach'
+  Todo: I'm repeating essentially the same method for each widget -- I should merge.
+  Todo: I'm confused: include or exclude window frame? See http://doc.qt.io/qt-5/application-windows.html#window-geometry
+  Todo: Equivalent of detach_start and detach_stop for grid widget + debug widget
 */
 
 /*
@@ -3424,24 +3430,69 @@ void MainWindow::action_exit()
 */
 #define DETACHED_WINDOW_FLAGS Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowMinMaxButtonsHint | Qt::WindowSystemMenuHint
 
-/* menu item = Options|detach history widget */
-/* or SET ocelot_history_detached= "0|1"; */
-/* Todo: options|detach_history_widget is now useless and obsolete! SET is what matters! */
 void MainWindow::action_option_detach_history_widget(bool checked)
 {
+  if (checked)
+  {
+    ocelot_history_detached= "no";
+    new_ocelot_history_detached= "yes";
+  }
+  else
+  {
+    ocelot_history_detached= "yes";
+    new_ocelot_history_detached= "no";
+  }
+  action_change_one_setting(ocelot_history_detached, new_ocelot_history_detached, "ocelot_history_detached");
+}
+
+
+/*
+  For SET ocelot_history_detached= "yes|no"; perhaps caused by menu item = Options|detach history widget
+*/
+void MainWindow::detach_history_widget(bool checked)
+{
+  static int shrink= 0;
   bool is_visible= history_edit_widget->isVisible();
   ocelot_detach_history_widget= checked;
+  QPoint widget_point= history_edit_widget->mapToGlobal(QPoint(0, 0));
+  QRect widget_rect= history_edit_widget->rect();
+  int x, y, w, h;
+  if (ocelot_history_left == "default") x= widget_point.x();
+  else x= ocelot_history_left.toInt();
+  if (ocelot_history_top == "default") y= widget_point.y();
+  else y= ocelot_history_top.toInt();
+  if (ocelot_history_width == "default") w= widget_rect.width();
+  else w= ocelot_history_width.toInt();
+  if (ocelot_history_height == "default") h= widget_rect.height();
+  else h= ocelot_history_height.toInt();
+  QPoint main_point= mapToGlobal(QPoint(0, 0));
+  QRect main_rect= rect();
   if (checked)
   {
     menu_options_action_option_detach_history_widget->setText("attach history widget");
     history_edit_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     history_edit_widget->setWindowTitle("history widget");
-    history_edit_widget->setGeometry(ocelot_history_top.toInt(), ocelot_history_left.toInt(),
-                                     ocelot_history_width.toInt(), ocelot_history_height.toInt());
+    if (ocelot_history_top == "default")
+    {
+      shrink= widget_rect.height();
+      int main_rect_height= main_rect.height() - shrink;
+      hide();
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      show();
+      y= main_point.y() + main_rect_height;
+    }
+    else shrink= 0;
+    history_edit_widget->setGeometry(x, y, w, h);
     history_edit_widget->detach_start();
   }
   else
   {
+    if (shrink != 0)
+    {
+      int main_rect_height= main_rect.height() + shrink;
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      shrink= 0;
+    }
     menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
     history_edit_widget->setWindowFlags(Qt::Widget);
     history_edit_widget->detach_stop();
@@ -3449,71 +3500,208 @@ void MainWindow::action_option_detach_history_widget(bool checked)
   if (is_visible) history_edit_widget->show();
 }
 
-
-/* menu item = Options|detach result grid widget */
-/* or SET ocelot_grid_detached= "0|1"; */
-/* Todo: options|detach_grid_widget is now useless and obsolete! SET is what matters! */
 void MainWindow::action_option_detach_result_grid_widget(bool checked)
 {
+  if (checked)
+  {
+    ocelot_grid_detached= "no";
+    new_ocelot_grid_detached= "yes";
+  }
+  else
+  {
+    ocelot_grid_detached= "yes";
+    new_ocelot_grid_detached= "no";
+  }
+  action_change_one_setting(ocelot_grid_detached, new_ocelot_grid_detached, "ocelot_grid_detached");
+}
+
+/*
+  For SET ocelot_grid_detached= "yes|no"; perhaps caused by menu item = Options|detach grid widget
+*/
+void MainWindow::detach_result_grid_widget(bool checked)
+{
+  static int shrink= 0;
   bool is_visible= result_grid_tab_widget->isVisible();
   ocelot_detach_result_grid_widget= checked;
+  QPoint widget_point= result_grid_tab_widget->mapToGlobal(QPoint(0, 0));
+  QRect widget_rect= result_grid_tab_widget->rect();
+  int x, y, w, h;
+  if (ocelot_grid_left == "default") x= widget_point.x();
+  else x= ocelot_grid_left.toInt();
+  if (ocelot_grid_top == "default") y= widget_point.y();
+  else y= ocelot_grid_top.toInt();
+  if (ocelot_grid_width == "default") w= widget_rect.width();
+  else w= ocelot_grid_width.toInt();
+  if (ocelot_grid_height == "default") h= widget_rect.height();
+  else h= ocelot_grid_height.toInt();
+  QPoint main_point= mapToGlobal(QPoint(0, 0));
+  QRect main_rect= rect();
   if (checked)
   {
     menu_options_action_option_detach_result_grid_widget->setText("attach result grid widget");
     result_grid_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
-    result_grid_tab_widget->setGeometry(ocelot_grid_top.toInt(), ocelot_grid_left.toInt(),
-                                        ocelot_grid_width.toInt(), ocelot_grid_height.toInt());
     result_grid_tab_widget->setWindowTitle("result grid widget");
+    if (ocelot_grid_top == "default")
+    {
+      shrink= widget_rect.height();
+      int main_rect_height= main_rect.height() - shrink;
+      hide();
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      show();
+      y= main_point.y() + main_rect_height;
+    }
+    else shrink= 0;
+    result_grid_tab_widget->setGeometry(x, y, w, h);
   }
   else
   {
+    if (shrink != 0)
+    {
+      int main_rect_height= main_rect.height() + shrink;
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      shrink= 0;
+    }
     menu_options_action_option_detach_result_grid_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
     result_grid_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) result_grid_tab_widget->show();
 }
 
-/* Obsolete */
-/* menu item = Options|detach debug widget */
 void MainWindow::action_option_detach_debug_widget(bool checked)
 {
-  bool is_visible= debug_tab_widget->isVisible();
-  ocelot_detach_debug_widget= checked;
   if (checked)
   {
-    menu_options_action_option_detach_debug_widget->setText("attach debug widget");
-    debug_tab_widget->setWindowFlags(Qt::Window| DETACHED_WINDOW_FLAGS);
-    debug_tab_widget->setGeometry(ocelot_debug_top.toInt(), ocelot_debug_left.toInt(),
-                                       ocelot_debug_width.toInt(), ocelot_debug_height.toInt());
-    debug_tab_widget->setWindowTitle("debug widget");
+    ocelot_debug_detached= "no";
+    new_ocelot_debug_detached= "yes";
   }
   else
   {
-    menu_options_action_option_detach_debug_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
+    ocelot_debug_detached= "yes";
+    new_ocelot_debug_detached= "no";
+  }
+  action_change_one_setting(ocelot_debug_detached, new_ocelot_debug_detached, "ocelot_debug_detached");
+}
+
+
+/*
+  For SET ocelot_debug_detached= "yes|no"; perhaps caused by menu item = Options|detach debug widget
+*/
+void MainWindow::detach_debug_widget(bool checked)
+{
+  static int shrink= 0;
+  bool is_visible= debug_tab_widget->isVisible();
+  ocelot_detach_debug_widget= checked;
+  QPoint widget_point= debug_tab_widget->mapToGlobal(QPoint(0, 0));
+  QRect widget_rect= debug_tab_widget->rect();
+  int x, y, w, h;
+  if (ocelot_debug_left == "default") x= widget_point.x();
+  else x= ocelot_debug_left.toInt();
+  if (ocelot_debug_top == "default") y= widget_point.y();
+  else y= ocelot_debug_top.toInt();
+  if (ocelot_debug_width == "default") w= widget_rect.width();
+  else w= ocelot_debug_width.toInt();
+  if (ocelot_debug_height == "default") h= widget_rect.height();
+  else h= ocelot_debug_height.toInt();
+  QPoint main_point= mapToGlobal(QPoint(0, 0));
+  QRect main_rect= rect();
+  if (checked)
+  {
+    menu_options_action_option_detach_debug_widget->setText("attach debug widget");
+    debug_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
+    debug_tab_widget->setWindowTitle("debug widget");
+    if (ocelot_debug_top == "default")
+    {
+      shrink= widget_rect.height();
+      int main_rect_height= main_rect.height() - shrink;
+      hide();
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      show();
+      y= main_point.y() + main_rect_height;
+    }
+    else shrink= 0;
+    debug_tab_widget->setGeometry(x, y, w, h);
+  }
+  else
+  {
+    if (shrink != 0)
+    {
+      int main_rect_height= main_rect.height() + shrink;
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      shrink= 0;
+    }
+    menu_options_action_option_detach_debug_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
     debug_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) debug_tab_widget->show();
 }
 
-/* due to SET ocelot_statement_detached= "0|1"; */
-void MainWindow::action_option_detach_statement_edit_widget(bool checked)
+void MainWindow::action_option_detach_statement_widget(bool checked)
 {
-  bool is_visible= statement_edit_widget->isVisible();
-  ocelot_detach_statement_edit_widget= checked;
   if (checked)
   {
-    statement_edit_widget->setWindowFlags(Qt::Window| DETACHED_WINDOW_FLAGS);
-    statement_edit_widget->setGeometry(ocelot_statement_top.toInt(), ocelot_statement_left.toInt(),
-                                       ocelot_statement_width.toInt(), ocelot_statement_height.toInt());
-    statement_edit_widget->setWindowTitle("statement widget");
+    ocelot_statement_detached= "no";
+    new_ocelot_statement_detached= "yes";
   }
   else
   {
+    ocelot_statement_detached= "yes";
+    new_ocelot_statement_detached= "no";
+  }
+  action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, "ocelot_statement_detached");
+}
+
+
+/*
+  For SET ocelot_statement_detached= "yes|no"; perhaps caused by menu item = Options|detach statement widget
+*/
+void MainWindow::detach_statement_widget(bool checked)
+{
+  static int shrink= 0;
+  bool is_visible= statement_edit_widget->isVisible();
+  ocelot_detach_statement_edit_widget= checked;
+  QPoint widget_point= statement_edit_widget->mapToGlobal(QPoint(0, 0));
+  QRect widget_rect= statement_edit_widget->rect();
+  int x, y, w, h;
+  if (ocelot_statement_left == "default") x= widget_point.x();
+  else x= ocelot_statement_left.toInt();
+  if (ocelot_statement_top == "default") y= widget_point.y();
+  else y= ocelot_statement_top.toInt();
+  if (ocelot_statement_width == "default") w= widget_rect.width();
+  else w= ocelot_statement_width.toInt();
+  if (ocelot_statement_height == "default") h= widget_rect.height();
+  else h= ocelot_statement_height.toInt();
+  QPoint main_point= mapToGlobal(QPoint(0, 0));
+  QRect main_rect= rect();
+  if (checked)
+  {
+    menu_options_action_option_detach_statement_widget->setText("attach statement widget");
+    statement_edit_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
+    statement_edit_widget->setWindowTitle("statement widget");
+    if (ocelot_statement_top == "default")
+    {
+      shrink= widget_rect.height();
+      int main_rect_height= main_rect.height() - shrink;
+      hide();
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      show();
+      y= main_point.y() + main_rect_height;
+    }
+    else shrink= 0;
+    statement_edit_widget->setGeometry(x, y, w, h);
+  }
+  else
+  {
+    if (shrink != 0)
+    {
+      int main_rect_height= main_rect.height() + shrink;
+      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
+      shrink= 0;
+    }
+    menu_options_action_option_detach_statement_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
     statement_edit_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) statement_edit_widget->show();
 }
-
 
 /*
   Next/Prev focus widget. Qt hardcodes tab | Shift+Tab (backtab) see
@@ -8577,6 +8765,38 @@ QString MainWindow::get_delimiter(QString token, QString text, int offset)
   return token_to_return;
 }
 
+/*
+  Get a value that would be would be legal as input.
+  Called from execute_client_statement()
+  Legal values are: "yes" or "no"
+  Return = input (stripped, lower case if string), or "" which means "INVALID"
+*/
+QString MainWindow::detached_value(QString input)
+{
+  QString ccn= connect_stripper(input, false);
+  ccn= ccn.toLower();
+  if ((ccn == "no") || (ccn == "yes")) return ccn;
+  return "";
+}
+
+/*
+  Get a value that would be would be legal as input.
+  Called from execute_client_statement()
+  Legal values are: "default" or integer >= 0
+  Return = input (stripped, lower case if string), or "" which means "INVALID"
+*/
+QString MainWindow::rect_value(QString input)
+{
+  QString ccn= connect_stripper(input, false);
+  ccn= ccn.toLower();
+  if (ccn == "default") return ccn;
+  bool toint_is_ok;
+  int toint_result;
+  toint_result= ccn.toInt(&toint_is_ok);
+  if ((toint_is_ok == false) || (toint_result < 0)) return "";
+  return ccn;
+}
+
 
 /*
  Handle "client statements" -- statements that the client itself executes.
@@ -9275,78 +9495,76 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_height", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_left", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_top", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_width", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_detached", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int checked= ccn.toInt();
-        if (checked < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (checked == 0) action_option_detach_statement_edit_widget(false);
-        else action_option_detach_statement_edit_widget(true);
+        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        if (ccn == "no") { menu_options_action_option_detach_statement_widget->setChecked(false); detach_statement_widget(false); }
+        else { menu_options_action_option_detach_statement_widget->setChecked(true); detach_statement_widget(true); }
         ocelot_statement_detached= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
 
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_height", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_left", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_top", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_width", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_detached", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int checked= ccn.toInt();
-        if (checked < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (checked == 0) action_option_detach_debug_widget(false);
-        else action_option_detach_debug_widget(true);
+        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        if (ccn == "no") { menu_options_action_option_detach_debug_widget->setChecked(false); detach_debug_widget(false); }
+        else { menu_options_action_option_detach_debug_widget->setChecked(true); detach_debug_widget(true); }
         ocelot_debug_detached= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
@@ -9456,39 +9674,38 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_height", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_left", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_top", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_width", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_detached", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int checked= ccn.toInt();
-        if (checked < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (checked == 0) action_option_detach_result_grid_widget(false);
-        else action_option_detach_result_grid_widget(true);
+        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        if (ccn == "no") { menu_options_action_option_detach_result_grid_widget->setChecked(false); detach_result_grid_widget(false); }
+        else { menu_options_action_option_detach_result_grid_widget->setChecked(true); detach_result_grid_widget(true); }
         ocelot_grid_detached= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
@@ -9586,15 +9803,15 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_height", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_left", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
@@ -9607,25 +9824,25 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_top", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_width", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_detached", Qt::CaseInsensitive) == 0)
       {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int checked= ccn.toInt();
-        if (checked < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (checked == 0) action_option_detach_history_widget(false);
-        else action_option_detach_history_widget(true);
+        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+
+        if (ccn == "no") { menu_options_action_option_detach_history_widget->setChecked(false); detach_history_widget(false); }
+        else { menu_options_action_option_detach_history_widget->setChecked(true); detach_history_widget(true); }
         ocelot_history_detached= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
