@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: September 25 2018
+   Last modified: September 28 2018
 */
 
 /*
@@ -3421,6 +3421,14 @@ void MainWindow::action_exit()
   Todo: I'm repeating essentially the same method for each widget -- I should merge.
   Todo: I'm confused: include or exclude window frame? See http://doc.qt.io/qt-5/application-windows.html#window-geometry
   Todo: Equivalent of detach_start and detach_stop for grid widget + debug widget
+  Todo: We lose current focus when we detach. Save and restore it.
+  Todo: indicate how many pixels each item takes currently, by adding to the combobox
+  Todo: * ctrl + tab, ctrl + backtab ... don't work with detached, I tried for a while but gave up
+  Todo: * a shortcut for bring to top and focus
+  Todo: example.cnf: ocelot_{history|grid|debug_statement}_{detached|top|left|height|width} = n
+  Todo: * In ostrings.h: add "attach ..."
+  Todo: * Some shortcuts for attach|detach
+  Todo: * check again re example.cnf and documentation
 */
 
 /*
@@ -3720,11 +3728,23 @@ void MainWindow::detach_statement_widget(bool checked)
   focusNextPrevChild(true) focusNextPrevChild(false).
   See also "Navigating Between Window Panes" according to Microsoft
   https://msdn.microsoft.com/en-us/library/ms971323.aspx
+  Todo: for detached windows:
+    We can switch to a detached window with setActiveWindow (setFocus won't do,
+    something to do with lack of parent). But we would have to keep track of
+    whether we want from grid to statement (or tried to), and how to go to the
+    first cell in a grid from history. It could be more complicated if
+    there are more detached windows, and some might be hidden
+    e.g. hparse_line_edit.
+    Trick: by comparing QApplication::focusWidget() you can see if focus changed.
+    Trick: by seeing if focusNextPrevChild returned false you can see if focus changed.
+    But how do you specify you are going to a grid from history?
+    I tried going through children till there were no more children, that just crashed.
 */
 
 void MainWindow::action_option_next_window()
 {
-  focusNextPrevChild(true);
+  bool res= focusNextPrevChild(true);
+  return;
 }
 
 void MainWindow::action_option_previous_window()
