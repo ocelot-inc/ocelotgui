@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: September 28 2018
+   Last modified: October 8 2018
 */
 
 /*
@@ -561,7 +561,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   history_edit_widget->setFont(fixed_font);
   statement_edit_widget->setFont(fixed_font);
 
-
 #ifdef DEBUGGER
   create_widget_debug();
 #endif
@@ -647,6 +646,15 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   initialize_widget_history();
 
   initialize_widget_statement();
+
+  /*
+    2018-10-08 setFont() before adding tab with ResultGrid, in hope that ResultGrid
+    will inherit and that will fix the bug where initial height is too small.
+    Actually I now think that the fix this day in ocelotgui.h, where we're creating
+    ResultGrid, solves the bug. But leave setFont() in for luck.
+  */
+  QFont grid_font= get_font_from_style_sheet(ocelot_grid_style_string);
+  result_grid_tab_widget->setFont(grid_font);
   result_grid_add_tab();
 
   main_layout->addWidget(history_edit_widget);
@@ -683,7 +691,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   {
     action_connect();
   }
-
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
 }
 
@@ -3743,7 +3750,7 @@ void MainWindow::detach_statement_widget(bool checked)
 
 void MainWindow::action_option_next_window()
 {
-  bool res= focusNextPrevChild(true);
+  focusNextPrevChild(true);
   return;
 }
 
@@ -4821,6 +4828,8 @@ QString MainWindow::qt_color(QString color_name)
   The string can be light|normal|demibold|bold|black, or a number which we'll try to interpret.
   Todo: check whether setStyleSheet accepts numbers too.
   I think the font dialog box returns lower case, so that's what we regard as canonical.
+  There's a slight error -- maximum should be 99 not 100 -- but okay, it's "black" anyway.
+  Don't allow anything that we're not testing for in get_font_from_style_sheet().
 */
 QString MainWindow::canonical_font_weight(QString font_weight_string)
 {

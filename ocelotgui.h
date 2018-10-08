@@ -4348,7 +4348,10 @@ ResultGrid(
 
   client->setLayout(grid_main_layout);
 
-  text_edit_widget_font= this->font();
+  /* 2018-10-08 Maybe this will finally fix the bug where initial cell height was too small? */
+  // text_edit_widget_font= this->font();
+  text_edit_widget_font= parent->get_font_from_style_sheet(parent->ocelot_grid_style_string);
+
   set_frame_color_setting();
 
   batch_text_edit= new QTextEdit(this);
