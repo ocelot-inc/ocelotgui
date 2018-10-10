@@ -272,7 +272,7 @@ static const char *er_strings[]=
     "Erreur. instruction SOURCE n'a pas d'argument.", /* ER_SOURCE */
     "Erreur: file_open() échoué", /* ER_FILE_OPEN */
     "Erreur, delimiter ne doit pas être vide", /* ER_DELIMITER */
-    "Pour HELP, utiliser les éléments du menu Aide. Par exemple cliquez sur: Aide | Le manuel.", /* ER_HELP */
+    "Pour HELP, utiliser les éléments du menu Aide. Illustration: cliquez sur: Aide | Le manuel.", /* ER_HELP */
     "CHARSET pas mis en oeuvre",
     "EDIT pas mis en oeuvre",
     "EGO ne fait rien à moins que son sur sa propre ligne après une instruction exécutable, et --named-commandes est vrai.", /* ER_EGO */

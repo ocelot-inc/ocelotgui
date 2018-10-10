@@ -449,11 +449,17 @@
   static unsigned short int hparse_dbms_mask= FLAG_VERSION_DEFAULT;
   static bool hparse_is_in_subquery= false;
 
-/* Suppress useless messages
+/*
+   Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
    https://github.com/MartinBriza/QGnomePlatform/issues/23 (Fedora)
-   Todo: consider also suppressing "OpenType support missing for script" */
-#if (QT_VERSION >= 0x50000)
+   Todo: consider also suppressing "OpenType support missing for script"
+   Todo: Actually the GtkDialog warning is happening now with Linux too e.g. see
+         above-mentioned Fedora bug report. But there's not much I can do except
+         maybe replace all native dialogs (I use QFontDialog) with substitutes in
+         this program. Quite a lot of work just to suppress a useless message, eh?
+*/
+#if (defined(_WIN32) && (QT_VERSION >= 0x50000))
 void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
   if (type == QtWarningMsg)
@@ -472,6 +478,7 @@ int main(int argc, char *argv[])
 #if (defined(_WIN32) && (QT_VERSION >= 0x50000))
   qInstallMessageHandler(dump_qtmessage);
 #endif
+
   QApplication main_application(argc, argv);
   MainWindow w(argc, argv);
   /* We depend on w being maximized in resizeEvent() */

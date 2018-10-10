@@ -5870,7 +5870,7 @@ void MainWindow::hparse_f_explain_or_describe(int block_top)
   }
   if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR") == 1))
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONNNECTION");
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONNECTION");
     if (hparse_errno > 0) return;
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
     return;

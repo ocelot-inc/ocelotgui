@@ -118,6 +118,7 @@
 # e.g. to generate .deb file and install with dpkg:
 # cmake . -DCPACK_GENERATOR="DEB"
 # make
+# strip --remove-section=.comment ocelotgui
 # cpack
 # lintian ocelotgui-1.0.7-1_amd64.deb
 # sudo dpkg -i ocelotgui-1.0.7-1_amd64.deb
@@ -223,6 +224,7 @@ include_directories(${MYSQL_INCLUDE_DIR_RESULT})
 #lintian complained about "unstripped-binary-or-object"
 # set(CPACK_STRIP_FILES TRUE) was useless
 # SET(CMAKE_BUILD_TYPE "Release" was useless
+# We also should say, after "make" and before "cpack": strip --remove-section=.comment ocelotgui
 # Todo: check: does this override a user who wants CMAKE_BUILD_TYPE debug?
 if(CMAKE_COMPILER_IS_GNUCXX)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s")
