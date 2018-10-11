@@ -104,7 +104,7 @@
 
 # FILENAME_EXTRA
 # Default is blank. Ocelot passes -DFILENAME_EXTRA="qt4" when building with qt4,
-# so the final package name will look like ocelotgui-1.0.7qt4-1_amd64.deb or
+# so the final package name will look like ocelotgui_1.0.7qt4-1_amd64.deb or
 # ocelotgui-1.0.7qt4-1.x86_64.rpm. Ordinarily it should not be specified.
 
 # FILENAME_RELEASE
@@ -120,8 +120,8 @@
 # make
 # strip --remove-section=.comment ocelotgui
 # cpack
-# lintian ocelotgui-1.0.7-1_amd64.deb
-# sudo dpkg -i ocelotgui-1.0.7-1_amd64.deb
+# lintian ocelotgui_1.0.7-1_amd64.deb
+# sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb
 # Todo: lintian will warn "new-package-should-close-itp-bug", which we ignore.
 # Todo: lintian will warn about permissions if you are not root, which we work around by being root.
 # but see also comments in rpm_build.sh
@@ -362,24 +362,24 @@ if (CPACK_GENERATOR MATCHES "DEB")
   #lintian complains changelog-file-missing-in-native-package, this fixes it,
   #but lintian will still complain new-package-should-close-itp-bug
   #which we cannot fix until version >= 1.0.7 and someone posts an ITP bug
-  execute_process(COMMAND cp changelog changelog.bak)
-  execute_process(COMMAND gzip -9 -f -n changelog)
-  execute_process(COMMAND mv changelog.bak changelog)
+  execute_process(COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/changelog ${CMAKE_CURRENT_SOURCE_DIR}/changelog.bak)
+  execute_process(COMMAND gzip -9 -f -n ${CMAKE_CURRENT_SOURCE_DIR}/changelog)
+  execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/changelog.bak ${CMAKE_CURRENT_SOURCE_DIR}/changelog)
   install(FILES changelog.gz DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif (CPACK_GENERATOR MATCHES "DEB")
 
 if (NOT CPACK_GENERATOR)
-  execute_process(COMMAND cp ocelotgui.1 ocelotgui.1.bak)
-  execute_process(COMMAND gzip -9 -f -n ocelotgui.1)
-  execute_process(COMMAND mv ocelotgui.1.bak ocelotgui.1)
+  execute_process(COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1 ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak)
+  execute_process(COMMAND gzip -9 -f -n ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
+  execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (NOT CPACK_GENERATOR)
 
 if (CPACK_GENERATOR MATCHES "DEB")
   #lintian complains manpage-not-compressed, this fixes it.
-  execute_process(COMMAND cp ocelotgui.1 ocelotgui.1.bak)
-  execute_process(COMMAND gzip -9 -f -n ocelotgui.1)
-  execute_process(COMMAND mv ocelotgui.1.bak ocelotgui.1)
+  execute_process(COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1 ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak)
+  execute_process(COMMAND gzip -9 -f -n ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
+  execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (CPACK_GENERATOR MATCHES "DEB")
 
@@ -387,9 +387,9 @@ if (CPACK_GENERATOR MATCHES "RPM")
   #rpm -i will compress so if you plan to use cpack you only need to say:
   #install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
   #but since we use rpm_build.sh we have the same as for "DEB"
-  execute_process(COMMAND cp ocelotgui.1 ocelotgui.1.bak)
-  execute_process(COMMAND gzip -9 -f -n ocelotgui.1)
-  execute_process(COMMAND mv ocelotgui.1.bak ocelotgui.1)
+  execute_process(COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1 ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak)
+  execute_process(COMMAND gzip -9 -f -n ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
+  execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (CPACK_GENERATOR MATCHES "RPM")
 
@@ -405,9 +405,9 @@ set(CPACK_PACKAGE_VERSION_PATCH "7")
 set(CPACK_PACKAGE_ICON ocelotgui_logo.png)
 # CPACK_PROJECT_CONFIG_FILE = nonexistent
 
-# I assume nobody wants package names like ocelotgui-1.0.7-Linux.deb
+# I assume nobody wants package names like ocelotgui_1.0.7-Linux.deb
 # but that's what I get if CMAKE_SYSTEM_NAME = "Linux".
-# I'd prefer ocelotgui-1.0.7-1_amd64.deb or ocelotgui-1.0.7.x86_64.rpm
+# I'd prefer ocelotgui_1.0.7-1_amd64.deb or ocelotgui-1.0.7.x86_64.rpm
 # If it's neither "DEB" nor "RPM", CPACK_PACKAGE_FILE_NAME = default.
 set(FILENAME_PLATFORM_FOR_DEB "Linux")
 set(FILENAME_PLATFORM_FOR_RPM "Linux")
@@ -440,8 +440,8 @@ if (CPACK_GENERATOR MATCHES "RPM")
 endif (CPACK_GENERATOR MATCHES "RPM")
 
 # Todo: You should have both COPYING and COPYING.thirdparty, no?
-set(CPACK_RESOURCE_FILE_LICENSE "COPYING")
-set(CPACK_RESOURCE_FILE_README "README.htm")
+set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
+set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.htm")
 
 if (CPACK_GENERATOR MATCHES "DEB")
   # CPACK_RESOURCE_FILE_WELCOME = nonexistent
