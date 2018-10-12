@@ -948,7 +948,7 @@ Public License instead of this License.
 
 == the BSD license for the included-on-Windows connector code by Tarantool
 == (source = https://github.com/tarantool/tarantool-c/blob/master/LICENSE) ==
-== (inclusion is only done on Windows, this does not apply for Linux) ==
+== (inclusion is always done on Windows, and may be done on Linux if built with -DOCELOT_THIRD_PARTY=1) ==
 
 Copyright 2010-2016 Tarantool AUTHORS: please see AUTHORS file.
 
