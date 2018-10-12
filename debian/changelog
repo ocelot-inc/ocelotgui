@@ -1,0 +1,47 @@
+ocelotgui (1.0.7) UNRELEASED; urgency=low
+
+  * Synch with newer versions of DBMS servers
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Wed, 29 Aug 2018 12:00:00 -0600
+
+ocelotgui (1.0.6) UNRELEASED; urgency=low
+
+  * Some bug fixes
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Tue, 12 Dec 2017 12:00:00 -0600
+
+ocelotgui (1.0.5) UNRELEASED; urgency=low
+
+  * Syntax checker understands more SQL dialects
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Sun, 02 Jul 2017 12:00:00 -0600
+
+ocelotgui (1.0.4) UNRELEASED; urgency=low
+
+  * New options html, xml, ocelot_language
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Mon, 12 Dec 2016 12:00:00 -0600
+
+ocelotgui (1.0.3) UNRELEASED; urgency=low
+
+  * Better default font, new formatter and history-output options.
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Tue, 27 Sep 2016 12:00:00 -0600
+
+ocelotgui (1.0.2) UNRELEASED; urgency=low
+
+  * Some bug fixes.
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Mon, 15 Aug 2016 12:00:00 -0600
+
+ocelotgui (1.0.1) UNRELEASED; urgency=low
+
+  * Some bug fixes.
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Fri, 01 Jul 2016 17:37:35 -0600
+
+ocelotgui (1.0.0) UNRELEASED; urgency=low
+
+  * Initial release.
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Thu, 27 May 2016 12:00:00 -0600

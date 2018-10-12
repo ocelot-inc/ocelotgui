@@ -1,0 +1,10 @@
+ocelotgui for Debian
+
+The ocelotgui documentation is in README.htm.
+
+Specific matters affecting the creation of the .deb file are:
+
+Re lintian:
+There are no errors or warnings. If one uses "lintian -I ..." one sees
+that the /share/doc is bigger than recommended, this happens because
+our documentation contains pictures (.png and .jpg files).
