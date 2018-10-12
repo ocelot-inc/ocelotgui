@@ -1,10 +1,65 @@
-ocelotgui for Debian
+ocelotgui for Debian and any Linux distro that uses .deb packages
 
-The ocelotgui documentation is in README.htm.
+The ocelotgui documentation is in README.htm. This file only has comments about .deb packages.
 
-Specific matters affecting the creation of the .deb file are:
+In the official ocelotgui-1.0.7 release we create the .deb file with cpack (see the comments in CMakeLists.txt).
+We intend to switch to using debian/rules.
+Although some problems remain, we currently can create the .deb file and "dpkg -i" installs the main components.
+These are example instructions.
 
-Re lintian:
-There are no errors or warnings. If one uses "lintian -I ..." one sees
-that the /share/doc is bigger than recommended, this happens because
-our documentation contains pictures (.png and .jpg files).
+# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.0.7.tar.gz.
+# (Internally Ocelot has a script for "Making a package" but we do not supply it, you must make your own tar.gz.) 
+# (After we release 1.0.8, you'll be able to simply download ocelotgui-1.0.8.tar.gz from the github release files.)
+sudo ls a
+cd ~
+sudo rm -r ~/debian2
+mkdir ~/debian2
+cd ~/debian2
+cp ~/ocelotgui-1.0.7.tar.gz ocelotgui_1.0.7.orig.tar.gz
+tar -xvf ocelotgui_1.0.7.orig.tar.gz
+cd ./ocelotgui/debian
+debuild
+
+# Mystery messages
+dpkg-genchanges: info: including full source code in upload ... but source isn't in the .deb.
+.png files were subjected to normalizing by "dh_strip_nondeterminism"
+
+# Lintian results after "debuild" and after "lintian -I ~/debian2/ocelotgui_1.0.7_amd64.deb"
+W: ocelotgui source: non-native-package-with-native-version
+I: ocelotgui: hardening-no-fortify-functions usr/bin/ocelotgui
++ Earlier I was seeing an -I complaint about the size of what went to /usr/share/doc/ocelotgui.
+  This can happen because our documentation contains pictures in .png and .jpg files.
+
+# Differences between .deb files made with cpack versus .deb files made with debian/rules
+# (Just say "dpkg -c ocelotgui_1.0.7_amd64.deb" for each) (Not done yet)
+(1) Files were compressed: README.md.gz README.txt.gz debugger_reference.txt.gz options.txt.gz
+(2) We'll see whether there were other differences after we compare "dpkg -c" results
+(3) The CXX flags that we pass for making the executable are different
+
+# Problems with cmake and .CMakeLists.txt
+(1) Comments will have to be changed
+(2) Because we pass -DCPACK_GENERATOR="DEB", cmake will do some extra hopefully-harmless steps
+(3) It produces ~/debian2/ocelotgui/ocelotgui.1.gz which I must delete before running debuild again
+
+# Problems with current source
+(1) We now have duplicates: change and debian/changelog, copyright and debian/copyright
+
+# Prerequisites
+For an earlier version I said "sudo apt-get install debmake" but apparently it is not necessary.
+Everything necessary for debuild was already present.
+
+# Todo
+So far this has only been tried on Ubuntu 18.04. It needs to be tried on debian too.
+The "recommends" and "depends" and "suggests" aren't filled in.
+We don't access the manual with Help|Manual, perhaps that's because of the .gz compressions.
+?? Better read this too: https://www.debian.org/doc/manuals/debmake-doc/ch05.en.html
+?? Better read this too: https://lists.debian.org/debian-mentors/2015/03/msg00030.html
+?? Read the lintian manual https://lintian.debian.org/manual/section-2.3.html
+?? Read the debian policy https://www.debian.org/doc/debian-policy/
+
+I added a rule in debian/rules so that "debian/rules override_dh_auto_install".
+Therefore it only produces the .deb, it does not install the .deb, you can do that with dpkg -i.
+
+I added a rule in debian/rules so that there would be an override to add
+-DCPACK_GENERATOR="DEB" for cmake, explanation of CPACK_GENERATOR is in CMakeLists.txt comments.
+
