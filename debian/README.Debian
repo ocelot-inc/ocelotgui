@@ -25,8 +25,11 @@ dpkg-genchanges: info: including full source code in upload ... but source isn't
 .png files were subjected to normalizing by "dh_strip_nondeterminism"
 
 # Lintian results after "debuild" and after "lintian -I ~/debian2/ocelotgui_1.0.7_amd64.deb"
-W: ocelotgui source: non-native-package-with-native-version
-I: ocelotgui: hardening-no-fortify-functions usr/bin/ocelotgui
+There are no errors or warnings. There is one informative message.
+"I: ocelotgui: hardening-no-fortify-functions usr/bin/ocelotgui"
+    But, but, but ... cmake passes -D_FORTIFY_SOURCE=2 to the compiler!
+    Have a look at verbose output, it is there.
+    So, although lintian thinks otherwise, hardening is done.
 + Earlier I was seeing an -I complaint about the size of what went to /usr/share/doc/ocelotgui.
   This can happen because our documentation contains pictures in .png and .jpg files.
 
@@ -38,15 +41,15 @@ I: ocelotgui: hardening-no-fortify-functions usr/bin/ocelotgui
 
 # Problems with cmake and .CMakeLists.txt
 (1) Comments will have to be changed
-(2) Because we pass -DCPACK_GENERATOR="DEB", cmake will do some extra hopefully-harmless steps
-(3) It produces ~/debian2/ocelotgui/ocelotgui.1.gz which I must delete before running debuild again
+(2) Because we pass -DPACKAGE_TYPE="DEB", cmake will do some extra hopefully-harmless steps
 
 # Problems with current source
 (1) We now have duplicates: change and debian/changelog, copyright and debian/copyright
+    (although in version 1.0.7 debian/changelog is not an exact duplicate)
 
 # Prerequisites
-For an earlier version I said "sudo apt-get install debmake" but apparently it is not necessary.
-Everything necessary for debuild was already present.
+For an earlier version I said "sudo apt-get install debmake" and "sudo apt-get install dh-make"
+but apparently it is not necessary. Everything necessary for debuild was already present.
 
 # Todo
 So far this has only been tried on Ubuntu 18.04. It needs to be tried on debian too.
@@ -61,5 +64,4 @@ I added a rule in debian/rules so that "debian/rules override_dh_auto_install".
 Therefore it only produces the .deb, it does not install the .deb, you can do that with dpkg -i.
 
 I added a rule in debian/rules so that there would be an override to add
--DCPACK_GENERATOR="DEB" for cmake, explanation of CPACK_GENERATOR is in CMakeLists.txt comments.
-
+-DPACKAGE_TYPE="DEB" for cmake, there are some explanations in CMakeLists.txt comments.

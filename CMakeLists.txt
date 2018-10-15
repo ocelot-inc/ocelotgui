@@ -100,7 +100,17 @@
 #     cpack_package_file_name = package-version-release.arch.rpm
 # iff CPACK_GENERATOR="DEB" is used, then after build say "cpack" to generate a .deb file
 # iff CPACK_GENERATOR="RPM" is used, then after build say "cpack" to generate an .rpm file
-# but nowadays Ocelot's official method is not with cpack it is with rpm_build.sh
+# CPACK_GENERATOR is becoming obsolete. Nowadays Ocelot's official method for .rpm is not
+# wih cpack it is with rpm_build.sh. For ocelotgui version 1.0.8 Ocelot's official method
+# will probably be with debian/rules and debuild which causes a pass of PACKAGE_TYPE="DEB".
+
+# PACKAGE_TYPE
+#   DEB:
+#     This is the pass specified in debian/rules, we don't use it for cmake standalone.
+#     cpack_package_file_name = package_version-release_arch.deb
+#     Do not install COPYING file or LICENSE.GPL file.
+#     This is to avoid lintian warning "extra-license-file".
+#     Unlike CPACK_GENERATOR="DEB", we do not try to make .gz files, leave that to debuild.
 
 # FILENAME_EXTRA
 # Default is blank. Ocelot passes -DFILENAME_EXTRA="qt4" when building with qt4,
@@ -124,7 +134,7 @@
 # sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb
 # Todo: lintian will warn "new-package-should-close-itp-bug", which we ignore.
 # Todo: lintian will warn about permissions if you are not root, which we work around by being root.
-# but see also comments in rpm_build.sh
+# but see also comments in rpm_build.sh and debian/README.Debian, we intend to stop using cpack
 
 # e.g. to generate .rpm file and install with rpm:
 # cmake . -DCPACK_GENERATOR="RPM"
@@ -135,7 +145,7 @@
 # Todo: rpmlint will warn "standard-dir-owned-by-package" for /usr/share/man and /usr/share/man/man1, which we ignore.
 # Todo: rpmlint will warn "no-signature", which we ignore.
 # Todo: rpmlint will warn "no-packager-tag", wich we ignore.
-# but see also comments in rpm_build.sh
+# but see also comments in rpm_build.sh and debian/README.Debian, we intend to stop using cpack
 
 # Todo: allow user to pass -DCMAKE_INSTALL_RPATH
 
@@ -290,6 +300,17 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -Wno-nonnull -Wno-pointer-arith -Wno-conversion")
 endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
+#Alas, lintian-I will say hardening-no-fortify-functions.
+#This is how we try to fix that problem but, although it is seen and generates -D_FORTIFY_SOURCE=2, lintian doesn't see it.
+#Maybe I could also check CMAKE_CXX_COMPILER should be gcc and CMAKE_CXXCOMPILER_VERSION should be >= something.
+if (PACKAGE_TYPE STREQUAL "DEB")
+if(CMAKE_COMPILER_IS_GNUCXX)
+  message("-- Adding -D_FORTIFY_SOURCE=2 etc. to CXXFLAGS")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wformat -Wformat-security -fstack-protector -D_FORTIFY_SOURCE=2 -fPIC -fstack-protector-strong")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat -Wformat-security -fstack-protector -D_FORTIFY_SOURCE=2 -fPIC  -fPIC -fstack-protector-strong")
+endif(CMAKE_COMPILER_IS_GNUCXX)
+endif (PACKAGE_TYPE STREQUAL "DEB")
+
 if (NOT UI_OCELOTGUI)
   message(FATAL_ERROR "uic did not produce ui_ocelotgui.h")
 endif (NOT UI_OCELOTGUI)
@@ -342,8 +363,10 @@ install(FILES options.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES debugger_reference.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES tarantool.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 if (NOT CPACK_GENERATOR MATCHES "DEB")
+if (NOT PACKAGE_TYPE MATCHES "DEB")
 install(FILES LICENSE.GPL DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES COPYING DESTINATION ${CMAKE_INSTALL_DOCDIR})
+endif (NOT PACKAGE_TYPE MATCHES "DEB")
 endif (NOT CPACK_GENERATOR MATCHES "DEB")
 install(FILES copyright DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
@@ -369,10 +392,12 @@ if (CPACK_GENERATOR MATCHES "DEB")
 endif (CPACK_GENERATOR MATCHES "DEB")
 
 if (NOT CPACK_GENERATOR)
+if (NOT PACKAGE_TYPE MATCHES "DEB")
   execute_process(COMMAND cp ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1 ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak)
   execute_process(COMMAND gzip -9 -f -n ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+endif (NOT PACKAGE_TYPE MATCHES "DEB")
 endif (NOT CPACK_GENERATOR)
 
 if (CPACK_GENERATOR MATCHES "DEB")
@@ -392,6 +417,10 @@ if (CPACK_GENERATOR MATCHES "RPM")
   execute_process(COMMAND mv ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1.bak ${CMAKE_CURRENT_SOURCE_DIR}/ocelotgui.1)
   install(FILES ocelotgui.1.gz DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (CPACK_GENERATOR MATCHES "RPM")
+
+if (PACKAGE_TYPE MATCHES "DEB")
+  install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+endif (PACKAGE_TYPE MATCHES "DEB")
 
 # version = 1.0.7
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "GUI client for MySQL or MariaDB")
@@ -438,6 +467,9 @@ endif (CPACK_GENERATOR MATCHES "DEB")
 if (CPACK_GENERATOR MATCHES "RPM")
   set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}-${FILENAME_VERSION}-${FILENAME_RELEASE}.${FILENAME_PLATFORM_FOR_RPM})
 endif (CPACK_GENERATOR MATCHES "RPM")
+if (PACKAGE_TYPE MATCHES "DEB")
+  set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}_${FILENAME_VERSION}-${FILENAME_RELEASE}_${FILENAME_PLATFORM_FOR_DEB})
+endif (PACKAGE_TYPE MATCHES "DEB")
 
 # Todo: You should have both COPYING and COPYING.thirdparty, no?
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/COPYING")
