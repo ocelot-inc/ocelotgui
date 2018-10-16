@@ -243,6 +243,7 @@ endif(CMAKE_COMPILER_IS_GNUCXX)
 #Typically this says [/usr/local] bin, share/doc/ocelotgui, man
 #We commented out the messages because they're misleading,
 #they say /usr/local etc. but if not local install they're /usr etc.
+#(Actually they appear to be correct if one builds via debian/rules.)
 include(GNUInstallDirs)
 #message("-- bin will go to ${CMAKE_INSTALL_FULL_BINDIR}")
 #message("-- doc will go to ${CMAKE_INSTALL_FULL_DOCDIR}")

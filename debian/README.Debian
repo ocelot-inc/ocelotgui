@@ -33,6 +33,16 @@ There are no errors or warnings. There is one informative message.
 + Earlier I was seeing an -I complaint about the size of what went to /usr/share/doc/ocelotgui.
   This can happen because our documentation contains pictures in .png and .jpg files.
 
+# Contents of debian/control
+"Source ... Build-Depends":
+    I am assming that users prefer Qt5.
+    Users who prefer Qt4 should remove "libgl1-mesa-dev, qt5-default, qt5-qmake, qtbase5-dev-tools, qtbase5-dev,"
+    and add "libqt4-dev-tools".
+"Package ... Depends":
+    I am assuming that dpkg-gencontrol will substitute ${misc:Depends}
+    I am not including libmariadbclient | libmysqlclient (which is in build-depends),
+    because some ocelotgui functionality is still there without them.
+
 # Differences between .deb files made with cpack versus .deb files made with debian/rules
 # (Just say "dpkg -c ocelotgui_1.0.7_amd64.deb" for each) (Not done yet)
 (1) Files were compressed: README.md.gz README.txt.gz debugger_reference.txt.gz options.txt.gz
