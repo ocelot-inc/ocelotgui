@@ -1,4 +1,81 @@
-# See comments in rpm_build.sh
+# ocelotgui-1.0.8.spec supplied by Ocelot Computer Services Inc. as part of ocelotgui package
+
+#How to Build an .rpm file
+#-------------------------
+# 1. Install necessary packages. These might already be installed. Some distros prefer dnf to install.
+# sudo yum install qt5-qttools-devel
+# sudo yum install mysql mysql-devel
+# sudo yum install gcc gcc-c++ make cmake git
+# sudo yum install rpm rpm-build rpmlint
+# 2. Make an rpm environment. Notice that we begin by wiping out previous contents of ~rpmtest.
+# rm -r ~/rpmtest
+# mkdir ~/rpmtest ~/rpmtest/rp ~/rpmtest/rp/rpmbuild
+# mkdir -p --verbose ~/rpmtest/rp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+# 3. Get the ocelotgui tar.gz file. It is available on github. You might have downloaded it already.
+# ... Eventually we might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+# (For this step, we assume you know where you downloaded to. See later explanation in section "Re: Source".)
+# 4. Copy the ocelotgui tar.gz file to the rpm environment SOURCES subdirectory.
+# You cannot simply download the tar.gz file from the github releases because it has an
+# older CMakeLists.txt file, and because the tar.gz file's base must be named ocelotgui-1.0.7 not ocelotgui.
+# cd ~
+# git clone https://github.com/ocelot-inc/ocelotgui ocelotgui-tmp
+# sudo cp ~/ocelotgui-tmp/* /ocelotgui-1.0.7
+# tar -zcvf ocelotgui-1.0.7.tar.gz /ocelotgui-1.0.7
+# cp ocelotgui-1.0.7.tar.gz ~/rpmtest/rp/rpmbuild/SOURCES/ocelotgui-1.0.7.tar.gz
+# sudo rm -r /ocelotgui-1.0.7
+# 5. Copy this ocelotgui.spec to ~/rpmtest and make ~/rpmtest the current directory.
+# cp ~/ocelotgui/ocelotgui.spec ~/rpmtest/ocelotgui.spec
+# cd ~/rpmtest
+# 6. Run rpmbuild using the ~/rpmtest environment. Notice that we don't bother with an .rpmmacros file.
+# rpmbuild -ba ocelotgui.spec --define "_topdir $HOME/rpmtest/rp/rpmbuild"
+# 7. Find the resulting rpm in the RPMS subdirectory and check it. Here we assume the platform is x86-64.
+# rpmlint ~/rpmtest//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.0.7-1.x86_64.rpm
+# If it says "0 errors, 0 warnings", you're done!
+# You can copy the .rpm file to a permanent location and remove the ~/rpmtest directory.
+
+#Re Group:
+#  Usually this is Group: Applications/Databases
+#  On Mageia we change it to Group: Databases
+#Re Source0:
+#  The URL here is in fact the source of the ocelotgui release.
+#  However, setup does not work. The assumption is that this
+#  ocelotgui.spec file is in an ocelotgui directory that contains
+#  the source, already downloaded.
+#Re Build-Requires:
+#  * qt5-qttools-devel implies that we assume Qt version 5.
+#    In fact Qt version 4 will work well.
+#  * mysql-devel implies that we assume MySQL.
+#    In fact MariaDB will work well.
+#    The requirement exists because our source has "#include mysql.h".
+#  * All the other Build-Requires packages are common utilities
+#    that are easily available on any rpm-based distro.
+#    ocelotgui does not require a MySQL or MariaDB server to build.
+#    ocelotgui will try to load a MySQL or MariaDB client library
+#    (an .so file) if there is an attempt to connect to a MySQL or
+#    MariaDB server.
+#Re Prefix:
+#    The line "Prefix: /usr" has been commented out because rpmlint
+#    complained about it. We think putting it back in is a good idea.
+#Re build:
+#  * The "rm" commands in this section are an attempted cleanup so
+#    that there won't be error messages saying
+#    "Installed (but unpackaged) file(s) found".
+#    Probably there is a more standard way to do this.
+#Re files:
+#  * We hardcode /usr/share/applications/ocelotgui.desktop instead
+#    of using the desktopdir macro. That way we don't get an error,
+#    but alas, we also don't get an installation on the desktop.
+
+#TODO
+#----
+# * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
+# * Look at the flags that get passed to cmake, maybe they must be used (currently we are ignoring them).
+# * Test on a completely new machine, because BuildRequires: might not have a complete list.
+# * Remove old files: rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
+# * Change rpm_build.sh to a script that simply does all the preparatory statements mentioned in the comments of this file.
+# * Keep track of howtobuild.txt
+# * Fix the desktop problem
+
 
 %define __spec_install_post %{nil}
 %define debug_package %{nil}
@@ -9,23 +86,27 @@
 %undefine _debugsource_packages
 %undefine _debuginfo_subpackages
 
-#%define _rpmdir %_topdir/RPMS
-#%define _srcrpmdir %_topdir/SRPMS
-#%define _rpmfilename ocelotgui-1.0.7-1.x86_64.rpm
-#%define _unpackaged_files_terminate_build 0
-
-# BuildRoot:      %_topdir/ocelotgui-1.0.7-1.x86_64
 Summary:        GUI client for MySQL or MariaDB
 Name:           ocelotgui
 Version:        1.0.7
 Release:        1
 License:        GPLv2
+# This "if" should be true for Mageia
+%if "%?mdvver" != ""
 Group:          Applications/Databases
+#else
+Group:          Databases
+%endif
 Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
-Source0:        ocelotgui-1.0.7-for-rpm.tar.gz
-Prefix: /usr
+Source0:         ocelotgui-1.0.7.tar.gz
+#Source:        https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+BuildRequires:  qt5-qttools-devel
+BuildRequires:  mysql-devel
+BuildRequires:  gcc gcc-c++ make cmake
+BuildRequires:  rpm rpm-build rpmlint
 
+#Prefix: /usr
 
 Requires(post): info
 Requires(preun): info
@@ -42,11 +123,43 @@ Ocelot GUI (ocelotgui), a database client, allows users to connect to
 %setup -q
 
 %build
+%cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM"
+make
+rm CMakeCache.txt
+rm -r CMakeFiles
+rm *.cmake
+rm Makefile
+
 %install
 rm -rf %{buildroot}
 mkdir -p %{buildroot}
-cp -a * %{buildroot}
+mkdir -p %{buildroot}/%{_docdir}
+mkdir -p %{buildroot}/%{_docdir}/ocelotgui
+cp %{_builddir}/ocelotgui-1.0.7/COPYING %{buildroot}/%{_docdir}/ocelotgui/COPYING
+cp %{_builddir}/ocelotgui-1.0.7/LICENSE.GPL %{buildroot}/%{_docdir}/ocelotgui/LICENSE.GPL
+cp %{_builddir}/ocelotgui-1.0.7/*.png %{buildroot}/%{_docdir}/ocelotgui
+cp %{_builddir}/ocelotgui-1.0.7/*.jpg %{buildroot}/%{_docdir}/ocelotgui
+cp %{_builddir}/ocelotgui-1.0.7/README.txt %{buildroot}/%{_docdir}/ocelotgui/README.txt
+cp %{_builddir}/ocelotgui-1.0.7/debugger_reference.txt %{buildroot}/%{_docdir}/ocelotgui/debugger_reference.txt
+cp %{_builddir}/ocelotgui-1.0.7/options.txt %{buildroot}/%{_docdir}/ocelotgui/options.txt
+cp %{_builddir}/ocelotgui-1.0.7/tarantool.txt %{buildroot}/%{_docdir}/ocelotgui/tarantool.txt
+cp %{_builddir}/ocelotgui-1.0.7/*.md %{buildroot}/%{_docdir}/ocelotgui
+cp %{_builddir}/ocelotgui-1.0.7/*.htm %{buildroot}/%{_docdir}/ocelotgui
+cp %{_builddir}/ocelotgui-1.0.7/copyright %{buildroot}/%{_docdir}/ocelotgui/copyright
+cp %{_builddir}/ocelotgui-1.0.7/example.cnf %{buildroot}/%{_docdir}/ocelotgui/example.cnf
+mkdir -p %{buildroot}/%{_bindir}
+cp %{_builddir}/ocelotgui-1.0.7/ocelotgui %{buildroot}/%{_bindir}/ocelotgui
+mkdir -p %{buildroot}/%{_mandir}
+mkdir -p %{buildroot}/%{_mandir}/man1
+cp %{_builddir}/ocelotgui-1.0.7/ocelotgui.1.gz %{buildroot}/%{_mandir}/man1/ocelotgui.1.gz
+mkdir -p %{buildroot}/usr
+mkdir -p %{buildroot}/usr/share
+mkdir -p %{buildroot}/usr/share/applications
+cp %{_builddir}/ocelotgui-1.0.7/ocelotgui.desktop %{buildroot}/usr/share/applications/ocelotgui.desktop
+mkdir -p %{buildroot}/usr/share/pixmaps
+cp %{_builddir}/ocelotgui-1.0.7/ocelotgui_logo.png %{buildroot}/usr/share/pixmaps/ocelotgui_logo
 %clean
+
 %files
 %defattr(-,root,root,-)
 %{_bindir}/ocelotgui

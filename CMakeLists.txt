@@ -104,13 +104,15 @@
 # wih cpack it is with rpm_build.sh. For ocelotgui version 1.0.8 Ocelot's official method
 # will probably be with debian/rules and debuild which causes a pass of PACKAGE_TYPE="DEB".
 
-# PACKAGE_TYPE
+# PACKAGE_TYPE="DEB" or PACKAGE_TYPE="RPM"
 #   DEB:
 #     This is the pass specified in debian/rules, we don't use it for cmake standalone.
 #     cpack_package_file_name = package_version-release_arch.deb
 #     Do not install COPYING file or LICENSE.GPL file.
 #     This is to avoid lintian warning "extra-license-file".
 #     Unlike CPACK_GENERATOR="DEB", we do not try to make .gz files, leave that to debuild.
+#   RPM:
+#     This is the pass that we should specify in ocelotgui.spec.
 
 # FILENAME_EXTRA
 # Default is blank. Ocelot passes -DFILENAME_EXTRA="qt4" when building with qt4,
@@ -373,11 +375,13 @@ install(FILES copyright DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES ocelotgui.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
 if (NOT CPACK_GENERATOR MATCHES "RPM")
+if (NOT PACKAGE_TYPE MATCHES "RPM")
   install(FILES ocelotgui_logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps)
+endif (NOT PACKAGE_TYPE MATCHES "RPM")
 endif (NOT CPACK_GENERATOR MATCHES "RPM")
-if (CPACK_GENERATOR MATCHES "RPM")
+if (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
   install(FILES ocelotgui_logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps RENAME ocelotgui_logo)
-endif (CPACK_GENERATOR MATCHES "RPM")
+endif (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h hparse.h ostrings.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
@@ -465,9 +469,9 @@ endif (NOT FILENAME_RELEASE)
 if (CPACK_GENERATOR MATCHES "DEB")
   set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}_${FILENAME_VERSION}-${FILENAME_RELEASE}_${FILENAME_PLATFORM_FOR_DEB})
 endif (CPACK_GENERATOR MATCHES "DEB")
-if (CPACK_GENERATOR MATCHES "RPM")
+if (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
   set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}-${FILENAME_VERSION}-${FILENAME_RELEASE}.${FILENAME_PLATFORM_FOR_RPM})
-endif (CPACK_GENERATOR MATCHES "RPM")
+endif (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
 if (PACKAGE_TYPE MATCHES "DEB")
   set(CPACK_PACKAGE_FILE_NAME ${CMAKE_PROJECT_NAME}_${FILENAME_VERSION}-${FILENAME_RELEASE}_${FILENAME_PLATFORM_FOR_DEB})
 endif (PACKAGE_TYPE MATCHES "DEB")
