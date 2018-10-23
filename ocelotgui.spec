@@ -1,46 +1,40 @@
-# ocelotgui-1.0.8.spec supplied by Ocelot Computer Services Inc. as part of ocelotgui package
+# ocelotgui.spec supplied by Ocelot Computer Services Inc. as part of ocelotgui package
 
 #How to Build an .rpm file
 #-------------------------
-# 1. Install necessary packages. These might already be installed. Some distros prefer dnf to install.
+# 1. Install necessary packages. These might already be installed. On some distros prefer dnf rather than yum.
 # sudo yum install qt5-qttools-devel
 # sudo yum install mysql mysql-devel
 # sudo yum install gcc gcc-c++ make cmake git
 # sudo yum install rpm rpm-build rpmlint
-# 2. Make an rpm environment. Notice that we begin by wiping out previous contents of ~rpmtest.
-# rm -r ~/rpmtest
-# mkdir ~/rpmtest ~/rpmtest/rp ~/rpmtest/rp/rpmbuild
-# mkdir -p --verbose ~/rpmtest/rp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-# 3. Get the ocelotgui tar.gz file. It is available on github. You might have downloaded it already.
-# ... Eventually we might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+# 2. Copy the ocelotgui tar.gz file to your $HOME directory.
+# It is available on github. You might have downloaded it already.
+# For example you might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
 # (For this step, we assume you know where you downloaded to. See later explanation in section "Re: Source".)
-# 4. Copy the ocelotgui tar.gz file to the rpm environment SOURCES subdirectory.
-# You cannot simply download the tar.gz file from the github releases because it has an
-# older CMakeLists.txt file, and because the tar.gz file's base must be named ocelotgui-1.0.7 not ocelotgui.
-# cd ~
-# git clone https://github.com/ocelot-inc/ocelotgui ocelotgui-tmp
-# sudo cp ~/ocelotgui-tmp/* /ocelotgui-1.0.7
-# tar -zcvf ocelotgui-1.0.7.tar.gz /ocelotgui-1.0.7
-# cp ocelotgui-1.0.7.tar.gz ~/rpmtest/rp/rpmbuild/SOURCES/ocelotgui-1.0.7.tar.gz
-# sudo rm -r /ocelotgui-1.0.7
-# 5. Copy this ocelotgui.spec to ~/rpmtest and make ~/rpmtest the current directory.
-# cp ~/ocelotgui/ocelotgui.spec ~/rpmtest/ocelotgui.spec
-# cd ~/rpmtest
-# 6. Run rpmbuild using the ~/rpmtest environment. Notice that we don't bother with an .rpmmacros file.
-# rpmbuild -ba ocelotgui.spec --define "_topdir $HOME/rpmtest/rp/rpmbuild"
+# You must copy it to $HOME/ocelotgui-1.0.7.tar.gz -- this is hard coded.
+# 3. Copy the ocelotgui.spec file to your $HOME directory.
+# (For this step, we assume you know where the spec file is. After all, it is what you are reading now.)
+# You must copy it to $HOME/ocelotgui.spec -- this is hard coded.
+# 4. Make sure you have nothing important in directory $HOME/ocelotgui_rpm, because it will be overwritten.
+# 5. Run rpmbuild writing to the ~/ocelotgui_rpm and reading $HOME/ocelotgui.spec + $HOME/ocelotgui-1.0.7.tar.gz: 
+# The command must look like this. We don't bother with an .rpmmacros file, therefore we must specify with --define.
+# rpmbuild -ba $HOME/ocelotgui.spec --define "_topdir $HOME/ocelotgui_rpm/rp/rpmbuild"
 # 7. Find the resulting rpm in the RPMS subdirectory and check it. Here we assume the platform is x86-64.
-# rpmlint ~/rpmtest//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.0.7-1.x86_64.rpm
+# rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.0.7-1.x86_64.rpm
 # If it says "0 errors, 0 warnings", you're done!
-# You can copy the .rpm file to a permanent location and remove the ~/rpmtest directory.
+# 8. You can copy the .rpm file to a permanent location and remove the $HOME/ocelotgui_rpm directory.
 
 #Re Group:
 #  Usually this is Group: Applications/Databases
 #  On Mageia we change it to Group: Databases
 #Re Source0:
 #  The URL here is in fact the source of the ocelotgui release.
-#  However, setup does not work. The assumption is that this
-#  ocelotgui.spec file is in an ocelotgui directory that contains
-#  the source, already downloaded.
+#  However, setup does not work. That is one reason that we require putting the tar gz file in $HOME.
+#  The other reason is that the regular tar directory is "ocelotgui", and we need it to be
+#  "ocelotgui-1.0.7". Therefore, as you can see by looking at the prep section below, some
+#  renaming takes place before the tar gz file is copied to $HOME/rp/rpmbuild/SOURCES.
+#  Of course you can make your own tar gz file from the current sources,
+#  i.e. git clone to directory ocelotgui and then tar -zcvf directory ocelotgui.
 #Re Build-Requires:
 #  * qt5-qttools-devel implies that we assume Qt version 5.
 #    In fact Qt version 4 will work well.
@@ -65,22 +59,23 @@
 #  * We hardcode /usr/share/applications/ocelotgui.desktop instead
 #    of using the desktopdir macro. That way we don't get an error,
 #    but alas, we also don't get an installation on the desktop.
+#Re cleanup:
+#  It's not automatic but it's simple: rm -r -f $HOME/ocelotgui_rpm.
 
 #TODO
 #----
-# * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
+# * It would be possible to wget the file as the first step in the prep section.
 # * Look at the flags that get passed to cmake, maybe they must be used (currently we are ignoring them).
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
-# * Remove old files: rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
-# * Change rpm_build.sh to a script that simply does all the preparatory statements mentioned in the comments of this file.
+# * Remove old files: rpm_build.sh rpm_post_install.sh rpm_post_uninstall.sh rpm_pre_install.sh rpm_pre_uninstall.sh
 # * Keep track of howtobuild.txt
 # * Fix the desktop problem
-
+# * End the hard coding
+# * Add error checks and explanatory messages for the lines that were added in the prep section.
 
 %define __spec_install_post %{nil}
 %define debug_package %{nil}
 %define __os_install_post %{_dbpath}/brp-compress
-
 
 # Restore old style debuginfo creation for rpm >= 4.14.
 %undefine _debugsource_packages
@@ -99,8 +94,8 @@ Group:          Databases
 %endif
 Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
-Source0:         ocelotgui-1.0.7.tar.gz
-#Source:        https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+#Source0:        ocelotgui-1.0.7.tar.gz
+Source:         https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
 BuildRequires:  qt5-qttools-devel
 BuildRequires:  mysql-devel
 BuildRequires:  gcc gcc-c++ make cmake
@@ -118,9 +113,17 @@ Ocelot GUI (ocelotgui), a database client, allows users to connect to
  and fonts for each part of the screen, result-set displays
  with rows that can have multiple lines and columns that can be dragged,
  and a debugger.
-
+ 
 %prep
-%setup -q
+rm -r -f $HOME/ocelotgui_rpm
+mkdir $HOME/ocelotgui_rpm $HOME/ocelotgui_rpm/rp $HOME/ocelotgui_rpm/rp/rpmbuild
+mkdir -p --verbose $HOME/ocelotgui_rpm/rp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+cp $HOME/ocelotgui-1.0.7.tar.gz $HOME/ocelotgui_rpm/ocelotgui-1.0.7.tar.gz
+cd $HOME/ocelotgui_rpm
+tar -xf ocelotgui-1.0.7.tar.gz
+mv ocelotgui ocelotgui-1.0.7
+tar -zcvf $HOME/ocelotgui_rpm/rp/rpmbuild/SOURCES/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7 
+%%setup -q
 
 %build
 %cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM"
