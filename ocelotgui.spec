@@ -61,6 +61,11 @@
 #    but alas, we also don't get an installation on the desktop.
 #Re cleanup:
 #  It's not automatic but it's simple: rm -r -f $HOME/ocelotgui_rpm.
+#Re Qt4:
+#  * I am assuming that users prefer Qt5.
+#    Users who prefer Qt4 should:
+#    Change the end of the cmake line to -DPACKAGE_TYPE="RPM" -DQT_VERSION=4
+#    Change the BuildRequires "qt5-qttools-devel" to "libqt4-devel"
 
 #TODO
 #----
@@ -72,6 +77,8 @@
 # * Fix the desktop problem
 # * End the hard coding
 # * Add error checks and explanatory messages for the lines that were added in the prep section.
+# * Find out why now you're saying qt5-qttools-devel when before it was just libqt5-devel.
+# * Correct package name for package containing mysql.h might be lib64mariadb-devel or libmysqlclient-devel or mariadb-devel
 
 %define __spec_install_post %{nil}
 %define debug_package %{nil}

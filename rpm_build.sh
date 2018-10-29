@@ -1,5 +1,8 @@
 # rpm_build.sh -- used by Ocelot to produce .rpm file for release 1.0.7
 
+# This utility is deprecated and will be removed in a later version.
+# For the newer way to produce an .rpm file, see the comments in ocelotgui.spec.
+
 # rpm prerequissites are:
 # dnf install gcc rpm-build rpm-devel rpmlint make python bash coreutils diffutils patch rpmdevtools
 
