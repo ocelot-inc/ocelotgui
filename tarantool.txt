@@ -9,12 +9,12 @@ The ocelotgui connection to Tarantool is alpha
 and is not produced by Tarantool and has no warranty.
 
 You need the latest Tarantool "SQL" server.
-The official "SQL" releases are 1.8.1 and 2.0.
+Tarantool's official "SQL" releases are 1.8.1 and 2.0 and 2.1.
 Release 1.8.1 https://github.com/tarantool/tarantool/releases/tag/1.8.1 is slightly obsolete.
-Release 2.0 will be available soon, look for it on https://github.com/tarantool/tarantool/releases,
+Release 2.0 or 2.1 will be available soon, look for it on https://github.com/tarantool/tarantool/releases,
 but at time of writing is not there yet.
 For a more current version, download from github.com/tarantool/tarantool:
-git clone -b 2.0 https://github.com/tarantool/tarantool.git ~/tarantool-2.0
+git clone -b 2.1 https://github.com/tarantool/tarantool.git ~/tarantool-2.1
 and build as instructed in the version-2.0 manual.
 
 Usually you do not need to install the Tarantool client (tarantool.so) library,

@@ -67,7 +67,7 @@ For example, on some platforms you can say
 "sudo apt-get install libqt5core5a" to install Qt5.</P>
 
 <P>You will need to know the version of the Qt library.
-It can be found with find /usr/lib -name "libQt*Gui.so*", or find /usr/lib64 -name "libQt*Gui.so*".
+It can be found with <i>find /usr/lib -name "libQt*Gui.so*"</i>, or <i>find /usr/lib64 -name "libQt*Gui.so*"</i>.
 If the response starts with libQtGui.so.4 then you have Qt4,
 if the response starts with libQt5Gui.so.5 then you have Qt5.
 Alternatively it sometimes can be found with qmake -v.</P>
@@ -99,7 +99,7 @@ Several other directories are searched; for details start ocelotgui
 after installation and choose Help | libmysqlclient.</P>
 
 <P>The libmysqlclient library is not necessary for ocelotgui installation;
-however, it is necessary at runtime in order to connect to a database server.</P>
+however, it is necessary at runtime in order to connect to a MySQL or MariaDB server.</P>
 
 <H3 id="getting-the-ocelotgui-executable-package">Getting the ocelotgui executable package</H3><HR>
 
@@ -731,7 +731,8 @@ from result sets of previous statements. To change this, click
 Settings|History and enter a number for Max Row Count.</P>
 
 <P>RE: TARANTOOL. By default ocelotgui is a client for MySQL or MariaDB.
-To use it as a client for Tarantool, read the tarantool.txt file.</P>
+To use it as a client for Tarantool, read
+<A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/tarantool.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/tarantool.txt</A>.<P>
 
 <H3 id="contact">Contact</H3><HR>
 
