@@ -1,8 +1,8 @@
-# ocelotgui.spec supplied by Ocelot Computer Services Inc. as part of ocelotgui package
+# ocelotgui-1.0.8.spec supplied by Ocelot Computer Services Inc. as part of ocelotgui package
 
 #How to Build an .rpm file
 #-------------------------
-# 1. Install necessary packages. These might already be installed. On some distros prefer dnf rather than yum.
+# 1. Install necessary packages. These might already be installed. Some distros prefer dnf to install.
 # sudo yum install qt5-qttools-devel
 # sudo yum install mysql mysql-devel
 # sudo yum install gcc gcc-c++ make cmake git
@@ -12,29 +12,51 @@
 # For example you might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
 # (For this step, we assume you know where you downloaded to. See later explanation in section "Re: Source".)
 # You must copy it to $HOME/ocelotgui-1.0.7.tar.gz -- this is hard coded.
+# x. Remake the ocelotgui.tar.gz file so it will unpack to ocelotgui-1.0.7 instead of to ocelotgui.
+# 2a. Alternative to step 2: make ocelotgui-1.0.7.tar.gz from a clone of the latest ocelotgui source.
+# This is approximately the way that Ocelot makes new tar.gz files when it makes new releases.
+# cd ~
+# mkdir ~/ocelotgui-tmp
+# mkdir ~/ocelotgui-tmp/ocelotgui
+# git clone https://github.com/ocelot-inc/ocelotgui ocelotgui-tmp
+# cd ocelotgui-tmp
+# sudo cp ~/ocelotgui-tmp/* ocelotgui
+# tar -zcvf ocelotgui-1.0.7.tar.gz ocelotgui
+# cp ocelotgui-1.0.7.tar.gz ~/ocelotgui-1.0.7.tar.gz
+# cd ~
+# sudo rm -r /ocelotgui-tmp
+# x. Remake ocelotgui-1.0.,7.tar.gz so it will unpack to directory ocelotgui-1.0.7 rather than to ocelotgui.
+# This is one way to do it:
+# cd /tmp
+# cp $HOME/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7.tar.gz
+# tar -xf ocelotgui-1.0.7.tar.gz
+# mv ocelotgui ocelotgui-1.0.7
+# rm ocelotgui-1.0.7.tar.gz
+# tar -zcvf ocelotgui-1.0.7.tar.gz ocelotgui
+# cp ocelotgui-1.0.7.tar.gz $HOME/ocelotui-1.0.7.tar.gz
 # 3. Copy the ocelotgui.spec file to your $HOME directory.
 # (For this step, we assume you know where the spec file is. After all, it is what you are reading now.)
 # You must copy it to $HOME/ocelotgui.spec -- this is hard coded.
-# 4. Make sure you have nothing important in directory $HOME/ocelotgui_rpm, because it will be overwritten.
-# 5. Run rpmbuild writing to the ~/ocelotgui_rpm and reading $HOME/ocelotgui.spec + $HOME/ocelotgui-1.0.7.tar.gz: 
-# The command must look like this. We don't bother with an .rpmmacros file, therefore we must specify with --define.
-# rpmbuild -ba $HOME/ocelotgui.spec --define "_topdir $HOME/ocelotgui_rpm/rp/rpmbuild"
+# 5. Copy this ocelotgui.spec to ~/ocelotgui_rpm and make ~/ocelotgui_rpm the current directory.
+# cp ~/ocelotgui/ocelotgui.spec ~/ocelotgui_rpm/ocelotgui.spec
+# cd ~/ocelotgui_rpm
+# 6. Run rpmbuild using the ~/ocelotgui_rpm environment. Notice that we don't bother with an .rpmmacros file.
+# rpmbuild -ba $HOME/ocelotgui.spec --define "_topdir $HOME/ocelotgui_rpm/rp/rpmbuild" --define "_sourcedir $HOME"
 # 7. Find the resulting rpm in the RPMS subdirectory and check it. Here we assume the platform is x86-64.
 # rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.0.7-1.x86_64.rpm
 # If it says "0 errors, 0 warnings", you're done!
-# 8. You can copy the .rpm file to a permanent location and remove the $HOME/ocelotgui_rpm directory.
+# You can copy the .rpm file to a permanent location and remove the ~/ocelotgui_rpm directory.
+# 8. With the .rpm file you can say
+# sudo rpm -i $HOME/ocelotgui_rpm/rp/rpmbuild/BUILD/ocelotgui-1.0.7/rp/rpmbuild/RPMS/x86_64/ocelotgui-1.0.7-1.x86_64.rpm
 
 #Re Group:
 #  Usually this is Group: Applications/Databases
 #  On Mageia we change it to Group: Databases
 #Re Source0:
 #  The URL here is in fact the source of the ocelotgui release.
-#  However, setup does not work. That is one reason that we require putting the tar gz file in $HOME.
-#  The other reason is that the regular tar directory is "ocelotgui", and we need it to be
-#  "ocelotgui-1.0.7". Therefore, as you can see by looking at the prep section below, some
-#  renaming takes place before the tar gz file is copied to $HOME/rp/rpmbuild/SOURCES.
-#  Of course you can make your own tar gz file from the current sources,
-#  i.e. git clone to directory ocelotgui and then tar -zcvf directory ocelotgui.
+#  However, setup does not work. The assumption is that this
+#  ocelotgui.spec file is in an ocelotgui directory that contains
+#  the source, already downloaded.
 #Re Build-Requires:
 #  * qt5-qttools-devel implies that we assume Qt version 5.
 #    In fact Qt version 4 will work well.
@@ -59,30 +81,30 @@
 #  * We hardcode /usr/share/applications/ocelotgui.desktop instead
 #    of using the desktopdir macro. That way we don't get an error,
 #    but alas, we also don't get an installation on the desktop.
-#Re cleanup:
-#  It's not automatic but it's simple: rm -r -f $HOME/ocelotgui_rpm.
-#Re Qt4:
-#  * I am assuming that users prefer Qt5.
-#    Users who prefer Qt4 should:
-#    Change the end of the cmake line to -DPACKAGE_TYPE="RPM" -DQT_VERSION=4
-#    Change the BuildRequires "qt5-qttools-devel" to "libqt4-devel"
+#Re ocelotgui_logo.png:
+#  * This goes to /usr/share/pixmaps, but something removes the .png
+#    extension. This is awful. If /usr/share/pixmaps/ocelotgui_logo.png
+#    were allowed to exist, then Ocelot's icon would appear for the
+#    desktop. But, since /usr/share/pixmaps/ocelotgui_logo exists instead,
+#    the generic icon appears instead.
+#    Incidentally ocelotgui.desktop has Icon=ocelotgui_logo.png but we
+#    change that with sed.
 
 #TODO
 #----
-# * It would be possible to wget the file as the first step in the prep section.
+# * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
 # * Look at the flags that get passed to cmake, maybe they must be used (currently we are ignoring them).
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
-# * Remove old files: rpm_build.sh rpm_post_install.sh rpm_post_uninstall.sh rpm_pre_install.sh rpm_pre_uninstall.sh
+# * Remove old files: rpm_build.sh  rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
 # * Keep track of howtobuild.txt
-# * Fix the desktop problem
-# * End the hard coding
-# * Add error checks and explanatory messages for the lines that were added in the prep section.
-# * Find out why now you're saying qt5-qttools-devel when before it was just libqt5-devel.
-# * Correct package name for package containing mysql.h might be lib64mariadb-devel or libmysqlclient-devel or mariadb-devel
+# * Fix the desktop problem with the generic icon
+# It would be great to have ifdef equivalents for sourcedir etc., and maybe you don't need to make subdirectories yourself.
+
 
 %define __spec_install_post %{nil}
 %define debug_package %{nil}
 %define __os_install_post %{_dbpath}/brp-compress
+
 
 # Restore old style debuginfo creation for rpm >= 4.14.
 %undefine _debugsource_packages
@@ -107,6 +129,7 @@ BuildRequires:  qt5-qttools-devel
 BuildRequires:  mysql-devel
 BuildRequires:  gcc gcc-c++ make cmake
 BuildRequires:  rpm rpm-build rpmlint
+BuildRequires:  desktop-file-utils
 
 #Prefix: /usr
 
@@ -120,17 +143,16 @@ Ocelot GUI (ocelotgui), a database client, allows users to connect to
  and fonts for each part of the screen, result-set displays
  with rows that can have multiple lines and columns that can be dragged,
  and a debugger.
+
  
 %prep
 rm -r -f $HOME/ocelotgui_rpm
 mkdir $HOME/ocelotgui_rpm $HOME/ocelotgui_rpm/rp $HOME/ocelotgui_rpm/rp/rpmbuild
 mkdir -p --verbose $HOME/ocelotgui_rpm/rp/rpmbuild/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
-cp $HOME/ocelotgui-1.0.7.tar.gz $HOME/ocelotgui_rpm/ocelotgui-1.0.7.tar.gz
-cd $HOME/ocelotgui_rpm
-tar -xf ocelotgui-1.0.7.tar.gz
-mv ocelotgui ocelotgui-1.0.7
-tar -zcvf $HOME/ocelotgui_rpm/rp/rpmbuild/SOURCES/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7 
 %%setup -q
+
+sed -i 's|Icon=%{name}_logo.png|Icon=%{name}_logo|g' %{_builddir}/ocelotgui-1.0.7/%{name}.desktop
+
 
 %build
 %cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM"
@@ -167,14 +189,14 @@ mkdir -p %{buildroot}/usr/share
 mkdir -p %{buildroot}/usr/share/applications
 cp %{_builddir}/ocelotgui-1.0.7/ocelotgui.desktop %{buildroot}/usr/share/applications/ocelotgui.desktop
 mkdir -p %{buildroot}/usr/share/pixmaps
-cp %{_builddir}/ocelotgui-1.0.7/ocelotgui_logo.png %{buildroot}/usr/share/pixmaps/ocelotgui_logo
+cp %{_builddir}/ocelotgui-1.0.7/ocelotgui_logo.png %{buildroot}/usr/share/pixmaps/ocelotgui_logo.png
+desktop-file-install --delete-original ocelotgui.desktop
 %clean
 
 %files
 %defattr(-,root,root,-)
 %{_bindir}/ocelotgui
 %{_mandir}/man1/ocelotgui.1.gz
-/usr/share/applications/ocelotgui.desktop
 %{_docdir}/ocelotgui/COPYING
 %{_docdir}/ocelotgui/LICENSE.GPL
 %{_docdir}/ocelotgui/README.htm
@@ -214,7 +236,8 @@ cp %{_builddir}/ocelotgui-1.0.7/ocelotgui_logo.png %{buildroot}/usr/share/pixmap
 %{_docdir}/ocelotgui/starting.png
 %{_docdir}/ocelotgui/statement-widget-example.png
 %{_docdir}/ocelotgui/tarantool.txt
-/usr/share/pixmaps/ocelotgui_logo
+/usr/share/applications/ocelotgui.desktop
+/usr/share/pixmaps/ocelotgui_logo.png
 
 %changelog
 * Wed Aug 29 2018 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.7-1
