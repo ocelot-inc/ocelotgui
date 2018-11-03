@@ -15,29 +15,25 @@
 # x. Remake the ocelotgui.tar.gz file so it will unpack to ocelotgui-1.0.7 instead of to ocelotgui.
 # 2a. Alternative to step 2: make ocelotgui-1.0.7.tar.gz from a clone of the latest ocelotgui source.
 # This is approximately the way that Ocelot makes new tar.gz files when it makes new releases.
-# cd ~
-# mkdir ~/ocelotgui-tmp
-# mkdir ~/ocelotgui-tmp/ocelotgui
-# git clone https://github.com/ocelot-inc/ocelotgui ocelotgui-tmp
-# cd ocelotgui-tmp
-# sudo cp ~/ocelotgui-tmp/* ocelotgui
-# tar -zcvf ocelotgui-1.0.7.tar.gz ocelotgui
-# cp ocelotgui-1.0.7.tar.gz ~/ocelotgui-1.0.7.tar.gz
-# cd ~
-# sudo rm -r /ocelotgui-tmp
-# x. Remake ocelotgui-1.0.,7.tar.gz so it will unpack to directory ocelotgui-1.0.7 rather than to ocelotgui.
-# This is one way to do it:
+# To produce $HOME/ocelotgui-1.0.7.tar.gz from the latest github source, say:
+# cd /tmp
+# git clone https://github.com/ocelot-inc/ocelotgui ocelotgui
+# rm -r ocelotgui/.git
+# tar -zcvf $HOME/ocelotgui-1.0.7.tar.gz ocelotgui
+# sudo rm -r ocelotgui
+# 3. Remake ocelotgui-1.0.,7.tar.gz so it will unpack to directory ocelotgui-1.0.7 rather than to ocelotgui.
+# This step is necessary because ocelotgui.spec will look for files in ocelotgui-1.0.7.
+# To change $HOME/ocelotgui-1.0.7.tar.gz to be ready for rpm, say:
 # cd /tmp
 # cp $HOME/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7.tar.gz
 # tar -xf ocelotgui-1.0.7.tar.gz
 # mv ocelotgui ocelotgui-1.0.7
-# rm ocelotgui-1.0.7.tar.gz
-# tar -zcvf ocelotgui-1.0.7.tar.gz ocelotgui
-# cp ocelotgui-1.0.7.tar.gz $HOME/ocelotui-1.0.7.tar.gz
-# 3. Copy the ocelotgui.spec file to your $HOME directory.
+# tar -zcvf $HOME/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7
+# 4. Copy the ocelotgui.spec file to your $HOME directory.
 # (For this step, we assume you know where the spec file is. After all, it is what you are reading now.)
 # You must copy it to $HOME/ocelotgui.spec -- this is hard coded.
 # 5. Copy this ocelotgui.spec to ~/ocelotgui_rpm and make ~/ocelotgui_rpm the current directory.
+# (Possibly this is no longer necessary and you can skip this step completely, it's just something we used to do.)
 # cp ~/ocelotgui/ocelotgui.spec ~/ocelotgui_rpm/ocelotgui.spec
 # cd ~/ocelotgui_rpm
 # 6. Run rpmbuild using the ~/ocelotgui_rpm environment. Notice that we don't bother with an .rpmmacros file.
@@ -48,6 +44,7 @@
 # You can copy the .rpm file to a permanent location and remove the ~/ocelotgui_rpm directory.
 # 8. With the .rpm file you can say
 # sudo rpm -i $HOME/ocelotgui_rpm/rp/rpmbuild/BUILD/ocelotgui-1.0.7/rp/rpmbuild/RPMS/x86_64/ocelotgui-1.0.7-1.x86_64.rpm
+# Of course, the .rpm file name will be different on an i386 platform.
 
 #Re Group:
 #  Usually this is Group: Applications/Databases
