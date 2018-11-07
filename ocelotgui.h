@@ -5530,6 +5530,7 @@ int column_number(char *column_name, int *off)
   on the first one or two columns -- todo: these might not be the right
   columns, and I'm hoping Tarantool won't always have this requirement.
   Todo: max_column_widths might be unreliable if multibyte character.
+  Todo: the assumption that when num_flag != 0 it's "INTEGER" is not always going to be best.
 */
 int creates(QString create_table_statement, int connections_dbms_0, QString read_format_result)
 {
@@ -5575,7 +5576,7 @@ int creates(QString create_table_statement, int connections_dbms_0, QString read
     if (i == 1) {first_columns.append(","); first_columns.append(column_name); }
     if ((result_field_flags[i] & NUM_FLAG) != 0)
     {
-      tmp.append(" BIGINT ");
+      tmp.append(" INTEGER ");
     }
     else
     {
