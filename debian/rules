@@ -4,6 +4,29 @@ export DEB_BUILD_MAINT_OPTIONS = hardening=+all
 export DEB_CFLAGS_MAINT_APPEND  = -Wall -pedantic
 export DEB_LDFLAGS_MAINT_APPEND = -Wl,--as-needed
 
+# Find include+lib directories within the installed MySQL|MariaDB package
+# Todo: Make sure Build-Depends: happens first. Doubtless it will be CELOT_MYSQL_PACKAGE.
+# Todo: See whether default-libmysqlclient-dev can be used in some very new Debian version.
+# Todo: Pass these things to dh_auto_configure, they will be the mandatory include+lib for make.
+# Todo: See whether we check that dpkg is installed.
+# Todo: See what happens if default-mysql-client or default-mysql-client-core is installed instead.
+# Todo: in debian/controls, the first option could be default-libmysqlclient-dev
+OCELOT_MYSQL_PACKAGE = libmariadbclient-dev
+OCELOT_TMP = $(shell dpkg -L $(OCELOT_MYSQL_PACKAGE) | grep "/mysql.h$$")
+ifeq (,$(findstring mysql.h,$(OCELOT_TMP)))
+  OCELOT_MYSQL_PACKAGE = libmysqlclient-dev
+  OCELOT_TMP = $(shell dpkg -L $(OCELOT_MYSQL_PACKAGE) | grep "/mysql.h$$")  
+  ifeq (,$(findstring mysql.h,$(OCELOT_TMP)))
+    $(error Cannot find mysql.h in either libmysqlclient-dev or libmariadbclient-dev)
+  endif
+endif
+OCELOT_MYSQL_INCLUDE_DIR = $(dir $(OCELOT_TMP))
+OCELOT_TMP = $(shell dpkg -L $(OCELOT_MYSQL_PACKAGE) | grep "/libm.*client.so$$")
+ifeq (,$(findstring client,$(OCELOT_TMP)))
+  $(error Cannot find libmysql.so|libmariadb.so in $(OCELOT_MYSQL_PACKAGE))
+endif
+OCELOT_MYSQL_LIBRARY_DIR = $(dir $(OCELOT_TMP))
+
 %:
 	dh $@  
 
