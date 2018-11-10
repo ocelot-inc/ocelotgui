@@ -2,7 +2,7 @@ Source: ocelotgui
 Section: database
 Priority: optional
 Maintainer: Peter Gulutzan <pgulutzan@ocelot.ca>
-Build-Depends: cmake, debhelper (>=9), libgl1-mesa-dev, qt5-qmake, qtbase5-dev-tools, qtbase5-dev, libmariadbclient-dev | libmysqlclient-dev
+Build-Depends: gcc, libc6-dev, cmake, dpkg, libgl1-mesa-dev, qt5-qmake, qtbase5-dev-tools, qtbase5-dev, default-libmysqlclient-dev | libmariadbclient-dev | libmysqlclient-dev
 Standards-Version: 3.9.8
 Homepage: http://ocelot.ca
 

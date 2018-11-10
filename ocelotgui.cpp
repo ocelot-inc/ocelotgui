@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: November 6 2018
+   Last modified: November 9 2018
 */
 
 /*
@@ -3841,6 +3841,16 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
   {
     the_text.append("<br>using DBMS client library version ");
     the_text.append(lmysql->ldbms_mysql_get_client_info());
+#ifdef OCELOT_OS_LINUX
+    if (is_libmysqlclient_loaded == 1)
+    {
+      char dlinfo_result[512];
+      the_text.append("(");
+      dlinfo(libmysqlclient_handle, RTLD_DI_ORIGIN, dlinfo_result);
+      the_text.append(dlinfo_result);
+      the_text.append(")");
+    }
+#endif
   }
   if (statement_edit_widget->dbms_version > "")
   {
@@ -12983,7 +12993,6 @@ struct reftypewords {
 int MainWindow::connect_mysql(unsigned int connection_number)
 {
   QString ldbms_return_string;
-
   ldbms_return_string= "";
 
   /* Find libmysqlclient. Prefer ld_run_path, within that prefer libmysqlclient.so.18.

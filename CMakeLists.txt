@@ -17,6 +17,7 @@
 
 # CMakeLists.txt for ocelotgui
 # This CmakeLists.txt file works if Qt + mysql/mariadb files are present.
+# Always say "make clean" and "rm CMakeCache.txt" before running cmake.
 
 # This has been tested on Linux distros such as Ubuntu 16.04 and Mageia 5.
 # On Ubuntu 16.04 the prerequisite steps were:
@@ -71,6 +72,18 @@
 
 # MYSQL_INCLUDE_DIR=<string>
 # Directory to search first for mysql.h.
+# In debian/rules this is calculated by looking in the installed MySQL/MariaDB package.
+
+# USE_RPATH=TRUE|FALSE and CMAKE_INSTALL_RPATH
+# By default we have rpath. But from debian/rules we pass -DUSE_RPATH=FALSE.
+# For QMake, QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time.
+# CMAKE_INSTALL_RPATH is apparently the CMake translation of QMAKE_RPATHDIR,
+# but first it will try several other ways.
+# It does not replace our hard-coded defaults -- we append the hard-coded defaults to it.
+# Start ocelotgui and say Help | libmysqlclient for details.
+# In fact there may be an effect on RUNPATH, overriding RUNPATH.
+# If you change this, test with "readelf -d ocelotgui | grep PATH".
+# Remember that .deb and .rpm packagers suggest avoiding rpath.
 
 # CMAKE_BUILD_TYPE=<string>
 # Typical alternatives: Debug, RelWithDebInfo, Release.
@@ -148,8 +161,6 @@
 # Todo: rpmlint will warn "no-signature", which we ignore.
 # Todo: rpmlint will warn "no-packager-tag", wich we ignore.
 # but see also comments in rpm_build.sh and debian/README.Debian, we intend to stop using cpack
-
-# Todo: allow user to pass -DCMAKE_INSTALL_RPATH
 
 message("-- CmakeLists.txt for ocelotgui 1.0.7")
 message("-- see comments in CMakeLists.txt for special instructions")
@@ -332,20 +343,36 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 target_link_libraries(ocelotgui ws2_32)
 endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
-# QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time,
-# and CMAKE_INSTALL_RPATH is apparently the CMake translation of QMAKE_RPATHDIR,
-# but first it will try several other ways.
-# Start ocelotgui and say Help | libmysqlclient for details.
-# This is not tested.
-set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-set_target_properties(ocelotgui PROPERTIES INSTALL_RPATH_USE_LINK_PATH TRUE)
-if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-  message("-- 64-bit")
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/x86_64-linux-gnu:/usr/lib64:/usr/lib64/mysql:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib:/usr/lib64/mariadb")
-else (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-  message("-- 32-bit")
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}:/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/i386-linux-gnu:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib")            
-endif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+# See comments at the start of this file regarding USE_RPATH and CMAKE_INSTALL_RPATH.
+if (DEFINED USE_RPATH)
+  set(TMP_USE_RPATH ${USE_RPATH})
+else (DEFINED USE_RPATH)
+  set(TMP_USE_RPATH TRUE)
+endif (DEFINED USE_RPATH)
+if (TMP_USE_RPATH)
+  if (NOT CMAKE_INSTALL_RPATH)
+    set(TMP_INSTALL_RPATH "")
+  else (NOT CMAKE_INSTALL_RPATH)
+    set(TMP_INSTALL_RPATH "${CMAKE_INSTALL_RPATH}")
+  endif (NOT CMAKE_INSTALL_RPATH)
+  if (TMP_INSTALL_RPATH STREQUAL "")
+    #
+  else (TMP_INSTALL_RPATH STREQUAL "")
+    set(TMP_INSTALL_RPATH "${TMP_INSTALL_RPATH}:")
+  endif (TMP_INSTALL_RPATH STREQUAL "")
+  if (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    message("-- 64-bit")
+    set(TMP_INSTALL_RPATH "${TMP_INSTALL_RPATH}/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/x86_64-linux-gnu:/usr/lib64:/usr/lib64/mysql:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib:/usr/lib64/mariadb")
+  else (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+    message("-- 32-bit")
+    set(TMP_INSTALL_RPATH "${TMP_INSTALL_RPATH}/usr/mysql/lib:/usr/lib:/usr/lib/mysql:/usr/local:/usr/local/lib:/usr/local/lib/mysql:/usr/local/mysql:/usr/local/mysql/lib:/usr:/usr/lib/i386-linux-gnu:/usr/mariadb/lib:/usr/lib/mariadb:/usr/local/lib/mariadb:/usr/local/mariadb:/usr/local/mariadb/lib")            
+  endif (CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
+  message("-- rpath = ${TMP_INSTALL_RPATH}")
+  set_target_properties(ocelotgui PROPERTIES INSTALL_RPATH "${TMP_INSTALL_RPATH}")
+  set_target_properties(ocelotgui PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
+else (TMP_USE_RPATH)
+  message("-- No rpath")
+endif (TMP_USE_RPATH)
 
 if (Qt5Widgets_FOUND)
   target_link_libraries(ocelotgui Qt5::Widgets)
