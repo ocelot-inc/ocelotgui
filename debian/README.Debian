@@ -38,6 +38,8 @@ There are no errors or warnings. There is one informative message.
     I am assming that users prefer Qt5.
     Users who prefer Qt4 should remove "libgl1-mesa-dev, qt5-default, qt5-qmake, qtbase5-dev-tools, qtbase5-dev,"
     and add "libqt4-dev-tools".
+    Although we first look for default-libmysqlclient-dev, in debian/rules we look for
+    libmariadbclient-dev | libmysqlclient-dev, the difference shouldn't have significant effect.
 "Package ... Depends":
     I am assuming that dpkg-gencontrol will substitute ${misc:Depends}
     I am not including libmariadbclient | libmysqlclient (which is in build-depends),

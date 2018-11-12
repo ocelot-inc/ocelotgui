@@ -3842,19 +3842,28 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
     the_text.append("<br>using DBMS client library version ");
     the_text.append(lmysql->ldbms_mysql_get_client_info());
 #ifdef OCELOT_OS_LINUX
+#if (OCELOT_STATIC_LIBRARY==0)
+    /* RDLD_DI_ORIGIN gives only library. RDLD_DI_LINKMAP gives all but needs #include <link.h>. */
     if (is_libmysqlclient_loaded == 1)
     {
-      char dlinfo_result[512];
-      the_text.append("(");
-      dlinfo(libmysqlclient_handle, RTLD_DI_ORIGIN, dlinfo_result);
-      the_text.append(dlinfo_result);
-      the_text.append(")");
+       struct link_map *map;
+       the_text.append("(");
+       if (dlinfo(libmysqlclient_handle, RTLD_DI_LINKMAP, &map) != -1)
+       {
+         if (map != NULL) the_text.append(map->l_name);
+       }
+       the_text.append(")");
     }
+#endif
 #endif
   }
   if (statement_edit_widget->dbms_version > "")
   {
-    the_text.append("<br>using DBMS server version ");
+    the_text.append("<br>using ");
+    if (connections_dbms[0] == DBMS_MYSQL) the_text.append("MySQL ");
+    if (connections_dbms[0] == DBMS_MARIADB) the_text.append("MariaDB ");
+    if (connections_dbms[0] == DBMS_TARANTOOL) the_text.append("Tarantool ");
+    the_text.append("DBMS server version ");
     the_text.append(statement_edit_widget->dbms_version);
   }
   the_text.append("<br>Some source code related to the debugger feature is ");

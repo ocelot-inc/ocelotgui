@@ -185,6 +185,7 @@
 /*
   Linux-specific:
   We use dlopen() when opening libmysqlclient.so and libcrypto.so, therefore include dlfcn.h.
+  We use dlinfo() to find the libmysqlclient file name for help|about, therefore include link.h.
   We use readlink() when checking if histfile links to dev/null, therefore include unistd.h.
   We use getpwuid() when getting password, therefore include pwd.h.
   We use pthread_create() for debug and kill, therefore include pthread.h.
@@ -193,6 +194,9 @@
 */
 #ifdef OCELOT_OS_LINUX
 #include <dlfcn.h>
+#if (OCELOT_STATIC_LIBRARY == 0)
+#include <link.h>
+#endif
 #include <unistd.h>
 #include <pwd.h>
 #include <pthread.h>
