@@ -23,6 +23,8 @@
 # On Ubuntu 16.04 the prerequisite steps were:
 #  sudo apt-get install build-essential libgl1-mesa-dev qtbase5-dev
 #  sudo apt-get install libmysqlclient-dev
+# On PureOS 8 the prerequisite steps were:
+# sudo apt-get install cmake g++ default-libmysqlclient-dev qtbase5-dev
 # On Mageia 5 the prerequisite steps were:
 #  sudo urpmi cmake make gcc gcc-c++
 #  sudo urpmi libqt5-devel
