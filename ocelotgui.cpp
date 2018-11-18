@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: November 9 2018
+   Last modified: November 17 2018
 */
 
 /*
@@ -458,6 +458,10 @@
          above-mentioned Fedora bug report. But there's not much I can do except
          maybe replace all native dialogs (I use QFontDialog) with substitutes in
          this program. Quite a lot of work just to suppress a useless message, eh?
+   Todo: Failed to load module "canberra-gtk-module" which has something to do with sound
+         https://cromwell-intl.com/open-source/missing-gtk-modules.html
+         We don't need special sounds so suppressing would be okay.
+         But I didn't bother because I only saw it with Linux + Qt4.
 */
 #if (defined(_WIN32) && (QT_VERSION >= 0x50000))
 void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QString &msg)
@@ -11277,7 +11281,6 @@ const keywords strvalues[]=
       {"CEILING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CEILING},
       {"CENTROID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CENTROID}, /* deprecated in MySQL 5.7.6 */
       {"CHANGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CHANGE},
-      {"CHANGES", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_CHANGES},
       {"CHAR", FLAG_VERSION_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_CHAR},
       {"CHARACTER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CHARACTER},
       {"CHARACTER_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARACTER_LENGTH},
@@ -11813,7 +11816,7 @@ const keywords strvalues[]=
       {"ROUND", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ROUND},
       {"ROW", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROW},
       {"ROWS", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROWS},
-      {"ROW_COUNT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ROW_COUNT},
+      {"ROW_COUNT", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ROW_COUNT},
       {"ROW_NUMBER", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_ROW_NUMBER},
       {"RPAD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RPAD},
       {"RTRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_RTRIM},
@@ -11849,7 +11852,7 @@ const keywords strvalues[]=
       {"SLOW", 0, 0, TOKEN_KEYWORD_SLOW},
       {"SMALLINT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SMALLINT},
       {"SONAME", 0, 0, TOKEN_KEYWORD_SONAME},
-      {"SOUNDEX", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_SOUNDEX},
+      {"SOUNDEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SOUNDEX},
       {"SOURCE", 0, 0, TOKEN_KEYWORD_SOURCE}, /* Ocelot keyword */
       {"SPACE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SPACE},
       {"SPATIAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SPATIAL},
@@ -11993,7 +11996,6 @@ const keywords strvalues[]=
       {"TINYINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYINT},
       {"TINYTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYTEXT},
       {"TO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TO},
-      {"TOTAL_CHANGES", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_TOTAL_CHANGES},
       {"TOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TOUCHES}, /* deprecated in MySQL 5.7.6 */
       {"TO_BASE64", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_BASE64},
       {"TO_DAYS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_DAYS},
@@ -12145,15 +12147,15 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "917" */
+      /* If the following assert happens, you inserted/removed something without changing "915" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (917 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (915 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 917; ++ii)
+      //for (int ii= 0; ii < 915; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 917, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 915, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -12161,8 +12163,8 @@ const keywords strvalues[]=
       //  assert(index == strvalues[ii].token_keyword);
       //}
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 917 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 917, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 915 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 915, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */

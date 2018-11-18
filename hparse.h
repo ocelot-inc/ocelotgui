@@ -1968,11 +1968,6 @@ void MainWindow::hparse_f_opr_7(int who_is_calling, int allow_flags) /* Preceden
       hparse_like_seen= false;
       break;
     }
-    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GLOB") == 1)
-    {
-      hparse_f_opr_8(who_is_calling, allow_flags & (~ALLOW_FLAG_IS_MULTI));
-      break;
-    }
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN") == 1)
     {
       hparse_f_opr_8(who_is_calling, allow_flags | ALLOW_FLAG_IS_MULTI);
