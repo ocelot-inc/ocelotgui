@@ -1,3 +1,7 @@
+
+The contents of this file have been copied to the README
+so it is obsolete. It will be removed in a later release.
+
 Some details about ocelotgui options.
 
 An option is a named value which affects connecting and behavior.

@@ -353,7 +353,8 @@ If there are connection-related options on the command line, ocelotgui
 will accept them just as the mysql client would. Therefore the typical
 way to start the program is to say  
 ocelotgui [--option [--option...]]  
-For a description of options see <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt</A>.
+<br>
+For a description of options see  <A href="#Appendix-1">Appendix 1 Details about ocelotgui options</A>.
 </P>
 <P>
 <A href="starting-dialog.png"><img src="starting-dialog.png" alt="starting-dialog.png" align="right" height="128"></A>
@@ -361,7 +362,7 @@ If a password is required but not supplied, a dialog box will appear.
 Or, if the initial attempt to connect fails, an error message will appear
 saying it is necessary to choose File|Connect, which will cause the dialog
 box to appear. The dialog box has many possible settings
-(see the list in <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/options.txt</A>);
+(see the list in <A href="#Appendix-1">Appendix 1</A>;
 however, for getting started, the ones that matter most are the ones
 at the top: host, port, user, socket, password, protocol.  
 If the connection still fails, then ocelotgui will still come up,
@@ -617,7 +618,7 @@ $exit or Debug|Exit -- stops a debug session.  <BR>
 <P>
 For a walk through a debugger example, with screenshots, see
 this blog post: <A HREF="http://ocelot.ca/blog/the-ocelotgui-debugger">http://ocelot.ca/blog/the-ocelotgui-debugger</A>.  
-For reference, read: <A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/debugger_reference.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/debugger_reference.txt</A>.
+For reference, read: <A HREF="#Appendix-2">Appendix 2 Reference for the Ocelot GUI debugger (ocelotgui)"></A>.
 </P>
 
 <H3 id="special-effects">Special Effects</H3><HR>
@@ -750,3 +751,1056 @@ Or send a private note to pgulutzan at ocelot.ca.</P>
 web page (ocelot.ca) or on the employee blog (<A HREF="http://ocelot.ca/blog">http://ocelot.ca/blog</A>).</P>
 
 <P>Any contributions will be appreciated.</P>
+
+<H3 id="Appendix-1">Appendix 1 Details about ocelotgui options</H3><HR>
+
+An option is a named value which affects connecting and behavior.
+Most Ocelot options are very similar to options of the mysql client.
+<br><br>
+The places that an option might be specified are:
+within the program for example the default port value is 3306,
+in an environment variable for example "export MYSQL_TCP_PORT=3306",
+in a configuration file for example "port=3306" in $HOME/.my.cnf,
+on the command line for example "./ocelotgui --port=3306",
+or on the File|Connect dialog box.
+<br><br>
+Environment Variables. The ocelotgui program will look at these variables:
+HOME, LD_RUN_PATH, MYSQL_GROUP_SUFFIX, MYSQL_HISTFILE,
+MYSQL_HISTIGNORE, MYSQL_HOST, MYSQL_PS1, MYSQL_PWD.
+MYSQL_TCP_PORT, MYSQL_UNIX_PORT, MYSQL_TEST_LOGIN_FILE.
+<br><br>
+Option Files: The ocelotgui program will look in these option files:
+/etc/my.cnf, /etc/mysql/my.cnf, [SYSCONFDIR]/my.cnf,
+[defaults-extra-file], $HOME/.my.cnf, $HOME/.mylogin.cnf.
+Within option files, the ocelotgui program will look
+in these groups: [client] [mysql] [ocelot], as well
+as groups specified by MYSQL_GROUP_SUFFIX.
+On Windows, the order is different: %system, %windir,
+[application-directory], %MYSQL_HOME%, [defaults-extra-file].
+<br><br>
+Command Line: The ocelotgui program will look at command-line arguments
+which are specified in short form such as "-p 3306", or
+which are specified in long form such as "--port=3306".
+<br><br>
+Dialog Box: A dialog box will appear if the user enters a user statement
+"CONNECT;" or if the user chooses menu item File|Connect.
+The user will be advised to do this at startup time if an
+initial attempt to connect fails.
+<br><br>
+Example
+<br>
+The default value for "port" is 3306, this is
+hard coded in the ocelotgui source.<br>
+The environment variable value for "port" is 3307, this is
+set by "export MYSQL_TCP_PORT=3307" before starting ocelotgui.<br>
+The option file value for "port" is 3308, this is
+set by putting "PORT=3308" in the [mysql] group in
+the $HOME/.mysql.cnf file.<br>
+The command-line value for "port" is 3309, this is
+set by putting "--port=3309" on the command line
+when starting the ocelotgui program.<br>
+The dialog-box value for "port" is 3310, this is
+set by choosing File|Connect, entering "3310" in
+the widget labelled "Port", and clicking "OK".<br>
+The ocelotgui program reads the settings in the
+above order, therefore the port number is 3310.
+<br><br>
+Options in the following table are in the same order that one sees
+on the File|Connect dialog box: first come the 8 important connect
+options (host, port, user, database, socket, password, protocol,
+init_command), then all the other options in alphabetical order.<br>
+Unless otherwise stated, options are specifiable by saying<br>
+[option_name] = [value] in an option file or<br>
+--[option_name] = [value] on the command line<br>
+(sometimes --[option_name] alone is sufficient for true|false values),
+or in the dialog box.<br>
+If an option value is irrelevant or invalid, the ocelotgui program
+ignores it without displaying an error message.
+
+ <table border="1" style="width:100%;background-color: #f1f1c1">
+ <tr>
+ <th>Option</th>
+ <th>Description</th>
+ </tr>
+ <tr>
+ <td valign="top">host</td>
+ <td valign="top">Server address. Specifiable with MYSQL_HOST
+environment variable, with host= in an option file, with
+-h or --host on the command line, or in dialog box.
+Example values: localhost 192.15.8.44 w@ww.com.
+Warning: if host=localhost, ocelotgui tries to use a socket,
+if this is not desirable then say localhost=127.0.0.1 instead.</td>
+ </tr>
+ <tr>
+ <td valign="top">port</td>
+ <td valign="top">Port that the server listens on, if the protocol is
+TCP. Specifiable with
+MYSQL_TCP_PORT environment variable, with port= in an option
+file, with -P or --port on the command line, or in dialog box.
+Example values: 3306 3307.</td>
+</tr>
+
+<tr>
+<td valign="top">user</td>
+<td valign="top"> User name. Specifiable with user= in an option file,
+with -u or --user on the command line, or in dialog box.
+Example values: root guest jsmith.</td>
+</tr>
+
+<tr>
+<td valign="top">database</td>
+<td valign="top">Database name also known as schema name. Specifiable
+with database= in an option file, with -D or --database on the
+command line, or in dialog box. Example values: test account_data.
+</td>
+</tr>
+
+<tr>
+<td valign="top">socket</td>
+<td valign="top">Socket name that the server receives on, if the
+protocol is SOCKET. Specifiable with socket= in an option file,
+with -S or --socket= on the command line, or in dialog box.
+Examples: var/lib/special.sock /home/user/x.sock.
+</td>
+</tr>
+
+<tr>
+<td valign="top">password</td>
+<td valign="top">Password associated with the user. Specifiable
+with password= in an option file, with -p or --password= on
+the command line, or in dialog box. If the password is
+required but not specified, the dialog box will always appear.
+Examples: sesame top_secret#1</td>
+</tr>
+
+<tr>
+<td valign="top">protocol</td>
+<td valign="top">How the connection to the server occurs. Possible
+values are: blank or TCP or SOCKET. If host=localhost and
+protocol is blank, then SOCKET is assumed. Specifiable with
+protocol= in an option file, with --protocol= on the command
+line, or in dialog box. Examples: tcp socket.</td>
+</tr>
+
+<tr>
+<td valign="top">init_command</td>
+<td valign="top">Initial statement that should be executed as
+soon as connect is complete. Example: "select current_user()".</td>
+</tr>
+
+<tr>
+<td valign="top">auto_rehash</td>
+<td valign="top">If 1 (true), ocelotgui may try to
+complete names.</td>
+</tr>
+
+<tr>
+<td valign="top">auto_vertical_output</td>
+<td valign="top">If 1 (true), ocelotgui will display
+with one column per row.</td>
+</tr>
+
+<tr>
+<td valign="top">batch</td>
+<td valign="top">Mostly ignored, but if 1 (true), history is not written.</td>
+</tr>
+
+<tr>
+<td valign="top">compress</td>
+<td valign="top">If 1 (true), value is passed to the server.</td>
+</tr>
+
+<tr>
+<td valign="top">connect_expired_password</td>
+<td valign="top">If 1 (true), ocelotgui goes into
+sandbox mode if a password has expired at connect time.</td>
+</tr>
+
+<tr>
+<td valign="top">connect_timeout</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">debug</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">debug_check</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">debug_info</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">default_auth</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">default_character_set</td>
+<td valign="top">Ignored, ocelotgui needs UTF-8.</td>
+</tr>
+
+<tr>
+<td valign="top">defaults_extra_file</td>
+<td valign="top">Name of an additional option file.</td>
+</tr>
+
+<tr>
+<td valign="top">defaults_file</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">defaults_group_suffix</td>
+<td valign="top">Suffix that is added to the regular group
+names for option files. For example, if defaults_group_suffix=_X,
+then ocelotgui will look at options in groups client_X and mysql_X and
+ocelot_X in addition to options in groups client and mysql and ocelot.</td>
+</tr>
+
+<tr>
+<td valign="top">delimiter</td>
+<td valign="top">What ends a statement, usually semicolon ";".</td>
+</tr>
+
+<tr>
+<td valign="top">enable_cleartext_plugin</td>
+<td valign="top">Ignored.
+</tr>
+
+<tr>
+<td valign="top">execute</td>
+<td valign="top">String to execute followed by program exit.</td>
+</tr>
+
+<tr>
+<td valign="top">force</td>
+<td valign="top">Ignored, ocelotgui always ignores errors in options.</td>
+</tr>
+
+<tr>
+<td valign="top">help</td>
+<td valign="top">Display a help message followed by program exit.</td>
+</tr>
+
+<tr>
+<td valign="top">histfile</td>
+<td valign="top">Name of file where statements are logged to, usually
+".mysql_history". Ignored if batch=1. Ignored if
+histfile=/dev/null.</td>
+</tr>
+
+<tr>
+<td valign="top">histignore</td>
+<td valign="top">Pattern to ignore when writing to histfile.
+For example, if histignoreis "*select*", then statements
+containing the string "select" will not be written.
+</tr>
+
+<tr>
+<td valign="top">html</td>
+<td valign="top">If one starts ocelotgui with --html, the grid display
+will be based on HTML rather than on widgets, making results
+look quite different. If one starts ocelotgui with --html --raw,
+the actual html markup code will appear.</td>
+</tr>
+
+<tr>
+<td valign="top">ignore_spaces</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">ld_run_path</td>
+<td valign="top">Where to look for libmysqlclient.so. Click help|libmysqlclient
+for details.</td>
+</tr>
+
+<tr>
+<td valign="top">line_numbers</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">local_infile</td>
+<td valign="top">If 1 (true), passed to the server.</td>
+</tr>
+
+<tr>
+<td valign="top">login_path</td>
+<td valign="top">Where to find login file if it's not "~/.mylogin.cnf".</td>
+</tr>
+
+<tr>
+<td valign="top">max_allowed_packet</td>
+<td valign="top">Passed to the server. Default 16777216.</td>
+
+<tr>
+<td valign="top">max_join_size</td>
+<td valign="top">Passed to the server. Default 1000000.</td>
+</tr>
+
+<tr>
+<td valign="top">named_commands</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">net_buffer_length</td>
+<td valign="top">Passed to the server. Default 16384.</td>
+</tr>
+
+<tr>
+<td valign="top">no_beep</td>
+<td valign="top">Ignored, ocelotgui does not usually beep when errors occur.</td>
+</tr>
+
+<tr>
+<td valign="top">no_defaults</td>
+<td valign="top">If 1 (true), options in environment variables and option
+files are read but not used.</td>
+</tr>
+
+<tr>
+<td valign="top">ocelot_*</td>
+<td valign="top">... Options that begin with "ocelot_" are only recognized
+by the ocelotgui client. Everything on the Settings menu has an
+associated option name. The intuitively-named settings options are:
+ocelot_extra_rule_1_text_color ocelot_extra_rule_1_background_color
+ocelot_extra_rule_1_condition ocelot_extra_rule_1_display_as
+ocelot_grid_text_color ocelot_grid_background_color
+ocelot_grid_border_color ocelot_grid_header_background_color
+ocelot_grid_font_size ocelot_grid_font_style
+ocelot_grid_font_weight ocelot_grid_cell_border_color
+ocelot_grid_cell_drag_line_color ocelot_grid_border_size
+ocelot_grid_cell_border_size ocelot_grid_cell_drag_line_size
+ocelot_history_text_color ocelot_history_background_color
+ocelot_history_border_color ocelot_history_font_family
+ocelot_history_font_size ocelot_history_font_style
+ocelot_history_font_weight ocelot_menu_text_color
+ocelot_menu_background_color ocelot_menu_border_color
+ocelot_menu_font_family ocelot_menu_font_size
+ocelot_menu_font_style ocelot_menu_font_weight
+ocelot_statement_text_color ocelot_statement_background_color
+ocelot_statement_border_color ocelot_statement_font_family
+ocelot_statement_font_size ocelot_statement_font_style
+ocelot_statement_font_weight ocelot_statement_highlight_literal_color
+ocelot_statement_highlight_identifier_color ocelot_statement_highlight_comment_color
+ocelot_statement_highlight_operator_color ocelot_statement_highlight_keyword_color
+ocelot_statement_prompt_background_color ocelot_statement_highlight_function_color
+ocelot_statement_highlight_current_line_color.
+See also: the ocelot_ options which aren't related to Settings, below.</td>
+</tr>
+
+<tr>
+<td valign="top">ocelot_client_side_functions</td>
+<td valign="top"> ocelot_client_side_functions=0 turns off
+the client-side functions, such as "select row_number() over ...".
+This may be unnecessary with newer versions of MariaDB.
+The default is 1.</td>
+</tr>
+
+<tr>
+<td valign="top">ocelot_dbms</td>
+<td valign="top">--ocelot_dbms=x means assume the server DBMS is x
+until connection is made. The possible values are 'mysql',
+'mariadb', and 'tarantool'. The default is 'mysql'.</td>
+</tr>
+
+<tr>
+<td valign="top">ocelot_grid_tabs</td>
+<td valign="top">ocelot_grid_tabs=5
+means assume that a stored procedure can return up to 5 result sets.
+The default is 16.</td>
+</tr>
+
+<tr>
+<td valign="top">ocelot_language</td>
+<td valign="top">--ocelot_language='english' means the menu and the
+client error messages should be in English, --ocelot_language='french'
+means the menu and the client error messages should be in French.
+The default is 'english'.</td>
+</tr>
+
+<tr>
+<td valign="top">ocelot_statement_syntax_checker</td>
+<td valign="top">setting
+ocelot_statement_syntax_checker=1 turns on the
+syntax checker; setting ocelot_statement_syntax_checker=2
+turns on the syntax checker and is insistent -- if ocelotgui
+doesn't like the syntax checker, a confirmation dialog box
+will appear. The default is 1.</td>
+</tr>
+
+<tr>
+<td valign="top">ocelot_shortcut_*</td>
+<td valign="top">ocelot_shortcut_connect, ocelotshortcut_exit, etc. ...
+You can change what the shortcut is, for any menu
+item, by specifying its name and a new keysequence.
+For example: SET ocelot_shortcut_paste = 'Ctrl+Shift+K';</td>
+</tr>
+
+<tr>
+<td valign="top">one_database</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">pager</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">pipe</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">plugin_dir</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">print_defaults</td>
+<td valign="top">If 1 (true), ocelotgui displays defaults and exits.</td>
+</tr>
+
+<tr>
+<td valign="top">prompt</td>
+<td valign="top">What to display on left of statement lines.
+Default is "mysql>".
+The prompt can include special character sequences
+for date, time, and line number.</td>
+</tr>
+
+<tr>
+<td valign="top">quick</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">raw</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">reconnect</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">safe_updates</td>
+<td valign="top">If 1 (true), ocelotgui passes 1 to the server.</td>
+</tr>
+
+<tr>
+<td valign="top">secure_auth</td>
+<td valign="top">If 1 (true), ocelotgui passes 1 to the server.</td>
+</tr>
+
+<tr>
+<td valign="top">select_limit</td>
+<td valign="top">The maximum number of rows to select; default is 0
+which means infinity; ocelotgui passes this to the server.</td>
+</tr>
+
+<tr>
+<td valign="top">server_public_key</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">shared_memory_base_name</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">show_warnings</td>
+<td valign="top">If 1 (true), ocelotgui displays warnings which
+result from problems that the server detects.</td>
+</tr>
+
+<tr>
+<td valign="top">sigint_ignore</td>
+<td valign="top">If 1 (true), ocelotgui will not stop statements
+when user types control-C or chooses the menu item Run|Kill.</td>
+</tr>
+
+<tr>
+<td valign="top">silent</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">ssl_*</td>
+<td valign="top">ssl, ssl_ca, ssl_capath, ssl_cert, ssl_cipher, ssl_crl,
+ssl_crlpath, ssl_key, ssl_verify_server_cert. SSL options
+are accepted and passed to the server.</td>
+</tr>
+
+<tr>
+<td valign="top">syslog</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">table</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">tee</td>
+<td valign="top">Name of a file to dump statements and results to.</td>
+</tr>
+
+<tr>
+<td valign="top">unbuffered</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">verbose</td>
+<td valign="top">Ignored.</td>
+</tr>
+
+<tr>
+<td valign="top">version</td>
+<td valign="top">If 1 (true), ocelotgui displays a version number and exits.</td>
+</tr>
+
+<tr>
+<td valign="top">vertical</td>
+<td valign="top">If 1 (true), results are displayed with one column
+per line.</td>
+</tr>
+
+<tr>
+<td valign="top">wait</td>
+<td valign="top">Ignored.</td>
+</tr>
+<tr>
+<td valign="top">xml</td>
+<td valign="top">If one starts with ocelotgui --xml, the grid display will
+show raw xml. See also --html.</td>
+</tr>
+</table>
+
+<H3 id="Appendix-2">Appendix 2 Reference for the Ocelot GUI debugger (ocelotgui)</H3><HR>
+
+<p>Before trying to read this reference, it is a good idea to
+become familiar with the ocelotgui client and try out the
+simple <A HREF="http://ocelot.ca/blog/blog/2015/03/02/the-ocelotgui-debugger">demonstration on the ocelot.ca blog</A>.
+</p>
+
+<P>Temporary warning: for debugging MySQL version 8.0 routines,
+you need a recent ocelotgui version as pushed to source on
+or after June 2018. Use ocelotgui version 1.0.7 or later.</P>
+
+<P>
+All debug statements can be entered on the Statement widget,
+optionally ending with ";".<br>
+Some debug statements can be invoked via the menu or with shortcut keys.<br>
+Like other statements, debug statements are editable, are logged,
+and can cause error or warning messages to appear in the history.<br>
+Most statements can be entered even while the routine is running.<br>
+Warning: the focus can change, be sure that the cursor is blinking
+on the Statement Widget and not on the Debug Widget before entering
+a statement.<br>
+The following table shows statements in alphabetical order.</P>
+
+ <table border="1" style="width:100%;background-color: #f1f1c1">
+<tr>
+<th valign="top">Statement</td>
+<th valign="top">What it's for</td>
+<th valign="top">Syntax</td>
+<th valign="top">Example</td>
+<th valign="top">Remarks</td>
+</tr>
+
+<tr>
+<td valign="top">$breakpoint</td>
+<td valign="top">specifying a line where execution must stop.</td>
+<td valign="top">$b[reakpoint [schema_identifier.] routine_identifier line_number [condition]
+                 <BR><B>Shortcut:</B>
+                 Alt+1, or via menu: Debug|Breakpoint, or click on line
+                 (If a shortcut is used, the breakpoint is set for
+                 the routine that is currently being
+                 displayed, for the line the cursor is on.)</td>
+<td valign="top">$breakpoint test.p 5;<br>
+                 (The debugger must be running -- see $debug.)</td>
+<td valign="top">If $breakpoint succeeds, a red marker will appear on
+                 the left of the line. The breakpoint identifier will
+                 be displayed on the Debug Widget.
+                 Users can set breakpoints on any line.
+                 Users should not set breakpoints twice on the same line.
+                 Later, if the user enters $continue or $next,
+                 execution may stop when a line with a breakpoint is seen.
+                 To turn off a breakpoint, a user may click on the line
+                 (it is a "toggle" switch), or see $clear and $delete.
+                 Re condition:
+                 A condition is an expression which must be true, otherwise
+                 the breakpoint is ignored during execution. For example,
+                 $breakpoint p20 5 x = 7;
+                 sets a breakpoint which will only cause execution to halt
+                 if x = 7. The expression must have the form
+                 variable_name = literal, variable_name should be a
+                 declared variable, and the literal should be numeric.
+                 At time of writing, conditions are not well tested.</td>
+</tr>
+
+<tr>
+<td valign="top">$clear</td>
+<td valign="top">removing a breakpoint</td>
+<td valign="top">$cl[ear] [schema_identifier.] routine_identifier line_number
+                 <BR><B>Shortcut:</B>
+                 Alt+6, or via menu: Debug|Clear
+                 (If a shortcut is used, the breakpoint is removed
+                 for the routine that is currently being displayed,
+                 for the line that the cursor is on.)</td>
+<td valign="top">$clear p 5;<br>
+                 (The debugger must be running -- see $debug.)<br>
+                 (The breakpoint must exist (see $breakpoint.)</td>
+<td valign="top">The breakpoint's red marker should disappear.
+                 If it does not disappear, and a shortcut was used:
+                 make sure the cursor is actually on the line, not
+                 just on the line number, which is considered separate.</td>
+</tr>
+
+<tr>
+<td valign="top">$continue</td>
+<td valign="top">running the routine till it ends or till a breakpoint.</td>
+<td valign="top">$co[ntinue]
+                 <BR><B>Shortcut:</B>
+                 Alt+6, or via menu: Debug|Continue</td>
+<td valign="top">$continue;<br>
+                 (The debugger must be running -- see $debug.)</td>
+<td valign="top">$continue differs from $next and $step because it
+                 does not halt on a following statement, it goes on
+                 until it reaches a line with a breakpoint or until
+                 the main routine ends.</td>
+</tr>
+
+<tr>
+<td valign="top">$debug</td>
+<td valign="top">beginning a debug session.</td>
+<td valign="top">$deb[ug] [schema_identifier.] routine_identifier
+                 [(parameter list)];
+                 <BR><B>Shortcut:</B>
+                 None, $debug is not on the Debug menu.</td>
+<td valign="top">$debug procedure21;<br>
+    $debug function_x(7);
+    (The debugger must not be already running.
+    The routine must be set up -- $setup.)
+    The user must have appropriate privileges.)</td>
+<td valign="top">If $debug is successful, then a Debug Widget
+                 will appear (see section Debug Widget).</td>
+</tr>
+
+<tr>
+<td valign="top">$exit</td>
+<td valign="top">ending a debug session</td>
+<td valign="top">$exi[t]
+                 <BR><B>Shortcut:</B>
+                 Alt+7, or via menu: Debug|Exit</td>
+<td valign="top">$exit;<br>
+                 (The debugger must be running -- see $debug.)</td>
+<td valign="top"></td>
+</tr>
+
+<tr>
+<td valign="top">$information status</td>
+<td valign="top">showing information about debugger status</td>
+<td valign="top">$inf[ormation status]
+                 <BR><B>Shortcut:</B>
+                 Alt+8, or via menu: Debug|Information
+                 (Choosing from the menu may not work on some platforms.)</td>
+<td valign="top">$information status;<br>
+                 select * from xxxmdbug. information_status;</td>
+<td valign="top">The $information status statement will populate a table
+                 named xxxmdbug. information_status, which contains
+                 debugger_name, debugger_version,
+                 timestamp_of_status_message, number_of_status_message,
+                 icc_count, schema_identifier, routine_identifier,
+                 line_number, is_at_breakpoint, is_at_tbreakpoint,
+                 is_at_routine_exit, stack_depth, last_command,
+                 last_command_result, commands_count.
+                 The most important items of information status are
+                 displayed automatically along with the Debug Widget,
+                 so $information status is only for advanced users.</td>
+</tr>
+
+<tr>
+<td valign="top">$install</td>
+<td valign="top">install the debugger</td>
+<td valign="top">$ins[tall]
+                 <BR><B>Shortcut:</B>
+                 $install is not on the Debug menu.</td>
+<td valign="top">$install;<br>
+                 (The user must have appropriate privileges.)</td>
+<td valign="top">A large group of procedures and tables are
+                 placed in a database named xxxmdbug.
+                 Installation may take up to 20 seconds.
+                 It is only necessary to run $install once,
+                 but it may be redone, for example if a new
+                 version of ocelotgui is used.
+                 If $install is not done, none of the other
+                 debug statements are possible.</td>
+</tr>
+
+<tr>
+<td valign="top">$leave</td>
+<td valign="top">exit from a loop without executing</td>
+<td valign="top">$l[eave]
+                 <BR><B>Shortcut:</B>
+                 None, $leave is not on the Debug menu.</td>
+<td valign="top">Suppose this routine is being debugged:<br>
+                 begin<br>
+                   declare x int;<br>
+                   set x = 0;<br>
+                   while x < 5 do<br>
+                     set x = x + 0;<br>
+                     end while;<br>
+                   end<br>
+                 The user types $continue, which gets the
+                 program running -- in an infinite loop.
+                 One way to break out of the loop is with
+                 "$set x = 6;", another way is with $leave.
+                 ($leave will also continue, so if you want
+                 to stop after leaving you must set a brekapoint.)<br>
+                 (The debugger must be running --see $debug.)<br>
+                 (The procedure must be executing within a
+                 loop.)</td>
+<td valign="top">If the $leave statement is used when the
+                 routine is not in a loop, consequences are
+                 undefined -- this is not recommended.</td>
+</tr>
+
+<tr>
+<td valign="top">$next</td>
+<td valign="top">Making the program go to the next statement
+                 in the current routine.</td>
+<td valign="top">$n[ext];
+                 <BR><B>Shortcut:</B>
+                 Alt+3, or via menu: Debug|Next</td>
+<td valign="top">Suppose that the current line in procedure p is<br>
+                 select f() from t;<br>
+                 After $next, the current line changes to
+                 the line following the select statement,
+                 or (if this was the last line) routine exit.<br>
+                 (The debugger must be running --see $debug.)</td>
+<td valign="top">$next is different from $step because $step
+                 can drop into a subroutine, $next does not.</td>
+</tr>
+
+<tr>
+<td valign="top">$refresh breakpoints</td>
+<td valign="top">showing what breakpoints exist.</td>
+<td valign="top">$refresh breakpoints;
+                 <BR><B>Shortcut:</B>
+                 None. $refresh breakpoints is not on the Debug menu.</td>
+<td valign="top">$refresh breakpoints;<br>
+    select * from xxxmdbug. breakpoints;</td>
+<td valign="top">The $refresh breakpoints statement will populate a table
+                 named xxxmdbug. breakpoints, which contains
+                 breakpoint_identifier, schema_identifier,
+                 routine_identifier, routine_type, line_number_minimum,
+                 line_number_maximum, condition_identifier,
+                 condition_operator, condition_value, hit_count,
+                 is_temporary, is_temporary_and_to_be_cleared,
+                 is_matching_location, call_stack_depth_when_set,
+                 command. For simple breakpoints which were set up with
+                 $breakpoint schema.routine line_number,
+                 $refresh breakpoints is unnecessary because
+                 breakpointed lines are marked in the Debug Widget.</td>
+</tr>
+
+<tr>
+<td valign="top">$refresh call_stack</td>
+<td valign="top">showing what the routines are that got us here.</td>
+<td valign="top">$refresh call_stack
+                 <BR><B>Shortcut:</B>
+                 Alt+B, or via menu: Debug|Refresh call_stack</td>
+                 (Choosing from the menu may not work on some platforms.)</td>
+<td valign="top">$refresh call_stack;<br>
+    select * from xxxmdbug. call_stack;</td>
+<td valign="top">Using menu Debug | Refresh call_stack will
+                 cause two statements: $refresh and select.
+                 The $refresh statement will populate a table
+                 named xxxmdbug. call_stack, which contains
+                 schema_identifier and routine_identifier and
+                 routine_type and line_number, with one row
+                 for each level. Thus, if routine p1 calls
+                 p2 and routine p2 calls p3, there are three rows.
+                 All $refresh statements may be blocked.</td>
+</tr>
+
+<tr>
+<td valign="top">$refresh server variables</td>
+<td valign="top">showing the contents of server variables.</td>
+<td valign="top">$refresh server_variables
+                 <BR><B>Shortcut:</B>
+                 Alt+9, or via menu: Debug|Refresh server_variables
+                 (Choosing from the menu may not work on some platforms.)</td>
+<td valign="top">$refresh server_variables;<br>
+    select * from xxxmdbug. server_variables;</td>
+<td valign="top">Using menu Debug | Refresh server_variables will
+                 cause two statements: $refresh and select.
+                 The $refresh statement will populate a table
+                 named xxxmdbug. server_variables, which contains
+                 variable_identifier and value and old_value.
+                 For example, regardless what the routine is,
+                 the available information will include that
+                 there is a server variable named @@innodb_compression_level
+                 which originally was null but now contains 6.
+                 All $refresh statements may be blocked.
+                 This statement is slow.</td>
+</tr>
+
+<tr>
+<td valign="top">$refresh user variables</td>
+<td valign="top">showing the contents of user variables.</td>
+<td valign="top">$refresh user_variables
+                 <BR><B>Shortcut:</B>
+                 Alt+A, or via menu: Debug|Refresh user_variables. 
+        (Choosing from the menu may not work on some platforms.)</td>
+<td valign="top">$refresh user_variables;<br>
+    select * from xxxmdbug. user_variables;</td>
+<td valign="top">Using menu Debug | Refresh user_variables will
+                 cause two statements: $refresh and select.
+                 The $refresh statement will populate a table
+                 named xxxmdbug. user_variables, which contains
+                 variable_identifier and value and old_value.
+                 Thus, if routine p has:<br>
+                 1 BEGIN<br>
+                 2  SET @x = 1;<br>
+                 3  SET @x = 2;<br>
+                 4  END;<br>
+                 and execution has stopped on line 3, the
+                 available information is that x is a bigint,
+                 which formerly
+                 contained 1, and now contains 2.
+                 All $refresh statements may be blocked.</td>
+</tr>
+
+<tr>
+<td valign="top">$refresh variables</td>
+<td valign="top">showing the contents of declared variables.</td>
+<td valign="top">$refresh variables
+                 <BR><B>Shortcut:</B>
+                Alt+B, or via menu: Debug|Refresh variables</td>
+<td valign="top">$refresh variables;<br>
+                 select * from xxxmdbug. variables;</td>
+<td valign="top">Using menu Debug | Refresh variables will
+                 cause two statements: $refresh and select.
+                 The $refresh statement will populate a table
+                 named xxxmdbug. variables, which contains
+                 schema_identifier and routine_identifier and
+                 routine_type and token_number_of_declare and
+                 variable_identifier and data_type and value
+                 and old_value and is_in_scope and is_settable
+                 and is_updated_by_set. Thus, if routine p has:<br>
+                 1 BEGIN<br>
+                 2  DECLARE x int;<br>
+                 3  SET x = 1;<br>
+                 4  SET x = 2;<br>
+                 5  END;<br>
+                 and execution has stopped on line 4, the
+                 available information is that x is an integer
+                 which was declared on line 2, which formerly
+                 contained 1, and now contains 2, and is in scope.
+                 All $refresh statements may be blocked.</td>
+</tr>
+
+<tr>
+<td valign="top">$set</td>
+<td valign="top">changing the value of a declared variable.</td>
+<td valign="top">$set variable_name = value;
+                 <BR><B>Shortcut:</B>
+                 None, $set is not on the Debug menu.</td>
+<td valign="top">$set x = 55;<br>
+    $set y = ''k'';<br>
+    (The debugger must be running -- see $debug.)<br>
+    (The variable must be in scope.)<br>
+    (The value must be a literal.
+    If it is a string literal, it must be
+    enclosed within two quote marks --
+    this is due to a temporary limitation.)</td>
+</td>
+<td valign="top">Only declared variables (variables that
+                 are specified with "DECLARE variable_name ...")
+                 can be changed with $set. There is no
+                 statement for changing user variables or
+                 system variables.
+                 $set should only be done while at a breakpoint.</td>
+</tr>
+
+<tr>
+<td valign="top">$setup</td>
+<td valign="top"></td>
+<td valign="top">$setu[p] [schema_identifier.] routine_identifier
+                 [, [schema_identifier.] routine_identifier ...]
+                 <BR><B>Shortcut:</B>
+                 None, $setup is not on the Debug menu.
+<td valign="top">$setup p;<br>
+    $setup test.procedure1, test.function2;<br>
+    (The debugger must be installed -- (see $install.)<br>
+    (Only procedures and functions may be listed,
+    not triggers. For "$setup X.Y", the user must
+    have CREATE privilege in schema X and EXECUTE
+    privilege on routine Y.)</td>
+<td valign="top">Unless a routine has been the object of $setup,
+                 it cannot be debugged.
+                 The $setup statement is slow, and if routines
+                 are large it is very slow. However, the effect
+                 is persistent so there is no need to run $setup
+                 for every debug session -- it only needs to be
+                 re-run if a routine is modified.
+                 The maximum number of routines per setup is 10.
+                 The $setup statement makes copies of routines,
+                 but never never changes the original routines.
+                 The default schema is what "select database();" returns.</td>
+</tr>
+
+<tr>
+<td valign="top">$step</td>
+<td valign="top">Making the program go to the next statement
+                 in the current routine or a subroutine.</td>
+<td valign="top">$st[ep]
+                 <BR><B>Shortcut:</B>
+                 Alt+5, or via menu: Debug|Step</td>
+<td valign="top">Suppose that the current line in procedure p is<br>
+                 select f() from t;<br>
+                 After $step, the current line changes to
+                 the first line in function f.<br>
+                 (The debugger must be running -- see $debug.)</td>
+<td valign="top">$step is different from $next because $step
+                 can drop into a subroutine, $next does not.</td>
+</tr>
+
+<tr>
+<td valign="top">$tbreakpoint</td>
+<td valign="top">specifying a line where execution must stop, once.</td>
+<td valign="top">$t[breakpoint [schema_identifier.] routine_identifier line_number
+                 <BR><B>Shortcut:</B>
+                 None, $tbreakpoint is not on the Debug menu.</td>
+<td valign="top">$tbreakpoint test.p 5;<br>
+                 (The debugger must be running -- see $debug.).</td>
+<td valign="top">The effect is the same as for ordinary breakpoints,
+                 see $breakpoint. However, a tbreakpoint (temporary
+                 breakpoint) becomes disabled after being hit once.
+                 Generally it is better to use $breakpoint and
+                 $clear; $tbreakpoint is not recommended.</td>
+</tr>
+</table>
+
+<h4>Debug Widget</h4>
+
+<P>The Debug Widget appears at the bottom of the window after
+execution of $debug, and disappears after execution of $exit.
+It is a tabbed widget, that is, if $setup was done for multiple
+routines, then the debug widget has multiple tabs and the user
+can look at a particular routine by clicking its tab.</P>
+
+<P>Above the widget is a line with information about current state.
+The state information includes the current position (what routine
+and line number is currently being executed), the result of the
+last debug statement, and whether the execution is currently halted
+(it will show "stopped at breakpoint" initially because there is
+automatically a temporary breakpoint at the start) (it will show
+"executing" if it is running) (it will show "routine end" at end).
+For example the line may contain<br>
+"Debugger status = (Current position: `test`.`p24` line 3)
+ (Last debug command: tbreakpoint test.p24 3, result: OK, breakpoint_identifier=3)
+ (STOPPED AT BREAKPOINT)"</P>
+
+<P>Below the tab is a display of the routine source, with line numbers
+on the left. This will appear to be editable; however, the only
+reason for that is so that $breakpoint and $clear will work.
+The line which is currently being executed will be highlighted.
+A line which has a breakpoint will have a mark on the left.</P>
+
+<P>The Debug Widget shares the settings of the Statement Widget.
+For example, if the user clicks Settings | Statement Widget and
+changes the background color to yellow, then the Debug Widget
+will also have a yellow background.</P>
+
+<H4>Maintenance</H4>
+
+<P>The $install statement places many routines and tables in the
+xxxmdbug database; to uninstall, simply drop the database.</P>
+
+<P>The $setup statement places copies of routines in the same
+databases that the original routines are in. These are not
+dropped automatically; users or administrators should watch
+for obsolete setup results.</P>
+
+<P>The $refresh statements make temporary tables, which may
+become large but which should disappear at session end.</P>
+
+<H4>Privileges</H4>
+
+<P>To do $install, one needs authorization to create a new
+database, xxxmdbug, and populate it. The user who does $install may
+then choose to grant or revoke privileges on the procedures
+of xxxmdbug so that debugging is limited to certain users.</P>
+
+<P>To do $setup routine_name(s), one needs authorization to execute the
+named routines and to create routines in the same database.</P>
+
+<P>To do $debug, one needs authorization to execute both the
+original routine and the copy that was made by $setup.
+Also, one needs READ or EXECUTE authorization for objects in xxxmdbug.
+Also, one needs the SUPER privilege.</P>
+
+<H4>Security</H4>
+
+<P>Before allowing ocelotgui in production systems, administrators should know:</P>
+
+<P>The <A HREF+"https://dev.mysql.com/doc/refman/5.1/en/privileges-provided.html#priv_super">SUPER privilege</A>
+allows ordinary users to do a few things which ordinarily they can't.</P>
+
+<P>For anyone who knows the workings of the system, it is possible to
+monitor or disrupt debugger activity. This means, for example, that
+if a debugger user asks what is the current value of variable X,
+some other user (with SUPER privilege) could see that the request
+was made and could see the value.</P>
+
+<P>The debugger runs in a separate thread, this separate thread will
+attempt to do a CONNECT every time the user calls $debug, with the same
+options and credentials as the one used for the main thread.</P>
+
+<P>For passing messages between the debugger thread and the main
+thread, the debugger makes heavy use of a system variable named
+@@init_connect. It is our belief that the debugger will not interfere
+with the ordinary usage of @@init_connect (for specifying what
+to do when connecting); however, the reverse is definitely not true.
+That is, if someone changes @@init_connect while the debugger is
+running, the debugger could return unexpected results or even hang.</P>
+
+<H4>Simultaneity</H4>
+
+<P>It is designed, but not tested in the field, that the debugger should
+operate while others are simultaneously accessing the same data with
+the same DBMS instance. Naturally the debugger will slow down other
+operations if (say) a user chooses to stop at a breakpoint while a
+table is locked -- but that is a user fault not a product flaw.</P>
+
+<P>Although the debugger is not terribly fast, the majority of the time in a stored
+procedure is probably taken up by the SQL statements rather than the
+debugger's processing. Therefore it should be possible to run a long
+routine for hours or days, occasionally monitoring it to see what the
+state of the variables is.</P>
+
+<H4>Further information</H4>
+
+<P>The low-level part of the debugger is based on a product from
+Hewlett-Packard called <A HREF="https://launchpad.net/mdbug">MDBug</A>. 
+An interesting early document is
+<A HREF="http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt">
+http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt</A>.</P>

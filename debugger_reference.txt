@@ -1,3 +1,8 @@
+The contents of this file have been copied to the README
+so it is obsolete. It will be removed in a later release.
+
+
+
 Reference for the Ocelot GUI debugger (ocelotgui)
 =================================================
 
