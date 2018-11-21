@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: November 17 2018
+   Last modified: November 20 2018
 */
 
 /*
@@ -114,7 +114,7 @@
   General comments
 
   These are comments about the code.
-  The user manual and blog comments are elsewhere; look at README.md or manual.htm
+  The user manual and blog comments are elsewhere; look at README.htm or README.md or manual.htm
   or README.txt or ocelot.ca or ocelot.ca/blog or the repository that
   this program was downloaded from, probably github.com/ocelot-inc/ocelotgui.
 
@@ -182,7 +182,7 @@
 
   See end of program for comments re valgrind.
 
-  The usual ways to build are described in README.txt (actually README.md).
+  The usual ways to build are described in README.txt (actually README.md or README.htm).
   An unusual way would be with Qt 4.8 source-code libraries supplied by Digia:
       Download 4.8 libraries via http://qt-project.org/downloads
          This is a source download; you'll need to do ./configure and make.
@@ -3778,11 +3778,12 @@ void MainWindow::action_option_previous_window()
   an install via cmake+cpack because they want the docs on /usr/share/doc not /usr/bin.
   But maybe cmake said it would go to /usr/local/share/doc but in fact it went to /usr/share/doc.
   So if we fail once, we try again after stripping /local from the path.
-  Todo: have more choice where to look for README.md
+  Todo: have more choice where to look for README.htm
         we could try: according to an option = "documentation" directory
                       ld_run_path, ocelot_login_path, ocelot_plugin_dir
                       some other path used by Qt or MySQL or Linux
                       (prefer the path that has everything)
+   We used to look for README.md but Debian gzips that, it doesn't gzip README.htm.
 */
 QString MainWindow::get_doc_path(QString file_name)
 {
@@ -3896,9 +3897,9 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 /*
   the_manual_widget will be shown when user clicks Help | The Manual.
   It does not inherit the fonts+colors settings of the main window (that's a message_box todo).
-  It reads the manual from README.md.
+  It reads the manual from README.htm.
   It uses HTML.
-  README.md refers to img src="...png|jpg" files, we expect them on the same directory as README.md.
+  README.htm refers to img src="...png|jpg" files, we expect them on the same directory as README.htm.
    Todo: Help | X should find X in the manual and display only X.
 */
 void MainWindow::action_the_manual()
@@ -3928,12 +3929,12 @@ void MainWindow::action_the_manual()
   <BR>For the most recent version of the manual, see \
   <BR>https://github.com/ocelot-inc/ocelotgui#user-manual \
     ";
-  QString application_dir_path= get_doc_path("README.md");
+  QString application_dir_path= get_doc_path("README.htm");
   if (application_dir_path != "")
   {
     QString readme_path= application_dir_path;
     readme_path.append("/");
-    readme_path.append("README.md");
+    readme_path.append("README.htm");
     QFile file(readme_path);
     if (file.open(QIODevice::ReadOnly | QIODevice::Text))
     {

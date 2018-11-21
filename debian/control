@@ -2,17 +2,18 @@ Source: ocelotgui
 Section: database
 Priority: optional
 Maintainer: Peter Gulutzan <pgulutzan@ocelot.ca>
-Build-Depends: debhelper, cmake, dpkg, qtbase5-dev, default-libmysqlclient-dev | libmariadbclient-dev | libmysqlclient-dev
-Standards-Version: 3.9.8
+Build-Depends: debhelper (>= 10), dpkg (>= 1.17), gcc (>= 5.1), g++ (>= 5.1), libc6 (>= 2.11),
+               qmake, qtbase5-dev, default-libmysqlclient-dev | libmariadbclient-dev | libmysqlclient-dev
+Suggests: tarantool, default-libmysqlclient-dev | libmariadbclient-dev | libmysqlclient-dev
+Standards-Version: 4.1.4
 Homepage: http://ocelot.ca
 
 Package: ocelotgui
 Architecture: any
 Multi-Arch: foreign
 Depends: ${misc:Depends}, ${shlibs:Depends}
-Description: Ocelot GUI (ocelotgui), a database client
- Users can connect to
- a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
+Description: GUI client for MySQL or MariaDB or Tarantool
+ Users can connect to a DBMS server, enter SQL statements, and receive results.
  Some features are: syntax highlighting, user-settable colors
  and fonts for each part of the screen, result-set displays
  with multi-line rows and columns that can be resized, and a debugger.

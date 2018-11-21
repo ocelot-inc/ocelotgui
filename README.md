@@ -733,7 +733,7 @@ Settings|History and enter a number for Max Row Count.</P>
 
 <P>RE: TARANTOOL. By default ocelotgui is a client for MySQL or MariaDB.
 To use it as a client for Tarantool, read
-<A HREF="https://github.com/ocelot-inc/ocelotgui/blob/master/tarantool.txt">https://github.com/ocelot-inc/ocelotgui/blob/master/tarantool.txt</A>.<P>
+<A HREF="#Appendix-3">Appendix 3 Tarantool</A>.<P>
 
 <H3 id="contact">Contact</H3><HR>
 
@@ -1804,3 +1804,532 @@ Hewlett-Packard called <A HREF="https://launchpad.net/mdbug">MDBug</A>.
 An interesting early document is
 <A HREF="http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt">
 http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt</A>.</P>
+
+
+<H3 id="Appendix-3">Appendix 3 Tarantool</H3><HR>
+
+<P>Ordinarily ocelotgui is a client for
+MySQL/MariaDB, and some documentation
+assumes that. However, it is possible
+to connect to Tarantool 1.8.1 or Tarantool 2.1 (with SQL) instead.
+You get all the same features except the debugger.</P>
+
+<P>The ocelotgui connection to Tarantool is not produced or approved by Tarantool.</P>
+
+<P>You need the latest Tarantool "SQL" server.
+The official "SQL" release beta is available now,
+look for it on https://github.com/tarantool/tarantool/releases.
+For a more current version, download from github.com/tarantool/tarantool:<br>
+git clone -b 2.1 https://github.com/tarantool/tarantool.git ~/tarantool-2.1<br>
+and build as instructed in the version-2.0 manual.</P>
+
+<P>Usually you do not need to install the Tarantool client (tarantool.so) library,
+but it is possible to use it if you build ocelotgui with "cmake -DTHIRD_PARTY=1".
+If you did that, then this is how to get tarantool.so.
+The tarantool-dev package does not have it any more.
+Clone and follow the instructions at
+github.com/tarantool/tarantool-c ...<pre>
+cd ~
+git clone https://github.com/tarantool/msgpuck.git tarantool-msgpuck
+cd tarantool-msgpuck
+cmake .
+make
+sudo make install
+cd ~
+git clone https://github.com/tarantool/tarantool-c tarantool-c
+cd tarantool-c
+cp ~/tarantool-msgpuck/msgpuck.h third_party/msgpuck/msgpuck.h
+cmake .
+make
+sudo make install</pre>
+WARNING: in the past the tarantool-c folks have changed
+structs in the public API. If they do it again, ocelotgui
+will crash.<br>
+WARNING: On some distros the installation will be to a
+directory that is not on the distro's default path.
+For example, if libtarantool.so ends up on /usr/local/lib,
+you will have to say this before you start ocelotgui:<br>
+export LD_RUN_PATH=/usr/local/lib<br>
+Or you can add --ld_run_path=/usr/local/lib on the
+command line where you start ocelotgui.
+On Windows you do not need to install a
+Tarantool library, its code is embedded in ocelotgui.exe.</P>
+
+<P>You need the latest ocelotgui client.
+The Release 1.07 version is okay,
+but some things might not be up to date.
+It is better to build it from source.
+Download from github.com/ocelot-inc/ocelotgui.</P>
+
+<P>Start the Tarantool server, and say:<br>
+box.cfg{listen=3301}<br>
+-- Second connect if you want LUA '...' to work<br>
+net_box = require('net.box')<br>
+ocelot_conn2=net_box.new('localhost:3301')<br>
+ocelot_conn2:eval('return 5')<br>
+box.schema.user.grant('guest','read,write,execute','universe')<br>
+NB: user 'guest' can read and write but not create. Therefore
+for demonstration purposes it is far better to be user 'admin'.
+To assign a password to user 'admin', say:<br>
+box.schema.user.passwd('admin')</P>
+
+<P>Start ocelotgui thus:<br>
+ocelotgui --ocelot_dbms='tarantool' --port=3301 --host='localhost' --user='admin' --password='admin'<br>
+The initial screen should come up saying "OK", you're connected.</P>
+
+<P>Type some SQL statements in the statement widget
+at the bottom of the screen.<pre>
+CREATE TABLE test1 (s1 INT PRIMARY KEY, s2 CHAR(5));
+INSERT INTO test1 VALUES (1,'a'),(2,'b'),(3,'c');
+UPDATE test1 set s2 = s2 || '!';
+SELECT * FROM test1;</pre>
+You'll see the usual hints appearing as you type.
+You'll see the usual grid display when you type
+Enter, or control-E.
+(By the way, if you prefer the HTML-based grid
+display, start ocelotgui with the additional
+option --html. It will look quite different.
+But you can't drag and resize with --html.)</P>
+
+<P>Now type any other SQL statements, as described
+in the Tarantool manual. (At time of writing this
+manual is not available but it's similar to SQLite.
+The <A href="https://www.tarantool.io/en/doc/2.0/tutorials/sql_tutorial/">tutorial SQL statements</A>
+work.)</P>
+
+<P>Now type<br>
+LUA 'return box.space._index:select()';<br>
+or simply<br>
+return box.space._index:select();<br>
+This will evaluate the expression, without SQL.
+The expression must return a result set.
+The result will be tabular (rows and columns),
+even though box.space._index was created with NoSQL.</P>
+
+<P>Bonus feature: A client statement,<br>
+CREATE SERVER id ... OPTIONS (PORT ..., HOST ..., USER ..., PASSWORD ...);<br>
+allows a second connection. Usually this is a connection
+to a different server.<br>
+Later you can use the second connection to create an SQL table
+that's populated from a NoSQL space, preserving
+all the data and converting it to fit in table rows,
+preserving names if they were made with a Tarantool
+format clause.<br>
+* The advantage is that the second server does no work
+except (lua box.space.x:select); the main server makes a
+temporary copy of the result set and the main server
+does all work required for select-list computations,
+group by, order by, etc. That should enhance throughput.
+And, since it's now an SQL table, you can create indexes
+on it and do SQL manipulations without needing NoSQL.<br>
+* The limitation is that you are now working on a copy
+instead of the original; it might quickly go out of date.
+* The big limitation is that the first column of the new
+table is automatically and always the PRIMARY KEY.
+Therefore if there is any duplication in the space,
+the CREATE TABLE statement will fail.<br>
+Example:<pre>
+  On #1 (server/lua):
+  box.cfg{listen=3301}
+  box.schema.user.grant('guest','read,write,execute','universe')
+  box.sql.execute([[create table a (s1 int primary key, s2 varchar);]])
+  box.sql.execute([[insert into a values (1,'wombat');]])
+  On #2 (server/lua)
+  box.cfg{listen=3302}
+  box.schema.user.grant('guest','read,write,execute','universe')
+  box.sql.execute([[CREATE TABLE t2 (x1 INT PRIMARY key, x2 VARCHAR);]])
+  box.sql.execute([[INSERT INTO t2 VALUES (0, 'Hi!');]])
+  On ocelotgui connection:
+  CREATE SERVER id FOREIGN DATA WRAPPER ocelot_tarantool OPTIONS (PORT 3302, HOST 'localhost', USER 'guest');
+  CREATE TABLE y4 SERVER id LUA 'return box.space._space:select()';
+  SELECT * FROM y4;
+-- It does not have to be a second server, so simplify the example.
+-- It does not have to be LUA '...', it can be RETURN lua-expression.
+-- We can have MariaDB=main and Tarantool=remote, or Tarantool=main and Tarantool=remote</pre></P>
+
+<P>Images:<br>
+Doubtless you have image (.png or .gif or .jpg) files on your system.
+For this example, change the three "box.space.timages:insert" lines,
+changing the file names to file names that are on your system, or
+changing the directory to wherever you installed ocelotgui documentation.
+Then "copy" the example code here and "paste" it into the ocelotgui
+statement widget. (Sometimes it is better to copy and paste statements
+one at a time rather than all at once.)
+(Important: "timages" is a quoted identifier, the quote marks are necessary.)</P>
+<pre>
+-- Lua function to set a variable to a file contents: based on fio_read.lua:
+function load_file(file_name)
+  local fio = require('fio')
+  local errno = require('errno')
+  local f = fio.open(file_name, {'O_RDONLY' })
+  if not f then
+    error("Failed to open file: "..errno.strerror())
+  end
+  local data = f:read(1000000)
+  f:close()
+  return data
+end;
+DROP TABLE "timages";
+create table "timages" (s1 int PRIMARY KEY, s2 blob, s3 char(5));
+box.space.timages:insert{1, load_file('/usr/share/doc/ocelotgui/shot1.jpg'), 'shot1'};
+box.space.timages:insert{2, load_file('/usr/share/doc/ocelotgui/shot2.jpg'), 'shot2'};
+box.space.timages:insert{3, load_file('/usr/share/doc/ocelotgui/shot3.png'), 'shot3'};
+SET ocelot_extra_rule_1_display_as = 'image';
+SET ocelot_extra_rule_1_condition = 'data_type LIKE ''%BLOB''';
+SELECT * FROM "timages";
+
+Alternative: (details are left to the reader's imagination) We could instead use:
+function f() return 5 end;
+box.internal.sql_create_function("f",f,0);
+CREATE TABLE test (s1 INT PRIMARY KEY);
+INSERT INTO test VALUES (f());
+SELECT s1, s1 * f() FROM test;
+</pre>
+
+<P>
+Rules concerning ocelotgui when connecting to tarantool:<br>
+* All statements must end with ; (or something established by DELIMITER statement).
+  This applies to Lua as well as SQL.<br>
+* If you want a result set for a Lua request, you must say "return".
+  For example "return box.space.T:select();" rather than "box.space.T:select();"<br>
+* SQL-style comments /* ... */ will not be considered errors inside Lua statements,
+  but will not be passed to the server.<br>
+* Statements may contain [[...]] strings, but not =[[...]]= strings.<br>
+* Defaults are MySQL/MariaDB defaults:
+  --delimiter is off
+  but ansi_quotes is on.<br>
+* (Possible flaw) When ocelotgui is displaying an image, cpu time rises.<br>
+* Decisions to right-justify, or display as images, are automatic rather than dependent on data type.<br>
+* SQL "verbs", for example COMMIT, should not be used as Lua identifiers.<br>
+* If you use SQL, you need Tarantool 1.8 or (preferably) 2.1. If you only use Lua, you can use Tarantool 1.7 or 1.9 or 1.10.<br>
+* We don't accept identifiers longer than 64 characters.</P>
+
+<P>
+If the Tarantool server version release date is after the date of the
+ocelotgui release, then there will probably be problems because the parsers
+are different. Sometimes this can be solved by downloading ocelotgui source
+and building again.</P>
+
+<H3 id="Appendix-4">Appendix 4 Windows</H3><HR>
+
+<P>These are extra instructions for ocelotgui for Microsoft Windows (TM).</P>
+
+<P>The Windows ocelotgui program has the same functionality
+as the Linux ocelotgui program, but is newer and has only
+been tested with basic Windows 10 64-bit machinery.
+We believe that on some Windows platforms it won't start.
+Treat it as "alpha except on Windows 64-bit".</P>
+
+<P>Connection should work to any modern MySQL or MariaDB server.</P>
+
+<P>
+How to get it:<br>
+* Download the ocelotgui zip file from github.
+  Check https://github.com/ocelot-inc/ocelotgui/blob/master/README.md
+  to see where the latest release is. For example it might be
+  https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.ocelotgui.zip<br>
+* Unzip. It was zipped with 7-zip from http://www.7-zip.org,
+  but other utilities should work. For example, on Windows command prompt,
+  if you have the PowerShell utility on your path:
+  PowerShell Expand-Archive ocelotgui-1.0.7-1.ocelotgui.zip c:\ocelotgui<br>
+* Read the COPYING and LICENSE arrangements.
+  On Windows ocelotgui is statically linked to Qt and MariaDB libraries,
+  so the copyright and licensing is not the same as for Linux.<br>
+* The unzipped package includes a file named ocelotgui.exe.
+  This is the file that you need for day-to-day ocelotgui use.
+  There is no installation file.
+  There is no need to download a MySQL/MariaDB client library.
+  There is no need to download a Qt library.
+  Since ocelotgui.exe may read other files on the same directory,
+  it is best to leave it in the directory that you unzipped to.</P>
+
+<P>How to test it:<br>
+Start up a MySQL or MariaDB server that is easily accessible
+(ocelotgui can use SSL etc. but for an initial test make it easy).
+Let's assume the download directory is c:\ocelotgui.
+Let's assume the host is 192.168.1.65, the user name is 'root',
+the password is 'root',  the port is 3306. Say:<br>
+c:\ocelotgui.exe --port=3306 --host=192.168.1.65 --port=3306 --user=root --password=root --protocol=tcp</P>
+
+<P>Full instructions are in the main documentation.
+The following notes are specifically for ocelotgui for Windows.<br>
+* When connecting, use protocol=tcp.<br>
+* this is a 32-bit .exe file<br>
+* these DLLs are used ... (they're all supplied with Windows 10)
+   ntdll.dll, wow64.dll, wow64win.dll, wow64cpu.dll
+   -- should be in system32 for 32-bit process running on a 64-bit computer<br>
+* this DLL might be used: libeay.dll.
+  It only matters if there is a .mylogin.cnf file, which is rare.
+  If libeay.dll is not found on the system, .mylogin.cnf is ignored.<br>
+* notice that the licence is slightly different from the Linux distribution,
+  because the MariaDB client library and the Qt library are statically linked
+  (in the Linux distribution they are dynamically linked and supplied separately).<br>
+* the program does not always take over the screen at start time.
+   You have to look for an icon on the bottom and click it,
+   or check the task manager.<br>
+* initial application load is very slow, although after that there are no known performance problems.</P>
+
+<p>The rest of this appendix is for advanced users only.</P>
+
+<H4>Building ocelotgui.exe from source</H4>
+
+<P>Although building ocelotgui from source on Windows should rarely be necessary,
+here are instructions for doing so. You will need:<br>
+Windows 10,<br>
+the source code of ocelotgui (which we always supply with the package),<br>
+an unzipper such as 7-zip,<br>
+the source code of Qt,<br>
+the MinGW 32-bit compiler version 5.30 (it comes with Qt),<br>
+the source code of MariaDB.<br>
+Building takes 6 to 60 hours depending on hardware, and at least 40GB
+disk space. one can use a 64GB USB stick.<br>
+We happened to have Microsoft's Windows SDK available when we built;
+it didn't hurt, but we do not believe it was necessary.<br>
+We assume that %path% includes c:\windows\system32 and all other Windows
+system directories that are normally in the default Windows 10 path.<br>
+In what follows, we assume the available space is on drive C:.<br>
+In what follows, comment lines begin with colons.</P>
+<pre>
+
+: If you are using a laptop, turn off power-saving features until this job is done.
+
+: (Getting an unzipper)
+
+: Install 32-bit 7-zip from http://www.7-zip.org.
+: In what follows, we assume the 7-zip program is on C:\Program Files (x86).
+: But we believe any unzipper will do.
+
+: (Downloading Qt libraries)
+
+: We assume that you have downloaded Qt, other than the source.
+: When accessing Qt downloads, you should choose version 5.9.1
+: (other versions might work but 5.9.1 is the version we used).
+: You must choose "open source". It will affect directory names.
+: Go to www1.qt.io/download.
+: Get qt-unified-windows-x86-3.0.5-online.exe, put it on drive C.
+: cd c:\
+: qt-unified-windows-x86-3.0.5-online.exe
+: If the MinGW compiler is not already there, run Qt's maintenance tool.
+: If the version number is slightly different from 3.0.5, it probably is still okay.
+
+: (Unzipping Qt source)
+
+: Download http://download.qt.io/official_releases/qt/5.9/5.9.1/single/qt-everywhere-opensource-src-5.9.1.tar.xz
+: to C:\Qt\Static\src.
+: First produce a .tar from the .tar.xz file.
+"C:\Program Files (x86)\7-Zip\7z" x qt-everywhere-opensource-src-5.9.1.tar.xz
+: Now you have to be in administrator mode to avoid ""ERROR: Can not create symbolic link" errors during unzip:
+:    Right-click Windows icon on bottom left of screen.
+:    Click Command Prompt(Admin) -- not Power Shell
+:   Click yes -- notice you get to C:\Windows\system32 instead of \Users\your-name.
+cd c:\Qt\Static\Src
+"C:\Program Files (x86)\7-Zip\7z" x qt-everywhere-opensource-src-5.9.1.tar
+It went into c:\Qt\static\src\qt-everywhere-opensource-src-5.9.1
+
+: (Specifying qmake.conf flags)
+
+: In c:\Qt\Static\src\qt-everywhere-opensource-src-5.9.1\qtbase\mkspecs\win32-g++\qmake.conf
+: add these lines after QMAKE_NM:
+ QMAKE_LFLAGS += -static -static-libgcc
+ QMAKE_CFLAGS_RELEASE -= -O2
+ QMAKE_CFLAGS_RELEASE += -Os -momit-leaf-frame-pointer
+ DEFINES += QT_STATIC_BUILD
+
+: (Building Qt static libraries)
+
+: Almost certainly this is not the most efficient way to configure.
+: We could say "skip" for many more subdirectories just below the main one.
+: We are saying "opengl desktop" because it happened to work, but Qt seems
+: to recommend "opengl dynamic" nowadays.
+: The "-opensource" is necessary because ocelotgui is open source.
+: The prefix directory c:\Qt\Qt5.9.1Static is an arbitrary name, you can
+: use a different one provided that you use the same name throughout.
+: The "-release" option is chosen because the alternative "debug"
+: is reportedly extremely large.
+: Although -qt-zlib -qt-pcre -qt-libpng -qt-libjpeg -qt-harfbuzz refer
+: to third-party components, ocelotgui does not explicitly link to them,
+: we intend to remove mention of them the next time we build Qt from source.
+: c:\Qt\Static\src\qt-everywhere-opensource-5.9.1 is the top level
+: directory and must be the default directory -- do not shadow build.
+: Pause after configure to read any error or warning messages.
+c:
+cd c:\
+rd /s /q c:\Qt\Qt5.9.1Static
+SET PATH=c:\Qt\Tools\mingw530_32\bin;c:\Qt\Tools\mingw530_32\opt\bin;%path%
+set LANG="en"
+set QT_INSTALL_PREFIX=c:\Qt\Qt5.9.1Static
+cd c:\Qt\Static\src\qt-everywhere-opensource-src-5.9.1
+del /s *.o
+del /s  moc_*
+configure -opensource -confirm-license -release -platform win32-g++ -static -opengl desktop -make libs -nomake examples -nomake tests -nomake tools -prefix c:\Qt\Qt5.9.1Static -skip qt3d -skip qtactiveqt -skip qtandroidextras -skip qtcanvas3d -skip qtcharts -skip qtconnectivity -skip qtdatavis3d -skip qtdeclarative -skip qtdoc -skip qtgamepad -skip qtgraphicaleffects -skip qtimageformats -skip qtlocation -skip qtmacextras -skip qtmultimedia -skip qtnetworkauth -skip qtpurchasing -skip qtquickcontrols -skip qtquickcontrols2 -skip qtremoteobjects -skip qtscript -skip qtscxml -skip qtsensors -skip qtserialbus -skip qtserialport -skip qtspeech -skip qtsvg -skip qttools -skip qttranslations -skip qtvirtualkeyboard -skip qtwayland -skip qtwebchannel -skip qtwebengine -skip qtwebsockets -skip qtwebview -skip qtwinextras -skip qtx11extras -skip qtxmlpatterns
+: pause
+mingw32-make
+mingw32-make install
+
+: (Building the MariaDB library)
+
+: You have to build MariaDB Connector C yourself so there will be a .a
+: file not a .lib file. We used the source of version 2.2.3 Stable.
+: Probably 2.1 or 2.3 would work too, feel free to try other versions
+: listed on the MariaDB Connector C download page
+: https://downloads.mariadb.org/connector-c/
+: but do not try MariaDB Connector C 3.0.2 because it uses InitOnceExecuteOnce(),
+: a kernel32 function which isn't present before Windows Vista,
+: https://msdn.microsoft.com/en-us/library/windows/desktop/aa363808(v=vs.85).aspx,
+: and which our version of MinGW doesn't expect.
+: Never use a client library associated with MariaDB 10.1.7.
+
+: Make a directory c:\mariadb.
+c:
+cd \
+rd /s /q mariadb
+mkdir mariadb
+cd mariadb
+
+: Download from
+: https://downloads.mariadb.org/connector-c/mariadb-connetor-c-2.2.3.src.tar.gz
+: to c:\mariadb -- if it does not go there directly, copy it to there.
+
+: Unzip.
+"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-2.2.3-src.tar.gz
+"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-2.2.3-src.tar
+
+: Now you must edit one file.
+: c:\mariadb\mariadb-connector-c-2.2.3-src\libmariadb\my_pthread.c
+: Change
+: #ifdef _WIN32
+: to
+: #if defined(_WIN32_IMPOSSIBLE) && !defined(__MINGW__)
+: Thus you eliminate pthread_cond_init() + pthread_cond_timedwait()
+: + pthread_cond_wait() + pthread_cond_destroy()
+: because MinGW already has them.
+
+:Build. Do not worry if mingw32-make clean generates a warning the first time.
+:       If cmake is not available, get from cmake.org/download and put on system path.
+cd mariadb-connector-c-2.2.3-src
+mingw32-make clean
+cmake -G "MinGW Makefiles"
+mingw32-make
+
+: Now you should have a file named
+: mariadb\mariadb-connector-c-2.2.3-src\libmariadb\libmariadbclient.a
+: This is the file that we used for static linking.
+: We did not try to do anything with the other .a file, liblibmariadb.dll.a,
+: but perhaps we should have.
+
+: (making ocelotgui.exe)
+
+: We have built Qt as "release", but we do not want to use the
+: compiler flags that come with "release" because we need guard
+: bytes when we call MariaDB's mysql_init() function. Possibly
+: we only need to turn the flags off with #pragma when we're calling
+: certain MariaDB functions; possibly we'll try that someday.
+: We will not use the CMakeLists.txt file in the ocelotgui package,
+: that is for use with Linux. We will start with a modified ocelotgui.pro.
+: We will still need the MinGW bin and lib directories.
+: Earlier we said prefix is c:\Qt\Qt5.9.1static, that is the Qt directory we need.
+: There will be an error message when you say mingw32-make the first time; we ignore it.
+: There will be warnings during compile; we ignore them.
+
+: Change ocelotgui.pro so that after the Copyright + License notice it looks like this.
+: When we built we forgot to say DEFINES += STATIC, but for us it works anyway.
+QT += core gui widgets
+TARGET = ocelotgui
+TEMPLATE = app
+CONFIG += warn_on
+CONFIG += static
+CONFIG += console
+QMAKE_CXXFLAGS = -fpermissive
+QMAKE_CXXFLAGS_RELEASE -= -O1
+QMAKE_CXXFLAGS_RELEASE -= -O2
+QMAKE_CXXFLAGS_RELEASE -= -O3
+QMAKE_CXXFLAGS_RELEASE -= -Os
+QMAKE_CXXFLAGS_RELEASE += -O0
+QMAKE_CXXFLAGS_RELEASE += -g
+QMAKE_CXXFLAGS -= -O1
+QMAKE_CXXFLAGS -= -O2
+QMAKE_CXXFLAGS -= -O3
+QMAKE_CXXFLAGS -= -Os
+QMAKE_CXXFLAGS += -O0
+QMAKE_CXXFLAGS += -g
+DEFINES += OCELOT_THIRD_PARTY
+SOURCES += ocelotgui.cpp
+HEADERS += ocelotgui.h
+HEADERS += codeeditor.h
+HEADERS += install_sql.cpp
+HEADERS += hparse.h
+HEADERS += ostrings.h
+HEADERS += third_party.h
+FORMS += ocelotgui.ui
+INCLUDEPATH += "c:\mariadb\mariadb-connector-c-2.2.3-src\include"
+LIBS += -Lc:\mariadb\mariadb-connector-c-2.2.3-src\libmariadb -lmariadbclient
+
+c:
+cd c:\ocelotgui
+SET PATH=c:\Qt\Qt5.9.1Static\bin;c:\Qt\Qt5.9.1Static\lib;c:\Qt\Tools\mingw530_32\bin;c:\Qt\Tools\mingw530_32\lib;%path%
+mingw32-make clean
+qmake ocelotgui.pro
+mingw32-make
+
+: (Test)
+release\ocelotgui.exe --ocelot_dbms=tarantool
+
+: (Making the .zip file)
+: The ocelotgui.zip package should be the same as what we distribute in the Windows release.
+: It includes several files which are used for Linux; this is harmless.
+: The file names are approximately the same as the ones on https://github.com/ocelot-inc/ocelotgui,
+: in fact this list is merely the result of concatenating "ocelotgui.exe" with an ocelotgui direcory listing.
+: Make sure you can unzip ocelotgui.zip with both 7-zip and winzip.
+copy release\ocelotgui.exe ocelotgui.exe
+"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui_logo.png         rpm_post_uninstall.sh  shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro              rpm_pre_install.sh     shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui               rpm_pre_uninstall.sh   special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf             ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h        rpm_post_install.sh        shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec
+
+: What we actually put in the release looks like ocelotgui-1.0.7-1.ocelotgui.zip, so rename the .zip file at some point.
+
+
+: (Dynamic linking)
+
+: We have shown the instructions for static build because that is what
+: we ship. That does not mean that ocelotgui cannot be done with dynamic
+: build. Currently we are not officially supporting it, but it has been done,
+: with Qt 5.6.
+: You will need Qt, CMake, MySQL, and ocelotgui source.
+: 
+: For Qt: Go to www.qt.io/download-open-source
+:     Avoid/skip any suggestion to login -- there can be no special license
+:     After installation is complete, you should have Qt in
+:     something like C:\Qt\Qt5.6.1 and MinGW compiler gcc.exe in
+:     c:\Qt\Qt5.6.1\Tools\mingw492_32\bin\gcc.
+: For MySQL: it's simplest to install the whole package,
+:     although the only things necessary here are the
+:     client shared library and the usual include files.
+:     After installation is complete, you should have mysql.h in
+:     C:\Program Files\MySQL\MySQL Server 5.7\include\mysql.h
+: For CMake: go to cmake.org/download
+:     When asked whether to add Cmake to the system path, say yes.
+: For ocelotgui: go to github.com/ocelot-inc/ocelotgui
+:     An easy choice is git clone (to install git, see git-scm.com/downloads).
+:     git clone https://github.com/ocelot-inc/ocelotgui.git c:\ocelotgui
+:
+: change ocelotgui.h so that OCELOT_STATIC_LIBRARY is 0,
+: or pass a OCELOT_STATIC_LIBRARY as a variable with value = 0. 
+: cd c:\ocelotgui
+: SET PATH=C:\Qt\qt5.6.1\Tools\mingw492_32\bin;C:\Qt\qt5.6.1\Tools\mingw492_32\lib;C:\Qt\qt5.6.1\5.6\mingw49_32\bin;%path%
+: cmake . -G "MinGW Makefiles" -DMYSQL_INCLUDE_DIR="C:/Program Files/MySQL/MySQL Server 5.7/include"
+: mingw32-make
+: And now there should be a file named c:\ocelotgui\ocelotgui.exe.
+
+: (The GPLv2 "Offer")
+
+: Due to GLPv2 requirements we must ensure that all recipients of ocelotgui
+: can have all the source code used to build the executable ocelotgui.exe.
+: You already have all ocelotgui's source code -- it is in the package --
+: but we do not supply in the package the source code of Qt or MariaDB,
+: whose libraries are statically linked. Of course, their source code is
+: easily available from the Internet, as we have described above.
+: But there is a minuscule chance that they will go out of business.
+: If that happens or if for some reason you sincerely need to
+: get their source code from Ocelot rather than downloading it, Ocelot
+: will mail it on a USB stick for a reasonable fee -- send us a request.
+: This offer is valid for three years from the date of the ocelotgui release.
+</pre>
+

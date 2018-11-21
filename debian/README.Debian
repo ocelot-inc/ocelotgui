@@ -43,16 +43,27 @@ There are no errors or warnings. There is one informative message.
     libmariadbclient-dev | libmysqlclient-dev, the difference shouldn't have significant effect.
     Todo: We do not list the build-essential packages gcc, g++, libc6-dev, dpkg -- it would be good
     to mention them, but lintian won't like it unless we indicate the minimum version number.
+    Todo: I've seen "libmariadbclient18 (>= ${binary:Version})", try that out someday
 
 "Package ... Depends":
     I am assuming that dpkg-gencontrol will substitute ${misc:Depends}
-    I am not including libmariadbclient | libmysqlclient (which is in build-depends),
-    because some ocelotgui functionality is still there without them.
+
+"Package ... Suggests":
+    Again we mention libmariadbclient-dev and equivalents; this time it's because we
+    might try to load the .so library at runtime. But it is not always necessary,
+    because we might connect via some other .so or to some other server.
+    The mention of tarantool (i.e. Tarantool server) is a weak suggestion, because
+    we can connect to servers on remote machines.
+    Some ocelotgui functionality e.g. syntax checking is there even if there
+    is no connection at all.
 
 # Contents of debian/rules
 "override_dh_auto_configure":
-    I am assuming that users prefer Qt5.
-    Users who prefer Qt4 should add -DQT_VERSION=4
+    Re -DPACKAGE_TYPE="DEB" there are some explanations in CMakeLists.txt comments.
+    Re DMYSQL_INCLUDE_DIR=${OCELOT_MYSQL_INCLUDE_DIR} earlier we found what has mysql.h
+    Re -DUSE_RPATH=FALSE we have an RPATH by default, this turns it off, Debian discourages it
+    Re -DQT_VERSION=5 I am assuming that users prefer Qt5.
+                      Users who prefer Qt4 should change -DQT_VERSION=5 to -DQT_VERSION=4
 
 # Differences between .deb files made with cpack versus .deb files made with debian/rules
 # (Just say "dpkg -c ocelotgui_1.0.7_amd64.deb" for each) (Not done yet)
@@ -84,5 +95,3 @@ We don't access the manual with Help|Manual, perhaps that's because of the .gz c
 I added a rule in debian/rules so that "debian/rules override_dh_auto_install".
 Therefore it only produces the .deb, it does not install the .deb, you can do that with dpkg -i.
 
-I added a rule in debian/rules so that there would be an override to add
--DPACKAGE_TYPE="DEB" for cmake, there are some explanations in CMakeLists.txt comments.

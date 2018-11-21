@@ -390,10 +390,13 @@ install(FILES ${png_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES ${jpg_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES ${htm_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES README.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
+# Debian packages would gzip .txt and .md files anyway.
+if (NOT PACKAGE_TYPE MATCHES "DEB")
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES options.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES debugger_reference.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES tarantool.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
+endif (NOT PACKAGE_TYPE MATCHES "DEB")
 if (NOT CPACK_GENERATOR MATCHES "DEB")
 if (NOT PACKAGE_TYPE MATCHES "DEB")
 install(FILES LICENSE.GPL DESTINATION ${CMAKE_INSTALL_DOCDIR})
@@ -414,7 +417,7 @@ endif (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h hparse.h ostrings.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
-
+# and maybe redundant doc files
 if (CPACK_GENERATOR MATCHES "DEB")
   #lintian complains changelog-file-missing-in-native-package, this fixes it,
   #but lintian will still complain new-package-should-close-itp-bug

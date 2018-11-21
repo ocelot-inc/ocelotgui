@@ -1,3 +1,7 @@
+The contents of this file have been copied to the README
+so it is obsolete. It will be removed in a later release.
+
+
 These are extra instructions for ocelotgui for Windows.
 
 The Windows ocelotgui program has the same functionality
