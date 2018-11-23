@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: November 20 2018
+   Last modified: November 23 2018
 */
 
 /*
@@ -150,10 +150,10 @@
   Other contributors will be acknowledged here and/or in a "Help" display.
 
   The code #includes header files from MySQL/Oracle and from Qt/Digia,
-  and relies on the MySQL client library and the Qt core, gui,
-  and widgets libraries. Builds have been successful with several
-  Linux distros and gcc 4.6/4.7/7.3. Build instructions are in the user manual or
-  in a readme file
+  and may rely on MySQL or MariaDB libraries if it connects to MySQL or MariaDB servers,
+  and relies on the Qt core, gui, and widgets libraries.
+  Builds have been successful with several Linux distros and gcc 4.6/4.7/7.3.
+  Build instructions are in the user manual or in a readme file.
 
   There are many comments. Searching for the word "Todo:" in the comments
   will give some idea of what's especially weak and what's planned.
@@ -182,7 +182,7 @@
 
   See end of program for comments re valgrind.
 
-  The usual ways to build are described in README.txt (actually README.md or README.htm).
+  The usual ways to build are described in README.htm (copied to README.md or README.txt).
   An unusual way would be with Qt 4.8 source-code libraries supplied by Digia:
       Download 4.8 libraries via http://qt-project.org/downloads
          This is a source download; you'll need to do ./configure and make.

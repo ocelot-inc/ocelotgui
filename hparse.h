@@ -4219,6 +4219,11 @@ int MainWindow::hparse_f_create_definition()
   {
     hparse_f_parenthesized_expression();
     if (hparse_errno > 0) return 2;
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      hparse_f_conflict_clause();
+      if (hparse_errno > 0) return 2;
+    }
     return 1;
   }
   if ((fulltext_seen == true) || (unique_seen == true))
@@ -4230,16 +4235,6 @@ int MainWindow::hparse_f_create_definition()
   if (hparse_errno > 0) return 2;
   hparse_f_index_columns(TOKEN_KEYWORD_TABLE, fulltext_seen, foreign_seen, primary_seen);
   if (hparse_errno > 0) return 2;
-
-  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
-  {
-    if ((primary_seen == true) || (unique_seen == true))
-    {
-      hparse_f_conflict_clause();
-      if (hparse_errno > 0) return 2;
-    }
-  }
-
   return 1;
 }
 
@@ -4368,12 +4363,12 @@ void MainWindow::hparse_f_column_definition()
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL");
       if (hparse_errno > 0) return;
       null_seen= true;
+      hparse_f_conflict_clause();
+      if (hparse_errno > 0) return;
     }
     else if ((null_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL") == 1))
     {
       null_seen= true;
-      hparse_f_conflict_clause();
-      if (hparse_errno > 0) return;
     }
     else if ((generated_seen == false) && (default_seen == false) && (hparse_f_default_clause(TOKEN_KEYWORD_CREATE) == 1))
     {
@@ -4396,16 +4391,12 @@ void MainWindow::hparse_f_column_definition()
     {
       hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
       unique_seen= true;
-      hparse_f_conflict_clause();
-      if (hparse_errno > 0) return;
     }
     else if ((primary_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PRIMARY") == 1))
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
       if (hparse_errno > 0) return;
       primary_seen= true;
-      hparse_f_conflict_clause();
-      if (hparse_errno > 0) return;
     }
     else if ((primary_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY") == 1))
     {

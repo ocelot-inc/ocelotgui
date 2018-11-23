@@ -41,17 +41,16 @@ There are no errors or warnings. There is one informative message.
     Users who prefer Qt4 should change qtbase5-dev to libqt4-dev and libqt4-dev-tools.
     Although we first look for default-libmysqlclient-dev, in debian/rules we look for
     libmariadbclient-dev | libmysqlclient-dev, the difference shouldn't have significant effect.
-    Todo: We do not list the build-essential packages gcc, g++, libc6-dev, dpkg -- it would be good
-    to mention them, but lintian won't like it unless we indicate the minimum version number.
     Todo: I've seen "libmariadbclient18 (>= ${binary:Version})", try that out someday
 
 "Package ... Depends":
     I am assuming that dpkg-gencontrol will substitute ${misc:Depends}
 
 "Package ... Suggests":
-    Again we mention libmariadbclient-dev and equivalents; this time it's because we
+    Again we mention default-libmysqlclient-dev, this time it's because we
     might try to load the .so library at runtime. But it is not always necessary,
     because we might connect via some other .so or to some other server.
+    We don't mention libmysqlclient-dev because that causes a lintian warning.
     The mention of tarantool (i.e. Tarantool server) is a weak suggestion, because
     we can connect to servers on remote machines.
     Some ocelotgui functionality e.g. syntax checking is there even if there
@@ -64,6 +63,8 @@ There are no errors or warnings. There is one informative message.
     Re -DUSE_RPATH=FALSE we have an RPATH by default, this turns it off, Debian discourages it
     Re -DQT_VERSION=5 I am assuming that users prefer Qt5.
                       Users who prefer Qt4 should change -DQT_VERSION=5 to -DQT_VERSION=4
+"debian/rules override_dh_auto_install":
+    Therefore it only produces the .deb, it does not install the .deb, you can do that with dpkg -i.
 
 # Differences between .deb files made with cpack versus .deb files made with debian/rules
 # (Just say "dpkg -c ocelotgui_1.0.7_amd64.deb" for each) (Not done yet)
@@ -85,8 +86,6 @@ but apparently it is not necessary. Everything necessary for debuild was already
 
 # Todo
 So far this has only been tried on Ubuntu 18.04. It needs to be tried on debian too.
-The "recommends" and "depends" and "suggests" aren't filled in.
-We don't access the manual with Help|Manual, perhaps that's because of the .gz compressions.
 ?? Better read this too: https://www.debian.org/doc/manuals/debmake-doc/ch05.en.html
 ?? Better read this too: https://lists.debian.org/debian-mentors/2015/03/msg00030.html
 ?? Read the lintian manual https://lintian.debian.org/manual/section-2.3.html
@@ -98,10 +97,8 @@ We don't access the manual with Help|Manual, perhaps that's because of the .gz c
   "Depends: libqt5core5a (>= 5.9.0~beta) but 5.5.1+dfsg-16ubuntu7 is to be installed"
   We absolutely do not require that the version number be so high. In fact, trusty is okay.
 ! Because it is 16.04, debhelper has to be 9 instead of 10 (affects control and compat).
-! Standards-version should be lower too -- 4.1.4 is current but we might not recognize it.
+! Standards-version has to be lower too -- 4.1.4 is current but Ubuntu 16 won't know it, so we say 3.9.7.
 ? Alternatively, we could override the version number, see the tip in
   https://unix.stackexchange.com/questions/459392/override-version-of-dependency-package-set-by-shlibsdepends-in-deb
 
-I added a rule in debian/rules so that "debian/rules override_dh_auto_install".
-Therefore it only produces the .deb, it does not install the .deb, you can do that with dpkg -i.
 
