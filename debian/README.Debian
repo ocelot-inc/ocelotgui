@@ -7,6 +7,8 @@ We intend to switch to using debian/rules.
 Although some problems remain, we currently can create the .deb file and "dpkg -i" installs the main components.
 These are example instructions.
 
+The ocelotgui source package includes a script deb_build.sh which builds a .deb from a source directory.
+
 # Get the prerequisites for build: apt-get install git cmake g++ default-libmysqlclient-dev qtbase5-dev
 # Get the prerequisites for debuild:  apt-get install devscripts build-essential lintian
 
