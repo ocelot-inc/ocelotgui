@@ -2,7 +2,7 @@ Source: ocelotgui
 Section: database
 Priority: optional
 Maintainer: Peter Gulutzan <pgulutzan@ocelot.ca>
-Build-Depends: debhelper (>= 9), dpkg (>= 1.17),
+Build-Depends: debhelper (>= 9), dpkg-dev (>= 1.17),
                gcc (>= 5.1), g++ (>= 5.1), libc6 (>= 2.11), cmake (>= 2.8.11),
                qtbase5-dev,
                default-libmysqlclient-dev | libmariadbclient-dev | libmysqlclient-dev

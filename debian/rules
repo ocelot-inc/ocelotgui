@@ -24,6 +24,10 @@ ifeq (,$(findstring mysql.h,$(OCELOT_TMP)))
 endif
 OCELOT_MYSQL_INCLUDE_DIR = $(dir $(OCELOT_TMP))
 
+OCELOT_C_FLAGS = $(shell dpkg-buildflags --get CFLAGS)
+OCELOT_CXX_FLAGS = $(shell dpkg-buildflags --get CXXFLAGS)
+OCELOT_CPP_FLAGS = $(shell dpkg-buildflags --get CPPFLAGS)
+
 %:
 	dh $@  
 
@@ -34,4 +38,7 @@ override_dh_auto_configure:
 	dh_auto_configure -- -DPACKAGE_TYPE="DEB" \
 			     -DMYSQL_INCLUDE_DIR=${OCELOT_MYSQL_INCLUDE_DIR} \
                              -DUSE_RPATH=FALSE \
-                             -DQT_VERSION=5
+                             -DQT_VERSION=5 \
+                             -DOCELOT_C_FLAGS="${OCELOT_C_FLAGS}" \
+                             -DOCELOT_CXX_FLAGS="${OCELOT_CXX_FLAGS}" \
+                             -DOCELOT_CPP_FLAGS="${OCELOT_CPP_FLAGS}"

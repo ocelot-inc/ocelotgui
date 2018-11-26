@@ -8,7 +8,7 @@
 # The result will be /tmp/debian3/ocelotgui_1.0.7-1_amd64.deb or /tmp/debian3/ocelotgui_1.0.7-1_i386.deb.
 # See also the comments in README.Debian.
 
-sudo apt-get install debhelper dpkg
+sudo apt-get install debhelper dpkg-dev devscripts
 sudo apt-get install gcc g++ libc6 cmake
 sudo apt-get install qtbase5-dev
 sudo apt-get install default-libmysqlclient-dev

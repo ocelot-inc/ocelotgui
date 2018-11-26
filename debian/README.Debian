@@ -28,14 +28,10 @@ debuild
 dpkg-genchanges: info: including full source code in upload ... but source isn't in the .deb.
 .png files were subjected to normalizing by "dh_strip_nondeterminism"
 
-# Lintian results after "debuild" and after "lintian -I ~/debian2/ocelotgui_1.0.7_amd64.deb"
-There are no errors or warnings. There is one informative message.
-"I: ocelotgui: hardening-no-fortify-functions usr/bin/ocelotgui"
-    But, but, but ... cmake passes -D_FORTIFY_SOURCE=2 to the compiler!
-    Have a look at verbose output, it is there.
-    So, although lintian thinks otherwise, hardening is done.
+# Lintian results after "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.0.7_amd64.deb"
+There are no errors. There are no warnings. There are no informative messages. Hurrah.
 + Earlier I was seeing an -I complaint about the size of what went to /usr/share/doc/ocelotgui.
-  This can happen because our documentation contains pictures in .png and .jpg files.
+  Perhaps it happened because our documentation contains pictures in .png and .jpg files.
 
 # Contents of debian/control
 "Source ... Build-Depends":
@@ -59,6 +55,11 @@ There are no errors or warnings. There is one informative message.
     is no connection at all.
 
 # Contents of debian/rules
+"OCELOT_C_FLAGS = $(shell dpkg-buildflags --get CFLAGS)"
+    We ensure that the executable will be compiled with exactly the flags that
+    buildflags recommends (but something adds -fPIC), both C_FLAGS and CXX_FLAGS.
+    Strange but true: CMAKE_C_FLAGS gets set automatically but CMAKE_CXX_FLAGS
+    does not get set automatically, therefore we might as well pass them both.
 "override_dh_auto_configure":
     Re -DPACKAGE_TYPE="DEB" there are some explanations in CMakeLists.txt comments.
     Re DMYSQL_INCLUDE_DIR=${OCELOT_MYSQL_INCLUDE_DIR} earlier we found what has mysql.h
@@ -87,7 +88,7 @@ So far this has only been tried on Ubuntu 18.04. It needs to be tried on debian 
 ! Not 18.04. If you do the debuild on 18.04, then Depends: will have an exansion of ${shlibs:Depends}
   to libqt5core5a (>= 5.9.0~beta) -- which is too great a version number to work on Ubuntu 16.04!
   "Depends: libqt5core5a (>= 5.9.0~beta) but 5.5.1+dfsg-16ubuntu7 is to be installed"
-  We absolutely do not require that the version number be so high. In fact, trusty is okay.
+  We do not require that the version number be so high. In fact, trusty is okay.
 ! Because it is 16.04, debhelper has to be 9 instead of 10 (affects control and compat).
 ! Standards-version has to be lower too -- 4.1.4 is current but Ubuntu 16 won't know it, so we say 3.9.7.
 ? Alternatively, we could override the version number, see the tip in

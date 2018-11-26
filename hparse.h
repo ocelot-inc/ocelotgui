@@ -4150,9 +4150,10 @@ void MainWindow::hparse_f_reference_definition()
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MATCH") == 1)
     {
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FULL") == 1) {;}
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTIAL") == 1) {;}
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIMPLE") == 1) {;}
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTIAL") == 1) {;}
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIMPLE") == 1) {;}
       else hparse_f_error();
+      if (hparse_errno > 0) return;
     }
     bool on_delete_seen= false, on_update_seen= false;
     while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON") == 1)

@@ -129,6 +129,12 @@
 #   RPM:
 #     This is the pass that we should specify in ocelotgui.spec.
 
+# OCELOT_C_FLAGS and OCELOT_CXX_FLAGS and OCELOT_CPP_FLAGS
+# These will override any environment variables or Qt defaults for C_FLAGS etc. if PACKAGE_TYPE="DEB".
+# See debian/rules.
+# Ordinarily the environment variables are blank and the Qt default is blank or -fPIE.
+# Something can add -fPIC anyway.
+
 # FILENAME_EXTRA
 # Default is blank. Ocelot passes -DFILENAME_EXTRA="qt4" when building with qt4,
 # so the final package name will look like ocelotgui_1.0.7qt4-1_amd64.deb or
@@ -316,16 +322,20 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -w -Wno-nonnull -Wno-pointer-arith -Wno-conversion")
 endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
-#Alas, lintian-I will say hardening-no-fortify-functions.
-#This is how we try to fix that problem but, although it is seen and generates -D_FORTIFY_SOURCE=2, lintian doesn't see it.
+#If OCELOT_xxx_FLAGS is passed for a Debian package, then override environment variables and Qt5 setting.
 #Maybe I could also check CMAKE_CXX_COMPILER should be gcc and CMAKE_CXXCOMPILER_VERSION should be >= something.
 if (PACKAGE_TYPE STREQUAL "DEB")
 if(CMAKE_COMPILER_IS_GNUCXX)
-  message("-- Adding -D_FORTIFY_SOURCE=2 etc. to CXXFLAGS")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wformat -Wformat-security -fstack-protector -D_FORTIFY_SOURCE=2 -fPIC -fstack-protector-strong")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat -Wformat-security -fstack-protector -D_FORTIFY_SOURCE=2 -fPIC  -fPIC -fstack-protector-strong")
+if (OCELOT_C_FLAGS)
+  message("-- Setting CMAKE_C_FLAGS=OCELOT_C_FLAGS+OCELOT_CPP_FLAGS, CMAKE_CXX_FLAGS=OCELOT_CXX_FLAGS+OCELOt-CPP_FLAGS")
+  set(CMAKE_C_FLAGS "${OCELOT_C_FLAGS} ${OCELOT_CPP_FLAGS}")
+  set(CMAKE_CXX_FLAGS "${OCELOT_CXX_FLAGS} ${OCELOT_CPP_FLAGS}")
+endif (OCELOT_C_FLAGS)
 endif(CMAKE_COMPILER_IS_GNUCXX)
 endif (PACKAGE_TYPE STREQUAL "DEB")
+
+message("-- CMAKE_CXX_FLAGS  = ${CMAKE_CXX_FLAGS}")
+message("-- CMAKE_C_FLAGS  = ${CMAKE_C_FLAGS}")
 
 if (NOT UI_OCELOTGUI)
   message(FATAL_ERROR "uic did not produce ui_ocelotgui.h")
