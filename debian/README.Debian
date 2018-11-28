@@ -28,10 +28,20 @@ debuild
 dpkg-genchanges: info: including full source code in upload ... but source isn't in the .deb.
 .png files were subjected to normalizing by "dh_strip_nondeterminism"
 
-# Lintian results after "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.0.7_amd64.deb"
-There are no errors. There are no warnings. There are no informative messages. Hurrah.
-+ Earlier I was seeing an -I complaint about the size of what went to /usr/share/doc/ocelotgui.
-  Perhaps it happened because our documentation contains pictures in .png and .jpg files.
+# Lintian results
+After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.0.7_amd64.deb":
+  There are no errors. There are no warnings. There are no informative messages. Hurrah.
+On some distros, after "debuild" and after "lintian -I ocelotgui_1.0.7-1_amd64.changes":
+  I: ocelotgui source: ored-build-depends-on-obsolete-package build-depends: libmysqlclient-dev => default-libmysqlclient-dev
+  I: ocelotgui source: out-of-date-standards-version 3.9.7 (released 2016-02-01) (current is 4.1.4)
+  I: ocelotgui source: testsuite-autopkgtest-missing
+  These are not warnings they are informative.
+  The first one means prefer default-libmysqlclient-dev, but we already do so.
+  The second one means change standards-version, but we deliberately build on Ubuntu 16, not the latest.
+  The third one means a test would be good, but we'd have to install a server to connect to.
+On some distros, there is one other note: that our documentation size is large.
+  This happens because our documentation contains pictures in .png and .jpg files.
+  We do not expect users to depend on man for documentation, we want them to see pictures fir README.htm.
 
 # Contents of debian/control
 "Source ... Build-Depends":
@@ -77,13 +87,6 @@ There are no errors. There are no warnings. There are no informative messages. H
 For an earlier version I said "sudo apt-get install debmake" and "sudo apt-get install dh-make"
 but apparently it is not necessary. Everything necessary for debuild was already present.
 
-# Todo
-So far this has only been tried on Ubuntu 18.04. It needs to be tried on debian too.
-?? Better read this too: https://www.debian.org/doc/manuals/debmake-doc/ch05.en.html
-?? Better read this too: https://lists.debian.org/debian-mentors/2015/03/msg00030.html
-?? Read the lintian manual https://lintian.debian.org/manual/section-2.3.html
-?? Read the debian policy https://www.debian.org/doc/debian-policy/
-
 # The original .deb file should be made on Ubuntu 16.04
 ! Not 18.04. If you do the debuild on 18.04, then Depends: will have an exansion of ${shlibs:Depends}
   to libqt5core5a (>= 5.9.0~beta) -- which is too great a version number to work on Ubuntu 16.04!
@@ -93,5 +96,25 @@ So far this has only been tried on Ubuntu 18.04. It needs to be tried on debian 
 ! Standards-version has to be lower too -- 4.1.4 is current but Ubuntu 16 won't know it, so we say 3.9.7.
 ? Alternatively, we could override the version number, see the tip in
   https://unix.stackexchange.com/questions/459392/override-version-of-dependency-package-set-by-shlibsdepends-in-deb
+
+# Debian policy
+We have looked at the Debian policy manual for packagers https://www.debian.org/doc/debian-policy/  and (less thoroughly) at
+  https://www.debian.org/doc/manuals/debmake-doc/ch05.en.html
+  https://lists.debian.org/debian-mentors/2015/03/msg00030.html
+  https://lintian.debian.org/manual/section-2.3.html
+We believe that we are compliant except for these items:
+1. As explained above we build on Ubuntu 16 xenial not debian sid, and therefore
+   debian/compat and debuild version and standards version are not the latest.
+2. We provide a tar.gz that requires a change to the directory that it unpacks to.
+3. By default we include some code in thirdparty.h instead of loading it at runtime
+   from libtarantool.so, this only has an effect if one starts with
+   ocelotgui --ocelot_dbms=tarantool, instead of connecting to MySQL or MariaDB.
+4. We read documentation files in /usr/share/doc if users type Help|Manual.
+5. Documentation via "man ocelotgui" is stubby, we claim it has to be HTML
+   because a GUI manual depends on pictures.
+6. No GnuGPG key.
+We will welcome comments from anyone who thinks we have missed anything else.
+
+
 
 

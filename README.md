@@ -50,10 +50,10 @@ All rights reserved.</P>
 
 <H3 id="prerequisites">Prerequisites</H3><HR>
 
-<P>The installation instructions in this file are for Linux.
+<P>The installation instructions in this section are for Linux.
 If you prefer to run on Windows, read the installation instructions
-in the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A>
-and come back to this file to read the User Manual section.
+in <A href="#Appendix-4">Appendix 4 windows</A>
+and come back to read the User Manual section.
 
 The basic prerequisites for installation are Linux, and the Qt library.
 The libmysqlclient library will also be necessary, at runtime.</P>
@@ -1823,8 +1823,8 @@ For a more current version, download from github.com/tarantool/tarantool:<br>
 git clone -b 2.1 https://github.com/tarantool/tarantool.git ~/tarantool-2.1<br>
 and build as instructed in the version-2.0 manual.</P>
 
-<P>Usually you do not need to install the Tarantool client (tarantool.so) library,
-but it is possible to use it if you build ocelotgui with "cmake -DTHIRD_PARTY=1".
+<P>Usually you do not need to install the Tarantool client (libtarantool.so) library,
+but it is possible to use it if you build ocelotgui with "cmake -DTHIRD_PARTY=0".
 If you did that, then this is how to get tarantool.so.
 The tarantool-dev package does not have it any more.
 Clone and follow the instructions at
@@ -2017,8 +2017,7 @@ and building again.</P>
 <P>The Windows ocelotgui program has the same functionality
 as the Linux ocelotgui program, but is newer and has only
 been tested with basic Windows 10 64-bit machinery.
-We believe that on some Windows platforms it won't start.
-Treat it as "alpha except on Windows 64-bit".</P>
+We believe that on some other Windows platforms it won't start.</P>
 
 <P>Connection should work to any modern MySQL or MariaDB server.</P>
 
