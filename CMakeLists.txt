@@ -77,7 +77,7 @@
 # In debian/rules this is calculated by looking in the installed MySQL/MariaDB package.
 
 # USE_RPATH=TRUE|FALSE and CMAKE_INSTALL_RPATH
-# By default we have rpath. But from debian/rules we pass -DUSE_RPATH=FALSE.
+# By default we have rpath. But from debian/rules and ocelotgui.spec we pass -DUSE_RPATH=FALSE.
 # For QMake, QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time.
 # CMAKE_INSTALL_RPATH is apparently the CMake translation of QMAKE_RPATHDIR,
 # but first it will try several other ways.

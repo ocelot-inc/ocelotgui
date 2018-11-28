@@ -158,7 +158,7 @@ sed -i 's|Icon=%{name}_logo.png|Icon=%{name}_logo|g' %{_builddir}/ocelotgui-1.0.
 
 
 %build
-%cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM"
+%cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE
 make
 rm CMakeCache.txt
 rm -r CMakeFiles

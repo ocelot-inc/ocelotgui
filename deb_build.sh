@@ -4,7 +4,7 @@
 # Only advanced users will want this, ordinary users will download the official-release .deb file or make with cmake.
 
 # An easy way to get ~/ocelotgui is "cd ~" + "git clone https://github.com/ocelot-inc/ocelotgui ocelotgui".
-# It uses /tmp and cheerily deletes existing files in /tmp.
+# This script uses /tmp and cheerily deletes existing files in /tmp.
 # The result will be /tmp/debian3/ocelotgui_1.0.7-1_amd64.deb or /tmp/debian3/ocelotgui_1.0.7-1_i386.deb.
 # See also the comments in README.Debian.
 
@@ -113,8 +113,13 @@ cd ocelotgui-$VERSION/debian
 debuild
 
 #Optional tests
-# (Change celotgui_$VERSION-1_amd64.deb to ocelotgui_$VERSION-1_i386.deb if 32-bit)
-# (Change bionic to xenial/trusty/etc. if building on Ubuntu xenial/trusty/etc.)
+# The result of debuild should be ocelotgui_$VERSION-1_amd64.deb or ocelotgui_$VERSION-1_i386.deb if 32-bit
+# Assuming platform is Ubuntu, $CODENAME will be trusty/senial/bionic/etc. Remember, Ocelot builds on xenial.
+# Final lines of output should show: piuparts says "PASS: All tests." and lintian -I says nothing.
+export CODENAME=`lsb_release --codename --short`
 cd /tmp/debian3
-lintian -I /tmp/debian3/ocelotgui_$VERSION-1_amd64.deb
-sudo piuparts /tmp/debian3/ocelotgui_$VERSION-1_amd64.deb -d bionic
+export DEBFILENAME=`ls *.deb`
+sudo piuparts $DEBFILENAME -d $CODENAME
+lintian -I $DEBFILENAME
+lintian -I $DEBFILENAME
+
