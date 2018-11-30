@@ -131,9 +131,18 @@ Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
 #Source0:        ocelotgui-1.0.7.tar.gz
 Source:         https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+
+%if %{defined suse_version}
+BuildRequires:  libqt5-qttools-devel
+%else
 BuildRequires:  qt5-qttools-devel
+%endif
 BuildRequires:  mysql-devel
-BuildRequires:  gcc gcc-c++ make cmake
+BuildRequires:  gcc >= 5.1
+BuildRequires:  gcc-c++ >= 5.1
+BuildRequires:  make
+BuildRequires:  cmake >= 2.8.11
+BuildRequires:  sed
 BuildRequires:  rpm rpm-build rpmlint
 BuildRequires:  desktop-file-utils
 
@@ -160,40 +169,13 @@ sed -i 's|Icon=%{name}_logo.png|Icon=%{name}_logo|g' %{_builddir}/ocelotgui-1.0.
 %build
 %cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE
 make
-rm CMakeCache.txt
-rm -r CMakeFiles
-rm *.cmake
-rm Makefile
+#rm CMakeCache.txt
+#rm -r CMakeFiles
+#rm *.cmake
+#rm Makefile
 
 %install
-rm -rf %{buildroot}
-mkdir -p %{buildroot}
-mkdir -p %{buildroot}/%{_docdir}
-mkdir -p %{buildroot}/%{_docdir}/ocelotgui
-cp %{_builddir}/ocelotgui-1.0.7/COPYING %{buildroot}/%{_docdir}/ocelotgui/COPYING
-cp %{_builddir}/ocelotgui-1.0.7/LICENSE.GPL %{buildroot}/%{_docdir}/ocelotgui/LICENSE.GPL
-cp %{_builddir}/ocelotgui-1.0.7/*.png %{buildroot}/%{_docdir}/ocelotgui
-cp %{_builddir}/ocelotgui-1.0.7/*.jpg %{buildroot}/%{_docdir}/ocelotgui
-cp %{_builddir}/ocelotgui-1.0.7/README.txt %{buildroot}/%{_docdir}/ocelotgui/README.txt
-cp %{_builddir}/ocelotgui-1.0.7/debugger_reference.txt %{buildroot}/%{_docdir}/ocelotgui/debugger_reference.txt
-cp %{_builddir}/ocelotgui-1.0.7/options.txt %{buildroot}/%{_docdir}/ocelotgui/options.txt
-cp %{_builddir}/ocelotgui-1.0.7/tarantool.txt %{buildroot}/%{_docdir}/ocelotgui/tarantool.txt
-cp %{_builddir}/ocelotgui-1.0.7/*.md %{buildroot}/%{_docdir}/ocelotgui
-cp %{_builddir}/ocelotgui-1.0.7/*.htm %{buildroot}/%{_docdir}/ocelotgui
-cp %{_builddir}/ocelotgui-1.0.7/copyright %{buildroot}/%{_docdir}/ocelotgui/copyright
-cp %{_builddir}/ocelotgui-1.0.7/example.cnf %{buildroot}/%{_docdir}/ocelotgui/example.cnf
-mkdir -p %{buildroot}/%{_bindir}
-cp %{_builddir}/ocelotgui-1.0.7/ocelotgui %{buildroot}/%{_bindir}/ocelotgui
-mkdir -p %{buildroot}/%{_mandir}
-mkdir -p %{buildroot}/%{_mandir}/man1
-cp %{_builddir}/ocelotgui-1.0.7/ocelotgui.1.gz %{buildroot}/%{_mandir}/man1/ocelotgui.1.gz
-mkdir -p %{buildroot}/usr
-mkdir -p %{buildroot}/usr/share
-mkdir -p %{buildroot}/usr/share/applications
-cp %{_builddir}/ocelotgui-1.0.7/ocelotgui.desktop %{buildroot}/usr/share/applications/ocelotgui.desktop
-mkdir -p %{buildroot}/usr/share/pixmaps
-cp %{_builddir}/ocelotgui-1.0.7/ocelotgui_logo.png %{buildroot}/usr/share/pixmaps/ocelotgui_logo.png
-desktop-file-install --delete-original ocelotgui.desktop
+%make_install
 %clean
 
 %files
@@ -203,11 +185,8 @@ desktop-file-install --delete-original ocelotgui.desktop
 %{_docdir}/ocelotgui/COPYING
 %{_docdir}/ocelotgui/LICENSE.GPL
 %{_docdir}/ocelotgui/README.htm
-%{_docdir}/ocelotgui/README.md
-%{_docdir}/ocelotgui/README.txt
 %{_docdir}/ocelotgui/copyright
 %{_docdir}/ocelotgui/debugger.png
-%{_docdir}/ocelotgui/debugger_reference.txt
 %{_docdir}/ocelotgui/example.cnf
 %{_docdir}/ocelotgui/manual.htm
 %{_docdir}/ocelotgui/menu-debug.png
@@ -218,7 +197,6 @@ desktop-file-install --delete-original ocelotgui.desktop
 %{_docdir}/ocelotgui/menu-run.png
 %{_docdir}/ocelotgui/menu-settings.png
 %{_docdir}/ocelotgui/ocelotgui_logo.png
-%{_docdir}/ocelotgui/options.txt
 %{_docdir}/ocelotgui/result-widget-example.png
 %{_docdir}/ocelotgui/shot1.jpg
 %{_docdir}/ocelotgui/shot10.jpg
@@ -238,9 +216,9 @@ desktop-file-install --delete-original ocelotgui.desktop
 %{_docdir}/ocelotgui/starting-dialog.png
 %{_docdir}/ocelotgui/starting.png
 %{_docdir}/ocelotgui/statement-widget-example.png
-%{_docdir}/ocelotgui/tarantool.txt
-/usr/share/applications/ocelotgui.desktop
-/usr/share/pixmaps/ocelotgui_logo.png
+%{_datadir}/applications/ocelotgui.desktop
+%{_datadir}/pixmaps/ocelotgui_logo.png
+
 
 %changelog
 * Wed Aug 29 2018 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.7-1

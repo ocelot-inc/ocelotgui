@@ -35,7 +35,7 @@
 # cmake .                       # but see below for description of options
 # make
 # make install                  # might require root privileges
-# (optional: generate .deb or .rpm file: see comment at end of this file)
+# (Steps are different when generating .deb or .rpm, see comments later.)
 
 # Qt4 or Qt5 dev packages must be installed first. See 
 # http://doc.qt.io/qt-5/linux.html
@@ -97,6 +97,9 @@
 
 # OCELOT_THIRD_PARTY=n
 # Say -DOCELOT_THIRD_PARTY=0 if you do not want to include third_party.h
+# By default it is included.
+# If it is not included, and ocelotgui is started with --ocelot_dbms=tarantool,
+# then libtarantool.so will be sought.
 
 # QT_VERSION=4 or QT_VERSION=5
 # If -DQT_VERSION=4: Search only for Qt4, do not search for Qt5 first.
@@ -115,9 +118,10 @@
 #     cpack_package_file_name = package-version-release.arch.rpm
 # iff CPACK_GENERATOR="DEB" is used, then after build say "cpack" to generate a .deb file
 # iff CPACK_GENERATOR="RPM" is used, then after build say "cpack" to generate an .rpm file
-# CPACK_GENERATOR is becoming obsolete. Nowadays Ocelot's official method for .rpm is not
-# wih cpack it is with rpm_build.sh. For ocelotgui version 1.0.8 Ocelot's official method
-# will probably be with debian/rules and debuild which causes a pass of PACKAGE_TYPE="DEB".
+# CPACK_GENERATOR is becoming obsolete. In ocelotgui 1.08 Ocelot's official method for .rpm
+# is not wih cpack it is with rpm_build.sh. In ocelotgui 1.08 Ocelot's official method for .deb
+# is not wth cpack it is with deb_build.sh and|or debian/rules -- debuild causes a pass of
+# PACKAGE_TYPE="DEB" not CPACK_GENERATOR="DEB". So eventually we will remove this option.
 
 # PACKAGE_TYPE="DEB" or PACKAGE_TYPE="RPM"
 #   DEB:
@@ -127,7 +131,7 @@
 #     This is to avoid lintian warning "extra-license-file".
 #     Unlike CPACK_GENERATOR="DEB", we do not try to make .gz files, leave that to debuild.
 #   RPM:
-#     This is the pass that we should specify in ocelotgui.spec.
+#     In ocelotgui.spec we say -DPACKAGE_TYPE="RPM" but we might not use it here.
 
 # OCELOT_C_FLAGS and OCELOT_CXX_FLAGS and OCELOT_CPP_FLAGS
 # These will override any environment variables or Qt defaults for C_FLAGS etc. if PACKAGE_TYPE="DEB".
@@ -212,6 +216,7 @@ project(ocelotgui)
 # Second time, use hard-coded list "/usr/include/mysql" etc.
 # without specifying NO_DEFAULT_PATH so CMake searches its default
 # directories first so quite often the hard-coded list doesn't matter.
+# We don't need this if "DEB" because in debian/rules we find package's path.
 unset(MYSQL_INCLUDE_DIR_RESULT)
 unset(MYSQL_INCLUDE_DIR_SEARCH_PATH)
 if (MYSQL_INCLUDE_DIR)
@@ -401,11 +406,13 @@ install(FILES ${jpg_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES ${htm_files} DESTINATION ${CMAKE_INSTALL_DOCDIR})
 # Debian packages would gzip .txt and .md files anyway.
 if (NOT PACKAGE_TYPE MATCHES "DEB")
+if (NOT PACKAGE_TYPE MATCHES "RPM")
 install(FILES README.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES README.md DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES options.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES debugger_reference.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES tarantool.txt DESTINATION ${CMAKE_INSTALL_DOCDIR})
+endif (NOT PACKAGE_TYPE MATCHES "RPM")
 endif (NOT PACKAGE_TYPE MATCHES "DEB")
 if (NOT CPACK_GENERATOR MATCHES "DEB")
 if (NOT PACKAGE_TYPE MATCHES "DEB")
@@ -420,14 +427,14 @@ else (PACKAGE_TYPE MATCHES "DEB")
 install(FILES example.cnf DESTINATION ${CMAKE_INSTALL_DOCDIR})
 endif (PACKAGE_TYPE MATCHES "DEB")
 install(FILES ocelotgui.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/applications)
-if (NOT CPACK_GENERATOR MATCHES "RPM")
-if (NOT PACKAGE_TYPE MATCHES "RPM")
+#if (NOT CPACK_GENERATOR MATCHES "RPM")
+#if (NOT PACKAGE_TYPE MATCHES "RPM")
   install(FILES ocelotgui_logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps)
-endif (NOT PACKAGE_TYPE MATCHES "RPM")
-endif (NOT CPACK_GENERATOR MATCHES "RPM")
-if (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
-  install(FILES ocelotgui_logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps RENAME ocelotgui_logo)
-endif (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
+#endif (NOT PACKAGE_TYPE MATCHES "RPM")
+#endif (NOT CPACK_GENERATOR MATCHES "RPM")
+#if (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
+#  install(FILES ocelotgui_logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps RENAME ocelotgui_logo)
+#endif (CPACK_GENERATOR MATCHES "RPM" OR PACKAGE_TYPE MATCHES "RPM")
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h hparse.h ostrings.h
 # readmylogin.c ocelotgui.ui install_sql.cpp
