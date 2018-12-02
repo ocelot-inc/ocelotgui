@@ -74,10 +74,11 @@
 #    The line "Prefix: /usr" has been commented out because rpmlint
 #    complained about it. We think putting it back in is a good idea.
 #Re build:
-#  * The "rm" commands in this section are an attempted cleanup so
-#    that there won't be error messages saying
-#    "Installed (but unpackaged) file(s) found".
-#    Probably there is a more standard way to do this.
+#  * On Fedora if we pass -DCMAKE_INSTALL_DOCDIR we get an error.
+#    On SUSE if we don't pass -DCMAKE_INSTALL_DOCDIR we get an error.
+#Re install:
+#  * On Fedora we let the macros expand and all is well.
+#    On SUSE if we let the macros expand then the "cd" would not be to /build.
 #Re files:
 #  * We hardcode /usr/share/applications/ocelotgui.desktop instead
 #    of using the desktopdir macro. That way we don't get an error,
@@ -102,7 +103,7 @@
 # * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
 # * Look at the flags that get passed to cmake, maybe they must be used (currently we are ignoring them).
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
-# * Remove old files: rpm_build.sh  rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
+# * Remove old files: rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
 # * Keep track of howtobuild.txt
 # It would be great to have ifdef equivalents for sourcedir etc.
 
@@ -167,15 +168,21 @@ sed -i 's|Icon=%{name}_logo.png|Icon=%{name}_logo|g' %{_builddir}/ocelotgui-1.0.
 
 
 %build
+%if %{defined suse_version}
+%cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE -DCMAKE_INSTALL_DOCDIR=%{_docdir}
+%else
 %cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE
+%endif
 make
-#rm CMakeCache.txt
-#rm -r CMakeFiles
-#rm *.cmake
-#rm Makefile
 
+%if %{defined suse_version}
+cd %{_builddir}
+cd %{name}-%{version}/build
+make DESTDIR=%{buildroot} install
+%else
 %install
 %make_install
+%endif
 %clean
 
 %files
