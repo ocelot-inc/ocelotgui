@@ -84,15 +84,13 @@
 #    of using the desktopdir macro. That way we don't get an error,
 #    but alas, we also don't get an installation on the desktop.
 #    That is why we have to use desktop-file-install.
-#Re ocelotgui_logo.png:
-#  * When we just said ocelotgui_logo without a fle name extension,
+#Re ocelotgui-logo.png:
+#  * When we just said ocelotgui-logo without a fle name extension,
 #    which is supposedly the recommended style, we ended up with
-#    /usr/share/pixmaps/ocelotgui_logo and it wasn't seen, the generic
+#    /usr/share/pixmaps/ocelotgui-logo and it wasn't seen, the generic
 #    logo appeared instead. So we insist on using an extension.
 #    However, in ocelotgui.desktop we do not need an extension so we
-#    change Icon=ocelotgui_logo.png to Icon=ocelotgui_logo, with sed.
-#  * A more conventional name would be ocelotgui-logo.png not ocelotgui_logo.png
-#    so see whether a rename would be okay for both debian and rpm.
+#    change Icon=ocelotgui-logo.png to Icon=ocelotgui-logo, with sed.
 #  * "rpm -i ..." will put the icon file in the right place but will
 #    not add to favorites. For that, the user has to click Activities,
 #    click on the search bar (where it says "Type to search ..."), search
@@ -164,7 +162,7 @@ Ocelot GUI (ocelotgui), a database client, allows users to connect to
 %prep
 %%setup -q
 
-sed -i 's|Icon=%{name}_logo.png|Icon=%{name}_logo|g' %{_builddir}/ocelotgui-1.0.7/%{name}.desktop
+sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/ocelotgui-1.0.7/%{name}.desktop
 
 
 %build
@@ -224,7 +222,7 @@ make DESTDIR=%{buildroot} install
 %{_docdir}/ocelotgui/starting.png
 %{_docdir}/ocelotgui/statement-widget-example.png
 %{_datadir}/applications/ocelotgui.desktop
-%{_datadir}/pixmaps/ocelotgui_logo.png
+%{_datadir}/pixmaps/ocelotgui-logo.png
 
 
 %changelog

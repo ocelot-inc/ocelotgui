@@ -29,7 +29,6 @@ All rights reserved.</P>
 ... <A href="#getting-the-qt-library">Getting the Qt library</A>
 ... <A href="#getting-the-libmysqlclientso-library">Getting the libmysqlclient.so library</A>
 ... <A href="#getting-the-ocelotgui-executable-package">Getting the ocelotgui executable package</A>
-... <A href="#getting-and-using-the-ocelotgui-source">Getting and using the ocelotgui source</A>
 ... <A href="#starting-the-program">Starting the program</A>
 <H4>Illustrating</H4>
 ... <A href="#some-screenshots">Some screenshots</A>
@@ -47,6 +46,12 @@ All rights reserved.</P>
 ... <A href="#debugger">Debugger</A>
 ... <A href="#special-effects">Special effects</A>
 ... <A href="#contact">Contact</A>
+<H4>Appendixes</H4>
+... <A href="#Appendix-1">Appendix 1 Details about ocelotgui options</A>
+... <A href="#Appendix-2">Appendix 2 Reference for the Ocelot GUI debugger</A>
+... <A href="#Appendix-3">Appendix 3 Tarantoo</A>
+... <A href="#Appendix-4">Appendix 4 windows</A>
+... <A href="#getting-and-using-the-ocelotgui-source">Appendix 5 Getting and using the ocelotgui source</A>
 
 <H3 id="prerequisites">Prerequisites</H3><HR>
 
@@ -131,127 +136,6 @@ For 32-bit, RPM-like, Qt5<PRE>
 wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.i686.rpm
 sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
 </P>
-
-<H3 id="getting-and-using-the-ocelotgui-source">Getting and using the ocelotgui source</H3><HR>
-
-<P>The ocelotgui source package has everything necessary to compile
-and link and install for any Linux distribution. If the typical
-developer packages such as cmake and the gcc c/c++ compiler has
-been installed already, building an executable usually takes
-less than fifteen minutes.</P>
-
-<P>The official location of the project is on github: <A HREF="https://github.com/ocelot-inc/ocelotgui">https://github.com/ocelot-inc/ocelotgui</A>.
-This is where the latest source files are. This is what can be "cloned".
-Typically, to get it, one would install git, cd to a download directory, then</P>
-<PRE>
-git clone https://github.com/ocelot-inc/ocelotgui
-</PRE>
-<P>A clone has the latest source, but not executables.
-A clone may contain patches which are not yet part of a release.
-Ordinarily users are advised to use a release rather than a clone,
-until they have used ocelotgui for a while.</P>
-
-<P>The releases for ocelot-inc/ocelotgui are also on github:
-<A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>.
-A release includes the source files as of the release time.
-Although the release does not have the "latest" source which is
-in ocelot-inc/ocelotgui, it usually is more stable.
-A release file is highlighted in green
-by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.7 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz.
-Typically, to get it, one would cd to a download directory, then
-<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
-</PRE>
-or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui-1.0.7.tar.gz.</P>
-
-<P>On Debian-like systems some packages must be installed first.
-For example on Ubuntu:<PRE>
- sudo apt-get install gcc cmake make
- sudo apt-get install libmysqlclient-dev
- #Do the following if and only if build is for use with Qt4
- sudo apt-get install qt4-dev-tools
- #Do the following if and only if build is for use with Qt5
- sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools</PRE></P>
-
-<P>On RPM-like systems some packages must be installed first.
-For example on Mageia:<PRE>
- urpmi gcc gcc-c++ make cmake git
- #The name of the following package (containing mysql.h) varies,
- #it might be lib64mariadb-devel or libmysqlclient-devel or mariadb-devel
- urpmi mysql-devel
- urpmi rpm-build       
- #Do the following if and only if build is for use with Qt4
- urpmi libqt4-devel
- #Do the following if and only if build is for use with Qt5
- urpmi libqt5-devel</PRE></P>
-
-<P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui-1.0.7.tar.gz
- cd ocelotgui</PRE>
-At this point it is a good idea to examine the file CMakeLists.txt.
-This file has comments about options which are available to
-customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
-MYSQL_INCLUDE_DIR, WITH_QT4, OCELOT_THIRD_PARTY.
-For explanation of these flags, read the comments
-in the CMakeLists.txt file.
-If no customizing is necessary,
-the typical build process is:<PRE>
- make clean        # unnecessary the first time
- rm CMakeCache.txt # unnecessary the first time
- cmake .
- make
- sudo make install</PRE>
-The above instructions will usually put the ocelotgui program and
-directories in subdirectories of /usr/local, so if /usr/local/bin
-is on your PATH then after this saying ocelotgui will start the program.
-However, it is sometimes better to make and install a package,
-which will cause a few additional steps to be performed, such as
-registering so that ocelotgui can be started from the launcher.
-For Debian-like platforms say:<PRE>
- cmake . -DCPACK_GENERATOR="DEB"
- make
- cpack
- sudo dpkg -i ocelotgui_1.0.7-1_i386.deb
- #or sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
-For RPM-like platforms say:<PRE>
- cmake . -DCPACK_GENERATOR="RPM"
- make
- cpack
- sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm
- #or sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
-Usually the result will go to subdirectories of /usr, in which case,
-if /usr/bin is on your PATH, then saying ocelotgui will start the program.
-</P>
-
-<P>Some other facts about the source package, for users who
-like to explore code ...
-files with the extension *.png
-or *.htm or *.md or *.txt or *.jpg are for documentation, the file
-LICENSE.GPL is for legal requirements, and
-files with the extension *.cpp or *.pro or *.h are source code.
-The main() code is in ocelotgui.cpp. All the source code has
-comments. Since ocelotgui is a Qt-using program, it is also
-possible to use Qt Creator as an IDE editor/compiler and qmake
-to build -- the file ocelotgui.pro exists for this purpose,
-and the comments at the end of ocelotgui.pro have more explanation.
-For example, on Ubuntu 14.04, if the intent is to rebuild for Qt 4 from source,
-these instructions have been known to work:
-<PRE>
- sudo apt-get install qt4-qmake
- sudo apt-get install libqt4-dev
- cd [path to ocelotgui source files]
- make clean
- /usr/bin/qmake-qt4 -config release
- make</PRE>
-For more commentary about compiling and building,
-read an ocelotgui.cpp comment that begins with the words
-"General comments".
-For instructions to build from source on Microsoft Windows,
-see the file <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/windows.txt">windows.txt</A>.
-</P>
-
 
 <H3 id="starting-the-program">Starting the program</H3><HR>
 
@@ -2280,7 +2164,7 @@ release\ocelotgui.exe --ocelot_dbms=tarantool
 : in fact this list is merely the result of concatenating "ocelotgui.exe" with an ocelotgui direcory listing.
 : Make sure you can unzip ocelotgui.zip with both 7-zip and winzip.
 copy release\ocelotgui.exe ocelotgui.exe
-"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui_logo.png         rpm_post_uninstall.sh  shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro              rpm_pre_install.sh     shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui               rpm_pre_uninstall.sh   special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf             ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h        rpm_post_install.sh        shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec
+"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png         rpm_post_uninstall.sh  shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro              rpm_pre_install.sh     shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui               rpm_pre_uninstall.sh   special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf             ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h        rpm_post_install.sh        shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec
 
 : What we actually put in the release looks like ocelotgui-1.0.7-1.ocelotgui.zip, so rename the .zip file at some point.
 
@@ -2331,4 +2215,125 @@ copy release\ocelotgui.exe ocelotgui.exe
 : will mail it on a USB stick for a reasonable fee -- send us a request.
 : This offer is valid for three years from the date of the ocelotgui release.
 </pre>
+
+<H3 id="getting-and-using-the-ocelotgui-source">Appendix 5 Getting and using the ocelotgui source</H3><HR>
+
+<P>The ocelotgui source package has everything necessary to compile
+and link and install for any Linux distribution. If the typical
+developer packages such as cmake and the gcc c/c++ compiler has
+been installed already, building an executable usually takes
+less than fifteen minutes.</P>
+
+<P>The official location of the project is on github: <A HREF="https://github.com/ocelot-inc/ocelotgui">https://github.com/ocelot-inc/ocelotgui</A>.
+This is where the latest source files are. This is what can be "cloned".
+Typically, to get it, one would install git, cd to a download directory, then</P>
+<PRE>
+git clone https://github.com/ocelot-inc/ocelotgui
+</PRE>
+<P>A clone has the latest source, but not executables.
+A clone may contain patches which are not yet part of a release.
+Ordinarily users are advised to use a release rather than a clone,
+until they have used ocelotgui for a while.</P>
+
+<P>The releases for ocelot-inc/ocelotgui are also on github:
+<A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>.
+A release includes the source files as of the release time.
+Although the release does not have the "latest" source which is
+in ocelot-inc/ocelotgui, it usually is more stable.
+A release file is highlighted in green
+by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.7 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz.
+Typically, to get it, one would cd to a download directory, then
+<PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+</PRE>
+or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
+and click ocelotgui-1.0.7.tar.gz.</P>
+
+<P>On Debian-like systems some packages must be installed first.
+For example on Ubuntu:<PRE>
+ sudo apt-get install gcc cmake make
+ sudo apt-get install libmysqlclient-dev
+ #Do the following if and only if build is for use with Qt4
+ sudo apt-get install qt4-dev-tools
+ #Do the following if and only if build is for use with Qt5
+ sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools</PRE></P>
+
+<P>On RPM-like systems some packages must be installed first.
+For example on Mageia:<PRE>
+ urpmi gcc gcc-c++ make cmake git
+ #The name of the following package (containing mysql.h) varies,
+ #it might be lib64mariadb-devel or libmysqlclient-devel or mariadb-devel
+ urpmi mysql-devel
+ urpmi rpm-build       
+ #Do the following if and only if build is for use with Qt4
+ urpmi libqt4-devel
+ #Do the following if and only if build is for use with Qt5
+ urpmi libqt5-devel</PRE></P>
+
+<P>Unpack all the source files by saying:<PRE>
+ tar -zxvf ocelotgui-1.0.7.tar.gz
+ cd ocelotgui</PRE>
+At this point it is a good idea to examine the file CMakeLists.txt.
+This file has comments about options which are available to
+customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
+MYSQL_INCLUDE_DIR, WITH_QT4, OCELOT_THIRD_PARTY.
+For explanation of these flags, read the comments
+in the CMakeLists.txt file.
+If no customizing is necessary,
+the typical build process is:<PRE>
+ make clean        # unnecessary the first time
+ rm CMakeCache.txt # unnecessary the first time
+ cmake .
+ make
+ sudo make install</PRE>
+The above instructions will usually put the ocelotgui program and
+directories in subdirectories of /usr/local, so if /usr/local/bin
+is on your PATH then after this saying ocelotgui will start the program.
+However, it is sometimes better to make and install a package,
+which will cause a few additional steps to be performed, such as
+registering so that ocelotgui can be started from the launcher.
+For Debian-like platforms say:<PRE>
+ cmake . -DCPACK_GENERATOR="DEB"
+ make
+ cpack
+ sudo dpkg -i ocelotgui_1.0.7-1_i386.deb
+ #or sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
+For RPM-like platforms say:<PRE>
+ cmake . -DCPACK_GENERATOR="RPM"
+ make
+ cpack
+ sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm
+ #or sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
+Usually the result will go to subdirectories of /usr, in which case,
+if /usr/bin is on your PATH, then saying ocelotgui will start the program.
+</P>
+
+<P>Some other facts about the source package, for users who
+like to explore code ...
+files with the extension *.png
+or *.htm or *.md or *.txt or *.jpg are for documentation, the file
+LICENSE.GPL is for legal requirements, and
+files with the extension *.cpp or *.pro or *.h are source code.
+The main() code is in ocelotgui.cpp. All the source code has
+comments. Since ocelotgui is a Qt-using program, it is also
+possible to use Qt Creator as an IDE editor/compiler and qmake
+to build -- the file ocelotgui.pro exists for this purpose,
+and the comments at the end of ocelotgui.pro have more explanation.
+For example, on Ubuntu 14.04, if the intent is to rebuild for Qt 4 from source,
+these instructions have been known to work:
+<PRE>
+ sudo apt-get install qt4-qmake
+ sudo apt-get install libqt4-dev
+ cd [path to ocelotgui source files]
+ make clean
+ /usr/bin/qmake-qt4 -config release
+ make</PRE>
+For more commentary about compiling and building,
+read an ocelotgui.cpp comment that begins with the words
+"General comments".
+For instructions to build from source on Microsoft Windows,
+see <A href="#Appendix-4">Appendix 4 Windows</A>.
+</P>
+
 

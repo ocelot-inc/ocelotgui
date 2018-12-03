@@ -77,6 +77,7 @@ cp -p $SOURCE/shot8.jpg /tmp/ocelotgui-$VERSION/shot8.jpg
 cp -p $SOURCE/shot9.jpg /tmp/ocelotgui-$VERSION/shot9.jpg
 cp -p $SOURCE/shot10.jpg /tmp/ocelotgui-$VERSION/shot10.jpg
 cp -p $SOURCE/shot11.png /tmp/ocelotgui-$VERSION/shot11.png
+cp -p $SOURCE/ocelotgui-logo.png /tmp/ocelotgui-$VERSION/ocelotgui-logo.png
 cp -p $SOURCE/ocelotgui_logo.png /tmp/ocelotgui-$VERSION/ocelotgui_logo.png
 cp -p $SOURCE/CMakeLists.txt /tmp/ocelotgui-$VERSION/CMakeLists.txt
 cp -p $SOURCE/COPYING /tmp/ocelotgui-$VERSION/COPYING
