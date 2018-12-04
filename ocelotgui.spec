@@ -28,7 +28,7 @@
 # cd /tmp
 # rm -r -f ocelotgui
 # rm -r -f ocelotgui-1.0.7
-# cp $HOME/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7.tar.gz
+# cp -p $HOME/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7.tar.gz
 # tar -xf ocelotgui-1.0.7.tar.gz
 # mv ocelotgui ocelotgui-1.0.7
 # tar -zcvf $HOME/ocelotgui-1.0.7.tar.gz ocelotgui-1.0.7
@@ -36,7 +36,7 @@
 # (For this step, we assume you know where the spec file is. After all, it is what you are reading now.)
 # You must copy it to $HOME/ocelotgui.spec -- this is hard coded.
 # In the followin gline we assume the spec file is on $HOME/ocelotgui, but change to wherever it really is.
-# cp $HOME/ocelotgui/ocelotgui.spec $HOME/ocelotgui.spec
+# cp -p $HOME/ocelotgui/ocelotgui.spec $HOME/ocelotgui.spec
 # 5. Clear $HOME/ocelotgui_rpm. This is an arbitrary directory name that we use in step 6. Change it if you wish.
 # rm -r -f $HOME/ocelotgui_rpm
 # 6. Run rpmbuild using the $HOME/ocelotgui_rpm directory. Notice that we don't bother with an .rpmmacros file.
@@ -47,7 +47,7 @@
 # You can copy the .rpm file to a permanent location and remove the ~/ocelotgui_rpm directory.
 # 8. With the .rpm file you can say
 # sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.0.7-1.x86_64.rpm
-# Of course, the .rpm file name will be different on an i386 platform.
+# Of course, the .rpm file name will be different on a 32-bit platform.
 
 #Re Group:
 #  Usually this is Group: Applications/Databases
@@ -95,7 +95,10 @@
 #    not add to favorites. For that, the user has to click Activities,
 #    click on the search bar (where it says "Type to search ..."), search
 #    ocelotgui, right click on the ocelotgui logo, click "Add to favorites".
-
+#Re if and endif for different Linux distros:
+#  The mdvver test is for Mageia.
+#  The suse_version test is for openSUSE.
+#  The else path is for Fedora but other distros will go on the same path.
 #TODO
 #----
 # * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
@@ -103,12 +106,16 @@
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
 # * Remove old files: rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
 # * Keep track of howtobuild.txt
+# * CXXFLAGS is exported but we end up with CMAKE_CXX_FLAGS = (blank)
+# * (Mageia warnings) no-signature, no-packager-tag, manpage-not-compressed
+# * (SUSE warnings) invalid-license GPLv2, non-standard-group Unspecified, package-with-huge-docs, position-independent-executable suggested
 # It would be great to have ifdef equivalents for sourcedir etc.
 
 
-%define __spec_install_post %{nil}
-%define debug_package %{nil}
-%define __os_install_post %{_dbpath}/brp-compress
+%global __spec_install_post %{nil}
+%global debug_package %{nil}
+%global __os_install_post %{_dbpath}/brp-compress
+%global _hardened_build 1
 
 
 # Restore old style debuginfo creation for rpm >= 4.14.
@@ -134,7 +141,11 @@ Source:         https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/
 %if %{defined suse_version}
 BuildRequires:  libqt5-qttools-devel
 %else
+%if "%?mdvver" != ""
+BuildRequires:  qt5-devel
+%else
 BuildRequires:  qt5-qttools-devel
+%endif
 %endif
 BuildRequires:  mysql-devel
 BuildRequires:  gcc >= 5.1
@@ -144,6 +155,7 @@ BuildRequires:  cmake >= 2.8.11
 BuildRequires:  sed
 BuildRequires:  rpm rpm-build rpmlint
 BuildRequires:  desktop-file-utils
+Suggests: tarantool
 
 #Prefix: /usr
 
@@ -158,35 +170,45 @@ Ocelot GUI (ocelotgui), a database client, allows users to connect to
  with rows that can have multiple lines and columns that can be dragged,
  and a debugger.
 
- 
+
 %prep
 %%setup -q
 
-sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/ocelotgui-1.0.7/%{name}.desktop
+sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{version}/%{name}.desktop
 
 
 %build
 %if %{defined suse_version}
-%cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE -DCMAKE_INSTALL_DOCDIR=%{_docdir}
+%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE -DCMAKE_INSTALL_DOCDIR=%{_docdir}
 %else
-%cmake %{_builddir}/ocelotgui-1.0.7 -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE
+%if "%?mdvver" != ""
+%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name}
+%else
+%cmake . -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE
 %endif
-make
+%endif
+%make_build
 
 %if %{defined suse_version}
 cd %{_builddir}
 cd %{name}-%{version}/build
 make DESTDIR=%{buildroot} install
 %else
+%if "%?mdvver" != ""
+%install
+cd %{_builddir}
+cd %{name}/%{version}/build
+%make_install
+%else
 %install
 %make_install
 %endif
-%clean
+%endif
 
 %files
 %defattr(-,root,root,-)
 %{_bindir}/ocelotgui
-%{_mandir}/man1/ocelotgui.1.gz
+%{_mandir}/man1/ocelotgui.1*
 %{_docdir}/ocelotgui/COPYING
 %{_docdir}/ocelotgui/LICENSE.GPL
 %{_docdir}/ocelotgui/README.htm
