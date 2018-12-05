@@ -109,6 +109,7 @@
 # * CXXFLAGS is exported but we end up with CMAKE_CXX_FLAGS = (blank)
 # * (Mageia warnings) no-signature, no-packager-tag, manpage-not-compressed
 # * (SUSE warnings) invalid-license GPLv2, non-standard-group Unspecified, package-with-huge-docs, position-independent-executable suggested
+# * (Fedora-26 warnings) non-standard-group Databases, rpm-buildroot-usage
 # It would be great to have ifdef equivalents for sourcedir etc.
 
 
@@ -130,7 +131,7 @@ License:        GPLv2
 # This "if" should be true for Mageia
 %if "%?mdvver" != ""
 Group:          Applications/Databases
-#else
+%else
 Group:          Databases
 %endif
 Vendor:         Ocelot Computer Services Inc.
