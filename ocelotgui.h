@@ -5178,7 +5178,7 @@ void frame_resize(int ki, int grid_col, int width, int height)
 */
 void display_batch()
 {
-  char ocelot_grid_table_start[640];
+  char ocelot_grid_table_start[896];
   char ocelot_grid_header_row_start[32];
   char ocelot_grid_header_row_end[32];
   char ocelot_grid_header_numeric_column_start[32];

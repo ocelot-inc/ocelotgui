@@ -37,7 +37,7 @@ override_dh_auto_install:
 override_dh_auto_configure:
 	dh_auto_configure -- -DPACKAGE_TYPE="DEB" \
 			     -DMYSQL_INCLUDE_DIR=${OCELOT_MYSQL_INCLUDE_DIR} \
-                             -DUSE_RPATH=FALSE \
+                             -DCMAKE_SKIP_RPATH=TRUE \
                              -DQT_VERSION=5 \
                              -DOCELOT_C_FLAGS="${OCELOT_C_FLAGS}" \
                              -DOCELOT_CXX_FLAGS="${OCELOT_CXX_FLAGS}" \

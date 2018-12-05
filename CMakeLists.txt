@@ -76,8 +76,8 @@
 # Directory to search first for mysql.h.
 # In debian/rules this is calculated by looking in the installed MySQL/MariaDB package.
 
-# USE_RPATH=TRUE|FALSE and CMAKE_INSTALL_RPATH
-# By default we have rpath. But from debian/rules and ocelotgui.spec we pass -DUSE_RPATH=FALSE.
+# CMAKE_SKIP_RPATH=TRUE|FALSE and CMAKE_INSTALL_RPATH
+# By default we have rpath. But from debian/rules and ocelotgui.spec we pass -DCMAKE_SKIP_RPATH=TRUE.
 # For QMake, QMAKE_RPATHDIR is where ocelotgui will search for libmysqlclient.so at run time.
 # CMAKE_INSTALL_RPATH is apparently the CMake translation of QMAKE_RPATHDIR,
 # but first it will try several other ways.
@@ -329,7 +329,7 @@ endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
 #If OCELOT_xxx_FLAGS is passed for a Debian package, then override environment variables and Qt5 setting.
 #Maybe I could also check CMAKE_CXX_COMPILER should be gcc and CMAKE_CXXCOMPILER_VERSION should be >= something.
-if (PACKAGE_TYPE STREQUAL "DEB")
+if (PACKAGE_TYPE STREQUAL "DEB" OR PACKAGE_TYPE STREQUAL "RPM")
 if(CMAKE_COMPILER_IS_GNUCXX)
 if (OCELOT_C_FLAGS)
   message("-- Setting CMAKE_C_FLAGS=OCELOT_C_FLAGS+OCELOT_CPP_FLAGS, CMAKE_CXX_FLAGS=OCELOT_CXX_FLAGS+OCELOt-CPP_FLAGS")
@@ -337,7 +337,7 @@ if (OCELOT_C_FLAGS)
   set(CMAKE_CXX_FLAGS "${OCELOT_CXX_FLAGS} ${OCELOT_CPP_FLAGS}")
 endif (OCELOT_C_FLAGS)
 endif(CMAKE_COMPILER_IS_GNUCXX)
-endif (PACKAGE_TYPE STREQUAL "DEB")
+endif (PACKAGE_TYPE STREQUAL "DEB" OR PACKAGE_TYPE STREQUAL "RPM")
 
 message("-- CMAKE_CXX_FLAGS  = ${CMAKE_CXX_FLAGS}")
 message("-- CMAKE_C_FLAGS  = ${CMAKE_C_FLAGS}")
@@ -360,13 +360,13 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 target_link_libraries(ocelotgui ws2_32)
 endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
-# See comments at the start of this file regarding USE_RPATH and CMAKE_INSTALL_RPATH.
-if (DEFINED USE_RPATH)
-  set(TMP_USE_RPATH ${USE_RPATH})
-else (DEFINED USE_RPATH)
-  set(TMP_USE_RPATH TRUE)
-endif (DEFINED USE_RPATH)
-if (TMP_USE_RPATH)
+# See comments at the start of this file regarding CMAKE_SKIP_RPATH and CMAKE_INSTALL_RPATH.
+if (DEFINED CMAKE_SKIP_RPATH)
+  set(TMP_CMAKE_SKIP_RPATH ${CMAKE_SKIP_RPATH})
+else (DEFINED CMAKE_SKIP_RPATH)
+  set(TMP_CMAKE_SKIP_RPATH FALSE)
+endif (DEFINED CMAKE_SKIP_RPATH)
+if (NOT TMP_CMAKE_SKIP_RPATH)
   if (NOT CMAKE_INSTALL_RPATH)
     set(TMP_INSTALL_RPATH "")
   else (NOT CMAKE_INSTALL_RPATH)
@@ -387,9 +387,9 @@ if (TMP_USE_RPATH)
   message("-- rpath = ${TMP_INSTALL_RPATH}")
   set_target_properties(ocelotgui PROPERTIES INSTALL_RPATH "${TMP_INSTALL_RPATH}")
   set_target_properties(ocelotgui PROPERTIES BUILD_WITH_INSTALL_RPATH TRUE)
-else (TMP_USE_RPATH)
+else (NOT TMP_CMAKE_SKIP_RPATH)
   message("-- No rpath")
-endif (TMP_USE_RPATH)
+endif (NOT TMP_CMAKE_SKIP_RPATH)
 
 if (Qt5Widgets_FOUND)
   target_link_libraries(ocelotgui Qt5::Widgets)

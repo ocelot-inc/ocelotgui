@@ -73,7 +73,7 @@ On some distros, there is one other note: that our documentation size is large.
 "override_dh_auto_configure":
     Re -DPACKAGE_TYPE="DEB" there are some explanations in CMakeLists.txt comments.
     Re DMYSQL_INCLUDE_DIR=${OCELOT_MYSQL_INCLUDE_DIR} earlier we found what has mysql.h
-    Re -DUSE_RPATH=FALSE we have an RPATH by default, this turns it off, Debian discourages it
+    Re -DCMAKE_SKIP_RPATH=TRUE we have an RPATH by default, this turns it off, Debian discourages it
     Re -DQT_VERSION=5 I am assuming that users prefer Qt5.
                       Users who prefer Qt4 should change -DQT_VERSION=5 to -DQT_VERSION=4
 "debian/rules override_dh_auto_install":

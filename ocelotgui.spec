@@ -63,7 +63,7 @@
 #  * qt5-qttools-devel implies that we assume Qt version 5.
 #    In fact Qt version 4 will work well.
 #  * mysql-devel implies that we assume MySQL.
-#    In fact MariaDB will work well.
+#    In fact MariaDB will work well so mariadb-devel would be good too.
 #    The requirement exists because our source has "#include mysql.h".
 #  * All the other Build-Requires packages are common utilities
 #    that are easily available on any rpm-based distro.
@@ -84,7 +84,7 @@
 #  * We hardcode /usr/share/applications/ocelotgui.desktop instead
 #    of using the desktopdir macro. That way we don't get an error,
 #    but alas, we also don't get an installation on the desktop.
-#    That is why we have to use desktop-file-install.
+#    Perhaps we should use desktop-file-install.
 #Re ocelotgui-logo.png:
 #  * When we just said ocelotgui-logo without a fle name extension,
 #    which is supposedly the recommended style, we ended up with
@@ -100,11 +100,11 @@
 #  The mdvver test is for Mageia.
 #  The suse_version test is for openSUSE.
 #  The else path is for Fedora but other distros will go on the same path.
-#  rpmlint might complain "rpm-buildroot-usage" even if it's inside an if that is false
+#  rpmlint (source) might complain "rpm-buildroot-usage" even if it's inside an if that is false
 #TODO
 #----
 # * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
-# * Look at the flags that get passed to cmake, maybe they must be used (currently we are ignoring them).
+# * Currently we pass suggested c_flags and cxx_flags but not ldflags.
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
 # * Remove old files: rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
 # * Keep track of howtobuild.txt
@@ -178,12 +178,15 @@ sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{vers
 
 %build
 %if %{defined suse_version}
-%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE -DCMAKE_INSTALL_DOCDIR=%{_docdir}
+%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir} \
+       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
 %else
 %if "%?mdvver" != ""
-%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name}
+%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name} \
+       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
 %else
-%cmake . -DPACKAGE_TYPE="RPM" -DUSE_RPATH=FALSE
+%cmake . -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE \
+       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
 %endif
 %endif
 %make_build

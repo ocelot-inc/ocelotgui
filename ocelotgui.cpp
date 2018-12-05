@@ -499,7 +499,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   assert(sizeof(int) >= 4);
 
 #ifdef OCELOT_OS_LINUX
+#if defined(NDEBUG)
+  if (MENU_FONT != 82) {printf("assert(MENU_FONT == 82);"); exit(1); }
+#else
   assert(MENU_FONT == 82); /* See kludge alert in ocelotgui.h Settings() */
+#endif
 #else
   assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
 #endif
@@ -749,7 +753,11 @@ int MainWindow::result_grid_add_tab()
   {
     r= new ResultGrid(lmysql, this, true);
     int new_tab_index= result_grid_tab_widget->addTab(r, QString::number(i_r + 1));
+#if defined(NDEBUG)
+    if (new_tab_index != i_r) {printf("assert(new_tab_index == i_r);"); exit(1); }
+#else
     assert(new_tab_index == i_r);
+#endif
     r->hide(); /* Maybe this isn't necessary */
   }
   {
@@ -7015,7 +7023,11 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   /* Create a debuggee thread. */
   /* Todo: consider whether it would have been better to use the Qt QThread function */
   int pthread_create_result= pthread_create(&debug_thread_id, NULL, &debuggee_thread, NULL);
-  assert(pthread_create_result == 0);
+#if defined(NDEBUG)
+    if (pthread_create_result != 0) {printf("assert(pthread_create_result == 0);"); exit(1); }
+#else
+    assert(pthread_create_result == 0);
+#endif
   debug_thread_exists= true;
   /*
     Wait till debuggee has indicated that it is about to call debuggee_wait_loop().
@@ -7689,7 +7701,11 @@ void MainWindow::debug_exit_go(int flagger)
   if (debug_thread_exists == true)
   {
     int pthread_join_result= pthread_join(debug_thread_id, NULL);
+#if defined(NDEBUG)
+    if (pthread_join_result != 0) {printf("assert(pthread_join_result == 0);"); exit(1); }
+#else
     assert(pthread_join_result == 0);
+#endif
     debug_thread_exists= false;
   }
 
@@ -10509,7 +10525,11 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
         assert(mysql_res_for_warnings != NULL);
         //for (unsigned int wi= 0; wi <= lmysql->ldbms_mysql_warning_count(&mysql[connection_number]); ++wi)
         int count_of_fields= lmysql->ldbms_mysql_num_fields(mysql_res_for_warnings);
+#if defined(NDEBUG)
+        if (count_of_fields != 3) {printf("assert(count_of_fields == 3);"); exit(1); }
+#else
         assert(count_of_fields == 3);
+#endif
         for (;;)
         {
           warnings_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_warnings);
@@ -14614,7 +14634,11 @@ int MainWindow::tarantool_execute_sql(
     struct tnt_request *req2 = lmysql->ldbms_tnt_request_eval(NULL);
 
     int m= lmysql->ldbms_tnt_request_set_exprz(req2, request_string);
+#if defined(NDEBUG)
+    if (m < 0) {printf("assert(m >= 0);"); exit(1); }
+#else
     assert(m >= 0);
+#endif
     lmysql->ldbms_tnt_request_set_tuple(req2, arg);
     /* uint64_t sync1 = */ lmysql->ldbms_tnt_request_compile(tnt[connection_number], req2);
     tarantool_flush_and_save_reply(connection_number);
@@ -14887,7 +14911,11 @@ const char * MainWindow::tarantool_seek_0(int *returned_result_set_type)
     tarantool_tnt_reply_data+= bytes;
 //    --row_count;
   }
+#if defined(NDEBUG)
+  if (row_count != result_row_count) {printf("assert(row_count == result_row_count);"); exit(1); }
+#else
   assert(row_count == result_row_count);
+#endif
   *returned_result_set_type= result_set_type;
   return tarantool_tnt_reply_data;
 }
