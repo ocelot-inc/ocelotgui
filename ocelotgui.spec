@@ -2,6 +2,7 @@
 
 #How to Build an .rpm file
 #-------------------------
+# (A version of this is also inside the rpm_build.sh script file.)
 # 1. Install necessary packages. These might already be installed. Some distros prefer dnf to install.
 # sudo yum install qt5-qttools-devel
 # sudo yum install mysql-devel
@@ -99,6 +100,7 @@
 #  The mdvver test is for Mageia.
 #  The suse_version test is for openSUSE.
 #  The else path is for Fedora but other distros will go on the same path.
+#  rpmlint might complain "rpm-buildroot-usage" even if it's inside an if that is false
 #TODO
 #----
 # * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
@@ -112,12 +114,8 @@
 # * (Fedora-26 warnings) non-standard-group Databases, rpm-buildroot-usage
 # It would be great to have ifdef equivalents for sourcedir etc.
 
-
-%global __spec_install_post %{nil}
 %global debug_package %{nil}
-%global __os_install_post %{_dbpath}/brp-compress
 %global _hardened_build 1
-
 
 # Restore old style debuginfo creation for rpm >= 4.14.
 %undefine _debugsource_packages
