@@ -6682,7 +6682,7 @@ int MainWindow::debug_parse_statement(QString text,
 
         {
           QString result_string;
-          char query_for_select_check[512];
+          char query_for_select_check[1280];
           sprintf(query_for_select_check, "select count(*) from information_schema.routines where routine_schema='%s' and routine_name='%s'", tmp_schema_name, tmp_routine_name);
           result_string= select_1_row(query_for_select_check);
           if (result_string != "") { strcpy(command_string, "Tried to check routine name but select from information_schema.routines failed"); return -1; }
@@ -7294,7 +7294,7 @@ void MainWindow::action_debug_mousebuttonpress(QEvent *event, int which_debug_wi
 {
   log("action_debug_mousebutonpress", 90);
   int line_number;
-  char command[512];
+  char command[1280];
   char schema_name[512];
   char routine_name[512];
   int debug_widget_index;

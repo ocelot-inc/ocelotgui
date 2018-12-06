@@ -178,7 +178,7 @@ sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{vers
 
 %build
 %if %{defined suse_version}
-%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir} \
+%cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name} \
        -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
 %else
 %if "%?mdvver" != ""
@@ -197,10 +197,9 @@ cd %{name}-%{version}/build
 make DESTDIR=%{buildroot} install
 %else
 %if "%?mdvver" != ""
-%install
 cd %{_builddir}
-cd %{name}/%{version}/build
-%make_install
+cd %{name}-%{version}/build
+make DESTDIR=%{buildroot} install
 %else
 %install
 %make_install
