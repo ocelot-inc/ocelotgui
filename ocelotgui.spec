@@ -76,10 +76,13 @@
 #    complained about it. We think putting it back in is a good idea.
 #Re build:
 #  * On Fedora if we pass -DCMAKE_INSTALL_DOCDIR we get an error.
-#    On SUSE if we don't pass -DCMAKE_INSTALL_DOCDIR we get an error.
+#    On SUSE or Mageia if we don't pass -DCMAKE_INSTALL_DOCDIR we get an error.
 #Re install:
 #  * On Fedora we let the macros expand and all is well.
 #    On SUSE if we let the macros expand then the "cd" would not be to /build.
+#  * On SUSE and Mageia we need to cd to the build subdirectory.
+#    On Fedora this is automatic.
+#    So no problem -- but a mystery that it's not automatic for everybody.
 #Re files:
 #  * We hardcode /usr/share/applications/ocelotgui.desktop instead
 #    of using the desktopdir macro. That way we don't get an error,
@@ -100,7 +103,6 @@
 #  The mdvver test is for Mageia.
 #  The suse_version test is for openSUSE.
 #  The else path is for Fedora but other distros will go on the same path.
-#  rpmlint (source) might complain "rpm-buildroot-usage" even if it's inside an if that is false
 #TODO
 #----
 # * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
@@ -108,10 +110,9 @@
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
 # * Remove old files: rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
 # * Keep track of howtobuild.txt
-# * CXXFLAGS is exported but we end up with CMAKE_CXX_FLAGS = (blank)
-# * (Mageia warnings) no-signature, no-packager-tag, manpage-not-compressed
-# * (SUSE warnings) invalid-license GPLv2, non-standard-group Unspecified, package-with-huge-docs, position-independent-executable suggested
-# * (Fedora-26 warnings) non-standard-group Databases, rpm-buildroot-usage
+# * (Mageia warnings) no-signature, manpage-not-compressed
+# * (SUSE warnings) package-with-huge-docs, position-independent-executable suggested
+# * (Fedora-26 warnings) non-standard-group Databases
 # It would be great to have ifdef equivalents for sourcedir etc.
 
 %global debug_package %{nil}
@@ -124,7 +125,7 @@
 Summary:        GUI client for MySQL or MariaDB
 Name:           ocelotgui
 Version:        1.0.7
-Release:        1
+Release:        1%{?dist}
 
 %if %{defined suse_version}
 License:        GPL-2.0-only
@@ -145,6 +146,9 @@ Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
 #Source0:        ocelotgui-1.0.7.tar.gz
 Source:         https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+%if "%?mdvver" != ""
+Packager:       Peter Gulutzan
+%endif
 
 %if %{defined suse_version}
 BuildRequires:  libqt5-qttools-devel
@@ -206,9 +210,9 @@ cd %{_builddir}/%{name}-%{version}/build
 %make_install
 %else
 %if "%?mdvver" != ""
-cd %{_builddir}
-cd %{name}-%{version}/build
-make DESTDIR=%{buildroot} install
+%install
+cd %{_builddir}/%{name}-%{version}/build
+%make_install
 %else
 %install
 %make_install
@@ -219,40 +223,40 @@ make DESTDIR=%{buildroot} install
 %defattr(-,root,root,-)
 %{_bindir}/ocelotgui
 %{_mandir}/man1/ocelotgui.1*
-%{_docdir}/ocelotgui/COPYING
-%{_docdir}/ocelotgui/LICENSE.GPL
-%{_docdir}/ocelotgui/README.htm
-%{_docdir}/ocelotgui/copyright
-%{_docdir}/ocelotgui/debugger.png
-%{_docdir}/ocelotgui/example.cnf
-%{_docdir}/ocelotgui/manual.htm
-%{_docdir}/ocelotgui/menu-debug.png
-%{_docdir}/ocelotgui/menu-edit.png
-%{_docdir}/ocelotgui/menu-file.png
-%{_docdir}/ocelotgui/menu-help.png
-%{_docdir}/ocelotgui/menu-options.png
-%{_docdir}/ocelotgui/menu-run.png
-%{_docdir}/ocelotgui/menu-settings.png
-%{_docdir}/ocelotgui/ocelotgui_logo.png
-%{_docdir}/ocelotgui/result-widget-example.png
-%{_docdir}/ocelotgui/shot1.jpg
-%{_docdir}/ocelotgui/shot10.jpg
-%{_docdir}/ocelotgui/shot11.png
-%{_docdir}/ocelotgui/shot2.jpg
-%{_docdir}/ocelotgui/shot3.png
-%{_docdir}/ocelotgui/shot4.jpg
-%{_docdir}/ocelotgui/shot5.jpg
-%{_docdir}/ocelotgui/shot6.jpg
-%{_docdir}/ocelotgui/shot7.jpg
-%{_docdir}/ocelotgui/shot8.jpg
-%{_docdir}/ocelotgui/shot9.jpg
-%{_docdir}/ocelotgui/special-detach.png
-%{_docdir}/ocelotgui/special-images.png
-%{_docdir}/ocelotgui/special-settings.png
-%{_docdir}/ocelotgui/special-vertical.png
-%{_docdir}/ocelotgui/starting-dialog.png
-%{_docdir}/ocelotgui/starting.png
-%{_docdir}/ocelotgui/statement-widget-example.png
+%doc COPYING
+%doc LICENSE.GPL
+%doc README.htm
+%doc copyright
+%doc debugger.png
+%doc example.cnf
+%doc manual.htm
+%doc menu-debug.png
+%doc menu-edit.png
+%doc menu-file.png
+%doc menu-help.png
+%doc menu-options.png
+%doc menu-run.png
+%doc menu-settings.png
+%doc ocelotgui_logo.png
+%doc result-widget-example.png
+%doc shot1.jpg
+%doc shot10.jpg
+%doc shot11.png
+%doc shot2.jpg
+%doc shot3.png
+%doc shot4.jpg
+%doc shot5.jpg
+%doc shot6.jpg
+%doc shot7.jpg
+%doc shot8.jpg
+%doc shot9.jpg
+%doc special-detach.png
+%doc special-images.png
+%doc special-settings.png
+%doc special-vertical.png
+%doc starting-dialog.png
+%doc starting.png
+%doc statement-widget-example.png
 %{_datadir}/applications/ocelotgui.desktop
 %{_datadir}/pixmaps/ocelotgui-logo.png
 
