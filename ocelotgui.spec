@@ -125,12 +125,21 @@ Summary:        GUI client for MySQL or MariaDB
 Name:           ocelotgui
 Version:        1.0.7
 Release:        1
+
+%if %{defined suse_version}
+License:        GPL-2.0-only
+%else
 License:        GPLv2
-# This "if" should be true for Mageia
+%endif
+
 %if "%?mdvver" != ""
 Group:          Applications/Databases
 %else
+%if %{defined suse_version}
+Group:          Productivity/Databases/Clients
+%else
 Group:          Databases
+%endif
 %endif
 Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
@@ -192,9 +201,9 @@ sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{vers
 %make_build
 
 %if %{defined suse_version}
-cd %{_builddir}
-cd %{name}-%{version}/build
-make DESTDIR=%{buildroot} install
+%install
+cd %{_builddir}/%{name}-%{version}/build
+%make_install
 %else
 %if "%?mdvver" != ""
 cd %{_builddir}
