@@ -53,6 +53,10 @@
 #Re Group:
 #  Usually this is Group: Applications/Databases
 #  On Mageia we change it to Group: Databases
+#Re Release:
+#   Although 1[[percent-sign]{?{dist}, instead of 1, is the right thing for packaging
+#   for a specific distro, it adds to the .rpm name, and we don't want that for a
+#   package that has to work with more than one version.
 #Re Source:
 #  The URL here is in fact the source of the ocelotgui release.
 #  However, we commented it out because setup doesn't download it
@@ -115,7 +119,28 @@
 # * (Mageia warnings) no-signature, manpage-not-compressed
 # * (SUSE warnings) package-with-huge-docs, position-independent-executable suggested
 # * (Fedora-26 warnings) non-standard-group Databases
+# * Instead of if/endif for 3 distros, make 3 directories = rpm_fedora | rpm_suse | rpm_mageia,
+#   and each directory contains an ocelotgui.spec file that's only got the spec for that distro.
 # It would be great to have ifdef equivalents for sourcedir etc.
+
+%if %{defined suse_version}
+#
+# spec file for package ocelotgui
+#
+# Copyright (c) 2018 Ocelot Compputer Services Inc.
+#
+# All modifications and additions to the file contributed by third parties
+# remain the property of their copyright owners, unless otherwise agreed
+# upon. The license for this file, and modifications and additions to the
+# file, is the same license as for the pristine package itself (unless the
+# license for the pristine package is not an Open Source License, in which
+# case the license is the MIT License). An "Open Source License" is a
+# license that conforms to the Open Source Definition (Version 1.9)
+# published by the Open Source Initiative.
+
+# (The above text is copied for legal reasons from a specfile guideline:
+#  https://en.opensuse.org/openSUSE:Specfile_guidelines)
+%endif
 
 %global debug_package %{nil}
 %global _hardened_build 1
@@ -127,7 +152,7 @@
 Summary:        GUI client for MySQL or MariaDB
 Name:           ocelotgui
 Version:        1.0.7
-Release:        1%{?dist}
+Release:        1
 
 %if %{defined suse_version}
 License:        GPL-2.0-only
@@ -177,13 +202,12 @@ Requires(post): info
 Requires(preun): info
 
 %description
-Ocelot GUI (ocelotgui), a database client, allows users to connect to
- a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
- Some of its features are: syntax highlighting, user-settable colors
+GUI client for MySQL or MariaDB or similar servers
+ Users can connect to a DBMS server, enter SQL statements, and receive results.
+ Some features are: syntax highlighting, user-settable colors
  and fonts for each part of the screen, result-set displays
  with rows that can have multiple lines and columns that can be dragged,
  and a debugger.
-
 
 %prep
 %%setup -q
@@ -262,11 +286,10 @@ cd %{_builddir}/%{name}-%{version}/build
 %{_datadir}/applications/ocelotgui.desktop
 %{_datadir}/pixmaps/ocelotgui-logo.png
 
-
 %changelog
 * Wed Aug 29 2018 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.7-1
 - Synch with newer versions of DBMS servers.
-* Tue Dec 12 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.7-1
+* Tue Dec 12 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.6-1
 - Some bug fixes.
 * Sun Jul 02 2017 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.0.5-1
 - Syntax checker understands more dialects.

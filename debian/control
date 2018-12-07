@@ -18,4 +18,6 @@ Description: GUI client for MySQL or MariaDB or similar servers
  Users can connect to a DBMS server, enter SQL statements, and receive results.
  Some features are: syntax highlighting, user-settable colors
  and fonts for each part of the screen, result-set displays
- with multi-line rows and columns that can be resized, and a debugger.
+ with rows that can have multiple lines and columns that can be dragged,
+ and a debugger.
+
