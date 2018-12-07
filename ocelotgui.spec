@@ -71,6 +71,9 @@
 #    ocelotgui will try to load a MySQL or MariaDB client library
 #    (an .so file) at runtime if there is an attempt to connect to a MySQL
 #    or MariaDB server.
+#Re Requires:
+#    This is left out because the required packages (glibc, libstdc, Qt)
+#    are present in the core.
 #Re Prefix:
 #    The line "Prefix: /usr" has been commented out because rpmlint
 #    complained about it. We think putting it back in is a good idea.
@@ -108,7 +111,6 @@
 # * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
 # * Currently we pass suggested c_flags and cxx_flags but not ldflags.
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
-# * Remove old files: rpm_post_install.sh  rpm_post_uninstall.sh  rpm_pre_install.sh  rpm_pre_uninstall.sh
 # * Keep track of howtobuild.txt
 # * (Mageia warnings) no-signature, manpage-not-compressed
 # * (SUSE warnings) package-with-huge-docs, position-independent-executable suggested
@@ -144,8 +146,8 @@ Group:          Databases
 %endif
 Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
-#Source0:        ocelotgui-1.0.7.tar.gz
-Source:         https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+#Source0:        %name---%{version}.tar.gz
+Source:         https://github.com/ocelot-inc/%name/releases/download/1.0.7/%name-%{version}.tar.gz
 %if "%?mdvver" != ""
 Packager:       Peter Gulutzan
 %endif

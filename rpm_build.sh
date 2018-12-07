@@ -86,10 +86,6 @@ cp -p $SOURCE/ocelotgui.1 /tmp/ocelotgui-$VERSION/ocelotgui.1
 cp -p $SOURCE/copyright /tmp/ocelotgui-$VERSION/copyright
 cp -p $SOURCE/changelog /tmp/ocelotgui-$VERSION/changelog
 cp -p $SOURCE/rpmchangelog /tmp/ocelotgui-$VERSION/rpmchangelog
-cp -p $SOURCE/rpm_pre_install.sh /tmp/ocelotgui-$VERSION/rpm_pre_install.sh
-cp -p $SOURCE/rpm_post_install.sh /tmp/ocelotgui-$VERSION/rpm_post_install.sh
-cp -p $SOURCE/rpm_pre_uninstall.sh /tmp/ocelotgui-$VERSION/rpm_pre_uninstall.sh
-cp -p $SOURCE/rpm_post_uninstall.sh /tmp/ocelotgui-$VERSION/rpm_post_uninstall.sh
 cp -p $SOURCE/ocelotgui.desktop /tmp/ocelotgui-$VERSION/ocelotgui.desktop
 cp -p $SOURCE/ocelotgui.spec /tmp/ocelotgui-$VERSION/ocelotgui.spec
 cp -p $SOURCE/rpm_build.sh /tmp/ocelotgui-$VERSION/rpm_build.sh

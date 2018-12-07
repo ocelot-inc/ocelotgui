@@ -588,10 +588,6 @@ if (CPACK_GENERATOR MATCHES "RPM")
  with rows that can have multiple lines and columns that can be dragged,
  and a debugger.")
   set(CPACK_RPM_CHANGELOG_FILE "${PROJECT_SOURCE_DIR}/rpmchangelog")
-  set(CPACK_RPM_PRE_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/rpm_pre_install.sh")
-  set(CPACK_RPM_POST_INSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/rpm_post_install.sh")
-  set(CPACK_RPM_PRE_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/rpm_pre_uninstall.sh")
-  set(CPACK_RPM_POST_UNINSTALL_SCRIPT_FILE "${CMAKE_CURRENT_SOURCE_DIR}/rpm_post_uninstall.sh")
 endif (CPACK_GENERATOR MATCHES "RPM")
 
 include(CPack)
