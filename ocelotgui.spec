@@ -171,7 +171,7 @@ Group:          Databases
 %endif
 Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
-#Source0:        %name---%{version}.tar.gz
+#Source0:        ocelotgui-1.0.7.tar.gz
 Source:         https://github.com/ocelot-inc/%name/releases/download/1.0.7/%name-%{version}.tar.gz
 %if "%?mdvver" != ""
 Packager:       Peter Gulutzan
@@ -213,7 +213,6 @@ GUI client for MySQL or MariaDB or similar servers
 %%setup -q
 
 sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{version}/%{name}.desktop
-
 
 %build
 %if %{defined suse_version}

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: November 23 2018
+   Last modified: December 12 2018
 */
 
 /*
@@ -11293,6 +11293,7 @@ const keywords strvalues[]=
       {"BOTH", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BOTH},
       {"BREAK", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_BREAK},
       {"BUFFER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BUFFER}, /* deprecated in MySQL 5.7.6 */
+      {"BUSY_TIMEOUT", 0, 0, TOKEN_KEYWORD_BUSY_TIMEOUT},
       {"BY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BY},
       {"CALL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CALL},
       {"CASCADE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CASCADE},
@@ -11315,6 +11316,7 @@ const keywords strvalues[]=
       {"COERCIBILITY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COERCIBILITY},
       {"COLLATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_COLLATE},
       {"COLLATION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COLLATION},
+      {"COLLATION_LIST", 0, 0, TOKEN_KEYWORD_COLLATION_LIST},
       {"COLUMN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_COLUMN},
       {"COLUMN_ADD", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_ADD},
       {"COLUMN_CHECK", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_CHECK},
@@ -11474,6 +11476,7 @@ const keywords strvalues[]=
       {"FOR", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FOR},
       {"FORCE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FORCE},
       {"FOREIGN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FOREIGN},
+      {"FOREIGN_KEY_LIST", 0, 0, TOKEN_KEYWORD_FOREIGN_KEY_LIST},
       {"FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FORMAT},
       {"FOUND_ROWS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FOUND_ROWS},
       {"FROM", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FROM},
@@ -11531,6 +11534,8 @@ const keywords strvalues[]=
       {"IN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IN},
       {"INDEX", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INDEX},
       {"INDEXED", 0, 0, TOKEN_KEYWORD_INDEXED},
+      {"INDEX_INFO", 0, 0, TOKEN_KEYWORD_INDEX_INFO},
+      {"INDEX_LIST", 0, 0, TOKEN_KEYWORD_INDEX_LIST},
       {"INET6_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_ATON},
       {"INET6_NTOA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_NTOA},
       {"INET_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET_ATON},
@@ -11745,6 +11750,7 @@ const keywords strvalues[]=
       {"OVERLAPS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OVERLAPS}, /* deprecated in MySQL 5.7.6 */
       {"PACKAGE", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_PACKAGE},
       {"PAGER", 0, 0, TOKEN_KEYWORD_PAGER}, /* Ocelot keyword */
+      {"PARSER_TRACE", 0, 0, TOKEN_KEYWORD_PARSER_TRACE},
       {"PARTIAL", 0, 0, TOKEN_KEYWORD_PARTIAL},
       {"PARTITION", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MARIADB_10_0, 0, TOKEN_KEYWORD_PARTITION},
       {"PASSWORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PASSWORD}, /* deprecated in MySQL 5.7.6 */
@@ -11884,6 +11890,8 @@ const keywords strvalues[]=
       {"SQLWARNING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQLWARNING},
       {"SQL_BIG_RESULT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQL_BIG_RESULT},
       {"SQL_CALC_FOUND_ROWS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQL_CALC_FOUND_ROWS},
+      {"SQL_COMPOUND_SELECT_LIMIT", 0, 0, TOKEN_KEYWORD_SQL_COMPOUND_SELECT_LIMIT},
+      {"SQL_DEFAULT_ENGINE", 0, 0, TOKEN_KEYWORD_SQL_DEFAULT_ENGINE},
       {"SQL_SMALL_RESULT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQL_SMALL_RESULT},
       {"SQRT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SQRT},
       {"SRID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SRID},
@@ -11892,6 +11900,7 @@ const keywords strvalues[]=
       {"STARTING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_STARTING},
       {"STARTPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STARTPOINT}, /* deprecated in MySQL 5.7.6 */
       {"STATEMENT", 0, 0, TOKEN_KEYWORD_STATEMENT},
+      {"STATS", 0, 0, TOKEN_KEYWORD_STATS},
       {"STATUS", 0, 0, TOKEN_KEYWORD_STATUS}, /* Ocelot keyword */
       {"STD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STD},
       {"STDDEV", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV},
@@ -12000,6 +12009,7 @@ const keywords strvalues[]=
           {"SYSTEM_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN},
       {"TABLE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TABLE},
       {"TABLESPACE", 0, 0, TOKEN_KEYWORD_TABLESPACE},
+      {"TABLE_INFO", 0, 0, TOKEN_KEYWORD_TABLE_INFO},
       {"TAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TAN},
       {"TEE", 0, 0, TOKEN_KEYWORD_TEE}, /* Ocelot keyword */
       {"TEMP", 0, 0, TOKEN_KEYWORD_TEMP},
@@ -12168,15 +12178,15 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "915" */
+      /* If the following assert happens, you inserted/removed something without changing "925" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (915 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (925 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 915; ++ii)
+      //for (int ii= 0; ii < 925; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 915, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 925, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -12184,8 +12194,8 @@ const keywords strvalues[]=
       //  assert(index == strvalues[ii].token_keyword);
       //}
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 915 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 915, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 925 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 925, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */

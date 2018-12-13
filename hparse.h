@@ -8869,27 +8869,27 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_PRAGMA;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BUSY_TIMEOUT") == 1)
+    if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BUSY_TIMEOUT, "BUSY_TIMEOUT") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CASE_SENSITIVE_LIKE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATION_LIST") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLLATION_LIST, "COLLATION_LIST") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COUNT_CHANGES") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFER_FOREIGN_KEYS") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN_KEY_LIST") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN_KEY_LIST, "FOREIGN_KEY_LIST") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FULL_COLUMN_NAMES") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX_INFO") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX_LIST") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX_XINFO") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARSER_TRACE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INDEX_INFO, "INDEX_INFO") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INDEX_LIST, "INDEX_LIST") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PARSER_TRACE, "PARSER_TRACE") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "QUERY_ONLY") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "READ_UNCOMMITTED") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RECURSIVE_TRIGGERS") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REVERSE_UNORDERED_SELECTS") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT_TRACE") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SHORT_COLUMN_NAMES") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL_DEFAULT_ENGINE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SQL_COMPOUND_SELECT_LIMIT, "SQL_COMPOUND_SELECT_LIMIT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SQL_DEFAULT_ENGINE, "SQL_DEFAULT_ENGINE") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL_TRACE") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STATS") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE_INFO") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STATS, "STATS") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE_INFO, "TABLE_INFO") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VDBE_ADDOPTRACE") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VDBE_DEBUG") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VDBE_EQP") == 1)
@@ -8897,25 +8897,71 @@ void MainWindow::hparse_f_statement(int block_top)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VDBE_TRACE") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHERE_TRACE") == 1))
     {
-      bool parenthesis_seen= false;
-      bool equal_seen= false;
-      if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
-        parenthesis_seen= true;
-      else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1)
-        equal_seen= true;
-      if ((parenthesis_seen) || (equal_seen))
+      int pragma_type= main_token_types[hparse_i_of_last_accepted];
+
+      if ((pragma_type == TOKEN_KEYWORD_COLLATION_LIST)
+       || (pragma_type == TOKEN_KEYWORD_FOREIGN_KEY_LIST)
+       || (pragma_type == TOKEN_KEYWORD_PARSER_TRACE)
+       || (pragma_type == TOKEN_KEYWORD_STATS))
       {
-        if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
-        else if (hparse_f_literal(TOKEN_REFTYPE_VARIABLE, FLAG_VERSION_TARANTOOL, TOKEN_LITERAL_FLAG_ANY) == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON") == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NO") == 1) {;}
-        else hparse_f_error();
-        if (hparse_errno > 0) return;
+        ;
       }
-      if (parenthesis_seen)
+      else
       {
-        hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
-        if (hparse_errno > 0) return;
+        bool parenthesis_seen= false;
+        bool equal_seen= false;
+        if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
+          parenthesis_seen= true;
+        else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1)
+          equal_seen= true;
+        if ((parenthesis_seen) || (equal_seen))
+        {
+          if ((pragma_type == TOKEN_KEYWORD_BUSY_TIMEOUT)
+           || (pragma_type == TOKEN_KEYWORD_SQL_COMPOUND_SELECT_LIMIT))
+          {
+            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
+            if (hparse_errno > 0) return;
+          }
+          else if (pragma_type == TOKEN_KEYWORD_INDEX_INFO)
+          {
+            hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+            if (hparse_errno > 0) return;
+            hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ".");
+            if (hparse_errno > 0) return;
+            hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_INDEX,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+            if (hparse_errno > 0) return;
+           }
+          else if ((pragma_type == TOKEN_KEYWORD_TABLE_INFO)
+                || (pragma_type == TOKEN_KEYWORD_INDEX_LIST))
+          {
+            if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+            else if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_TARANTOOL, TOKEN_LITERAL_FLAG_STRING) == 1) {;}
+            else hparse_f_error();
+            if (hparse_errno > 0) return;
+          }
+          else if (pragma_type == TOKEN_KEYWORD_SQL_DEFAULT_ENGINE)
+          {
+            if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ENGINE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+            else if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_TARANTOOL, TOKEN_LITERAL_FLAG_STRING) == 1) {;}
+            else hparse_f_error();
+            if (hparse_errno > 0) return;
+          }
+          else
+          {
+            /* TODO: in fact the only valid thing now is (boolean) */
+            if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) {;}
+            else if (hparse_f_literal(TOKEN_REFTYPE_VARIABLE, FLAG_VERSION_TARANTOOL, TOKEN_LITERAL_FLAG_ANY) == 1) {;}
+            else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON") == 1) {;}
+            else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NO") == 1) {;}
+            else hparse_f_error();
+            if (hparse_errno > 0) return;
+          }
+        }
+        if (parenthesis_seen)
+        {
+          hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+          if (hparse_errno > 0) return;
+        }
       }
     }
   }
