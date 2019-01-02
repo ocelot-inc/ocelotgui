@@ -3647,7 +3647,7 @@ void MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, 
     if (hparse_errno > 0) return;
     if (is_ok_if_decimal)
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
       {
         if (hparse_f_literal(TOKEN_REFTYPE_SCALE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
         if (hparse_errno > 0) return;

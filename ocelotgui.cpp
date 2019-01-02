@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.7
-   Last modified: December 12 2018
+   Last modified: January 2 2019
 */
 
 /*
@@ -449,6 +449,24 @@
   static unsigned short int hparse_dbms_mask= FLAG_VERSION_DEFAULT;
   static bool hparse_is_in_subquery= false;
 
+/* Variables used by kill thread, but which might be checked by debugger */
+#define KILL_STATE_CONNECT_THREAD_STARTED 0
+#define KILL_STATE_CONNECT_FAILED 1
+#define KILL_STATE_IS_CONNECTED 2
+#define KILL_STATE_MYSQL_REAL_QUERY_ERROR 3
+#define KILL_STATE_ENDED 4
+int volatile kill_state;
+int volatile kill_connection_id;
+
+#define LONG_QUERY_STATE_STARTED 0
+#define LONG_QUERY_STATE_ENDED 1
+char *dbms_query;
+int dbms_query_len;
+int dbms_query_connection_number;
+volatile int dbms_long_query_result;
+volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+  
+  
 /*
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -1120,6 +1138,16 @@ bool MainWindow::eventFilter(QObject *obj, QEvent *event)
 
 bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 {
+  /*
+    We got crashes in a long-running loop, ocelot_date_test().
+    I figured it was because for long-running queries we set a flag and
+    start a separate thread and loop with sleep + processEvents() so
+    we can get here. I think this line added on 2019-01-01 prevents crashing.
+    Todo: find out what the problem event is. Am I returning "true" wrongly?
+    Warn: Now only shortcuts will work, the Ubuntu workaround won't be seen.
+  */
+  if (dbms_long_query_state == LONG_QUERY_STATE_STARTED) return false;
+
 //  if (obj == result_grid_table_widget[0]->grid_vertical_scroll_bar)
 //  {
 //    /*
@@ -1224,7 +1252,9 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
         first (?? I think), so they're useless. But a few things are
         still handled by shortcuts, e.g. format, which is harmless
         because there's only one widget that format works with.
-  Todo: can we get here for a disabled menu item?
+  Todo: can we get here for a disabled menu item? I think it's possible
+        if we're coming not from edit filter but from textedit key press
+        event, so we should check "isenabled()" for more things.
   Todo: if e.g. menu_edit_undo() does nothing because it can't find the
         classname, it should return false so keypress_shortcut_handler()
         can return false. Currently these things are all void.
@@ -2170,6 +2200,8 @@ void MainWindow::create_menu()
   You might want to "do" e.g. menu_file_action_exit->setShortcut(value);
   You might want to both "set" and "do".
   Todo: ensure two keys don't have the same action (error check).
+        We already have an ambiguity for ^C = Copy and ^C = Kill,
+        but we try to solve that by disabling Copy before executing.
   Todo: ensure string is valid -- error checks and warnings|errors
         (now we check for displayable ASCII or F1-F12, is that okay?)
   Todo: syntax checker should see this.
@@ -5579,23 +5611,7 @@ QString MainWindow::select_1_row(const char *select_statement)
   return s;
 }
 
-/* Variables used by kill thread, but which might be checked by debugger */
-#define KILL_STATE_CONNECT_THREAD_STARTED 0
-#define KILL_STATE_CONNECT_FAILED 1
-#define KILL_STATE_IS_CONNECTED 2
-#define KILL_STATE_MYSQL_REAL_QUERY_ERROR 3
-#define KILL_STATE_ENDED 4
-int volatile kill_state;
-int volatile kill_connection_id;
-
-#define LONG_QUERY_STATE_STARTED 0
-#define LONG_QUERY_STATE_ENDED 1
-char *dbms_query;
-int dbms_query_len;
-int dbms_query_connection_number;
-volatile int dbms_long_query_result;
-volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
-
+/* volatile ints were here. moved up on 2019-01-01 */
 
 #ifdef DEBUGGER
 
@@ -8307,8 +8323,11 @@ int MainWindow::action_execute(int force)
 
     /* While executing, we allow no more statements, but a few things are enabled. */
     /* This makes the menu seem to blink. If that's not OK, turn off sub-items not main menu items. */
+    /* Todo: maybe other things should be disabled|enabled as we do with is_can_copy. */
+    bool is_can_copy= menu_edit_action_copy->isEnabled();
     menu_file->setEnabled(false);
     menu_edit->setEnabled(false);
+    menu_edit_action_copy->setEnabled(false);    
     menu_run_action_execute->setEnabled(false);
     if (ocelot_sigint_ignore == 0) menu_run_action_kill->setEnabled(true);
     menu_settings->setEnabled(false);
@@ -8319,6 +8338,7 @@ int MainWindow::action_execute(int force)
     return_value= action_execute_one_statement(text);
     menu_file->setEnabled(true);
     menu_edit->setEnabled(true);
+    menu_edit_action_copy->setEnabled(is_can_copy);
     menu_run_action_execute->setEnabled(true);
     menu_run_action_kill->setEnabled(false);
     menu_settings->setEnabled(true);
@@ -8778,7 +8798,7 @@ int MainWindow::execute_real_query(QString query, int connection_number)
   assert(strlen(dbms_query) < ((unsigned int) dbms_query_len + 1) * 2);
   dbms_query_connection_number= connection_number;
 #ifdef DBMS_TARANTOOL
-  /* todo: for tarantool as for mysql, call with a separate thread so it's killable */
+  /* todo: for tarantool as for mysql, call with a separate thread so it's killable and so processsEvents() happens. */
   if (connections_dbms[connection_number] == DBMS_TARANTOOL)
   {
     dbms_long_query_result= tarantool_real_query(dbms_query, dbms_query_len, MYSQL_MAIN_CONNECTION, main_token_number, main_token_count_in_statement);
