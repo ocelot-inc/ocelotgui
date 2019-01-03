@@ -11632,6 +11632,7 @@ const keywords strvalues[]=
       {"LAST_DAY", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_LAST_DAY},
       {"LAST_INSERT_ID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LAST_INSERT_ID},
       {"LAST_VALUE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_LAST_VALUE}, /* MariaDB 10.2 nonreserved */
+      {"LATERAL", 0, 0, TOKEN_KEYWORD_LATERAL}, /* MySQL 8.0.2 manual says reserved but it isn't */
       {"LCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LCASE},
       {"LEAD", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LEAD}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"LEADING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LEADING},
@@ -11726,6 +11727,7 @@ const keywords strvalues[]=
       {"NAMES", 0, 0, TOKEN_KEYWORD_NAMES},
       {"NAME_CONST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NAME_CONST},
       {"NATURAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NATURAL},
+      {"NCHAR", 0, 0, TOKEN_KEYWORD_NCHAR},
       {"NEXTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NEXTVAL},
       {"NIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NIL},
       {"NO", 0, 0, TOKEN_KEYWORD_NO},
@@ -11863,6 +11865,7 @@ const keywords strvalues[]=
       {"ROUND", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ROUND},
       {"ROW", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROW},
       {"ROWS", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROWS},
+      {"ROWTYPE", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_ROWTYPE},
       {"ROW_COUNT", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ROW_COUNT},
       {"ROW_NUMBER", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_ROW_NUMBER},
       {"RPAD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RPAD},
@@ -11893,6 +11896,7 @@ const keywords strvalues[]=
       {"SHUTDOWN", 0, 0, TOKEN_KEYWORD_SHUTDOWN},
       {"SIGN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SIGN},
       {"SIGNAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SIGNAL},
+      {"SIGNED", 0, 0, TOKEN_KEYWORD_SIGNED},
       {"SIMPLE", 0, 0, TOKEN_KEYWORD_SIMPLE},
       {"SIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SIN},
       {"SLEEP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SLEEP},
@@ -12198,15 +12202,15 @@ const keywords strvalues[]=
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "925" */
+      /* If the following assert happens, you inserted/removed something without changing "929" */
 
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (925 - 1));
+      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (929 - 1));
 
       ///* Test strvalues is ordered by bsearching for every item. */
-      //for (int ii= 0; ii < 925; ++ii)
+      //for (int ii= 0; ii < 929; ++ii)
       //{
       //  char *k= (char*) &strvalues[ii].chars;
-      //  p_item= (char*) bsearch(k, strvalues, 925, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      //  p_item= (char*) bsearch(k, strvalues, 929, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       //  assert(p_item != NULL);
       //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
       //  index+= TOKEN_KEYWORDS_START;
@@ -12214,8 +12218,8 @@ const keywords strvalues[]=
       //  assert(index == strvalues[ii].token_keyword);
       //}
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 925 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 925, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 929 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 929, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */

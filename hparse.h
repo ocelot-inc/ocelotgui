@@ -3693,10 +3693,61 @@ void MainWindow::hparse_f_enum_or_set()
   for example in CAST "UNSIGNED INT" is okay but "INT UNSIGNED" is illegal,
   while in CREATE "UNSIGNED INT" is illegal but "UNSIGNED INT" is okay.
   We allow any combination.
-  Todo: also, in CAST, only DOUBLE is okay, not DOUBLE PRECISION.
+  Todo: we no longer need to allow "UNSIGNED INT" for non-CAST.
+  Todo: notice how CAST checks are clean and ordered? Do the same for non-CAST.
+  Todo: with MariaDB DATE and DATETIME can be followed by (n), both for CAST and for non-CAST.
 */
 int MainWindow::hparse_f_data_type(int context)
 {
+  if ((context == TOKEN_KEYWORD_CAST) && ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0))
+  {
+    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BINARY, "BINARY") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHAR, "CHAR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHAR, "CHARACTER") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DATE, "DATE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DATETIME, "DATETIME") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECIMAL, "DEC") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECIMAL, "DECIMAL") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DOUBLE, "DOUBLE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INTEGER") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JSON, "JSON") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NCHAR, "NCHAR") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SIGNED, "SIGNED") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TIME, "TIME") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNSIGNED, "UNSIGNED") == 1))
+    {
+      int k= main_token_types[hparse_i_of_last_accepted];
+      main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+      if ((k == TOKEN_KEYWORD_SIGNED) || (k == TOKEN_KEYWORD_UNSIGNED))
+      {
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INT") == 0)
+        hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INTEGER");
+      }
+      if ((k == TOKEN_KEYWORD_BINARY) || (k == TOKEN_KEYWORD_CHAR) || (k == TOKEN_KEYWORD_NCHAR)
+       || ((k == TOKEN_KEYWORD_DATETIME) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0))
+       || ((k == TOKEN_KEYWORD_TIME) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)))
+      {
+        hparse_f_length(false, false, false);
+        if (hparse_errno > 0) return 0;
+        if (k == TOKEN_KEYWORD_CHAR)
+        {
+          if (hparse_f_character_set() == 1)
+          {
+            hparse_f_character_set_name();
+          }
+          if (hparse_errno > 0) return 0;
+        }
+      }
+      if (k == TOKEN_KEYWORD_DECIMAL)
+      {
+        hparse_f_length(true, true, false);
+      }
+      if (hparse_errno > 0) return 0;
+      return k;
+    }
+    return -1;
+  }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BIT") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
