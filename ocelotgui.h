@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -109,7 +109,7 @@
 /*
   Decide whether to #include third_party.h for use with Tarantool.
   Mostly third_party.h has tarantool-c source modified for Windows.
-  By default it is included for both Windows and Linux starting with ocelotgui 1.07.
+  By default it is included for both Windows and Linux starting with ocelotgui 1.0.7.
   To say it is not included, either build with cmake . -DOCELOT_THIRD_PARTY=0
   or change the lines below to say "#define OCELOT_THIRD_PARTY 0".
   If it is not included, then:

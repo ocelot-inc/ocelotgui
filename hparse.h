@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -2540,10 +2540,18 @@ void MainWindow::hparse_f_function_arguments(QString opd)
   {
     hparse_f_opr_1(0, 0);
     if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USING");
-    if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
+    {
+      if (hparse_f_data_type(TOKEN_KEYWORD_CAST) == -1) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+    else
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USING");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
   }
   else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "IF"))
   {

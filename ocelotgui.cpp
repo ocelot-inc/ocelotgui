@@ -1,12 +1,12 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.7
-   Last modified: January 2 2019
+   Version: 1.0.8
+   Last modified: January 8 2019
 */
 
 /*
-  Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.
+  Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -394,7 +394,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.7"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.8"; /* For --version. Make sure it's in manual too. */
   static unsigned short int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -2202,8 +2202,11 @@ void MainWindow::create_menu()
   Todo: ensure two keys don't have the same action (error check).
         We already have an ambiguity for ^C = Copy and ^C = Kill,
         but we try to solve that by disabling Copy before executing.
-  Todo: ensure string is valid -- error checks and warnings|errors
-        (now we check for displayable ASCII or F1-F12, is that okay?)
+  Todo: Ensure string is valid -- error checks and warnings|errors.
+        I commented out the check for displayable ASCII or F1-F12
+        because e.g. Ctrl+Tab is okay. But I don't know a way to
+        check whether the window manager will grab a key sequence
+        so we won't see it (e.g. Alt+Tab on X11).
   Todo: syntax checker should see this.
   Todo: all the other shortcut keys.
   Todo: also, something for "what to execute" e.g. SQL statement.
@@ -2220,6 +2223,8 @@ void MainWindow::create_menu()
   Warn: We don't say default = QKeySequence::Zoomin for zoomin, because
         it is Ctrl++ (Qt::CTRL + Qt::Key_Plus). But + requires shift.
         It seems more common to use without shift, which is Ctrl+=.
+        http://doc.qt.io/archives/qt-4.8/qkeysequence.html section
+        "Keyboard Layout Issues" mentions this but I didn't understand.
 */
 int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do)
 {
@@ -2240,15 +2245,15 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
       if ((k.count() < 1) || (k.count() > 4)) return -1;
       if (k.isEmpty()) return -1;
       if (k.toString() < " ") return -1;
-      for (unsigned int i= 0; i < (unsigned) k.count(); ++i)
-      {
-        int qi= k.operator[](i);
-        qi= (qi & ~(Qt::CTRL | Qt::SHIFT | Qt::ALT | Qt::META));
-        bool is_ok= false;
-        if ((qi >= Qt::Key_Space) && (qi <= Qt::Key_ydiaeresis)) is_ok= true;
-        if ((qi >= Qt::Key_F1) && (qi <= Qt::Key_F12)) is_ok= true;
-        if (is_ok == false) return -1;
-      }
+//      for (unsigned int i= 0; i < (unsigned) k.count(); ++i)
+//      {
+//        int qi= k.operator[](i);
+//        qi= (qi & ~(Qt::CTRL | Qt::SHIFT | Qt::ALT | Qt::META));
+//        bool is_ok= false;
+//        if ((qi >= Qt::Key_Space) && (qi <= Qt::Key_ydiaeresis)) is_ok= true;
+//        if ((qi >= Qt::Key_F1) && (qi <= Qt::Key_F12)) is_ok= true;
+//        if (is_ok == false) return -1;
+//      }
     }
   }
   if (target == "ocelot_shortcut_connect")
@@ -3867,7 +3872,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2018 by Ocelot Computer Services Inc.<br>\
+<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2019 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -3947,10 +3952,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.7, August 29 2018  \
+  <BR>Version 1.0.8, January 8 2019  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.  \
+  <BR>Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -18220,7 +18225,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2014-2018 by Ocelot Computer Services Inc. and others\n");
+  printf("Copyright (c) 2014-2019 by Ocelot Computer Services Inc. and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");

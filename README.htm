@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 1.0.7</P>
+<P>Version 1.0.8</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -9,7 +9,7 @@ Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, result-set displays
 with multi-line rows and resizable columns, and a debugger.</P>
 
-<P>Copyright (c) 2014-2018, Ocelot Computer Services Inc.
+<P>Copyright (c) 2014-2019, Ocelot Computer Services Inc.
 All rights reserved.</P>
 
 <P>For the GPL license terms see <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL">https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL</A>.</P>
@@ -114,27 +114,26 @@ are preferred.
 If one of the following ocelotgui binary packages is compatible with your platform,
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
-For 32-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7qt4-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.7qt4-1_i386.deb</PRE>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7-1_i386.deb
-sudo dpkg -i ocelotgui_1.0.7-1_i386.deb</PRE>
-For 64-bit, Debian-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7qt4-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.7qt4-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui_1.0.8-1_i386.deb
+sudo dpkg -i ocelotgui_1.0.8-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui_1.0.7-1_amd64.deb
-sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
-For 64-bit, RPM-like, Qt4<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7qt4-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.7qt4-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui_1.0.8-1_amd64.deb
+sudo dpkg -i ocelotgui_1.0.8-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui-1.0.8-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.0.8-1.x86_64.rpm</PRE>
 For 32-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.i686.rpm
-sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui-1.0.8-1.i686.rpm
+sudo rpm -i ocelotgui-1.0.8-1.i686.rpm</PRE>
+For 64-bit, any Linux, Qt5<PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui-1.0.8.tar.gz
+tar zxvf ocelotgui-1.0.8.tar.gz
+ocelotgui/ocelotgui-qt5</PRE>
+For 64-bit, any Linux, Qt4<PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui-1.0.8.tar.gz
+tar zxvf ocelotgui-1.0.8.tar.gz
+ocelotgui/ocelotgui-qt4</PRE>
 </P>
 
 <H3 id="starting-the-program">Starting the program</H3><HR>
@@ -167,9 +166,9 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.0.7, August 29 2018</P>
+<P>Version 1.0.8, January 8 2019</P>
 
-<P>Copyright (c) 2014-2018 by Ocelot Computer Services Inc. All rights reserved.</P>
+<P>Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.</P>
   
 <P>This program is free software; you can redistribute it and/or modify  
 it under the terms of the GNU General Public License as published by  
@@ -588,7 +587,7 @@ an options file such as my.cnf.</P>
 incompatible behavior change in version 5.7, which affects the
 debugger. The originally recommended workaround was to say
 "set global show_compatibility_56=on;". We believe we have made a
-more permanent fix for this problem in ocelotgui version 1.0.7.</P>
+more permanent fix for this problem in ocelotgui version 1.0.8.</P>
 
 <P>RE: CONNECTION DIALOG. As stated earlier, if a password is necessary
 to connect, it is sufficient to start ocelotgui with "--password=<i>password</i>"
@@ -1740,7 +1739,7 @@ On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.</P>
 
 <P>You need the latest ocelotgui client.
-The Release 1.07 version is okay,
+The Release 1.0.8 version is okay at the time of release,
 but some things might not be up to date.
 It is better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.</P>
@@ -1910,11 +1909,11 @@ How to get it:<br>
 * Download the ocelotgui zip file from github.
   Check https://github.com/ocelot-inc/ocelotgui/blob/master/README.md
   to see where the latest release is. For example it might be
-  https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7-1.ocelotgui.zip<br>
+  https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui-1.0.8-1.ocelotgui.zip<br>
 * Unzip. It was zipped with 7-zip from http://www.7-zip.org,
   but other utilities should work. For example, on Windows command prompt,
   if you have the PowerShell utility on your path:
-  PowerShell Expand-Archive ocelotgui-1.0.7-1.ocelotgui.zip c:\ocelotgui<br>
+  PowerShell Expand-Archive ocelotgui-1.0.8-1.ocelotgui.zip c:\ocelotgui<br>
 * Read the COPYING and LICENSE arrangements.
   On Windows ocelotgui is statically linked to Qt and MariaDB libraries,
   so the copyright and licensing is not the same as for Linux.<br>
@@ -2166,7 +2165,7 @@ release\ocelotgui.exe --ocelot_dbms=tarantool
 copy release\ocelotgui.exe ocelotgui.exe
 "C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf             ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec
 
-: What we actually put in the release looks like ocelotgui-1.0.7-1.ocelotgui.zip, so rename the .zip file at some point.
+: What we actually put in the release looks like ocelotgui-1.0.8-1.ocelotgui.zip, so rename the .zip file at some point.
 
 
 : (Dynamic linking)
@@ -2241,14 +2240,17 @@ A release includes the source files as of the release time.
 Although the release does not have the "latest" source which is
 in ocelot-inc/ocelotgui, it usually is more stable.
 A release file is highlighted in green
-by github and is named ocelotgui-[version].tar.gz. Thus release 1.0.7 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz.
+by github and is named ocelotgui-[version].tar.gz.
+Since version 1.0.8, there is also a release file named ocelotgui_[version].orig.tar.gz
+which is preferable because it does not contain unnecessary executables.
+Thus release 1.0.8 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui_1.0.8.orig.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.7/ocelotgui-1.0.7.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.8/ocelotgui_1.0.8.orig.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui-1.0.7.tar.gz.</P>
+and click ocelotgui_1.0.8.orig.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
@@ -2272,7 +2274,7 @@ For example on Mageia:<PRE>
  urpmi libqt5-devel</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui-1.0.7.tar.gz
+ tar -zxvf ocelotgui_1.0.8.orig.tar.gz
  cd ocelotgui</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
@@ -2297,14 +2299,14 @@ For Debian-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="DEB"
  make
  cpack
- sudo dpkg -i ocelotgui_1.0.7-1_i386.deb
- #or sudo dpkg -i ocelotgui_1.0.7-1_amd64.deb</PRE>
+ sudo dpkg -i ocelotgui_1.0.8-1_i386.deb
+ #or sudo dpkg -i ocelotgui_1.0.8-1_amd64.deb</PRE>
 For RPM-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="RPM"
  make
  cpack
- sudo rpm -i ocelotgui-1.0.7-1.x86_64.rpm
- #or sudo rpm -i ocelotgui-1.0.7-1.i686.rpm</PRE>
+ sudo rpm -i ocelotgui-1.0.8-1.x86_64.rpm
+ #or sudo rpm -i ocelotgui-1.0.8-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
 </P>
