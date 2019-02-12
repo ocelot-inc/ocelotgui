@@ -3795,8 +3795,11 @@ int MainWindow::hparse_f_data_type(int context)
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTEGER") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    hparse_f_length(false, true, false);
-    if (hparse_errno > 0) return 0;
+    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+    {
+      hparse_f_length(false, true, false);
+      if (hparse_errno > 0) return 0;
+    }
     return TOKEN_KEYWORD_INTEGER;
   }
   if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BIGINT") == 1)|| (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INT8") == 1))
@@ -4415,9 +4418,16 @@ void MainWindow::hparse_f_column_definition()
   }
   bool null_seen= false, default_seen= false, auto_increment_seen= false;
   bool unique_seen= false, primary_seen= false, comment_seen= false, column_format_seen= false;
-  bool on_seen= false, invisible_seen= false;
+  bool on_seen= false, invisible_seen= false, constraint_seen= false;
   for (;;)
   {
+    constraint_seen= false;
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONSTRAINT") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+      constraint_seen= true;
+    }
     if ((null_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1))
     {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL");
@@ -4426,9 +4436,9 @@ void MainWindow::hparse_f_column_definition()
       hparse_f_conflict_clause();
       if (hparse_errno > 0) return;
     }
-    else if ((null_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL") == 1))
+    else if ((null_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL") == 1))
     {
-      null_seen= true;
+      null_seen= true; /* constraint can = NULL = silliness. For Tarantool it's undocumented. */
     }
     else if ((generated_seen == false) && (default_seen == false) && (hparse_f_default_clause(TOKEN_KEYWORD_CREATE) == 1))
     {
@@ -4494,6 +4504,11 @@ void MainWindow::hparse_f_column_definition()
       if (hparse_errno > 0) return;
     }
     else break;
+  }
+  if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) && (constraint_seen == true))
+  {
+    hparse_f_error();
+    return;
   }
   if (generated_seen == false)
   {
@@ -6720,7 +6735,7 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
       if (hparse_errno > 0) return 0;
     }
   }
-  if ((is_group_by_seen == true) || ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) == 0))
+  /* No need to check "if ((is_group_by_seen == true)" now everybody accepts HAVING without it */
   {
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HAVING"))
     {
