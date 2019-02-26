@@ -6715,13 +6715,11 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
   }
   hparse_f_where();
   if (hparse_errno > 0) return 0;
-  bool is_group_by_seen= false;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GROUP"))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY");
     if (hparse_errno > 0) return 0;
-    is_group_by_seen= true;
     do
     {
       hparse_f_opr_1(0, 0);
@@ -6735,7 +6733,7 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
       if (hparse_errno > 0) return 0;
     }
   }
-  /* No need to check "if ((is_group_by_seen == true)" now everybody accepts HAVING without it */
+  /* No need to check if GROUP BY was seen, now everybody accepts HAVING without it */
   {
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HAVING"))
     {

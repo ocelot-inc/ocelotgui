@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: January 8 2019
+   Last modified: Februry 25 2019
 */
 
 /*
@@ -274,6 +274,7 @@
   static unsigned long int ocelot_net_buffer_length= 16384; /* --net_buffer_length=n */
   static unsigned short ocelot_no_beep= 0;                /* --no_beep */
   static unsigned short ocelot_no_defaults= 0;            /* --no_defaults */
+  /* QString ocelot_dbms */
   static unsigned short ocelot_one_database= 0;           /* --one-database */
   /* QString ocelot_pager */                              /* --pager[=s] */
   static unsigned short ocelot_pipe= 0;                   /* --pipe */
@@ -3166,7 +3167,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_is_password= 0;
   row_form_data= 0;
   row_form_width= 0;
-  column_count= 84; /* If you add or remove items, you have to change this */
+  column_count= 85; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
   row_form_is_password= new int[column_count];
@@ -3221,6 +3222,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= "net_buffer_length"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_net_buffer_length); row_form_width[i]= 5;
   row_form_label[++i]= "no_beep"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_beep); row_form_width[i]= 5;
   row_form_label[++i]= "no_defaults"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_defaults); row_form_width[i]= 5;
+  row_form_label[++i]= "ocelot_dbms"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_dbms; row_form_width[i]= 9;
   row_form_label[++i]= "one_database"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_one_database); row_form_width[i]= 5;
   row_form_label[++i]= "pager"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_pager; row_form_width[i]= 5;
   row_form_label[++i]= "pipe"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_pipe); row_form_width[i]= 5;
@@ -3337,6 +3339,7 @@ void MainWindow::action_connect_once(QString message)
       ocelot_net_buffer_length= to_long(row_form_data[i++].trimmed());
       ocelot_no_beep= to_long(row_form_data[i++].trimmed());
       ocelot_no_defaults= to_long(row_form_data[i++].trimmed());
+      connect_set_variable("ocelot_dbms", row_form_data[i++].trimmed());
       ocelot_one_database= to_long(row_form_data[i++].trimmed());
       ocelot_pager= row_form_data[i++].trimmed();
       ocelot_pipe= to_long(row_form_data[i++].trimmed());
@@ -10133,14 +10136,14 @@ int MainWindow::rehash_scan()
   if (connections_dbms[0] == DBMS_TARANTOOL)
   {
     int result;
-    sprintf(query, "select 'T', name,'T' "
-                   "from _space "
+    sprintf(query, "select 'T', \"name\",'T' "
+                   "from \"_space\" "
                    "union all "
-                   "select 't', name,'' "
-                   "from _trigger "
+                   "select 't', \"name\",'' "
+                   "from \"_trigger\" "
                    "union all "
-                   "select 'I', name,name "
-                   "from _index;"
+                   "select 'I', \"name\",\"name\" "
+                   "from \"_index\";"
 
            );
 
@@ -16464,6 +16467,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_execute= "";
   ocelot_ld_run_path= "";
   ocelot_login_path= "";
+  ocelot_dbms= "";
   ocelot_pager= "";
   //ocelot_prompt= "mysql>";                  /* Todo: change to "\N [\d]>"? */
 
@@ -17658,7 +17662,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   {
     ocelot_history_includes_warnings= is_enable;
     return;
-    }
+  }
   if (strcmp(token0_as_utf8, "sigint_ignore") == 0) { ocelot_sigint_ignore= is_enable; return; }
   if ((token0_length >= sizeof("sil") - 1) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
   {
