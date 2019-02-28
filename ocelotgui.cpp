@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: February 25 2019
+   Last modified: February 27 2019
 */
 
 /*
@@ -498,6 +498,7 @@ void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QSt
 
 int main(int argc, char *argv[])
 {
+
 #if (defined(_WIN32) && (QT_VERSION >= 0x50000))
   qInstallMessageHandler(dump_qtmessage);
 #endif
@@ -514,20 +515,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   QMainWindow(parent),
   ui(new Ui::MainWindow)
 {
-  /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
-  assert(sizeof(int) >= 4);
-
-#ifdef OCELOT_OS_LINUX
-#if defined(NDEBUG)
-  if (MENU_FONT != 82) {printf("assert(MENU_FONT == 82);"); exit(1); }
-#else
-  assert(MENU_FONT == 82); /* See kludge alert in ocelotgui.h Settings() */
-#endif
-#else
-  assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
-#endif
-
-  assert(TOKEN_REFTYPE_MAX == 91); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
+  initial_asserts();  /* Check that some defined | constant values are okay. */
 
   /* Initialization */
 
@@ -2019,56 +2007,56 @@ void MainWindow::create_menu()
   menu_file_action_connect= menu_file->addAction(menu_strings[menu_off + MENU_FILE_CONNECT]);
 
   connect(menu_file_action_connect, SIGNAL(triggered()), this, SLOT(action_connect()));
-  shortcut("ocelot_shortcut_connect", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT, "", false, true);
   menu_file_action_exit= menu_file->addAction(menu_strings[menu_off + MENU_FILE_EXIT]);
   connect(menu_file_action_exit, SIGNAL(triggered()), this, SLOT(action_exit()));
-  shortcut("ocelot_shortcut_exit", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT, "", false, true);
   menu_edit= ui->menuBar->addMenu(menu_strings[menu_off + MENU_EDIT]);
   menu_edit_action_undo= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_UNDO]);
   connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
-  shortcut("ocelot_shortcut_undo", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO, "", false, true);
   menu_edit_action_redo= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_REDO]);
   connect(menu_edit_action_redo, SIGNAL(triggered()), this, SLOT(menu_edit_redo()));
-  shortcut("ocelot_shortcut_redo", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO, "", false, true);
   menu_edit->addSeparator();
   menu_edit_action_cut= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_CUT]);
   connect(menu_edit_action_cut, SIGNAL(triggered()), this, SLOT(menu_edit_cut()));
-  shortcut("ocelot_shortcut_cut", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CUT, "", false, true);
   menu_edit_action_copy= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_COPY]);
   connect(menu_edit_action_copy, SIGNAL(triggered()), this, SLOT(menu_edit_copy()));
-  shortcut("ocelot_shortcut_copy", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_COPY, "", false, true);
   menu_edit_action_paste= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_PASTE]);
   connect(menu_edit_action_paste, SIGNAL(triggered()), this, SLOT(menu_edit_paste()));
-  shortcut("ocelot_shortcut_paste", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE, "", false, true);
   menu_edit->addSeparator();
   menu_edit_action_select_all= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_SELECT_ALL]);
   connect(menu_edit_action_select_all, SIGNAL(triggered()), this, SLOT(menu_edit_select_all()));
-  shortcut("ocelot_shortcut_select_all", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL, "", false, true);
   menu_edit_action_history_markup_previous= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_PREVIOUS_STATEMENT]);
   connect(menu_edit_action_history_markup_previous, SIGNAL(triggered()), this, SLOT(history_markup_previous()));
-  shortcut("ocelot_shortcut_history_markup_previous", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS, "", false, true);
   menu_edit_action_history_markup_next= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_NEXT_STATEMENT]);
   connect(menu_edit_action_history_markup_next, SIGNAL(triggered()), this, SLOT(history_markup_next()));
-  shortcut("ocelot_shortcut_history_markup_next", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT, "", false, true);
   menu_edit_action_formatter= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_FORMAT]);
   connect(menu_edit_action_formatter, SIGNAL(triggered()), this, SLOT(statement_edit_widget_formatter()));
-  shortcut("ocelot_shortcut_format", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT, "", false, true);
   menu_edit_action_zoomin= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_ZOOMIN]);
   connect(menu_edit_action_zoomin, SIGNAL(triggered()), this, SLOT(menu_edit_zoomin()));
-  shortcut("ocelot_shortcut_zoomin", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN, "", false, true);
   menu_edit_action_zoomout= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_ZOOMOUT]);
   connect(menu_edit_action_zoomout, SIGNAL(triggered()), this, SLOT(menu_edit_zoomout()));
-  shortcut("ocelot_shortcut_zoomout", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT, "", false, true);
   menu_edit_action_autocomplete= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_AUTOCOMPLETE]);
   connect(menu_edit_action_autocomplete, SIGNAL(triggered()), this, SLOT(menu_edit_autocomplete_via_menu()));
-  shortcut("ocelot_shortcut_autocomplete", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE, "", false, true);
   menu_run= ui->menuBar->addMenu(menu_strings[menu_off + MENU_RUN]);
   menu_run_action_execute= menu_run->addAction(menu_strings[menu_off + MENU_RUN_EXECUTE]);
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
-  shortcut("ocelot_shortcut_execute", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE, "", false, true);
   menu_run_action_kill= menu_run->addAction(menu_strings[menu_off + MENU_RUN_KILL]);
   connect(menu_run_action_kill, SIGNAL(triggered()), this, SLOT(action_kill()));
-  shortcut("ocelot_shortcut_kill", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL, "", false, true);
   menu_run_action_kill->setEnabled(false);
   menu_settings= ui->menuBar->addMenu(menu_strings[menu_off + MENU_SETTINGS]);
   menu_settings_action_menu= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_MENU]);
@@ -2102,10 +2090,10 @@ void MainWindow::create_menu()
   connect(menu_options_action_option_detach_statement_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_statement_widget(bool)));
   menu_options_action_next_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
   connect(menu_options_action_next_window, SIGNAL(triggered(bool)), this, SLOT(action_option_next_window()));
-  shortcut("ocelot_shortcut_next_window", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW, "", false, true);
   menu_options_action_previous_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
   connect(menu_options_action_previous_window, SIGNAL(triggered(bool)), this, SLOT(action_option_previous_window()));
-  shortcut("ocelot_shortcut_previous_window", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW, "", false, true);
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(menu_strings[menu_off + MENU_DEBUG]);
 //  menu_debug_action_install= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
@@ -2119,46 +2107,46 @@ void MainWindow::create_menu()
 //=shortcut(?)  menu_debug_action_debug->setShortcut(QKeySequence(tr("Alt+3")));
   menu_debug_action_breakpoint= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_BREAKPOINT]);
   connect(menu_debug_action_breakpoint, SIGNAL(triggered()), this, SLOT(action_debug_breakpoint()));
-  shortcut("ocelot_shortcut_breakpoint", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT, "", false, true);
   menu_debug_action_continue= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_CONTINUE]);
   connect(menu_debug_action_continue, SIGNAL(triggered()), this, SLOT(action_debug_continue()));
-  shortcut("ocelot_shortcut_continue", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE, "", false, true);
 //  menu_debug_action_leave= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_LEAVE);
 //  connect(menu_debug_action_leave, SIGNAL(triggered()), this, SLOT(action_debug_leave()));
 //=shortcut(?)  menu_debug_action_leave->setShortcut(QKeySequence(tr("Alt+B")));
   menu_debug_action_next= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_NEXT]);
   connect(menu_debug_action_next, SIGNAL(triggered()), this, SLOT(action_debug_next()));
-  shortcut("ocelot_shortcut_next", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT, "", false, true);
 //  menu_debug_action_skip= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_SKIP);
 //  connect(menu_debug_action_skip, SIGNAL(triggered()), this, SLOT(action_debug_skip()));
 //=shortcut(?)  menu_debug_action_skip->setShortcut(QKeySequence(tr("Alt+4")));
   menu_debug_action_step= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_STEP]);
   connect(menu_debug_action_step, SIGNAL(triggered()), this, SLOT(action_debug_step()));
-  shortcut("ocelot_shortcut_step", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP, "", false, true);
   menu_debug_action_clear= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_CLEAR]);
   connect(menu_debug_action_clear, SIGNAL(triggered()), this, SLOT(action_debug_clear()));
-  shortcut("ocelot_shortcut_clear", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR, "", false, true);
 //  menu_debug_action_delete= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_DELETE]);
 //  connect(menu_debug_action_delete, SIGNAL(triggered()), this, SLOT(action_debug_delete()));
 //=shortcut(?)  menu_debug_action_delete->setShortcut(QKeySequence(tr("Alt+G")));
   menu_debug_action_exit= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_EXIT]);
   connect(menu_debug_action_exit, SIGNAL(triggered()), this, SLOT(action_debug_exit()));
-  shortcut("ocelot_shortcut_debug_exit", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT, "", false, true);
   menu_debug_action_information= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INFORMATION]);
   connect(menu_debug_action_information, SIGNAL(triggered()), this, SLOT(action_debug_information()));
-  shortcut("ocelot_shortcut_information", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION, "", false, true);
   menu_debug_action_refresh_server_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_SERVER_VARIABLES]);
   connect(menu_debug_action_refresh_server_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_server_variables()));
-  shortcut("ocelot_shortcut_refresh_server_variables", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES, "", false, true);
   menu_debug_action_refresh_user_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_USER_VARIABLES]);
   connect(menu_debug_action_refresh_user_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_user_variables()));
-  shortcut("ocelot_shortcut_refresh_user_variables", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_USER_VARIABLES, "", false, true);
   menu_debug_action_refresh_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_VARIABLES]);
   connect(menu_debug_action_refresh_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_variables()));
-  shortcut("ocelot_shortcut_refresh_variables", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_VARIABLES, "", false, true);
   menu_debug_action_refresh_call_stack= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_CALL_STACK]);
   connect(menu_debug_action_refresh_call_stack, SIGNAL(triggered()), this, SLOT(action_debug_refresh_call_stack()));
-  shortcut("ocelot_shortcut_refresh_call_stack", "", false, true);
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK, "", false, true);
   debug_menu_enable_or_disable(TOKEN_KEYWORD_BEGIN); /* Disable most of debug menu */
 #endif
   menu_help= ui->menuBar->addMenu(menu_strings[menu_off + MENU_HELP]);
@@ -2227,12 +2215,11 @@ void MainWindow::create_menu()
         http://doc.qt.io/archives/qt-4.8/qkeysequence.html section
         "Keyboard Layout Issues" mentions this but I didn't understand.
 */
-int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do)
+int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
 {
-  QString target= token1.toLower();
   QString source;
   char source_as_utf8[80*4];
-  if (target.mid(0, 16) != "ocelot_shortcut_") return 0;
+  //if (target.mid(0, 16) != "ocelot_shortcut_") return 0;
   if (is_set)
   {
     source= connect_stripper(token3, false);
@@ -2257,7 +2244,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
 //      }
     }
   }
-  if (target == "ocelot_shortcut_connect")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT)
   {
     if (is_set) strcpy(ocelot_shortcut_connect, source_as_utf8);
     if (is_do)
@@ -2270,7 +2257,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_exit")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT)
   {
     if (is_set) strcpy(ocelot_shortcut_exit, source_as_utf8);
     if (is_do)
@@ -2284,7 +2271,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_undo")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT)
   {
     if (is_set) strcpy(ocelot_shortcut_undo, source_as_utf8);
     if (is_do)
@@ -2297,7 +2284,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_redo")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO)
   {
     if (is_set) strcpy(ocelot_shortcut_redo, source_as_utf8);
     if (is_do)
@@ -2310,7 +2297,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_cut")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_CUT)
   {
     if (is_set) strcpy(ocelot_shortcut_cut, source_as_utf8);
     if (is_do)
@@ -2323,7 +2310,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_copy")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_COPY)
   {
     if (is_set) strcpy(ocelot_shortcut_copy, source_as_utf8);
     if (is_do)
@@ -2336,7 +2323,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_paste")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE)
   {
     if (is_set) strcpy(ocelot_shortcut_paste, source_as_utf8);
     if (is_do)
@@ -2349,7 +2336,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_select_all")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL)
   {
     if (is_set) strcpy(ocelot_shortcut_select_all, source_as_utf8);
     if (is_do)
@@ -2362,7 +2349,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_history_markup_previous")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS)
   {
     if (is_set) strcpy(ocelot_shortcut_history_markup_previous, source_as_utf8);
     if (is_do)
@@ -2375,7 +2362,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_history_markup_next")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT)
   {
     if (is_set) strcpy(ocelot_shortcut_history_markup_next, source_as_utf8);
     if (is_do)
@@ -2388,7 +2375,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_format")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT)
   {
     if (is_set) strcpy(ocelot_shortcut_format, source_as_utf8);
     if (is_do)
@@ -2401,7 +2388,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_zoomin")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN)
   {
     if (is_set) strcpy(ocelot_shortcut_zoomin, source_as_utf8);
     if (is_do)
@@ -2414,7 +2401,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_zoomout")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT)
   {
     if (is_set) strcpy(ocelot_shortcut_zoomout, source_as_utf8);
     if (is_do)
@@ -2428,7 +2415,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     return 1;
   }
   /* Todo: Tab is like mysql but a poor default choice. Try Ctrl+Space? */
-  if (target == "ocelot_shortcut_autocomplete")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE)
   {
     if (is_set) strcpy(ocelot_shortcut_autocomplete, source_as_utf8);
     if (is_do)
@@ -2441,7 +2428,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_execute")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE)
   {
     if (is_set) strcpy(ocelot_shortcut_execute, source_as_utf8);
     if (is_do)
@@ -2454,7 +2441,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_kill")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL)
   {
     if (is_set) strcpy(ocelot_shortcut_kill, source_as_utf8);
     if (is_do)
@@ -2467,7 +2454,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_next_window")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW)
   {
     if (is_set) strcpy(ocelot_shortcut_next_window, source_as_utf8);
     if (is_do)
@@ -2480,7 +2467,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_previous_window")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW)
   {
     if (is_set) strcpy(ocelot_shortcut_previous_window, source_as_utf8);
     if (is_do)
@@ -2493,7 +2480,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_breakpoint")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT)
   {
     if (is_set) strcpy(ocelot_shortcut_breakpoint, source_as_utf8);
     if (is_do)
@@ -2506,7 +2493,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_continue")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE)
   {
     if (is_set) strcpy(ocelot_shortcut_continue, source_as_utf8);
     if (is_do)
@@ -2519,7 +2506,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_next")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT)
   {
     if (is_set) strcpy(ocelot_shortcut_next, source_as_utf8);
     if (is_do)
@@ -2532,7 +2519,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_step")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP)
   {
     if (is_set) strcpy(ocelot_shortcut_step, source_as_utf8);
     if (is_do)
@@ -2545,7 +2532,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_clear")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR)
   {
     if (is_set) strcpy(ocelot_shortcut_clear, source_as_utf8);
     if (is_do)
@@ -2558,7 +2545,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_debug_exit")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT)
   {
     if (is_set) strcpy(ocelot_shortcut_debug_exit, source_as_utf8);
     if (is_do)
@@ -2571,7 +2558,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_information")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION)
   {
     if (is_set) strcpy(ocelot_shortcut_information, source_as_utf8);
     if (is_do)
@@ -2584,7 +2571,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_refresh_server_variables")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES)
   {
     if (is_set) strcpy(ocelot_shortcut_refresh_server_variables, source_as_utf8);
     if (is_do)
@@ -2597,7 +2584,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_refresh_user_variables")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_USER_VARIABLES)
   {
     if (is_set) strcpy(ocelot_shortcut_refresh_user_variables, source_as_utf8);
     if (is_do)
@@ -2610,7 +2597,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_refresh_variables")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_VARIABLES)
   {
     if (is_set) strcpy(ocelot_shortcut_refresh_variables, source_as_utf8);
     if (is_do)
@@ -2623,7 +2610,7 @@ int MainWindow::shortcut(QString token1, QString token3, bool is_set, bool is_do
     }
     return 1;
   }
-  if (target == "ocelot_shortcut_refresh_call_stack")
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK)
   {
     if (is_set) strcpy(ocelot_shortcut_refresh_call_stack, source_as_utf8);
     if (is_do)
@@ -4330,7 +4317,7 @@ void MainWindow::action_statement()
     action_change_one_setting(ocelot_statement_font_weight, new_ocelot_statement_font_weight,"ocelot_statement_font_weight");
     action_change_one_setting(ocelot_statement_highlight_literal_color, new_ocelot_statement_highlight_literal_color,"ocelot_statement_highlight_literal_color");
     action_change_one_setting(ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color,"ocelot_statement_highlight_identifier_color");
-    action_change_one_setting(ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color,"ocelot_statement_highlight_comment_color");
+    action_change_one_setting(ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR].chars);
     action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,"ocelot_statement_highlight_operator_color");
     action_change_one_setting(ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color,"ocelot_statement_highlight_keyword_color");
     action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,"ocelot_statement_prompt_background_color");
@@ -9515,7 +9502,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_highlight_identifier_color= ccn;
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_comment_color", Qt::CaseInsensitive) == 0)
+      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR].chars, Qt::CaseInsensitive) == 0)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -10052,7 +10039,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       {
-        int ii= shortcut(text.mid(sub_token_offsets[1], sub_token_lengths[1]), text.mid(sub_token_offsets[3], sub_token_lengths[3]), true, true);
+        int ii= shortcut(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]), true, true);
         if (ii == 1)
         {
           make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
@@ -11224,1070 +11211,71 @@ int MainWindow::token_type(QChar *token, int token_length, bool ansi_quotes)
 }
 
 /*
-  I got tired of repeating
-  if (QString::compare(text.mid(main_token_offsets[0], main_token_lengths[0]), "SELECT", Qt::CaseInsensitive) == 0) ...
-  so switched to maintaining a permanent list.
-  Two compiler-dependent assumptions: bsearch() exists, and char* can be converted to unsigned long.
-  Upper case is reserved, lower case is unreserved, we search both ways.
-  Warning: We can call this from hparse routines.
+  We depend on some defined | constant values being correct, the right size, in order, etc.
+  So at the start we call these checks. So far most of them are related to strvalues.
+  Things will only go wrong if the code or the platform changes.
+  The time-consuming check is commented out, re-enable it if you changed something significant.
+  Todo: rather than asserts, do runtime tests iff debug mode.
 */
-/* Todo: use "const" and "static" more often */
+void MainWindow::initial_asserts()
+{
+  /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
+  assert(sizeof(int) >= 4);
 
+  #ifdef OCELOT_OS_LINUX
+  #if defined(NDEBUG)
+    if (MENU_FONT != 82) {printf("assert(MENU_FONT == 82);"); exit(1); }
+  #else
+    assert(MENU_FONT == 82); /* See kludge alert in ocelotgui.h Settings() */
+  #endif
+  #else
+    assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
+  #endif
 
-#define MAX_KEYWORD_LENGTH 46
-struct keywords {
-   char  chars[MAX_KEYWORD_LENGTH];
-   unsigned short int reserved_flags;
-   unsigned short int built_in_function_flags;
-   unsigned short int token_keyword;
-};
-const keywords strvalues[]=
-    {
-      {"?", 0, 0, TOKEN_KEYWORD_QUESTIONMARK}, /* Ocelot keyword, although tokenize() regards it as an operator */
-      {"ABORT", 0, 0, TOKEN_KEYWORD_ABORT},
-      {"ABS", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ABS},
-      {"ACCESSIBLE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ACCESSIBLE},
-      {"ACOS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ACOS},
-      {"ACTION", 0, 0, TOKEN_KEYWORD_ACTION},
-      {"ADD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ADD},
-      {"ADDDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ADDDATE},
-      {"ADDTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ADDTIME},
-      {"AES_DECRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AES_DECRYPT},
-      {"AES_ENCRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AES_ENCRYPT},
-      {"AFTER", 0, 0, TOKEN_KEYWORD_AFTER},
-      {"AGAINST", 0, 0, TOKEN_KEYWORD_AGAINST},
-      {"ALGORITHM", 0, 0, TOKEN_KEYWORD_ALGORITHM},
-      {"ALL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ALL},
-      {"ALTER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ALTER},
-      {"ALWAYS", 0, 0, TOKEN_KEYWORD_ALWAYS},
-      {"ANALYZE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ANALYZE},
-      {"AND", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_AND},
-      {"ANY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ANY},
-      {"ANY_VALUE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ANY_VALUE},
-      {"AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AREA}, /* deprecated in MySQL 5.7.6 */
-      {"AS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_AS},
-      {"ASBINARY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ASBINARY}, /* deprecated in MySQL 5.7.6 */
-      {"ASC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ASC},
-      {"ASCII", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ASCII},
-      {"ASENSITIVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ASENSITIVE},
-      {"ASIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ASIN},
-      {"ASTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ASTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"ASWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ASWKB}, /* deprecated in MySQL 5.7.6 */
-      {"ASWKT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ASWKT}, /* deprecated in MySQL 5.7.6 */
-      {"ASYMMETRIC_DECRYPT", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ASYMMETRIC_DECRYPT},
-      {"ASYMMETRIC_DERIVE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ASYMMETRIC_DERIVE},
-      {"ASYMMETRIC_ENCRYPT", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ASYMMETRIC_ENCRYPT},
-      {"ASYMMETRIC_SIGN", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ASYMMETRIC_SIGN},
-      {"ASYMMETRIC_VERIFY", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ASYMMETRIC_VERIFY},
-      {"ATAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ATAN},
-      {"ATAN2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ATAN2},
-      {"ATOMIC", 0, 0, TOKEN_KEYWORD_ATOMIC},
-      {"ATTACH", 0, 0, TOKEN_KEYWORD_ATTACH},
-      {"AUTOINCREMENT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_AUTOINCREMENT},
-      {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
-          {"BACKUP_ADMIN", 0, 0, TOKEN_KEYWORD_BACKUP_ADMIN},
-      {"BEFORE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BEFORE},
-      {"BEGIN", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BEGIN},
-      {"BENCHMARK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BENCHMARK},
-      {"BETWEEN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BETWEEN},
-      {"BFILE", 0, 0, TOKEN_KEYWORD_BFILE},
-      {"BIGINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BIGINT},
-      {"BIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIN},
-      {"BINARY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BINARY},
-      {"BINARY_DOUBLE", 0, 0, TOKEN_KEYWORD_BINARY_DOUBLE},
-      {"BINARY_FLOAT", 0, 0, TOKEN_KEYWORD_BINARY_FLOAT},
-      {"BINLOG", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BINLOG},
-          {"BINLOG_ADMIN", 0, 0, TOKEN_KEYWORD_BINLOG_ADMIN},
-      {"BINLOG_GTID_POS", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BINLOG_GTID_POS},
-      {"BIT", 0, 0, TOKEN_KEYWORD_BIT},
-      {"BIT_AND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIT_AND},
-      {"BIT_COUNT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIT_COUNT},
-      {"BIT_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIT_LENGTH},
-      {"BIT_OR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIT_OR},
-      {"BIT_XOR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BIT_XOR},
-      {"BLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BLOB},
-      {"BODY", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_BODY},
-      {"BOOL", 0, 0, TOKEN_KEYWORD_BOOL},
-      {"BOOLEAN", 0, 0, TOKEN_KEYWORD_BOOLEAN},
-      {"BOTH", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_BOTH},
-      {"BREAK", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_BREAK},
-      {"BUFFER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BUFFER}, /* deprecated in MySQL 5.7.6 */
-      {"BUSY_TIMEOUT", 0, 0, TOKEN_KEYWORD_BUSY_TIMEOUT},
-      {"BY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BY},
-      {"CALL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CALL},
-      {"CASCADE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CASCADE},
-      {"CASE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CASE},
-      {"CAST", FLAG_VERSION_TARANTOOL, FLAG_VERSION_ALL, TOKEN_KEYWORD_CAST},
-      {"CEIL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CEIL},
-      {"CEILING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CEILING},
-      {"CENTROID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CENTROID}, /* deprecated in MySQL 5.7.6 */
-      {"CHANGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CHANGE},
-      {"CHAR", FLAG_VERSION_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_CHAR},
-      {"CHARACTER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CHARACTER},
-      {"CHARACTER_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARACTER_LENGTH},
-      {"CHARSET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARSET},  /* + Ocelot keyword */
-      {"CHAR_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHAR_LENGTH},
-      {"CHECK", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CHECK},
-      {"CLEAR", 0, 0, TOKEN_KEYWORD_CLEAR}, /* Ocelot keyword */
-      {"CLOB", 0, 0, TOKEN_KEYWORD_CLOB},
-      {"CLOSE", 0, 0, TOKEN_KEYWORD_CLOSE},
-      {"COALESCE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_COALESCE},
-      {"COERCIBILITY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COERCIBILITY},
-      {"COLLATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_COLLATE},
-      {"COLLATION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COLLATION},
-      {"COLLATION_LIST", 0, 0, TOKEN_KEYWORD_COLLATION_LIST},
-      {"COLUMN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_COLUMN},
-      {"COLUMN_ADD", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_ADD},
-      {"COLUMN_CHECK", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_CHECK},
-      {"COLUMN_CREATE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_CREATE},
-      {"COLUMN_DELETE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_DELETE},
-      {"COLUMN_EXISTS", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_EXISTS},
-      {"COLUMN_GET", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_GET},
-      {"COLUMN_JSON", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_JSON},
-      {"COLUMN_LIST", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_LIST},
-      {"COMMENT", 0, 0, TOKEN_KEYWORD_COMMENT},
-      {"COMMIT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_COMMIT},
-      {"COMPACT", 0, 0, TOKEN_KEYWORD_COMPACT},
-      {"COMPRESS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COMPRESS},
-      {"COMPRESSED", 0, 0, TOKEN_KEYWORD_COMPRESSED},
-      {"COMPRESSION", 0, 0, TOKEN_KEYWORD_COMPRESSION},
-      {"CONCAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONCAT},
-      {"CONCAT_WS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONCAT_WS},
-      {"CONDITION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CONDITION},
-      {"CONFLICT", 0, 0, TOKEN_KEYWORD_CONFLICT},
-      {"CONNECT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_CONNECT}, /* Ocelot keyword */
-          {"CONNECTION_ADMIN", 0, 0, TOKEN_KEYWORD_CONNECTION_ADMIN},
-      {"CONNECTION_ID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONNECTION_ID},
-      {"CONSTRAINT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CONSTRAINT},
-      {"CONTAINS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONTAINS}, /* deprecated in MySQL 5.7.6 */
-      {"CONTINUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CONTINUE},
-      {"CONV", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONV},
-      {"CONVERT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONVERT},
-      {"CONVERT_TZ", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONVERT_TZ},
-      {"CONVEXHULL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONVEXHULL}, /* deprecated in MySQL 5.7.6 */
-      {"COS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COS},
-      {"COT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COT},
-      {"COUNT", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_COUNT},
-      {"CRC32", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CRC32},
-      {"CREATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CREATE},
-      {"CREATE_ASYMMETRIC_PRIV_KEY", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_CREATE_ASYMMETRIC_PRIV_KEY},
-      {"CREATE_ASYMMETRIC_PUB_KEY", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_CREATE_ASYMMETRIC_PUB_KEY},
-      {"CREATE_DH_PARAMETERS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CREATE_DH_PARAMETERS},
-      {"CREATE_DIGEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CREATE_DIGEST},
-      {"CROSS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CROSS},
-      {"CROSSES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CROSSES}, /* deprecated in MySQL 5.7.6 */
-    {"CUBE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_CUBE},
-      {"CUME_DIST", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_CUME_DIST},
-      {"CURDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURDATE},
-      {"CURRENT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_CURRENT},
-      {"CURRENT_DATE", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURRENT_DATE},
-      {"CURRENT_ROLE", FLAG_VERSION_MARIADB_10_0, 0, TOKEN_KEYWORD_CURRENT_ROLE},
-      {"CURRENT_TIME", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURRENT_TIME},
-      {"CURRENT_TIMESTAMP", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURRENT_TIMESTAMP},
-      {"CURRENT_USER", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURRENT_USER},
-      {"CURSOR", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CURSOR},
-      {"CURTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURTIME},
-      {"CYCLE", 0, 0, TOKEN_KEYWORD_CYCLE},
-      {"DATABASE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATABASE},
-      {"DATABASES", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DATABASES},
-      {"DATE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_DATE},
-      {"DATEDIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATEDIFF},
-      {"DATETIME", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_DATETIME},
-      {"DATE_ADD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATE_ADD},
-      {"DATE_FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATE_FORMAT},
-      {"DATE_SUB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DATE_SUB},
-      {"DAY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DAY},
-      {"DAYNAME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DAYNAME},
-      {"DAYOFMONTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DAYOFMONTH},
-      {"DAYOFWEEK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DAYOFWEEK},
-      {"DAYOFYEAR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DAYOFYEAR},
-      {"DAY_HOUR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DAY_HOUR},
-      {"DAY_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DAY_MICROSECOND},
-      {"DAY_MINUTE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DAY_MINUTE},
-      {"DAY_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DAY_SECOND},
-      {"DEALLOCATE", 0, 0, TOKEN_KEYWORD_DEALLOCATE},
-      {"DEC", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DEC},
-      {"DECIMAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DECIMAL},
-      {"DECLARE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DECLARE},
-      {"DECODE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DECODE},
-      {"DECODE_HISTOGRAM", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_DECODE_HISTOGRAM},
-      {"DEFAULT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DEFAULT},
-      {"DEFERRABLE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_DEFERRABLE},
-      {"DEFERRED", 0, 0, TOKEN_KEYWORD_DEFERRED},
-      {"DEGREES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DEGREES},
-      {"DELAYED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DELAYED},
-      {"DELETE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DELETE},
-      {"DELIMITER", 0, 0, TOKEN_KEYWORD_DELIMITER}, /* Ocelot keyword */
-      {"DENSE_RANK", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_DENSE_RANK},
-      {"DESC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DESC},
-      {"DESCRIBE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DESCRIBE},
-      {"DES_DECRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DES_DECRYPT}, /* deprecated in MySQL 5.7.6 */
-      {"DES_ENCRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DES_ENCRYPT}, /* deprecated in MySQL 5.7.6 */
-      {"DETACH", 0, 0, TOKEN_KEYWORD_DETACH},
-      {"DETERMINISTIC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DETERMINISTIC},
-      {"DIMENSION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DIMENSION}, /* deprecated in MySQL 5.7.6 */
-      {"DIRECTORY", 0, 0, TOKEN_KEYWORD_DIRECTORY},
-      {"DISJOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DISJOINT}, /* deprecated in MySQL 5.7.6 */
-      {"DISTANCE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DISTANCE}, /* deprecated in MySQL 5.7.6 */
-      {"DISTINCT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DISTINCT},
-      {"DISTINCTROW", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DISTINCTROW},
-      {"DIV", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DIV},
-      {"DO", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_DO},
-      {"DOUBLE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DOUBLE},
-      {"DROP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DROP},
-      {"DUAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DUAL},
-      {"DUPLICATE", 0, 0, TOKEN_KEYWORD_DUPLICATE},
-      {"DYNAMIC", 0, 0, TOKEN_KEYWORD_DYNAMIC},
-      {"EACH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_EACH},
-      {"EDIT", 0, 0, TOKEN_KEYWORD_EDIT}, /* Ocelot keyword */
-      {"EGO", 0, 0, TOKEN_KEYWORD_EGO}, /* Ocelot keyword */
-      {"ELSE", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_ELSE},
-      {"ELSEIF", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_ELSEIF},
-      {"ELSIF", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_ELSIF},
-      {"ELT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ELT},
-    {"EMPTY", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_EMPTY},
-      {"ENABLE", 0, 0, TOKEN_KEYWORD_ENABLE},
-      {"ENCLOSED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ENCLOSED},
-      {"ENCODE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENCODE},
-      {"ENCRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENCRYPT}, /* deprecated in MySQL 5.7.6 */
-          {"ENCRYPTION_KEY_ADMIN", 0, 0, TOKEN_KEYWORD_ENCRYPTION_KEY_ADMIN},
-      {"END", FLAG_VERSION_TARANTOOL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_END},
-      {"ENDPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENDPOINT}, /* deprecated in MySQL 5.7.6 */
-      {"ENUM", 0, 0, TOKEN_KEYWORD_ENUM},
-      {"ENVELOPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENVELOPE}, /* deprecated in MySQL 5.7.6 */
-      {"EQUALS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EQUALS}, /* deprecated in MySQL 5.7.6 */
-      {"ESCAPE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ESCAPE},
-      {"ESCAPED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ESCAPED},
-      {"EVENT", 0, 0, TOKEN_KEYWORD_EVENT},
-      {"EXCEPT", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_EXCEPT},
-      {"EXCEPTION", 0, 0, TOKEN_KEYWORD_EXCEPTION},
-      {"EXCHANGE", 0, 0, TOKEN_KEYWORD_EXCHANGE},
-      {"EXCLUSIVE", 0, 0, TOKEN_KEYWORD_EXCLUSIVE},
-      {"EXECUTE", 0, 0, TOKEN_KEYWORD_EXECUTE},
-      {"EXISTS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_EXISTS},
-      {"EXIT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_EXIT},
-      {"EXP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXP},
-      {"EXPANSION", 0, 0, TOKEN_KEYWORD_EXPANSION},
-      {"EXPLAIN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_EXPLAIN},
-      {"EXPORT", 0, 0, TOKEN_KEYWORD_EXPORT},
-      {"EXPORT_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXPORT_SET},
-      {"EXTERIORRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXTERIORRING}, /* deprecated in MySQL 5.7.6 */
-      {"EXTRACT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXTRACT},
-      {"EXTRACTVALUE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXTRACTVALUE},
-      {"FAIL", 0, 0, TOKEN_KEYWORD_FAIL},
-      {"FALSE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FALSE},
-      {"FETCH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FETCH},
-      {"FIELD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FIELD},
-      {"FILE", 0, 0, TOKEN_KEYWORD_FILE},
-      {"FIND_IN_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FIND_IN_SET},
-          {"FIREWALL_ADMIN", 0, 0, TOKEN_KEYWORD_FIREWALL_ADMIN},
-          {"FIREWALL_USER", 0, 0, TOKEN_KEYWORD_FIREWALL_USER},
-      {"FIRST", 0, 0, TOKEN_KEYWORD_FIRST}, /* MariaDB 10.2 nonreserved */
-      {"FIRST_VALUE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_FIRST_VALUE}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2*/
-      {"FIXED", 0, 0, TOKEN_KEYWORD_FIXED},
-      {"FLOAT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FLOAT},
-      {"FLOAT4", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FLOAT4},
-      {"FLOAT8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FLOAT8},
-      {"FLOOR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FLOOR},
-      {"FLUSH", 0, 0, TOKEN_KEYWORD_FLUSH},
-      {"FOLLOWING", FLAG_VERSION_MARIADB_10_2_2, 0, TOKEN_KEYWORD_FOLLOWING},
-      {"FOLLOWS", FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, 0, TOKEN_KEYWORD_FOLLOWS},
-      {"FOR", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FOR},
-      {"FORCE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FORCE},
-      {"FOREIGN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FOREIGN},
-      {"FOREIGN_KEY_LIST", 0, 0, TOKEN_KEYWORD_FOREIGN_KEY_LIST},
-      {"FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FORMAT},
-      {"FOUND_ROWS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FOUND_ROWS},
-      {"FROM", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FROM},
-      {"FROM_BASE64", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FROM_BASE64},
-      {"FROM_DAYS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FROM_DAYS},
-      {"FROM_UNIXTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FROM_UNIXTIME},
-      {"FULL", 0, 0, TOKEN_KEYWORD_FULL},
-      {"FULLTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_FULLTEXT},
-      {"FUNCTION", FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_TARANTOOL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FUNCTION},
-      {"GENERAL", 0, 0, TOKEN_KEYWORD_GENERAL},
-      {"GENERATED", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_GENERATED},
-      {"GEOMCOLLFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMCOLLFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMCOLLFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMCOLLFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMETRY", 0, 0, TOKEN_KEYWORD_GEOMETRY},
-      {"GEOMETRYCOLLECTION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMETRYCOLLECTION},
-      {"GEOMETRYCOLLECTIONFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMETRYCOLLECTIONFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMETRYCOLLECTIONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMETRYCOLLECTIONFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMETRYFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMETRYFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMETRYFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMETRYFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMETRYN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMETRYN}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMETRYTYPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMETRYTYPE}, /* deprecated in MySQL 5.7.6 */
-      {"GEOMFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMFROMTEXT},/* deprecated in MySQL 5.7.6 */
-      {"GEOMFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GEOMFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"GET", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_GET},
-      {"GET_FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GET_FORMAT},
-      {"GET_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GET_LOCK},
-      {"GLENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GLENGTH}, /* deprecated in MySQL 5.7.6 */
-      {"GLOB", FLAG_VERSION_TARANTOOL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_GLOB},
-      {"GLOBAL", 0, 0, TOKEN_KEYWORD_GLOBAL},
-      {"GO", 0, 0, TOKEN_KEYWORD_GO}, /* Ocelot keyword */
-      {"GOTO", FLAG_VERSION_LUA|FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_GOTO},
-      {"GRANT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GRANT},
-      {"GREATEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GREATEST},
-      {"GROUP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GROUP},
-    {"GROUPING", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0, TOKEN_KEYWORD_GROUPING},
-    {"GROUPS", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_GROUPS},
-      {"GROUP_CONCAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GROUP_CONCAT},
-          {"GROUP_REPLICATION_ADMIN", 0, 0, TOKEN_KEYWORD_GROUP_REPLICATION_ADMIN},
-      {"GTID_SUBSET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GTID_SUBSET},
-      {"GTID_SUBTRACT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_GTID_SUBTRACT},
-      {"HANDLER", 0, 0, TOKEN_KEYWORD_HANDLER},
-      {"HAVING", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_HAVING},
-      {"HELP", 0, 0, TOKEN_KEYWORD_HELP}, /* Ocelot keyword */
-      {"HEX", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_HEX},
-      {"HIGH_PRIORITY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HIGH_PRIORITY},
-      {"HOUR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_HOUR},
-      {"HOUR_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_MICROSECOND},
-      {"HOUR_MINUTE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_MINUTE},
-      {"HOUR_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_SECOND},
-      {"IF", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IF},
-      {"IFNULL", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_IFNULL},
-      {"IGNORE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_IGNORE},
-      {"IMMEDIATE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_IMMEDIATE},
-      {"IMPORT", 0, 0, TOKEN_KEYWORD_IMPORT},
-      {"IN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IN},
-      {"INDEX", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INDEX},
-      {"INDEXED", 0, 0, TOKEN_KEYWORD_INDEXED},
-      {"INDEX_INFO", 0, 0, TOKEN_KEYWORD_INDEX_INFO},
-      {"INDEX_LIST", 0, 0, TOKEN_KEYWORD_INDEX_LIST},
-      {"INET6_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_ATON},
-      {"INET6_NTOA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_NTOA},
-      {"INET_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET_ATON},
-      {"INET_NTOA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET_NTOA},
-      {"INFILE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INFILE},
-      {"INITIALLY", 0, 0, TOKEN_KEYWORD_INITIALLY},
-      {"INNER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INNER},
-      {"INOUT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INOUT},
-      {"INSENSITIVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INSENSITIVE},
-      {"INSERT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INSERT},
-      {"INSTALL", 0, 0, TOKEN_KEYWORD_INSTALL},
-      {"INSTEAD", 0, 0, TOKEN_KEYWORD_INSTEAD},
-      {"INSTR", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_INSTR},
-      {"INT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT},
-      {"INT1", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT1},
-      {"INT2", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT2},
-      {"INT3", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT3},
-      {"INT4", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT4},
-      {"INT8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT8},
-      {"INTEGER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INTEGER},
-      {"INTERIORRINGN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERIORRINGN}, /* deprecated in MySQL 5.7.6 */
-      {"INTERSECT", FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_INTERSECT},
-      {"INTERSECTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERSECTS}, /* deprecated in MySQL 5.7.6 */
-      {"INTERVAL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERVAL},
-      {"INTO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INTO},
-      {"IO_AFTER_GTIDS", FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_IO_AFTER_GTIDS},
-      {"IO_BEFORE_GTIDS", FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_IO_BEFORE_GTIDS},
-      {"IS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_IS},
-      {"ISCLOSED", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ISCLOSED}, /* deprecated in MySQL 5.7.6 */
-      {"ISEMPTY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ISEMPTY}, /* deprecated in MySQL 5.7.6 */
-      {"ISNULL", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ISNULL},
-      {"ISSIMPLE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ISSIMPLE}, /* deprecated in MySQL 5.7.6 */
-      {"IS_FREE_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_FREE_LOCK},
-      {"IS_IPV4", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_IPV4},
-      {"IS_IPV4_COMPAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_IPV4_COMPAT},
-      {"IS_IPV4_MAPPED", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_IPV4_MAPPED},
-      {"IS_IPV6", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_IPV6},
-      {"IS_USED_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_USED_LOCK},
-      {"ITERATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ITERATE},
-      {"JOIN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_JOIN},
-      {"JSON", 0, 0, TOKEN_KEYWORD_JSON},
-      {"JSON_APPEND", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_APPEND},
-      {"JSON_ARRAY", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_ARRAY},
-      {"JSON_ARRAY_APPEND", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_ARRAY_APPEND},
-      {"JSON_ARRAY_INSERT", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_ARRAY_INSERT},
-      {"JSON_CONTAINS", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_CONTAINS},
-      {"JSON_CONTAINS_PATH", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_CONTAINS_PATH},
-      {"JSON_DEPTH", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_DEPTH},
-      {"JSON_EXTRACT", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_EXTRACT},
-      {"JSON_INSERT", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_INSERT},
-      {"JSON_KEYS", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_KEYS},
-      {"JSON_LENGTH", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_LENGTH},
-      {"JSON_MERGE", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_MERGE},
-      {"JSON_OBJECT", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_OBJECT},
-      {"JSON_QUERY", 0, FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_QUERY},
-      {"JSON_QUOTE", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_QUOTE},
-      {"JSON_REMOVE", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_REMOVE},
-      {"JSON_REPLACE", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_REPLACE},
-      {"JSON_SEARCH", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_SEARCH},
-      {"JSON_SET", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_SET},
-    {"JSON_TABLE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_JSON_TABLE},
-      {"JSON_TYPE", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_TYPE},
-      {"JSON_UNQUOTE", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_UNQUOTE},
-      {"JSON_VALID", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_VALID},
-      {"JSON_VALUE", 0, FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_VALUE},
-      {"JULIANDAY", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JULIANDAY},
-      {"KEY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_KEY},
-      {"KEYS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KEYS},
-      {"KILL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KILL},
-      {"LAG", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LAG}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
-      {"LANGUAGE", 0, 0, TOKEN_KEYWORD_LANGUAGE},
-      {"LAST", 0, 0, TOKEN_KEYWORD_LAST}, /* MariaDB 10.2 nonreserved */
-      {"LASTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LASTVAL},
-      {"LAST_DAY", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_LAST_DAY},
-      {"LAST_INSERT_ID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LAST_INSERT_ID},
-      {"LAST_VALUE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_LAST_VALUE}, /* MariaDB 10.2 nonreserved */
-      {"LATERAL", 0, 0, TOKEN_KEYWORD_LATERAL}, /* MySQL 8.0.2 manual says reserved but it isn't */
-      {"LCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LCASE},
-      {"LEAD", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LEAD}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
-      {"LEADING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LEADING},
-      {"LEAST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LEAST},
-      {"LEAVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LEAVE},
-      {"LEFT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LEFT},
-      {"LENGTH", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LENGTH},
-      {"LEVEL", 0, 0, TOKEN_KEYWORD_LEVEL},
-      {"LIKE", FLAG_VERSION_ALL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_LIKE},
-      {"LIMIT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LIMIT},
-      {"LINEAR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LINEAR},
-      {"LINEFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINEFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"LINEFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINEFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"LINES", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LINES},
-      {"LINESTRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINESTRING},
-      {"LINESTRINGFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINESTRINGFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"LINESTRINGFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINESTRINGFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"LN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LN},
-      {"LOAD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOAD},
-      {"LOAD_FILE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOAD_FILE},
-      {"LOCAL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_LOCAL},
-      {"LOCALTIME", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOCALTIME},
-      {"LOCALTIMESTAMP", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOCALTIMESTAMP},
-      {"LOCATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOCATE},
-      {"LOCK", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOCK},
-      {"LOG", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOG},
-      {"LOG10", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOG10},
-      {"LOG2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOG2},
-      {"LOGFILE", 0, 0, TOKEN_KEYWORD_LOGFILE},
-      {"LONG", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LONG},
-      {"LONGBLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LONGBLOB},
-      {"LONGTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LONGTEXT},
-      {"LOOP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LOOP},
-      {"LOWER", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LOWER},
-      {"LOW_PRIORITY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOW_PRIORITY},
-      {"LPAD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LPAD},
-      {"LTRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LTRIM},
-      {"LUA", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_LUA},
-      {"MAKEDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKEDATE},
-      {"MAKETIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKETIME},
-      {"MAKE_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKE_SET},
-      {"MASTER_BIND", FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_MASTER_BIND},
-      {"MASTER_HEARTBEAT_PERIOD", 0, 0, TOKEN_KEYWORD_MASTER_HEARTBEAT_PERIOD},
-      {"MASTER_POS_WAIT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MASTER_POS_WAIT},
-      {"MASTER_SSL_VERIFY_SERVER_CERT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MASTER_SSL_VERIFY_SERVER_CERT},
-      {"MATCH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_MATCH},
-      {"MAX", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_MAX},
-      {"MAXVALUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MAXVALUE},
-      {"MBRCONTAINS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCONTAINS},
-      {"MBRCOVEREDBY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCOVEREDBY},
-      {"MBRCOVERS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCOVERS},
-      {"MBRDISJOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRDISJOINT},
-      {"MBREQUAL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBREQUAL}, /* deprecated in MySQL 5.7.6 */
-      {"MBREQUALS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBREQUALS},
-      {"MBRINTERSECTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRINTERSECTS},
-      {"MBROVERLAPS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBROVERLAPS},
-      {"MBRTOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRTOUCHES},
-      {"MBRWITHIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRWITHIN},
-      {"MD5", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MD5},
-      {"MEDIAN", FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_MEDIAN}, /* MariaDB 10.3.3 */
-      {"MEDIUMBLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MEDIUMBLOB},
-      {"MEDIUMINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MEDIUMINT},
-      {"MEDIUMTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MEDIUMTEXT},
-      {"MICROSECOND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MICROSECOND},
-      {"MID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MID},
-      {"MIDDLEINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MIDDLEINT},
-      {"MIN", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_MIN},
-      {"MINUTE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MINUTE},
-      {"MINUTE_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_MICROSECOND},
-      {"MINUTE_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_SECOND},
-      {"MINVALUE", 0, 0, TOKEN_KEYWORD_MINVALUE},
-      {"MLINEFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MLINEFROMTEXT},  /* deprecated in MySQL 5.7.6 */
-      {"MLINEFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MLINEFROMWKB},  /* deprecated in MySQL 5.7.6 */
-      {"MOD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MOD},
-      {"MODE", 0, 0, TOKEN_KEYWORD_MODE},
-      {"MODIFIES", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MODIFIES},
-      {"MONTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MONTH},
-      {"MONTHNAME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MONTHNAME},
-      {"MPOINTFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MPOINTFROMTEXT},  /* deprecated in MySQL 5.7.6 */
-      {"MPOINTFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MPOINTFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"MPOLYFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MPOLYFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"MPOLYFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MPOLYFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"MULTILINESTRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTILINESTRING},
-      {"MULTILINESTRINGFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTILINESTRINGFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"MULTILINESTRINGFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTILINESTRINGFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"MULTIPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOINT},
-      {"MULTIPOINTFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOINTFROMTEXT},  /* deprecated in MySQL 5.7.6 */
-      {"MULTIPOINTFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOINTFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"MULTIPOLYGON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGON},
-      {"MULTIPOLYGONFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGONFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"MULTIPOLYGONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MULTIPOLYGONFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"NAMES", 0, 0, TOKEN_KEYWORD_NAMES},
-      {"NAME_CONST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NAME_CONST},
-      {"NATURAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NATURAL},
-      {"NCHAR", 0, 0, TOKEN_KEYWORD_NCHAR},
-      {"NEXTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NEXTVAL},
-      {"NIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NIL},
-      {"NO", 0, 0, TOKEN_KEYWORD_NO},
-      {"NOPAGER", 0, 0, TOKEN_KEYWORD_NOPAGER}, /* Ocelot keyword */
-      {"NOT", FLAG_VERSION_TARANTOOL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NOT},
-      {"NOTEE", 0, 0, TOKEN_KEYWORD_NOTEE}, /* Ocelot keyword */
-      {"NOTNULL", 0, 0, TOKEN_KEYWORD_NOTNULL},
-      {"NOW", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NOW},
-      {"NOWARNING", 0, 0, TOKEN_KEYWORD_NOWARNING}, /* Ocelot keyword */
-      {"NO_WRITE_TO_BINLOG", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_NO_WRITE_TO_BINLOG},
-      {"NTH_VALUE", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NTH_VALUE}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
-      {"NTILE", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_NTILE},
-      {"NULL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NULL},
-      {"NULLIF", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_NULLIF},
-      {"NULLS", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_NULLS}, /* MariaDB 10.2 nonreserved  -- or, maybe not in MariaDB 10.2 */
-      {"NUMBER", 0, 0, TOKEN_KEYWORD_NUMBER},
-      {"NUMERIC", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_NUMERIC},
-      {"NUMGEOMETRIES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMGEOMETRIES}, /* deprecated in MySQL 5.7.6 */
-      {"NUMINTERIORRINGS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMINTERIORRINGS}, /* deprecated in MySQL 5.7.6 */
-      {"NUMPOINTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMPOINTS}, /* deprecated in MySQL 5.7.6 */
-      {"NVARCHAR2", 0, 0, TOKEN_KEYWORD_NVARCHAR2},
+  assert(TOKEN_REFTYPE_MAX == 91); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
 
-    {"OCELOT_BATCH", 0, 0, TOKEN_KEYWORD_OCELOT_BATCH},
-    {"OCELOT_DEBUG_DETACHED", 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED},
-    {"OCELOT_DEBUG_HEIGHT", 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT},
-    {"OCELOT_DEBUG_LEFT", 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT},
-    {"OCELOT_DEBUG_TOP", 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP},
-    {"OCELOT_DEBUG_WIDTH", 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH},
-    {"OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR},
-    {"OCELOT_EXTRA_RULE_1_CONDITION", 0, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION},
-    {"OCELOT_EXTRA_RULE_1_DISPLAY_AS", 0, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS},
-    {"OCELOT_EXTRA_RULE_1_TEXT_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR},
-    {"OCELOT_GRID_BACKGROUND_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR},
-    {"OCELOT_GRID_BORDER_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR},
-    {"OCELOT_GRID_BORDER_SIZE", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE},
-    {"OCELOT_GRID_CELL_BORDER_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR},
-    {"OCELOT_GRID_CELL_BORDER_SIZE", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
-    {"OCELOT_GRID_CELL_DRAG_LINE_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR},
-    {"OCELOT_GRID_CELL_DRAG_LINE_SIZE", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE},
-    {"OCELOT_GRID_DETACHED", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_DETACHED},
-    {"OCELOT_GRID_FONT_FAMILY", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY},
-    {"OCELOT_GRID_FONT_SIZE", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE},
-    {"OCELOT_GRID_FONT_STYLE", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE},
-    {"OCELOT_GRID_FONT_WEIGHT", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT},
-    {"OCELOT_GRID_HEADER_BACKGROUND_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR},
-    {"OCELOT_GRID_HEIGHT", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT},
-    {"OCELOT_GRID_LEFT", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT},
-    {"OCELOT_GRID_TEXT_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR},
-    {"OCELOT_GRID_TOP", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TOP},
-    {"OCELOT_GRID_WIDTH", 0, 0, TOKEN_KEYWORD_OCELOT_GRID_WIDTH},
-    {"OCELOT_HISTORY_BACKGROUND_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR},
-    {"OCELOT_HISTORY_BORDER_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR},
-    {"OCELOT_HISTORY_DETACHED", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED},
-    {"OCELOT_HISTORY_FONT_FAMILY", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY},
-    {"OCELOT_HISTORY_FONT_SIZE", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE},
-    {"OCELOT_HISTORY_FONT_STYLE", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE},
-    {"OCELOT_HISTORY_HEIGHT", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT},
-    {"OCELOT_HISTORY_LEFT", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_LEFT},
-    {"OCELOT_HISTORY_MAX_ROW_COUNT", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT},
-    {"OCELOT_HISTORY_TOP", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_TOP},
-    {"OCELOT_HISTORY_WIDTH", 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH},
-    {"OCELOT_HTML", 0, 0, TOKEN_KEYWORD_OCELOT_HTML},
-    {"OCELOT_MENU_BACKGROUND_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
-    {"OCELOT_MENU_BORDER_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR},
-    {"OCELOT_MENU_FONT_FAMILY", 0, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY},
-    {"OCELOT_MENU_FONT_SIZE", 0, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE},
-    {"OCELOT_MENU_FONT_STYLE", 0, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE},
-    {"OCELOT_MENU_FONT_WEIGHT", 0, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT},
-    {"OCELOT_MENU_TEXT_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR},
-    {"OCELOT_RAW", 0, 0, TOKEN_KEYWORD_OCELOT_RAW},
-    {"OCELOT_SHORTCUT_AUTOCOMPLETE", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
-    {"OCELOT_SHORTCUT_BREAKPOINT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
-    {"OCELOT_SHORTCUT_CLEAR", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR},
-    {"OCELOT_SHORTCUT_CONNECT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT},
-    {"OCELOT_SHORTCUT_CONTINUE", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE},
-    {"OCELOT_SHORTCUT_COPY", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_COPY},
-    {"OCELOT_SHORTCUT_CUT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CUT},
-    {"OCELOT_SHORTCUT_DEBUG_EXIT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT},
-    {"OCELOT_SHORTCUT_EXECUTE", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE},
-    {"OCELOT_SHORTCUT_EXIT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT},
-    {"OCELOT_SHORTCUT_FORMAT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT},
-    {"OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT},
-    {"OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS},
-    {"OCELOT_SHORTCUT_INFORMATION", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION},
-    {"OCELOT_SHORTCUT_KILL", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL},
-    {"OCELOT_SHORTCUT_NEXT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT},
-    {"OCELOT_SHORTCUT_NEXT_WINDOW", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW},
-    {"OCELOT_SHORTCUT_PASTE", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE},
-    {"OCELOT_SHORTCUT_PREVIOUS_WINDOW", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW},
-    {"OCELOT_SHORTCUT_REDO", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO},
-    {"OCELOT_SHORTCUT_REFRESH_CALL_STACK", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK},
-    {"OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES},
-    {"OCELOT_SHORTCUT_REFRESH_USER_VARIABLES", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_USER_VARIABLES},
-    {"OCELOT_SHORTCUT_REFRESH_VARIABLES", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_VARIABLES},
-    {"OCELOT_SHORTCUT_SELECT_ALL", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL},
-    {"OCELOT_SHORTCUT_STEP", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP},
-    {"OCELOT_SHORTCUT_UNDO", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO},
-    {"OCELOT_SHORTCUT_ZOOMIN", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN},
-    {"OCELOT_SHORTCUT_ZOOMOUT", 0, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT},
-    {"OCELOT_STATEMENT_BACKGROUND_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR},
-    {"OCELOT_STATEMENT_BORDER_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR},
-    {"OCELOT_STATEMENT_DETACHED", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED},
-    {"OCELOT_STATEMENT_FONT_FAMILY", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY},
-    {"OCELOT_STATEMENT_FONT_SIZE", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE},
-    {"OCELOT_STATEMENT_FONT_STYLE", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE},
-    {"OCELOT_STATEMENT_FONT_WEIGHT", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT},
-    {"OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT},
-    {"OCELOT_STATEMENT_FORMAT_KEYWORD_CASE", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE},
-    {"OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT},
-    {"OCELOT_STATEMENT_HEIGHT", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT},
-    {"OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR},
-    {"OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR},
-    {"OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR},
-    {"OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR},
-    {"OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR},
-    {"OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR},
-    {"OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR},
-    {"OCELOT_STATEMENT_LEFT", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT},
-    {"OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR},
-    {"OCELOT_STATEMENT_SYNTAX_CHECKER", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER},
-    {"OCELOT_STATEMENT_TEXT_COLOR", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR},
-    {"OCELOT_STATEMENT_TOP", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_TOP},
-    {"OCELOT_STATEMENT_WIDTH", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH},
-    {"OCELOT_XML", 0, 0, TOKEN_KEYWORD_OCELOT_XML},
+  /* If the following assert happens, you inserted/removed something in strvalues[] */
+  /* without changing "1045" in tokens_to_keywords(). */
+  /* That is okay but you must change all occurrences of "10451" to the new size */
+  /* and you should also temporarily uncomment the "test strvalues" test below. */
+  assert(TOKEN_KEYWORD__UTF8MB4 == 1045 - 1);
 
-      {"OCT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OCT},
-      {"OCTET_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OCTET_LENGTH},
-      {"OF", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_OF},
-      {"OFF", 0, 0, TOKEN_KEYWORD_OFF},
-      {"OFFSET", 0, 0, TOKEN_KEYWORD_OFFSET},
-      {"OJ", 0, 0, TOKEN_KEYWORD_OJ},
-      {"OLD_PASSWORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OLD_PASSWORD},
-      {"ON", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ON},
-      {"OPEN", 0, 0, TOKEN_KEYWORD_OPEN},
-      {"OPTIMIZE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTIMIZE},
-      {"OPTIMIZER_COSTS", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_OPTIMIZER_COSTS},
-      {"OPTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTION},
-      {"OPTIONALLY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTIONALLY},
-      {"OR", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_OR},
-      {"ORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ORD},
-      {"ORDER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ORDER},
-      {"OUT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_OUT},
-      {"OUTER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_OUTER},
-      {"OUTFILE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OUTFILE},
-      {"OVER", FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_TARANTOOL | FLAG_VERSION_MARIADB_10_2_2, 0, TOKEN_KEYWORD_OVER},
-      {"OVERLAPS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OVERLAPS}, /* deprecated in MySQL 5.7.6 */
-      {"PACKAGE", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_PACKAGE},
-      {"PAGER", 0, 0, TOKEN_KEYWORD_PAGER}, /* Ocelot keyword */
-      {"PARSER_TRACE", 0, 0, TOKEN_KEYWORD_PARSER_TRACE},
-      {"PARTIAL", 0, 0, TOKEN_KEYWORD_PARTIAL},
-      {"PARTITION", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MARIADB_10_0, 0, TOKEN_KEYWORD_PARTITION},
-      {"PASSWORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PASSWORD}, /* deprecated in MySQL 5.7.6 */
-      {"PERCENTILE_CONT", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_CONT}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
-      {"PERCENTILE_DISC", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_DISC}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
-      {"PERCENT_RANK", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_PERCENT_RANK},
-      {"PERIOD_ADD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PERIOD_ADD},
-      {"PERIOD_DIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PERIOD_DIFF},
-    {"PERSIST", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_PERSIST},
-    {"PERSIST_ONLY", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_PERSIST_ONLY},
-          {"PERSIST_RO_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_PERSIST_RO_VARIABLES_ADMIN},
-      {"PI", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PI},
-      {"PLAN", 0, 0, TOKEN_KEYWORD_PLAN},
-      {"POINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POINT},
-      {"POINTFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POINTFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"POINTFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POINTFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"POINTN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POINTN}, /* deprecated in MySQL 5.7.6 */
-      {"POLYFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POLYFROMTEXT},
-      {"POLYFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POLYFROMWKB}, /* deprecated in MySQL 5.7 */
-      {"POLYGON", 0, 0, TOKEN_KEYWORD_POLYGON},
-      {"POLYGONFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POLYGONFROMTEXT}, /* deprecated in MySQL 5.7.6 */
-      {"POLYGONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POLYGONFROMWKB}, /* deprecated in MySQL 5.7.6 */
-      {"POSITION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POSITION},
-      {"POW", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POW},
-      {"POWER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POWER},
-      {"PRAGMA", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_PRAGMA},
-      {"PRECEDES", FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, 0, TOKEN_KEYWORD_PRECEDES},
-      {"PRECISION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PRECISION},
-      {"PREPARE", 0, 0, TOKEN_KEYWORD_PREPARE},
-      {"PRIMARY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PRIMARY},
-      {"PRINT", 0, 0, TOKEN_KEYWORD_PRINT}, /* Ocelot keyword */
-      {"PRINTF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_PRINTF},
-      {"PROCEDURE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PROCEDURE},
-      {"PROCESS", 0, 0, TOKEN_KEYWORD_PROCESS},
-      {"PROMPT", 0, 0, TOKEN_KEYWORD_PROMPT}, /* Ocelot keyword */
-      {"PROXY", 0, 0, TOKEN_KEYWORD_PROXY},
-      {"PURGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_PURGE},
-      {"QUARTER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_QUARTER},
-      {"QUERY", 0, 0, TOKEN_KEYWORD_QUERY},
-      {"QUIT", 0, 0, TOKEN_KEYWORD_QUIT}, /* Ocelot keyword */
-      {"QUOTE", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_QUOTE},
-      {"RADIANS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RADIANS},
-      {"RAISE", FLAG_VERSION_PLSQL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RAISE},
-      {"RAND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RAND},
-      {"RANDOM", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RANDOM},
-      {"RANDOMBLOB", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_RANDOMBLOB},
-      {"RANDOM_BYTES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RANDOM_BYTES},
-      {"RANGE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RANGE},
-      {"RANK", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_TARANTOOL | FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_RANK},
-      {"RAW", 0, 0, TOKEN_KEYWORD_RAW},
-      {"READ", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_READ},
-      {"READS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_READS},
-      {"READ_WRITE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_READ_WRITE},
-      {"REAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_REAL},
-      {"REBUILD", 0, 0, TOKEN_KEYWORD_REBUILD},
-      {"RECURSIVE", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_RECURSIVE},
-    {"REDOFILE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_REDOFILE},
-      {"REDUNDANT", 0, 0, TOKEN_KEYWORD_REDUNDANT},
-      {"REFERENCES", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_REFERENCES},
-      {"REGEXP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_REGEXP},
-      {"REHASH", 0, 0, TOKEN_KEYWORD_REHASH}, /* Ocelot keyword */
-      {"REINDEX", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_REINDEX},
-      {"RELEASE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RELEASE},
-      {"RELEASE_ALL_LOCKS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RELEASE_ALL_LOCKS},
-      {"RELEASE_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RELEASE_LOCK},
-      {"RELOAD", 0, 0, TOKEN_KEYWORD_RELOAD},
-      {"RENAME", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RENAME},
-      {"REORGANIZE", 0, 0, TOKEN_KEYWORD_REORGANIZE},
-      {"REPAIR", 0, 0, TOKEN_KEYWORD_REPAIR},
-      {"REPEAT", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REPEAT},
-      {"REPLACE", FLAG_VERSION_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_REPLACE},
-      {"REPLICATION", 0, 0, TOKEN_KEYWORD_REPLICATION},
-          {"REPLICATION_SLAVE_ADMIN", 0, 0, TOKEN_KEYWORD_REPLICATION_SLAVE_ADMIN},
-      {"REQUIRE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_REQUIRE},
-      {"RESET", 0, 0, TOKEN_KEYWORD_RESET},
-      {"RESETCONNECTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RESETCONNECTION},
-      {"RESIGNAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RESIGNAL},
-          {"RESOURCE_GROUP_ADMIN", 0, 0, TOKEN_KEYWORD_RESOURCE_GROUP_ADMIN},
-          {"RESOURCE_GROUP_USER", 0, 0, TOKEN_KEYWORD_RESOURCE_GROUP_USER},
-      {"RESTRICT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RESTRICT},
-      {"RETURN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_RETURN},
-      {"RETURNS", 0, 0, TOKEN_KEYWORD_RETURNS},
-      {"REVERSE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REVERSE},
-      {"REVOKE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_REVOKE},
-      {"RIGHT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RIGHT},
-      {"RLIKE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_RLIKE},
-      {"ROLE", 0, 0, TOKEN_KEYWORD_ROLE},
-          {"ROLE_ADMIN", 0, 0, TOKEN_KEYWORD_ROLE_ADMIN},
-      {"ROLLBACK", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROLLBACK},
-      {"ROUND", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ROUND},
-      {"ROW", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROW},
-      {"ROWS", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ROWS},
-      {"ROWTYPE", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_ROWTYPE},
-      {"ROW_COUNT", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_ROW_COUNT},
-      {"ROW_NUMBER", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_ROW_NUMBER},
-      {"RPAD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_RPAD},
-      {"RTRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_RTRIM},
-      {"SAVEPOINT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SAVEPOINT},
-      {"SCHEMA", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SCHEMA},
-      {"SCHEMAS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SCHEMAS},
-      {"SECOND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SECOND},
-      {"SECOND_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SECOND_MICROSECOND},
-      {"SECURITY", 0, 0, TOKEN_KEYWORD_SECURITY},
-      {"SEC_TO_TIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SEC_TO_TIME},
-      {"SELECT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SELECT},
-      {"SENSITIVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SENSITIVE},
-      {"SEPARATOR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SEPARATOR},
-      {"SEQUENCE", 0, 0, TOKEN_KEYWORD_SEQUENCE},
-      {"SERIAL", 0, 0, TOKEN_KEYWORD_SERIAL},
-      {"SERVER", 0, 0, TOKEN_KEYWORD_SERVER},
-      {"SESSION", 0, 0, TOKEN_KEYWORD_SESSION},
-      {"SESSION_USER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SESSION_USER},
-      {"SET", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SET},
-      {"SETVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_SETVAL},
-          {"SET_USER_ID", 0, 0, TOKEN_KEYWORD_SET_USER_ID},
-      {"SHA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA},
-      {"SHA1", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA1},
-      {"SHA2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA2},
-      {"SHARED", 0, 0, TOKEN_KEYWORD_SHARED},
-      {"SHOW", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SHOW},
-      {"SHUTDOWN", 0, 0, TOKEN_KEYWORD_SHUTDOWN},
-      {"SIGN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SIGN},
-      {"SIGNAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SIGNAL},
-      {"SIGNED", 0, 0, TOKEN_KEYWORD_SIGNED},
-      {"SIMPLE", 0, 0, TOKEN_KEYWORD_SIMPLE},
-      {"SIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SIN},
-      {"SLEEP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SLEEP},
-      {"SLOW", 0, 0, TOKEN_KEYWORD_SLOW},
-      {"SMALLINT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SMALLINT},
-      {"SONAME", 0, 0, TOKEN_KEYWORD_SONAME},
-      {"SOUNDEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SOUNDEX},
-      {"SOURCE", 0, 0, TOKEN_KEYWORD_SOURCE}, /* Ocelot keyword */
-      {"SPACE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SPACE},
-      {"SPATIAL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SPATIAL},
-      {"SPECIFIC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SPECIFIC},
-      {"SQL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SQL},
-      {"SQLEXCEPTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQLEXCEPTION},
-      {"SQLSTATE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQLSTATE},
-      {"SQLWARNING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQLWARNING},
-      {"SQL_BIG_RESULT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQL_BIG_RESULT},
-      {"SQL_CALC_FOUND_ROWS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQL_CALC_FOUND_ROWS},
-      {"SQL_COMPOUND_SELECT_LIMIT", 0, 0, TOKEN_KEYWORD_SQL_COMPOUND_SELECT_LIMIT},
-      {"SQL_DEFAULT_ENGINE", 0, 0, TOKEN_KEYWORD_SQL_DEFAULT_ENGINE},
-      {"SQL_SMALL_RESULT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SQL_SMALL_RESULT},
-      {"SQRT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SQRT},
-      {"SRID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SRID},
-      {"SSL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SSL},
-      {"START", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_START},
-      {"STARTING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_STARTING},
-      {"STARTPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STARTPOINT}, /* deprecated in MySQL 5.7.6 */
-      {"STATEMENT", 0, 0, TOKEN_KEYWORD_STATEMENT},
-      {"STATS", 0, 0, TOKEN_KEYWORD_STATS},
-      {"STATUS", 0, 0, TOKEN_KEYWORD_STATUS}, /* Ocelot keyword */
-      {"STD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STD},
-      {"STDDEV", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV},
-      {"STDDEV_POP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV_POP},
-      {"STDDEV_SAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV_SAMP},
-      {"STOP", 0, 0, TOKEN_KEYWORD_STOP},
-      {"STORED", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_STORED},
-      {"STRAIGHT_JOIN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_STRAIGHT_JOIN},
-      {"STRCMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STRCMP},
-      {"STRFTIME", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_STRFTIME},
-      {"STR_TO_DATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STR_TO_DATE},
-      {"ST_AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_AREA},
-      {"ST_ASBINARY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASBINARY},
-      {"ST_ASGEOJSON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASGEOJSON},
-      {"ST_ASTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASTEXT},
-      {"ST_ASWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASWKB},
-      {"ST_ASWKT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASWKT},
-      {"ST_BUFFER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_BUFFER},
-      {"ST_BUFFER_STRATEGY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_BUFFER_STRATEGY},
-      {"ST_CENTROID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_CENTROID},
-      {"ST_CONTAINS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_CONTAINS},
-      {"ST_CONVEXHULL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_CONVEXHULL},
-      {"ST_CROSSES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_CROSSES},
-      {"ST_DIFFERENCE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_DIFFERENCE},
-      {"ST_DIMENSION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_DIMENSION},
-      {"ST_DISJOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_DISJOINT},
-      {"ST_DISTANCE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_DISTANCE},
-      {"ST_DISTANCE_SPHERE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_DISTANCE_SPHERE},
-      {"ST_ENDPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ENDPOINT},
-      {"ST_ENVELOPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ENVELOPE},
-      {"ST_EQUALS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_EQUALS},
-      {"ST_EXTERIORRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_EXTERIORRING},
-      {"ST_GEOHASH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOHASH},
-      {"ST_GEOMCOLLFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMCOLLFROMTEXT},
-      {"ST_GEOMCOLLFROMTXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMCOLLFROMTXT},
-      {"ST_GEOMCOLLFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMCOLLFROMWKB},
-      {"ST_GEOMETRYCOLLECTIONFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMETRYCOLLECTIONFROMTEXT},
-      {"ST_GEOMETRYCOLLECTIONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMETRYCOLLECTIONFROMWKB},
-      {"ST_GEOMETRYFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMETRYFROMTEXT},
-      {"ST_GEOMETRYFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMETRYFROMWKB},
-      {"ST_GEOMETRYN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMETRYN},
-      {"ST_GEOMETRYTYPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMETRYTYPE},
-      {"ST_GEOMFROMGEOJSON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMFROMGEOJSON},
-      {"ST_GEOMFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMFROMTEXT},
-      {"ST_GEOMFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_GEOMFROMWKB},
-      {"ST_INTERIORRINGN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_INTERIORRINGN},
-      {"ST_INTERSECTION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_INTERSECTION},
-      {"ST_INTERSECTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_INTERSECTS},
-      {"ST_ISCLOSED", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ISCLOSED},
-      {"ST_ISEMPTY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ISEMPTY},
-      {"ST_ISSIMPLE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ISSIMPLE},
-      {"ST_ISVALID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ISVALID},
-      {"ST_LATFROMGEOHASH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_LATFROMGEOHASH},
-      {"ST_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_LENGTH},
-      {"ST_LINEFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_LINEFROMTEXT},
-      {"ST_LINEFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_LINEFROMWKB},
-      {"ST_LINESTRINGFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_LINESTRINGFROMTEXT},
-      {"ST_LINESTRINGFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_LINESTRINGFROMWKB},
-      {"ST_LONGFROMGEOHASH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_LONGFROMGEOHASH},
-      {"ST_MAKEENVELOPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MAKEENVELOPE},
-      {"ST_MLINEFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MLINEFROMTEXT},
-      {"ST_MLINEFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MLINEFROMWKB},
-      {"ST_MPOINTFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MPOINTFROMTEXT},
-      {"ST_MPOINTFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MPOINTFROMWKB},
-      {"ST_MPOLYFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MPOLYFROMTEXT},
-      {"ST_MPOLYFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MPOLYFROMWKB},
-      {"ST_MULTILINESTRINGFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MULTILINESTRINGFROMTEXT},
-      {"ST_MULTILINESTRINGFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MULTILINESTRINGFROMWKB},
-      {"ST_MULTIPOINTFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MULTIPOINTFROMTEXT},
-      {"ST_MULTIPOINTFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MULTIPOINTFROMWKB},
-      {"ST_MULTIPOLYGONFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MULTIPOLYGONFROMTEXT},
-      {"ST_MULTIPOLYGONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_MULTIPOLYGONFROMWKB},
-      {"ST_NUMGEOMETRIES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_NUMGEOMETRIES},
-      {"ST_NUMINTERIORRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_NUMINTERIORRING},
-      {"ST_NUMINTERIORRINGS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_NUMINTERIORRINGS},
-      {"ST_NUMPOINTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_NUMPOINTS},
-      {"ST_OVERLAPS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_OVERLAPS},
-      {"ST_POINTFROMGEOHASH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POINTFROMGEOHASH},
-      {"ST_POINTFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POINTFROMTEXT},
-      {"ST_POINTFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POINTFROMWKB},
-      {"ST_POINTN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POINTN},
-      {"ST_POLYFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POLYFROMTEXT},
-      {"ST_POLYFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POLYFROMWKB},
-      {"ST_POLYGONFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POLYGONFROMTEXT},
-      {"ST_POLYGONFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_POLYGONFROMWKB},
-      {"ST_SIMPLIFY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_SIMPLIFY},
-      {"ST_SRID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_SRID},
-      {"ST_STARTPOINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_STARTPOINT},
-      {"ST_SYMDIFFERENCE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_SYMDIFFERENCE},
-      {"ST_TOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_TOUCHES},
-      {"ST_UNION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_UNION},
-      {"ST_VALIDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_VALIDATE},
-      {"ST_WITHIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_WITHIN},
-      {"ST_X", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_X},
-      {"ST_Y", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_Y},
-      {"SUBDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBDATE},
-      {"SUBSTR", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_SUBSTR},
-      {"SUBSTRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBSTRING},
-      {"SUBSTRING_INDEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBSTRING_INDEX},
-      {"SUBTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SUBTIME},
-      {"SUM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_SUM},
-      {"SUPER", 0, 0, TOKEN_KEYWORD_SUPER},
-      {"SYSDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SYSDATE},
-      {"SYSTEM", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SYSTEM}, /* Ocelot keyword */
-      {"SYSTEM_USER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SYSTEM_USER},
-          {"SYSTEM_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN},
-      {"TABLE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TABLE},
-      {"TABLESPACE", 0, 0, TOKEN_KEYWORD_TABLESPACE},
-      {"TABLE_INFO", 0, 0, TOKEN_KEYWORD_TABLE_INFO},
-      {"TAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TAN},
-      {"TEE", 0, 0, TOKEN_KEYWORD_TEE}, /* Ocelot keyword */
-      {"TEMP", 0, 0, TOKEN_KEYWORD_TEMP},
-      {"TEMPORARY", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TEMPORARY},
-      {"TERMINATED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TERMINATED},
-      {"THEN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_THEN},
-      {"TIME", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TIME},
-      {"TIMEDIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMEDIFF},
-      {"TIMESTAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMESTAMP},
-      {"TIMESTAMPADD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMESTAMPADD},
-      {"TIMESTAMPDIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMESTAMPDIFF},
-      {"TIME_FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIME_FORMAT},
-      {"TIME_TO_SEC", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIME_TO_SEC},
-      {"TINYBLOB", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYBLOB},
-      {"TINYINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYINT},
-      {"TINYTEXT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TINYTEXT},
-      {"TO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TO},
-      {"TOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TOUCHES}, /* deprecated in MySQL 5.7.6 */
-      {"TO_BASE64", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_BASE64},
-      {"TO_DAYS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_DAYS},
-      {"TO_SECONDS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_SECONDS},
-      {"TRAILING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TRAILING},
-      {"TRANSACTION", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TRANSACTION},
-      {"TRIGGER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TRIGGER},
-      {"TRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TRIM},
-      {"TRUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_TRUE},
-      {"TRUNCATE", FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TRUNCATE},
-      {"TYPE", 0, 0, TOKEN_KEYWORD_TYPE},
-      {"TYPEOF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_TYPEOF},
-      {"UCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UCASE},
-      {"UNBOUNDED", 0, 0, TOKEN_KEYWORD_UNBOUNDED},
-      {"UNCOMPRESS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UNCOMPRESS},
-      {"UNCOMPRESSED_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UNCOMPRESSED_LENGTH},
-      {"UNDO", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_UNDO},
-      {"UNHEX", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UNHEX},
-      {"UNICODE", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_UNICODE},
-      {"UNINSTALL", 0, 0, TOKEN_KEYWORD_UNINSTALL},
-      {"UNION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_UNION},
-      {"UNIQUE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_UNIQUE},
-      {"UNIX_TIMESTAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UNIX_TIMESTAMP},
-      {"UNKNOWN", 0, 0, TOKEN_KEYWORD_UNKNOWN},
-      {"UNLOCK", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_UNLOCK},
-      {"UNSIGNED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_UNSIGNED},
-      {"UNTIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_UNTIL},
-      {"UPDATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_UPDATE},
-      {"UPDATEXML", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UPDATEXML},
-      {"UPPER", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_UPPER},
-      {"USAGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_USAGE},
-      {"USE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_USE}, /* Ocelot keyword, also reserved word */
-      {"USER", FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_USER},
-      {"USING", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_USING},
-      {"UTC_DATE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UTC_DATE},
-      {"UTC_TIME", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UTC_TIME},
-      {"UTC_TIMESTAMP", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UTC_TIMESTAMP},
-      {"UUID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UUID},
-      {"UUID_SHORT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UUID_SHORT},
-      {"VACUUM", 0, 0, TOKEN_KEYWORD_VACUUM},
-      {"VALIDATE_PASSWORD_STRENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VALIDATE_PASSWORD_STRENGTH},
-      {"VALIDATION", 0, 0, TOKEN_KEYWORD_VALIDATION},
-      {"VALUES", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VALUES},
-      {"VARBINARY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARBINARY},
-      {"VARCHAR", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_VARCHAR},
-      {"VARCHAR2", 0, 0, TOKEN_KEYWORD_VARCHAR2},
-      {"VARCHARACTER", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARCHARACTER},
-      {"VARIANCE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VARIANCE},
-      {"VARYING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARYING},
-      {"VAR_POP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VAR_POP},
-      {"VAR_SAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VAR_SAMP},
-      {"VERSION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VERSION},
-          {"VERSION_TOKEN_ADMIN", 0, 0, TOKEN_KEYWORD_VERSION_TOKEN_ADMIN},
-      {"VIEW", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_VIEW},
-      {"VIRTUAL", FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_VIRTUAL},
-      {"WAIT_FOR_EXECUTED_GTID_SET", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_WAIT_FOR_EXECUTED_GTID_SET},
-      {"WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_WAIT_UNTIL_SQL_THREAD_AFTER_GTIDS},
-      {"WARNINGS", 0, 0, TOKEN_KEYWORD_WARNINGS}, /* Ocelot keyword */
-      {"WEEK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WEEK},
-      {"WEEKDAY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WEEKDAY},
-      {"WEEKOFYEAR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WEEKOFYEAR},
-      {"WEIGHT_STRING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WEIGHT_STRING},
-      {"WHEN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WHEN},
-      {"WHENEVER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WHENEVER},
-      {"WHERE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WHERE},
-      {"WHILE", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_WHILE},
-    {"WINDOW", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_WINDOW},
-      {"WITH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_WITH},
-      {"WITHIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_WITHIN}, /* deprecated in MySQL 5.7.6 */
-      {"WITHOUT", 0, 0, TOKEN_KEYWORD_WITHOUT},
-      {"WRITE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_WRITE},
-      {"X", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_X}, /* deprecated in MySQL 5.7.6 */
-      {"XA", 0, 0, TOKEN_KEYWORD_XA},
-          {"XA_RECOVER_ADMIN", 0, 0, TOKEN_KEYWORD_XA_RECOVER_ADMIN},
-      {"XOR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_XOR},
-      {"Y", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_Y}, /* deprecated in MySQL 5.7.6 */
-      {"YEAR", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_YEAR},
-      {"YEARWEEK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_YEARWEEK},
-      {"YEAR_MONTH", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_YEAR_MONTH},
-      {"ZEROFILL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ZEROFILL},
-      {"_ARMSCII8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__ARMSCII8},
-      {"_ASCII", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__ASCII},
-      {"_BIG5", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__BIG5},
-      {"_BINARY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__BINARY},
-      {"_CP1250", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP1250},
-      {"_CP1251", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP1251},
-      {"_CP1256", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP1256},
-      {"_CP1257", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP1257},
-      {"_CP850", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP850},
-      {"_CP852", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP852},
-      {"_CP866", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP866},
-      {"_CP932", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__CP932},
-      {"_DEC8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__DEC8},
-      {"_EUCJPMS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__EUCJPMS},
-      {"_EUCKR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__EUCKR},
-      {"_FILENAME", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__FILENAME},
-      {"_GB18030", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD__GB18030},
-      {"_GB2312", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__GB2312},
-      {"_GBK", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__GBK},
-      {"_GEOSTD8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__GEOSTD8},
-      {"_GREEK", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__GREEK},
-      {"_HEBREW", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__HEBREW},
-      {"_HP8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__HP8},
-      {"_KEYBCS2", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__KEYBCS2},
-      {"_KOI8R", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__KOI8R},
-      {"_KOI8U", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__KOI8U},
-      {"_LATIN1", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__LATIN1},
-      {"_LATIN2", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__LATIN2},
-      {"_LATIN5", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__LATIN5},
-      {"_LATIN7", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__LATIN7},
-      {"_MACCE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__MACCE},
-      {"_MACROMAN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__MACROMAN},
-      {"_SJIS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__SJIS},
-      {"_SWE7", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__SWE7},
-      {"_TIS620", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__TIS620},
-      {"_UCS2", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UCS2},
-      {"_UJIS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UJIS},
-      {"_UTF16", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF16},
-      {"_UTF16LE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF16LE},
-      {"_UTF32", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF32},
-      {"_UTF8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF8},
-      {"_UTF8MB4", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF8MB4}
-    };
+  /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
+  /* That is okay but you must change this occurrence of "101" to the new size */
+  /* and you should also look whether SET statements cause an overflow */
+  /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 101);
+
+  /* If the following assert happens, you put something before "?" in strvalues[]. */
+  /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
+  assert(TOKEN_KEYWORD_QUESTIONMARK == TOKEN_KEYWORDS_START);
+
+  ///* Test strvalues is ordered by bsearching for every item. */
+  ///* This is commented out unless there has been a change to the list
+  //char *p_item;
+  //unsigned long index;
+  //char l[MAX_KEYWORD_LENGTH+1]= "";
+  //for (int ii= TOKEN_KEYWORD_QUESTIONMARK; ii < 1045; ++ii)
+  //{
+  //  char *k= (char*) &strvalues[ii].chars;
+  //  if (strcmp(k, l) <= 0) {printf("k <= l!\n"); exit(0); }
+  //  printf("ii=%d\n", ii);
+  //  printf("k=%s.\n", k);
+  //  p_item= (char*) bsearch(k, strvalues, 1045, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+  //  assert(p_item != NULL);
+  //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
+  //  printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
+  //  if (index != strvalues[ii].token_keyword) exit(0);
+  //  assert(index == strvalues[ii].token_keyword);
+  //  strcpy(l, k);
+  //}
+  //assert(strcmp(strvalues[TOKEN_KEYWORD_QUESTIONMARK].chars, "?") == 0);
+  //assert(strcmp(strvalues[TOKEN_KEYWORD__UTF8MB4].chars, "_UTF8MB4") == 0);
+}
 
 void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
 {
   log("tokens_to_keywords start", 80);
-  /*
-    Sorted list of keywords.
-    If you change this, you must also change bsearch parameters and change TOKEN_KEYWORD list.
-    We consider introducers e.g. _UTF8 to be equivalent to reserved words.
-    The longest keyword, OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR, causes some space waste.
-  */
-
 
   //QString text;
   QString s= "";
@@ -12315,38 +11303,10 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
       /* Uppercase it. I don't necessarily have strupr(). */
       for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
       key2[i]= '\0';
-      /* If the following assert happens, you inserted/removed something without changing "1031" */
-      /* That is okay but you must change all occurrences of "1031" to the new size */
-      /* and you should also temporarily uncomment the "test strvalues" test below. */
-      assert(TOKEN_KEYWORD__UTF8MB4 == TOKEN_KEYWORD_QUESTIONMARK + (1031 - 1));
 
-      /* If the following assert happens, you inserted/removed an OCELOT_... item */
-      /* That is okay but you must change this occurrence of "101" to the new size */
-      /* and you should also look whether SET statements cause an overflow */
-      /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
-      assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 101);
-
-      ///* Test strvalues is ordered by bsearching for every item. */
-      ///* This is commented out unless there has been a change to the list
-      //char l[MAX_KEYWORD_LENGTH+1]= "";
-      //for (int ii= 0; ii < 1031; ++ii)
-      //{
-      //  char *k= (char*) &strvalues[ii].chars;
-      //  if (strcmp(k, l) <= 0) {printf("k <= l!\n"); exit(0); }
-      //  printf("ii=%d\n", ii);
-      //  printf("k=%s.\n", k);
-      //  p_item= (char*) bsearch(k, strvalues, 1031, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
-      //  assert(p_item != NULL);
-      //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
-      //  index+= TOKEN_KEYWORDS_START;
-      //  printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
-      //  if (index != strvalues[ii].token_keyword) exit(0);
-      //  assert(index == strvalues[ii].token_keyword);
-      //  strcpy(l, k);
-      //}
       /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 1031 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 1031, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+      /* Search it with library binary-search. Assume 1045 items and everything MAX_KEYWORD_LENGTH bytes long. */
+      p_item= (char*) bsearch(key2, strvalues, 1045, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
       if (p_item != NULL)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
@@ -12359,7 +11319,7 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
         }
         if ((strvalues[index].reserved_flags & FLAG_VERSION_LUA) != 0)
           main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_MAYBE_LUA);
-        index+= TOKEN_KEYWORDS_START;
+        //index+= TOKEN_KEYWORDS_START; commented out on 2019-02-27
         main_token_types[i2]= index;
       }
 #ifdef DEBUGGER
@@ -17348,6 +16308,7 @@ QString MainWindow::connect_unstripper(QString value_to_unstrip)
   ! If we say --skip-socket=x then socket='0' i.e. override previous setting
   I try to follow some of this but not all.
 */
+/* For variables beginning "ocelot_" we may use strcasecmp rather than strcmp. */
 void MainWindow::connect_set_variable(QString token0, QString token2)
 {
   unsigned int token0_length;
@@ -17640,7 +16601,8 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (strcmp(token0_as_utf8, "ocelot_menu_font_weight") == 0)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_menu_font_weight= ccn; return; }
   /* "ocelot_shortcut_exit" etc. are handled specially */
-  if (shortcut(token0_as_utf8, token2, true, false) != 0) return;
+  /* TEMPORARILY COMMENTED OUT */
+  //if (shortcut(token0_as_utf8, token2, true, false) != 0) return;
   if (strcmp(token0_as_utf8, "ocelot_statement_text_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_text_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_background_color") == 0)
@@ -17657,7 +16619,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_literal_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_highlight_identifier_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_identifier_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_comment_color") == 0)
+  if (strcasecmp(token0_as_utf8, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR].chars) == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_comment_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_statement_highlight_operator_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_operator_color= ccn; return; }

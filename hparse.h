@@ -12834,16 +12834,13 @@ int MainWindow::hparse_f_client_statement()
     /* If you add to this, hparse_errmsg might not be big enough. */
     /* Todo: strvalues items are in order so you could bsearch(). */
     /* Todo: TOKEN_REFTYPE_ANY is vague, you'd do well with a reftype for ocelot_ items */
+    /* Todo: it's really TOKEN_TYPE_IDENTIFIER so see what hovering does */
     {
       int i;
       for (i= TOKEN_KEYWORD_OCELOT_BATCH; i <= TOKEN_KEYWORD_OCELOT_XML; ++i)
       {
-        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, strvalues[i].chars) == 1)
-        {
-          printf("**** i=%d\n", i);
-          exit(0);
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,i, strvalues[i].chars) == 1)
           break;
-        }
       }
       if (i > TOKEN_KEYWORD_OCELOT_XML) hparse_f_error();
     }
