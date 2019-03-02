@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: February 27 2019
+   Last modified: March 2 2019
 */
 
 /*
@@ -4308,22 +4308,22 @@ void MainWindow::action_statement()
     //make_style_strings();
     //statement_edit_widget_setstylesheet();
     /* For each changed Settings item, produce and execute a settings-change statement. */
-    action_change_one_setting(ocelot_statement_text_color, new_ocelot_statement_text_color,"ocelot_statement_text_color");
-    action_change_one_setting(ocelot_statement_background_color, new_ocelot_statement_background_color,"ocelot_statement_background_color");
-    action_change_one_setting(ocelot_statement_border_color, new_ocelot_statement_border_color,"ocelot_statement_border_color");
-    action_change_one_setting(ocelot_statement_font_family, new_ocelot_statement_font_family,"ocelot_statement_font_family");
-    action_change_one_setting(ocelot_statement_font_size, new_ocelot_statement_font_size,"ocelot_statement_font_size");
-    action_change_one_setting(ocelot_statement_font_style, new_ocelot_statement_font_style,"ocelot_statement_font_style");
-    action_change_one_setting(ocelot_statement_font_weight, new_ocelot_statement_font_weight,"ocelot_statement_font_weight");
-    action_change_one_setting(ocelot_statement_highlight_literal_color, new_ocelot_statement_highlight_literal_color,"ocelot_statement_highlight_literal_color");
-    action_change_one_setting(ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color,"ocelot_statement_highlight_identifier_color");
+    action_change_one_setting(ocelot_statement_text_color, new_ocelot_statement_text_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR].chars);
+    action_change_one_setting(ocelot_statement_background_color, new_ocelot_statement_background_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR].chars);
+    action_change_one_setting(ocelot_statement_border_color, new_ocelot_statement_border_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR].chars);
+    action_change_one_setting(ocelot_statement_font_family, new_ocelot_statement_font_family,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY].chars);
+    action_change_one_setting(ocelot_statement_font_size, new_ocelot_statement_font_size,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE].chars);
+    action_change_one_setting(ocelot_statement_font_style, new_ocelot_statement_font_style,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE].chars);
+    action_change_one_setting(ocelot_statement_font_weight, new_ocelot_statement_font_weight,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT].chars);
+    action_change_one_setting(ocelot_statement_highlight_literal_color, new_ocelot_statement_highlight_literal_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR].chars);
+    action_change_one_setting(ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR].chars);
     action_change_one_setting(ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR].chars);
-    action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,"ocelot_statement_highlight_operator_color");
-    action_change_one_setting(ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color,"ocelot_statement_highlight_keyword_color");
-    action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,"ocelot_statement_prompt_background_color");
-    action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,"ocelot_statement_highlight_current_line_color");
-    action_change_one_setting(ocelot_statement_highlight_function_color, new_ocelot_statement_highlight_function_color,"ocelot_statement_highlight_function_color");
-    action_change_one_setting(ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker,"ocelot_statement_syntax_checker");
+    action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR].chars);
+    action_change_one_setting(ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR].chars);
+    action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR].chars);
+    action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR].chars);
+    action_change_one_setting(ocelot_statement_highlight_function_color, new_ocelot_statement_highlight_function_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR].chars);
+    action_change_one_setting(ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER].chars);
 
     /* Todo: consider: maybe you have to do a restore like this */
     //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
@@ -4335,11 +4335,11 @@ void MainWindow::action_statement()
     statement_edit_widget->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_text_color);
     action_statement_edit_widget_text_changed(0, 0, 0);            /* only for highlight? repaint so new highlighting will appear */
     /* Todo: Check: Do we need to change style settings for this stuff? */
-    action_change_one_setting(ocelot_statement_height, new_ocelot_statement_height, "ocelot_statement_height");
-    action_change_one_setting(ocelot_statement_left, new_ocelot_statement_left, "ocelot_statement_left");
-    action_change_one_setting(ocelot_statement_top, new_ocelot_statement_top, "ocelot_statement_top");
-    action_change_one_setting(ocelot_statement_width, new_ocelot_statement_width, "ocelot_statement_width");
-    action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, "ocelot_statement_detached");
+    action_change_one_setting(ocelot_statement_height, new_ocelot_statement_height, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT].chars);
+    action_change_one_setting(ocelot_statement_left, new_ocelot_statement_left, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT].chars);
+    action_change_one_setting(ocelot_statement_top, new_ocelot_statement_top, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_TOP].chars);
+    action_change_one_setting(ocelot_statement_width, new_ocelot_statement_width, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH].chars);
+    action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED].chars);
   }
   delete(se);
 }
@@ -9422,8 +9422,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
+      int keyword_index= sub_token_types[1];
       /* Todo: figure out why sometimes we say connect_stripper() and sometimes we don't */
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_text_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9432,7 +9433,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget_setstylesheet();
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_background_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9441,7 +9442,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget_setstylesheet();
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_border_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9454,14 +9455,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
                because only 'Courier New' exists. There should be a warning, and
                setting some style hint e.g. "at least it should be monospace" would be good.
                This applies for all font_family settings. */
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_family", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY)
       {
         ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
         make_style_strings();
         statement_edit_widget_setstylesheet();
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_size", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
@@ -9470,7 +9471,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget_setstylesheet();
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_style", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
@@ -9479,7 +9480,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget_setstylesheet();
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_font_weight", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
@@ -9488,42 +9489,42 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget_setstylesheet();
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_literal_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_literal_color= ccn;
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_identifier_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_identifier_color= ccn;
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR].chars, Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_comment_color= ccn;
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_operator_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_operator_color= ccn;
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_keyword_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_keyword_color= ccn;
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_prompt_background_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9533,7 +9534,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_current_line_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9541,14 +9542,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         statement_edit_widget->highlightCurrentLine();
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_highlight_function_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_statement_highlight_function_color= ccn;
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_syntax_checker", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER)
       {
         QString syntax_checker= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int syntax_checker_as_int= syntax_checker.toInt();
@@ -9557,7 +9558,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_syntax_checker= syntax_checker;
         make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_format_statement_indent", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT)
       {
         QString format_indent= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int format_indent_as_int= format_indent.toInt();
@@ -9566,7 +9567,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_format_statement_indent= format_indent;
         make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_format_clause_indent", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT)
       {
         QString format_indent= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int format_indent_as_int= format_indent.toInt();
@@ -9575,7 +9576,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_format_clause_indent= format_indent;
         make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_format_keyword_case", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE)
       {
         QString format_case= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         format_case= format_case.toLower();
@@ -9584,35 +9585,35 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_statement_format_keyword_case= format_case;
         make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_height", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_left", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_top", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_TOP)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_width", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_statement_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_statement_detached", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
       {
         QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
@@ -9622,35 +9623,35 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
 
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_height", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_left", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_LEFT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_top", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_TOP)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_width", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_debug_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_debug_detached", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
       {
         QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
@@ -9662,40 +9663,40 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 
       bool is_result_grid_style_changed= false;
       bool is_result_grid_font_size_changed= false;
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_text_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_text_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_background_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_header_background_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_header_background_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_family", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
       {
         ocelot_grid_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
         is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_size", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
@@ -9703,49 +9704,49 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_grid_font_size= ccn;
         is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_style", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_grid_font_style= ccn;
         is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_font_weight", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
         ocelot_grid_font_weight= ccn;
         is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_cell_border_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_grid_cell_drag_line_color= ccn;
         assign_names_for_colors(); is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_border_size", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { make_and_put_message_in_result(ER_UNKNOWN_BORDER_SIZE, 0, (char*)""); return 1; }
         ocelot_grid_border_size= ccn;
         is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_border_size", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < 0) || (ccn.toInt() > 10)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_BORDER_SIZE, 0, (char*)""); return 1; }
         ocelot_grid_cell_border_size= ccn;
         is_result_grid_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_cell_drag_line_size", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < 0) || (ccn.toInt() > 10)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_DRAG_LINE_SIZE, 0, (char*)""); return 1; }
@@ -9763,35 +9764,35 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         }
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_height", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_HEIGHT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_left", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_LEFT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_top", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TOP)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_width", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_WIDTH)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_grid_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_grid_detached", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
       {
         QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
@@ -9801,26 +9802,26 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       bool is_extra_rule_1_style_changed= false;
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_text_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_extra_rule_1_text_color= ccn;
         assign_names_for_colors(); is_extra_rule_1_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_background_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
         ocelot_extra_rule_1_background_color= ccn;
         assign_names_for_colors(); is_extra_rule_1_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_condition", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION)
       {
         ocelot_extra_rule_1_condition= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), true);
         is_extra_rule_1_style_changed= true;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_extra_rule_1_display_as", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS)
       {
         ocelot_extra_rule_1_display_as= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         is_extra_rule_1_style_changed= true;
@@ -9831,7 +9832,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
 
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_text_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9840,7 +9841,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_background_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9849,7 +9850,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_border_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9858,14 +9859,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_family", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY)
       {
         ocelot_history_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_size", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
@@ -9874,7 +9875,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_style", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
@@ -9883,7 +9884,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_font_weight", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
@@ -9892,42 +9893,42 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_height", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_height= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_left", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_LEFT)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_left= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_max_row_count", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_max_row_count= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_top", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_TOP)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_top= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_width", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH)
       {
         QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_history_width= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_history_detached", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
       {
         QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
         if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
@@ -9937,7 +9938,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ocelot_history_detached= ccn;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_text_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9946,7 +9947,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_background_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9955,7 +9956,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_border_color", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
@@ -9964,7 +9965,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
         assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_family", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY)
       {
         ocelot_menu_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         make_style_strings();
@@ -9972,7 +9973,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_size", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
@@ -9982,7 +9983,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_style", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE)
       {
         QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
@@ -9992,7 +9993,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_menu_font_weight", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT)
       {
         QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
@@ -10003,7 +10004,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
 
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_batch", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_BATCH)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int i= ccn.toInt();
@@ -10012,7 +10013,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         if (i == 1) ocelot_html= ocelot_xml= 0; /* should we warn? */
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_html", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int i= ccn.toInt();
@@ -10021,7 +10022,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         if (i == 1) ocelot_batch= ocelot_xml= 0; /* should we warn? */
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_xml", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_XML)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int i= ccn.toInt();
@@ -10030,7 +10031,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         if (i == 1) ocelot_batch= ocelot_html= 0; /* should we warn? */
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (QString::compare(text.mid(sub_token_offsets[1], sub_token_lengths[1]), "ocelot_raw", Qt::CaseInsensitive) == 0)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_RAW)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int i= ccn.toInt();
@@ -11234,17 +11235,21 @@ void MainWindow::initial_asserts()
 
   assert(TOKEN_REFTYPE_MAX == 91); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
 
+  //printf("TOKEN_KEYWORD__UTf8MB4 == %d\n", TOKEN_KEYWORD__UTF8MB4);
+
+  //printf("TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH=%d\n", TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH);
+
   /* If the following assert happens, you inserted/removed something in strvalues[] */
-  /* without changing "1045" in tokens_to_keywords(). */
-  /* That is okay but you must change all occurrences of "10451" to the new size */
+  /* without changing KEYWORD_LIST_SIZE in tokens_to_keywords(). */
+  /* That is okay but you must change all occurrences of KEYWORD_LIST_SIZE to the new size */
   /* and you should also temporarily uncomment the "test strvalues" test below. */
-  assert(TOKEN_KEYWORD__UTF8MB4 == 1045 - 1);
+  assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "101" to the new size */
+  /* That is okay but you must change this occurrence of "102" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 101);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 108);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -11255,13 +11260,13 @@ void MainWindow::initial_asserts()
   //char *p_item;
   //unsigned long index;
   //char l[MAX_KEYWORD_LENGTH+1]= "";
-  //for (int ii= TOKEN_KEYWORD_QUESTIONMARK; ii < 1045; ++ii)
+  //for (int ii= TOKEN_KEYWORD_QUESTIONMARK; ii < KEYWORD_LIST_SIZE; ++ii)
   //{
   //  char *k= (char*) &strvalues[ii].chars;
   //  if (strcmp(k, l) <= 0) {printf("k <= l!\n"); exit(0); }
   //  printf("ii=%d\n", ii);
   //  printf("k=%s.\n", k);
-  //  p_item= (char*) bsearch(k, strvalues, 1045, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+  //  p_item= (char*) bsearch(k, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
   //  assert(p_item != NULL);
   //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
   //  printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
@@ -11280,10 +11285,9 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
   //QString text;
   QString s= "";
   int t;
-  char *p_item;
-  unsigned long index;
+  int index;
   char key2[MAX_KEYWORD_LENGTH + 1];
-  int i, i2;
+  int i2;
 
   //text= statement_edit_widget->toPlainText();
   for (i2= start; main_token_lengths[i2] != 0; ++i2)
@@ -11300,17 +11304,11 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
       /* It's not a literal or operator. Maybe it's a keyword. Convert it to char[]. */
       QByteArray key_as_byte_array= s.toLocal8Bit();
       const char *key= key_as_byte_array.data();
-      /* Uppercase it. I don't necessarily have strupr(). */
-      for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
-      key2[i]= '\0';
+      index= get_keyword_index(key, key2);
 
-      /* TODO: you don't need to calculate index, it's strvalues[...].token_keyword. */
-      /* Search it with library binary-search. Assume 1045 items and everything MAX_KEYWORD_LENGTH bytes long. */
-      p_item= (char*) bsearch(key2, strvalues, 1045, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
-      if (p_item != NULL)
+      if (index != -1)
       {
         /* It's in the list, so instead of TOKEN_TYPE_OTHER, make it TOKEN_KEYWORD_something. */
-        index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
         if ((strvalues[index].reserved_flags & dbms_version_mask) != 0)
           main_token_flags[i2]= (main_token_flags[i2] | TOKEN_FLAG_IS_RESERVED);
         if ((strvalues[index].built_in_function_flags & dbms_version_mask) != 0)
@@ -11447,6 +11445,24 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
     if (s == QString("\\W")) main_token_types[xx]= main_token_types[xx + 1]= TOKEN_KEYWORD_WARNINGS;
   }
   log("tokens_to_keywords end", 80);
+}
+
+/*
+  Pass a word. Return a pointer to the keywords list, or 0 if word is not in keywords list.
+  And change key2, which must be big enough to store the biggest word, to upper(key).
+  Todo: the calculation in the return might not be portable, maybe use strvalues[x].token_keyword
+*/
+int MainWindow::get_keyword_index(const char *key, char *key2)
+{
+  int i;
+  char *p_item;
+  /* Uppercase it. I don't necessarily have strupr() or strcmpi(). */
+  for (i= 0; (*(key + i) != '\0') && (i < MAX_KEYWORD_LENGTH); ++i) key2[i]= toupper(*(key + i));
+  key2[i]= '\0';
+  /* Search it with library binary-search. Assume KEYWORD_LIST_SIZE items and everything MAX_KEYWORD_LENGTH bytes long. */
+  p_item=  (char*) bsearch(key2, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+  if (p_item == NULL) return -1;
+  return (int)((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
 }
 
 /*
@@ -16365,36 +16381,40 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     else /* error */ is_enable= 0;
   }
 
-  if (strcmp(token0_as_utf8, "abort_source_on_error") == 0) { ocelot_abort_source_on_error= is_enable; return; }
-  if (strcmp(token0_as_utf8, "auto_rehash") == 0) { ocelot_auto_rehash= is_enable; return; }
-  if (strcmp(token0_as_utf8, "auto_vertical_output") == 0) { ocelot_auto_vertical_output= is_enable; return; }
+  char key2[MAX_KEYWORD_LENGTH + 1];
+  int keyword_index;
+  keyword_index= get_keyword_index(token0_as_utf8, key2);
+
+  if (keyword_index == TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR) { ocelot_abort_source_on_error= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_AUTO_REHASH) { ocelot_auto_rehash= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT) { ocelot_auto_vertical_output= is_enable; return; }
   if (strcmp(token0_as_utf8, "batch") == 0)
   {
     ocelot_batch= is_enable;
     ocelot_silent= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "binary_mode") == 0) { ocelot_binary_mode= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_BINARY_MODE) { ocelot_binary_mode= is_enable; return; }
   if (strcmp(token0_as_utf8, "bind") == 0) /* not available in mysql client */
   {
     ocelot_opt_bind= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "bind_address") == 0) { ocelot_bind_address= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_BIND_ADDRESS) { ocelot_bind_address= is_enable; return; }
 
-  if (strcmp(token0_as_utf8, "connect_expired_password") == 0) /* not available in mysql client before version 5.7 */
+  if (keyword_index == TOKEN_KEYWORD_CONNECT_EXPIRED_PASSWORD) /* not available in mysql client before version 5.7 */
   {
     ocelot_opt_can_handle_expired_passwords= is_enable;
     return;
   }
 
-  if (strcmp(token0_as_utf8, "character_sets_dir") == 0)
+  if (keyword_index == TOKEN_KEYWORD_CHARACTER_SETS_DIR)
   {
     ocelot_set_charset_dir= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "column_names") == 0) { ocelot_result_grid_column_names= is_enable; return; }
-  if (strcmp(token0_as_utf8, "column_type_info") == 0) { ocelot_column_type_info= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_COLUMN_NAMES) { ocelot_result_grid_column_names= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_COLUMN_TYPE_INFO) { ocelot_column_type_info= is_enable; return; }
   if ((token0_length >= sizeof("comm") - 1) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
   {
     ocelot_comments= is_enable;
@@ -16405,12 +16425,12 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_compress= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "connect_attr_delete") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_CONNECT_ATTR_DELETE) /* not available in mysql client */
   {
     ocelot_opt_connect_attr_delete= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "connect_attr_reset") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_CONNECT_ATTR_RESET) /* not available in mysql client */
   {
     ocelot_opt_connect_attr_reset= is_enable;
     return;
@@ -16420,34 +16440,34 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_connect_timeout= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "database") == 0)
+  if (keyword_index == TOKEN_KEYWORD_DATABASE)
   {
     ocelot_database= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "debug") == 0) { ocelot_debug= token2; return; }
-  if (strcmp(token0_as_utf8, "debug_info") == 0) { ocelot_debug_info= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_DEBUG) { ocelot_debug= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_DEBUG_INFO) { ocelot_debug_info= is_enable; return; }
   if ((token0_length >= sizeof("default_a") - 1) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
   {
     ocelot_default_auth= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "default_character_set") == 0)
+  if (keyword_index == TOKEN_KEYWORD_DEFAULT_CHARACTER_SET)
   {
     ocelot_set_charset_name= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "defaults_extra_file") == 0)
+  if (keyword_index == TOKEN_KEYWORD_DEFAULTS_EXTRA_FILE)
   {
     ocelot_defaults_extra_file= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "defaults_file") == 0)
+  if (keyword_index == TOKEN_KEYWORD_DEFAULTS_FILE)
   {
     ocelot_defaults_file= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "defaults_group_suffix") == 0)
+  if (keyword_index == TOKEN_KEYWORD_DEFAULTS_GROUP_SUFFIX)
   {
     ocelot_defaults_group_suffix= token2;
     return;
@@ -16457,65 +16477,65 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_delimiter_str= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "cleartext_plugin") == 0)
+  if (keyword_index == TOKEN_KEYWORD_ENABLE_CLEARTEXT_PLUGIN)
   {
     ocelot_enable_cleartext_plugin= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "execute") == 0) { ocelot_execute= token2; return; }
-  if (strcmp(token0_as_utf8, "force") == 0) { ocelot_force= is_enable; return; }
-  if (strcmp(token0_as_utf8, "help") == 0) { ocelot_help= is_enable; return; }
-  if (strcmp(token0_as_utf8, "histfile") == 0) { ocelot_history_hist_file_name= token2; return; }
-  if (strcmp(token0_as_utf8, "histignore") == 0) { ocelot_histignore= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_EXECUTE) { ocelot_execute= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_FORCE) { ocelot_force= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_HELP) { ocelot_help= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_HISTFILE) { ocelot_history_hist_file_name= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_HISTIGNORE) { ocelot_histignore= token2; return; }
   if ((token0_length >= sizeof("ho") - 1) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
   {
     ocelot_host= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "html") == 0) { ocelot_html= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_HTML) { ocelot_html= is_enable; return; }
   if ((token0_length >= sizeof("i_") - 1) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
   {
     ocelot_safe_updates= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "ignore_spaces") == 0) { ocelot_ignore_spaces= is_enable; return; }
-  if (strcmp(token0_as_utf8, "ld_run_path") == 0) { ocelot_ld_run_path= token2; return; }
-  if (strcmp(token0_as_utf8, "init_command") == 0)
+  if (keyword_index == TOKEN_KEYWORD_IGNORE_SPACES) { ocelot_ignore_spaces= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_LD_RUN_PATH) { ocelot_ld_run_path= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_INIT_COMMAND)
   {
     ocelot_init_command= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "line_numbers") == 0) { ocelot_line_numbers= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_LINE_NUMBERS) { ocelot_line_numbers= is_enable; return; }
   if ((token0_length >= sizeof("loc") - 1) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
   {
     if (token2 > "") ocelot_opt_local_infile= to_long(token2);
     else ocelot_opt_local_infile= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "login_path") == 0) { ocelot_login_path= token2; return; }
-  if (strcmp(token0_as_utf8, "max_allowed_packet") == 0) { ocelot_max_allowed_packet= to_long(token2); return; }
+  if (keyword_index == TOKEN_KEYWORD_LOGIN_PATH) { ocelot_login_path= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_MAX_ALLOWED_PACKET) { ocelot_max_allowed_packet= to_long(token2); return; }
   if ((token0_length >= sizeof("max_j") - 1) && (strncmp(token0_as_utf8, "max_join_size", token0_length) == 0))
   {
     ocelot_max_join_size= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "named_commands") == 0) { ocelot_named_commands= is_enable; return; }
-  if (strcmp(token0_as_utf8, "net_buffer_length") == 0) { ocelot_net_buffer_length= to_long(token2); return; }
-  if (strcmp(token0_as_utf8, "no_auto_rehash") == 0) { ocelot_auto_rehash= 0; return; }
+  if (keyword_index == TOKEN_KEYWORD_NAMED_COMMANDS) { ocelot_named_commands= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_NET_BUFFER_LENGTH) { ocelot_net_buffer_length= to_long(token2); return; }
+  if (keyword_index == TOKEN_KEYWORD_NO_AUTO_REHASH) { ocelot_auto_rehash= 0; return; }
   if ((token0_length >= sizeof("no_b") - 1) && (strncmp(token0_as_utf8, "no_beep", token0_length) == 0))
   {
     ocelot_no_beep= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "no_defaults") == 0) { ocelot_no_defaults= is_enable; return; }
-  if (strcmp(token0_as_utf8, "no_named_commands") == 0) { ocelot_named_commands= 0; return; }
-  if (strcmp(token0_as_utf8, "no_tee") == 0) { history_file_stop("TEE"); return; }/* see comment=tee+hist */
+  if (keyword_index == TOKEN_KEYWORD_NO_DEFAULTS) { ocelot_no_defaults= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_NO_NAMED_COMMANDS) { ocelot_named_commands= 0; return; }
+  if (keyword_index == TOKEN_KEYWORD_NO_TEE) { history_file_stop("TEE"); return; }/* see comment=tee+hist */
 
   QString ccn;
   /* Changes to ocelot_* settings. But we don't check that they're in the [ocelot] group. */
   /* Todo: validity checks */
 
-  if (strcmp(token0_as_utf8, "ocelot_dbms") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DBMS)
   {
     ocelot_dbms= token2;
     if (ocelot_dbms.contains("mysql", Qt::CaseInsensitive) == true)
@@ -16536,134 +16556,133 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
 
-  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_text_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_extra_rule_1_text_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_background_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_extra_rule_1_background_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_condition") == 0) { ocelot_extra_rule_1_condition= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_extra_rule_1_display_as") == 0) { ocelot_extra_rule_1_display_as= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_text_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION) { ocelot_extra_rule_1_condition= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS) { ocelot_extra_rule_1_display_as= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_text_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_background_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_background_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_border_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_border_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_header_background_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_header_background_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_font_family") == 0) { ocelot_grid_font_family= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_font_size") == 0) { ocelot_grid_font_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_font_style") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY) { ocelot_grid_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE) { ocelot_grid_font_size= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
   { ccn= canonical_font_style(token2); if (ccn != "") ocelot_grid_font_style= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_font_weight") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_grid_font_weight= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_cell_border_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_cell_border_color= ccn; return; }
   if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_color") == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_cell_drag_line_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_border_size") == 0) { ocelot_grid_border_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_cell_border_size") == 0) { ocelot_grid_cell_border_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_size") == 0) { ocelot_grid_cell_drag_line_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_tabs") == 0) { ocelot_grid_tabs= to_long(token2); return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_height") == 0) { ocelot_grid_height= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_left") == 0) { ocelot_grid_left= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_top") == 0) { ocelot_grid_top= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_width") == 0) { ocelot_grid_width= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_detached") == 0) { ocelot_grid_detached= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_text_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) { ocelot_grid_border_size= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE) { ocelot_grid_cell_border_size= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE) { ocelot_grid_cell_drag_line_size= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TABS) { ocelot_grid_tabs= to_long(token2); return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_HEIGHT) { ocelot_grid_height= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_LEFT) { ocelot_grid_left= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TOP) { ocelot_grid_top= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_WIDTH){ ocelot_grid_width= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED) { ocelot_grid_detached= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_text_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_background_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_background_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_border_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_border_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_font_family") == 0) { ocelot_history_font_family= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_font_size") == 0) { ocelot_history_font_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_font_style") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY) { ocelot_history_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE) { ocelot_history_font_size= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
   { ccn= canonical_font_style(token2); if (ccn != "") ocelot_history_font_style= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_font_weight") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_history_font_weight= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_left") == 0) { ocelot_history_left= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_height") == 0) { ocelot_history_height= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_max_row_count") == 0) { ocelot_history_max_row_count= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_top") == 0) { ocelot_history_top= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_width") == 0) { ocelot_history_width= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_history_detached") == 0) { ocelot_history_detached= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_language") == 0) { ocelot_language= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_text_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_LEFT) { ocelot_history_left= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT) { ocelot_history_height= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT) { ocelot_history_max_row_count= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_TOP) { ocelot_history_top= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH) { ocelot_history_width= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED) { ocelot_history_detached= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_LANGUAGE) { ocelot_language= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_text_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_background_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_background_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_border_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_border_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_font_family") == 0) { ocelot_menu_font_family= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_font_size") == 0) { ocelot_menu_font_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_font_style") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY) { ocelot_menu_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE) { ocelot_menu_font_size= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE)
   { ccn= canonical_font_style(token2); if (ccn != "") ocelot_menu_font_style= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_menu_font_weight") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_menu_font_weight= ccn; return; }
   /* "ocelot_shortcut_exit" etc. are handled specially */
-  /* TEMPORARILY COMMENTED OUT */
-  //if (shortcut(token0_as_utf8, token2, true, false) != 0) return;
-  if (strcmp(token0_as_utf8, "ocelot_statement_text_color") == 0)
+  if (shortcut(keyword_index, token2, true, false) > 0) return;
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_text_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_background_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_background_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_border_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_border_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_font_family") == 0) { ocelot_statement_font_family= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_font_size") == 0) { ocelot_statement_font_size= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_font_style") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY) { ocelot_statement_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE) { ocelot_statement_font_size= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
   { ccn= canonical_font_style(token2); if (ccn != "") ocelot_statement_font_style= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_font_weight") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_statement_font_weight= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_literal_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_literal_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_identifier_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_identifier_color= ccn; return; }
   if (strcasecmp(token0_as_utf8, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR].chars) == 0)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_comment_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_operator_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_operator_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_keyword_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_keyword_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_prompt_background_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_prompt_background_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_current_line_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_current_line_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_highlight_function_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_highlight_function_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_syntax_checker") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER)
   { ocelot_statement_syntax_checker= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_format_statement_indent") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT)
   { ocelot_statement_format_statement_indent= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_format_clause_indent") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT)
   { ocelot_statement_format_clause_indent= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_format_keyword_case") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE)
   { ocelot_statement_format_keyword_case= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_height") == 0) { ocelot_statement_height= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_left") == 0) { ocelot_statement_left= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_top") == 0) { ocelot_statement_top= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_detached") == 0) { ocelot_statement_width= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_statement_width") == 0) { ocelot_statement_detached= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_debug_height") == 0) { ocelot_debug_height= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_debug_left") == 0) { ocelot_debug_left= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_debug_top") == 0) { ocelot_debug_top= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_debug_detached") == 0) { ocelot_debug_width= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_debug_width") == 0) { ocelot_debug_detached= token2; return; }
-  if (strcmp(token0_as_utf8, "ocelot_client_side_functions") == 0) { ocelot_client_side_functions= is_enable; return; }
-  if (strcmp(token0_as_utf8, "ocelot_log_level") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT) { ocelot_statement_height= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT) { ocelot_statement_left= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_TOP) { ocelot_statement_top= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH) { ocelot_statement_width= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED) { ocelot_statement_detached= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT) { ocelot_debug_height= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_LEFT) { ocelot_debug_left= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_TOP) { ocelot_debug_top= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED) { ocelot_debug_width= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH) { ocelot_debug_detached= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS) { ocelot_client_side_functions= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_LOG_LEVEL)
   {
     ocelot_log_level= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "one_database") == 0) { ocelot_one_database= is_enable; return; }
-  if (strcmp(token0_as_utf8, "pager") == 0) { ocelot_pager= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_ONE_DATABASE) { ocelot_one_database= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_PAGER) { ocelot_pager= is_enable; return; }
   if ((token0_length >= sizeof("pas") - 1) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
   {
     ocelot_password= token2;
     ocelot_password_was_specified= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "pipe") == 0) /* Not sure about this. Windows. Same as protocol? */
+  if (keyword_index == TOKEN_KEYWORD_PIPE) /* Not sure about this. Windows. Same as protocol? */
   {
     ocelot_opt_named_pipe= is_enable;
     return;
@@ -16678,37 +16697,37 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_port= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "print_defaults") == 0) { ocelot_print_defaults= is_enable; return; }
-  if (strcmp(token0_as_utf8, "prompt") == 0) { ocelot_prompt= token2; ocelot_prompt_is_default= false; return; }
+  if (keyword_index == TOKEN_KEYWORD_PRINT_DEFAULTS) { ocelot_print_defaults= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_PROMPT) { ocelot_prompt= token2; ocelot_prompt_is_default= false; return; }
   if ((token0_length >= sizeof("prot") - 1) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
   {
     ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
     ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
     return;
   }
-  if (strcmp(token0_as_utf8, "quick") == 0) { ocelot_quick= is_enable; return; }
-  if (strcmp(token0_as_utf8, "raw") == 0) { ocelot_raw= is_enable; return; }
-  if (strcmp(token0_as_utf8, "read_default_file") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_QUICK) { ocelot_quick= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_RAW) { ocelot_raw= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_READ_DEFAULT_FILE) /* not available in mysql client */
   {
     ocelot_read_default_file= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "read_default_group") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_READ_DEFAULT_GROUP) /* not available in mysql client */
   {
     ocelot_read_default_group= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "read_timeout") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_READ_TIMEOUT) /* not available in mysql client */
   {
     ocelot_opt_read_timeout= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "reconnect") == 0)
+  if (keyword_index == TOKEN_KEYWORD_RECONNECT)
   {
     ocelot_opt_reconnect= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "report_data_truncation") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_REPORT_DATA_TRUNCATION)/* not available in mysql client */
   {
     ocelot_report_data_truncation= is_enable;
     return;
@@ -16723,7 +16742,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_secure_auth= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "server_public_key") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_SERVER_PUBLIC_KEY) /* not available in mysql client */
   {
     ocelot_server_public_key= token2;
     return;
@@ -16734,7 +16753,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
 
-  if (strcmp(token0_as_utf8, "shared_memory_base_name") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SHARED_MEMORY_BASE_NAME)
   {
     ocelot_shared_memory_base_name= token2;
     return;
@@ -16744,7 +16763,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_history_includes_warnings= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "sigint_ignore") == 0) { ocelot_sigint_ignore= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_SIGINT_IGNORE) { ocelot_sigint_ignore= is_enable; return; }
   if ((token0_length >= sizeof("sil") - 1) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
   {
     ocelot_silent= is_enable;
@@ -16755,47 +16774,47 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_unix_socket= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL)
   {
     ocelot_opt_ssl= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_ca") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_CA)
   {
     ocelot_opt_ssl_ca= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_capath") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_CAPATH)
   {
     ocelot_opt_ssl_capath= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_cert") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_CERT)
   {
     ocelot_opt_ssl_cert= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_cipher") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_CIPHER)
   {
     ocelot_opt_ssl_cipher= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_crl") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_CRL)
   {
     ocelot_opt_ssl_crl= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_crlpath") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_CRLPATH)
   {
     ocelot_opt_ssl_crlpath= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_key") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_KEY)
   {
     ocelot_opt_ssl_key= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "ssl_mode") == 0)
+  if (keyword_index == TOKEN_KEYWORD_SSL_MODE)
   {
     ocelot_opt_ssl_mode= token2;
     return;
@@ -16805,11 +16824,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_ssl_verify_server_cert= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "syslog") == 0) { ocelot_syslog= is_enable; return; }
-  if (strcmp(token0_as_utf8, "table") == 0) { ocelot_table= is_enable; return; }
-  if (strcmp(token0_as_utf8, "tee") == 0) { history_file_start("TEE", token2); /* todo: check whether history_file_start returned NULL which is an error */ return; }/* see comment=tee+hist */
-  if (strcmp(token0_as_utf8, "unbuffered") == 0) { ocelot_unbuffered= is_enable; return; }
-  if (strcmp(token0_as_utf8, "use_result") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_SYSLOG) { ocelot_syslog= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_TABLE) { ocelot_table= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_TEE) { history_file_start("TEE", token2); /* todo: check whether history_file_start returned NULL which is an error */ return; }/* see comment=tee+hist */
+  if (keyword_index == TOKEN_KEYWORD_UNBUFFERED) { ocelot_unbuffered= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_USE_RESULT)/* not available in mysql client */
   {
     ocelot_opt_use_result= to_long(token2);
     return;
@@ -16819,21 +16838,21 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_user= token2;
     return;
   }
-  if (strcmp(token0_as_utf8, "verbose") == 0) { ocelot_verbose= is_enable; return; }
-  if (strcmp(token0_as_utf8, "version") == 0) { ocelot_version= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_VERBOSE) { ocelot_verbose= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_VERSION) { ocelot_version= is_enable; return; }
   /* todo: check that this finds both --vertical and -E */ /* for vertical */
-  if (strcmp(token0_as_utf8, "vertical") == 0) { ocelot_result_grid_vertical= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_VERTICAL) { ocelot_result_grid_vertical= is_enable; return; }
   if ((token0_length >= sizeof("wa") - 1) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
   {
     ocelot_wait= is_enable;
     return;
   }
-  if (strcmp(token0_as_utf8, "write_timeout") == 0)
+  if (keyword_index == TOKEN_KEYWORD_WRITE_TIMEOUT)
   {
     ocelot_opt_write_timeout= to_long(token2);
     return;
   }
-  if (strcmp(token0_as_utf8, "xml") == 0) { ocelot_xml= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_XML) { ocelot_xml= is_enable; return; }
 }
 
 
