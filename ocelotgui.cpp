@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: March 2 2019
+   Last modified: March 3 2019
 */
 
 /*
@@ -3160,93 +3160,93 @@ void MainWindow::action_connect_once(QString message)
   row_form_is_password= new int[column_count];
   row_form_data= new QString[column_count];
   row_form_width= new QString[column_count];
-  row_form_label[i=0]= "host"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_host; row_form_width[i]= 80;
-  row_form_label[++i]= "port"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_port); row_form_width[i]= 4;
-  row_form_label[++i]= "user"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_user; row_form_width[i]= 80;
-  row_form_label[++i]= "database"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_database; row_form_width[i]= 80;
-  row_form_label[++i]= "socket"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_unix_socket; row_form_width[i]= 80;
-  row_form_label[++i]= "password"; row_form_type[i]= 0; row_form_is_password[i]= 1; row_form_data[i]= ocelot_password; row_form_width[i]= 80;
-  row_form_label[++i]= "protocol"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_protocol; row_form_width[i]= 80;
-  row_form_label[++i]= "init_command"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_init_command; row_form_width[i]= 80;
-  row_form_label[++i]= "abort_source_on_error"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_abort_source_on_error); row_form_width[i]= 5;
-  row_form_label[++i]= "auto_rehash"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_rehash); row_form_width[i]= 5;
-  row_form_label[++i]= "auto_vertical_output"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_vertical_output); row_form_width[i]= 5;
-  row_form_label[++i]= "batch"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_batch); row_form_width[i]= 5;
-  row_form_label[++i]= "binary_mode"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_binary_mode); row_form_width[i]= 5;
-  row_form_label[++i]= "bind_address"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_bind_address; row_form_width[i]= 5;
-  row_form_label[++i]= "character_sets_dir"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_set_charset_dir; row_form_width[i]= 5;
-  row_form_label[++i]= "column_names"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_column_names); row_form_width[i]= 5;
-  row_form_label[++i]= "column_type_info"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_column_type_info); row_form_width[i]= 5;
-  row_form_label[++i]= "comments"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_comments); row_form_width[i]= 5;
-  row_form_label[++i]= "compress"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_compress); row_form_width[i]= 5;
-  row_form_label[++i]= "connect_expired_password"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_can_handle_expired_passwords); row_form_width[i]= 5;
-  row_form_label[++i]= "connect_timeout"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_connect_timeout); row_form_width[i]= 5;
-  row_form_label[++i]= "debug"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_debug; row_form_width[i]= 5;
-  row_form_label[++i]= "debug_check"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_check); row_form_width[i]= 5;
-  row_form_label[++i]= "debug_info"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_info); row_form_width[i]= 5;
-  row_form_label[++i]= "default_auth"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_default_auth; row_form_width[i]= 5;
-  row_form_label[++i]= "default_character_set"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_set_charset_name; row_form_width[i]= 5;
-  row_form_label[++i]= "defaults_extra_file"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_extra_file; row_form_width[i]= 5;
-  row_form_label[++i]= "defaults_file"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_file; row_form_width[i]= 5;
-  row_form_label[++i]= "defaults_group_suffix"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_group_suffix; row_form_width[i]= 5;
-  row_form_label[++i]= "delimiter"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_delimiter_str; row_form_width[i]= 5;
-  row_form_label[++i]= "enable_cleartext_plugin"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_enable_cleartext_plugin); row_form_width[i]= 5;
-  row_form_label[++i]= "execute"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_execute; row_form_width[i]= 5;
-  row_form_label[++i]= "force"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_force); row_form_width[i]= 5;
-  row_form_label[++i]= "help"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0;  row_form_data[i]= QString::number(ocelot_help); row_form_width[i]= 5;
-  row_form_label[++i]= "histfile"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_history_hist_file_name; row_form_width[i]= 5;
-  row_form_label[++i]= "histignore"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_histignore; row_form_width[i]= 5;
-  row_form_label[++i]= "html"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_html); row_form_width[i]= 5;
-  row_form_label[++i]= "ignore_spaces"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ignore_spaces); row_form_width[i]= 5;
-  row_form_label[++i]= "ld_run_path"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_ld_run_path; row_form_width[i]= 5;
+  row_form_label[i=0]= QString(strvalues[TOKEN_KEYWORD_HOST].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_host; row_form_width[i]= 80;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PORT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_port); row_form_width[i]= 4;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_USER].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_user; row_form_width[i]= 80;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DATABASE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_database; row_form_width[i]= 80;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SOCKET].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_unix_socket; row_form_width[i]= 80;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PASSWORD].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 1; row_form_data[i]= ocelot_password; row_form_width[i]= 80;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PROTOCOL].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_protocol; row_form_width[i]= 80;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_INIT_COMMAND].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_init_command; row_form_width[i]= 80;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_abort_source_on_error); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_AUTO_REHASH].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_rehash); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_auto_vertical_output); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_BATCH].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_batch); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_BINARY_MODE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_binary_mode); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_BIND_ADDRESS].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_bind_address; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_CHARACTER_SETS_DIR].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_set_charset_dir; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_NAMES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_column_names); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_TYPE_INFO].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_column_type_info); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COMMENTS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_comments); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COMPRESS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_compress); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_CONNECT_EXPIRED_PASSWORD].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_can_handle_expired_passwords); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_CONNECT_TIMEOUT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_connect_timeout); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEBUG].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_debug; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEBUG_CHECK].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_check); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEBUG_INFO].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_debug_info); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEFAULT_AUTH].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_default_auth; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEFAULT_CHARACTER_SET].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_set_charset_name; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEFAULTS_EXTRA_FILE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_extra_file; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEFAULTS_FILE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_file; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DEFAULTS_GROUP_SUFFIX].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_defaults_group_suffix; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DELIMITER].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_delimiter_str; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_ENABLE_CLEARTEXT_PLUGIN].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_enable_cleartext_plugin); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_EXECUTE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_execute; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_FORCE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_force); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_HELP].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0;  row_form_data[i]= QString::number(ocelot_help); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_HISTFILE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_history_hist_file_name; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_HISTIGNORE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_histignore; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_HTML].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_html); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_IGNORE_SPACES].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ignore_spaces); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LD_RUN_PATH].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_ld_run_path; row_form_width[i]= 5;
   if (is_libmysqlclient_loaded != 0) row_form_type[i]= (row_form_type[i] | READONLY_FLAG);
-  row_form_label[++i]= "line_numbers"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_line_numbers); row_form_width[i]= 5;
-  row_form_label[++i]= "local_infile"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_local_infile); row_form_width[i]= 5;
-  row_form_label[++i]= "login_path"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_login_path; row_form_width[i]= 5;
-  row_form_label[++i]= "max_allowed_packet"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_max_allowed_packet); row_form_width[i]= 5;
-  row_form_label[++i]= "max_join_size"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_max_join_size); row_form_width[i]= 5;
-  row_form_label[++i]= "named_commands"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_named_commands); row_form_width[i]= 5;
-  row_form_label[++i]= "net_buffer_length"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_net_buffer_length); row_form_width[i]= 5;
-  row_form_label[++i]= "no_beep"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_beep); row_form_width[i]= 5;
-  row_form_label[++i]= "no_defaults"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_defaults); row_form_width[i]= 5;
-  row_form_label[++i]= "ocelot_dbms"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_dbms; row_form_width[i]= 9;
-  row_form_label[++i]= "one_database"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_one_database); row_form_width[i]= 5;
-  row_form_label[++i]= "pager"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_pager; row_form_width[i]= 5;
-  row_form_label[++i]= "pipe"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_pipe); row_form_width[i]= 5;
-  row_form_label[++i]= "plugin_dir"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_plugin_dir; row_form_width[i]= 5;
-  row_form_label[++i]= "print_defaults"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_print_defaults); row_form_width[i]= 5;
-  row_form_label[++i]= "prompt"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_prompt; row_form_width[i]= 5;
-  row_form_label[++i]= "quick"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_quick); row_form_width[i]= 5;
-  row_form_label[++i]= "raw"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_raw); row_form_width[i]= 5;
-  row_form_label[++i]= "reconnect"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_reconnect); row_form_width[i]= 5;
-  row_form_label[++i]= "safe_updates"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_safe_updates); row_form_width[i]= 5;
-  row_form_label[++i]= "secure_auth"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_secure_auth); row_form_width[i]= 5;
-  row_form_label[++i]= "select_limit"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_select_limit); row_form_width[i]= 5;
-  row_form_label[++i]= "server_public_key"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_server_public_key; row_form_width[i]= 5;
-  row_form_label[++i]= "shared_memory_base_name"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_shared_memory_base_name; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LINE_NUMBERS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_line_numbers); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LOCAL_INFILE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_local_infile); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LOGIN_PATH].chars).toLower();; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_login_path; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ALLOWED_PACKET].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_max_allowed_packet); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_JOIN_SIZE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_max_join_size); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NAMED_COMMANDS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_named_commands); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NET_BUFFER_LENGTH].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_net_buffer_length); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NO_BEEP].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_beep); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NO_DEFAULTS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_no_defaults); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_OCELOT_DBMS].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_dbms; row_form_width[i]= 9;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_ONE_DATABASE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_one_database); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PAGER].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_pager; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PIPE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_pipe); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PLUGIN_DIR].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_plugin_dir; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PRINT_DEFAULTS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_print_defaults); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PROMPT].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_prompt; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_QUICK].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_quick); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_RAW].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_raw); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_RECONNECT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_reconnect); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SAFE_UPDATES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_safe_updates); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SECURE_AUTH].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_secure_auth); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SELECT_LIMIT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_select_limit); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SERVER_PUBLIC_KEY].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_server_public_key; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SHARED_MEMORY_BASE_NAME].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_shared_memory_base_name; row_form_width[i]= 5;
   /* It used to crash if I said number(ocelot_history_includes_warnings). Problem has disappeared. */
-  row_form_label[++i]= "show_warnings"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_history_includes_warnings); row_form_width[i]= 5;
-  row_form_label[++i]= "sigint_ignore"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_sigint_ignore); row_form_width[i]= 5;
-  row_form_label[++i]= "silent"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_silent); row_form_width[i]= 5;
-  row_form_label[++i]= "ssl"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_ca"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_ca; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_capath"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_capath; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_cert"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_cert; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_cipher"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_cipher; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_crl"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crl; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_crlpath"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crlpath; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_key"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_key; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_mode"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_mode; row_form_width[i]= 5;
-  row_form_label[++i]= "ssl_verify_server_cert"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_ssl_verify_server_cert); row_form_width[i]= 5;
-  row_form_label[++i]= "syslog"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_syslog); row_form_width[i]= 5;
-  row_form_label[++i]= "table"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_table); row_form_width[i]= 5;
-  row_form_label[++i]= "tee"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_history_tee_file_name; row_form_width[i]= 5;
-  row_form_label[++i]= "unbuffered"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_unbuffered); row_form_width[i]= 5;
-  row_form_label[++i]= "verbose"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_verbose); row_form_width[i]= 5;
-  row_form_label[++i]= "version"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_version); row_form_width[i]= 5;
-  row_form_label[++i]= "vertical"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_vertical); row_form_width[i]= 5;
-  row_form_label[++i]= "wait"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_wait); row_form_width[i]= 5;
-  row_form_label[++i]= "xml"; row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_xml); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SHOW_WARNINGS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_history_includes_warnings); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SIGINT_IGNORE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_sigint_ignore); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SILENT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_silent); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_CA].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_ca; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_CAPATH].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_capath; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_CERT].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_cert; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_CIPHER].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_cipher; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_CRL].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crl; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_CRLPATH].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_crlpath; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_KEY].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_key; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_MODE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_opt_ssl_mode; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_opt_ssl_verify_server_cert); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_SYSLOG].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_syslog); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_TABLE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_table); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_TEE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_history_tee_file_name; row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_UNBUFFERED].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_unbuffered); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_VERBOSE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_verbose); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_VERSION].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_version); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_VERTICAL].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_vertical); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_WAIT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_wait); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_XML].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_xml); row_form_width[i]= 5;
   assert(i == column_count - 1);
   if (message == "Print")
   {
@@ -3503,7 +3503,7 @@ void MainWindow::action_option_detach_history_widget(bool checked)
     ocelot_history_detached= "yes";
     new_ocelot_history_detached= "no";
   }
-  action_change_one_setting(ocelot_history_detached, new_ocelot_history_detached, "ocelot_history_detached");
+  action_change_one_setting(ocelot_history_detached, new_ocelot_history_detached, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED);
 }
 
 
@@ -3573,7 +3573,7 @@ void MainWindow::action_option_detach_result_grid_widget(bool checked)
     ocelot_grid_detached= "yes";
     new_ocelot_grid_detached= "no";
   }
-  action_change_one_setting(ocelot_grid_detached, new_ocelot_grid_detached, "ocelot_grid_detached");
+  action_change_one_setting(ocelot_grid_detached, new_ocelot_grid_detached, TOKEN_KEYWORD_OCELOT_GRID_DETACHED);
 }
 
 /*
@@ -3640,7 +3640,7 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
     ocelot_debug_detached= "yes";
     new_ocelot_debug_detached= "no";
   }
-  action_change_one_setting(ocelot_debug_detached, new_ocelot_debug_detached, "ocelot_debug_detached");
+  action_change_one_setting(ocelot_debug_detached, new_ocelot_debug_detached, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED);
 }
 
 
@@ -3708,7 +3708,7 @@ void MainWindow::action_option_detach_statement_widget(bool checked)
     ocelot_statement_detached= "yes";
     new_ocelot_statement_detached= "no";
   }
-  action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, "ocelot_statement_detached");
+  action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED);
 }
 
 
@@ -4308,22 +4308,22 @@ void MainWindow::action_statement()
     //make_style_strings();
     //statement_edit_widget_setstylesheet();
     /* For each changed Settings item, produce and execute a settings-change statement. */
-    action_change_one_setting(ocelot_statement_text_color, new_ocelot_statement_text_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR].chars);
-    action_change_one_setting(ocelot_statement_background_color, new_ocelot_statement_background_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR].chars);
-    action_change_one_setting(ocelot_statement_border_color, new_ocelot_statement_border_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR].chars);
-    action_change_one_setting(ocelot_statement_font_family, new_ocelot_statement_font_family,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY].chars);
-    action_change_one_setting(ocelot_statement_font_size, new_ocelot_statement_font_size,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE].chars);
-    action_change_one_setting(ocelot_statement_font_style, new_ocelot_statement_font_style,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE].chars);
-    action_change_one_setting(ocelot_statement_font_weight, new_ocelot_statement_font_weight,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT].chars);
-    action_change_one_setting(ocelot_statement_highlight_literal_color, new_ocelot_statement_highlight_literal_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR].chars);
-    action_change_one_setting(ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR].chars);
-    action_change_one_setting(ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR].chars);
-    action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR].chars);
-    action_change_one_setting(ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR].chars);
-    action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR].chars);
-    action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR].chars);
-    action_change_one_setting(ocelot_statement_highlight_function_color, new_ocelot_statement_highlight_function_color,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR].chars);
-    action_change_one_setting(ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker,strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER].chars);
+    action_change_one_setting(ocelot_statement_text_color, new_ocelot_statement_text_color,TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR);
+    action_change_one_setting(ocelot_statement_background_color, new_ocelot_statement_background_color,TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR);
+    action_change_one_setting(ocelot_statement_border_color, new_ocelot_statement_border_color,TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR);
+    action_change_one_setting(ocelot_statement_font_family, new_ocelot_statement_font_family,TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY);
+    action_change_one_setting(ocelot_statement_font_size, new_ocelot_statement_font_size,TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE);
+    action_change_one_setting(ocelot_statement_font_style, new_ocelot_statement_font_style,TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE);
+    action_change_one_setting(ocelot_statement_font_weight, new_ocelot_statement_font_weight,TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT);
+    action_change_one_setting(ocelot_statement_highlight_literal_color, new_ocelot_statement_highlight_literal_color,TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR);
+    action_change_one_setting(ocelot_statement_highlight_identifier_color, new_ocelot_statement_highlight_identifier_color,TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR);
+    action_change_one_setting(ocelot_statement_highlight_comment_color, new_ocelot_statement_highlight_comment_color,TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR);
+    action_change_one_setting(ocelot_statement_highlight_operator_color, new_ocelot_statement_highlight_operator_color,TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR);
+    action_change_one_setting(ocelot_statement_highlight_keyword_color, new_ocelot_statement_highlight_keyword_color,TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR);
+    action_change_one_setting(ocelot_statement_prompt_background_color, new_ocelot_statement_prompt_background_color,TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR);
+    action_change_one_setting(ocelot_statement_highlight_current_line_color, new_ocelot_statement_highlight_current_line_color,TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR);
+    action_change_one_setting(ocelot_statement_highlight_function_color, new_ocelot_statement_highlight_function_color,TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR);
+    action_change_one_setting(ocelot_statement_syntax_checker, new_ocelot_statement_syntax_checker,TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER);
 
     /* Todo: consider: maybe you have to do a restore like this */
     //text= statement_edit_widget->toPlainText(); /* or I could just pass this to tokenize() directly */
@@ -4335,11 +4335,11 @@ void MainWindow::action_statement()
     statement_edit_widget->statement_edit_widget_left_treatment1_textcolor= QColor(ocelot_statement_text_color);
     action_statement_edit_widget_text_changed(0, 0, 0);            /* only for highlight? repaint so new highlighting will appear */
     /* Todo: Check: Do we need to change style settings for this stuff? */
-    action_change_one_setting(ocelot_statement_height, new_ocelot_statement_height, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT].chars);
-    action_change_one_setting(ocelot_statement_left, new_ocelot_statement_left, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT].chars);
-    action_change_one_setting(ocelot_statement_top, new_ocelot_statement_top, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_TOP].chars);
-    action_change_one_setting(ocelot_statement_width, new_ocelot_statement_width, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH].chars);
-    action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, strvalues[TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED].chars);
+    action_change_one_setting(ocelot_statement_height, new_ocelot_statement_height, TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT);
+    action_change_one_setting(ocelot_statement_left, new_ocelot_statement_left, TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT);
+    action_change_one_setting(ocelot_statement_top, new_ocelot_statement_top, TOKEN_KEYWORD_OCELOT_STATEMENT_TOP);
+    action_change_one_setting(ocelot_statement_width, new_ocelot_statement_width, TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH);
+    action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED);
   }
   delete(se);
 }
@@ -4357,25 +4357,25 @@ void MainWindow::action_grid()
     //make_style_strings();                                                      /* I think this should be commented out */
     //result_grid_tab_widget[0]->set_all_style_sheets();
     /* For each changed Settings item, produce and execute a settings-change statement. */
-    action_change_one_setting(ocelot_grid_text_color, new_ocelot_grid_text_color, "ocelot_grid_text_color");
-    action_change_one_setting(ocelot_grid_border_color, new_ocelot_grid_border_color, "ocelot_grid_border_color");
-    action_change_one_setting(ocelot_grid_background_color, new_ocelot_grid_background_color, "ocelot_grid_background_color");
-    action_change_one_setting(ocelot_grid_header_background_color, new_ocelot_grid_header_background_color, "ocelot_grid_header_background_color");
-    action_change_one_setting(ocelot_grid_font_family, new_ocelot_grid_font_family, "ocelot_grid_font_family");
-    action_change_one_setting(ocelot_grid_font_size, new_ocelot_grid_font_size, "ocelot_grid_font_size");
-    action_change_one_setting(ocelot_grid_font_style, new_ocelot_grid_font_style, "ocelot_grid_font_style");
-    action_change_one_setting(ocelot_grid_font_weight, new_ocelot_grid_font_weight, "ocelot_grid_font_weight");
-    action_change_one_setting(ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color, "ocelot_grid_cell_border_color");
-    action_change_one_setting(ocelot_grid_cell_drag_line_color, new_ocelot_grid_cell_drag_line_color, "ocelot_grid_cell_drag_line_color");
-    action_change_one_setting(ocelot_grid_border_size, new_ocelot_grid_border_size, "ocelot_grid_border_size");
-    action_change_one_setting(ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size, "ocelot_grid_cell_border_size");
-    action_change_one_setting(ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size, "ocelot_grid_cell_drag_line_size");
+    action_change_one_setting(ocelot_grid_text_color, new_ocelot_grid_text_color, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR);
+    action_change_one_setting(ocelot_grid_border_color, new_ocelot_grid_border_color, TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR);
+    action_change_one_setting(ocelot_grid_background_color, new_ocelot_grid_background_color, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR);
+    action_change_one_setting(ocelot_grid_header_background_color, new_ocelot_grid_header_background_color, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR);
+    action_change_one_setting(ocelot_grid_font_family, new_ocelot_grid_font_family, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY);
+    action_change_one_setting(ocelot_grid_font_size, new_ocelot_grid_font_size, TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE);
+    action_change_one_setting(ocelot_grid_font_style, new_ocelot_grid_font_style, TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE);
+    action_change_one_setting(ocelot_grid_font_weight, new_ocelot_grid_font_weight, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT);
+    action_change_one_setting(ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR);
+    action_change_one_setting(ocelot_grid_cell_drag_line_color, new_ocelot_grid_cell_drag_line_color, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR);
+    action_change_one_setting(ocelot_grid_border_size, new_ocelot_grid_border_size, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE);
+    action_change_one_setting(ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE);
+    action_change_one_setting(ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE);
     /* Todo: check: do we need to change style sheet for this stuff? */
-    action_change_one_setting(ocelot_grid_height, new_ocelot_grid_height, "ocelot_grid_height");
-    action_change_one_setting(ocelot_grid_left, new_ocelot_grid_left, "ocelot_grid_left");
-    action_change_one_setting(ocelot_grid_top, new_ocelot_grid_top, "ocelot_grid_top");
-    action_change_one_setting(ocelot_grid_width, new_ocelot_grid_width, "ocelot_grid_width");
-    action_change_one_setting(ocelot_grid_detached, new_ocelot_grid_detached, "ocelot_grid_detached");
+    action_change_one_setting(ocelot_grid_height, new_ocelot_grid_height, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT);
+    action_change_one_setting(ocelot_grid_left, new_ocelot_grid_left, TOKEN_KEYWORD_OCELOT_GRID_LEFT);
+    action_change_one_setting(ocelot_grid_top, new_ocelot_grid_top, TOKEN_KEYWORD_OCELOT_GRID_TOP);
+    action_change_one_setting(ocelot_grid_width, new_ocelot_grid_width, TOKEN_KEYWORD_OCELOT_GRID_WIDTH);
+    action_change_one_setting(ocelot_grid_detached, new_ocelot_grid_detached, TOKEN_KEYWORD_OCELOT_GRID_DETACHED);
   }
   delete(se);
 }
@@ -4388,11 +4388,11 @@ void MainWindow::action_debug()
   if (result == QDialog::Accepted)
   {
     /* Todo: check: do we need to change style sheet for this stuff? */
-    action_change_one_setting(ocelot_debug_height, new_ocelot_debug_height, "ocelot_debug_height");
-    action_change_one_setting(ocelot_debug_left, new_ocelot_debug_left, "ocelot_debug_left");
-    action_change_one_setting(ocelot_debug_top, new_ocelot_debug_top, "ocelot_debug_top");
-    action_change_one_setting(ocelot_debug_width, new_ocelot_debug_width, "ocelot_debug_width");
-    action_change_one_setting(ocelot_debug_detached, new_ocelot_debug_detached, "ocelot_debug_detached");
+    action_change_one_setting(ocelot_debug_height, new_ocelot_debug_height, TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT);
+    action_change_one_setting(ocelot_debug_left, new_ocelot_debug_left, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT);
+    action_change_one_setting(ocelot_debug_top, new_ocelot_debug_top, TOKEN_KEYWORD_OCELOT_DEBUG_TOP);
+    action_change_one_setting(ocelot_debug_width, new_ocelot_debug_width, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH);
+    action_change_one_setting(ocelot_debug_detached, new_ocelot_debug_detached, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED);
  }
   delete(se);
 }
@@ -4408,10 +4408,10 @@ void MainWindow::action_extra_rule_1()
   int result= se->exec();
   if (result == QDialog::Accepted)
   {
-    action_change_one_setting(ocelot_extra_rule_1_condition, new_ocelot_extra_rule_1_condition, "ocelot_extra_rule_1_condition");
-    action_change_one_setting(ocelot_extra_rule_1_text_color, new_ocelot_extra_rule_1_text_color, "ocelot_extra_rule_1_text_color");
-    action_change_one_setting(ocelot_extra_rule_1_background_color, new_ocelot_extra_rule_1_background_color, "ocelot_extra_rule_1_background_color");
-    action_change_one_setting(ocelot_extra_rule_1_display_as, new_ocelot_extra_rule_1_display_as, "ocelot_extra_rule_1_display_as");
+    action_change_one_setting(ocelot_extra_rule_1_condition, new_ocelot_extra_rule_1_condition, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION);
+    action_change_one_setting(ocelot_extra_rule_1_text_color, new_ocelot_extra_rule_1_text_color, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR);
+    action_change_one_setting(ocelot_extra_rule_1_background_color, new_ocelot_extra_rule_1_background_color, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR);
+    action_change_one_setting(ocelot_extra_rule_1_display_as, new_ocelot_extra_rule_1_display_as, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS);
  }
   delete(se);
 }
@@ -4425,19 +4425,19 @@ void MainWindow::action_history()
   {
     //make_style_strings();
     //history_edit_widget->setStyleSheet(ocelot_history_style_string);
-    action_change_one_setting(ocelot_history_text_color, new_ocelot_history_text_color, "ocelot_history_text_color");
-    action_change_one_setting(ocelot_history_background_color, new_ocelot_history_background_color, "ocelot_history_background_color");
-    action_change_one_setting(ocelot_history_border_color, new_ocelot_history_border_color, "ocelot_history_border_color");
-    action_change_one_setting(ocelot_history_font_family, new_ocelot_history_font_family, "ocelot_history_font_family");
-    action_change_one_setting(ocelot_history_font_size, new_ocelot_history_font_size, "ocelot_history_font_size");
-    action_change_one_setting(ocelot_history_font_style, new_ocelot_history_font_style, "ocelot_history_font_style");
-    action_change_one_setting(ocelot_history_font_weight, new_ocelot_history_font_weight, "ocelot_history_font_weight");
-    action_change_one_setting(ocelot_history_height, new_ocelot_history_height, "ocelot_history_height");
-    action_change_one_setting(ocelot_history_left, new_ocelot_history_left, "ocelot_history_left");
-    action_change_one_setting(ocelot_history_max_row_count, new_ocelot_history_max_row_count, "ocelot_history_max_row_count");
-    action_change_one_setting(ocelot_history_top, new_ocelot_history_top, "ocelot_history_top");
-    action_change_one_setting(ocelot_history_width, new_ocelot_history_width, "ocelot_history_width");
-    action_change_one_setting(ocelot_history_detached, new_ocelot_history_detached, "ocelot_history_detached");
+    action_change_one_setting(ocelot_history_text_color, new_ocelot_history_text_color, TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR);
+    action_change_one_setting(ocelot_history_background_color, new_ocelot_history_background_color, TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR);
+    action_change_one_setting(ocelot_history_border_color, new_ocelot_history_border_color, TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR);
+    action_change_one_setting(ocelot_history_font_family, new_ocelot_history_font_family, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY);
+    action_change_one_setting(ocelot_history_font_size, new_ocelot_history_font_size, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE);
+    action_change_one_setting(ocelot_history_font_style, new_ocelot_history_font_style, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE);
+    action_change_one_setting(ocelot_history_font_weight, new_ocelot_history_font_weight, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT);
+    action_change_one_setting(ocelot_history_height, new_ocelot_history_height, TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT);
+    action_change_one_setting(ocelot_history_left, new_ocelot_history_left, TOKEN_KEYWORD_OCELOT_HISTORY_LEFT);
+    action_change_one_setting(ocelot_history_max_row_count, new_ocelot_history_max_row_count, TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT);
+    action_change_one_setting(ocelot_history_top, new_ocelot_history_top, TOKEN_KEYWORD_OCELOT_HISTORY_TOP);
+    action_change_one_setting(ocelot_history_width, new_ocelot_history_width, TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH);
+    action_change_one_setting(ocelot_history_detached, new_ocelot_history_detached, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED);
   }
   delete(se);
 }
@@ -4452,13 +4452,13 @@ void MainWindow::action_menu()
     //make_style_strings();
     //main_window->setStyleSheet(ocelot_menu_style_string);
     //ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-      action_change_one_setting(ocelot_menu_text_color, new_ocelot_menu_text_color, "ocelot_menu_text_color");
-      action_change_one_setting(ocelot_menu_background_color, new_ocelot_menu_background_color, "ocelot_menu_background_color");
-      action_change_one_setting(ocelot_menu_border_color, new_ocelot_menu_border_color, "ocelot_menu_border_color");
-      action_change_one_setting(ocelot_menu_font_family, new_ocelot_menu_font_family, "ocelot_menu_font_family");
-      action_change_one_setting(ocelot_menu_font_size, new_ocelot_menu_font_size, "ocelot_menu_font_size");
-      action_change_one_setting(ocelot_menu_font_style, new_ocelot_menu_font_style, "ocelot_menu_font_style");
-      action_change_one_setting(ocelot_menu_font_weight, new_ocelot_menu_font_weight, "ocelot_menu_font_weight");
+      action_change_one_setting(ocelot_menu_text_color, new_ocelot_menu_text_color, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR);
+      action_change_one_setting(ocelot_menu_background_color, new_ocelot_menu_background_color, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR);
+      action_change_one_setting(ocelot_menu_border_color, new_ocelot_menu_border_color, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR);
+      action_change_one_setting(ocelot_menu_font_family, new_ocelot_menu_font_family, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY);
+      action_change_one_setting(ocelot_menu_font_size, new_ocelot_menu_font_size, TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE);
+      action_change_one_setting(ocelot_menu_font_style, new_ocelot_menu_font_style, TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE);
+      action_change_one_setting(ocelot_menu_font_weight, new_ocelot_menu_font_weight, TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT);
   }
   delete(se);
 }
@@ -4472,7 +4472,7 @@ void MainWindow::action_menu()
 */
 void MainWindow::action_change_one_setting(QString old_setting,
                                            QString new_setting,
-                                           const char *name_of_setting)
+                                           int keyword_index)
 {
   if (old_setting != new_setting)
   {
@@ -4480,11 +4480,11 @@ void MainWindow::action_change_one_setting(QString old_setting,
     old_setting= new_setting;
     main_token_number= 0;
     text= "SET ";
-    text.append(name_of_setting);
+    text.append(strvalues[keyword_index].chars);
     text.append(" = ");
     text.append("'");
     QString source= new_setting;
-    if (strstr(name_of_setting, "_color") != NULL)
+    if (strstr(strvalues[keyword_index].chars, "_color") != NULL)
       source= rgb_to_color(new_setting);
     for (int i= 0; i < source.length(); ++i)
     {
@@ -15794,7 +15794,9 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   todo: check: is it okay still to abbreviate e.g. us rather than user?
   todo: strip the arguments so Qt doesn't see them, or maybe don't
   todo: you seem to be forgetting that Qt can also expect command-line options
+  todo: all the .ToLower() stuff is probably unnecessary, it can probably be upper
 */
+/* BUG: If there are multiple -x and --x and --x=y options, this will get confused. */
 void MainWindow::connect_read_command_line(int argc, char *argv[])
 {
   QString token0, token1, token2;
@@ -15821,42 +15823,42 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
         token2= token0.right(token0.size() - 2);
         token0= token0.left(2);
       }
-      if (token0 == "-?") token0= "help";
-      if (token0 == "-#") token0= "debug";
-      if (token0 == "-A") token0= "no_auto_rehash";
-      if (token0 == "-B") token0= "batch";
-      if (token0 == "-b") token0= "no_beep";
-      if (token0 == "-C") token0= "compress";
-      if (token0 == "-c") token0= "comments";
-      if (token0 == "-D") { token0= "database"; is_token2_needed= true; }
-      if (token0 == "-E") token0= "vertical";
-      if (token0 == "-e") { token0= "execute"; is_token2_needed= true; }
-      if (token0 == "-f") token0= "force";
-      if (token0 == "-G") token0= "named_commands";
-      if (token0 == "-H") token0= "html";
-      if (token0 == "-h") { token0= "host"; is_token2_needed= true; }
-      if (token0 == "-i") token0= "ignore_spaces";
-      if (token0 == "-j") token0= "syslog";
+      if (token0 == "-?") token0= QString(strvalues[TOKEN_KEYWORD_HELP].chars).toLower();
+      if (token0 == "-#") token0= QString(strvalues[TOKEN_KEYWORD_DEBUG].chars).toLower();
+      if (token0 == "-A") token0= QString(strvalues[TOKEN_KEYWORD_NO_AUTO_REHASH].chars).toLower();
+      if (token0 == "-B") token0= QString(strvalues[TOKEN_KEYWORD_BATCH].chars).toLower();
+      if (token0 == "-b") token0= QString(strvalues[TOKEN_KEYWORD_NO_BEEP].chars).toLower();
+      if (token0 == "-C") token0= QString(strvalues[TOKEN_KEYWORD_COMPRESS].chars).toLower();
+      if (token0 == "-c") token0= QString(strvalues[TOKEN_KEYWORD_COMMENTS].chars).toLower();
+      if (token0 == "-D") { token0= QString(strvalues[TOKEN_KEYWORD_DATABASE].chars).toLower(); is_token2_needed= true; }
+      if (token0 == "-E") token0= QString(strvalues[TOKEN_KEYWORD_VERTICAL].chars).toLower();
+      if (token0 == "-e") { token0= QString(strvalues[TOKEN_KEYWORD_EXECUTE].chars).toLower(); is_token2_needed= true; }
+      if (token0 == "-f") token0= QString(strvalues[TOKEN_KEYWORD_FORCE].chars).toLower();
+      if (token0 == "-G") token0= QString(strvalues[TOKEN_KEYWORD_NAMED_COMMANDS].chars).toLower();
+      if (token0 == "-H") token0= QString(strvalues[TOKEN_KEYWORD_HTML].chars).toLower();
+      if (token0 == "-h") { token0= QString(strvalues[TOKEN_KEYWORD_HOST].chars).toLower(); is_token2_needed= true; }
+      if (token0 == "-i") token0= QString(strvalues[TOKEN_KEYWORD_IGNORE_SPACES].chars).toLower();
+      if (token0 == "-j") token0= QString(strvalues[TOKEN_KEYWORD_SYSLOG].chars).toLower();
       if (token0 == "-L") token0= "skip_line_numbers";
       /* Somewhere I think I saw "l login-path" but it doesn't work with mysql client. */
       if (token0 == "-N") token0= "skip_column_names";
-      if (token0 == "-n") token0= "unbuffered";
-      if (token0 == "-o") token0= "one_database";
-      if (token0 == "-P") { token0= "port"; is_token2_needed= true; }
-      if (token0 == "-p") token0= "password";
-      if (token0 == "-q") token0= "quick";
-      if (token0 == "-r") token0= "raw";
-      if (token0 == "-S") { token0= "socket"; is_token2_needed= true; }
-      if (token0 == "-s") token0= "silent";
-      if (token0 == "-T") token0= "debug_info";
-      if (token0 == "-t") token0= "table";
-      if (token0 == "-U") token0= "safe_updates";
-      if (token0 == "-u") { token0= "user"; is_token2_needed= true; }
-      if (token0 == "-V") token0= "version";
-      if (token0 == "-v") token0= "verbose";
-      if (token0 == "-W") token0= "pipe";
-      if (token0 == "-w") token0= "wait";
-      if (token0 == "-X") token0= "xml";
+      if (token0 == "-n") token0= QString(strvalues[TOKEN_KEYWORD_UNBUFFERED].chars).toLower();
+      if (token0 == "-o") token0= QString(strvalues[TOKEN_KEYWORD_ONE_DATABASE].chars).toLower();
+      if (token0 == "-P") { token0= QString(strvalues[TOKEN_KEYWORD_PORT].chars).toLower(); is_token2_needed= true; }
+      if (token0 == "-p") token0= QString(strvalues[TOKEN_KEYWORD_PASSWORD].chars).toLower();
+      if (token0 == "-q") token0= QString(strvalues[TOKEN_KEYWORD_QUICK].chars).toLower();
+      if (token0 == "-r") token0= QString(strvalues[TOKEN_KEYWORD_RAW].chars).toLower();
+      if (token0 == "-S") { token0= QString(strvalues[TOKEN_KEYWORD_SOCKET].chars).toLower(); is_token2_needed= true; }
+      if (token0 == "-s") token0= QString(strvalues[TOKEN_KEYWORD_SILENT].chars).toLower();
+      if (token0 == "-T") token0= QString(strvalues[TOKEN_KEYWORD_DEBUG_INFO].chars).toLower();
+      if (token0 == "-t") token0= QString(strvalues[TOKEN_KEYWORD_TABLE].chars).toLower();
+      if (token0 == "-U") token0= QString(strvalues[TOKEN_KEYWORD_SAFE_UPDATES].chars).toLower();
+      if (token0 == "-u") { token0= QString(strvalues[TOKEN_KEYWORD_USER].chars).toLower(); is_token2_needed= true; }
+      if (token0 == "-V") token0= QString(strvalues[TOKEN_KEYWORD_VERSION].chars).toLower();
+      if (token0 == "-v") token0= QString(strvalues[TOKEN_KEYWORD_VERBOSE].chars).toLower();
+      if (token0 == "-W") token0= QString(strvalues[TOKEN_KEYWORD_PIPE].chars).toLower();
+      if (token0 == "-w") token0= QString(strvalues[TOKEN_KEYWORD_WAIT].chars).toLower();
+      if (token0 == "-X") token0= QString(strvalues[TOKEN_KEYWORD_XML].chars).toLower();
       if ((i < argc - 1) && (is_token2_needed == true) && (token2 == ""))
       {
         token1= "="; token2= argv[i + 1];
@@ -16324,7 +16326,13 @@ QString MainWindow::connect_unstripper(QString value_to_unstrip)
   ! If we say --skip-socket=x then socket='0' i.e. override previous setting
   I try to follow some of this but not all.
 */
-/* For variables beginning "ocelot_" we may use strcasecmp rather than strcmp. */
+/*
+  Re case sensitivity:
+    * Effectively case sensitive for "skip_" etc. because we use strcmp()
+    * Effectively case insensitive for keywords because get_keyword_index makes upper
+    * For variables beginning "ocelot_" we may use strcasecmp rather than strcmp.
+    * This is different from mysql which is usually case sensitive all the way
+*/
 void MainWindow::connect_set_variable(QString token0, QString token2)
 {
   unsigned int token0_length;
@@ -16385,17 +16393,74 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   int keyword_index;
   keyword_index= get_keyword_index(token0_as_utf8, key2);
 
+  /*
+    Shortenings.
+    These are obsolete, one should say --password= not -pas=, but we continue to accept them.
+    Todo: put this inside "if keyword_index < 0" if you're sure there can be no ambiguity.
+    Todo: let this be case insensitive like most other options, and compared with strvalues[] items.
+    Todo: let i_am_a_dummy be part of the keyword list? */
+  {
+    if ((token0_length >= sizeof("pas") - 1) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_PASSWORD;
+    if ((token0_length >= sizeof("comm") - 1) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_COMMENTS;
+    if ((token0_length >= sizeof("comp") - 1) && (strncmp(token0_as_utf8, "compress", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_COMPRESS;
+    if ((token0_length >= sizeof("con") - 1) && (strncmp(token0_as_utf8, "connect_timeout", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_CONNECT_TIMEOUT;
+    if ((token0_length >= sizeof("default_a") - 1) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_DEFAULT_AUTH;
+    if ((token0_length >= sizeof("del") - 1) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_DELIMITER;
+    if ((token0_length >= sizeof("ho") - 1) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_HOST;
+    if ((token0_length >= sizeof("i_") - 1) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SAFE_UPDATES;
+    if ((token0_length >= sizeof("loc") - 1) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_LOCAL_INFILE;
+    if ((token0_length >= sizeof("max_j") - 1) && (strncmp(token0_as_utf8, "max_join_size", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_MAX_JOIN_SIZE;
+    if ((token0_length >= sizeof("no_b") - 1) && (strncmp(token0_as_utf8, "no_beep", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_NO_BEEP;
+    if ((token0_length >= sizeof("pas") - 1) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_PASSWORD;
+    if ((token0_length >= sizeof("pl") - 1) && (strncmp(token0_as_utf8, "plugin_dir", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_PLUGIN_DIR;
+    if ((token0_length >= sizeof("po") - 1) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_PORT;
+    if ((token0_length >= sizeof("prot") - 1) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_PROTOCOL;
+    if ((token0_length >= sizeof("sa") - 1) && (strncmp(token0_as_utf8, "safe_updates", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SAFE_UPDATES;
+    if ((token0_length >= sizeof("sec") -1 ) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SECURE_AUTH;
+    if ((token0_length >= sizeof("sel") - 1) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SELECT_LIMIT;
+    if ((token0_length >= sizeof("sh") - 1) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SHOW_WARNINGS;
+    if ((token0_length >= sizeof("sil") - 1) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SILENT;
+    if ((token0_length >= sizeof("so") - 1) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SOCKET;
+    if ((token0_length >= sizeof("ssl_verify") - 1) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT;
+    if ((token0_length >= sizeof("us") - 1) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_USER;
+    if ((token0_length >= sizeof("wa") - 1) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
+      keyword_index= TOKEN_KEYWORD_WAIT;
+  }
+
   if (keyword_index == TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR) { ocelot_abort_source_on_error= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_AUTO_REHASH) { ocelot_auto_rehash= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT) { ocelot_auto_vertical_output= is_enable; return; }
-  if (strcmp(token0_as_utf8, "batch") == 0)
+  if (keyword_index == TOKEN_KEYWORD_BATCH)
   {
     ocelot_batch= is_enable;
     ocelot_silent= is_enable;
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_BINARY_MODE) { ocelot_binary_mode= is_enable; return; }
-  if (strcmp(token0_as_utf8, "bind") == 0) /* not available in mysql client */
+  if (keyword_index == TOKEN_KEYWORD_BIND) /* not available in mysql client */
   {
     ocelot_opt_bind= token2;
     return;
@@ -16415,12 +16480,12 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (keyword_index == TOKEN_KEYWORD_COLUMN_NAMES) { ocelot_result_grid_column_names= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_COLUMN_TYPE_INFO) { ocelot_column_type_info= is_enable; return; }
-  if ((token0_length >= sizeof("comm") - 1) && (strncmp(token0_as_utf8, "comments", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_COMMENTS)
   {
     ocelot_comments= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("comp") - 1) && (strncmp(token0_as_utf8, "compress", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_COMPRESS)
   {
     ocelot_opt_compress= is_enable;
     return;
@@ -16435,7 +16500,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_connect_attr_reset= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("con") - 1) && (strncmp(token0_as_utf8, "connect_timeout", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_CONNECT_TIMEOUT)
   {
     ocelot_opt_connect_timeout= to_long(token2);
     return;
@@ -16447,7 +16512,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (keyword_index == TOKEN_KEYWORD_DEBUG) { ocelot_debug= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_DEBUG_INFO) { ocelot_debug_info= is_enable; return; }
-  if ((token0_length >= sizeof("default_a") - 1) && (strncmp(token0_as_utf8, "default_auth", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_DEFAULT_AUTH)
   {
     ocelot_default_auth= token2;
     return;
@@ -16472,7 +16537,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_defaults_group_suffix= token2;
     return;
   }
-  if ((token0_length >= sizeof("del") - 1) && (strncmp(token0_as_utf8, "delimiter", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_DELIMITER)
   {
     ocelot_delimiter_str= token2;
     return;
@@ -16487,13 +16552,13 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (keyword_index == TOKEN_KEYWORD_HELP) { ocelot_help= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_HISTFILE) { ocelot_history_hist_file_name= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_HISTIGNORE) { ocelot_histignore= token2; return; }
-  if ((token0_length >= sizeof("ho") - 1) && (strncmp(token0_as_utf8, "host", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_HOST)
   {
     ocelot_host= token2;
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_HTML) { ocelot_html= is_enable; return; }
-  if ((token0_length >= sizeof("i_") - 1) && (strncmp(token0_as_utf8, "i_am_a_dummy", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_SAFE_UPDATES) /* Actually this could be "i-am-a-dummy" */
   {
     ocelot_safe_updates= is_enable;
     return;
@@ -16506,7 +16571,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_LINE_NUMBERS) { ocelot_line_numbers= is_enable; return; }
-  if ((token0_length >= sizeof("loc") - 1) && (strncmp(token0_as_utf8, "local_infile", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_LOCAL_INFILE)
   {
     if (token2 > "") ocelot_opt_local_infile= to_long(token2);
     else ocelot_opt_local_infile= is_enable;
@@ -16514,7 +16579,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (keyword_index == TOKEN_KEYWORD_LOGIN_PATH) { ocelot_login_path= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_MAX_ALLOWED_PACKET) { ocelot_max_allowed_packet= to_long(token2); return; }
-  if ((token0_length >= sizeof("max_j") - 1) && (strncmp(token0_as_utf8, "max_join_size", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_MAX_JOIN_SIZE)
   {
     ocelot_max_join_size= to_long(token2);
     return;
@@ -16522,7 +16587,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (keyword_index == TOKEN_KEYWORD_NAMED_COMMANDS) { ocelot_named_commands= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_NET_BUFFER_LENGTH) { ocelot_net_buffer_length= to_long(token2); return; }
   if (keyword_index == TOKEN_KEYWORD_NO_AUTO_REHASH) { ocelot_auto_rehash= 0; return; }
-  if ((token0_length >= sizeof("no_b") - 1) && (strncmp(token0_as_utf8, "no_beep", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_NO_BEEP)
   {
     ocelot_no_beep= is_enable;
     return;
@@ -16578,7 +16643,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_grid_font_weight= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_cell_border_color= ccn; return; }
-  if (strcmp(token0_as_utf8, "ocelot_grid_cell_drag_line_color") == 0)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_cell_drag_line_color= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) { ocelot_grid_border_size= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE) { ocelot_grid_cell_border_size= token2; return; }
@@ -16676,7 +16741,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   }
   if (keyword_index == TOKEN_KEYWORD_ONE_DATABASE) { ocelot_one_database= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PAGER) { ocelot_pager= is_enable; return; }
-  if ((token0_length >= sizeof("pas") - 1) && (strncmp(token0_as_utf8, "password", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_PASSWORD)
   {
     ocelot_password= token2;
     ocelot_password_was_specified= is_enable;
@@ -16687,19 +16752,19 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_named_pipe= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("pl") - 1) && (strncmp(token0_as_utf8, "plugin_dir", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_PLUGIN_DIR)
   {
     ocelot_plugin_dir= token2;
     return;
   }
-  if ((token0_length >= sizeof("po") - 1) && (strncmp(token0_as_utf8, "port", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_PORT)
   {
     ocelot_port= to_long(token2);
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_PRINT_DEFAULTS) { ocelot_print_defaults= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PROMPT) { ocelot_prompt= token2; ocelot_prompt_is_default= false; return; }
-  if ((token0_length >= sizeof("prot") - 1) && (strncmp(token0_as_utf8, "protocol", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_PROTOCOL)
   {
     ocelot_protocol= token2; /* Todo: perhaps make sure it's tcp/socket/pipe/memory */
     ocelot_protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
@@ -16732,12 +16797,12 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_report_data_truncation= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("sa") - 1) && (strncmp(token0_as_utf8, "safe_updates", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_SAFE_UPDATES)
   {
     ocelot_safe_updates= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("sec") -1 ) && (strncmp(token0_as_utf8, "secure_auth", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_SECURE_AUTH)
   {
     ocelot_secure_auth= is_enable;
     return;
@@ -16747,7 +16812,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_server_public_key= token2;
     return;
   }
-   if ((token0_length >= sizeof("sel") - 1) && (strncmp(token0_as_utf8, "select_limit", token0_length) == 0))
+   if (keyword_index == TOKEN_KEYWORD_SELECT_LIMIT)
   {
     ocelot_select_limit= to_long(token2);
     return;
@@ -16758,18 +16823,18 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_shared_memory_base_name= token2;
     return;
     }
-  if ((token0_length >= sizeof("sh") - 1) && (strncmp(token0_as_utf8, "show_warnings", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_SHOW_WARNINGS)
   {
     ocelot_history_includes_warnings= is_enable;
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_SIGINT_IGNORE) { ocelot_sigint_ignore= is_enable; return; }
-  if ((token0_length >= sizeof("sil") - 1) && (strncmp(token0_as_utf8, "silent", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_SILENT)
   {
     ocelot_silent= is_enable;
     return;
   }
-  if ((token0_length >= sizeof("so") - 1) && (strncmp(token0_as_utf8, "socket", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_SOCKET)
   {
     ocelot_unix_socket= token2;
     return;
@@ -16819,7 +16884,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_ssl_mode= token2;
     return;
   }
-  if ((token0_length >= sizeof("ssl_verify") - 1) && (strncmp(token0_as_utf8, "ssl_verify_server_cert", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT)
   {
     ocelot_opt_ssl_verify_server_cert= to_long(token2);
     return;
@@ -16833,7 +16898,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_use_result= to_long(token2);
     return;
   }
-  if ((token0_length >= sizeof("us") - 1) && (strncmp(token0_as_utf8, "user", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_USER)
   {
     ocelot_user= token2;
     return;
@@ -16842,7 +16907,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (keyword_index == TOKEN_KEYWORD_VERSION) { ocelot_version= is_enable; return; }
   /* todo: check that this finds both --vertical and -E */ /* for vertical */
   if (keyword_index == TOKEN_KEYWORD_VERTICAL) { ocelot_result_grid_vertical= is_enable; return; }
-  if ((token0_length >= sizeof("wa") - 1) && (strncmp(token0_as_utf8, "wait", token0_length) == 0))
+  if (keyword_index == TOKEN_KEYWORD_WAIT)
   {
     ocelot_wait= is_enable;
     return;
@@ -16852,7 +16917,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     ocelot_opt_write_timeout= to_long(token2);
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_XML) { ocelot_xml= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_XML)
+  {
+    ocelot_xml= is_enable;
+    return;
+  }
 }
 
 

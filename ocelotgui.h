@@ -3238,7 +3238,7 @@ public slots:
   void action_redo();
   void menu_activations(QObject*, QEvent::Type);
   void statement_edit_widget_formatter();
-  void action_change_one_setting(QString old_setting, QString new_setting, const char *name_of_setting);
+  void action_change_one_setting(QString old_setting, QString new_setting, int keyword_index);
   void action_menu();
   void action_history();
   void action_grid();
