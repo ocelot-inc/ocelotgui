@@ -3305,6 +3305,7 @@ public slots:
   void menu_edit_autocomplete_via_menu();
   bool menu_edit_autocomplete();
   bool eventfilter_function(QObject *obj, QEvent *event);
+  void menu_context(const QPoint &);
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
@@ -3860,7 +3861,6 @@ private:
   int left_mouse_button_was_pressed;
   int widget_side;
   enum {LEFT= 1, RIGHT= 2, TOP= 3, BOTTOM= 4};
-
 };
 #endif // TEXTEDITFRAME_H
 
@@ -3882,6 +3882,7 @@ public:
   TextEditFrame *text_edit_frame_of_cell;
 
   void copy();
+  void menu_context_t_2(const QPoint & pos);
 protected:
   void paintEvent(QPaintEvent *event);
   void keyPressEvent(QKeyEvent *event);
@@ -3889,6 +3890,12 @@ protected:
   void focusInEvent(QFocusEvent *event);
 
   QString unstripper(QString value_to_unstrip);
+
+public slots:
+void menu_context_t(const QPoint & pos)
+{
+  menu_context_t_2(pos);
+}
 
 };
 
@@ -8552,9 +8559,11 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
 }
 
 public slots:
+
 private:
 };
 #endif // RESULTGRID_H
+
 
 /*********************************************************************************************************/
 

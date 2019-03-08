@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: March 3 2019
+   Last modified: March 7 2019
 */
 
 /*
@@ -693,6 +693,13 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   create_menu();    /* Do this at a late stage because widgets must exist before we call connect() */
 
+  history_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(history_edit_widget, SIGNAL(customContextMenuRequested(const QPoint &)),
+      this, SLOT(menu_context(const QPoint &)));
+  statement_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
+  connect(statement_edit_widget, SIGNAL(customContextMenuRequested(const QPoint &)),
+      this, SLOT(menu_context(const QPoint &)));
+
   /* If any widget is detached, there might be some blinking. Probably not worth worrying about. */
   if (ocelot_history_detached.toInt() == 1) detach_history_widget(true);
   if (ocelot_grid_detached.toInt() == 1) detach_result_grid_widget(true);
@@ -713,6 +720,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   {
     action_connect();
   }
+
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
 }
 
@@ -1152,7 +1160,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 //    ||  (event->type() == QEvent::MouseMove)
 //    ||  (event->type() == QEvent::MouseTrackingChange)) return (result_grid_table_widget->scroll_event());
 //  }
-  QString text;
+//  QString text; /* This is unused now */
 
   if (event->type() == QEvent::FocusIn)
   {
@@ -4233,6 +4241,10 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
     if (t->text_edit_frame_of_cell->is_image_flag)
     {
+
+      /* !! TEST !! */
+      is_can_copy= true;
+
       /* zoomin + zoomout are already false */
       is_can_cut= false;
       is_can_paste= false;
@@ -14831,6 +14843,42 @@ void MainWindow::log(const char *message, int level)
   }
 }
 
+/*
+  Context Menu
+  Usually caused by right-click on a widget but we do not try to
+  assume that by intercepting a Qt::RightButton event, it might be Menu key.
+  https://doc.qt.io/archives/qt-4.8/qcontextmenuevent.html
+  * When we start we say
+    statement_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
+        statement_edit_widget, SLOT(menu_context(const QPoint &)));
+    etc.
+    For ResultGrid we do this in ocelotgui.h during client initiation, before making the cell pool,
+    so that TextEditFrame will inherit the policy (and it does).
+  * We don't want the default context menu. I tried to turn it off by calling
+    setContextMenuPolicy(Qt::PreventContextMenu); in TextEditFrame::TextEditFrame(),
+    and in MainWindow, but failed. However, I succeeded with the method I'm using now.
+  * In ocelotgui.h we have public slots: menu_context().
+  * TIP? itemAt(pos) might tell you where right click happened, else you might need special measures.
+  * Todo: pass QContextMenuEvent::Reason too?
+  * Todo: I wish we could just connect for MainWindow and inherit, but I couldn't get that to work.
+          Now we're only setting policy and connecting for
+          result grid, + history_edit_widget, + statement_edit_widget, + TextEditWidget
+          and not debug or line or texteditframe|textedwidget.
+  * Todo: mapToGlobal(pos) is nearly okay but the menu is slightly to the left of the cursor.
+          And, since we get here for all widgets not just statement_edit_widget, it can be way off.
+  * Todo: This is not really a custom or in-context menu, we just show the menu that we'd see if we
+    clicked Menu|Edit. We re-use menu_edit rather than making a new QMenu. This seems to work
+    but I've not seen a definite statement that it is supposed to work.
+  * Todo: Meanwhile TextEditWidget has a public slot menu_context_t which calls menu_context_t_2
+    which calls here. Probably more jumps than needed, eh? Anyway, at the time we call, we
+    know exactly which cell the cursor is on, and we know it's result grid not statement_edit_widget,
+    so considerable improvement is possible for that.
+*/
+void MainWindow::menu_context(const QPoint &pos)
+{
+  menu_edit->exec(statement_edit_widget->mapToGlobal(pos));
+}
 
 #include "codeeditor.h"
 
@@ -14861,8 +14909,8 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
   {
     left_mouse_button_was_pressed= 1;
   }
+  /* We don't look for Qt::RightButton because we have menu_context in MainWIndow. */
 }
-
 
 void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
 {
@@ -15026,6 +15074,11 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
 TextEditWidget::TextEditWidget(QWidget *parent) :
     QTextEdit(parent)
 {
+
+    this->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
+        this, SLOT(menu_context_t(const QPoint &)));
+
 }
 
 
@@ -15284,11 +15337,11 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
   The reason that we reimplement copy(), and call it from QKeySequence, is:
   for images we do not do setText(). So we (?) have to loadfromData again and
   put in the clipboard as a pixmap.
+  This can be called via QKeySequence (default ^C), menu, or via right-click RightButton see menu_context.
   This gets the entire unclipped image because we're reloading from the source.
   Todo: check for nulls.
   Todo: decide whether we care about select() before copy().
         If it's an image, Copy is enabled even if there's no selection.
-  Todo: although ^C seems okay, right-click and select copy does not seem okay.
   Todo: With Qt4, when program ends, if there was a copy, we might see
         "QClipboard: Unable to receive an event from the clipboard manager in a reasonable time"
         which might be like https://bugreports.qt.io/browse/QTBUG-32853.
@@ -15318,6 +15371,12 @@ void TextEditWidget::copy()
   else QTextEdit::copy();
 }
 
+void TextEditWidget::menu_context_t_2(const QPoint & pos)
+{
+  ResultGrid *r;
+  r= text_edit_frame_of_cell->ancestor_result_grid_widget;
+  r->copy_of_parent->menu_context(pos);
+}
 
 /* Add ' at start and end of a string. Change ' to '' within string. Compare connect_stripper(). */
 /* mysql_hex_string() might be useful for some column types here */
@@ -15796,7 +15855,11 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   todo: you seem to be forgetting that Qt can also expect command-line options
   todo: all the .ToLower() stuff is probably unnecessary, it can probably be upper
 */
-/* BUG: If there are multiple -x and --x and --x=y options, this will get confused. */
+/*
+  BUG: If user enters "--ocelot_xml = wombat" rather than "--ocelot_xml=wombat", we will interpret
+       this as three entries, and the third entry is not preceded by - so we will interpret wombat as
+       a database name. Of course the spaces shouldn't be there, but we should parse better.
+*/
 void MainWindow::connect_read_command_line(int argc, char *argv[])
 {
   QString token0, token1, token2;
