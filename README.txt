@@ -1694,7 +1694,7 @@ http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt</
 <P>Ordinarily ocelotgui is a client for
 MySQL/MariaDB, and some documentation
 assumes that. However, it is possible
-to connect to Tarantool 1.8.1 or Tarantool 2.1 (with SQL) instead.
+to connect to Tarantool Tarantool 2.1 (with SQL) instead.
 You get all the same features except the debugger.</P>
 
 <P>The ocelotgui connection to Tarantool is not produced or approved by Tarantool.</P>
@@ -1704,7 +1704,7 @@ The official "SQL" release beta is available now,
 look for it on https://github.com/tarantool/tarantool/releases.
 For a more current version, download from github.com/tarantool/tarantool:<br>
 git clone -b 2.1 https://github.com/tarantool/tarantool.git ~/tarantool-2.1<br>
-and build as instructed in the version-2.0 manual.</P>
+and build as instructed in the version-2.1 manual.</P>
 
 <P>Usually you do not need to install the Tarantool client (libtarantool.so) library,
 but it is possible to use it if you build ocelotgui with "cmake -DTHIRD_PARTY=0".
@@ -1762,7 +1762,7 @@ The initial screen should come up saying "OK", you're connected.</P>
 
 <P>Type some SQL statements in the statement widget
 at the bottom of the screen.<pre>
-CREATE TABLE test1 (s1 INT PRIMARY KEY, s2 CHAR(5));
+CREATE TABLE test1 (s1 INT PRIMARY KEY, s2 VARCHAR(5));
 INSERT INTO test1 VALUES (1,'a'),(2,'b'),(3,'c');
 UPDATE test1 set s2 = s2 || '!';
 SELECT * FROM test1;</pre>
@@ -1777,7 +1777,7 @@ But you can't drag and resize with --html.)</P>
 <P>Now type any other SQL statements, as described
 in the Tarantool manual. (At time of writing this
 manual is not available but it's similar to SQLite.
-The <A href="https://www.tarantool.io/en/doc/2.0/tutorials/sql_tutorial/">tutorial SQL statements</A>
+The <A href="https://www.tarantool.io/en/doc/2.1/tutorials/sql_tutorial/">tutorial SQL statements</A>
 work.)</P>
 
 <P>Now type<br>
@@ -1853,7 +1853,7 @@ function load_file(file_name)
   return data
 end;
 DROP TABLE "timages";
-create table "timages" (s1 int PRIMARY KEY, s2 blob, s3 char(5));
+create table "timages" (s1 int PRIMARY KEY, s2 scalar, s3 varchar(5));
 box.space.timages:insert{1, load_file('/usr/share/doc/ocelotgui/shot1.jpg'), 'shot1'};
 box.space.timages:insert{2, load_file('/usr/share/doc/ocelotgui/shot2.jpg'), 'shot2'};
 box.space.timages:insert{3, load_file('/usr/share/doc/ocelotgui/shot3.png'), 'shot3'};

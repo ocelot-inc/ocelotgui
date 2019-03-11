@@ -957,6 +957,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_RTRIM,
         TOKEN_KEYWORD_SAFE_UPDATES,
     TOKEN_KEYWORD_SAVEPOINT,
+    TOKEN_KEYWORD_SCALAR,
     TOKEN_KEYWORD_SCHEMA,
     TOKEN_KEYWORD_SCHEMAS,
     TOKEN_KEYWORD_SECOND,
@@ -1340,7 +1341,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1134
+#define KEYWORD_LIST_SIZE 1135
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2159,6 +2160,7 @@ static const keywords strvalues[]=
       {"RTRIM", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_RTRIM},
         {"SAFE_UPDATES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SAFE_UPDATES},
       {"SAVEPOINT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SAVEPOINT},
+      {"SCALAR", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SCALAR},
       {"SCHEMA", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SCHEMA},
       {"SCHEMAS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SCHEMAS},
       {"SECOND", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SECOND},
@@ -5895,7 +5897,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 #define OCELOT_DATA_TYPE_BINARY      10001
 #define OCELOT_DATA_TYPE_VARBINARY   10002
 #define OCELOT_DATA_TYPE_TEXT        10003
-
+#define OCELOT_DATA_TYPE_SCALAR      12001     /* Tarantool */
 /*
   Return true if what's at pointer has an image signature.
   We only do this for Tarantool, we set data type = OCELOT_DATA_TYPE_BLOB
