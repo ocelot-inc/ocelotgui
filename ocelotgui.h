@@ -2499,6 +2499,7 @@ static const keywords strvalues[]=
 #ifdef OCELOT_OS_NONLINUX
 #include <QApplication>
 #endif
+#include <QBuffer>             /* only needed for pasting pixmaps to QByteArray */
 #include <QClipboard>
 #include <QComboBox>
 #include <QDateTime>
@@ -3884,6 +3885,7 @@ public:
   TextEditFrame *text_edit_frame_of_cell;
 
   void copy();
+  void paste();
   void menu_context_t_2(const QPoint & pos);
 protected:
   void paintEvent(QPaintEvent *event);

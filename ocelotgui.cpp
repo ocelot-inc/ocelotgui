@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: March 7 2019
+   Last modified: March 15 2019
 */
 
 /*
@@ -2721,6 +2721,7 @@ void MainWindow::menu_edit_paste()
   if (strcmp(class_name, "CodeEditor") == 0)
     qobject_cast<CodeEditor*>(focus_widget)->paste();
   else if (strcmp(class_name, "TextEditWidget") == 0)
+    /* see TextEditWidget::paste() later in this file */
     qobject_cast<TextEditWidget*>(focus_widget)->paste();
   if (strcmp(class_name, "TextEditHistory") == 0)
     qobject_cast<TextEditHistory*>(focus_widget)->paste();
@@ -15369,6 +15370,57 @@ void TextEditWidget::copy()
     }
   }
   else QTextEdit::copy();
+}
+
+/*
+  Pasting to a cell in the result grid -- what to do with images.
+    This is a Work in progress. So far, we detect that the clipboard has
+    a pixmap, and if so we convert the pixmap to a byte array following
+    https://doc.qt.io/qt-5/qpixmap.html#save-1, and we copy that to a
+    permanent char[], and we call update() so that (I think)
+    TextEditFrame::paintEvent() is seeing it and overwriting the old pixmap.
+    An advantage is that scrolling and then coming back, we'll see the new image.
+    But the job is only half done.
+    Todo: allow undo, which would require saving the old pointers.
+    Todo: generate an UPDATE statement.
+    Todo: have an array of char[] not just one, and delete it when result set is closed.
+          (right now there is only one and it leaks)
+    Todo: check if is_retrieved_flag is necessary, and is all you need.
+    Todo: maybe there should be another flag to indicate "a paste happened here".
+    Todo: the same technique could be applied to non-images though may be unnecessary.
+    Todo: make this a no-op if user is pasting an image to a non-image cell.
+          (but if the old value is NULL we might change it to an image, I suppose)
+    Todo: try removing "PNG" argument.
+    Todo: which is better, update() of frame or of textwidget? and is update() needed + best?
+    Todo: need more error checks, including for "new".
+    Todo: we're not falling through to QTextEdit::paste(). Is there any benefit in that?
+          I think it was causing "QXcbClipboard: SelectionRequest too old", but should test.
+    Todo: research: is there a way to get clipboard contents to char[] with fewer steps?
+*/
+void TextEditWidget::paste()
+{
+  QPixmap p;
+  QClipboard *p_clipboard= QApplication::clipboard();
+  p= p_clipboard->pixmap(QClipboard::Clipboard);
+  if (p.isNull() == false)
+  {
+    /* It is a pixmap. See the comments preceding this function. */
+    QByteArray image_as_byte_array;
+    QBuffer buffer(&image_as_byte_array);
+    buffer.open(QIODevice::WriteOnly);
+    if (p.save(&buffer, "PNG"))
+    {
+      int image_as_byte_array_size= image_as_byte_array.size();
+      char* image_as_char= new char[image_as_byte_array_size];
+      memcpy(image_as_char, image_as_byte_array.constData(), image_as_byte_array_size);
+      text_edit_frame_of_cell->content_pointer= image_as_char;
+      text_edit_frame_of_cell->content_length= image_as_byte_array_size;
+      text_edit_frame_of_cell->is_retrieved_flag= false;
+      text_edit_frame_of_cell->update();
+      return;
+    }
+  }
+  QTextEdit::paste();
 }
 
 void TextEditWidget::menu_context_t_2(const QPoint & pos)
