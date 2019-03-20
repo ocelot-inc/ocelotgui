@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: March 15 2019
+   Last modified: March 20 2019
 */
 
 /*
@@ -8829,7 +8829,7 @@ int MainWindow::execute_real_query(QString query, int connection_number)
     //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   }
   delete []dbms_query;
-  return dbms_long_query_result;
+  printf("**** after delete\n");
 }
 
 /*
@@ -13235,6 +13235,19 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
    spent time earlier in splitting them apart. We use a QStringList.
    Todo: We depend on commit|rollback to end a transaction but they might
          be inside a Lua function.
+   Todo: Somewhere around here we should be setting the table name and the
+         field names, if it is SELECT -- Tarantool doesn't tell us.
+         Currently generated UPDATEs lack the right information,
+         tarantool_scan_field_names generates the wrong table name and
+         the wrong literal (seems to assume it's varchar) and doesn't have
+         an equivalent for org_name. We could figure this out by looking
+         again at the statement -- make sure it's SELECT etc.
+         See inside this function where we calculate offset_of_space_name.
+         Make sure main_token list is still valid, make sure it's SELECT (not missing WITH),
+         calculate for both SQL table and NoSQL space, make sure it's not
+         in a transaction so it will really produce a grid result.
+         Put it in global or (somehow) add to the result set information.
+         But this is deferred because Tarantool is revising box.sql.execute.
 */
 int MainWindow::tarantool_real_query(const char *dbms_query,
                                      unsigned long dbms_query_len,
@@ -14495,10 +14508,10 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
 
 
 /*
+  In Tarantool, "name" and "org_name" (original name) are the same. Unlike MySQL which distinguishes.
   Todo: check: in tarantool_scan_field_names(), should I use
-  sizeof(TARANTOOL_FIELD_NAME_BASE) or strlen(TARANTOOL_FIELD_NAME_BASE)?
+        sizeof(TARANTOOL_FIELD_NAME_BASE) or strlen(TARANTOOL_FIELD_NAME_BASE)?
 */
-
 QString MainWindow::tarantool_scan_field_names(
                const char *which_field,
 
@@ -14517,7 +14530,7 @@ QString MainWindow::tarantool_scan_field_names(
   {
     total_size+= sizeof(unsigned int);
     if (strcmp(which_field, "name") == 0) total_size+= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
-    else if (strcmp(which_field, "org_name") == 0) total_size+= sizeof(TARANTOOL_FIELD_NAME_BASE);
+    else if (strcmp(which_field, "org_name") == 0) total_size+= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
     else if (strcmp(which_field, "org_table") == 0) total_size+= sizeof(TARANTOOL_FIELD_NAME_BASE);
     else /* if (strcmp(which_field, "db") == 0) */ total_size+= sizeof(TARANTOOL_FIELD_NAME_BASE);
   }
@@ -14527,15 +14540,15 @@ QString MainWindow::tarantool_scan_field_names(
   for (i= 0; i < p_result_column_count; ++i)                                 /* second loop */
   {
     if (strcmp(which_field, "name") == 0) v_lengths= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
-    else if (strcmp(which_field, "org_name") == 0) v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
+    else if (strcmp(which_field, "org_name") == 0) v_lengths= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
     else if (strcmp(which_field, "org_table") == 0) v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
     else /* if (strcmp(which_field, "db") == 0) */ v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
     memcpy(result_field_names_pointer, &v_lengths, sizeof(unsigned int));
     if (v_lengths >= TARANTOOL_MAX_FIELD_NAME_LENGTH) return "Field Name Too Long";
     result_field_names_pointer+= sizeof(unsigned int);
     if (strcmp(which_field, "name") == 0) memcpy(result_field_names_pointer, &tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH], v_lengths);
-    else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
-    else if (strcmp(which_field, "org_table") == 0) memcpy(result_field_names_pointer,  TARANTOOL_FIELD_NAME_BASE, v_lengths);
+    else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, &tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH], v_lengths);
+    else if (strcmp(which_field, "org_table") == 0) memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
     else /* if (strcmp(which_field, "db") == 0) */ memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
     result_field_names_pointer+= v_lengths;
   }
