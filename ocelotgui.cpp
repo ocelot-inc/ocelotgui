@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: March 20 2019
+   Last modified: March 22 2019
 */
 
 /*
@@ -8524,7 +8524,7 @@ int MainWindow::action_execute_one_statement(QString text)
       is_create_table_server= false;
 #endif
       if (is_create_table_server == false)
-        execute_real_query(query_utf16, MYSQL_MAIN_CONNECTION);
+        execute_real_query(query_utf16, MYSQL_MAIN_CONNECTION, &text);
       if (dbms_long_query_result)
       {
         /* beep() hasn't been tested because getting sound to work on my computer is so hard */
@@ -8773,7 +8773,7 @@ statement_is_over:
   mysql or tarantool.
   Todo: Tarantool can't be killed so easily. Make a fiber?
 */
-int MainWindow::execute_real_query(QString query, int connection_number)
+int MainWindow::execute_real_query(QString query, int connection_number, const QString *alltext)
 {
   /*
     If the last error was CR_SERVER_LOST 2013 or CR_SERVER_GONE_ERROR 2006,
@@ -8809,7 +8809,7 @@ int MainWindow::execute_real_query(QString query, int connection_number)
   /* todo: for tarantool as for mysql, call with a separate thread so it's killable and so processsEvents() happens. */
   if (connections_dbms[connection_number] == DBMS_TARANTOOL)
   {
-    dbms_long_query_result= tarantool_real_query(dbms_query, dbms_query_len, MYSQL_MAIN_CONNECTION, main_token_number, main_token_count_in_statement);
+    dbms_long_query_result= tarantool_real_query(dbms_query, dbms_query_len, MYSQL_MAIN_CONNECTION, main_token_number, main_token_count_in_statement, alltext);
     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   }
   else
@@ -8829,7 +8829,7 @@ int MainWindow::execute_real_query(QString query, int connection_number)
     //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   }
   delete []dbms_query;
-  printf("**** after delete\n");
+  return dbms_long_query_result;
 }
 
 /*
@@ -13072,6 +13072,7 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
         (which requires going ahead many more words)
   Warn: only works for Tarantool at the moment, e.g.
         wouldn't recognize MySQL/MariaDB comments starting with #
+  TODO: Now tarantool_real_query has alltext, you should use that!
 */
 QString MainWindow::get_statement_type(QString q_dbms_query, int *statement_type)
 {
@@ -13225,6 +13226,7 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
 /* An equivalent to mysql_real_query(). NB: this might be called from a non-main thread */
 /*
    Todo: we shouldn't be calling tparse_f_program() yet again!
+         AND WE DON'T NEED TO. NOW WE PASS ALLTEXT.
    Todo: I succeeded in making this work
            lua 'return box.space.t:select()';
          but:
@@ -13235,32 +13237,137 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
    spent time earlier in splitting them apart. We use a QStringList.
    Todo: We depend on commit|rollback to end a transaction but they might
          be inside a Lua function.
-   Todo: Somewhere around here we should be setting the table name and the
-         field names, if it is SELECT -- Tarantool doesn't tell us.
-         Currently generated UPDATEs lack the right information,
-         tarantool_scan_field_names generates the wrong table name and
-         the wrong literal (seems to assume it's varchar) and doesn't have
-         an equivalent for org_name. We could figure this out by looking
-         again at the statement -- make sure it's SELECT etc.
-         See inside this function where we calculate offset_of_space_name.
-         Make sure main_token list is still valid, make sure it's SELECT (not missing WITH),
-         calculate for both SQL table and NoSQL space, make sure it's not
-         in a transaction so it will really produce a grid result.
-         Put it in global or (somehow) add to the result set information.
-         But this is deferred because Tarantool is revising box.sql.execute.
+*/
+/*
+  Re dbms_query and alltext
+  We pass dbms_query = the string to execute, which might have been massaged by
+  get_ready_to_send(). It might not be the first query in alltext.
+  We pass alltext = the complete text, not massaged, which might contain multiple
+  statements (and if dbms_query is not the first statement then passed_main_token_number > 0).
+  Mainly we use it because it has already gone through the recognizer.
+  Todo: don't parse again if you don't need to!
+  Todo: use alltext rather than dbms_query sometimes!
+  Todo: we could be using const a lot more often!
+  Todo: You aren't actually using table_name or column_name QStrings!
+        You need them in tarantool_scan_field_names!
+*/
+/*
+      In here we should be setting the table name and the
+      field names, if it is SELECT -- Tarantool doesn't tell us.
+      Currently generated UPDATEs lack the right information,
+      tarantool_scan_field_names generates the wrong table name and
+      the wrong literal (seems to assume it's varchar) and doesn't have
+      an equivalent for org_name + org_table. We could figure this out by looking
+      again at the statement -- make sure it's SELECT etc.
+      See inside this function where we calculate offset_of_space_name.
+      Make sure main_token list is still valid, make sure it's SELECT (not missing WITH),
+      calculate for both SQL table and NoSQL space, make sure it's not
+      in a transaction so it will really produce a grid result.
+      Put it in global or (somehow) add to the result set information.
+      But this is deferred because Tarantool is revising box.sql.execute.
+      ! You won't see TOKEN_REFTYPE_COLUMN if it is *
+      ! dbms_query might be only the current query of a multi-query
+        this is a shame because when you call action_execute_one_statement you have text
+        see the comments REALL DUBIOUS twice in this function
+      ! Do this for Lua too
 */
 int MainWindow::tarantool_real_query(const char *dbms_query,
                                      unsigned long dbms_query_len,
                                      unsigned int connection_number,
                                      unsigned int passed_main_token_number,
-                                     unsigned int passed_main_token_count_in_statement)
+                                     unsigned int passed_main_token_count_in_statement,
+                                     const QString *alltext)
 {
   log("tarantool_real_query start", 80);
   tarantool_errno[connection_number]= 10001;
   strcpy(tarantool_errmsg, "Unknown Tarantool Error");
 
+  QString x_dbms_query;
+  if (passed_main_token_number > 0)
+  {
+    x_dbms_query= *alltext;
+  }
+  else x_dbms_query= QString::fromUtf8(dbms_query, dbms_query_len);
+
+  {
+    unsigned int i;
+    QString text= x_dbms_query;
+
+    tarantool_table_name= ""; /* global within MainWindow */
+    tarantool_column_name= ""; /* global within MainWindow */
+    int parentheses_count= 0;
+    int type;
+    bool is_select_seen= false;
+    bool is_comma= false;
+    bool is_from_seen= false;
+    for (i= passed_main_token_number; i < passed_main_token_count_in_statement; ++i)
+    {
+      if (main_token_lengths[i] == 0) break; /* This is impossible, is an assert better? */
+      is_comma= false;
+      type= main_token_types[i];
+      if (main_token_types[i] == TOKEN_TYPE_OPERATOR)
+      {
+        QString o= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        if (o == "(") ++parentheses_count;
+        if (o == ")") --parentheses_count;
+        if (o == ",")
+        {
+          is_comma= true;
+        }
+      }
+      if (parentheses_count != 0) continue;
+      if (is_select_seen == false)
+      {
+        if (type == TOKEN_KEYWORD_WITH) continue;
+        if ((type > TOKEN_KEYWORDS_START) && (type != TOKEN_KEYWORD_SELECT)) break;
+        is_select_seen= true;
+        continue;
+      }
+      if ((type == TOKEN_KEYWORD_FROM) || (is_comma == true))
+      {
+        /* Back up from "," or "from". Whatever precedes is either column or expression. */
+        for (unsigned int j= i - 1; j > passed_main_token_number; --j)
+        {
+          int jtype= main_token_types[j];
+          if ((type >= TOKEN_TYPE_COMMENT_WITH_SLASH) && (type <= TOKEN_TYPE_COMMENT_WITH_MINUS))
+            continue;
+          int jreftype= main_token_reftypes[j];
+          if (jreftype == TOKEN_REFTYPE_ALIAS_OF_COLUMN)
+          {
+            --j;
+            jtype= main_token_types[j];
+            if (jtype == TOKEN_KEYWORD_AS)
+            {
+              --j;
+            }
+          }
+          if (jreftype == TOKEN_REFTYPE_COLLATION)
+          {
+            --j;
+            --j;
+          }
+          if (main_token_reftypes[j] == TOKEN_REFTYPE_COLUMN)
+            tarantool_column_name= tarantool_column_name + ".!.!" + text.mid(main_token_offsets[j], main_token_lengths[j]);
+          else
+            tarantool_column_name= tarantool_column_name + ".!.!" + "";
+          break;
+        }
+        if (type == TOKEN_KEYWORD_FROM) is_from_seen= true;
+        continue;
+      }
+      if ((is_from_seen == true) && (main_token_reftypes[i] == TOKEN_REFTYPE_TABLE))
+      {
+        tarantool_table_name= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        break;
+      }
+    }
+  }
+
+
+
   QString q_dbms_query= QString::fromUtf8(dbms_query, dbms_query_len);
   int statement_type;
+  /* Todo: use x_dbms_query???? */
   QString word1= get_statement_type(q_dbms_query, &statement_type);
   int token_type= -1;
 
@@ -13356,6 +13463,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     }
   }
 
+  /* todo: use x_dbms_query???? */
   QString text= q_dbms_query; /* REALLY DUBIOUS */
 
   int spaceno= -1;
@@ -14508,16 +14616,29 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
 
 
 /*
-  In Tarantool, "name" and "org_name" (original name) are the same. Unlike MySQL which distinguishes.
+  Re is_for_display:
+  MySQL tells us "org_name" and "org_table" with the result set, but Tarantool doesn't.
+  If you're coming from action_execute_one_statement() which called
+  execute_real_query()+tarantool_real_query() before calling fillup() which called here, then
+  you know that tarantool_real_query() happened and left you a table name and column names,
+  which it figured out from the query.
+
   Todo: check: in tarantool_scan_field_names(), should I use
         sizeof(TARANTOOL_FIELD_NAME_BASE) or strlen(TARANTOOL_FIELD_NAME_BASE)?
 */
+
 QString MainWindow::tarantool_scan_field_names(
                const char *which_field,
 
         unsigned int p_result_column_count,
-               char **p_result_field_names)
+               char **p_result_field_names,
+        bool is_for_display)
 {
+  char tmp_table_name[128*3]; /* I hope this is safe, I discourage long-table-name nonsense. */
+
+  if (is_for_display == true) strcpy(tmp_table_name, tarantool_table_name.toUtf8());
+  else strcpy(tmp_table_name, "");
+
   unsigned int i;
   unsigned int v_lengths;
   /*
@@ -14531,7 +14652,7 @@ QString MainWindow::tarantool_scan_field_names(
     total_size+= sizeof(unsigned int);
     if (strcmp(which_field, "name") == 0) total_size+= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
     else if (strcmp(which_field, "org_name") == 0) total_size+= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
-    else if (strcmp(which_field, "org_table") == 0) total_size+= sizeof(TARANTOOL_FIELD_NAME_BASE);
+    else if (strcmp(which_field, "org_table") == 0) total_size+= strlen(tmp_table_name);
     else /* if (strcmp(which_field, "db") == 0) */ total_size+= sizeof(TARANTOOL_FIELD_NAME_BASE);
   }
   *p_result_field_names= new char[total_size];                               /* allocate */
@@ -14541,14 +14662,14 @@ QString MainWindow::tarantool_scan_field_names(
   {
     if (strcmp(which_field, "name") == 0) v_lengths= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
     else if (strcmp(which_field, "org_name") == 0) v_lengths= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
-    else if (strcmp(which_field, "org_table") == 0) v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
+    else if (strcmp(which_field, "org_table") == 0) v_lengths= strlen(tmp_table_name);
     else /* if (strcmp(which_field, "db") == 0) */ v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
     memcpy(result_field_names_pointer, &v_lengths, sizeof(unsigned int));
     if (v_lengths >= TARANTOOL_MAX_FIELD_NAME_LENGTH) return "Field Name Too Long";
     result_field_names_pointer+= sizeof(unsigned int);
     if (strcmp(which_field, "name") == 0) memcpy(result_field_names_pointer, &tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH], v_lengths);
     else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, &tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH], v_lengths);
-    else if (strcmp(which_field, "org_table") == 0) memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
+    else if (strcmp(which_field, "org_table") == 0) memcpy(result_field_names_pointer, tmp_table_name, v_lengths);
     else /* if (strcmp(which_field, "db") == 0) */ memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
     result_field_names_pointer+= v_lengths;
   }
@@ -14708,7 +14829,8 @@ int MainWindow::create_table_server(QString text,
                          q.toUtf8().size(),
                          MYSQL_REMOTE_CONNECTION,
                          new_passed_main_token_number,
-                         new_passed_main_token_count_in_statement);
+                         new_passed_main_token_count_in_statement,
+                         &q);
     if (result != 0)
     {
       put_diagnostics_in_result(MYSQL_REMOTE_CONNECTION);

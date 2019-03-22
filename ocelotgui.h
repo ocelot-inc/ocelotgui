@@ -3187,7 +3187,7 @@ public:
   void hparse_f_parse_hint_line_create();
   bool hparse_f_is_nosql(QString);
   void log(const char*,int);
-  int execute_real_query(QString, int);
+  int execute_real_query(QString, int, const QString *);
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
   void tparse_f_term();
@@ -3218,7 +3218,8 @@ public:
   QString tarantool_scan_field_names(
                  const char *which_field,
                  unsigned int p_result_column_count,
-                 char **p_result_field_names);
+                 char **p_result_field_names,
+                 bool is_for_display);
   int create_table_server(QString, bool *, unsigned int, unsigned int);
   QString tarantool_read_format(QString);
 #endif
@@ -3443,7 +3444,7 @@ private:
   int connect_tarantool(unsigned int connection_number, QString, QString, QString, QString);
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
-  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int);
+  int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, const QString *);
   QString get_statement_type(QString, int *);
   int get_statement_type_low(QString, QString, QString);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
@@ -3609,6 +3610,9 @@ public:
   unsigned int saved_main_token_count_in_all;
   unsigned int saved_main_token_count_in_statement;
   unsigned int saved_main_token_number;
+
+  QString tarantool_table_name;
+  QString tarantool_column_name;
 
   /* main_token_flags[] values. so far there are only sixteen but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
@@ -5993,12 +5997,12 @@ QString fillup(MYSQL_RES *mysql_res,
   if (connections_dbms == DBMS_TARANTOOL)
   {
     QString r;
-    r= copy_of_parent->tarantool_scan_field_names("name", result_column_count, &result_field_names);
+    r= copy_of_parent->tarantool_scan_field_names("name", result_column_count, &result_field_names, is_for_display);
     if (r != "OK") return r;
     /* Next three scan_field_names calls are only needed if user will edit the result set */
-    copy_of_parent->tarantool_scan_field_names("org_name", result_column_count, &result_original_field_names);
-    copy_of_parent->tarantool_scan_field_names("org_table", result_column_count, &result_original_table_names);
-    copy_of_parent->tarantool_scan_field_names("db", result_column_count, &result_original_database_names);
+    copy_of_parent->tarantool_scan_field_names("org_name", result_column_count, &result_original_field_names, is_for_display);
+    copy_of_parent->tarantool_scan_field_names("org_table", result_column_count, &result_original_table_names, is_for_display);
+    copy_of_parent->tarantool_scan_field_names("db", result_column_count, &result_original_database_names, is_for_display);
   }
   else
 #endif
@@ -6995,7 +6999,7 @@ int creates(QString create_table_statement, int connections_dbms_0, QString read
     tmp.append(")");
   }
   tmp.append(")");
-  int result= copy_of_parent->execute_real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
+  int result= copy_of_parent->execute_real_query(tmp, 0, &tmp); /* MYSQL_MAIN_CONNECTION */
   if (result != 0) return result;
   return result;
 }
@@ -7052,7 +7056,7 @@ int inserts(QString temporary_table_name)
       pointer+= v_length;
     }
     tmp.append(");");
-    int result= copy_of_parent->execute_real_query(tmp, 0); /* MYSQL_MAIN_CONNECTION */
+    int result= copy_of_parent->execute_real_query(tmp, 0, &tmp); /* MYSQL_MAIN_CONNECTION */
     if (result != 0) return result;
   }
   return 0;
