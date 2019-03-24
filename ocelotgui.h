@@ -2754,6 +2754,8 @@ extern int MENU_PICK_NEW_FONT;
 
 extern unsigned int menu_off;
 
+extern unsigned short int dbms_version_mask;
+
 namespace Ui
 {
 class MainWindow;
@@ -3853,7 +3855,8 @@ public:
   int ancestor_grid_result_row_number;
   unsigned int content_length;
   unsigned short int cell_type;                        /* detail or header or detail_extra_rule_1 */
-  char *content_pointer;
+  char content_field_value_flags; /* if detail, might be a copy of result_row_copy field_value_flag values */
+  char *content_pointer; /* if detail, might point to result_row_copy */
   bool is_retrieved_flag;
   bool is_style_sheet_set_flag;
   bool is_image_flag;                    /* true if data type = blob and appropriate flag is on */
@@ -7202,7 +7205,7 @@ bool is_image(int col)
   Todo: convert to QString, fiddle, convert back ... not a fast way, eh?
 */
 QByteArray history_padder(char *str, int length,
-                       int column_width, unsigned int result_field_flags)
+                       int column_width, char field_value_flags)
 {
   QString s= QString::fromUtf8(str, length);
   int space_count= column_width - s.length();
@@ -7211,7 +7214,7 @@ QByteArray history_padder(char *str, int length,
   {
     QString spaces= " ";
     /* Todo: for Tarantool, check (flag & FIELD_VALUE_FLAG_IS_NUMBER) */
-    if ((result_field_flags & NUM_FLAG) != 0)
+    if (field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER)
       s= spaces.repeated(space_count) + s;
     else
       s= s + spaces.repeated(space_count);
@@ -7424,7 +7427,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   {
     char *row_pointer;
     unsigned int column_length;
-    char flag;
+    char field_value_flags;
     char *pointer_to_source;
     pointer_to_history_line= history_line;
     row_pointer= result_set_copy_rows[r];
@@ -7433,9 +7436,9 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     for (col= 0; col < history_result_column_count; ++col)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
-      flag= *(row_pointer + sizeof(unsigned int));
+      field_value_flags= *(row_pointer + sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
-      if ((flag & FIELD_VALUE_FLAG_IS_NULL) != 0)
+      if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0)
       {
         length= strlen(NULL_STRING);
         pointer_to_source= (char *) NULL_STRING;
@@ -7448,7 +7451,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
       pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
       pcv= history_padder(pointer_to_source, length,
-                     history_max_column_widths[col], result_field_flags[col]);
+                     history_max_column_widths[col], field_value_flags);
       memcpy(pointer_to_history_line, pcv, pcv.size());
       pointer_to_history_line+= pcv.size();
       memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
@@ -7927,6 +7930,7 @@ void scan_field_names(
 void set_alignment_and_height(int ki, int grid_col, int field_type)
 {
   TextEditWidget *cell_text_edit_widget= text_edit_widgets[ki];
+  /* Todo: probably MySQL should be done the same way as Tarantool, no need to check field_type */
   if ((field_type <= MYSQL_TYPE_DOUBLE)
    || (field_type == MYSQL_TYPE_NEWDECIMAL)
    || (field_type == MYSQL_TYPE_LONGLONG)
@@ -8012,6 +8016,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       //if (ocelot_client_side_functions_copy != 0)                         /* include row#? */
       //{
       //  text_edit_frames[text_edit_frames_index]->content_length= 0;
+      //  text_edit_frames[text_edit_frames_index]->content_field_value_flags= 0;
       //  text_edit_frames[text_edit_frames_index]->content_pointer= 0;
       //  text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
       //  text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
@@ -8038,7 +8043,9 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         ++text_edit_frames_index;
       }
       text_edit_frames[text_edit_frames_index]->content_length= new_content_length; /* include value. */
-      if (*(row_pointer - 1) == FIELD_VALUE_FLAG_IS_NULL)
+      char field_value_flags= *(row_pointer - 1);
+      text_edit_frames[text_edit_frames_index]->content_field_value_flags= field_value_flags;
+      if (field_value_flags == FIELD_VALUE_FLAG_IS_NULL)
       {
         text_edit_frames[text_edit_frames_index]->content_pointer= 0;
       }
@@ -8138,7 +8145,9 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         {
           memcpy(&(text_edit_frames[text_edit_frames_index]->content_length), row_pointer, sizeof(unsigned int));
           row_pointer+= sizeof(unsigned int) + sizeof(char);
-          if (*(row_pointer - 1) == FIELD_VALUE_FLAG_IS_NULL)
+          char field_value_flags= *(row_pointer - 1);
+          text_edit_frames[text_edit_frames_index]->content_field_value_flags= field_value_flags;
+          if (field_value_flags == FIELD_VALUE_FLAG_IS_NULL)
           {
             text_edit_frames[text_edit_frames_index]->content_pointer= 0;
           }
@@ -8300,14 +8309,35 @@ bool vertical_scroll_bar_event(int connections_dbms)
   Todo: some other types e.g. BLOBs might also need special handling.
   Todo: user-settable option rather than WrapAnywhere.
   Todo: check that the effect is immediate, not deferred to the next time resultgrid comes up.
+  ? For some reason this used to be:
+    void text_align(QTextEdit *cell_text_edit_widget, enum Qt::AlignmentFlag alignment_flag)
 */
-void text_align(QTextEdit *cell_text_edit_widget, enum Qt::AlignmentFlag alignment_flag)
+void text_align(TextEditWidget *cell_text_edit_widget, enum Qt::AlignmentFlag alignment_flag)
 {
+  enum Qt::AlignmentFlag a;
+  /* Following should only be needed for Tarantool/NoSQL or Tarantool/SQL scalar */
+  /* But maybe we should do it for all Tarantool and for MySQL/MariaDB, it probably works */
+  /* Override what was passed, we will depend on the cell's field_value_flags */
+  if ((dbms_version_mask & FLAG_VERSION_TARANTOOL) != 0)
+  {
+    char field_value_flags= cell_text_edit_widget->text_edit_frame_of_cell->content_field_value_flags;
+    {
+      if (field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER)
+      {
+        a= Qt::AlignRight;
+      }
+      else
+      {
+        a= Qt::AlignLeft;
+      }
+    }
+  }
+  else a= alignment_flag;
   QTextOption to;
-  to.setAlignment(alignment_flag);
+  to.setAlignment(a);
   to.setWrapMode(QTextOption::WrapAnywhere);
   cell_text_edit_widget->document()->setDefaultTextOption(to);
-  cell_text_edit_widget->setAlignment(alignment_flag);
+  cell_text_edit_widget->setAlignment(a);
 }
 
 

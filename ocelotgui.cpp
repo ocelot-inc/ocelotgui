@@ -396,7 +396,7 @@
 
   /* This should correspond to the version number in the comment at the start of this program. */
   static const char ocelotgui_version[]="1.0.8"; /* For --version. Make sure it's in manual too. */
-  static unsigned short int dbms_version_mask= FLAG_VERSION_DEFAULT;
+  unsigned short int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
   static MYSQL mysql[MYSQL_MAX_CONNECTIONS];
@@ -15190,7 +15190,7 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
         {
           if (is_image_flag == false)
           {
-            if (content_pointer == 0)
+            if (content_pointer == 0) /* or check content_field_value_flags */
             {
               text_edit->setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
             }
@@ -15241,7 +15241,7 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
     return;
   }
 
-  if (text_edit_frame_of_cell->content_pointer == 0)
+  if (text_edit_frame_of_cell->content_pointer == 0) /* or check content_field_value_flags */
   {
     setText(QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1));
     QTextEdit::paintEvent(event);
@@ -15255,7 +15255,8 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
                      0,
                      Qt::AutoColor) == false)
   {
-    if (text_edit_frame_of_cell->content_pointer != 0)
+    /* Todo: check above. Haven't we alread esitablished that content_pointer != 0? */
+    if (text_edit_frame_of_cell->content_pointer != 0)  /* or check content_field_value_flags */
     {
       setText(QString::fromUtf8(text_edit_frame_of_cell->content_pointer,
                                 text_edit_frame_of_cell->content_length));
@@ -15337,6 +15338,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
     /* Content has changed since the last keyPressEvent. */
     /* column number = text_edit_frame_of_cell->ancestor_grid_column_number */
     /* length = text_edit_frame_of_cell->content_length */
+    /* field_value_flags = null, numeric, etc. */
     /* *content = text_edit_frame_of_cell->content_pointer, which should be 0 for null */
 
     /* result_grid->text_edit_frames[0] etc. have all the TextEditFrame widgets of the rows */
@@ -15399,7 +15401,7 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
 
       char *p= text_edit_frame->content_pointer;
       int l;
-      if (p == 0) l= 0; /* if content_pointer == 0, that means null */
+      if (p == 0) l= 0; /* if content_pointer == 0, that means null */ /* or check field_value_flags */
       else
       {
         l= text_edit_frame->content_length;
@@ -15411,12 +15413,13 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
         if (where_clause == "") where_clause= " WHERE ";
         else where_clause.append(" AND ");
         where_clause.append(name_in_result_set);
-        if (p == 0) where_clause.append(" IS NULL");
+        if (p == 0) where_clause.append(" IS NULL"); /* or check content_field_value_flags */
         else
         {
           where_clause.append("=");
           QString s;
-          if (result_grid->result_field_types[column_number] <= OCELOT_DATA_TYPE_DOUBLE)
+          //if (result_grid->result_field_types[column_number] <= OCELOT_DATA_TYPE_DOUBLE)
+          if (text_edit_frame->content_field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER)
             s= content_in_result_set;
           else s= unstripper(content_in_result_set);
           where_clause.append(s);
@@ -15433,15 +15436,19 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
           if (update_statement == "")
           {
             update_statement= "/* generated */ UPDATE ";
-            update_statement.append(QString::fromUtf8(db_pointer, db_length));
-            update_statement.append(".");
+            if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) == 0)
+            {
+              update_statement.append(QString::fromUtf8(db_pointer, db_length));
+              update_statement.append(".");
+            }
             update_statement.append(QString::fromUtf8(table_pointer, table_length));
             update_statement.append(" SET ");
           }
           else update_statement.append(",");
           update_statement.append(name_in_result_set);
           update_statement.append('=');
-          if ((result_grid->result_field_types[column_number] <= OCELOT_DATA_TYPE_DOUBLE)
+          //if ((result_grid->result_field_types[column_number] <= OCELOT_DATA_TYPE_DOUBLE)
+          if ((text_edit_frame->content_field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER)
           || (content_in_text_edit_widget == NULL_STRING))
             update_statement.append(content_in_text_edit_widget);
           else update_statement.append(unstripper(content_in_text_edit_widget));
