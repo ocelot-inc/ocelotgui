@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: March 22 2019
+   Last modified: March 24 2019
 */
 
 /*
@@ -14369,6 +14369,7 @@ QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
   Return amount that we would need for allocating.
   Called from: scan_rows in result grid.
   Compare: what we do for first loop in scan_rows().
+  Todo: Wonder: any advantage to having more precise field_value_flags since we know MP_UINT etc.?
 */
 QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
                unsigned int p_result_row_count,

@@ -3854,11 +3854,13 @@ public:
   int ancestor_grid_column_number;
   int ancestor_grid_result_row_number;
   unsigned int content_length;
+  /* todo: check: could this be unsigned char cell_type instead of unsigned short int cell_type? */
   unsigned short int cell_type;                        /* detail or header or detail_extra_rule_1 */
   char content_field_value_flags; /* if detail, might be a copy of result_row_copy field_value_flag values */
   char *content_pointer; /* if detail, might point to result_row_copy */
   bool is_retrieved_flag;
   bool is_style_sheet_set_flag;
+  /* todo: check: now that we have field_value_flags, can we get rid of is_image_flag? */
   bool is_image_flag;                    /* true if data type = blob and appropriate flag is on */
 
 protected:
@@ -6287,6 +6289,7 @@ void display()
         field_names_pointer+= sizeof(unsigned int);
         text_edit_frames[ki]->content_pointer= field_names_pointer;
         field_names_pointer+= text_edit_frames[ki]->content_length;
+        text_edit_frames[ki]->content_field_value_flags= 0;
         text_edit_frames[ki]->is_retrieved_flag= false;
         text_edit_frames[ki]->ancestor_grid_column_number= column_number;
         text_edit_frames[ki]->ancestor_grid_result_row_number= -1;          /* probably unnecessary */
@@ -7213,7 +7216,6 @@ QByteArray history_padder(char *str, int length,
   else
   {
     QString spaces= " ";
-    /* Todo: for Tarantool, check (flag & FIELD_VALUE_FLAG_IS_NUMBER) */
     if (field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER)
       s= spaces.repeated(space_count) + s;
     else
@@ -8036,6 +8038,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         }
         text_edit_frames[text_edit_frames_index]->content_length= v_lengths;
         text_edit_frames[text_edit_frames_index]->content_pointer= result_field_names_pointer;
+        text_edit_frames[text_edit_frames_index]->content_field_value_flags= 0;
         text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
         text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= result_column_number;
         text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
@@ -8140,6 +8143,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         {
           text_edit_frames[text_edit_frames_index]->content_length= 0;
           text_edit_frames[text_edit_frames_index]->content_pointer= 0;
+          text_edit_frames[text_edit_frames_index]->content_field_value_flags= FIELD_VALUE_FLAG_IS_NUMBER;
         }
         else
         {
@@ -8321,16 +8325,8 @@ void text_align(TextEditWidget *cell_text_edit_widget, enum Qt::AlignmentFlag al
   if ((dbms_version_mask & FLAG_VERSION_TARANTOOL) != 0)
   {
     char field_value_flags= cell_text_edit_widget->text_edit_frame_of_cell->content_field_value_flags;
-    {
-      if (field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER)
-      {
-        a= Qt::AlignRight;
-      }
-      else
-      {
-        a= Qt::AlignLeft;
-      }
-    }
+    if (field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER) a= Qt::AlignRight;
+    else a= Qt::AlignLeft;
   }
   else a= alignment_flag;
   QTextOption to;
