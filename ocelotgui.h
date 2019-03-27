@@ -770,6 +770,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE,
@@ -1341,7 +1342,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1135
+#define KEYWORD_LIST_SIZE 1136
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1972,6 +1973,7 @@ static const keywords strvalues[]=
     {"OCELOT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_RAW},
     {"OCELOT_SHORTCUT_AUTOCOMPLETE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
     {"OCELOT_SHORTCUT_BREAKPOINT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
+    {"OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY},
     {"OCELOT_SHORTCUT_CLEAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR},
     {"OCELOT_SHORTCUT_CONNECT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT},
     {"OCELOT_SHORTCUT_CONTINUE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE},
@@ -3259,6 +3261,7 @@ public slots:
   void action_option_detach_statement_widget(bool checked); void detach_statement_widget(bool checked);
   void action_option_next_window();
   void action_option_previous_window();
+  void action_option_change_result_display();
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -3502,6 +3505,7 @@ private:
     QAction *menu_options_action_option_detach_statement_widget;
     QAction *menu_options_action_next_window;
     QAction *menu_options_action_previous_window;
+    QAction *menu_options_action_change_result_display;
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -3572,6 +3576,7 @@ private:
   QKeySequence ocelot_shortcut_kill_keysequence;
   QKeySequence ocelot_shortcut_next_window_keysequence;
   QKeySequence ocelot_shortcut_previous_window_keysequence;
+  QKeySequence ocelot_shortcut_change_result_display_keysequence;
   QKeySequence ocelot_shortcut_breakpoint_keysequence;
   QKeySequence ocelot_shortcut_continue_keysequence;
   QKeySequence ocelot_shortcut_next_keysequence;
@@ -4173,7 +4178,7 @@ void handle_button_for_cancel()
 /*
   I'm doing my own garbage collection. Maybe it's a bad idea but it's the way that I know.
   Objective: anything set up with "new", without a "this", must be deleted explicitly.
-  Todo: the garbage_collect for result_grid_table isn't as well put together as this.
+  Todo: fillup_garbage_collect+display_garbage_collect for result_grid aren't as well put together as this.
 */
 void garbage_collect ()
 {
@@ -5634,11 +5639,11 @@ ResultGrid(
   text_edit_widgets= 0;                                     /* all dynamic-sized items should be initially zero */
   text_edit_layouts= 0;
   text_edit_frames= 0;
-  grid_column_widths= 0;                                    /* initializing for garbage_collect */
+  grid_column_widths= 0;                                    /* initializing for display_garbage_collect */
   result_max_column_widths= 0;
   grid_column_heights= 0;
   grid_column_dbms_sources= 0;
-  result_field_types= 0;
+  result_field_types= 0;                                     /* initializing for fillup_garbage_collect */
   result_field_charsetnrs= 0;
   result_field_flags= 0;
   result_set_copy= 0;
@@ -5933,26 +5938,19 @@ bool is_image_format(int length, char* pointer)
   return false;
 }
 
+/* Todo: not everything that calls fillup() calls fillup_garbage_collect() later, i.e. leak */
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
 QString fillup(MYSQL_RES *mysql_res,
             //struct tnt_reply *tarantool_tnt_reply,
             int connections_dbms,
             //MainWindow *parent,
-            unsigned short ocelot_result_grid_vertical,
-            unsigned short ocelot_result_grid_column_names,
             ldbms *passed_lmysql,
             int ocelot_client_side_functions,
-            unsigned short int ocelot_batch,
-            unsigned short int ocelot_html,
-            unsigned short int ocelot_raw,
-            unsigned short int ocelot_xml,
             unsigned int connection_number,
             bool is_for_display)
 {
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
   lmysql= passed_lmysql;
-  ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
-  ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
   ocelot_client_side_functions_copy= ocelot_client_side_functions;
 
   grid_mysql_res= mysql_res;
@@ -5988,7 +5986,7 @@ QString fillup(MYSQL_RES *mysql_res,
               &result_max_column_widths);
     if (result != "OK")
     {
-      garbage_collect();
+      fillup_garbage_collect();
       return result;
     }
   }
@@ -6020,6 +6018,7 @@ QString fillup(MYSQL_RES *mysql_res,
   }
 #ifdef DBMS_TARANTOOL
   /* Scan entire result set to determine if NUM_FLAG should go on. */
+  /* TODO: maybe this is unnecessary now that we are checking numericness for each cell? */
   if (connections_dbms == DBMS_TARANTOOL)
   {
     for (unsigned int i= 0; i < result_column_count; ++i)
@@ -6083,44 +6082,21 @@ QString fillup(MYSQL_RES *mysql_res,
       result_max_column_widths
       mysql_fields (which we should not use, but we do)
     From now on there should be no need to call mysql_ functions again for this result set.
+    if is_for_display was true, we're ready to call display() now
   */
 
-  if (is_for_display == false) return "OK";
-  copy_result_to_gridx(connections_dbms);
-  /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
-     said what gridx_row_count is. */
-  if (ocelot_result_grid_vertical == 0) grid_result_row_count= gridx_row_count + 1;
-  else grid_result_row_count= result_row_count * result_column_count;
-  if (ocelot_result_grid_vertical == 0)
-  {
-    gridx_row_count= grid_result_row_count + 1;
-  }
-  if (ocelot_result_grid_vertical != 0)
-  {
-    gridx_row_count= result_row_count * result_column_count;
-    gridx_column_count= 1;
-    if (ocelot_result_grid_column_names != 0) ++gridx_column_count;
-  }
-
-  grid_column_widths= new unsigned int[gridx_column_count];
-  grid_column_heights= new unsigned int[gridx_column_count];
-  grid_column_dbms_sources= new unsigned char[gridx_column_count];
-  dbms_set_grid_column_sources();                 /* Todo: this could return an error? */
-  /***** BEYOND THIS POINT, IT'S LAYOUT MATTERS *****/
-  copy_of_connections_dbms= connections_dbms;
-  copy_of_ocelot_result_grid_vertical= ocelot_result_grid_vertical;
-  copy_of_ocelot_result_grid_column_names= ocelot_result_grid_column_names;
-  copy_of_ocelot_batch= ocelot_batch;
-  copy_of_ocelot_html= ocelot_html;
-  copy_of_ocelot_raw= ocelot_raw;
-  copy_of_ocelot_xml= ocelot_xml;
-  display();
+  copy_of_connections_dbms= connections_dbms; /* Todo: check: will I ever need this? */
   return "OK";
 }
 
 /*
-  Todo: find out why I get here twice.
-        I think it's because fillup() calls display(), but then
+  display(due_to)
+  ---------------
+  After fillup() we can do layout and fill cells or just print out, depending on user options.
+  If due_to = 0, this is immediately after fillup().
+  If due_to = 1, this is coming from a change_result_display choice
+  If due_to = 2, this is for resize_or_font_change
+  Todo: We get here twice because right after fillup() we call display(), but then
         resize_or_font_change() calls display() again.
         This is invisible because resize_or_font_change() calls
         remove_layouts() first, but it's a silly waste of time.
@@ -6139,9 +6115,64 @@ QString fillup(MYSQL_RES *mysql_res,
         the display is obscured, that is why in display() I say
         batch_text_edit->hide();
         but why do I need it, if I've removed it from layout?
+  Todo: Allow switch from one output to another. This does require
+        having fillup() completely separate from display(), that part is now done.
+        setSizeConstraint and setVerticalScrollBarPolicy should be
+        reset if we change to non-batch display.
+  Re copy_of items
+    The idea is that copy_of variables will store what was there when we called with 0 or 1,
+    therefore when we call with 2 the value will be what we had when we called with 0 or 1
+    rather than something that might have been set later.
+    Todo: ocelot_result_grid_vertical_copy is a pointless duplication of copy_of_ocelot_result_grid_vertical?
+    Todo: ocelot_result_grid_column_names_copy is a pointless duplication of copy_of_ocelot_result_grid_column_names?
+  Re display_batch
+    We should set the copy_of items even if we will call display_batch, because we might change
+    how change_result_display() works. But there are other items that we set at the start that,
+    I think, we don't need to set since display_batch() won't use them.
 */
-void display()
+void display(int due_to,
+             unsigned short ocelot_result_grid_vertical,
+             unsigned short int ocelot_batch,
+             unsigned short int ocelot_html,
+             unsigned short int ocelot_raw,
+             unsigned short int ocelot_xml,
+             unsigned short ocelot_result_grid_column_names)
 {
+  /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
+  hide();
+
+  if ((due_to == 0) || (due_to == 1))
+  {
+    display_garbage_collect();
+    copy_result_to_gridx();
+    /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
+       said what gridx_row_count is. */
+    if (ocelot_result_grid_vertical == 0) grid_result_row_count= gridx_row_count + 1;
+    else grid_result_row_count= result_row_count * result_column_count;
+    if (ocelot_result_grid_vertical == 0)
+    {
+      gridx_row_count= grid_result_row_count + 1;
+    }
+    if (ocelot_result_grid_vertical != 0)
+    {
+      gridx_row_count= result_row_count * result_column_count;
+      gridx_column_count= 1;
+      if (ocelot_result_grid_column_names != 0) ++gridx_column_count;
+    }
+
+    grid_column_widths= new unsigned int[gridx_column_count];
+    grid_column_heights= new unsigned int[gridx_column_count];
+    grid_column_dbms_sources= new unsigned char[gridx_column_count];
+    copy_of_ocelot_result_grid_vertical= ocelot_result_grid_vertical;
+    copy_of_ocelot_result_grid_column_names= ocelot_result_grid_column_names;
+    copy_of_ocelot_batch= ocelot_batch;
+    copy_of_ocelot_html= ocelot_html;
+    copy_of_ocelot_raw= ocelot_raw;
+    copy_of_ocelot_xml= ocelot_xml;
+    ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
+    ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
+  }
+
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_html != 0)
    || (copy_of_ocelot_xml != 0))
@@ -6157,11 +6188,7 @@ void display()
   unsigned int xcol;
   MainWindow *parent= copy_of_parent;
   int connections_dbms= copy_of_connections_dbms;
-  unsigned short int ocelot_result_grid_vertical= copy_of_ocelot_result_grid_vertical;
-  unsigned short int ocelot_result_grid_column_names= copy_of_ocelot_result_grid_column_names;
 
-  /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
-  hide();
   is_paintable= 0;
 
   ocelot_grid_text_color= parent->ocelot_grid_text_color;
@@ -6211,7 +6238,7 @@ void display()
     */
     int result_grid_height= (parent->height() / 3) - 11;
     int line_height= mm.lineSpacing();
-    if ((ocelot_result_grid_column_names == 1) && (ocelot_result_grid_vertical == 0))
+    if ((copy_of_ocelot_result_grid_column_names == 1) && (copy_of_ocelot_result_grid_vertical == 0))
         result_grid_height-= line_height;
     ocelot_grid_max_column_height_in_lines= result_grid_height / line_height;
     if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
@@ -6270,19 +6297,19 @@ void display()
   char *field_names_pointer;
   for (xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
   {
-    field_names_pointer= gridx_field_names; /* unnecessary reset if ocelot_result_grid_vertical = 0 */
+    field_names_pointer= gridx_field_names; /* unnecessary reset if copy_of_ocelot_result_grid_vertical = 0 */
     for (unsigned int column_number= 0; column_number < gridx_column_count; ++column_number)
     {
       int ki= xrow * gridx_column_count + column_number;
       bool is_header= false;
-      if (ocelot_result_grid_vertical != 0)
+      if (copy_of_ocelot_result_grid_vertical != 0)
       {
-        if (ocelot_result_grid_column_names != 0)
+        if (copy_of_ocelot_result_grid_column_names != 0)
         {
           if (column_number == 0) is_header= true;
         }
       }
-      if ((ocelot_result_grid_vertical == 0) && (xrow == 0)) is_header= true;
+      if ((copy_of_ocelot_result_grid_vertical == 0) && (xrow == 0)) is_header= true;
       if (is_header == true)
       {
         memcpy(&(text_edit_frames[ki]->content_length), field_names_pointer, sizeof(unsigned int));
@@ -6321,12 +6348,12 @@ void display()
       }
     }
   }
-  //if (ocelot_result_grid_vertical != 0)
+  //if (copy_of_ocelot_result_grid_vertical != 0)
   //  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
   //                      ocelot_grid_cell_drag_line_size_as_int,
   //                      0); /* get grid_column_widths[] and grid_column_heights[] */
 
-  if (ocelot_result_grid_vertical != 0)
+  if (copy_of_ocelot_result_grid_vertical != 0)
   {
     /* TODO: Make sure considerations for horizontal are all considered for vertical. */
     /* We'll have to figure out the alignment etc. each time we get ready to display */
@@ -6378,7 +6405,7 @@ void display()
   }
 
   is_paintable= 1;
-  if (ocelot_result_grid_vertical == 0)
+  if (copy_of_ocelot_result_grid_vertical == 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_drag_line_size_as_int,
                         ocelot_result_grid_column_names_copy,
@@ -6403,7 +6430,7 @@ void display()
     possibly going beyond the original desired maximum width, possibly causing a horizontal scroll bar to appear.
     grid_row_layout->setSpacing(0) means the only thing separating cells is the "border".
   */
-  if (ocelot_result_grid_vertical == 0)
+  if (copy_of_ocelot_result_grid_vertical == 0)
   {
     for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
     {
@@ -6455,8 +6482,11 @@ void display()
     After client->show(), client->height()=something big e.g. 1098 and height()=30.
     But client = the grid itself rather than the result grid widget?
     Without client->show(), grid becomes blank after a font change.
+    TODO: now grid becomes blank after a font change anyway! So I have to say show().
   */
   client->show();
+
+  show();
 
 //  grid_scroll_area->setWidget(client);
 //  grid_scroll_area->setWidgetResizable(true);              /* Without this, the QTextEdit widget heights won't change */
@@ -6535,10 +6565,6 @@ void frame_resize(int ki, int grid_col, int width, int height)
         I only output when necessary, i.e. when user scrolls
   Todo: check: does it do any good to hide() first?
   Todo: callback to a local Lua function prior to display, for each row
-  Todo: Allow switch from one output to another. This does require
-        having fillup() completely separate from display().
-        setSizeConstraint and setVerticalScrollBarPolicy should be
-        reset if we change to non-batch display.
   Todo: allow row update. and, if there's a change in one mode, show
         the changed row when modes are switched
   Todo: xml statement="" and field name="" contents lack escaping.
@@ -6585,6 +6611,7 @@ void frame_resize(int ki, int grid_col, int width, int height)
   copy_of_parent->ocelot_grid_border_size; (no)
   copy_of_parent->ocelot_grid_cell_border_size;
   copy_of_parent->ocelot_grid_cell_drag_line_size;
+  Todo: I think hide() is unnecessary because the caller has already done it.
 */
 void display_batch()
 {
@@ -6934,7 +6961,8 @@ int column_number(char *column_name, int *off)
 #ifdef DBMS_TARANTOOL
 /*
   Make a create statement for a CREATE TABLE ... SERVER table.
-  We've done fillup() so we've done tarantool_scan_field_names()
+  We've done
+) so we've done tarantool_scan_field_names()
   so we have result_field_names and result_column_count.
   If Lua statement was 'box.space.X:select()" we may have X's field names,
   in read_format_result.
@@ -7087,14 +7115,14 @@ int inserts(QString temporary_table_name)
    gridx_result_indexes                use as index for result_ lists
    gridx_column_count, gridx_row_count
 */
-void copy_result_to_gridx(int connections_dbms)
+void copy_result_to_gridx()
 {
-  (void) connections_dbms; /* suppress "unused parameter" warning */
   unsigned int i, j;
   unsigned int v_lengths;
   char *result_field_names_pointer;
   char *gridx_field_names_pointer;
 
+  /* todo: shouldn't this be only in display_garbage_collect()? */
   if (gridx_field_names != 0) { delete [] gridx_field_names; gridx_field_names= 0; }
   if (gridx_max_column_widths != 0) { delete [] gridx_max_column_widths; gridx_max_column_widths= 0; }
   if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
@@ -8213,10 +8241,10 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
    || (max_height_in_lines > result_grid_widget_max_height_in_lines))
   {
     result_grid_widget_max_height_in_lines= max_height_in_lines;
-    if (result_set_copy != 0)  /* see garbage_collect() comment */
+    if (result_set_copy != 0)  /* see fillup_garbage_collect() comment */
     {
       remove_layouts();
-      display();
+      display(2, 0, 0, 0, 0, 0, 0);
       this->show();
     }
   }
@@ -8374,6 +8402,8 @@ void remove_layouts()
 
 /*
   We'll do our own garbage collecting for non-Qt items.
+  fillup_garbage_collect for anything made with "new " in fillup() or fillup() subsidiaries.
+  display_garbage_collect for anything made with "new " in display() or display() subsidiaries.
   Todo: make sure Qt items have parents where possible so that "delete result_grid_table_widget"
         takes care of them.
   Why we clear() text_edit_widgets:
@@ -8385,13 +8415,8 @@ void remove_layouts()
     Perhaps it would be better to clear only if current size > (some minimum)?
   Warning: we check if (result_set_copy == 0) to ensure there's a result.
 */
-void garbage_collect()
+void fillup_garbage_collect()
 {
-  remove_layouts();
-  if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
-  if (result_max_column_widths != 0) { delete [] result_max_column_widths; result_max_column_widths= 0; }
-  if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
-  if (grid_column_dbms_sources != 0) { delete [] grid_column_dbms_sources; grid_column_dbms_sources= 0; }
   if (result_field_types != 0) { delete [] result_field_types; result_field_types= 0; }
   if (result_field_charsetnrs != 0) { delete [] result_field_charsetnrs; result_field_charsetnrs= 0; }
   if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
@@ -8401,6 +8426,15 @@ void garbage_collect()
   if (result_original_field_names != 0) { delete [] result_original_field_names; result_original_field_names= 0; }
   if (result_original_table_names != 0) { delete [] result_original_table_names; result_original_table_names= 0; }
   if (result_original_database_names != 0) { delete [] result_original_database_names; result_original_database_names= 0; }
+  if (result_max_column_widths != 0) { delete [] result_max_column_widths; result_max_column_widths= 0; }
+}
+
+void display_garbage_collect()
+{
+  remove_layouts();
+  if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
+  if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
+  if (grid_column_dbms_sources != 0) { delete [] grid_column_dbms_sources; grid_column_dbms_sources= 0; }
   if (gridx_field_names != 0) { delete [] gridx_field_names; gridx_field_names= 0; }
   if (gridx_max_column_widths != 0) { delete [] gridx_max_column_widths; gridx_max_column_widths= 0; }
   if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
@@ -8409,7 +8443,6 @@ void garbage_collect()
   for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear(); /* unnecessary? */
   if (batch_text_edit != NULL) batch_text_edit->clear(); /* unnecessary? */
 }
-
 
 void set_frame_color_setting()
 {
@@ -8482,22 +8515,6 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
 //  if (h > height()) grid_vertical_scroll_bar->show();
 //  else  grid_vertical_scroll_bar->hide();
 //}
-
-
-/* Todo: this doesn't appear to do anything any more. */
-void dbms_set_grid_column_sources()
-{
-  unsigned int column_number;
-  unsigned int dbms_field_number;
-
-  dbms_field_number= 0;
-  for (column_number= 0; column_number < result_column_count; ++column_number)
-  {
-    {
-      ++dbms_field_number;
-    }
-  }
-}
 
 //unsigned int dbms_get_field_length(unsigned int column_number)
 //{
@@ -8576,7 +8593,7 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
 ~ResultGrid()
 {
   //remove_layouts(); /* I think this is unnecessary */
-  garbage_collect();
+  fillup_garbage_collect();
   if (row_pool_size != 0)
   {
     delete [] grid_row_layouts;
@@ -8904,7 +8921,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
     Change the assert in ocelotgui.cpp if MENU_FONT changes in ostrings.h.
   */
-  menu_strings_menu_font_copy= menu_strings[menu_off + 82];
+  menu_strings_menu_font_copy= menu_strings[menu_off + 83];
 
   int settings_width, settings_height;
 

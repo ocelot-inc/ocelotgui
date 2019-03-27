@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: March 24 2019
+   Last modified: March 27 2019
 */
 
 /*
@@ -351,6 +351,7 @@
   static char ocelot_shortcut_kill[80]= "default";
   static char ocelot_shortcut_next_window[80]= "default";
   static char ocelot_shortcut_previous_window[80]= "default";
+  static char ocelot_shortcut_change_result_display[80]= "default";
   static char ocelot_shortcut_breakpoint[80]= "default";
   static char ocelot_shortcut_continue[80]= "default";
   static char ocelot_shortcut_next[80]= "default";
@@ -1293,6 +1294,7 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   }
   if (qk == ocelot_shortcut_next_window_keysequence){action_option_next_window(); return true; }
   if (qk == ocelot_shortcut_previous_window_keysequence){action_option_previous_window(); return true; }
+  if (qk == ocelot_shortcut_change_result_display_keysequence){action_option_change_result_display(); return true; }
   if (menu_debug_action_breakpoint->isEnabled())
     if (qk == ocelot_shortcut_breakpoint_keysequence) { action_debug_breakpoint(); return true; }
   if (menu_debug_action_continue->isEnabled())
@@ -2102,6 +2104,9 @@ void MainWindow::create_menu()
   menu_options_action_previous_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
   connect(menu_options_action_previous_window, SIGNAL(triggered(bool)), this, SLOT(action_option_previous_window()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW, "", false, true);
+  menu_options_action_change_result_display= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_CHANGE_RESULT_DISPLAY]);
+  connect(menu_options_action_change_result_display, SIGNAL(triggered(bool)), this, SLOT(action_option_change_result_display()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY, "", false, true);
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(menu_strings[menu_off + MENU_DEBUG]);
 //  menu_debug_action_install= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
@@ -2485,6 +2490,19 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
       else
         ocelot_shortcut_previous_window_keysequence= QKeySequence(ocelot_shortcut_previous_window);
       menu_options_action_previous_window->setShortcut(ocelot_shortcut_previous_window_keysequence);
+    }
+    return 1;
+  }
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY)
+  {
+    if (is_set) strcpy(ocelot_shortcut_change_result_display, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_change_result_display, "default") == 0)
+        ocelot_shortcut_change_result_display_keysequence= QKeySequence("Alt+C");
+      else
+        ocelot_shortcut_change_result_display_keysequence= QKeySequence(ocelot_shortcut_change_result_display);
+      menu_options_action_change_result_display->setShortcut(ocelot_shortcut_change_result_display_keysequence);
     }
     return 1;
   }
@@ -3812,6 +3830,55 @@ void MainWindow::action_option_next_window()
 void MainWindow::action_option_previous_window()
 {
   focusNextPrevChild(false);
+}
+
+/*
+  User chose Options|change_result_display.
+  So we change display type from horizontal to vertical or vice versa, and display again.
+  If there is no current widget, the display type changes but there is nothing to re-display.
+  Rotate among the options:
+    horizontal vertical html (if --html done) xml (if xml done) batch (if --batch done)
+    Todo: not quite good enough, you might want a combination of raw+html as a separate option
+  Todo: show starting with row at current location, not at start
+        i.e. change vertial scroll bar
+*/
+void MainWindow::action_option_change_result_display()
+{
+  /* Toggle between horizontal and vertical. This might not be the final way we do it. */
+  if (ocelot_result_grid_vertical == 1) ocelot_result_grid_vertical= 0;
+  else ocelot_result_grid_vertical= 1;
+  int current_index= result_grid_tab_widget->currentIndex();
+  if (current_index >= 0)
+  {
+    ResultGrid *rg;
+    rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(current_index));
+
+    unsigned short x_ocelot_result_grid_vertical= rg->copy_of_ocelot_result_grid_vertical;
+    unsigned short int x_ocelot_batch= rg->copy_of_ocelot_batch;
+    unsigned short int x_ocelot_html= rg->copy_of_ocelot_html;
+    unsigned short int x_ocelot_raw= rg->copy_of_ocelot_raw;
+    unsigned short int x_ocelot_xml= rg->copy_of_ocelot_xml;
+    QString next;
+    for (;;)
+    {
+      if (x_ocelot_batch == 1) next= "html";
+      else if (x_ocelot_html == 1) next= "raw";
+      else if (x_ocelot_raw == 1) next= "xml";
+      else if (x_ocelot_xml == 1) next= "horizontal";
+      else if (x_ocelot_result_grid_vertical == 0) next= "vertical";
+      else if (x_ocelot_result_grid_vertical != 0) next= "batch";
+      if (next == "batch") {x_ocelot_batch= 1; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 0; if (ocelot_batch == 1) break; }
+      if (next == "html") {x_ocelot_batch= 0; x_ocelot_html= 1; x_ocelot_raw= 0; x_ocelot_xml= 0; if (ocelot_html == 1) break; }
+      if (next == "raw") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 1; x_ocelot_xml= 0; if (ocelot_raw == 1) break; }
+      if (next == "xml") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 1; if (ocelot_xml == 1) break; }
+      if (next == "horizontal") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 0; x_ocelot_result_grid_vertical= 0; break; }
+      if (next == "vertical") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 0; x_ocelot_result_grid_vertical= 1; break; }
+    }
+    rg->display(1,
+                x_ocelot_result_grid_vertical,
+                x_ocelot_batch, x_ocelot_html, x_ocelot_raw, x_ocelot_xml,
+                ocelot_result_grid_column_names);
+  }
 }
 
 /*
@@ -8616,7 +8683,8 @@ int MainWindow::action_execute_one_statement(QString text)
             {
               rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
               rg->is_paintable= 0;
-              rg->garbage_collect();
+              rg->fillup_garbage_collect();
+              rg->display_garbage_collect();
             }
             rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
             //QFont tmp_font;
@@ -8625,9 +8693,7 @@ int MainWindow::action_execute_one_statement(QString text)
                       //&tarantool_tnt_reply,
                       connections_dbms[0],
                       //this,
-                      is_vertical, ocelot_result_grid_column_names,
                       lmysql, ocelot_client_side_functions,
-                      ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
                       MYSQL_MAIN_CONNECTION,
                       true);
             if (fillup_result != "OK")
@@ -8637,6 +8703,10 @@ int MainWindow::action_execute_one_statement(QString text)
               return_value= 1;
               goto statement_is_over;
             }
+            rg->display(0,
+                        ocelot_result_grid_vertical,
+                        ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
+                        ocelot_result_grid_column_names);
             result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
             /* next line redundant? display() ends with show() */
@@ -8725,14 +8795,18 @@ int MainWindow::action_execute_one_statement(QString text)
                           //&tarantool_tnt_reply,
                           connections_dbms[0],
                           //this,
-                          is_vertical,
-                          ocelot_result_grid_column_names,
                           lmysql,
                           ocelot_client_side_functions,
-                          ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
                           MYSQL_MAIN_CONNECTION,
                           true);
+                /* TODO: Check that fillup() returned "OK" before you call display() */
+                rg->display(0,
+                            is_vertical,
+                            ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
+                            ocelot_result_grid_column_names);
                 /* next line redundant? display() ends with show() */
+                /* what is r? */
+                /* TODO: REMOVE IT!!!! */
                 r->show();
 
                 //Put in something based on this if you want extra results to go to history:
@@ -10165,9 +10239,7 @@ int MainWindow::rehash_scan()
               //&tarantool_tnt_reply,
               connections_dbms[MYSQL_MAIN_CONNECTION],
               //this,
-              false, ocelot_result_grid_column_names,
               lmysql, ocelot_client_side_functions,
-              ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
               MYSQL_MAIN_CONNECTION,
               false);
     rehash_result_column_count= tarantool_num_fields();
@@ -11238,9 +11310,9 @@ void MainWindow::initial_asserts()
 
   #ifdef OCELOT_OS_LINUX
   #if defined(NDEBUG)
-    if (MENU_FONT != 82) {printf("assert(MENU_FONT == 82);"); exit(1); }
+    if (MENU_FONT != 83) {printf("assert(MENU_FONT == 83);"); exit(1); }
   #else
-    assert(MENU_FONT == 82); /* See kludge alert in ocelotgui.h Settings() */
+    assert(MENU_FONT == 83); /* See kludge alert in ocelotgui.h Settings() */
   #endif
   #else
     assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
@@ -11259,10 +11331,10 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "102" to the new size */
+  /* That is okay but you must change this occurrence of "109" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 108);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 109);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -14860,16 +14932,14 @@ int MainWindow::create_table_server(QString text,
       }
     }
 
-    /* TODO: I'd be much happier if we didn't fool with existing grid */
+    /* TODO: I'd be much happier if we didn't fool with existing result copy (NOW THAT IS A BUG!!!) */
     /* TODO: Check for an error return from fillup(). */
     //rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
     rg->fillup(mysql_res,
               //&tarantool_tnt_reply,
               connections_dbms[MYSQL_REMOTE_CONNECTION],
               //this,
-              false, ocelot_result_grid_column_names,
               lmysql, ocelot_client_side_functions,
-              ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
               MYSQL_REMOTE_CONNECTION,
               false);
     /* TODO: Get field names and data types from fillup!! */
