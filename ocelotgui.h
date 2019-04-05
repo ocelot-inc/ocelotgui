@@ -3206,6 +3206,8 @@ public:
 #ifdef DBMS_TARANTOOL
   QString tarantool_add_return(QString);
   const char *tarantool_result_set_init(int,long unsigned int *,int *);
+  const char *tarantool_result_set_init_select(long unsigned int *, int);
+
   long unsigned int tarantool_num_rows(unsigned int connection_number);
   QString tarantool_sql_to_lua(QString,int,int);
   unsigned int tarantool_num_fields();
@@ -5961,6 +5963,8 @@ QString fillup(MYSQL_RES *mysql_res,
     if (result_row_count == 0)
     {
       /* Tarantool has no columns if there are no rows. */
+      /* Todo: this is no longer true, if type = 5 */
+      result_column_count= 0; /* solves the crash? */
       return "OK";
     }
     result_column_count= copy_of_parent->tarantool_num_fields();
@@ -6084,7 +6088,6 @@ QString fillup(MYSQL_RES *mysql_res,
     From now on there should be no need to call mysql_ functions again for this result set.
     if is_for_display was true, we're ready to call display() now
   */
-
   copy_of_connections_dbms= connections_dbms; /* Todo: check: will I ever need this? */
   return "OK";
 }
@@ -6159,7 +6162,6 @@ void display(int due_to,
       gridx_column_count= 1;
       if (ocelot_result_grid_column_names != 0) ++gridx_column_count;
     }
-
     grid_column_widths= new unsigned int[gridx_column_count];
     grid_column_heights= new unsigned int[gridx_column_count];
     grid_column_dbms_sources= new unsigned char[gridx_column_count];
@@ -6180,7 +6182,6 @@ void display(int due_to,
     display_batch();
     return;
   }
-
   grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
   batch_text_edit->hide();
 
@@ -6210,7 +6211,6 @@ void display(int due_to,
     if (row_pool_size < result_grid_widget_max_height_in_lines) row_pool_size= result_grid_widget_max_height_in_lines;
     if (cell_pool_size < minimum_number_of_cells) cell_pool_size= minimum_number_of_cells;
   }
-
   /*
     Calculate desired width and height based on parent width and height.
      Desired max width in chars = width when created - width of scroll bar.
@@ -6228,7 +6228,6 @@ void display(int due_to,
 
   /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
   ocelot_grid_max_desired_width_in_pixels= (parent->width() - (mm.width("W") * 3));
-
   {
     /*
       Try to ensure we can fit at least header (if there is a header) plus one row.
