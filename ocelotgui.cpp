@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: April 4 2019
+   Last modified: April 15 2019
 */
 
 /*
@@ -13881,7 +13881,8 @@ erret:
        a7,'integer'                     string
      a4,"rows"                          string
      91                                 1-element array (for row count)
-     ... the rows ...
+     91                                 1-element array (for field count)
+     5                                  contents
   Return: pointer to first row
   Re column_number: If it is >= 0, we return pointer to column name not pointer to first data row.
                     Then the caller can say

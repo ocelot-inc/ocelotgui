@@ -55,6 +55,12 @@
 #define ALLOW_FLAG_IS_MULTI 1
 #define ALLOW_FLAG_IS_IN_DUPLICATE_KEY 2
 
+/* conflict clauses are temporarily disabled */
+//#define ALLOW_CONFLICT_CLAUSES 0
+
+// create virtual is disabled, probably permanently
+//#define ALLOW_CREATE_VIRTUAL
+
 void MainWindow::hparse_f_nexttoken()
 {
   if (hparse_errno > 0) return;
@@ -3026,20 +3032,31 @@ void MainWindow::hparse_f_alter_specification()
   if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ADD") == 1))
   {
     bool column_name_is_expected= false;
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN") == 1) column_name_is_expected= true;
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN") == 1) column_name_is_expected= true;
     else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "CONSTRAINT") == 1)
     {
       /* some similarity to part of hparse_f_create_definition() */
       hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN");
-      if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
-      if (hparse_errno > 0) return;
-      hparse_f_column_list(true, false);
-      if (hparse_errno > 0) return;
-      hparse_f_reference_definition();
-      if (hparse_errno > 0) return;
+      if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN") == 1)
+        || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PRIMARY") == 1)
+        || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNIQUE") == 1))
+      {
+        int constraint_type= main_token_types[hparse_i_of_last_accepted];
+        if (constraint_type != TOKEN_KEYWORD_UNIQUE)
+        {
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
+          if (hparse_errno > 0) return;
+        }
+        hparse_f_column_list(true, false);
+        if (hparse_errno > 0) return;
+        if (constraint_type == TOKEN_KEYWORD_FOREIGN)
+        {
+          hparse_f_reference_definition();
+          if (hparse_errno > 0) return;
+        }
+      }
+      else hparse_f_error();
       return;
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTITION") == 1)
@@ -3646,24 +3663,25 @@ void MainWindow::hparse_f_character_set_or_collate()
 }
 
 /* Used for data type length. Might be useful for any case of "(" integer ")" */
-void MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, bool is_ok_if_binary)
+int MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, bool is_ok_if_binary)
 {
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_NOT_AFTER_SPACE;
     if (hparse_f_literal(TOKEN_REFTYPE_LENGTH, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
     if (is_ok_if_decimal)
     {
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
       {
         if (hparse_f_literal(TOKEN_REFTYPE_SCALE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
-        if (hparse_errno > 0) return;
+        if (hparse_errno > 0) return 0;
       }
     }
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
   }
+  else return 0;
   if (is_ok_if_unsigned)
   {
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNSIGNED") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIGNED") == 1)) {;}
@@ -3673,8 +3691,9 @@ void MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, 
   {
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY");
     hparse_f_character_set_or_collate();
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return 0;
   }
+  return 1;
 }
 
 void MainWindow::hparse_f_enum_or_set()
@@ -3929,8 +3948,12 @@ int MainWindow::hparse_f_data_type(int context)
    || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VARCHAR, "VARCHAR2") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    /* Todo: Tarantool: (length) is compulsory so ensure there is a "(" here */
-    hparse_f_length(false, false, true);
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+    {
+      if (hparse_f_length(false, false, false) == 0) hparse_f_error();
+    }
+    else
+      hparse_f_length(false, false, true);
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_VARCHAR;
   }
@@ -4029,7 +4052,7 @@ int MainWindow::hparse_f_data_type(int context)
   }
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCALAR") == 1) return TOKEN_KEYWORD_SCALAR;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TINYBLOB") == 1) return TOKEN_KEYWORD_TINYBLOB;
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BLOB") == 1) return TOKEN_KEYWORD_BLOB;
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BLOB") == 1) return TOKEN_KEYWORD_BLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MEDIUMBLOB") == 1) return TOKEN_KEYWORD_MEDIUMBLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LONGBLOB") == 1) return TOKEN_KEYWORD_LONGBLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TINYTEXT") == 1)
@@ -4282,11 +4305,13 @@ int MainWindow::hparse_f_create_definition()
   {
     hparse_f_parenthesized_expression();
     if (hparse_errno > 0) return 2;
+#ifdef ALLOW_CONFLICT_CLAUSES
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
       hparse_f_conflict_clause();
       if (hparse_errno > 0) return 2;
     }
+#endif
     return 1;
   }
   if ((fulltext_seen == true) || (unique_seen == true))
@@ -4433,7 +4458,9 @@ void MainWindow::hparse_f_column_definition()
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL");
       if (hparse_errno > 0) return;
       null_seen= true;
+#ifdef ALLOW_CONFLICT_CLAUSES
       hparse_f_conflict_clause();
+#endif
       if (hparse_errno > 0) return;
     }
     else if ((null_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NULL") == 1))
@@ -6259,11 +6286,13 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
 /* Todo: VALUES(...) is now called from hparse_f_query(). Redundancy? */
 void MainWindow::hparse_f_insert_or_replace()
 {
+#ifdef ALLOW_CONFLICT_CLAUSES
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OR") == 1)
   {
     hparse_f_conflict_algorithm();
     if (hparse_errno > 0) return;
   }
+#endif
   if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
   {
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO");
@@ -6332,6 +6361,7 @@ void MainWindow::hparse_f_insert_or_replace()
 
 void MainWindow::hparse_f_conflict_clause()
 {
+#ifdef ALLOW_CONFLICT_CLAUSES
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
@@ -6340,10 +6370,12 @@ void MainWindow::hparse_f_conflict_clause()
     hparse_f_conflict_algorithm();
     if (hparse_errno > 0) return;
   }
+#endif
 }
 
 void MainWindow::hparse_f_conflict_algorithm()
 {
+#ifdef ALLOW_CONFLICT_CLAUSES
   if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROLLBACK") == 1)
    || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ABORT") == 1)
    || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FAIL") == 1)
@@ -6353,6 +6385,7 @@ void MainWindow::hparse_f_conflict_algorithm()
     return;
   }
   hparse_f_error();
+#endif
 }
 
 void MainWindow::hparse_f_condition_information_item_name()
@@ -7352,7 +7385,7 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else hparse_f_error();
   }
-  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ANALYZE") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ANALYZE") == 1)
   {
     hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
@@ -7894,9 +7927,12 @@ void MainWindow::hparse_f_statement(int block_top)
         }
         if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
         {
-          hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
+          /* Tarantool no longer acceps AS SELECT here */
+          //hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS");
+          //if (hparse_errno > 0) return;
+          //ignore_or_as_seen= true;
+          hparse_f_error();
           if (hparse_errno > 0) return;
-          ignore_or_as_seen= true;
         }
         else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1) ignore_or_as_seen= true;
         bool select_is_seen= false;
@@ -7982,7 +8018,7 @@ void MainWindow::hparse_f_statement(int block_top)
       }
       else
       {
-        if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+        if ((hparse_dbms_mask & FLAG_VERSION_ALL) != 0)
         {
           hparse_f_error();
           if (hparse_errno > 0) return;
@@ -8046,6 +8082,7 @@ void MainWindow::hparse_f_statement(int block_top)
       hparse_f_alter_or_create_view();
       if (hparse_errno > 0) return;
     }
+#ifdef ALLOW_CREATE_VIRTUAL
     else if ((((hparse_flags) & HPARSE_FLAG_TABLE) != 0) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIRTUAL") == 1))
     {
       hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
@@ -8070,6 +8107,7 @@ void MainWindow::hparse_f_statement(int block_top)
         }
       }
     }
+#endif
     else hparse_f_error();
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEALLOCATE, "DEALLOCATE"))
@@ -10191,11 +10229,13 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_UPDATE;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
+#ifdef ALLOW_CONFLICT_CLAUSES
     if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OR") == 1)
     {
       hparse_f_conflict_algorithm();
       if (hparse_errno > 0) return;
     }
+#endif
     hparse_subquery_is_allowed= true;
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
