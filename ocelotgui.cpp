@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: April 15 2019
+   Last modified: April 17 2019
 */
 
 /*
@@ -220,7 +220,8 @@
 /* Whenever you see STRING_LENGTH_512, think: here's a fixed arbitrary allocation, which should be be fixed up. */
 #define STRING_LENGTH_512 512
 
-#define MAX_HPARSE_ERRMSG_LENGTH 3072
+/* MAX_HPARSE_ERRMSG_LENGTH should be enough for all keywords that begin with "OCELOT_" */
+#define MAX_HPARSE_ERRMSG_LENGTH 3600
 
 /* Connect arguments and options */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
@@ -309,7 +310,7 @@
   static unsigned short ocelot_unbuffered= 0;       /* --unbuffered */
   static unsigned short ocelot_verbose= 0;          /* --verbose */
   static unsigned short ocelot_version= 0;          /* --version */
-  static unsigned short ocelot_result_grid_vertical= 0;   /* --vertical for vertical */
+  static unsigned short ocelot_vertical= 0;               /* --vertical */
   static unsigned short ocelot_wait= 0;                   /* --wait ... actually this does nothing */
   static unsigned short ocelot_xml= 0;                    /* --xml */
 
@@ -351,7 +352,6 @@
   static char ocelot_shortcut_kill[80]= "default";
   static char ocelot_shortcut_next_window[80]= "default";
   static char ocelot_shortcut_previous_window[80]= "default";
-  static char ocelot_shortcut_change_result_display[80]= "default";
   static char ocelot_shortcut_breakpoint[80]= "default";
   static char ocelot_shortcut_continue[80]= "default";
   static char ocelot_shortcut_next[80]= "default";
@@ -363,6 +363,14 @@
   static char ocelot_shortcut_refresh_user_variables[80]= "default";
   static char ocelot_shortcut_refresh_variables[80]= "default";
   static char ocelot_shortcut_refresh_call_stack[80]= "default";
+
+  static char ocelot_shortcut_batch[80]= "default";
+  static char ocelot_shortcut_horizontal[80]= "default";
+  static char ocelot_shortcut_html[80]= "default";
+  static char ocelot_shortcut_htmlraw[80]= "default";
+  static char ocelot_shortcut_raw[80]= "default";
+  static char ocelot_shortcut_vertical[80]= "default";
+  static char ocelot_shortcut_xml[80]= "default";
 
   /* Some items we allow, but the reasons we allow them are lost in the mists of time */
   /* I gather that one is supposed to read the charset file. I don't think we do. */
@@ -1294,7 +1302,14 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   }
   if (qk == ocelot_shortcut_next_window_keysequence){action_option_next_window(); return true; }
   if (qk == ocelot_shortcut_previous_window_keysequence){action_option_previous_window(); return true; }
-  if (qk == ocelot_shortcut_change_result_display_keysequence){action_option_change_result_display(); return true; }
+  if (qk == ocelot_shortcut_batch_keysequence){action_option_batch(); return true; }
+  if (qk == ocelot_shortcut_horizontal_keysequence){action_option_horizontal(); return true; }
+  if (qk == ocelot_shortcut_html_keysequence){action_option_html(); return true; }
+  if (qk == ocelot_shortcut_htmlraw_keysequence){action_option_htmlraw(); return true; }
+  if (qk == ocelot_shortcut_raw_keysequence){action_option_raw(); return true; }
+  if (qk == ocelot_shortcut_vertical_keysequence){action_option_vertical(); return true; }
+  if (qk == ocelot_shortcut_xml_keysequence){action_option_xml(); return true; }
+
   if (menu_debug_action_breakpoint->isEnabled())
     if (qk == ocelot_shortcut_breakpoint_keysequence) { action_debug_breakpoint(); return true; }
   if (menu_debug_action_continue->isEnabled())
@@ -2104,9 +2119,29 @@ void MainWindow::create_menu()
   menu_options_action_previous_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
   connect(menu_options_action_previous_window, SIGNAL(triggered(bool)), this, SLOT(action_option_previous_window()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW, "", false, true);
-  menu_options_action_change_result_display= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_CHANGE_RESULT_DISPLAY]);
-  connect(menu_options_action_change_result_display, SIGNAL(triggered(bool)), this, SLOT(action_option_change_result_display()));
-  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY, "", false, true);
+
+  menu_options_action_batch= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BATCH]);
+  connect(menu_options_action_batch, SIGNAL(triggered(bool)), this, SLOT(action_option_batch()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH, "", false, true);
+  menu_options_action_horizontal= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL]);
+  connect(menu_options_action_horizontal, SIGNAL(triggered(bool)), this, SLOT(action_option_horizontal()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL, "", false, true);
+  menu_options_action_html= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTML]);
+  connect(menu_options_action_html, SIGNAL(triggered(bool)), this, SLOT(action_option_html()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML, "", false, true);
+  menu_options_action_htmlraw= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW]);
+  connect(menu_options_action_htmlraw, SIGNAL(triggered(bool)), this, SLOT(action_option_htmlraw()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW, "", false, true);
+  menu_options_action_raw= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_RAW]);
+  connect(menu_options_action_raw, SIGNAL(triggered(bool)), this, SLOT(action_option_raw()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW, "", false, true);
+  menu_options_action_vertical= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_VERTICAL]);
+  connect(menu_options_action_vertical, SIGNAL(triggered(bool)), this, SLOT(action_option_vertical()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL, "", false, true);
+  menu_options_action_xml= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_XML]);
+  connect(menu_options_action_xml, SIGNAL(triggered(bool)), this, SLOT(action_option_xml()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_XML, "", false, true);
+
 #ifdef DEBUGGER
   menu_debug= ui->menuBar->addMenu(menu_strings[menu_off + MENU_DEBUG]);
 //  menu_debug_action_install= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
@@ -2493,19 +2528,105 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     }
     return 1;
   }
-  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY)
+
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH)
   {
-    if (is_set) strcpy(ocelot_shortcut_change_result_display, source_as_utf8);
+    if (is_set) strcpy(ocelot_shortcut_batch, source_as_utf8);
     if (is_do)
     {
-      if (strcmp(ocelot_shortcut_change_result_display, "default") == 0)
-        ocelot_shortcut_change_result_display_keysequence= QKeySequence("Alt+C");
+      if (strcmp(ocelot_shortcut_batch, "default") == 0)
+        ocelot_shortcut_batch_keysequence= QKeySequence("Alt+Shift+1");
       else
-        ocelot_shortcut_change_result_display_keysequence= QKeySequence(ocelot_shortcut_change_result_display);
-      menu_options_action_change_result_display->setShortcut(ocelot_shortcut_change_result_display_keysequence);
+        ocelot_shortcut_batch_keysequence= QKeySequence(ocelot_shortcut_batch);
+      menu_options_action_batch->setShortcut(ocelot_shortcut_batch_keysequence);
     }
     return 1;
   }
+
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL)
+  {
+    if (is_set) strcpy(ocelot_shortcut_horizontal, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_horizontal, "default") == 0)
+        ocelot_shortcut_horizontal_keysequence= QKeySequence("Alt+Shift+2");
+      else
+        ocelot_shortcut_horizontal_keysequence= QKeySequence(ocelot_shortcut_horizontal);
+      menu_options_action_horizontal->setShortcut(ocelot_shortcut_horizontal_keysequence);
+    }
+    return 1;
+  }
+
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML)
+  {
+    if (is_set) strcpy(ocelot_shortcut_html, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_html, "default") == 0)
+        ocelot_shortcut_html_keysequence= QKeySequence("Alt+Shift+3");
+      else
+        ocelot_shortcut_html_keysequence= QKeySequence(ocelot_shortcut_html);
+      menu_options_action_html->setShortcut(ocelot_shortcut_html_keysequence);
+    }
+    return 1;
+  }
+
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW)
+  {
+    if (is_set) strcpy(ocelot_shortcut_htmlraw, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_htmlraw, "default") == 0)
+        ocelot_shortcut_htmlraw_keysequence= QKeySequence("Alt+Shift+4");
+      else
+        ocelot_shortcut_htmlraw_keysequence= QKeySequence(ocelot_shortcut_htmlraw);
+      menu_options_action_htmlraw->setShortcut(ocelot_shortcut_htmlraw_keysequence);
+    }
+    return 1;
+  }
+
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW)
+  {
+    if (is_set) strcpy(ocelot_shortcut_raw, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_raw, "default") == 0)
+        ocelot_shortcut_raw_keysequence= QKeySequence("Alt+Shift+5");
+      else
+        ocelot_shortcut_raw_keysequence= QKeySequence(ocelot_shortcut_raw);
+      menu_options_action_raw->setShortcut(ocelot_shortcut_raw_keysequence);
+    }
+    return 1;
+  }
+
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL)
+  {
+    if (is_set) strcpy(ocelot_shortcut_vertical, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_vertical, "default") == 0)
+        ocelot_shortcut_vertical_keysequence= QKeySequence("Alt+Shift+6");
+      else
+        ocelot_shortcut_vertical_keysequence= QKeySequence(ocelot_shortcut_vertical);
+      menu_options_action_vertical->setShortcut(ocelot_shortcut_vertical_keysequence);
+    }
+    return 1;
+  }
+
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_XML)
+  {
+    if (is_set) strcpy(ocelot_shortcut_xml, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_xml, "default") == 0)
+        ocelot_shortcut_xml_keysequence= QKeySequence("Alt+Shift+7");
+      else
+        ocelot_shortcut_xml_keysequence= QKeySequence(ocelot_shortcut_xml);
+      menu_options_action_xml->setShortcut(ocelot_shortcut_xml_keysequence);
+    }
+    return 1;
+  }
+
   if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT)
   {
     if (is_set) strcpy(ocelot_shortcut_breakpoint, source_as_utf8);
@@ -3271,7 +3392,7 @@ void MainWindow::action_connect_once(QString message)
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_UNBUFFERED].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_unbuffered); row_form_width[i]= 5;
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_VERBOSE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_verbose); row_form_width[i]= 5;
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_VERSION].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_version); row_form_width[i]= 5;
-  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_VERTICAL].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_result_grid_vertical); row_form_width[i]= 5;
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_VERTICAL].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_vertical); row_form_width[i]= 5;
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_WAIT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_wait); row_form_width[i]= 5;
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_XML].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_xml); row_form_width[i]= 5;
   assert(i == column_count - 1);
@@ -3387,7 +3508,7 @@ void MainWindow::action_connect_once(QString message)
       ocelot_unbuffered= to_long(row_form_data[i++].trimmed());
       ocelot_verbose= to_long(row_form_data[i++].trimmed());
       ocelot_version= row_form_data[i++].trimmed().toInt();
-      ocelot_result_grid_vertical= to_long(row_form_data[i++].trimmed());
+      ocelot_vertical= to_long(row_form_data[i++].trimmed());
       ocelot_wait= to_long(row_form_data[i++].trimmed());
       ocelot_xml= to_long(row_form_data[i++].trimmed());
       assert(i == column_count);
@@ -3833,53 +3954,83 @@ void MainWindow::action_option_previous_window()
 }
 
 /*
-  User chose Options|change_result_display.
-  So we change display type from horizontal to vertical or vice versa, and display again.
+  User chose Options|result_display_batch|result_display_horizontal|result_display_vertical etc.
+  So we change display type, and display again.
   If there is no current widget, the display type changes but there is nothing to re-display.
-  Rotate among the options:
-    horizontal vertical html (if --html done) xml (if xml done) batch (if --batch done)
-    Todo: not quite good enough, you might want a combination of raw+html as a separate option
+  Todo: if no change, do nothing
+        i.e. compare new and old -- but we ought to be disabling the menu choices anyway
   Todo: show starting with row at current location, not at start
         i.e. change vertial scroll bar
+  Todo: disable menu if no current display
+  Todo: this isn't doing a permanent change, and maybe that's wrong
+        (if you want permanent change, try SET ocelot_batch=1; etc.)
+  Todo: there's some checking here to prevent a crash if no result set is on display,
+        but I'm not at all sure that it's enough
 */
-void MainWindow::action_option_change_result_display()
+void MainWindow::action_option_change_result_display(QString next)
 {
-  /* Toggle between horizontal and vertical. This might not be the final way we do it. */
-  if (ocelot_result_grid_vertical == 1) ocelot_result_grid_vertical= 0;
-  else ocelot_result_grid_vertical= 1;
   int current_index= result_grid_tab_widget->currentIndex();
-  if (current_index >= 0)
+  if ((current_index >= 0)
+   && (current_index <= (ocelot_grid_actual_tabs - 1)))
   {
     ResultGrid *rg;
     rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(current_index));
-
-    unsigned short x_ocelot_result_grid_vertical= rg->copy_of_ocelot_result_grid_vertical;
-    unsigned short int x_ocelot_batch= rg->copy_of_ocelot_batch;
-    unsigned short int x_ocelot_html= rg->copy_of_ocelot_html;
-    unsigned short int x_ocelot_raw= rg->copy_of_ocelot_raw;
-    unsigned short int x_ocelot_xml= rg->copy_of_ocelot_xml;
-    QString next;
-    for (;;)
+    if ((rg != NULL) && (rg->isVisible()))
     {
-      if (x_ocelot_batch == 1) next= "html";
-      else if (x_ocelot_html == 1) next= "raw";
-      else if (x_ocelot_raw == 1) next= "xml";
-      else if (x_ocelot_xml == 1) next= "horizontal";
-      else if (x_ocelot_result_grid_vertical == 0) next= "vertical";
-      else if (x_ocelot_result_grid_vertical != 0) next= "batch";
-      if (next == "batch") {x_ocelot_batch= 1; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 0; if (ocelot_batch == 1) break; }
-      if (next == "html") {x_ocelot_batch= 0; x_ocelot_html= 1; x_ocelot_raw= 0; x_ocelot_xml= 0; if (ocelot_html == 1) break; }
-      if (next == "raw") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 1; x_ocelot_xml= 0; if (ocelot_raw == 1) break; }
-      if (next == "xml") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 1; if (ocelot_xml == 1) break; }
-      if (next == "horizontal") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 0; x_ocelot_result_grid_vertical= 0; break; }
-      if (next == "vertical") {x_ocelot_batch= 0; x_ocelot_html= 0; x_ocelot_raw= 0; x_ocelot_xml= 0; x_ocelot_result_grid_vertical= 1; break; }
+      unsigned short int new_ocelot_batch= 0;
+      unsigned short int new_ocelot_html= 0;
+      unsigned short int new_ocelot_raw= 0;
+      unsigned short int new_ocelot_vertical= 0;
+      unsigned short int new_ocelot_xml= 0;
+      //unsigned short int old_ocelot_batch= rg->copy_of_ocelot_batch;
+      //unsigned short int old_ocelot_html= rg->copy_of_ocelot_html;
+      //unsigned short int old_ocelot_raw= rg->copy_of_ocelot_raw;
+      //unsigned short int old_ocelot_vertical= rg->copy_of_ocelot_vertical;
+      //unsigned short int old_ocelot_xml= rg->copy_of_ocelot_xml;
+      if (next == "batch") {new_ocelot_batch= 1; }
+      if (next == "horizontal") {;}
+      if (next == "html") {new_ocelot_html= 1; }
+      if (next == "htmlraw") {new_ocelot_html= 1; new_ocelot_raw= 1; }
+      if (next == "raw") {new_ocelot_raw= 1; }
+      if (next == "vertical") {new_ocelot_vertical= 1;  }
+      if (next == "xml") {new_ocelot_xml= 1;  }
+      rg->display(1,
+                  new_ocelot_vertical,
+                  new_ocelot_batch, new_ocelot_html, new_ocelot_raw, new_ocelot_xml,
+                  ocelot_result_grid_column_names);
     }
-    rg->display(1,
-                x_ocelot_result_grid_vertical,
-                x_ocelot_batch, x_ocelot_html, x_ocelot_raw, x_ocelot_xml,
-                ocelot_result_grid_column_names);
   }
 }
+
+void MainWindow::action_option_batch()
+{
+  action_option_change_result_display("batch");
+}
+void MainWindow::action_option_horizontal()
+{
+    action_option_change_result_display("horizontal");
+}
+void MainWindow::action_option_html()
+{
+    action_option_change_result_display("html");
+}
+void MainWindow::action_option_htmlraw()
+{
+      action_option_change_result_display("htmlraw");
+}
+void MainWindow::action_option_raw()
+{
+      action_option_change_result_display("raw");
+}
+void MainWindow::action_option_vertical()
+{
+      action_option_change_result_display("vertical");
+}
+void MainWindow::action_option_xml()
+{
+      action_option_change_result_display("xml");
+}
+
 
 /*
   Called from action_about("ocelotgui_logo.png") and action_the_manual("README.htm").
@@ -8503,7 +8654,7 @@ int MainWindow::action_execute_one_statement(QString text)
   log("action_execute_one_statement", 80);
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set= NULL;
-  unsigned short int is_vertical= ocelot_result_grid_vertical; /* true if --vertical or \G or ego */
+  unsigned short int is_vertical= ocelot_vertical; /* true if --vertical or \G or ego */
   unsigned return_value= 0;
   ++statement_edit_widget->statement_count;
   /*
@@ -8704,7 +8855,7 @@ int MainWindow::action_execute_one_statement(QString text)
               goto statement_is_over;
             }
             rg->display(0,
-                        ocelot_result_grid_vertical,
+                        ocelot_vertical,
                         ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
                         ocelot_result_grid_column_names);
             result_grid_tab_widget->setCurrentWidget(rg);
@@ -10097,7 +10248,15 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         int i= ccn.toInt();
         if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_batch= i;
-        if (i == 1) ocelot_html= ocelot_xml= 0; /* should we warn? */
+        if (i == 1) ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        int i= ccn.toInt();
+        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        if (i == 1) ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
@@ -10106,16 +10265,16 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         int i= ccn.toInt();
         if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_html= i;
-        if (i == 1) ocelot_batch= ocelot_xml= 0; /* should we warn? */
+        if (i == 1) ocelot_batch= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_XML)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         int i= ccn.toInt();
         if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_xml= i;
-        if (i == 1) ocelot_batch= ocelot_html= 0; /* should we warn? */
+        ocelot_html= ocelot_raw= i;
+        if (i == 1) ocelot_batch= ocelot_vertical= ocelot_xml= 0;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_RAW)
@@ -10124,6 +10283,16 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         int i= ccn.toInt();
         if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_raw= i;
+        if (i == 1) ocelot_batch= ocelot_html= ocelot_vertical= ocelot_xml= 0;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_XML)
+      {
+        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        int i= ccn.toInt();
+        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_xml= i;
+        if (i == 1) ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= 0;
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       {
@@ -11310,9 +11479,9 @@ void MainWindow::initial_asserts()
 
   #ifdef OCELOT_OS_LINUX
   #if defined(NDEBUG)
-    if (MENU_FONT != 83) {printf("assert(MENU_FONT == 83);"); exit(1); }
+    if (MENU_FONT != 89) {printf("assert(MENU_FONT == 89);"); exit(1); }
   #else
-    assert(MENU_FONT == 83); /* See kludge alert in ocelotgui.h Settings() */
+    assert(MENU_FONT == 89); /* See kludge alert in ocelotgui.h Settings() */
   #endif
   #else
     assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
@@ -11331,10 +11500,11 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "109" to the new size */
+  /* That is okay but you must change this occurrence of "115" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 109);
+  /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 118);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -11361,6 +11531,21 @@ void MainWindow::initial_asserts()
   //}
   //assert(strcmp(strvalues[TOKEN_KEYWORD_QUESTIONMARK].chars, "?") == 0);
   //assert(strcmp(strvalues[TOKEN_KEYWORD__UTF8MB4].chars, "_UTF8MB4") == 0);
+  //{
+  //  int ocelot_keyword_lengths= 200; /* approximately what hparse_f_errormsg() adds */
+  //  for (int ii= TOKEN_KEYWORD_OCELOT_BATCH; ii <= TOKEN_KEYWORD_OCELOT_XML; ++ii)
+  //  {
+  //    char *k= (char*) &strvalues[ii].chars;
+  //    printf("k=%s.\n", k);
+  //    ocelot_keyword_lengths+= strlen(k) + 3;
+  //  }
+  //  if (ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH)
+  //  {
+  //    printf("ocelot_keyword_lengths=%d\n", ocelot_keyword_lengths);
+  //    printf("MAX_HPARSE_ERRMSG_LENGTH=%d\n", MAX_HPARSE_ERRMSG_LENGTH);
+  //    exit(0);
+  //  }
+  //}
 }
 
 void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
@@ -15250,7 +15435,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
   {
     if (event->x() > minimum_width)
     {
-      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy != 0)
+      if (ancestor_result_grid_widget->ocelot_vertical_copy != 0)
       {
         ancestor_result_grid_widget->frame_resize(text_edit_frames_index, ancestor_grid_column_number, event->x(), height());
         //setFixedSize(event->x(), height());
@@ -15279,7 +15464,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
   {
     if (event->y() > minimum_height)
     {
-      if (ancestor_result_grid_widget->ocelot_result_grid_vertical_copy > 0)
+      if (ancestor_result_grid_widget->ocelot_vertical_copy > 0)
       {
         ancestor_result_grid_widget->frame_resize(text_edit_frames_index, ancestor_grid_column_number, width(), event->y());
         //setFixedSize(width(), event->y());
@@ -15289,7 +15474,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
         The following extra 'if' exists because Qt was displaying warnings like
         "QWidget::setMinimumSize: (/TextEditFrame) Negative sizes (-4,45) are not possible"
         when someone grabs the bottom and drags to the left.
-        todo: find out why it doesn't seem to happen for ocelot_result_grid_vertical, see above.
+        todo: find out why it doesn't seem to happen for ocelot_vertical, see above.
       */
       if (event->x() >= minimum_width)
       {
@@ -17335,7 +17520,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (keyword_index == TOKEN_KEYWORD_VERBOSE) { ocelot_verbose= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_VERSION) { ocelot_version= is_enable; return; }
   /* todo: check that this finds both --vertical and -E */ /* for vertical */
-  if (keyword_index == TOKEN_KEYWORD_VERTICAL) { ocelot_result_grid_vertical= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_VERTICAL) { ocelot_vertical= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_WAIT)
   {
     ocelot_wait= is_enable;

@@ -757,7 +757,9 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_HISTORY_TOP,
     TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH,
+    TOKEN_KEYWORD_OCELOT_HORIZONTAL,
     TOKEN_KEYWORD_OCELOT_HTML,
+    TOKEN_KEYWORD_OCELOT_HTMLRAW,
     TOKEN_KEYWORD_OCELOT_LANGUAGE,
     TOKEN_KEYWORD_OCELOT_LOG_LEVEL,
     TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR,
@@ -769,8 +771,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT,
-    TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE,
@@ -782,12 +784,16 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES,
@@ -796,6 +802,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_XML,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT,
     TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR,
@@ -822,6 +830,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_STATEMENT_TOP,
     TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH,
+    TOKEN_KEYWORD_OCELOT_VERTICAL,
     TOKEN_KEYWORD_OCELOT_XML,
     TOKEN_KEYWORD_OCT,
     TOKEN_KEYWORD_OCTET_LENGTH,
@@ -1342,7 +1351,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1136
+#define KEYWORD_LIST_SIZE 1145
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1960,7 +1969,9 @@ static const keywords strvalues[]=
     {"OCELOT_HISTORY_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR},
     {"OCELOT_HISTORY_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_TOP},
     {"OCELOT_HISTORY_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH},
+    {"OCELOT_HORIZONTAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HORIZONTAL},
     {"OCELOT_HTML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTML},
+    {"OCELOT_HTMLRAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW},
     {"OCELOT_LANGUAGE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {"OCELOT_LOG_LEVEL", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
     {"OCELOT_MENU_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
@@ -1972,8 +1983,8 @@ static const keywords strvalues[]=
     {"OCELOT_MENU_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR},
     {"OCELOT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_RAW},
     {"OCELOT_SHORTCUT_AUTOCOMPLETE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
+    {"OCELOT_SHORTCUT_BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
     {"OCELOT_SHORTCUT_BREAKPOINT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
-    {"OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CHANGE_RESULT_DISPLAY},
     {"OCELOT_SHORTCUT_CLEAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR},
     {"OCELOT_SHORTCUT_CONNECT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT},
     {"OCELOT_SHORTCUT_CONTINUE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE},
@@ -1985,12 +1996,16 @@ static const keywords strvalues[]=
     {"OCELOT_SHORTCUT_FORMAT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT},
     {"OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT},
     {"OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS},
+    {"OCELOT_SHORTCUT_HORIZONTAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL},
+    {"OCELOT_SHORTCUT_HTML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML},
+    {"OCELOT_SHORTCUT_HTMLRAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW},
     {"OCELOT_SHORTCUT_INFORMATION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION},
     {"OCELOT_SHORTCUT_KILL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL},
     {"OCELOT_SHORTCUT_NEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT},
     {"OCELOT_SHORTCUT_NEXT_WINDOW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW},
     {"OCELOT_SHORTCUT_PASTE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE},
     {"OCELOT_SHORTCUT_PREVIOUS_WINDOW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW},
+    {"OCELOT_SHORTCUT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW},
     {"OCELOT_SHORTCUT_REDO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO},
     {"OCELOT_SHORTCUT_REFRESH_CALL_STACK", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK},
     {"OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES},
@@ -1999,6 +2014,8 @@ static const keywords strvalues[]=
     {"OCELOT_SHORTCUT_SELECT_ALL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL},
     {"OCELOT_SHORTCUT_STEP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP},
     {"OCELOT_SHORTCUT_UNDO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO},
+    {"OCELOT_SHORTCUT_VERTICAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL},
+    {"OCELOT_SHORTCUT_XML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_XML},
     {"OCELOT_SHORTCUT_ZOOMIN", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN},
     {"OCELOT_SHORTCUT_ZOOMOUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT},
     {"OCELOT_STATEMENT_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR},
@@ -2025,6 +2042,7 @@ static const keywords strvalues[]=
     {"OCELOT_STATEMENT_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR},
     {"OCELOT_STATEMENT_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_TOP},
     {"OCELOT_STATEMENT_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH},
+    {"OCELOT_VERTICAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {"OCELOT_XML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_XML},
 
       {"OCT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OCT},
@@ -3263,7 +3281,15 @@ public slots:
   void action_option_detach_statement_widget(bool checked); void detach_statement_widget(bool checked);
   void action_option_next_window();
   void action_option_previous_window();
-  void action_option_change_result_display();
+  void action_option_change_result_display(QString);
+  void action_option_batch();
+  void action_option_horizontal();
+  void action_option_html();
+  void action_option_htmlraw();
+  void action_option_raw();
+  void action_option_vertical();
+  void action_option_xml();
+
 #ifdef DEBUGGER
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
@@ -3507,7 +3533,14 @@ private:
     QAction *menu_options_action_option_detach_statement_widget;
     QAction *menu_options_action_next_window;
     QAction *menu_options_action_previous_window;
-    QAction *menu_options_action_change_result_display;
+    QAction *menu_options_action_batch;
+    QAction *menu_options_action_horizontal;
+    QAction *menu_options_action_html;
+    QAction *menu_options_action_htmlraw;
+    QAction *menu_options_action_raw;
+    QAction *menu_options_action_vertical;
+    QAction *menu_options_action_xml;
+
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -3578,7 +3611,13 @@ private:
   QKeySequence ocelot_shortcut_kill_keysequence;
   QKeySequence ocelot_shortcut_next_window_keysequence;
   QKeySequence ocelot_shortcut_previous_window_keysequence;
-  QKeySequence ocelot_shortcut_change_result_display_keysequence;
+  QKeySequence ocelot_shortcut_batch_keysequence;
+  QKeySequence ocelot_shortcut_horizontal_keysequence;
+  QKeySequence ocelot_shortcut_html_keysequence;
+  QKeySequence ocelot_shortcut_htmlraw_keysequence;
+  QKeySequence ocelot_shortcut_raw_keysequence;
+  QKeySequence ocelot_shortcut_vertical_keysequence;
+  QKeySequence ocelot_shortcut_xml_keysequence;
   QKeySequence ocelot_shortcut_breakpoint_keysequence;
   QKeySequence ocelot_shortcut_continue_keysequence;
   QKeySequence ocelot_shortcut_next_keysequence;
@@ -5552,7 +5591,7 @@ public:
   TextEditFrame **text_edit_frames;
 
   MYSQL_RES *grid_mysql_res;
-  unsigned short ocelot_result_grid_vertical_copy;
+  unsigned short ocelot_vertical_copy;
   unsigned short ocelot_result_grid_column_names_copy;
   unsigned short ocelot_client_side_functions_copy;
   char *result_set_copy;                                     /* gets a copy of mysql_res contents, if necessary */
@@ -5584,7 +5623,7 @@ public:
 
   MainWindow *copy_of_parent;
   int copy_of_connections_dbms;
-  unsigned short int copy_of_ocelot_result_grid_vertical;
+  unsigned short int copy_of_ocelot_vertical;
   unsigned short int copy_of_ocelot_result_grid_column_names;
   unsigned short int copy_of_ocelot_batch;
   unsigned short int copy_of_ocelot_html;
@@ -6126,15 +6165,15 @@ QString fillup(MYSQL_RES *mysql_res,
     The idea is that copy_of variables will store what was there when we called with 0 or 1,
     therefore when we call with 2 the value will be what we had when we called with 0 or 1
     rather than something that might have been set later.
-    Todo: ocelot_result_grid_vertical_copy is a pointless duplication of copy_of_ocelot_result_grid_vertical?
+    Todo: ocelot_vertical_copy is a pointless duplication of copy_of_ocelot_vertical?
     Todo: ocelot_result_grid_column_names_copy is a pointless duplication of copy_of_ocelot_result_grid_column_names?
   Re display_batch
-    We should set the copy_of items even if we will call display_batch, because we might change
-    how change_result_display() works. But there are other items that we set at the start that,
+    We should set the copy_of items even if we will call display_batch etc., because we might change
+    how result_display_batch() works. But there are other items that we set at the start that,
     I think, we don't need to set since display_batch() won't use them.
 */
 void display(int due_to,
-             unsigned short ocelot_result_grid_vertical,
+             unsigned short ocelot_vertical,
              unsigned short int ocelot_batch,
              unsigned short int ocelot_html,
              unsigned short int ocelot_raw,
@@ -6150,13 +6189,13 @@ void display(int due_to,
     copy_result_to_gridx();
     /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
        said what gridx_row_count is. */
-    if (ocelot_result_grid_vertical == 0) grid_result_row_count= gridx_row_count + 1;
+    if (ocelot_vertical == 0) grid_result_row_count= gridx_row_count + 1;
     else grid_result_row_count= result_row_count * result_column_count;
-    if (ocelot_result_grid_vertical == 0)
+    if (ocelot_vertical == 0)
     {
       gridx_row_count= grid_result_row_count + 1;
     }
-    if (ocelot_result_grid_vertical != 0)
+    if (ocelot_vertical != 0)
     {
       gridx_row_count= result_row_count * result_column_count;
       gridx_column_count= 1;
@@ -6165,13 +6204,13 @@ void display(int due_to,
     grid_column_widths= new unsigned int[gridx_column_count];
     grid_column_heights= new unsigned int[gridx_column_count];
     grid_column_dbms_sources= new unsigned char[gridx_column_count];
-    copy_of_ocelot_result_grid_vertical= ocelot_result_grid_vertical;
+    copy_of_ocelot_vertical= ocelot_vertical;
     copy_of_ocelot_result_grid_column_names= ocelot_result_grid_column_names;
     copy_of_ocelot_batch= ocelot_batch;
     copy_of_ocelot_html= ocelot_html;
     copy_of_ocelot_raw= ocelot_raw;
     copy_of_ocelot_xml= ocelot_xml;
-    ocelot_result_grid_vertical_copy= ocelot_result_grid_vertical;
+    ocelot_vertical_copy= ocelot_vertical;
     ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
   }
 
@@ -6237,7 +6276,7 @@ void display(int due_to,
     */
     int result_grid_height= (parent->height() / 3) - 11;
     int line_height= mm.lineSpacing();
-    if ((copy_of_ocelot_result_grid_column_names == 1) && (copy_of_ocelot_result_grid_vertical == 0))
+    if ((copy_of_ocelot_result_grid_column_names == 1) && (copy_of_ocelot_vertical == 0))
         result_grid_height-= line_height;
     ocelot_grid_max_column_height_in_lines= result_grid_height / line_height;
     if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
@@ -6296,19 +6335,19 @@ void display(int due_to,
   char *field_names_pointer;
   for (xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
   {
-    field_names_pointer= gridx_field_names; /* unnecessary reset if copy_of_ocelot_result_grid_vertical = 0 */
+    field_names_pointer= gridx_field_names; /* unnecessary reset if copy_of_ocelot_vertical = 0 */
     for (unsigned int column_number= 0; column_number < gridx_column_count; ++column_number)
     {
       int ki= xrow * gridx_column_count + column_number;
       bool is_header= false;
-      if (copy_of_ocelot_result_grid_vertical != 0)
+      if (copy_of_ocelot_vertical != 0)
       {
         if (copy_of_ocelot_result_grid_column_names != 0)
         {
           if (column_number == 0) is_header= true;
         }
       }
-      if ((copy_of_ocelot_result_grid_vertical == 0) && (xrow == 0)) is_header= true;
+      if ((copy_of_ocelot_vertical == 0) && (xrow == 0)) is_header= true;
       if (is_header == true)
       {
         memcpy(&(text_edit_frames[ki]->content_length), field_names_pointer, sizeof(unsigned int));
@@ -6347,12 +6386,12 @@ void display(int due_to,
       }
     }
   }
-  //if (copy_of_ocelot_result_grid_vertical != 0)
+  //if (copy_of_ocelot_vertical != 0)
   //  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
   //                      ocelot_grid_cell_drag_line_size_as_int,
   //                      0); /* get grid_column_widths[] and grid_column_heights[] */
 
-  if (copy_of_ocelot_result_grid_vertical != 0)
+  if (copy_of_ocelot_vertical != 0)
   {
     /* TODO: Make sure considerations for horizontal are all considered for vertical. */
     /* We'll have to figure out the alignment etc. each time we get ready to display */
@@ -6404,7 +6443,7 @@ void display(int due_to,
   }
 
   is_paintable= 1;
-  if (copy_of_ocelot_result_grid_vertical == 0)
+  if (copy_of_ocelot_vertical == 0)
   grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
                         ocelot_grid_cell_drag_line_size_as_int,
                         ocelot_result_grid_column_names_copy,
@@ -6429,7 +6468,7 @@ void display(int due_to,
     possibly going beyond the original desired maximum width, possibly causing a horizontal scroll bar to appear.
     grid_row_layout->setSpacing(0) means the only thing separating cells is the "border".
   */
-  if (copy_of_ocelot_result_grid_vertical == 0)
+  if (copy_of_ocelot_vertical == 0)
   {
     for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
     {
@@ -7498,8 +7537,8 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 }
 
 /*
-  Thoughts about ocelot_result_grid_vertical
-  ------------------------------------------
+  Thoughts about ocelot_vertical
+  ------------------------------
 
   This is a row with headings-at-top.
   +-------+---------+-----------+
@@ -8013,7 +8052,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 
   first_row= new_grid_vertical_scroll_bar_value;
 
-  if (ocelot_result_grid_vertical_copy != 0)
+  if (ocelot_vertical_copy != 0)
   {
     unsigned int result_column_number; /* i.e. column number in result set, not column number in grid */
     first_row= new_grid_vertical_scroll_bar_value / result_column_count;
@@ -8155,7 +8194,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
     //for (text_edit_frames_index= text_edit_frames_index + 1; text_edit_frames_index < max_text_edit_frames_count; ++text_edit_frames_index) text_edit_frames[text_edit_frames_index]->hide();
   }
 
-  else /* if ocelot_result_grid_vertical_copy == 0 */
+  else /* if ocelot_vertical_copy == 0 */
   {
     for (result_row_number= first_row, grid_row= 1;
          (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
@@ -8306,7 +8345,7 @@ bool vertical_scroll_bar_event(int connections_dbms)
       return false;
   }
   /* It's ridiculous to do these settings every time. But when is the best time to do them? Which event matters? */
-  if (ocelot_result_grid_vertical_copy == 0) grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+  if (ocelot_vertical_copy == 0) grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
   else grid_vertical_scroll_bar->setMaximum(grid_result_row_count - 1);
   grid_vertical_scroll_bar->setSingleStep(1);
   grid_vertical_scroll_bar->setPageStep(1);
@@ -8920,7 +8959,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
     Change the assert in ocelotgui.cpp if MENU_FONT changes in ostrings.h.
   */
-  menu_strings_menu_font_copy= menu_strings[menu_off + 83];
+  menu_strings_menu_font_copy= menu_strings[menu_off + 89];
 
   int settings_width, settings_height;
 

@@ -155,6 +155,7 @@ void MainWindow::hparse_f_error()
   q_errormsg.append(") ");
   q_errormsg.append(". The list of expected tokens is: ");
   q_errormsg.append(hparse_expected);
+  /* Todo: this looks a bit odd. why a loop rather than a single assignment? */
   while ((unsigned) q_errormsg.toUtf8().length() >= (unsigned int) sizeof(hparse_errmsg) - 1)
     q_errormsg= q_errormsg.left(q_errormsg.length() - 1);
   assert(q_errormsg.length() < MAX_HPARSE_ERRMSG_LENGTH);
