@@ -8002,7 +8002,17 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
       }
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPDATE") == 1) {;}
+      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPDATE") == 1)
+      {
+        if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF") == 1)
+        {
+          do
+          {
+            hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+            if (hparse_errno > 0) return;
+          } while (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+        }
+      }
       else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DELETE") == 1) {;}
       else hparse_f_error();
       if (hparse_errno > 0) return;
@@ -8034,6 +8044,9 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 1)
         {
+          main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+          /* Todo: subqueries are allowed here, but maybe this is the wrong place to say so. */
+          hparse_subquery_is_allowed= true;
           hparse_f_opr_1(0, 0);
           if (hparse_errno > 0) return;
         }
