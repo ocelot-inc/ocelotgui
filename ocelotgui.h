@@ -2525,6 +2525,7 @@ static const keywords strvalues[]=
 #include <QDateTime>
 #include <QDialog>
 #include <QDir>
+#include <QElapsedTimer>        /* only needed for log(), and even for that it's not needed much */
 #include <QFontDialog>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -3942,6 +3943,7 @@ public:
   void copy();
   void paste();
   void menu_context_t_2(const QPoint & pos);
+  void generate_update();
 protected:
   void paintEvent(QPaintEvent *event);
   void keyPressEvent(QKeyEvent *event);

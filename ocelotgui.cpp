@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: April 17 2019
+   Last modified: May 2 2019
 */
 
 /*
@@ -524,6 +524,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   QMainWindow(parent),
   ui(new Ui::MainWindow)
 {
+  log("MainWindow start", 90); /* Ordinarily this is less than ocelot_log_level so won't appear */
   initial_asserts();  /* Check that some defined | constant values are okay. */
 
   /* Initialization */
@@ -731,6 +732,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   }
 
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
+  log("MainWindow end", 90);
 }
 
 
@@ -13072,13 +13074,17 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     tvp.tv_usec= 0;
     lmysql->ldbms_tnt_set(tnt[connection_number], (int)TNT_OPT_TMOUT_CONNECT, (char*)&tvp);
   }
-  if (ocelot_net_buffer_length != 16384)
   {
-    /* in ocelotgui.h I said third arg is char*, so casting is goofy */
-    /* warning: 16384 is MySQL's default, maybe not Tarantool's */
-    /* warning: ocelot_net_buffer_length is long */
-    lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_SEND_BUF, (char*)ocelot_net_buffer_length);
-    lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_RECV_BUF, (char*)ocelot_net_buffer_length);
+    /* Todo:
+       I was setting TNT_OPT_SEND_BUF and TNT_OPT_RECV_BUF to (char*)ocelot_net_buffer_length in
+       ocelotgui.h. I said third arg is char*, so casting was goofy. The greater problem was that
+       the default on startup is 16384 which is MySQL's default, not Tarantool's. The true solution
+       is to change the default if --ocelot_dbms=tarantool, perhaps. But 0 turns buffering off, and
+       I think that is convenient for sending or receiving images.
+       Warning: ocelot_net_buffer_length is long.
+    */
+    lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_SEND_BUF, 0);
+    lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_RECV_BUF, 0);
   }
   {
     char connection_string[1024];
@@ -13914,7 +13920,7 @@ const char *MainWindow::tarantool_result_set_init(
   long unsigned int r= 0;
   //unsigned int data_length;
 
-  ///* TEST!! start (todo: maybe we should log with low priority) */
+  /* TEST!! start (todo: maybe we should log with low priority) */
   //int mm= tarantool_tnt_reply.data_end - tarantool_tnt_reply.data;
   //printf("**** (tarantool_tnt_reply.data_end - tarantool_tnt_reply.data)=%d\n", mm);
   //for (int i= 0; i < mm; ++i)
@@ -13928,7 +13934,15 @@ const char *MainWindow::tarantool_result_set_init(
   //{
   //  printf("    %x\n", *(tarantool_tnt_reply_error + i));
   //}
-  ///* TEST!! end */
+  //const char *tarantool_tnt_reply_metadata= tarantool_tnt_reply.metadata;
+  //mm= tarantool_tnt_reply.metadata_end - tarantool_tnt_reply.metadata;
+  //printf("**** (tarantool_tnt_reply.metadata_end - tarantool_tnt_reply.metadata)=%d\n", mm);
+  //for (int i= 0; i < mm; ++i)
+  //{
+  //  printf("    %x\n", *(tarantool_tnt_reply_metadata + i));
+  //}
+  //printf("**** tarantool_tnt_reply.code=%ld\n", tarantool_tnt_reply.code);
+  // TEST!! end */
   if ((tarantool_tnt_reply.data == NULL)
    || (tarantool_tnt_reply.data_end == NULL))
     goto erret;
@@ -15318,6 +15332,11 @@ QString MainWindow::tarantool_read_format(QString lua_request)
   We also fflush(stdout) which is usually unnecessary (messages
   are printed with "\n") unless stdout has been redirected to a file.
   ocelot_log_level default value = 100, can be changed with --ocelot_log_level==N.
+  Re QElapsedTimer:
+    We also printf(seconds-since-last-printf) based on a so-called nanoseconds count.
+    Of course it's not really nanoseconds and sometimes it's based on ticks or milliseconds.
+    So printf doesn't really say anything with %.9f especially since printf itself takes so much time.
+    If this is never used, then #include #include <QElapsedTimer> can be removed from ocelotgui.h.
   Todo: consider using stderr or a named file.
   Todo: attach a timer or counter so printf occurs if dangers exist.
   Todo: consider using a bit mask instead of a greater-than comparison.
@@ -15327,9 +15346,22 @@ QString MainWindow::tarantool_read_format(QString lua_request)
 */
 void MainWindow::log(const char *message, int level)
 {
+  static QElapsedTimer* timer;
+  static long int elapsed_nanoseconds= 0;
   if (level > ocelot_log_level)
   {
-    printf("%s\n", message);
+    long int new_elapsed_nanoseconds;
+    double seconds;
+    if (elapsed_nanoseconds == 0)
+    {
+      timer= new QElapsedTimer(); /* Todo: this leaks. destroy it eventually. */
+      timer->start();
+    }
+    new_elapsed_nanoseconds= timer->nsecsElapsed();
+    seconds= new_elapsed_nanoseconds - elapsed_nanoseconds;
+    seconds= seconds / 1000000000;
+    printf("%s %.9f\n", message, seconds);
+    elapsed_nanoseconds= new_elapsed_nanoseconds;
 #if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
     fflush(stdout);
 #endif
@@ -15664,7 +15696,7 @@ void TextEditWidget::paintEvent(QPaintEvent *event)
   TODO: If different columns come from different tables, update is impossible, do nothing
 */
 #define MAX_WHERE_CLAUSE_LITERAL_SIZE 128   /* arbitrary. maybe should be user-settable. */
-void TextEditWidget::keyPressEvent(QKeyEvent *event)
+void TextEditWidget::generate_update()
 {
   QString content_in_result_set;
   QString content_in_text_edit_widget;
@@ -15673,24 +15705,14 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
 
   ResultGrid *result_grid= text_edit_frame_of_cell->ancestor_result_grid_widget;
   MainWindow *m= result_grid->copy_of_parent;
-  if (m->keypress_shortcut_handler(event, true) == true)
-  {
-    copy();
-    return;
-  }
-  if (m->keypress_shortcut_handler(event, false) == true) return;
-  QString content_in_cell_before_keypress= toPlainText();
-  QTextEdit::keyPressEvent(event);
-  QString content_in_cell_after_keypress= toPlainText();
+
   TextEditFrame *text_edit_frame;
 
+  /* Todo: look for text_edit_frame_of_cell->is_image_flag == true -- if so, byte array */
+
   int xrow;
-  if ((content_in_cell_before_keypress != content_in_cell_after_keypress)
-   && (text_edit_frame_of_cell->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER)
-   && (text_edit_frame_of_cell->is_image_flag == false))
   {
     xrow= text_edit_frame_of_cell->ancestor_grid_result_row_number;
-
     ++xrow; /* possible bug: should this be done if there's no header row? */
     /* Content has changed since the last keyPressEvent. */
     /* column number = text_edit_frame_of_cell->ancestor_grid_column_number */
@@ -15723,7 +15745,6 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
     dbs_pointer= result_grid->result_original_database_names;
     unsigned int column_number;
     unsigned int tefi= text_edit_frame_index_of_first_cell;
-
     for (column_number= 0; column_number < result_grid->result_column_count; )
     {
       text_edit_frame= result_grid->text_edit_frames[tefi];
@@ -15784,10 +15805,31 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       }
       if (text_edit_frame->is_retrieved_flag == true)
       {
-        content_in_text_edit_widget= result_grid->text_edit_widgets[tefi]->toPlainText();
         bool contents_changed_flag= true;
-        if ((p == 0) && (content_in_text_edit_widget == NULL_STRING)) contents_changed_flag= false;
-        else if (content_in_text_edit_widget == content_in_result_set) contents_changed_flag= false;
+        if (text_edit_frame->is_image_flag == true)
+        {
+          /* Todo: I'm assuming we changed the pointers and came in via paste(). I could be wrong. */
+          /* Todo: use p, I think it is the same as content_pointer */
+          int content_length= text_edit_frame->content_length;
+          char *content_pointer= text_edit_frame->content_pointer;
+          content_in_text_edit_widget="X'";
+          char tmp[3];
+          for (int i= 0; i < content_length; ++i)
+          {
+            sprintf(tmp, "%02X", (unsigned char) *(content_pointer+i));
+            content_in_text_edit_widget.append(tmp);
+          }
+          content_in_text_edit_widget.append("'");
+          /* TODO: THIS IS JUST A GUESS! */
+          contents_changed_flag= true;
+        }
+        else
+        {
+          /* Todo: I think this works because we don't change the pointers, but that will change. */
+          content_in_text_edit_widget= result_grid->text_edit_widgets[tefi]->toPlainText();
+          if ((p == 0) && (content_in_text_edit_widget == NULL_STRING)) contents_changed_flag= false;
+          else if (content_in_text_edit_widget == content_in_result_set) contents_changed_flag= false;
+        }
         if (contents_changed_flag == true)
         {
           if (update_statement == "")
@@ -15806,7 +15848,8 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
           update_statement.append('=');
           //if ((result_grid->result_field_types[column_number] <= OCELOT_DATA_TYPE_DOUBLE)
           if ((text_edit_frame->content_field_value_flags == FIELD_VALUE_FLAG_IS_NUMBER)
-          || (content_in_text_edit_widget == NULL_STRING))
+          || (content_in_text_edit_widget == NULL_STRING)
+          || (text_edit_frame->is_image_flag == true))
             update_statement.append(content_in_text_edit_widget);
           else update_statement.append(unstripper(content_in_text_edit_widget));
         }
@@ -15814,7 +15857,6 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       ++column_number;
       ++tefi;
     }
-
     /* We've got a string. If it's not blank, put it in the statement widget, overwriting. */
     /* It might be blank because user returned to the original values, if so wipe out. */
     CodeEditor *c= m->statement_edit_widget;
@@ -15829,6 +15871,26 @@ void TextEditWidget::keyPressEvent(QKeyEvent *event)
       if (c->toPlainText().mid(0, 23) == "/* generated */ UPDATE ") c->setPlainText("");
     }
   }
+}
+
+void TextEditWidget::keyPressEvent(QKeyEvent *event)
+{
+  ResultGrid *result_grid= text_edit_frame_of_cell->ancestor_result_grid_widget;
+  MainWindow *m= result_grid->copy_of_parent;
+  if (m->keypress_shortcut_handler(event, true) == true)
+  {
+    copy();
+    return;
+  }
+  if (m->keypress_shortcut_handler(event, false) == true) return;
+
+  QString content_in_cell_before_keypress= toPlainText();
+  QTextEdit::keyPressEvent(event);
+  QString content_in_cell_after_keypress= toPlainText();
+
+  if ((content_in_cell_before_keypress != content_in_cell_after_keypress)
+   && (text_edit_frame_of_cell->cell_type != TEXTEDITFRAME_CELL_TYPE_HEADER))
+    generate_update();
 }
 
 
@@ -15883,7 +15945,7 @@ void TextEditWidget::copy()
     Todo: allow undo, which would require saving the old pointers.
     Todo: generate an UPDATE statement.
     Todo: have an array of char[] not just one, and delete it when result set is closed.
-          (right now there is only one and it leaks)
+          (right now there is only one and it leaks, look at the "new" instruction inside the function)
     Todo: check if is_retrieved_flag is necessary, and is all you need.
     Todo: maybe there should be another flag to indicate "a paste happened here".
     Todo: the same technique could be applied to non-images though may be unnecessary.
@@ -15914,8 +15976,9 @@ void TextEditWidget::paste()
       memcpy(image_as_char, image_as_byte_array.constData(), image_as_byte_array_size);
       text_edit_frame_of_cell->content_pointer= image_as_char;
       text_edit_frame_of_cell->content_length= image_as_byte_array_size;
-      text_edit_frame_of_cell->is_retrieved_flag= false;
       text_edit_frame_of_cell->update();
+      generate_update();
+      text_edit_frame_of_cell->is_retrieved_flag= false; /* why say this? must come after generate_update */
       return;
     }
   }
