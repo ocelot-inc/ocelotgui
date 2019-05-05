@@ -490,8 +490,9 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned short int flag_
   if (token_literal_flags & TOKEN_LITERAL_FLAG_CONSTANT)
   {
     if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TRUE, "TRUE") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FALSE, "FALSE") == 1))
+         || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TRUE, "TRUE") == 1)
+         || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FALSE, "FALSE") == 1)
+         || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNKNOWN, "UNKNOWN") == 1))
     {
       return 1;
     }
@@ -3034,32 +3035,6 @@ void MainWindow::hparse_f_alter_specification()
   {
     bool column_name_is_expected= false;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN") == 1) column_name_is_expected= true;
-    else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "CONSTRAINT") == 1)
-    {
-      /* some similarity to part of hparse_f_create_definition() */
-      hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return;
-      if ((hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN") == 1)
-        || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PRIMARY") == 1)
-        || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNIQUE") == 1))
-      {
-        int constraint_type= main_token_types[hparse_i_of_last_accepted];
-        if (constraint_type != TOKEN_KEYWORD_UNIQUE)
-        {
-          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
-          if (hparse_errno > 0) return;
-        }
-        hparse_f_column_list(true, false);
-        if (hparse_errno > 0) return;
-        if (constraint_type == TOKEN_KEYWORD_FOREIGN)
-        {
-          hparse_f_reference_definition();
-          if (hparse_errno > 0) return;
-        }
-      }
-      else hparse_f_error();
-      return;
-    }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTITION") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
@@ -3070,8 +3045,12 @@ void MainWindow::hparse_f_alter_specification()
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) column_name_is_expected= true;
-    else if (hparse_f_create_definition() == 3) column_name_is_expected= true;
+    else if (hparse_f_create_definition(TOKEN_KEYWORD_ALTER) == 3)
+    {
+      /* If "ADD", but not constraint, and MySQL|MariaDB, then column */
+      if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) hparse_f_error();
+      column_name_is_expected= true;
+    }
     if (hparse_errno > 0) return;
     if (column_name_is_expected == true)
     {
@@ -4152,12 +4131,12 @@ int MainWindow::hparse_f_data_type(int context)
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_POLYGON;
   }
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BOOL") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BOOL") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_BOOL;
   }
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BOOLEAN") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BOOLEAN") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_BOOLEAN;
@@ -4225,40 +4204,40 @@ void MainWindow::hparse_f_reference_option()
 }
 
 /* todo: Check re Tarantool: last I saw it accepts but ignores MATCH, that will probably change */
-void MainWindow::hparse_f_reference_definition()
+int MainWindow::hparse_f_reference_definition()
 {
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REFERENCES") == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REFERENCES") == 0)
+    return 0;
+  if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
+  if (hparse_errno > 0) return 0;
+  hparse_f_column_list(0, 0);
+  if (hparse_errno > 0) return 0;
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MATCH") == 1)
   {
-    if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
-    hparse_f_column_list(0, 0);
-    if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MATCH") == 1)
-    {
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FULL") == 1) {;}
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTIAL") == 1) {;}
-      else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIMPLE") == 1) {;}
-      else hparse_f_error();
-      if (hparse_errno > 0) return;
-    }
-    bool on_delete_seen= false, on_update_seen= false;
-    while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON") == 1)
-    {
-      if ((on_delete_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DELETE") == 1))
-      {
-        hparse_f_reference_option();
-        if (hparse_errno > 0) return;
-        on_delete_seen= true;
-      }
-      else if ((on_update_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPDATE") == 1))
-      {
-        hparse_f_reference_option();
-        if (hparse_errno > 0) return;
-        on_update_seen= true;
-      }
-      else hparse_f_error();
-    }
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FULL") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTIAL") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIMPLE") == 1) {;}
+    else hparse_f_error();
+    if (hparse_errno > 0) return 0;
   }
+  bool on_delete_seen= false, on_update_seen= false;
+  while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ON") == 1)
+  {
+    if ((on_delete_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DELETE") == 1))
+    {
+      hparse_f_reference_option();
+      if (hparse_errno > 0) return 0;
+      on_delete_seen= true;
+    }
+    else if ((on_update_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPDATE") == 1))
+    {
+      hparse_f_reference_option();
+      if (hparse_errno > 0) return 0;
+      on_update_seen= true;
+    }
+    else hparse_f_error();
+  }
+  return 1;
 }
 
 /*
@@ -4273,15 +4252,23 @@ void MainWindow::hparse_f_reference_definition()
   The manual says [index_name] is not allowed for PRIMARY KEY, actually it is, ignored.
   Return 1 if valid constraint definition, 2 if error, 3 if nothing (probably data type).
 */
-int MainWindow::hparse_f_create_definition()
+int MainWindow::hparse_f_create_definition(int keyword)
 {
   bool constraint_seen= false;
   bool fulltext_seen= false, foreign_seen= false;
   bool unique_seen= false, check_seen= false, primary_seen= false;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONSTRAINT") == 1)
   {
-    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
+    {
+      if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) hparse_f_error();
+      if (hparse_errno > 0) return 2;
+    }
     constraint_seen= true;
+  }
+  else
+  {
+    if ((keyword == TOKEN_KEYWORD_ALTER) && ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)) return 3;
   }
   if ((constraint_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1)) {;}
   else if ((constraint_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY") == 1)) {;}
@@ -4300,7 +4287,8 @@ int MainWindow::hparse_f_create_definition()
     if (hparse_errno > 0) return 2;
     foreign_seen= true;
   }
-  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1) check_seen= true;
+  else if (((keyword != TOKEN_KEYWORD_ALTER) || (hparse_dbms_mask & FLAG_VERSION_TARANTOOL) == 0)
+        && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)) check_seen= true;
   else return 3;
   if (check_seen == true)
   {
@@ -4315,13 +4303,16 @@ int MainWindow::hparse_f_create_definition()
 #endif
     return 1;
   }
-  if ((fulltext_seen == true) || (unique_seen == true))
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1) {;}
-    else hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
+    if ((fulltext_seen == true) || (unique_seen == true))
+    {
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1) {;}
+      else hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
+    }
+    hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT);
+    if (hparse_errno > 0) return 2;
   }
-  hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT);
-  if (hparse_errno > 0) return 2;
   hparse_f_index_columns(TOKEN_KEYWORD_TABLE, fulltext_seen, foreign_seen, primary_seen);
   if (hparse_errno > 0) return 2;
   return 1;
@@ -5338,9 +5329,11 @@ void MainWindow::hparse_f_create_procedure_clauses()
 
 
 /*
-  During CREATE TABLE ... (..., PRIMARY|UNIQUE(...)) we know what
+  During CREATE TABLE ... (..., PRIMARY|UNIQUE(...)) we might know what
   the preceding column names are, so expect them.
-  In Tarantool this is compulsory. In MySQL|MariaDB this is optional.
+  In Tarantool this is compulsory. ?? Well, it used to be compulsory.
+  In MySQL|MariaDB this is optional.
+  If ALTER this won't happen.
   Return: hparse_i of the column's data type word, or 0
   TODO: This stops showing expecteds as soon as I type the first letter.
   TODO: The comparison to "INTEGER" is redundant if data type flag is okay.
@@ -5386,12 +5379,19 @@ int MainWindow::hparse_f_index_column_expecter()
       }
     }
   }
-  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) hparse_f_error();
-  else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  //if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) hparse_f_error();
+  //else
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
   return 0;
 }
 
 /* (index_col_name,...) [index_option] for both CREATE INDEX and CREATE TABLE */
+/*
+   Todo Re Tarantool:
+   * Currently Tarantool requires that primary key constraint must follow column definition, but this
+     might be a temporary bug, so check that it's still true.
+   * alter table ... add primary (...) autoincrement will probably never happen but we should allow
+*/
 void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, bool foreign_seen, bool primary_seen)
 {
   if ((fulltext_seen == false) && (foreign_seen == false))
@@ -5420,6 +5420,7 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
     ++index_column_number;
     if (index_or_table == TOKEN_KEYWORD_TABLE)
     {
+      /* i_of_data_type will only come in if it's CREATE not ALTER, and constraints after all columns */
       int i_of_data_type= hparse_f_index_column_expecter();
       if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
        && (index_column_number == 1)
@@ -5443,22 +5444,23 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
       if (hparse_errno > 0) return;
     }
-    if (foreign_seen == false)
+    if ((foreign_seen == true) && ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)) {;}
+    else
     {
       if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLLATE"))
       {
         if (hparse_f_collation_name() == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
-    }
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASC") != 1) hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DESC");
+    }
   } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
 
   if (foreign_seen == true)
   {
-    hparse_f_reference_definition();
+    if (hparse_f_reference_definition() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
   else /* if (foreign_seen == false) */
@@ -7891,7 +7893,7 @@ void MainWindow::hparse_f_statement(int block_top)
           else
           {
             if (hparse_errno > 0) return;
-            if (hparse_f_create_definition() != 3) item_is_seen= true;
+            if (hparse_f_create_definition(TOKEN_KEYWORD_CREATE) != 3) item_is_seen= true;
             if (hparse_errno > 0) return;
           }
           if (item_is_seen == false)
@@ -9132,13 +9134,13 @@ void MainWindow::hparse_f_statement(int block_top)
     if (hparse_errno > 0) return;
     return;
   }
-  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REINDEX, "REINDEX") == 1)
-  {
-    hparse_statement_type= TOKEN_KEYWORD_REINDEX;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE);
-    if (hparse_errno > 0) return;
-  }
+  //else if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REINDEX, "REINDEX") == 1)
+  //{
+  //  hparse_statement_type= TOKEN_KEYWORD_REINDEX;
+  //  main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
+  //  hparse_f_qualified_name_of_object(TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE);
+  //  if (hparse_errno > 0) return;
+  //}
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RENAME, "RENAME") == 1)
   {
     if (hparse_errno > 0) return;
