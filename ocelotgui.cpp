@@ -13255,20 +13255,59 @@ QString MainWindow::tarantool_internal_query(char *query,
   Todo: check tarantool_errno[connection_number=0 and tarantool_errmsg
   Todo: version check. we pick it up during connect with "return box.info.version"
   Todo: it's all obsolete now I think, but we will keep calling tarantool_initialize() anyway.
+  Todo: query_return is unused
+  Input = a string containing size;[[sql-statement]] repeated.
+  Output = results returned from box.execute, one for each statement
+  Example: '37;CREATE TABLE MJ (s1 INT PRIMARY KEY);37;CREATE TABLE MJ (s1 INT PRIMARY KEY);'
+  You could invoke this with conn:eval([[return0 = ocelot_sqle(stuff)]])
+  Or conn:call() i.e. maybe you would be happier with tnt_request_call
+  I don't do anything if status == false
+  Output = a table or multiple tables
+  Todo: I fear that query_return might have nothing even if there is an error.
+  Todo: If there's only one statement, you could do the return directly, not via a local
+  TODO: the caller should do something if this returns multiple result sets.
 */
 void MainWindow::tarantool_initialize(int connection_number)
 {
-const char *my_string= "function ocelot_sqle(p)"
-                 "  local n = {}"
-                 "    local x, y = pcall(function() n = box.execute(p) end)"
-                 "    if (x) then"
-                 "      table.insert(n[0], 1, string.char(8))"
-                 "      table.insert(n, 1, n[0])"
-                 "      return n"
-                 "    end"
-                 "    box.error{code = 555, reason = y}"
-                 "  end";
+const char *my_string=
+"function ocelot_sqle (input_statements)"
+"  local i = 0"
+"  local statement_number = 1"
+"  local j, original_i, size_string, size_int, statement, status"
+"  local returns = {}"
+"  while true do"
+"    original_i = i"
+"    i, j = string.find(input_statements, ';', i)"
+"    if i == nil then break end"
+"    size_string = string.sub(input_statements, original_i, i - 1)"
+"    size_int = string.format('%d', size_string)"
+"    statement = string.sub(input_statements, j + 1, j + size_int)"
+"    status, returns[statement_number] = pcall(box.execute, statement)"
+"    i = j + 1 + size_int"
+"    statement_number = statement_number + 1"
+"  end"
+"  return unpack(returns)"
+"  end";
   QString query_return= tarantool_internal_query((char*)my_string, connection_number);
+/*
+  Todo:
+  This test worked but we haven't tried to use ocelot_sqle() yet.
+  struct tnt_stream *tuple= lmysql->ldbms_tnt_object(NULL);
+  lmysql->ldbms_tnt_object_add_array(tuple, 1);
+  lmysql->ldbms_tnt_object_add_str(tuple, "13;DROP TABLE w;", 16);
+  lmysql->ldbms_tnt_call(tnt[0], "ocelot_sqle", 11, tuple);
+  tarantool_flush_and_save_reply(0);
+  if (tarantool_errno[0] != 0) printf("**** ERROR %d!\n", tarantool_errno[0]);
+
+  Look at tarantool_statements_in_begin in tarantool_real_query.
+  You want to adapt the statements that are saying
+  ocelot_return0 = statement
+  ocelot_return1 = statement
+  etc.
+  because you've got something now that returns them all
+
+
+*/
 }
 #endif
 
@@ -15327,12 +15366,14 @@ QString MainWindow::tarantool_read_format(QString lua_request)
 
 /*
   log() may be useful for debugging if the program is acting strangely.
-  We do not use printf() ordinarily, but if level > ocelot_log_level,
-  we printf(message).
-  We also fflush(stdout) which is usually unnecessary (messages
-  are printed with "\n") unless stdout has been redirected to a file.
-  ocelot_log_level default value = 100, can be changed with --ocelot_log_level==N.
-  Re QElapsedTimer:
+  * We do not use printf() ordinarily, but if level > ocelot_log_level,  we printf(message).
+    Thus level is a priority, ocelot_log_level is a threshold, to increase the chance that a
+    particular message will appear we increase level, to increase the chance that any message
+    will appear we decrease ocelot_log_level.
+  * We also fflush(stdout) which is usually unnecessary (messages
+    are printed with "\n") unless stdout has been redirected to a file.
+  * ocelot_log_level default value = 100, can be changed with --ocelot_log_level==N.
+  * Re QElapsedTimer:
     We also printf(seconds-since-last-printf) based on a so-called nanoseconds count.
     Of course it's not really nanoseconds and sometimes it's based on ticks or milliseconds.
     So printf doesn't really say anything with %.9f especially since printf itself takes so much time.

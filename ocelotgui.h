@@ -4533,6 +4533,7 @@ public:
   typedef void            (*ttnt_reply_free)     (struct tnt_reply *);
   typedef int64_t         (*ttnt_request_compile)(struct tnt_stream *, struct tnt_request *);
   typedef tnt_request*    (*ttnt_request_eval)   (struct tnt_request *);
+  typedef tnt_request*    (*ttnt_request_call)   (struct tnt_request *);
   typedef int             (*ttnt_request_set_exprz) (struct tnt_request *, const char *);
   typedef int             (*ttnt_request_set_tuple) (struct tnt_request *, struct tnt_stream *);
   typedef ssize_t         (*ttnt_select)         (struct tnt_stream *, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t, struct tnt_stream *);
@@ -4618,6 +4619,7 @@ public:
   ttnt_reply_free t__tnt_reply_free;
   ttnt_request_compile t__tnt_request_compile;
   ttnt_request_eval t__tnt_request_eval;
+  ttnt_request_call t__tnt_request_call;
   ttnt_request_set_exprz t__tnt_request_set_exprz;
   ttnt_request_set_tuple t__tnt_request_set_tuple;
   ttnt_select t__tnt_select;
@@ -4738,6 +4740,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       t__tnt_reply_free= (ttnt_reply_free) &tnt_reply_free;
       t__tnt_request_compile= (ttnt_request_compile) &tnt_request_compile;
       t__tnt_request_eval= (ttnt_request_eval) &tnt_request_eval;
+      t__tnt_request_call= (ttnt_request_call) &tnt_request_call;
       t__tnt_request_set_exprz= (ttnt_request_set_exprz) &tnt_request_set_exprz;
       t__tnt_request_set_tuple= (ttnt_request_set_tuple) &tnt_request_set_tuple;
       t__tnt_reply_init= (ttnt_reply_init) &tnt_reply_init;
@@ -5009,6 +5012,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__tnt_reply_free= (ttnt_reply_free) dlsym(dlopen_handle, "tnt_reply_free"); if (dlerror() != 0) s.append("tnt_reply_free ");
         t__tnt_request_compile= (ttnt_request_compile) dlsym(dlopen_handle, "tnt_request_compile"); if (dlerror() != 0) s.append("tnt_request_compile ");
         t__tnt_request_eval= (ttnt_request_eval) dlsym(dlopen_handle, "tnt_request_eval"); if (dlerror() != 0) s.append("tnt_request_eval ");
+        t__tnt_request_call= (ttnt_request_call) dlsym(dlopen_handle, "tnt_request_call"); if (dlerror() != 0) s.append("tnt_request_call ");
         t__tnt_request_set_exprz= (ttnt_request_set_exprz) dlsym(dlopen_handle, "tnt_request_set_exprz"); if (dlerror() != 0) s.append("tnt_request_set_exprz ");
         t__tnt_request_set_tuple= (ttnt_request_set_tuple) dlsym(dlopen_handle, "tnt_request_set_tuple"); if (dlerror() != 0) s.append("tnt_request_set_tuple ");
         t__tnt_reply_init= (ttnt_reply_init) dlsym(dlopen_handle, "tnt_reply_init"); if (dlerror() != 0) s.append("tnt_reply_init ");
@@ -5429,6 +5433,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   struct tnt_request* ldbms_tnt_request_eval(struct tnt_request *a)
   {
     return t__tnt_request_eval(a);
+  }
+  struct tnt_request* ldbms_tnt_request_call(struct tnt_request *a)
+  {
+    return t__tnt_request_call(a);
   }
   int ldbms_tnt_request_set_exprz(struct tnt_request *a, const char *b)
   {
