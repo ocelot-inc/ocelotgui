@@ -3210,6 +3210,7 @@ public:
   void hparse_f_parse_hint_line_create();
   bool hparse_f_is_nosql(QString);
   void log(const char*,int);
+  void extra_result_set(int, unsigned short int);
   int execute_real_query(QString, int, const QString *);
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
@@ -3228,7 +3229,6 @@ public:
   const char *tarantool_result_set_init_select(long unsigned int *, int);
 
   long unsigned int tarantool_num_rows(unsigned int connection_number);
-  QString tarantool_sql_to_lua(QString,int,int);
   unsigned int tarantool_num_fields();
   int tarantool_num_fields_recursive(const char **tarantool_tnt_reply_data,
                                      char *field_name,
@@ -3479,6 +3479,7 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, const QString *);
+  int tarantool_m(int);
   QString get_statement_type(QString, int *);
   int get_statement_type_low(QString, QString, QString);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
@@ -3590,6 +3591,7 @@ private:
 
 #ifdef DBMS_TARANTOOL
   struct tnt_reply tarantool_tnt_reply;
+  const char *tarantool_tnt_reply_data_p; /* initially = tarantool_tnt_reply.data. can move if transaction. */
   char * tarantool_field_names;
   bool tarantool_select_nosql;
 #endif
@@ -3633,7 +3635,8 @@ private:
 
 public:
   bool keypress_shortcut_handler(QKeyEvent *, bool);
-  int tarantool_execute_sql(QString, unsigned int, int);
+  int tarantool_execute_sql(const char *, unsigned int, int);
+  int tarantool_execute_lua(const char *, unsigned int, int);
   QString query_utf16;
   QString query_utf16_copy;
   /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
