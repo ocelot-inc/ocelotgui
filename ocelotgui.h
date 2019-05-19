@@ -3479,7 +3479,9 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, const QString *);
-  int tarantool_m(int);
+  int tarantool_get_result_set(int);
+  QString tarantool_get_messages(int);
+  int tarantool_signature(const char *);
   QString get_statement_type(QString, int *);
   int get_statement_type_low(QString, QString, QString);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
