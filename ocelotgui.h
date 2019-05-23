@@ -3479,9 +3479,10 @@ private:
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, const QString *);
-  int tarantool_get_result_set(int);
+  int tarantool_get_result_set(int, int);
   QString tarantool_get_messages(int);
-  int tarantool_signature(const char *);
+  bool tarantool_is_result_count(const char *);
+  const char *tarantool_get_result_type(int, const char *, int *);
   QString get_statement_type(QString, int *);
   int get_statement_type_low(QString, QString, QString);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
@@ -3667,6 +3668,22 @@ public:
 
   QString tarantool_table_name;
   QString tarantool_column_name;
+
+  /*
+    result_type values, determined by tarantool_get_result_type()
+    4 == result set of box.space.x:select() with signature = array+array
+    5 == result set of SQL select|values, with "metadata" signature
+    6 == result of SQL not select|values, with "row_count" signature
+    7 == error with "Error: " signature (but maybe RESULT_TYPE_0 is error as well?)
+  */
+  #define RESULT_TYPE_0 0
+  #define RESULT_TYPE_1 1
+  #define RESULT_TYPE_2 2
+  #define RESULT_TYPE_3 3
+  #define RESULT_TYPE_4 4
+  #define RESULT_TYPE_5 5
+  #define RESULT_TYPE_6 6
+  #define RESULT_TYPE_7 7
 
   /* main_token_flags[] values. so far there are only sixteen but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
