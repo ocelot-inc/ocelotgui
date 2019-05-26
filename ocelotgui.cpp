@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: May 22 2019
+   Last modified: May 26 2019
 */
 
 /*
@@ -8665,9 +8665,7 @@ int MainWindow::action_execute_one_statement(QString text)
     Whatever it is, turn it on now and turn it off when statement is done.
     Update: the Run|Execute menu item changes, which is slightly helpful.
   */
-
   /* Apparently there is no need for a call to tokenize() here, it seems certain that it's already been called. */
-
   int query_utf16_len= main_token_offsets[main_token_number+main_token_count_in_statement - 1]
                        + main_token_lengths[main_token_number+main_token_count_in_statement - 1]
                        - main_token_offsets[main_token_number];
@@ -8883,7 +8881,6 @@ int MainWindow::action_execute_one_statement(QString text)
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
           put_diagnostics_in_result(MYSQL_MAIN_CONNECTION); /* Do this while we still have number of rows */
           //history_markup_append(result_set_for_history, true);
-
           int result_grid_table_widget_index= 1;
 #ifdef DBMS_TARANTOOL
           if (connections_dbms[0] == DBMS_TARANTOOL)
@@ -13761,8 +13758,8 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   }
   if (tarantool_start_transaction_seen == true)
   {
-    strcpy(tarantool_errmsg, "Deferred till commit|rollback");
-    tarantool_errno[connection_number]= 8372;
+    strcpy(tarantool_errmsg, er_strings[er_off + ER_8372]);
+    tarantool_errno[connection_number]= ER_8372_INT;
     return tarantool_errno[connection_number];
   }
   if (hparse_f_is_nosql(q_dbms_query) == false)
@@ -14072,6 +14069,11 @@ QString MainWindow::tarantool_get_messages(int connection_number)
     messages.append(tarantool_errmsg);
   }
 
+  /* Don't look for messages if deferred because the search itself might cause an error. */
+  if ((connections_dbms[0]= DBMS_TARANTOOL)
+   && (tarantool_errno[connection_number] == ER_8372_INT))
+    return messages;
+
   if (tarantool_is_result_count(tarantool_tnt_reply_data_copy))
     number_of_results= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
   else
@@ -14103,6 +14105,7 @@ QString MainWindow::tarantool_get_messages(int connection_number)
       }
       if (sig == RESULT_TYPE_5)
       {
+        messages.append(" ");
         messages.append(QString::number(tarantool_row_count[connection_number]));
         messages= messages + " rows selected";
       }
@@ -14115,7 +14118,7 @@ QString MainWindow::tarantool_get_messages(int connection_number)
         char *error_string= new char[value_length + 1];
         memcpy(error_string, value, value_length);
         *(error_string + value_length)= '\0';
-        messages= messages + error_string;
+        messages= messages + " " + error_string;
         delete [] error_string;
       }
       lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
