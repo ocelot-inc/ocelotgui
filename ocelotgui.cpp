@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: May 26 2019
+   Last modified: May 27 2019
 */
 
 /*
@@ -12699,7 +12699,19 @@ void MainWindow::set_dbms_version_mask(QString version)
 #ifdef DBMS_TARANTOOL
   else if (version.contains("tarantool", Qt::CaseInsensitive) == true)
   {
-    dbms_version_mask= FLAG_VERSION_TARANTOOL;
+    if ((dbms_version_mask & FLAG_VERSION_TARANTOOL_2_2) != 0)
+    {
+      /* Apparently user specified tarantool-2.2 on startup, keep it */
+      dbms_version_mask= FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2;
+    }
+    else
+    {
+      dbms_version_mask= FLAG_VERSION_TARANTOOL;
+      if (version.contains("2.2") == true)
+      {
+        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_2;
+      }
+    }
   }
 #endif
   /* MySQL's version string might not contain 'mysql */
@@ -13201,6 +13213,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   statement_edit_widget->dbms_host= ocelot_host;
   //connections_is_connected[connection_number]= 1;
   tarantool_initialize(connection_number);
+  if (connection_number == 0) set_dbms_version_mask("tarantool-" + version);
   return 0;
 }
 #endif

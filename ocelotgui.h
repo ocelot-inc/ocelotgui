@@ -60,6 +60,7 @@
   In set_dbms_version_mask we set for the version and for lower versions,
   e.g. if it's MySQL 5.6 we set both FLAG_VERSION_MYSQL_5_5 and
   FLAG_VERSION_MYSQL_5_6.
+  Todo: eventually FLAG_VERSION_TARANTOOL_2_2 has to be part of FLAG_VERSION_ALL
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -85,6 +86,7 @@
 #define FLAG_VERSION_SET_OPTION         8192
 #define FLAG_VERSION_CONNECT_OPTION     16384
 #define FLAG_VERSION_OPTION             (8192 | 16384)
+#define FLAG_VERSION_TARANTOOL_2_2  32768
 #define FLAG_VERSION_DEFAULT FLAG_VERSION_MYSQL_OR_MARIADB_ALL
 
 #include <assert.h>
@@ -1049,6 +1051,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_STRAIGHT_JOIN,
     TOKEN_KEYWORD_STRCMP,
     TOKEN_KEYWORD_STRFTIME,
+    TOKEN_KEYWORD_STRING,
     TOKEN_KEYWORD_STR_TO_DATE,
     TOKEN_KEYWORD_ST_AREA,
     TOKEN_KEYWORD_ST_ASBINARY,
@@ -1351,7 +1354,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1145
+#define KEYWORD_LIST_SIZE 1146
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1918,7 +1921,7 @@ static const keywords strvalues[]=
       {"NULLIF", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_NULLIF},
       {"NULLS", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_NULLS}, /* MariaDB 10.2 nonreserved  -- or, maybe not in MariaDB 10.2 */
       {"NUM", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_NUM},
-      {"NUMBER", 0, 0, TOKEN_KEYWORD_NUMBER},
+      {"NUMBER", FLAG_VERSION_TARANTOOL_2_2, 0, TOKEN_KEYWORD_NUMBER},
       {"NUMERIC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NUMERIC},
       {"NUMGEOMETRIES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMGEOMETRIES}, /* deprecated in MySQL 5.7.6 */
       {"NUMINTERIORRINGS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NUMINTERIORRINGS}, /* deprecated in MySQL 5.7.6 */
@@ -2262,6 +2265,7 @@ static const keywords strvalues[]=
       {"STRAIGHT_JOIN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_STRAIGHT_JOIN},
       {"STRCMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STRCMP},
       {"STRFTIME", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_STRFTIME},
+      {"STRING", FLAG_VERSION_TARANTOOL_2_2, 0, TOKEN_KEYWORD_STRING},
       {"STR_TO_DATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STR_TO_DATE},
       {"ST_AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_AREA},
       {"ST_ASBINARY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASBINARY},
