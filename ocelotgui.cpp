@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.8
-   Last modified: May 27 2019
+   Last modified: June 18 2019
 */
 
 /*
@@ -404,7 +404,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.8"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.0.9"; /* For --version. Make sure it's in manual too. */
   unsigned short int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -8707,7 +8707,6 @@ int MainWindow::action_execute_one_statement(QString text)
   int additional_result= 0;
   int ecs= execute_client_statement(text, &additional_result);
   QString result_set_for_history= "";
-
   if (ecs != 1)
   {
     /* The statement was not handled entirely by the client, it must be passed to the DBMS. */
@@ -10761,7 +10760,6 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
     float elapsed_time_as_float= (float) elapsed_time_as_long_int / 1000; /* todo: round */
     sprintf(elapsed_time_string, " (%.1f seconds)", elapsed_time_as_float);
   }
-
 #ifdef DBMS_TARANTOOL
   if (connections_dbms[connection_number] == DBMS_TARANTOOL)
   {
@@ -13036,8 +13034,11 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
 {
   //(void) connection_number; /* suppress "unused parameter" warning */
   QString ldbms_return_string;
-
   ldbms_return_string= "";
+
+  /* Mainly we want to be sure tarantool_tnt_reply.data == 0 if failure */
+  /* tnt_reply_init() also does memset but it might not be available yet */
+  memset(&tarantool_tnt_reply, 0, sizeof(struct tnt_reply));
 
   /* Find libtarantool. Prefer ld_run_path. */
   if (is_libtarantool_loaded != 1)
@@ -13048,7 +13049,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   {
     lmysql->ldbms_get_library("", &is_libtarantool_loaded, &libtarantool_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOL);
   }
-
   /* Find libtarantoolnet. Prefer ld_run_path. */
   /* Now libtarantool.so has everything so this is removed. */
   //if (is_libtarantoolnet_loaded != 1)
@@ -13088,7 +13088,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     delete lmysql;
     return 1;
   }
-
   /* Todo: this should have been done already; we must be calling from the wrong place. */
   copy_connect_strings_to_utf8();
 
@@ -13157,7 +13156,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
       strcpy(tarantool_errmsg, er_strings[er_off + ER_OK]);
     }
   }
-
   if (tarantool_errno[connection_number] != 0)
   {
     /* Kludge so put_diagnostics_in_result won't crash */
@@ -13175,7 +13173,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   }
   make_and_put_message_in_result(ER_OK, 0, (char*)"");
   connections_is_connected[connection_number]= 1;
-
   QString session_id, version;
   {
     char query_string[1024];
@@ -13192,7 +13189,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     /* The caller should save the connection for the server id. */
     return 0;
   }
-
   sql_mode_ansi_quotes= true;        /* see comment = ansi_quotes */
   hparse_sql_mode_ansi_quotes= true; /* probably not necessary */
 
@@ -13615,7 +13611,7 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
       calculate for both SQL table and NoSQL space, make sure it's not
       in a transaction so it will really produce a grid result.
       Put it in global or (somehow) add to the result set information.
-      But this is deferred because Tarantool is revising box.execute.
+      Tarantool has revised box.execute() but I still mostly follow the old way.
       ! You won't see TOKEN_REFTYPE_COLUMN if it is *
       ! dbms_query might be only the current query of a multi-query
         this is a shame because when you call action_execute_one_statement you have text
@@ -14067,7 +14063,6 @@ QString MainWindow::tarantool_get_messages(int connection_number)
     messages.append(tarantool_errmsg);
     return messages;
   }
-
   const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
 
   if (tarantool_errno[connection_number] == 0)
@@ -17967,7 +17962,6 @@ void MainWindow::connect_make_statement()
   /* Todo: QMessageBox should have a parent, use "= new" */
   QMessageBox msgBox;
   QString statement_text;
-
   statement_text= "CONNECT";
   if (ocelot_defaults_file > "") statement_text= statement_text + " defaults_file=" + ocelot_defaults_file;
   if (ocelot_no_defaults > 0) statement_text= statement_text + " no_defaults";
