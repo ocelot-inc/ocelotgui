@@ -1,20 +1,21 @@
-# deb_build.sh -- produce ocelotgui-1.0.8 .deb from ~/ocelotgui
+# deb_build.sh -- produce ocelotgui-1.0.9 .deb from ~/ocelotgui
 
 # Ocelot uses this script to produce a .deb file from a source directory ~/ocelotgui on Ubuntu xenial.
 # Only advanced users will want this, ordinary users will download the official-release .deb file or make with cmake.
 
 # An easy way to get ~/ocelotgui is "cd ~" + "git clone https://github.com/ocelot-inc/ocelotgui ocelotgui".
 # This script uses /tmp and cheerily deletes existing files in /tmp.
-# The result will be /tmp/debian3/ocelotgui_1.0.8-1_amd64.deb or /tmp/debian3/ocelotgui_1.0.8-1_i386.deb.
+# The result will be /tmp/debian3/ocelotgui_1.0.9-1_amd64.deb or /tmp/debian3/ocelotgui_1.0.9-1_i386.deb.
 # See also the comments in README.Debian.
 
 sudo apt-get install debhelper dpkg-dev devscripts
 sudo apt-get install gcc g++ libc6 cmake
 sudo apt-get install qtbase5-dev
+#If this fails on an old system, try libmysqlclient-dev or libmariadbclient-dev
 sudo apt-get install default-libmysqlclient-dev
 sudo apt-get install piuparts
 
-export VERSION=1.0.8
+export VERSION=1.0.9
 export SOURCE=$HOME/ocelotgui
 
 cd /tmp

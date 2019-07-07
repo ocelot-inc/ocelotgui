@@ -3,8 +3,9 @@ ocelotgui for Debian and any Linux distro that uses .deb packages
 The ocelotgui documentation is in README.htm. This file only has comments about .deb packages.
 
 In the official ocelotgui-1.0.7 release we created the .deb file with cpack (see the comments in CMakeLists.txt).
-In the official ocelotgui-1.0.8 release we switched to using debian/rules.
-Although some problems remain, we currently can create the .deb file and "dpkg -i" installs the main components.
+In the official ocelotgui-1.0.9 release we switched to using debian/rules.
+Although some problems remain, we currently can create the .deb file and later can install the main componetns with
+sudo apt install [.deb file].
 These are example instructions.
 
 The ocelotgui source package includes a script deb_build.sh which builds a .deb from a source directory.
@@ -12,15 +13,15 @@ The ocelotgui source package includes a script deb_build.sh which builds a .deb 
 # Get the prerequisites for build: apt-get install git cmake g++ default-libmysqlclient-dev qtbase5-dev
 # Get the prerequisites for debuild:  apt-get install devscripts build-essential lintian
 
-# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.0.8.tar.gz.
+# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.0.9.tar.gz.
 # (Internally Ocelot has a script for "Making a package" but we do not supply it, you must make your own tar.gz.) 
-# (After we release 1.0.8, you'll be able to simply download ocelotgui-1.0.8.tar.gz from the github release files.)
+# (Since release 1.0.9, you're able to simply download ocelotgui-1.0.9.tar.gz from the github release files.)
 cd ~
 rm -r -f ~/debian2
 mkdir ~/debian2
 cd ~/debian2
-cp ~/ocelotgui-1.0.8.tar.gz ocelotgui_1.0.8.orig.tar.gz
-tar -xvf ocelotgui_1.0.8.orig.tar.gz
+cp ~/ocelotgui-1.0.9.tar.gz ocelotgui_1.0.9.orig.tar.gz
+tar -xvf ocelotgui_1.0.9.orig.tar.gz
 cd ./ocelotgui/debian
 debuild
 
@@ -29,9 +30,9 @@ dpkg-genchanges: info: including full source code in upload ... but source isn't
 .png files were subjected to normalizing by "dh_strip_nondeterminism"
 
 # Lintian results
-After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.0.8_amd64.deb":
+After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.0.9_amd64.deb":
   There are no errors. There are no warnings. There are no informative messages. Hurrah.
-On some distros, after "debuild" and after "lintian -I ocelotgui_1.0.8-1_amd64.changes":
+On some distros, after "debuild" and after "lintian -I ocelotgui_1.0.9-1_amd64.changes":
   I: ocelotgui source: ored-build-depends-on-obsolete-package build-depends: libmysqlclient-dev => default-libmysqlclient-dev
   I: ocelotgui source: out-of-date-standards-version 3.9.7 (released 2016-02-01) (current is 4.1.4)
   I: ocelotgui source: testsuite-autopkgtest-missing
@@ -41,15 +42,17 @@ On some distros, after "debuild" and after "lintian -I ocelotgui_1.0.8-1_amd64.c
   The third one means a test would be good, but we'd have to install a server to connect to.
 On some distros, there is one other note: that our documentation size is large.
   This happens because our documentation contains pictures in .png and .jpg files.
-  We do not expect users to depend on man for documentation, we want them to see pictures fir README.htm.
+  We do not expect users to depend on man for documentation, we want them to see pictures for README.htm.
 
 # Contents of debian/control
 "Source ... Build-Depends":
-    I am assming that users prefer Qt5.
+    Since Qt4 has passed end of life, we nowadays only build with Qt5.
     Users who prefer Qt4 should change qtbase5-dev to libqt4-dev and libqt4-dev-tools.
     Although we first look for default-libmysqlclient-dev, in debian/rules we look for
     libmariadbclient-dev | libmysqlclient-dev, the difference shouldn't have significant effect.
     Todo: I've seen "libmariadbclient18 (>= ${binary:Version})", try that out someday
+    We don't recommend automatic install of the MySQL or MariaDB client library
+    because an incompatible library might already be installed.
 
 "Package ... Depends":
     I am assuming that dpkg-gencontrol will substitute ${misc:Depends}
@@ -74,10 +77,10 @@ On some distros, there is one other note: that our documentation size is large.
     Re -DPACKAGE_TYPE="DEB" there are some explanations in CMakeLists.txt comments.
     Re DMYSQL_INCLUDE_DIR=${OCELOT_MYSQL_INCLUDE_DIR} earlier we found what has mysql.h
     Re -DCMAKE_SKIP_RPATH=TRUE we have an RPATH by default, this turns it off, Debian discourages it
-    Re -DQT_VERSION=5 I am assuming that users prefer Qt5.
+    Re -DQT_VERSION=5 The assumption ow is that always users prefer Qt5.
                       Users who prefer Qt4 should change -DQT_VERSION=5 to -DQT_VERSION=4
 "debian/rules override_dh_auto_install":
-    Therefore it only produces the .deb, it does not install the .deb, you can do that with dpkg -i.
+    Therefore it only produces the .deb, it does not install the .deb, you can do that with dpkg -i or apt install.
 
 # Problems with current source
 (1) We now have duplicates: change and debian/changelog, copyright and debian/copyright
@@ -114,7 +117,6 @@ We believe that we are compliant except for these items:
    because a GUI manual depends on pictures.
 6. No GnuGPG key.
 We will welcome comments from anyone who thinks we have missed anything else.
-
 
 
 

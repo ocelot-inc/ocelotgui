@@ -1,8 +1,8 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.8
-   Last modified: June 18 2019
+   Version: 1.0.9
+   Last modified: June 29 2019
 */
 
 /*
@@ -392,8 +392,9 @@
   static void *libtarantool_handle= 0;
   //static void *libtarantoolnet_handle= 0;
   /* Todo: these shouldn't be global */
-  tnt_reply *tarantool_tnt_for_new_result_set;
-  bool tarantool_start_transaction_seen= false;
+  //static tnt_reply *tarantool_tnt_for_new_result_set;
+  static bool tarantool_start_transaction_seen= false;
+  static char tarantool_box_execute[16]= "box.execute"; /* can be changed to "box.sql.execute" */
 #endif
 
   static  unsigned int rehash_result_column_count= 0; /* Todo: check: why isn't this long unsigned int? */
@@ -4170,7 +4171,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.8, January 8 2019  \
+  <BR>Version 1.0.9, June 30 2019  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.  \
@@ -8656,6 +8657,7 @@ int MainWindow::action_execute_one_statement(QString text)
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set= NULL;
   unsigned short int is_vertical= ocelot_vertical; /* true if --vertical or \G or ego */
+  unsigned int ecs= 0; /* 1 means "is client statement" */
   unsigned return_value= 0;
   ++statement_edit_widget->statement_count;
   /*
@@ -8705,7 +8707,7 @@ int MainWindow::action_execute_one_statement(QString text)
 
   statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch(); /* will be used for elapsed-time display */
   int additional_result= 0;
-  int ecs= execute_client_statement(text, &additional_result);
+  ecs= execute_client_statement(text, &additional_result);
   QString result_set_for_history= "";
   if (ecs != 1)
   {
@@ -8852,7 +8854,7 @@ int MainWindow::action_execute_one_statement(QString text)
               /* fillup() failure is unexpected so this is crude */
               put_message_in_result(fillup_result);
               return_value= 1;
-              goto statement_is_over;
+              goto statement_is_aborted;
             }
             rg->display(0,
                         ocelot_vertical,
@@ -8954,8 +8956,9 @@ int MainWindow::action_execute_one_statement(QString text)
 statement_is_over:
   /* statement is over */
   /* todo: bug: start of session has an elapsed time */
-  if (connections_dbms[0] == DBMS_TARANTOOL) put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
-
+  if ((ecs == 0) && (connections_dbms[0] == DBMS_TARANTOOL))
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+statement_is_aborted:
   log("action_execute_one_statement end", 80);
   if (additional_result != TOKEN_KEYWORD_SOURCE)
   {
@@ -13184,6 +13187,24 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     if (index_of_hyphen > 0) version= version.left(index_of_hyphen);
   }
 
+  /* Old Tarantool (before 2.1.2?) need box.sql.execute not box.execute */
+  /* If box.execute() fails and box.sql.execute() fails, SQL is impossible. */
+  if (connection_number == 0)
+  {
+    tarantool_internal_query((char*)"box.execute('select 5;');", 0);
+    if (tarantool_errno[0] == 0) strcpy(tarantool_box_execute, "box.execute");
+    else
+    {
+      tarantool_internal_query((char*)"box.sql.execute('select 5;');", 0);
+      if (tarantool_errno[0] == 0) strcpy(tarantool_box_execute, "box.sql.execute");
+      else
+      {
+        tarantool_internal_query((char*)"return box.info().id;", 0); /* Just to clear the error */
+        strcpy(tarantool_box_execute, "No SQL");
+      }
+    }
+  }
+
   if (connection_number == MYSQL_REMOTE_CONNECTION)
   {
     /* The caller should save the connection for the server id. */
@@ -13299,9 +13320,11 @@ QString MainWindow::tarantool_internal_query(char *query,
   You could invoke ocelot_sqle with conn:eval([[return0 = ocelot_sqle(stuff)]])
   but I think conn:call() i.e. I am happier with tnt_request_call.
   Todo: I fear that query_return might have nothing even if there is an error.
+  Todo: Global! So This assumes that all clients use box.execute() or all use box.sql.execute().
 */
 void MainWindow::tarantool_initialize(int connection_number)
 {
+  if (strcmp(tarantool_box_execute, "No SQL") == 0) return;
   QString query_return;
   const char *error_string=
         "function ocelot_sqle_error (x)"
@@ -13319,7 +13342,7 @@ void MainWindow::tarantool_initialize(int connection_number)
         "  end";
   query_return= tarantool_internal_query((char*)error_string, connection_number);
 
-  const char *e_string=
+  const char *ex_string_1=
         "function ocelot_sqle (input_statements)"
         "  local i = 1"
         "  local statement_number = 1"
@@ -13336,7 +13359,9 @@ void MainWindow::tarantool_initialize(int connection_number)
         "    size_string = string.sub(input_statements, original_i, i - 1)"
         "    size_int = string.format('%d', size_string)"
         "    statement = string.sub(input_statements, j + 1, j + size_int)"
-        "    if r_type == 'S' then status, returns[statement_number] = pcall(box.execute, statement) end"
+        "    if r_type == 'S' then status, returns[statement_number] = pcall(";
+  const char *ex_string_2=
+        ", statement) end"
         "    if r_type == 'L' then status, returns[statement_number] = pcall(dostring, statement) end"
         "    if status == false then"
         "      status, e = pcall(ocelot_sqle_error, returns[statement_number])"
@@ -13350,7 +13375,11 @@ void MainWindow::tarantool_initialize(int connection_number)
         "  return unpack(returns)"
         "  end";
 
-  query_return= tarantool_internal_query((char*)e_string, connection_number);
+  char ex_string_4[2048]; /* actual current size = 1150 but allow for slight increase */
+  strcpy(ex_string_4, ex_string_1);
+  strcat(ex_string_4, tarantool_box_execute);
+  strcat(ex_string_4, ex_string_2);
+  query_return= tarantool_internal_query((char*)ex_string_4, connection_number);
 }
 #endif
 
@@ -13371,6 +13400,19 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
 
   lmysql->ldbms_tnt_reply_init(&tarantool_tnt_reply);
   int read_result= tnt[connection_number]->read_reply(tnt[connection_number], &tarantool_tnt_reply);
+
+  /*
+    Because of a Tarantool bug "Result code is sometimes 0 when there is an error"
+    I cannot trust reply.code, so decide it is an error if error message is set.
+    Also I notice that reply.data == NULL, which probably is the cause of later trouble.
+    Todo: But this is not a fix. Follow issue#4177 and change this when it is fixed.
+    Todo: ocelotgui will crash if this kludge is not present. Make it more robust, eh?
+  */
+  if (tarantool_tnt_reply.code == 0)
+  {
+    if (tarantool_tnt_reply.error != NULL) tarantool_tnt_reply.code= 3;
+  }
+
   tarantool_tnt_reply_data_p= tarantool_tnt_reply.data;
   if (read_result != 0)
   {
@@ -13540,8 +13582,11 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
   else if (word0 == "SELECT") { statement_type= TOKEN_KEYWORD_SELECT; }
   else if (word0 == "START")
   {
-    if (QString::compare(word1, "TRANSACTION", Qt::CaseInsensitive) == 0)
-      statement_type= TOKEN_KEYWORD_START;
+    if (strcmp(tarantool_box_execute, "No SQL") != 0)
+    {
+      if (QString::compare(word1, "TRANSACTION", Qt::CaseInsensitive) == 0)
+        statement_type= TOKEN_KEYWORD_START;
+    }
   }
   else if (word0 == "TRUNCATE")
   {
@@ -13715,13 +13760,11 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   /* Todo: use x_dbms_query???? */
   QString word1= get_statement_type(q_dbms_query, &statement_type);
   int token_type= -1;
-
   //int result_row_count= 0; /* for everything except SELECT we ignore rows that are returned */
 
   {
     /* If it is LUA 'X'; we only want to pass X. */
     if (statement_type == TOKEN_KEYWORD_LUA) q_dbms_query= connect_stripper(word1, false);
-
     int statement_number= tarantool_statements_in_begin.size();
 
     if (statement_number > 0) q_dbms_query= q_dbms_query.append(" ");
@@ -13742,7 +13785,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
       return tarantool_errno[connection_number];
     }
   }
-
   if ((statement_type != TOKEN_KEYWORD_LUA) && (statement_type != TOKEN_KEYWORD_DO_LUA))
     tarantool_statements_in_begin.append(
                 "S" +
@@ -13803,7 +13845,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   strcpy(tarantool_errmsg, "/* NOSQL */ is temporarily disabled");
   tarantool_errno[connection_number]= 8373;
   return tarantool_errno[connection_number];
-
   tarantool_select_nosql= true;
   //int hparse_statement_type=-1, clause_type=-1;
   //QString current_token, what_we_expect, what_we_got;
@@ -14246,6 +14287,7 @@ const char * MainWindow::tarantool_get_result_type(
   Todo: The calculation of data_length might be buggy.
   Todo: It might be nice to know what statement caused the result, although
         the signature of "select ..." won't look different from box.execute("select ...").
+  Todo: return box.info().version returns 81 1 1 (fixmap, 1) which we do not recognize
   What is in tarantool_tnt_reply_data_p?
   LUA '"a"'         ... dd 0 0 0 1 a1 61
   LUA '15'          ... dd 0 0 0 1 f
@@ -14632,9 +14674,17 @@ int MainWindow::tarantool_execute_sql(
 {
   struct tnt_stream *tuple= lmysql->ldbms_tnt_object(NULL);
   lmysql->ldbms_tnt_object_reset(tuple); /* Todo: check if this is necessary. Doc is a bit unclear. */
+  tarantool_tnt_reply.data= NULL;
+  tarantool_tnt_reply.error= NULL;
+  if (strcmp(tarantool_box_execute, "No SQL") == 0)
+  {
+    tarantool_errno[connection_number]= 9998;
+    strcpy(tarantool_errmsg, "(Warning) Tarantool server won't accept SQL, only Lua");
+    return tarantool_errno[connection_number];
+  }
   lmysql->ldbms_tnt_object_add_array(tuple, 1);
   lmysql->ldbms_tnt_object_add_str(tuple, dbms_query, dbms_query_len);
-  lmysql->ldbms_tnt_call(tnt[connection_number], "box.execute", 11, tuple);
+  lmysql->ldbms_tnt_call(tnt[connection_number], tarantool_box_execute, strlen(tarantool_box_execute), tuple);
   tarantool_flush_and_save_reply(connection_number);
   if (tarantool_errno[connection_number] != 0) return tarantool_errno[connection_number];
   return 0;

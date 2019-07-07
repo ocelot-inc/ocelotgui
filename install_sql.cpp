@@ -2165,6 +2165,7 @@ strcpy(x,
 "  DECLARE first_char_in_token CHAR CHARACTER SET utf8;" 
 "  DECLARE last_was_operator INT;" 
 "  DECLARE is_unary INT;" 
+"  DECLARE is_body INT DEFAULT 1;"
 "" 
 "  SET token='';" 
 "  SET last_was_operator=1;" 

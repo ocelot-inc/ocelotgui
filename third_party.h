@@ -1,7 +1,7 @@
 /*
   Third-party code that may optionally be included with ocelotgui
   
-  Last modified: 2018-09-11
+  Last modified: 2019-07-05
   
   This code is not required. It does not have to be brought in for Ocelot's default
   configuration as a MySQL/MariaDB client.
@@ -63,6 +63,7 @@
 */
 #ifndef WINDOWS_KLUDGE_H
 #define WINDOWS_KLUDGE_H
+
 #ifdef WIN32
 #define _WIN32_WINNT 0x501
 #include <ws2tcpip.h>
@@ -18441,7 +18442,7 @@ int tnt_object_reset(struct tnt_stream *s)
      &opt to static_cast<*void*>(&opt)
      &s->opt.tmout_send to static_cast<void*>(&s->opt.tmout_send)
      &s->opt.tmout_recv to static_cast<void*>(&s->opt.tmout_recv)
-   Re writev: I didn't know what to do, I hope it's unnecessary for us.
+   Re writev: I wrote pseudo_writev, I hope it does the same thing.
    Anything inside #ifdef WIN32 ... #endif is added by Ocelot.
    Todo: We call WSAStartup every time we connect, never WSACleanup.
 */
@@ -18870,6 +18871,31 @@ tnt_io_send_raw(struct tnt_stream_net *s, const char *buf, size_t size, int all)
     return off;
 }
 
+#ifdef _WIN32
+/*
+  Addition for ocelotgui 1.0.9 on 2019-07-05
+  MinGW lacks writev() so combine input buffers and call write().
+*/
+ssize_t
+pseudo_writev(int fd, const struct iovec *iov, int iovcnt)
+{
+  ssize_t r;
+  char *combined_buffer;
+  int combined_buffer_size= 0, offset= 0, i;
+  for(i= 0; i < iovcnt; ++i) combined_buffer_size+= iov[i].iov_len;
+  combined_buffer= (char*)malloc(combined_buffer_size);
+  if (combined_buffer == NULL) return -1000; /* -1000 later causes errno= ENOMEM */
+  for (i= 0; i < iovcnt; ++i)
+  {
+    memcpy(combined_buffer + offset, iov[i].iov_base, iov[i].iov_len);
+    offset+= iov[i].iov_len;
+  }
+  r= send(fd, combined_buffer, combined_buffer_size, 0);
+  free(combined_buffer);
+  return r;
+}
+#endif
+
 ssize_t
 tnt_io_sendv_raw(struct tnt_stream_net *s, struct iovec *iov, int count, int all)
 {
@@ -18881,18 +18907,22 @@ tnt_io_sendv_raw(struct tnt_stream_net *s, struct iovec *iov, int count, int all
         } else {
             do {
 #ifdef _WIN32
-                printf("** Unexpected writev call.\n");
-                printf("   (Ocelot didn't translate this for Windows.\n");
-                exit(1);
+                r = pseudo_writev(s->fd, iov, count);
 #else
                 r = writev(s->fd, iov, count);
 #endif
+#ifdef _WIN32
+            } while (r == -1 && (WSAGetLastError() == WSAEINTR));
+#else
             } while (r == -1 && (errno == EINTR));
+#endif
         }
         if (r <= 0) {
             s->error = TNT_ESYSTEM;
 #ifdef _WIN32
-            errno = WSAGetLastError();
+            if (r == -1000) errno= ENOMEM; /* special value returned by pseudo_writev */
+            else errno = WSAGetLastError();
+            /* todo: maybe if r<0 and errno==0 we should set errno= something not 0 */
 #endif
             s->errno_ = errno;
             return -1;

@@ -1,3 +1,9 @@
+ocelotgui (1.0.9-1) UNRELEASED; urgency=low
+
+  * Some bug fixes
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Sat, 29 Jun 2019 12:00:00 -0600
+
 ocelotgui (1.0.8-1) UNRELEASED; urgency=low
 
   * Detached mode works better
