@@ -743,10 +743,10 @@ int MainWindow::hparse_f_character_set_name()
 int MainWindow::hparse_f_collation_name()
 {
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLLATION,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) return 1;
-  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
-  {
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLLATION,TOKEN_TYPE_KEYWORD, "BINARY") == 1) return 1;
-  }
+//  if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+//  {
+//    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLLATION,TOKEN_TYPE_KEYWORD, "BINARY") == 1) return 1;
+//  }
   if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
     if (hparse_f_literal(TOKEN_REFTYPE_COLLATION, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) return 1;
@@ -3642,8 +3642,10 @@ void MainWindow::hparse_f_character_set_or_collate()
 }
 
 /* Used for data type length. Might be useful for any case of "(" integer ")" */
+/* Return 1 if there was a length. This also checks for character set and collate clauses. */
 int MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, bool is_ok_if_binary)
 {
+  int return_value= 0;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_NOT_AFTER_SPACE;
@@ -3659,8 +3661,8 @@ int MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, b
     }
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return 0;
+    return_value= 1;
   }
-  else return 0;
   if (is_ok_if_unsigned)
   {
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNSIGNED") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIGNED") == 1)) {;}
@@ -3672,7 +3674,7 @@ int MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, b
     hparse_f_character_set_or_collate();
     if (hparse_errno > 0) return 0;
   }
-  return 1;
+  return return_value;
 }
 
 void MainWindow::hparse_f_enum_or_set()
@@ -3837,10 +3839,9 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_FLOAT4;
   }
-  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DECIMAL") == 1)
-   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEC") == 1)
+  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DECIMAL") == 1)
+   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEC") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FIXED") == 1)
-   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNSIGNED") == 1)
    || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECIMAL, "NUMBER") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
@@ -3855,12 +3856,16 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_NUMERIC;
   }
-  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNSIGNED") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIGNED") == 1))
+  /* Todo: looks like this might return unsigned if we say "signed" */
+  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNSIGNED") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SIGNED") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INT") == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTEGER");
-    hparse_f_length(false, true, false);
-    if (hparse_errno > 0) return 0;
+    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+    {
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INT") == 0) hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTEGER");
+      hparse_f_length(false, true, false);
+      if (hparse_errno > 0) return 0;
+    }
     return TOKEN_KEYWORD_UNSIGNED;
   }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SERIAL") == 1)
@@ -3918,19 +3923,18 @@ int MainWindow::hparse_f_data_type(int context)
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
       varying_seen= true;
     }
-    /* Todo: Tarantool: (length) is compulsory so ensure there is a "(" here */
     if (byte_seen == false) hparse_f_length(false, false, true);
     if (hparse_errno > 0) return 0;
     if (varying_seen == true) return TOKEN_KEYWORD_VARCHAR;
     return TOKEN_KEYWORD_CHAR;
   }
-  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1)
+  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1)
    || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VARCHAR, "VARCHAR2") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
-      if (hparse_f_length(false, false, false) == 0) hparse_f_error();
+      if (hparse_f_length(false, false, true) == 0) hparse_f_error();
     }
     else
       hparse_f_length(false, false, true);
@@ -4035,7 +4039,6 @@ int MainWindow::hparse_f_data_type(int context)
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BLOB") == 1) return TOKEN_KEYWORD_BLOB;
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARBINARY") == 1) return TOKEN_KEYWORD_VARBINARY;
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NUMBER") == 1) return TOKEN_KEYWORD_NUMBER;
-  if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STRING") == 1) return TOKEN_KEYWORD_STRING;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MEDIUMBLOB") == 1) return TOKEN_KEYWORD_MEDIUMBLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LONGBLOB") == 1) return TOKEN_KEYWORD_LONGBLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TINYTEXT") == 1)
@@ -4044,7 +4047,22 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_TINYTEXT;
   }
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEXT") == 1)
+  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STRING") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEXT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1))
+  {
+    int data_type= main_token_types[hparse_i_of_last_accepted];
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+    if (data_type == TOKEN_KEYWORD_VARCHAR)
+    {
+      if (hparse_f_length(false, false, false) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 0;
+    }
+    hparse_f_character_set_or_collate();
+    if (hparse_errno > 0) return 0;
+    return data_type;
+  }
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEXT") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     hparse_f_length(false, false, true);
