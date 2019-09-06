@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: June 29 2019
+   Last modified: September 6 2019
 */
 
 /*
@@ -12712,6 +12712,10 @@ void MainWindow::set_dbms_version_mask(QString version)
       {
         dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_2;
       }
+      if (version.contains("2.3") == true)
+      {
+        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_3; /* Warning: may be same as FLAG_VERSION_TARANTOOL_2_2 */
+      }
     }
   }
 #endif
@@ -15027,7 +15031,8 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
     if (field_type == MP_BOOL)
     {
       bool bool_value= lmysql->ldbms_mp_decode_bool(&tarantool_tnt_reply_data);
-      value_length= sprintf(value_as_string, "%d", bool_value);
+      if (bool_value == 0) {value_length= 5; strcpy(value_as_string, "FALSE"); }
+      else                 {value_length= 4; strcpy(value_as_string, "TRUE"); }
     }
     if (field_type == MP_FLOAT)
     {
@@ -15304,7 +15309,8 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         else if (field_type == MP_BOOL)
         {
           bool bool_value= lmysql->ldbms_mp_decode_bool(&tarantool_tnt_reply_data_copy);
-          value_length= sprintf(value_as_string, "%d", bool_value);
+          if (bool_value == 0) {value_length= 5; strcpy(value_as_string, "FALSE"); }
+          else                 {value_length= 4; strcpy(value_as_string, "TRUE"); }
           value= value_as_string;
           *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
         }

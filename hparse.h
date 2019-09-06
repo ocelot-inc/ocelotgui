@@ -4034,7 +4034,6 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_VARBINARY;
   }
-  if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCALAR") == 1) return TOKEN_KEYWORD_SCALAR;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TINYBLOB") == 1) return TOKEN_KEYWORD_TINYBLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BLOB") == 1) return TOKEN_KEYWORD_BLOB;
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARBINARY") == 1) return TOKEN_KEYWORD_VARBINARY;
@@ -4048,6 +4047,7 @@ int MainWindow::hparse_f_data_type(int context)
     return TOKEN_KEYWORD_TINYTEXT;
   }
   if ((hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STRING") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCALAR") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TEXT") == 1)
      || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1))
   {
@@ -4309,6 +4309,8 @@ int MainWindow::hparse_f_create_definition(int keyword)
     foreign_seen= true;
   }
   else if (((keyword != TOKEN_KEYWORD_ALTER) || (hparse_dbms_mask & FLAG_VERSION_TARANTOOL) == 0)
+        && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)) check_seen= true;
+  else if (((keyword == TOKEN_KEYWORD_ALTER) && (hparse_dbms_mask & FLAG_VERSION_TARANTOOL_2_2) != 0)
         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)) check_seen= true;
   else return 3;
   if (check_seen == true)
@@ -7935,7 +7937,16 @@ void MainWindow::hparse_f_statement(int block_top)
       if ((element_is_seen == true)
        && ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0))
       {
-        ; /* we used to check for WITHOUT ROWID here */
+        /* we used to check for WITHOUT ROWID here. Now the only table option is WITH ENGINE='' */
+        if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_3, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_WITH, "WITH") == 1)
+        {
+          hparse_f_expect(FLAG_VERSION_TARANTOOL_2_3, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_ENGINE, "ENGINE");
+          if (hparse_errno > 0) return;
+          hparse_f_expect(FLAG_VERSION_TARANTOOL_2_3, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return;
+          if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_TARANTOOL_2_3, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+          if (hparse_errno > 0) return;
+        }
       }
       else
       {
