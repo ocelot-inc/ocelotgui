@@ -875,11 +875,11 @@ void MainWindow::statement_edit_widget_setstylesheet()
     "lists of columns lined up in select/update/insert/set".
   Cursor will go back to start.
   Indentation is meaningless unless there is a fixed font.
-  Todo: Formatter is on the Edit menu but there is no shortcut key.
-      It would be easy to add a shortcut key with setShortcut()
-      or add a line in eventfilter() e.g.
-      if (key->key() == Qt::Key_1) { statement_edit_widget_formatter(); return true; }
-      But I haven't decided what the shortcut key should be.
+  Menu item is Edit|Format and shortcut key (which is done with setShortcut not
+  eventfilter, I forget why) is Alt+Shift+F. Statements which can affect it are
+    SET ocelot_statement_format_clause_indent = integer 0-8; default='4'
+    SET ocelot_statement_format_statement_indent = integer 0-8; default='2'
+    SET ocelot_statement_format_keyword_case = 'upper'|'lower'|'unchanged'; default='upper'
   Todo: stop giving up when you see DELIMITER, it can be figured out.
 */
 void MainWindow::statement_edit_widget_formatter()
@@ -2250,8 +2250,6 @@ void MainWindow::create_menu()
   Todo: all the other shortcut keys.
   Todo: also, something for "what to execute" e.g. SQL statement.
   Todo: return 0 if token1 first characters are not "ocelot_shortcut_"
-  Todo: The format shortcut should be Ctrl+Shift+F, but isn't.
-        See the comment about this in ocelotgui.cpp.
   Todo: There is no GUI "shortcut editor" here, but such things exist:
         see doc.qt.io/qt-5/qkeysequenceedit.html#details.
         We could show a table with current settings, and let
@@ -2264,6 +2262,12 @@ void MainWindow::create_menu()
         It seems more common to use without shift, which is Ctrl+=.
         http://doc.qt.io/archives/qt-4.8/qkeysequence.html section
         "Keyboard Layout Issues" mentions this but I didn't understand.
+  Warn: There are some slightly-standardized keysequences, see them in
+        Qt https://doc-snapshots.qt.io/qt5-5.9/qkeysequence.html#StandardKey-enum
+        Eclipse http://help.eclipse.org/mars/index.jsp?topic=%2Forg.eclipse.platform.doc.user%2Freference%2Fref-keybindings.htm
+        Visual Studio https://code.visualstudio.com/docs/getstarted/keybindings
+        Wikipedia https://en.wikipedia.org/wiki/Table_of_keyboard_shortcuts
+        In the past we failed to follow. In the future we should follow.
 */
 int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
 {
