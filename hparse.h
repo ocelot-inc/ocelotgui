@@ -4491,7 +4491,7 @@ void MainWindow::hparse_f_column_definition()
     {
       auto_increment_seen= true;
     }
-    else if ((generated_seen == false) && (auto_increment_seen == false) && (primary_seen == true) && ((data_type == TOKEN_KEYWORD_INTEGER || data_type == TOKEN_KEYWORD_INT)) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTOINCREMENT") == 1))
+    else if ((generated_seen == false) && (auto_increment_seen == false) /* && (primary_seen == true) */ && ((data_type == TOKEN_KEYWORD_INTEGER || data_type == TOKEN_KEYWORD_INT || data_type == TOKEN_KEYWORD_UNSIGNED)) && (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTOINCREMENT") == 1))
     {
       auto_increment_seen= true;
     }
@@ -5446,12 +5446,11 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
       /* i_of_data_type will only come in if it's CREATE not ALTER, and constraints after all columns */
       int i_of_data_type= hparse_f_index_column_expecter();
       if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
-       && (index_column_number == 1)
+       /* && (index_column_number == 1) */
        && (primary_seen == true))
       {
-        QString token;
-        token= hparse_text_copy.mid(main_token_offsets[i_of_data_type], main_token_lengths[i_of_data_type]);
-        if (QString::compare(token, "INTEGER", Qt::CaseInsensitive) == 0)
+        int data_type= main_token_types[i_of_data_type];
+        if (data_type == TOKEN_KEYWORD_INT || data_type == TOKEN_KEYWORD_INTEGER || data_type == TOKEN_KEYWORD_UNSIGNED)
         {
           hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTOINCREMENT");
           if (hparse_errno > 0) return;
