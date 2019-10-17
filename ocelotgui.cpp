@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: October 15 2019
+   Last modified: October 17 2019
 */
 
 /*
@@ -14343,6 +14343,27 @@ const char *MainWindow::tarantool_result_set_init(
     if (field_type == MP_MAP)
     {
       array_size= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_data_copy_copy);
+      if (array_size == 2)
+      {
+        value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy_copy, &value_length);
+        if (value_length == 17)
+        {
+          if (memcmp(value, "autoincrement_ids", 17) == 0)
+          {
+            field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy_copy);
+            if (field_type != MP_ARRAY) goto erret;
+            int autoincrement_id_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy_copy);
+            for (int k= 0; k < autoincrement_id_count; ++k)
+            {
+                field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy_copy);
+                if (field_type == MP_UINT) lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data_copy_copy);
+                else if (field_type == MP_INT) lmysql->ldbms_mp_decode_int(&tarantool_tnt_reply_data_copy_copy);
+                else goto erret;
+            }
+            array_size= 1; /* we have skipped autoincrement_ids so now we can proceed with field_count */
+          }
+        }
+      }
       if (array_size == 1)
       {
         field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy_copy);
