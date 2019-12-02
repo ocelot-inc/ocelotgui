@@ -3242,6 +3242,17 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_errno > 0) return;
     return;
   }
+  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL_2_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ENABLE, "ENABLE") == 1)
+  || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISABLE") == 1))
+  {
+    hparse_f_expect(FLAG_VERSION_TARANTOOL_2_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CHECK, "CHECK");
+    if (hparse_errno > 0) return;
+    hparse_f_expect(FLAG_VERSION_TARANTOOL_2_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CONSTRAINT, "CONSTRAINT");
+    if (hparse_errno > 0) return;
+    if (hparse_f_qualified_name_of_object(TOKEN_REFTYPE_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT) == 0) hparse_f_error();
+    if (hparse_errno > 0) return;
+    return;
+  }
   if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCHANGE") == 1))
   {
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTITION");
