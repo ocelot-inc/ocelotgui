@@ -457,7 +457,7 @@
   static bool hparse_subquery_is_allowed;
   static QString hparse_delimiter_str;
   static bool hparse_sql_mode_ansi_quotes= false;
-  static unsigned short int hparse_dbms_mask= FLAG_VERSION_DEFAULT;
+  static unsigned int hparse_dbms_mask= FLAG_VERSION_DEFAULT;
   static bool hparse_is_in_subquery= false;
 
 /* Variables used by kill thread, but which might be checked by debugger */
@@ -5459,6 +5459,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   {
     bool is_maybe_in_compound_statement= false;
     bool is_create_trigger= false;
+    bool is_create_routine= false;
     int statement_type= -1;
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
     {
@@ -5495,7 +5496,6 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           begin_seen= true;
         }
       }
-
       second_last_token= last_token;
       last_token= text.mid(main_token_offsets[i], main_token_lengths[i]);
       if (QString::compare(ocelot_delimiter_str, ";") != 0)
@@ -5527,13 +5527,17 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
       {
         if (main_token_types[i_of_first_non_comment_seen] == TOKEN_KEYWORD_CREATE)
         {
-          if ((main_token_types[i] == TOKEN_KEYWORD_PROCEDURE)
-          ||  (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
-          ||  (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)
-          ||  (main_token_types[i] == TOKEN_KEYWORD_EVENT))
+          if (main_token_types[i] == TOKEN_KEYWORD_TRIGGER)
           {
             is_maybe_in_compound_statement= true;
             is_create_trigger= true;
+          }
+          if ((main_token_types[i] == TOKEN_KEYWORD_PROCEDURE)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_FUNCTION)
+          ||  (main_token_types[i] == TOKEN_KEYWORD_EVENT))
+          {
+            is_maybe_in_compound_statement= true;
+            is_create_routine= true;
           }
           if (main_token_types[i] == TOKEN_KEYWORD_PACKAGE) /* new */
           { /* new */
@@ -5546,7 +5550,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
       }
       if (i_of_first_non_comment_seen == -1)
       {
-        if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+        if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) && (is_create_routine == false))
         {
           if (statement_type == TOKEN_KEYWORD_DO_LUA)
           {
@@ -5577,7 +5581,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
       /* For some reason the following was checking TOKEN_KEYWORD_ELSEIF too. Removed. */
       if (is_maybe_in_compound_statement == true)
       {
-        if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
+        if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) && (is_create_routine == false))
         {
           if (statement_type == TOKEN_KEYWORD_DO_LUA)
           {
@@ -9272,6 +9276,17 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 #endif
     return 1;
   }
+  /* Todo: this isn't robust, it will fail if we ever allow other words e.g. IF NOT EXISTS after CREATE. */
+  if ((statement_type == TOKEN_KEYWORD_CREATE)
+   && (sub_token_types[1] == TOKEN_KEYWORD_LUA))
+  {
+    if ((sub_token_types[2] == TOKEN_KEYWORD_PROCEDURE)
+     || (sub_token_types[2] == TOKEN_KEYWORD_FUNCTION))
+    {
+      clf(text);
+      return 1;
+    }
+  }
 
 #ifdef DBMS_TARANTOOL
   /*
@@ -11541,19 +11556,19 @@ void MainWindow::initial_asserts()
   //unsigned long index;
   //char l[MAX_KEYWORD_LENGTH+1]= "";
   //for (int ii= TOKEN_KEYWORD_QUESTIONMARK; ii < KEYWORD_LIST_SIZE; ++ii)
-  //{
-  //  char *k= (char*) &strvalues[ii].chars;
-  //  if (strcmp(k, l) <= 0) {printf("k <= l!\n"); exit(0); }
-  //  printf("ii=%d\n", ii);
-  //  printf("k=%s.\n", k);
-  //  p_item= (char*) bsearch(k, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
-  //  assert(p_item != NULL);
-  //  index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
-  //  printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
-  //  if (index != strvalues[ii].token_keyword) exit(0);
-  //  assert(index == strvalues[ii].token_keyword);
-  //  strcpy(l, k);
-  //}
+  // {
+  //   char *k= (char*) &strvalues[ii].chars;
+  //   if (strcmp(k, l) <= 0) {printf("k <= l!\n"); exit(0); }
+  //   printf("ii=%d\n", ii);
+  //   printf("k=%s.\n", k);
+  //   p_item= (char*) bsearch(k, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+   //   assert(p_item != NULL);
+  //   index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
+  //   printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
+  //   if (index != strvalues[ii].token_keyword) exit(0);
+  //   assert(index == strvalues[ii].token_keyword);
+  //   strcpy(l, k);
+  // }
   //assert(strcmp(strvalues[TOKEN_KEYWORD_QUESTIONMARK].chars, "?") == 0);
   //assert(strcmp(strvalues[TOKEN_KEYWORD__UTF8MB4].chars, "_UTF8MB4") == 0);
   //{
@@ -12271,6 +12286,7 @@ void MainWindow::tokens_to_keywords_revert(int i_of_body, int i_of_function, int
 }
 
 /* returns next token after i, skipping comments, but do not go past end */
+/* todo: maybe it could be merged with next_i() */
 int MainWindow::next_token(int i)
 {
   int i2;
@@ -12718,7 +12734,7 @@ void MainWindow::set_dbms_version_mask(QString version)
       }
       if (version.contains("2.3") == true)
       {
-        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_3; /* Warning: may be same as FLAG_VERSION_TARANTOOL_2_2 */
+        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_3;
       }
     }
   }
@@ -17838,8 +17854,8 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT) { ocelot_debug_height= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_LEFT) { ocelot_debug_left= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_TOP) { ocelot_debug_top= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED) { ocelot_debug_width= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH) { ocelot_debug_detached= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH) { ocelot_debug_width= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED) { ocelot_debug_detached= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS) { ocelot_client_side_functions= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_LOG_LEVEL)
   {
@@ -20791,6 +20807,1459 @@ int MainWindow::setup_generate_statement_text_as_is(int i_of_statement_start,
               (main_token_offsets[i] - main_token_offsets[i_of_statement_start]) + main_token_lengths[i]);
   if (setup_append(d, text, i)) return 1;
   return 0;
+}
+
+/*
+  clf stands for create lua function. All its sub-functions begin with clf_.
+  If input is CREATE LUA PROCEDURE or CREATE LUA FUNCTION,
+  we generate a Lua function that would do the same thing.
+  Called from execute_client_statement().
+  It works only if syntax checking is on and sql mode is not Oracle.
+  Re labels: see clf_label
+  Re comments:
+    We preserve them inside box.execute([[...]]). Outside, block comment is --[[]], -- comment is unchanged
+    Beware: we do lots of iterating through the tokens, usually it should not be with ++ unless comments are skipped.
+  Re semicolons: They're often unnecessary in Lua but we preserve them when we can.
+  Re object names: If they're within ""s we strip the ""s and output after making pretty, else we output upper().
+  Re variables:
+    For "DECLARE x INT" the Lua name is X.
+    When using in an SQL expression, we don't replace with "CAST(? AS data_type)", we do put Lua name in parameter list
+    When using as target of SET, replace with lua_name = box.execute([[SELECT (expression);]])
+  Re other kinds of DECLARE besides DECLARE variables:
+    No support, we're working on it
+  Re BEGIN:
+        You can LEAVE from a BEGIN, or have an error that forces leave from begin.
+        Option 1: a loop that you break from: while true do ... break; end
+                  However, "break" won't work right if we're trying to exit from begin...while...end-while...end,
+                  you'd only break out of the while, so you have to hve goto past-end anyway.
+        Option 2: do...end (what we chose). it doesn't confuse (possibly a loop would be confusing)
+                  but all Lua statements for getting out of the loop have to be goto past-end,
+                  unless it's the last statement.
+  Re conditions:
+       For IF and UNTIL and WHILE, the condition checking is according to SQL logic,
+       and might contain declared variables, so we pass the condition to a SELECT and see if it returns true.
+        After WHILE etc. we will have a condition, which we will pass to SQL, but it isn't the statement end.
+        There is a check here whether executing the SELECT causes an error, but that is okay because
+        sql_execute() is supposed to return nil when there is an error, so the condition will not be true,
+        so we will end up after the END, and conditions do get checked after END (I hope).
+  Todo: add recursion for all flow-control statements so you can handle IF within IF
+  Todo: For LEAVE or ITERATE, check that label exists and goto will work.
+        Lua goto might fail if it is over a local declare.
+        There is no check in hparse whether a target exists, I think.
+        Unlike DB2, we won't allow ITERATE or LEAVE to jump out of a handler because each handler has its own function.
+*/
+
+int clfi; /* In clf() and its offspring, this is the index for main_token_xxx lists */
+QString clf_parameter_list;
+int clf_last_token; /* maybe a better name would be i_of_last_token */
+QString clf_output_final;
+
+int handler_count;
+int *handler_starts;
+int *handler_code_ends;
+int *handler_scope_ends;
+int *handler_begin_of_declares; /* to BEGIN or to label preceding BEGIN */
+QString sql_execute_starter;
+QString sql_execute_ender;
+
+void MainWindow::clf(QString text)
+{
+  log("clf start", 90);
+  clf_output_final= "";
+  QString clf_output_main_function= "";
+  clf_last_token= main_token_number + main_token_count_in_statement;
+  //QString indent_string;
+
+  /* Preliminary error checks. */
+  if (((ocelot_statement_syntax_checker.toInt()) & (FLAG_FOR_HIGHLIGHTS | FLAG_FOR_ERRORS)) != (FLAG_FOR_HIGHLIGHTS | FLAG_FOR_ERRORS))
+  {
+    clf_output_final= "Sorry, we cannot handle this statement unless ocelot_statement_syntax_checker flags are on.";
+    goto ret;
+  }
+  if ((hparse_errno != 0) || (hparse_errno_count != 0))
+  {
+    clf_output_final= "Sorry, we cannot handle this statement if the syntax checker thinks there is a problem.";
+    goto ret;
+  }
+  if ((connections_dbms[0] == DBMS_MARIADB) && ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0))
+  {
+    clf_output_final= "Sorry, we cannot handle procedures when sql_mode is for PL/SQL (e.g. oracle + mariadb) at this time.";
+    goto ret;
+  }
+  if (ocelot_delimiter_str != ";")
+  {
+    clf_output_final= "Sorry, we cannot handle procedures when the delimiter is something other than ; (semicolon) at this time.";
+    goto ret;
+  }
+  if ((connections_dbms[0] != DBMS_TARANTOOL) && (sql_mode_ansi_quotes == false))
+  {
+    clf_output_final= "Sorry, we do not handle procedures unless sql_mode = ansi_quotes is set, at this time.";
+    goto ret;
+  }
+  /* Usually starter="sql_execute([[", sql_execute_ender="]]". But we might change to [=[ ... ]=] etc. */
+  if (clf_make_sql_execute_starter_and_ender(text, &clf_output_final) == false) goto ret;
+
+  /* CREATE PROCEDURE|FUNCTION name () --> function name () */
+  for (clfi= main_token_number;
+       /* Todo: check: how reliable is clf_last_token? */
+       ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token));
+       ++clfi)
+  {
+    if ((main_token_reftypes[clfi] == TOKEN_REFTYPE_PROCEDURE)
+       || (main_token_reftypes[clfi] == TOKEN_REFTYPE_FUNCTION))
+    {
+      clf_output_main_function= "function ";
+      QString routine_name= clf_v(text, clfi, TOKEN_REFTYPE_PROCEDURE);
+      clf_output_main_function= clf_output_main_function + routine_name;
+      clf_output_main_function= clf_output_main_function + "(";
+      break;
+    }
+  }
+  {
+    int parentheses_count= 0;
+    int parameter_count= 0;
+    while ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token))
+    {
+      QString d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+      if (d == "(") ++parentheses_count;
+      if (d == ")")
+      {
+        --parentheses_count;
+        if (parentheses_count == 0) break;
+      }
+
+      if ((main_token_types[clfi] == TOKEN_KEYWORD_INOUT) || (main_token_types[clfi] == TOKEN_KEYWORD_OUT))
+      {
+        clf_output_final= "Sorry, we do not support OUT or INOUT parameters at this time";
+        goto ret;
+      }
+
+      if (main_token_reftypes[clfi] == TOKEN_REFTYPE_PARAMETER_DEFINE)
+      {
+        if (parameter_count > 0) clf_output_main_function= clf_output_main_function + ",";
+        clf_output_main_function= clf_output_main_function + clf_v(text, clfi, TOKEN_REFTYPE_PARAMETER_DEFINE);
+        ++parameter_count;
+      }
+      ++clfi;
+    }
+  }
+  clf_output_main_function= clf_output_main_function + ")";
+  clf_dump_whitespace(text, &clf_output_main_function);
+  ++clfi;
+
+  clf_make_sql_execute_function(&clf_output_main_function);
+
+  /* clf_handler_list() creates handler_begin_of_declares[] etc. so after it you should not say goto ret. */
+  if (clf_handler_list(text, main_token_number, clf_last_token, &clf_output_final) == false) goto ret;
+
+  if (clf_block(text, 999999, &clf_output_main_function) == 1) clf_output_final= clf_output_main_function;
+  else clf_output_final= clf_output_final + clf_output_main_function;
+
+  if (handler_count > 0)
+  {
+    delete []handler_begin_of_declares;
+    delete []handler_scope_ends;
+    delete []handler_code_ends;
+    delete []handler_starts;
+  }
+ret:
+  /* Similar to how we display Help meessages. */
+  Message_box *message_box;
+  /* Don't use width=960 if screen width is smaller, e.g. on a VGA screen. */
+  QDesktopWidget desktop;
+  int desktop_width= desktop.availableGeometry().width();
+  if (desktop_width > (960 + 50)) message_box= new Message_box("Result", clf_output_final, 960, this);
+  else message_box= new Message_box("Result", clf_output_final, desktop_width - 50, this);
+  message_box->exec();
+  delete message_box;
+  log("clf end", 90);
+}
+
+/* Beware recursion -- we aren't doing it yet, but when we do, if (clf_block()==1) then return 1; */
+int MainWindow::clf_block(QString text, int i_of_end_of_handler, QString *clf_output)
+{
+  int token_type; /* warning: there is also a function named token_type() */
+  int begin_count= 0;
+
+  for (clfi= clfi;
+       ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token));
+       ++clfi)
+  {
+    if (clfi >= i_of_end_of_handler)
+    {
+      return 0;
+    }
+
+    token_type= main_token_types[clfi];
+    QString d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+
+    /* Dump whatever is between this token and last token, which presumably is whitespace */
+    /* Similar calculation is in clfdw() but that is for inside the statement, this is outside */
+    /* Todo: maybe call clf_dump_whitespace() instead. */
+    if (clfi > 0)
+    {
+      QString d2= text.mid(main_token_offsets[clfi - 1] + main_token_lengths[clfi - 1],
+                    main_token_offsets[clfi] - (main_token_offsets[clfi - 1] + main_token_lengths[clfi - 1]));
+      *clf_output= *clf_output + d2;
+    }
+
+    /* Todo: don't you want to output the label, at least in a comment? */
+    if (main_token_reftypes[clfi] == TOKEN_REFTYPE_LABEL_DEFINE)
+    {
+      /* Todo: If there are two labels in a row, return error (we could handle them but don't). */
+      /*       But this isn't necessary at the moment because our syntax checker won't accept them anyway. */
+      clfi= next_token(clfi); /* skip to the ":" */
+      continue;
+    }
+
+    if (main_token_types[clfi] == TOKEN_TYPE_COMMENT_WITH_SLASH)
+    {
+      *clf_output= *clf_output + "--[[" + d + "]]";
+      continue;
+    }
+
+    if (main_token_types[clfi] == TOKEN_TYPE_COMMENT_WITH_MINUS)
+    {
+      *clf_output= *clf_output + d;
+      continue;
+    }
+
+    if (main_token_types[clfi] == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+    {
+      *clf_output= *clf_output + "--" + d;
+      continue;
+    }
+
+    /*
+      Since it's not a label or comment, we'll presume it's a statement start
+      i.e. ((main_token_flags[clfi] & TOKEN_FLAG_IS_START_STATEMENT) == 0)
+      or it might be an operator such as ";"
+    */
+
+    QString indent_string= clf_indent(clf_output);
+
+    if (token_type == TOKEN_KEYWORD_BEGIN)
+    {
+      //Beware: BEGIN might be inside DECLARE ... HANDLER
+      if (main_token_types[clfi] == TOKEN_KEYWORD_NOT) clfi= next_i(clfi, 2); /* Skip [NOT ATOMIC] */
+      ++begin_count;
+      *clf_output= *clf_output + "do "; /* alternative = while true do ... break end */
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_CASE)
+    {
+      *clf_output= "Sorry, we do not handle CASE statements at this time.";
+      return 1;
+    }
+
+    if (token_type == TOKEN_KEYWORD_CLOSE)
+    {
+      /* Todo: We do not check if it is not open, maybe that is an error */
+      clfi= next_i(clfi, 1); /* skip to cursor name */
+      if (clf_check_reference(text, clfi, TOKEN_REFTYPE_CURSOR_DEFINE, clf_output) == false) return 1;
+      int i_of_cursor_name= main_token_pointers[clfi];
+      /* Following lines are similar to initialization done for TOKEN_KEYWORD_DECLARE. */
+      QString cursor_name;
+      cursor_name= clf_v(text, i_of_cursor_name, TOKEN_REFTYPE_CURSOR_DEFINE);
+      *clf_output= *clf_output + "\n" + indent_string + cursor_name + "= {};";
+      *clf_output= *clf_output + "\n" + indent_string + cursor_name + "_OFFSET = 0;";
+      *clf_output= *clf_output + "\n" + indent_string + cursor_name + "_STATUS = 'not open';";
+      /* As long as CLOSE doesn't cause a condition to change, we won't need to call clf_find_handler */
+      clf_handler_end(clfi, clf_output);
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_DECLARE)
+    {
+      int i_of_declare= clfi;
+      int i2= next_token(clfi); i2= next_token(i2);
+      if (main_token_types[i2] == TOKEN_KEYWORD_HANDLER)
+      {
+        *clf_output= *clf_output + "local function " + clf_handler_name(i_of_declare) + "()";
+        clfi= i2;
+        /* If next is BEGIN/LOOP/etc. then handler end is past the next END, otherwise it is past next statement */
+        /* Skip to statement start (past "FOR conditions") */
+        int i3;
+        for (i3= clfi;; ++i3) /* todo: error check! */
+        {
+          if ((main_token_flags[i3] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+          {
+            clfi= i3 - 1;
+            break;
+          }
+        }
+        /* So for example, we're looking at FOUND. By continuing, we should be getting handler statement #1. */
+        continue;
+      }
+
+      if (main_token_types[i2] == TOKEN_KEYWORD_CURSOR)
+      {
+        int i_of_cursor_name= next_i(i2, -1);
+        QString cursor_name= clf_v(text, i_of_cursor_name, TOKEN_REFTYPE_CURSOR_DEFINE);
+        *clf_output= *clf_output +               + "local " + cursor_name + " = {};\n";
+        *clf_output= *clf_output + indent_string + "local " + cursor_name + "_OFFSET = 0;\n";
+        *clf_output= *clf_output + indent_string + "local " + cursor_name + "_STATUS = 'not open';\n";
+        continue;
+      }
+      if (main_token_types[next_i(i2, 1)] == TOKEN_KEYWORD_CONDITION)
+      {
+        *clf_output= "Sorry, DECLARE ... CONDITION is not supported at this time.\n";
+        return 1;
+      }
+      /* It's not DECLARE ... CONDITION|CURSOR|HANDLER. So it must be DECLARE ... variable. */
+      while ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token))
+      {
+        QString d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+        if (main_token_reftypes[clfi] == TOKEN_REFTYPE_VARIABLE_DEFINE)
+        {
+          QString variable_name= clf_v(text, clfi, TOKEN_REFTYPE_VARIABLE_DEFINE);
+          *clf_output= *clf_output + "local ";
+          *clf_output= *clf_output + variable_name;
+          /* Look for DEFAULT clause. It might apply for multiple locals, e.g. DECLARE x,y,z INT DEFAULT 5; */
+          int saved_clfi= clfi;
+          while ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token))
+          {
+            QString d2= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+            if (d2 == ";") break;
+            if (main_token_types[clfi] == TOKEN_KEYWORD_DEFAULT)
+            {
+              /* This looks much like SET. Whats between DEFAULT and ; is the expression to assign to variable. */
+              clfi= next_i(clfi, 1);
+              *clf_output= *clf_output + "; " + sql_execute_starter + "SELECT ";
+              if (clfds(text, TOKEN_KEYWORD_DEFAULT, indent_string, "", clf_output) == false) return false;
+              *clf_output= *clf_output + "; " + variable_name + " = sqlresult[1][1]";
+              break;
+            }
+            ++clfi;
+          }
+          clfi= saved_clfi;
+
+          *clf_output= *clf_output + ";";
+        }
+        if (d == ";") { break; }
+        ++clfi;
+      }
+      clf_handler_end(clfi, clf_output); /* DECLARE statement ends handler? Foolish but possible. */
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_ELSE)
+    {
+      *clf_output= *clf_output + "else ";
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_ELSEIF)
+    {
+      *clf_output= "Sorry, we do not handle ELSEIF clauses at this time.";
+      return 1;
+    }
+
+    if (token_type == TOKEN_KEYWORD_END)
+    {
+      QString label_1= clf_label(text, "_1");
+      QString label_2= clf_label(text, "_2");
+      *clf_output= *clf_output + label_1;
+      /* Todo: END CASE? Not necessary as long as we don't support CASE */
+      int i_of_start_of_statement= clfi;
+      int i_of_begin= main_token_pointers[clfi]; /* to BEGIN or to label preceding BEGIN */
+      clfi= next_token(clfi);
+      int n= main_token_types[clfi];
+
+      if (n == TOKEN_KEYWORD_IF)
+      {
+        *clf_output= *clf_output + "end;";
+      }
+      else if (n == TOKEN_KEYWORD_LOOP)
+      {
+        *clf_output= *clf_output + "end;";
+      }
+      else if (n == TOKEN_KEYWORD_REPEAT)
+      {
+        *clf_output= *clf_output + "end;";
+      }
+      else if (n == TOKEN_KEYWORD_WHILE)
+      {
+        *clf_output= *clf_output + "end;";
+      }
+      else /* Nothing after? Must be END of BEGIN ... END */
+      {
+        *clf_output= *clf_output + "end;";
+        /* We add a label = "::end_n:"" so if there is an EXIT handler it knows where to goto */
+        /* Even if there's no EXIT handler we might jump out of a BEGIN/END. Also you can LEAVE a BEGIN but it has a different label. */
+        *clf_output= *clf_output + " ::end_" + QString::number(i_of_begin) + ":: ";
+        --begin_count;
+      }
+//      clf_dump_whitespace(text, clf_output); /* This dumps as far as ";" but could get mixed up if delimiter wasn't ";". */
+//      clfi= next_i(clfi, 1);
+      *clf_output= *clf_output + label_2;
+
+//      if (begin_count != 0)
+
+      {
+        if (clf_find_handler(text, clf_output, indent_string, i_of_start_of_statement + 1, token_type) == false) return false;
+        clf_handler_end(clfi, clf_output);
+      }
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_FETCH)
+    {
+      /* Todo: check if too many or too few columns */
+      /* Todo: There is probably some resemblance to what we do with SET, see if you can merge code. */
+      int i_of_start_of_statement= clfi;
+      clfi= next_i(clfi, 1); /* skip to cursor name */
+      if (clf_check_reference(text, clfi, TOKEN_REFTYPE_CURSOR_DEFINE, clf_output) == false) return 1;
+      int i_of_cursor_name= main_token_pointers[clfi];
+      QString cursor_name;
+      cursor_name= clf_v(text, i_of_cursor_name, TOKEN_REFTYPE_CURSOR_DEFINE);
+      /* If the cursor is not open, that's an error */
+      *clf_output= *clf_output + "if " + cursor_name + "_STATUS ~= 'open' then sqlstate = '07000';";
+      *clf_output= *clf_output + "\n" + indent_string + "else if " + cursor_name + "_OFFSET >= #" + cursor_name + " then sqlstate = '02000';";
+      *clf_output= *clf_output + "\n" + indent_string + "else do";
+      *clf_output= *clf_output + "\n" + indent_string + "   " + cursor_name + "_OFFSET = " + cursor_name + "_OFFSET + 1;";
+      /* Some of the following lines are similar to initialization done for TOKEN_KEYWORD_DECLARE. */
+      int column_number= 1;
+      for (clfi= clfi + 1;; ++clfi)
+      {
+        if (main_token_types[clfi] == TOKEN_TYPE_OPERATOR) break; /* ";" ends FETCH, perhaps there is no INTO */
+        if (main_token_types[clfi] == TOKEN_TYPE_IDENTIFIER)
+        {
+          if (clf_check_reference(text, clfi, TOKEN_REFTYPE_VARIABLE_DEFINE, clf_output) == false) return 1;
+          QString variable_name= clf_v(text, main_token_pointers[clfi], TOKEN_REFTYPE_VARIABLE_DEFINE);
+          *clf_output= *clf_output + "\n" + indent_string + "    " + variable_name + " = " + cursor_name;
+          *clf_output= *clf_output + "[";
+          *clf_output= *clf_output + cursor_name + "_OFFSET][";
+          *clf_output= *clf_output + QString::number(column_number);
+          *clf_output= *clf_output + "];";
+          ++column_number;
+        }
+      }
+      *clf_output= *clf_output + "\n" + indent_string + "end; end; end;";
+      if (clf_find_handler(text, clf_output, indent_string, i_of_start_of_statement, TOKEN_KEYWORD_FETCH) == false) return false;
+      clf_handler_end(clfi, clf_output);
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT)
+    {
+      *clf_output= "Sorry, we do not handle FOR statements at this time.";
+      return 1;
+    }
+
+    if (token_type == TOKEN_KEYWORD_GET)
+    {
+      //I doubt that we can support GET DIAGNOSTICS
+      /* Todo: If GET DIAGNOSTICS into an error message of a certain type, we might support it in Tarantool */
+      /* Todo: error check: assignment to declared variable (though we should try to support it someday) */
+      *clf_output= "Sorry, we do not handle GET statements at this time.";
+      return 1;
+    }
+
+    if (token_type == TOKEN_KEYWORD_IF)
+    {
+    }
+
+    if (token_type == TOKEN_KEYWORD_ITERATE)
+    {
+      *clf_output= *clf_output + "goto ";
+      clfi= next_token(clfi);
+      /* Todo: Check if label was defined. main_token_pointers[clfi] isn't pointing to it. */
+      QString d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]).toUpper();
+      *clf_output= *clf_output + d + "_1;";
+      /* no need to call clf_find_handler() */
+      clf_handler_end(clfi, clf_output);
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_LEAVE) /* See comment = Re labels */
+    {
+      *clf_output= *clf_output + "goto ";
+      clfi= next_token(clfi);
+      /* Todo: Check if label was defined. main_token_pointers[clfi] isn't pointing to it. */
+      QString d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]).toUpper();
+      *clf_output= *clf_output + d + "_2;";
+      /* no need to call clf_find_handler() */
+      clf_handler_end(clfi, clf_output);
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_LOOP)
+    {
+      *clf_output= *clf_output + "while true do ";
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_OPEN)
+    {
+     /* Todo: check if it is already open, maybe that is an error */
+      clfi= next_i(clfi, 1); /* skip to cursor name */
+      if (clf_check_reference(text, clfi, TOKEN_REFTYPE_CURSOR_DEFINE, clf_output) == false) return 1;
+      int i_of_cursor_name= main_token_pointers[clfi];
+
+      assert(main_token_reftypes[i_of_cursor_name] == TOKEN_REFTYPE_CURSOR_DEFINE);
+
+      QString cursor_name = clf_v(text, i_of_cursor_name, TOKEN_REFTYPE_CURSOR_DEFINE);
+
+      int saved_clfi= clfi;
+
+      for (clfi= i_of_cursor_name;; ++clfi) /* skip past "CURSOR FOR", skipping comments */
+      {
+        clf_dump_whitespace(text, clf_output);
+        if (main_token_types[clfi] == TOKEN_KEYWORD_FOR) break;
+      }
+      clfi= next_i(clfi, 1);
+
+      *clf_output= *clf_output + cursor_name + " = ";
+
+      QString indent_string_for_open= clf_indent(clf_output);
+      *clf_output= *clf_output + sql_execute_starter;
+      *clf_output= *clf_output + "\n" + indent_string_for_open;
+      if (clfds(text, TOKEN_KEYWORD_OPEN, indent_string_for_open, "", clf_output) == false) return false;
+      clfi= saved_clfi;
+
+      *clf_output= *clf_output + "\n" + indent_string_for_open + "if string.sub(sqlstate,1,2) == '00' or string.sub(sqlstate,1,2) == '02' then";
+      *clf_output= *clf_output + "\n" + indent_string + cursor_name + "_OFFSET = 0;";
+      *clf_output= *clf_output + "\n" + indent_string + cursor_name + "_STATUS = 'open';";
+      *clf_output= *clf_output + "\n" + indent_string + "end;\n";
+      /* todo: clf_dump_whitespace? */
+      clfi= next_i(clfi, 1); /* skip to ";" */
+      /* clfds should have called clf_find_handler already */
+      clf_handler_end(clfi, clf_output);
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_REPEAT)
+    {
+      *clf_output= *clf_output + "repeat ";
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_RESIGNAL)
+    {
+      *clf_output= "Sorry, we do not support RESIGNAL statements at this time.";
+      return 1;
+    }
+
+    if (token_type == TOKEN_KEYWORD_RETURN)
+    {
+      clf_parameter_list= ""; /* todo: see whether this is necessary */
+      if (clf_internal_select(TOKEN_KEYWORD_RETURN, text, clf_output) == false) return false;
+      *clf_output= *clf_output + " return sqlresult[1][1];";
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_SELECT)
+    {
+      /* Todo: Maybe SELECT should display, currently it just finds the result set and then ignores it */
+      /* SELECT INTO declared-variable won't work. Todo: We should support it the same way we do FETCH. */
+      bool into_seen= false;
+      for (int i= clfi; i < clf_last_token; ++i)
+      {
+        QString d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        if (d == ";") break;
+        if (main_token_types[i] == TOKEN_KEYWORD_INTO) { into_seen= true; continue; }
+        if (into_seen == true)
+        {
+          /* If it's the end of the INTO clause, we've found no problems. */
+          if (((main_token_flags[clfi] & TOKEN_FLAG_IS_START_CLAUSE) != 0)
+           || (main_token_types[i] == TOKEN_KEYWORD_FROM))
+            break;
+          /* If it's a declared variable, i.e. not @variable (which should be TOKEN_REFTYPE_USER_VARIABLE), problem. */
+          if ((main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_REFER)
+           || (main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER_REFER))
+          {
+            *clf_output= "Sorry, SELECT INTO declared-variable is not supported at this time.";
+            return 1;
+          }
+        }
+      }
+    }
+
+    if (token_type == TOKEN_KEYWORD_SET)
+    {
+      if (clf_set(text, indent_string, clf_output) == false) return 1;
+      /* TODO: I wonder how many other statements hae 'continue' without calling clf_handler_end. */
+      /* clfds should have called clf_find_handler already */
+      clf_handler_end(clfi, clf_output);
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_SIGNAL)
+    {
+      int i_of_start_of_statement= clfi;
+      clfi= next_i(clfi, 2);
+      QString d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+      clfi= next_i(clfi, 1);
+      QString d2= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+      if (d2 != ";")
+      {
+        *clf_output= "Sorry, the only SIGNAL statement that we support at this time is SIGNAL SQLSTATE sqlstate_value.";
+        return 1;
+      }
+      *clf_output= *clf_output + "sqlstate = " + d + ";";
+      if (clf_find_handler(text, clf_output, indent_string, i_of_start_of_statement, token_type) == false) return false;
+      clf_handler_end(clfi, clf_output);
+      continue;
+    }
+
+    if (token_type == TOKEN_KEYWORD_UNTIL)
+    {
+    }
+
+    if (token_type == TOKEN_KEYWORD_UPDATE)
+    {
+      /* We don't allow assigning to declared variables in UPDATE. Todo: get inspired by how we do SET. */
+      for (int i= clfi; i < clf_last_token; ++i)
+      {
+        if ((main_token_types[i] == TOKEN_KEYWORD_WHERE)
+         || (main_token_types[i] == TOKEN_KEYWORD_ORDER)
+         || (main_token_types[i] == TOKEN_KEYWORD_LIMIT))
+          break;
+        QString d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+        if (d == ";") break;
+        int i2= next_i(i, -1);
+        d= text.mid(main_token_offsets[i2], main_token_lengths[i2]);
+        if ((main_token_types[i2] == TOKEN_KEYWORD_SET)
+         || (d == ","))
+        {
+          if ((main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER_REFER)
+           || (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_REFER))
+          {
+            int i3= next_i(i, +1);
+            d= text.mid(main_token_offsets[i3], main_token_lengths[i3]);
+            if (d == "=")
+            {
+              *clf_output= "Sorry, we do not handle assignments to variables in UPDATE statements at this time.";
+              return 1;
+              }
+          }
+        }
+      }
+    }
+
+    if (token_type == TOKEN_KEYWORD_WHILE)
+    {
+    }
+
+    /* todo: probably this "if" is unnecessary now, we want to check earlier */
+    if ((main_token_flags[clfi] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+    {
+      /*
+        Usually our result is box.execute([=[statement]=]); but special things can happen, e.g.
+        if it's RETURN we want sql_execute(); return sqlresult[1][1];
+      */
+      clf_parameter_list= ""; /* Todo: probably this is the wrong place to initialize */
+      if (token_type == TOKEN_KEYWORD_IF) *clf_output= *clf_output + "if ";
+      if (token_type == TOKEN_KEYWORD_UNTIL) *clf_output= *clf_output + "until ";
+      if (token_type == TOKEN_KEYWORD_WHILE) *clf_output= *clf_output + "while ";
+      if ((token_type == TOKEN_KEYWORD_IF)
+       || (token_type == TOKEN_KEYWORD_UNTIL)
+       || (token_type == TOKEN_KEYWORD_WHILE))
+      {
+        if (clf_internal_select(token_type, text, clf_output) == false) return false;
+      }
+      else
+      {
+        *clf_output= *clf_output + sql_execute_starter;
+        *clf_output= *clf_output + "\n" + indent_string;
+        if (clfds(text, token_type, indent_string, "", clf_output) == false) return false;
+      }
+      clf_handler_end(clfi, clf_output); /*Sometimes this useless because we're not at end of a statement. */
+    }
+  }
+
+  /* Todo: make sure this is indented the same as the CREATE statement. */
+  *clf_output= *clf_output + "\nend;";
+  return 0;
+}
+
+/*
+  An internal select is a query that we construct in order to get sql_execute to return one row with one value.
+  We want it for conditions, e.g. WHILE 0 = 0 should cause sql_execute([[SELECT 0 = 0;]],{});
+  Also we want it for statements that assign to declared variables. At first, that means SET statements.
+  Usually our indenting is where the SQL statement begins, but in this case it's where the condition begins.
+  Todo: use VALUES rather than SELECT?
+  Todo: don't pass ; unless you're really sure there is no ; i.e. it is a WHILE/IF conditional, not SET or RETURN or UNTIL 
+*/
+bool MainWindow::clf_internal_select(int token_type, QString text, QString *clf_output)
+{
+  QString indent_string= clf_indent(clf_output);
+  *clf_output= *clf_output + sql_execute_starter;
+  *clf_output= *clf_output + "\n" + indent_string;
+  *clf_output= *clf_output + "SELECT "; clfi= next_token(clfi);
+  if (clfds(text, token_type, indent_string, ";", clf_output) == false) return false;
+  return true;
+}
+
+/*
+  Pass: i = token number of a reference to a variable, parameter, or cursor.
+  Return: 0 = ok, 1 = bad and *clf_output has an error description
+  Usually this probably means that the user typed in a nonexistent name.
+  If we had parsed perfectly earlier, this check would not be necessary.
+  Todo: No error if name begins with @ (MySQL/MariaDB)
+  Todo: Check if offset too great. If so, status = 'not found' and clf_find_handler() (I forget what this means)
+*/
+bool MainWindow::clf_check_reference(QString text, int i, int reftype, QString *clf_output)
+{
+  bool is_ok= true;
+  int j= main_token_pointers[i];
+  if ((j == 0) || (j > clf_last_token)) is_ok= false; /* actually j > clf_last_token could be an assert */
+  else if (reftype == TOKEN_REFTYPE_VARIABLE_DEFINE)
+  {
+    if ((main_token_reftypes[j] != reftype) && (main_token_reftypes[j] != TOKEN_REFTYPE_PARAMETER_DEFINE))
+      is_ok= false;
+  }
+  else if (main_token_reftypes[j] != reftype) is_ok= false;
+  if (is_ok == false)
+  {
+    QString d= text.mid(main_token_offsets[i], main_token_lengths[i]);
+    QString type_name;
+    if (reftype == TOKEN_REFTYPE_VARIABLE_DEFINE) type_name= " variable-or-parameter ";
+    else if (reftype == TOKEN_REFTYPE_CURSOR_DEFINE) type_name= " cursor ";
+    else type_name= "";
+    *clf_output= "Sorry, cannot find the declaration of" + type_name + d;
+  }
+  return is_ok;
+}
+
+/* Todo: parameter #1 doesn't seem to be of statement, it should be of ;, so consider changing the name. */
+void MainWindow::clf_handler_end(int i_of_statement, QString *clf_output)
+{
+  for (int i= 0; i < handler_count; ++i)
+  {
+    if (i_of_statement == handler_code_ends[i]) *clf_output= *clf_output + " end;";
+  }
+}
+
+/*
+  Dump statements
+  Sometimes there are tokens that we must stop at:
+    ";" always (todo: actually it should be delimiter)
+    "DO" if it is WHILE ... DO (Todo: check: can DO ever appear in an expression?)
+    "END" if it is UNTIL ... END (Todo: check: can END ever appear in an expression, other than CASE where it is ok?)
+    "THEN" if it is IF ... THEN (THEN can appear in a CASE expression, that's why we have cases_count)
+    "," if it is SET variable=expression , variable_expression
+  The start of the statement has already been dumped.
+*/
+bool MainWindow::clfds(QString text, int token_type, QString indent_string, QString terminator, QString *clf_output)
+{
+  int parentheses_count= 0;
+  int cases_count= 0;
+  int i_of_start_of_statement= clfi;
+  QString d;
+  clf_parameter_list= "";
+  /* Todo: you need to stop at last_token */
+  while ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token))
+  {
+    d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]).toUpper();
+    if (d == "(") ++parentheses_count;
+    if (d == ")") --parentheses_count;
+    if (main_token_types[clfi] == TOKEN_KEYWORD_CASE_IN_CASE_EXPRESSION) ++cases_count;
+    if (main_token_types[clfi] == TOKEN_KEYWORD_END_IN_CASE_EXPRESSION) --cases_count;
+    int current_token_type= main_token_types[clfi];
+    if ((parentheses_count == 0) && (cases_count == 0))
+    {
+      if ((token_type == TOKEN_KEYWORD_SET) && (d == ",")) break;
+      if ((token_type == TOKEN_KEYWORD_WHILE) && (current_token_type == TOKEN_KEYWORD_DO)) break;
+      if ((token_type == TOKEN_KEYWORD_IF) && (current_token_type == TOKEN_KEYWORD_THEN)) break;
+      if (current_token_type == TOKEN_KEYWORD_END) { --clfi; break; }
+    }
+    if (d == ";") { *clf_output= *clf_output + d; break; }
+    if (clfdw(text, clf_output) == false) return false;
+    //if (text.mid(main_token_offsets[clfi], main_token_lengths[clfi]) == ";") break;
+    ++clfi;
+  }
+
+  /* Todo: I still worry that we might get two ;;s at the end of the statement, write a test that ignores spaces. */
+  if (terminator == ";")
+  {
+    if ((clf_output)->right(1) != ";")
+      *clf_output= *clf_output + terminator; /* statement terminator is either "" or ";" */
+  }
+
+  *clf_output= *clf_output + "\n" + indent_string + sql_execute_ender;
+  *clf_output= *clf_output + ",{" + clf_parameter_list + "}";
+  clf_parameter_list= "";
+
+  if (token_type == TOKEN_KEYWORD_RETURN) { *clf_output= *clf_output + ");"; return true; }
+  if (token_type == TOKEN_KEYWORD_DEFAULT) { *clf_output= *clf_output + ")"; return true; }
+  if (token_type == TOKEN_KEYWORD_IF) { *clf_output= *clf_output + ") == true and sqlresult[1][1] == true then "; return true; }
+  if (token_type == TOKEN_KEYWORD_WHILE) { *clf_output= *clf_output + ") == true and sqlresult[1][1] == true do "; return true; }
+  if (token_type == TOKEN_KEYWORD_SET) *clf_output= *clf_output + ")";
+  else if (token_type == TOKEN_KEYWORD_UNTIL) *clf_output= *clf_output + ") == true and sqlresult[1][1] == true ";
+  else *clf_output= *clf_output + ");";
+  if (clf_find_handler(text, clf_output, indent_string, i_of_start_of_statement, token_type) == false) return false;
+  return true;
+}
+
+/*
+  Dump words
+  What I'm really after is:
+    For each until endword (we pass endwod = ";" or "DO" or "" ("" means we only do it once)
+      Check: is this a variable name? If so, figure out the Lua equivalent.
+      Dump
+      Dump whatever is between this token and the next token
+  Re variable-name:
+    We depend on earlier success of hparse_f_variables().
+    Lua variable name should be prefix + sql_variable_name (upper?) + token number
+  Todo: call this from more places
+*/
+bool MainWindow::clfdw(QString text, QString *clf_output)
+{
+  QString d;
+
+  d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+  if ((main_token_reftypes[clfi] == TOKEN_REFTYPE_PARAMETER_REFER)
+   || (main_token_reftypes[clfi] == TOKEN_REFTYPE_VARIABLE_REFER))
+  {
+    if (clf_check_reference(text, clfi, TOKEN_REFTYPE_VARIABLE_DEFINE, clf_output) == false) return false;
+    int j= main_token_pointers[clfi];
+    if ((main_token_reftypes[j] == TOKEN_REFTYPE_PARAMETER_DEFINE)
+     || (main_token_reftypes[j] == TOKEN_REFTYPE_VARIABLE_DEFINE))
+    {
+      ;
+    }
+
+    /* Add ? to what we pass in box_execute(string...), add variable name to box.execute parameters */
+    *clf_output= *clf_output + "?";
+    if (clf_parameter_list != "") clf_parameter_list= clf_parameter_list + ", ";
+    clf_parameter_list= clf_parameter_list + clf_v(text, main_token_pointers[clfi], TOKEN_REFTYPE_VARIABLE_DEFINE);
+
+  }
+  else *clf_output= *clf_output + d;
+
+  clf_dump_whitespace(text, clf_output);
+  return true;
+}
+
+/*
+  Dump whatever is between this word and the next word, unless there is no next word.
+  This is whitespace, it isn't important, but we try to preserve it if there are multiple spaces or line feeds.
+*/
+void MainWindow::clf_dump_whitespace(QString text, QString *clf_output)
+{
+  if (main_token_lengths[clfi + 1] == 0) return;
+  if ((clfi + 1) >= clf_last_token) return;
+  QString d= text.mid(main_token_offsets[clfi] + main_token_lengths[clfi],
+              main_token_offsets[clfi + 1] - (main_token_offsets[clfi] + main_token_lengths[clfi]));
+  *clf_output= *clf_output + d;
+}
+
+/*
+  Labels
+    If the BEGIN|LOOP|REPEAT|WHILE was preceded by "label:", return a Lua label "::LABEL_1::" or "::LABEL_2::".
+    We call this when we see END, twice.
+    The first time, suffix == "_1", this is for the label that comes before "end".
+    The second time, suffix == "_2", this is for the label that comes after "end".
+    For ITERATE label; we generate goto LABEL_1", to do the loop again.
+    For LEAVE label; we generate "goto LABEL_2", to get out of a loop.
+    We depend on main_token_pointers[] which should have been set up during parsing.
+    Todo: There might be more than one e.g. user said label1: label2: BEGIN END -- so loop
+    Another label type is "end_" + token-number + "::", which is formed for handlers and does not call here.
+    The goto statements cause a reference to a label too.
+*/
+QString MainWindow::clf_label(QString text, QString suffix)
+{
+  int i= main_token_pointers[clfi];
+  if (i == 0) return ""; /* actually this must be soms sort of error */
+  if (main_token_reftypes[i] != TOKEN_REFTYPE_LABEL_DEFINE) return ""; /* there are no labels */
+  return "::"
+          + text.mid(main_token_offsets[i], main_token_lengths[i]).toUpper()
+          + suffix
+          + "::";
+}
+
+/*
+  SET
+  SET i = sql-expression [, j= sql_expression ...];
+  must become
+  S_i... = sql_execute([=[sql-expression]].row[1][1];
+  S_j... = sql_execute([=[sql-expression]].row[1][1];
+  It's complex because expression can contain specials e.g. SET i=(j=5), j= substr(k,1,1);
+  Notice we do assignments sequentially.
+  This is the only place where we can assign to a variable -- SELECT INTO is unknown.
+  Todo: small bug: If it is SET i=1, j = 1; we fail to put out ";" at the end of the first SELECT
+  Todo: Sometimes the expression is a literal that Lua can read, e.g. SET i = 1;
+        In that case maybe we could say "I=1;" instead of "i=sql_execute([=[SELECT 1;]]" etc.
+  Todo: This is not allowing for the chance that sql_execute might fail.
+        It would be better to say: if sql_execute() then assign end
+*/
+bool MainWindow::clf_set(QString text, QString indent_string, QString *clf_output)
+{
+  QString d;
+  QString variable_name;
+  for (;;)
+  {
+    clfi= next_token(clfi); /* skip "SET" or "," */
+    /* Surely this is a variable that we are assigning to. */
+    if (clf_check_reference(text, clfi, TOKEN_REFTYPE_VARIABLE_DEFINE, clf_output) == false) return false;
+    variable_name = clf_v(text, main_token_pointers[clfi], TOKEN_REFTYPE_VARIABLE_DEFINE);
+    clfi= next_token(clfi); /* skip variable name */
+    if (clf_internal_select(TOKEN_KEYWORD_SET, text, clf_output) == false) return false;
+    *clf_output= *clf_output + variable_name + " = sqlresult[1][1];";
+    /* repeat if it was ',' */
+    d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
+    if (d != ",") break;
+    *clf_output= *clf_output + "\n" + indent_string;
+  }
+  return true;
+}
+
+/*
+  Find out where we are in a line, so we know how many spaces to indent.
+  The general aim is: keep the original indent.
+  For example we should call this before sql_execute([=[\n, and use it so that the lines are
+    sql_execute([=[
+    sql-statement
+    ]=])
+  So another way to put it is: try to indent to wherever sql_execut([=[\n is.
+  We should use the indent for all decoration/wrapping, such as "if sqlstate ... handler()".
+  Figure out indent at start.
+  Whenever you are adding your own decoration/wrapping, \n wrapping \n
+  Whenever you are removing (as you do for OPEN/FETCH/CLOSE), keep original text, but in comments. + DECLARE?
+  Usually we want the same indenting as in the original i.e. text, but see clf_internal_select().
+*/
+QString MainWindow::clf_indent(QString *clf_output)
+{
+  int j= (*clf_output).length();
+  int i= j;
+  const QChar *ti = (*clf_output).constData();
+  for (; i > 0; --i)
+  {
+    if (*(ti + i) == '\n') break;
+  }
+  int indent_amount= (j - i) - 1;
+  QString indent_string= " ";
+  return indent_string.repeated(indent_amount);
+}
+
+/*
+  After every SQL statement, we check: is there a handler?
+  If BEGIN ... BEGIN ... DECLARE ... END statement, the DECLARE is not relevant, skip it.
+  There might be multiple handlers that are relevant: exception, not found, specific SQLSTATE, specific number.
+  By going backwards, we find the last handler first, which is fine, it's more immediate than handlers above it.
+  There are two passes: sqlexception first, then not found. Todo: eventually there will be multiple passes.
+  Todo: this can work after a full SQL statement, but not after a snippet as used in WHILE, SET, etc.
+  Todo: we're not checking for NOT FOUND if it's TOKEN_KEYWORD_OPEN. Good, but what about other exclusions?
+  Put this note somewhere:
+    If we have
+      BEGIN
+        DECLARE HANDLER#1 ...
+        non-handler stuff
+        BEGIN
+          DECLARE HANDLER#2 ...
+          non-handler stuff
+        END  -- END#1
+      END    -- END#2
+    The scope of HANDLER#1 is all the way to END#2. But I guess HANDLER#2 won't invoke HANDLER#1.
+    Todo: If we have SQLEXCEPTION, SQLWARNING in a higher begin, SQLWARNING in a lower begin won't appear. Okay?
+    Todo: allow handler within handler
+    Todo: some of the checks here are maybe redundant since we check when making the list (clf_handler_list)
+    Todo: Maybe you ought to store the conditions in a list when you make with clf_handler_list()
+    Pass 1: specifics, pass 2: sqlexception, pass 3: not found, pass 4: sqlwarning. Avoiding repetition.
+    After we dump the handlers, and even if there are no handlers, we still have "if sqlexception goto exit;"
+    Yet another exceptional situation:
+         If we're within a handler and it's a non-compound statement, we don't want the final
+         "if sqlstate... goto" because that would try to jump out of the main begin/end.
+         But if it's a compound statement, we do want to jump out because that will goto the end of
+         the BEGIN that is inside the handler. That is: DECLARE HANDLER FOR non-compound = no goto,
+         DECLARE HANDLER for BEGIN ... END -- goto.
+*/
+bool MainWindow::clf_find_handler(QString text, QString *clf_output, QString indent_string, int i_of_start_of_statement, int token_type)
+{
+  QString if_statements= ""; /* A string containing if_statements that we will add to clf_output at the end */
+  QString goto_string= "";
+
+  int i_of_begin= clf_find_begin(i_of_start_of_statement); /* = the BEGIN of the current block, if any */
+
+  /* Check that it's not in any handler. We don't call handlers from handlers. Todo: allow, it should be legal. */
+  for (int i= 0; i < handler_count; ++i)
+  {
+    if ((i_of_start_of_statement > handler_starts[i]) && (i_of_start_of_statement <= handler_code_ends[i]))
+    {
+      if ((i_of_begin != -1) && (i_of_begin >= handler_starts[i])) goto after_handler_calls;
+      return true;
+    }
+  }
+
+  /*
+    We'll want to produce "if condition then goto after-end-of-block end" if
+    we've just called an EXIT handler, or after we've called all handlers
+    (in which case the condition is sqlexception).
+    Since BEGIN...END causes a Lua do...end, the goto is unnecessary for the last statement in the block.
+    Notice: we goto to get out of the block of the handled statement, not the handler statement
+    (sometimes we invoke a handler that is in a higher level, rather than in our own block).
+    Todo: reconsider: we wouldn't have to do this if BEGIN...END produced "while true...end", then we'd just dump "break".
+  */
+  if (i_of_begin != -1)
+  {
+    int i= i_of_start_of_statement + 1;
+    for (;;++i)
+    {
+      if (i >= clf_last_token) break;
+      if ((main_token_types[i] == TOKEN_KEYWORD_END) && (main_token_types[next_i(i, 1)] == TOKEN_TYPE_OPERATOR)) break;
+      if ((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+      {
+        goto_string= " goto end_" + QString::number(i_of_begin) + ";";
+        break;
+      }
+    }
+  }
+
+  for (int pass= 1; pass <= 4; ++pass)
+  {
+    for (int i= handler_count - 1; i >= 0; --i)
+    {
+      if (i_of_start_of_statement >= handler_code_ends[i] && (i_of_start_of_statement < handler_scope_ends[i]))
+      {
+        QString action_after_call= "";
+        int j;
+        /* In DECLARE ... HANDLER FOR we only care if we see EXIT. Skip to the FOR. */
+        for (j= handler_starts[i];; ++j)
+        {
+          if (main_token_types[j] == TOKEN_KEYWORD_EXIT) action_after_call= goto_string;
+          if (main_token_types[j] == TOKEN_KEYWORD_FOR) break;
+        }
+        bool is_right_pass= false;
+        QString status_to_check= "";
+        for (j= j + 1;; ++j)
+        {
+          if (main_token_types[j] == TOKEN_KEYWORD_SQLSTATE)
+          {
+            j= next_i(j, 1);
+            if (main_token_types[j] == TOKEN_KEYWORD_VALUE) j= next_i(j, 1);
+            assert(main_token_reftypes[j]== TOKEN_REFTYPE_SQLSTATE);
+            QString d= text.mid(main_token_offsets[j], main_token_lengths[j]);
+            if (if_statements.contains(d) == false)                                   /* not if duplicate */
+            {
+              if (status_to_check != "") status_to_check= status_to_check + " or ";   /* if more than one condition */
+              status_to_check= status_to_check + "sqlstate == " + d;                  /* e.g. == '45000' */
+              if (pass == 1) is_right_pass= true;
+            }
+          }
+          else if (main_token_types[j] == TOKEN_KEYWORD_SQLEXCEPTION)
+          {
+            if (if_statements.contains("> '02'")== false)
+            {
+              if (status_to_check != "") status_to_check= status_to_check + " or ";
+              status_to_check= status_to_check + "string.sub(sqlstate,1,2) > '02'";
+              if (pass == 2) is_right_pass= true;
+            }
+          }
+          else if (main_token_types[j] == TOKEN_KEYWORD_NOT)
+          {
+            j= next_i(j, 1);
+            assert(main_token_types[j] == TOKEN_KEYWORD_FOUND);
+            if (token_type == TOKEN_KEYWORD_OPEN) continue;
+            if (if_statements.contains("== '02'")== false)
+            {
+              if (status_to_check != "") status_to_check= status_to_check + " or ";
+              status_to_check= status_to_check + "string.sub(sqlstate,1,2) == '02'";
+              if (pass == 3) is_right_pass= true;
+            }
+          }
+          else if (main_token_types[j] == TOKEN_KEYWORD_SQLWARNING)
+          {
+           if (if_statements.contains("== '01'")== false)
+           {
+              if (status_to_check != "") status_to_check= status_to_check + " or ";
+              status_to_check= status_to_check + "string.sub(sqlstate,1,2) == '01'";
+              if (pass == 4) is_right_pass= true;
+           }
+          }
+          else if (((main_token_flags[j] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+                || (main_token_types[j] >= TOKEN_KEYWORDS_START))
+          {
+            break; /* presumably at start of handler code */
+          }
+          // It might be "," or comment or label, that's fine, we skip
+          // What if it is a number? I guess if it's numeric we compare with a number (no, might start with 00/01/02?) */
+        }
+        if (is_right_pass == false) continue;
+        if_statements= if_statements + "\n" + indent_string +
+                                       "if " + status_to_check + " then " + clf_handler_name(handler_starts[i]) +
+                                       "();" +
+                                       action_after_call +
+                                       " end;";
+      }
+    }
+  }
+  *clf_output= *clf_output + if_statements;
+
+after_handler_calls:
+  if (goto_string > "")
+    *clf_output= *clf_output + "\n" + indent_string +
+                             "if string.sub(sqlstate,1,2) > '02' then " +
+                             goto_string +
+                             " end;";
+  return true;
+}
+
+/*
+  Pass: token number. Return: token_number of nearest earlier BEGIN for BEGIN/END enclosing this token.
+  If there is an intervening BEGIN/END or flow-control/END, we can skip over it via main_token_pointers[]
+  (this might skip back to the label of the BEGIN rather than to the BEGIN itself, but I think that is okay).
+  If we fail to find a BEGIN, we return -1 (probably this means we have
+      "CREATE PROCEDURE|FUNCTION ... non-compound-statement;" and we have backed up to the word CREATE).
+  If we are at the second END in BEGIN BEGIN END END, we will end up pointing to the first BEGIN.
+  If we go all the way back to main_token_number, we will end up returning -1 (presumably we were already at top level)
+      (although maybe this never happens)
+  Todo: it might be nice to have a standard way to find BEGIN that isn't as tedious as searching through main_token.
+  Todo: surely we need to find BEGIN in other contexts, so look for duplications of this.
+        You might find cases where we skip ENDs in a different way, without using main_token_pointers[].
+        You might find cases where we go forward till END, and then use main_token_pointer[] once to go to BEGIN.
+*/
+int MainWindow::clf_find_begin(int i_of_token)
+{
+  int k= i_of_token;
+  int minimum_token_number= (int) main_token_number;
+  if (main_token_types[k] == TOKEN_KEYWORD_END) k= main_token_pointers[k];
+  for (;; --k)
+  {
+    assert(k >= minimum_token_number);
+    if (k == minimum_token_number) return -1; /* failed to find a BEGIN */
+    if (main_token_types[k] == TOKEN_KEYWORD_BEGIN) break;
+    if (main_token_types[k] == TOKEN_KEYWORD_END) k= main_token_pointers[k];
+  }
+  return k;
+}
+
+/*
+  Make a list of handlers:
+    handler_count, handler_starts[], handler_code_ends[], handler_scope_ends[] handler_begin_of_declares[]
+  We set up the list when we start and delete it when we end.
+  Later we'll search from bottom to top so that first we're in local scope, then in encompassing scope(s).
+  For handler scope: go back to the BEGIN that precedes the DECLARE handler.
+     We find it by looking for END, is main_token_pointer will be to BEGIN or to the label preceding BEGIN.
+  Todo: Perhaps you should disallow combining specific and non-specific e.g. FOR SQLSTATE '80000', SQLWARNING
+        because the conditions have different priorities and the standard disallows such combinations.
+        However, perhaps you should leave it up to the user. Or maybe you should support warnings.
+*/
+bool MainWindow::clf_handler_list(QString text, int main_token_number, int clf_last_token, QString *clf_output)
+{
+  int handler_index;
+  int i;
+  handler_count= 0;
+  for (i= main_token_number; i < clf_last_token; ++i)
+  {
+    if ((main_token_types[i] == TOKEN_KEYWORD_DECLARE)
+     && (main_token_types[next_i(i, 2)] == TOKEN_KEYWORD_HANDLER))
+      ++handler_count;
+  }
+  if (handler_count == 0) return true;
+  handler_starts= new int[handler_count];
+  handler_code_ends= new int[handler_count];
+  handler_scope_ends= new int[handler_count];
+  handler_begin_of_declares= new int[handler_count];
+  handler_index= 0;
+
+  for (i= main_token_number; i < clf_last_token; ++i)
+  {
+    if ((main_token_types[i] != TOKEN_KEYWORD_DECLARE)
+     || (main_token_types[next_i(i, 2)] != TOKEN_KEYWORD_HANDLER))
+      continue;
+    int i_of_declare= i;
+    assert(handler_index < handler_count);
+
+    /* Todo: Saying "i_of_begin_of_declare= main_token_pointers[j];" failed. Maybe change h_parse someday? */
+    /* We're assuming BEGIN ... DECLARE END; and ... is either blank or another handler or won't have BEGIN+END */
+    int i_of_begin_of_declare= 0;
+    int begin_count= 0;
+    for (int k= i_of_declare - 1; k > main_token_number; --k)
+    {
+      if (main_token_types[k] == TOKEN_KEYWORD_END)
+      {
+        if (main_token_types[next_i(k, 1)] == TOKEN_TYPE_OPERATOR) --begin_count;
+      }
+      if (main_token_types[k] == TOKEN_KEYWORD_BEGIN)
+      {
+        ++begin_count;
+        if (begin_count <= 0) continue;
+        i_of_begin_of_declare= k;
+        break;
+      }
+    }
+    {
+      int i= next_i(i_of_begin_of_declare, -2);
+      if (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL_DEFINE) i_of_begin_of_declare= i;
+      /* hparse doesn't allow x:y:begin but if someday it does, stop it because we haven't tested */
+      i= next_i(i_of_begin_of_declare, -2);
+      if (main_token_reftypes[i] == TOKEN_REFTYPE_LABEL_DEFINE)
+      {
+        *clf_output= "Sorry, we do not allow multiple labels for the same BEGIN at this time.";
+        return false;
+      }
+    }
+    assert(i_of_begin_of_declare > main_token_number);
+    handler_begin_of_declares[handler_index]= i_of_begin_of_declare;
+    handler_scope_ends[handler_index]= 0;
+    for (int j= i_of_begin_of_declare; j < clf_last_token; ++j)
+    {
+      if ((main_token_types[j] == TOKEN_KEYWORD_END) && (main_token_pointers[j] == i_of_begin_of_declare))
+      {
+        handler_scope_ends[handler_index]= j;
+        break;
+      }
+    }
+
+    assert(handler_scope_ends[handler_index] != 0);
+
+    handler_starts[handler_index]= i_of_declare; /* Todo: should this be i_of_begin_of_declare? */
+
+    /* If it is a flow-control statement, handler code ends at the END. Otherwise it ends at the ";". */
+    int i_of_statement_after_declare= 0;
+    for (int i= i_of_declare + 1; i < clf_last_token; ++i)
+    {
+      if ((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) != 0)
+      {
+        i_of_statement_after_declare= i;
+        break;
+      }
+    }
+    assert(i_of_statement_after_declare != 0);
+    assert(i_of_statement_after_declare < clf_last_token);
+    int token= main_token_types[i_of_statement_after_declare];
+    handler_code_ends[handler_index]= 0;
+    /* Todo: Check whether you could simply check TOKEN_FLAG_IS_FLOW_CONTROL instead of the following. */
+    if ((token == TOKEN_KEYWORD_BEGIN)
+    || (token == TOKEN_KEYWORD_CASE)
+    || (token == TOKEN_KEYWORD_FOR_IN_FOR_STATEMENT) /* will only be true if MariaDB 10.3 */
+    || (token == TOKEN_KEYWORD_IF)
+    || (token == TOKEN_KEYWORD_LOOP)
+    || (token == TOKEN_KEYWORD_REPEAT)
+    || (token == TOKEN_KEYWORD_WHILE))
+    {
+      for (int k= i_of_statement_after_declare + 1; k < clf_last_token; ++k)
+      {
+        if ((main_token_types[k] == TOKEN_KEYWORD_END) && (main_token_pointers[k] == i_of_statement_after_declare))
+        {
+          /* Found an END that matches i_of_statement_after_declare. now skip to the terminating ";". */
+          while (main_token_types[k] != TOKEN_TYPE_OPERATOR) ++k;
+          handler_code_ends[handler_index]= k;
+          break;
+        }
+      }
+    }
+    else
+    {
+      for (int k= i_of_statement_after_declare;; ++k)
+      {
+        QString d= text.mid(main_token_offsets[k], main_token_lengths[k]);
+        if (d == ";")
+        {
+          handler_code_ends[handler_index]= k;
+          break;
+        }
+      }
+    }
+    assert(handler_starts[handler_index] < handler_code_ends[handler_index]);
+    assert(handler_code_ends[handler_index] <= handler_scope_ends[handler_index]);
+    ++handler_index;
+  }
+  /* Check: do not allow duplicate conditions for the same BEGIN. Standard restriction. */
+  /* Check: do not allow handlers within handlers. Hopefully temporary restriction. */
+  for (int outer_handler= 0; outer_handler < handler_count; ++outer_handler)
+  {
+    int outer_condition;
+    for (outer_condition= handler_starts[outer_handler]; main_token_types[outer_condition] != TOKEN_KEYWORD_FOR; ++outer_condition) {;}
+    for (outer_condition= outer_condition + 1; (main_token_flags[outer_condition] & TOKEN_FLAG_IS_START_STATEMENT) == 0; ++outer_condition)
+    {
+      int outer_condition_value= main_token_types[outer_condition];
+      if ((outer_condition_value == TOKEN_TYPE_OPERATOR)
+       || (outer_condition_value == TOKEN_KEYWORD_SQLSTATE)
+       ||(outer_condition_value == TOKEN_KEYWORD_VALUE))
+        continue;
+      if ((outer_condition_value == TOKEN_TYPE_IDENTIFIER)
+       || (outer_condition_value == TOKEN_TYPE_LITERAL_WITH_DIGIT))
+      {
+        *clf_output= "Sorry, the only handler conditions we allow at this time are sqlstate 'xxxxx', sqlexception, not found, and sqlwarning.";
+        return false;
+      }
+      int condition_count= 0; /* If this becomes > 1, there is duplication in the same block. */
+      for (int inner_handler= 0; inner_handler < handler_count; ++inner_handler)
+      {
+        if ((handler_starts[inner_handler] > handler_starts[outer_handler]) && (handler_code_ends[inner_handler] < handler_code_ends[outer_handler]))
+        {
+          *clf_output= "Sorry, we do not allow handlers within handlers at this time.";
+          return false;
+        }
+        if (handler_begin_of_declares[inner_handler] != handler_begin_of_declares[outer_handler]) continue; /* not in the same BEGIN */
+        int inner_condition;
+        for (inner_condition= handler_starts[inner_handler]; main_token_types[inner_condition] != TOKEN_KEYWORD_FOR; ++inner_condition) {;}
+        for (inner_condition= inner_condition + 1; (main_token_flags[inner_condition] & TOKEN_FLAG_IS_START_STATEMENT) == 0; ++inner_condition)
+        {
+          int inner_condition_value= main_token_types[inner_condition];
+          if ((inner_condition_value == TOKEN_TYPE_OPERATOR)
+           || (inner_condition_value == TOKEN_KEYWORD_SQLSTATE)
+           || (inner_condition_value == TOKEN_KEYWORD_VALUE))continue;
+          if (inner_condition_value == outer_condition_value)
+          {
+            QString d1= text.mid(main_token_offsets[inner_condition], main_token_lengths[inner_condition]);
+            QString d2= text.mid(main_token_offsets[outer_condition], main_token_lengths[outer_condition]);
+            if (QString::compare(d1, d2, Qt::CaseInsensitive) == 0) ++condition_count;
+            if (condition_count > 1)
+            {
+              *clf_output= "Sorry, we don't allow duplicate handler conditions in the same scope.";
+              return false;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+/*
+  Return a name of a handler function for a specified TOKEN_KEYWORD_DECLARE token.
+  We identify the handler by its number within the handler lists.
+  Any name will do. A name like "handler_1" seems okay. Maybe a line number or a recent label would be better.
+*/
+QString MainWindow::clf_handler_name(int i_of_declare)
+{
+  for (int i= 0; i < handler_count; ++i)
+  {
+    if (handler_starts[i] == i_of_declare)
+    {
+      return "handler_" + QString::number(i);
+    }
+  }
+  return "unknown_handler"; /* actually this must be an error */
+}
+
+/*
+  Return: declared variable name or parameter name or cursor name
+  Pass: i= clfi (if this is in the DECLARE) or main_token_pointers[clfi] (if this is a reference)
+  Example: if i == 1 and [i] has x, return "X". Usually it's that simple but here are complexities.
+  1. If it is a regular identifier, upper-case it.
+     If it is a delimited identifier, strip the ""s and do not upper-case it.
+  2. If any character might be illegal in a Lua name, replace it with "_" hex(unicode-value-of-character) "_"
+  3. If it is a cursor, add "_CURSOR" (because cursors should have a different namespace).
+  If any character was replaced, then there is a very slight chance that the name is not unique, for example
+  user could have both "a_32_b" and "a b", and we could guarantee uniqueness by adding QString::number(i) i.e.
+  token-number as a suffix, but we don't because (a) it really is a very slight chance (b) Lua will catch it.
+  Todo: we could consider adding a suffix or a comment so it's clear what was data type + whether it was a parameter.
+  i_type is TOKEN_REFTYPE_{VARIABLE|PARAMETER|CURSOR}_DEFINE
+  Converting to upper case is best because (a) we're sure there's no conflict with a Lua reserved word,
+  (b) we're sure there's no duplication of regular-identifier b and delimited-identifier "B", (c) this
+  correctly reflects what SQL does with identifiers.
+  Todo: watch out with connect_stripper, are we always checking ansi_quotes? And `...` quoting is okay?
+*/
+QString MainWindow::clf_v(const QString text, int i, int i_type)
+{
+  QString d1= text.mid(main_token_offsets[i], main_token_lengths[i]);
+  if (d1.left(1) == "\"") d1= connect_stripper(d1, true);
+  else d1= d1.toUpper();
+  QString d2= "";
+  QChar c;
+  for (int i= 0; i < d1.length(); ++i)
+  {
+    c= d1.at(i);
+    if (((c.isDigit()) && (i == 0))
+     || ((c.isDigit() == false) && (c.isLetter() == false) && (c != '_')))
+    {
+      d2= d2 + "_" + QString::number(c.unicode()) + "_";
+    }
+    else d2= d2 + c;
+  }
+  if (i_type == TOKEN_REFTYPE_CURSOR_DEFINE) d2= d2 + "_CURSOR";
+  return d2;
+}
+
+/*
+  When we call sql_execute, the first parameter is a string literal with the SQL statement.
+  Usually sql_execute_starter="sql_execute([[" and sql_execute_ender="]]".
+  But if text contains [[ or ]] that could cause trouble. In that case we change to [=[ ... ]=]... etc.
+  We go as high as 5 =s, that is, sql_execute([=====[ ... ]=====]). 5 is arbitrary, but we won't go forever.
+*/
+bool MainWindow::clf_make_sql_execute_starter_and_ender(QString text, QString *clf_output)
+{
+  QString starter_brackets;
+  QString ender_brackets;
+  QString equals= "=";
+  int equals_count= 0;
+  for (;;)
+  {
+    starter_brackets= "[" + equals.repeated(equals_count) + "[";
+    ender_brackets= "]" + equals.repeated(equals_count) + "]";
+    if ((text.contains(starter_brackets) == false)
+     && (text.contains(ender_brackets) == false)) break;
+    ++equals_count;
+    if (equals_count > 5)
+    {
+      *clf_output= "Sorry, there are too many [[s and [=[s etc. in the input. The limit is [=====[.";
+      return false;
+    }
+  }
+  sql_execute_starter= "sql_execute(" + starter_brackets;
+  sql_execute_ender= ender_brackets;
+  return true;
+}
+
+/*
+  sql_execute() takes a string containing an SQL statement and executes it.
+  The code inside the sql_execute function is non-generic, that is, it works only with a particular SQL dialect.
+  All the rest of the translation should be generic.
+  Todo: parameters.
+  Todo: true/false (for the sake of while/if/etc.) -- maybe we should return true or false or nil
+  Usually we just want result[1][1] but I think returning it isn't necessary.
+  Todo: at some point we might want to show an error message; m is cdata but tostring(m) will work.
+  With MySQL/MariaDB we simply return the SQLSTATE that the DBMS returns.
+  With Tarantool we make up an SQLSTATE = '00000' okay, '02000' not found, '45000' sqlexception.
+*/
+void MainWindow::clf_make_sql_execute_function(QString *clf_output)
+{
+  QString indent_string= clf_indent(clf_output); 
+  *clf_output= *clf_output +
+  "\n" + indent_string + "local sqlstate;"
+  "\n" + indent_string + "local sqlresult = {};" +
+  "\n" + indent_string + "local sqlmessage;";
+
+  if (connections_dbms[0] == DBMS_TARANTOOL)
+  {
+    *clf_output= *clf_output +
+    "\n" + indent_string + "local function sql_execute(statement, parameters)" +
+    "\n" + indent_string + "    local s, r, m;" +
+    "\n" + indent_string + "    s, r, m = pcall(box.execute,statement, parameters);" +
+    "\n" + indent_string + "    sqlmessage = tostring(m);" +
+    "\n" + indent_string + "    if r == nil and m ~= nil then sqlstate = '45000'; return false; end;" +
+    "\n" + indent_string + "    if (s == false) then sqlstate = '45000'; return false; end;" +
+    "\n" + indent_string + "    if (r.rows == nil) then sqlstate = '00000'; return nil; end;" +
+    "\n" + indent_string + "    if (r.rows[1] == nil) then sqlstate = '02000'; return nil; end;" +
+    "\n" + indent_string + "    sqlresult = r.rows;" +
+    "\n" + indent_string + "    sqlstate = '00000';" +
+    "\n" + indent_string + "    return true;" +
+    "\n" + indent_string + "    end;"
+    "\n";
+  }
+  else
+  {
+    *clf_output= *clf_output +
+    "\n" + indent_string + "local function sql_execute(statement, parameters)" +
+    "\n" + indent_string + "--[[" +
+    "\n" + indent_string + "    THIS IS A STUB." +
+    "\n" + indent_string + "    For MySQL/MariaDB, Ocelot has not written the sql_execute() code." +
+    "\n" + indent_string + "    But it should be easy, fewer than 50 lines." +
+    "\n" + indent_string + "    Using the C API, remembering to enclose within pcall():" +
+    "\n" + indent_string + "    * Pass each parameter." +
+    "\n" + indent_string + "     * Execute the statement (e.g. mysql_real_query)." +
+    "\n" + indent_string + "     * If there was an error: set sqlstate and return false." +
+    "\n" + indent_string + "   * If there was no result set:" +
+    "\n" + indent_string + "       set sqlstate = '00000' and return nil." +
+    "\n" + indent_string + "   * If there was a result set:" +
+    "\n" + indent_string + "       If row count == 0, set sqlstate = '02000' and return nil." +
+    "\n" + indent_string + "       Otherwise put it in sqlresult, set sqlstate = '00000', return true." +
+    "\n" + indent_string + "   For an example of code that works with another DBMS, look at ocelotgui" +
+    "\n" + indent_string + "   source code, function clf_make_sql_execute_function." +
+    "\n" + indent_string + "]]" +
+    "\n" + indent_string + "    sqlstate = '45000';" +
+    "\n" + indent_string + "    return false;" +
+    "\n" + indent_string + "    end;"
+    "\n";
+  }
 }
 
 /*

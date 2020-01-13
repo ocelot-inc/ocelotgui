@@ -61,7 +61,6 @@
   e.g. if it's MySQL 5.6 we set both FLAG_VERSION_MYSQL_5_5 and
   FLAG_VERSION_MYSQL_5_6.
   Todo: eventually FLAG_VERSION_TARANTOOL_2_2 has to be part of FLAG_VERSION_ALL
-  Todo: FLAG_VERSION_TARANTOOL_2_3 == FLAG_VERSION_2_2 because I'm afraid of increasing sizes from "short int"
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -88,7 +87,8 @@
 #define FLAG_VERSION_CONNECT_OPTION     16384
 #define FLAG_VERSION_OPTION             (8192 | 16384)
 #define FLAG_VERSION_TARANTOOL_2_2  32768
-#define FLAG_VERSION_TARANTOOL_2_3  32768
+#define FLAG_VERSION_TARANTOOL_2_3  (65536 | 32768)
+#define FLAG_VERSION_LUA_OUTPUT       131072
 #define FLAG_VERSION_DEFAULT FLAG_VERSION_MYSQL_OR_MARIADB_ALL
 
 #include <assert.h>
@@ -447,6 +447,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_FOREIGN,
     TOKEN_KEYWORD_FOREIGN_KEY_LIST,
     TOKEN_KEYWORD_FORMAT,
+    TOKEN_KEYWORD_FOUND,
     TOKEN_KEYWORD_FOUND_ROWS,
     TOKEN_KEYWORD_FROM,
     TOKEN_KEYWORD_FROM_BASE64,
@@ -1217,6 +1218,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_VACUUM,
     TOKEN_KEYWORD_VALIDATE_PASSWORD_STRENGTH,
     TOKEN_KEYWORD_VALIDATION,
+    TOKEN_KEYWORD_VALUE,
     TOKEN_KEYWORD_VALUES,
     TOKEN_KEYWORD_VARBINARY,
     TOKEN_KEYWORD_VARCHAR,
@@ -1357,13 +1359,13 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1147
+#define KEYWORD_LIST_SIZE 1149
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
-   unsigned short int reserved_flags;
-   unsigned short int built_in_function_flags;
+   unsigned int reserved_flags;
+   unsigned int built_in_function_flags;
    unsigned short int token_keyword;
 };
 static const keywords strvalues[]=
@@ -1661,6 +1663,7 @@ static const keywords strvalues[]=
       {"FOREIGN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FOREIGN},
       {"FOREIGN_KEY_LIST", 0, 0, TOKEN_KEYWORD_FOREIGN_KEY_LIST},
       {"FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FORMAT},
+      {"FOUND", 0, 0, TOKEN_KEYWORD_FOUND},
       {"FOUND_ROWS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FOUND_ROWS},
       {"FROM", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FROM},
       {"FROM_BASE64", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FROM_BASE64},
@@ -2432,6 +2435,7 @@ static const keywords strvalues[]=
       {"VACUUM", 0, 0, TOKEN_KEYWORD_VACUUM},
       {"VALIDATE_PASSWORD_STRENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VALIDATE_PASSWORD_STRENGTH},
       {"VALIDATION", 0, 0, TOKEN_KEYWORD_VALIDATION},
+      {"VALUE", 0, 0, TOKEN_KEYWORD_VALUE},
       {"VALUES", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VALUES},
       {"VARBINARY", FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_2, 0, TOKEN_KEYWORD_VARBINARY},
       {"VARCHAR", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_VARCHAR},
@@ -2956,6 +2960,7 @@ public:
   QString ocelot_execute;
   QString ocelot_ld_run_path;
   QString ocelot_login_path;
+  QString ocelot_opt_lua;
   QString ocelot_opt_ssl;
   QString ocelot_opt_ssl_ca;
   QString ocelot_opt_ssl_capath;
@@ -3031,11 +3036,11 @@ public:
   void hparse_f_error();
   bool hparse_f_is_equal(QString,QString);
   bool hparse_f_is_special_verb(int);
-  int hparse_f_accept(unsigned short int,unsigned char,int,QString);
+  int hparse_f_accept(unsigned int,unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
   QString hparse_f_token_to_appendee(QString,int,char);
-  int hparse_f_expect(unsigned short int,unsigned char,int,QString);
-  int hparse_f_literal(unsigned char,unsigned short int,int);
+  int hparse_f_expect(unsigned int,unsigned char,int,QString);
+  int hparse_f_literal(unsigned char,unsigned int,int);
   int hparse_f_default(int,bool);
   int hparse_f_user_or_role_name(int);
   int hparse_f_character_set_name();
@@ -3044,7 +3049,7 @@ public:
   int hparse_f_qualified_name_of_object(int,int);
   int hparse_f_qualified_name_of_object_with_star(int,int);
   int hparse_f_e_to_reftype(int);
-  int hparse_f_accept_qualifier(unsigned short int,unsigned char,int,QString);
+  int hparse_f_accept_qualifier(unsigned int,unsigned char,int,QString);
   bool hparse_f_is_variable(int, int);
   int hparse_f_qualified_name_of_operand(bool,bool,bool);
   int hparse_f_table_references();
@@ -3084,7 +3089,7 @@ public:
   void hparse_f_show_columns();
   void hparse_f_if_not_exists();
   void hparse_f_indexes_or_keys();
-  void hparse_f_alter_or_create_clause(int,unsigned short int*,bool*);
+  void hparse_f_alter_or_create_clause(int,unsigned int*,bool*);
   int hparse_f_semicolon_and_or_delimiter(int);
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
@@ -3205,7 +3210,7 @@ public:
   void hparse_f_lua_opr_16(int,int);
   void hparse_f_lua_opr_17(int,int);
   void hparse_f_lua_opr_18(int,int);
-  int hparse_f_lua_accept_dotted(unsigned short int,unsigned char,int,QString);
+  int hparse_f_lua_accept_dotted(unsigned int,unsigned char,int,QString);
   QString hparse_f_label(int *);
   int hparse_f_find_define(int,int,int,bool);
   void hparse_f_cursors(int);
@@ -3456,6 +3461,25 @@ private:
   void statement_edit_widget_setstylesheet();
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
+
+  void clf(QString);
+  int clf_block(QString, int, QString*);
+  bool clf_internal_select(int, QString, QString *);
+  bool clfdw(QString, QString*);
+  bool clfds(QString, int, QString, QString, QString*);
+  void clf_dump_whitespace(QString, QString*);
+  QString clf_label(QString, QString);
+  bool clf_set(QString, QString, QString*);
+  QString clf_v(const QString, int, int);
+  QString clf_indent(QString*);
+  bool clf_find_handler(QString, QString*, QString, int, int);
+  int clf_find_begin(int);
+  bool clf_handler_list(QString, int, int, QString*);
+  QString clf_handler_name(int);
+  bool clf_check_reference(QString, int, int, QString*);
+  void clf_handler_end(int, QString*);
+  bool clf_make_sql_execute_starter_and_ender(QString, QString*);
+  void clf_make_sql_execute_function(QString*);
 
 /*
   ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
@@ -3712,6 +3736,7 @@ public:
   #define TOKEN_FLAG_IS_DEBUGGABLE 32768
   #define TOKEN_FLAG_IS_DECLARE 65536
   #define TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON 131072
+  //#define TOKEN_FLAG_IS_ASSIGNEE 262144
 
 /* The enum for TOKEN_TYPE_LITERAL etc. was here, but moved outside MainWindow on 2019-02-26 */
 
