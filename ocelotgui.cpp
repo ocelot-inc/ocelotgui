@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: December 2 2019
+   Last modified: May 14 2020
 */
 
 /*
@@ -15087,8 +15087,8 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
     }
     if (field_type == MP_EXT)
     {
+      value_length= tarantool_fetch_row_ext(tarantool_tnt_reply_data, value_as_string);
       lmysql->ldbms_mp_next(&tarantool_tnt_reply_data);
-      value_length= sizeof("EXT");
     }
 
     total_length+= value_length;
@@ -15099,6 +15099,182 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
   return "OK";
 }
 
+/*
+  called from tarantool_fetch_row() and from tarantool_scan_rows()
+  MP_EXT requires a lot of special handling because it might be MP_DECIMAL or MP_UUID or MP_ERROR.
+  We brought in the older msgpuck.h which doesn't have mp_decode_ext.
+  Re possible errors:
+      For all types, we return "EXT" and length = 3. It will be skipped because caller lmysql->ldbms_mp_next(&tarantool_tnt_reply_data);
+      Error if: ext 16 and ext 32, which would not be possible for decimal, but might be allowed someday
+      Error if: not equal to MP_DECIMAL = 1: MP_UNKNOWN_EXTENSION = 0, MP_UUID = 2, MP_ERROR = 3.
+      We do not check for premature end of input (we rarely do), so really bad input could cause segmentation fault
+  Re uuid:
+      I assume that length = 16 and I do not check that the MP_EXT byte was d8.
+      I produce a string that does not contain any "-"s.
+  todo: we could distinguish non-decimal sub-types rather than return "EXT" for everything
+  todo: for perfect lining up, we could keep track of maximum scale not just maximum length
+*/
+#define MP_DECIMAL 1
+#define MP_UUID 2
+#define MP_ERROR 3
+#define MP_ERROR_STACK 0x00
+#define MP_ERROR_TYPE 0
+#define MP_ERROR_FILE 1
+#define MP_ERROR_LINE 2
+#define MP_ERROR_MESSAGE 3
+#define MP_ERROR_ERRNO 4
+#define MP_ERROR_CODE 5
+#define MP_ERROR_FIELDS 6
+
+int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
+                                            char *value_as_string)
+{
+  const char *next_tarantool_tnt_reply_data;
+  unsigned char ext_field_type;
+  next_tarantool_tnt_reply_data= tarantool_tnt_reply_data;
+  lmysql->ldbms_mp_next(&next_tarantool_tnt_reply_data);
+  unsigned char mp_ext_byte= *tarantool_tnt_reply_data;
+  /* int l= 0; */
+  if (mp_ext_byte == 0xd4) { /* l= 1; */ tarantool_tnt_reply_data+= 1; }
+  else if (mp_ext_byte == 0xd5) { /* l= 2; */ tarantool_tnt_reply_data+= 1; }
+  else if (mp_ext_byte == 0xd6) { /* l= 4; */ tarantool_tnt_reply_data+= 1; }
+  else if (mp_ext_byte == 0xd7) { /* l= 8; */ tarantool_tnt_reply_data+= 1; }
+  else if (mp_ext_byte == 0xd8) { /* l= 16; */ tarantool_tnt_reply_data+= 1; }
+  else if (mp_ext_byte == 0xc7) { /* l= *(tarantool_tnt_reply_data + 1); */ tarantool_tnt_reply_data+= 2; }
+  else {strcpy(value_as_string, "EXT"); return 3; }
+  ext_field_type= *tarantool_tnt_reply_data;
+  ++tarantool_tnt_reply_data;
+  if (ext_field_type == MP_DECIMAL)
+  {
+    unsigned char scale= *tarantool_tnt_reply_data;
+    ++tarantool_tnt_reply_data;
+    unsigned char high_nibble, low_nibble;
+    unsigned char decimal_output[64];
+    unsigned char *decimal_output_pointer= &decimal_output[0];
+    unsigned char sign;
+    while (tarantool_tnt_reply_data < next_tarantool_tnt_reply_data)
+    {
+      unsigned char ch= (unsigned char) *tarantool_tnt_reply_data;
+      high_nibble= (ch >> 4);
+      if ((high_nibble != 0) || (decimal_output_pointer != &decimal_output[0]))
+      {
+        *decimal_output_pointer= high_nibble + 0x30;
+        ++decimal_output_pointer;
+      }
+      low_nibble= (ch & 0xf);
+      if ((low_nibble == 10) || (low_nibble == 12) || (low_nibble == 14) || (low_nibble == 15)) sign= '+';
+      else if ((low_nibble == 11) || (low_nibble == 13)) sign= '-';
+      else
+      {
+        *decimal_output_pointer= low_nibble + 0x30;
+        ++decimal_output_pointer;
+      }
+      ++tarantool_tnt_reply_data;
+    }
+    int decimal_output_length= decimal_output_pointer - &decimal_output[0];
+    char *o= value_as_string;
+    if (sign == '-') { *o= sign; ++o; }
+    if ((scale == 0) && (decimal_output_length == 0))
+    {
+      *o= '0';
+      ++o;
+    }
+    else if (scale == 0)
+    {
+      memcpy(o, decimal_output, decimal_output_length);
+      o+= decimal_output_length;
+    }
+    else if (scale >= decimal_output_length)
+    {
+      *o= '0'; ++o; /* Actually I prefer '.1' not '0.1' but '0.1' is what Tarantool client produces */
+      *o= '.'; ++o;
+      memset(o, '0', scale - decimal_output_length);
+      o+= scale - decimal_output_length;
+      memcpy(o, decimal_output, decimal_output_length);
+      o+= decimal_output_length;
+    }
+    else
+    {
+      memcpy(o, decimal_output, decimal_output_length - scale);
+      o+= decimal_output_length - scale;
+      *o= '.'; ++o;
+      memcpy(o, decimal_output + (decimal_output_length - scale), scale);
+      o+= scale;
+    }
+    return o - value_as_string;
+  }
+  else if (ext_field_type == MP_UUID)
+  {
+    char *o= value_as_string;
+    unsigned char ch, high_nibble, low_nibble;
+    for (int i= 0; i < 16; ++i)
+    {
+      ch= (unsigned char) *tarantool_tnt_reply_data;
+      if ((i == 4) || (i == 6) || (i == 8) || (i == 10)) *(o++)= '-';
+      high_nibble= (ch >> 4);
+      if (high_nibble < 10) high_nibble+= 0x30; else high_nibble+= 0x61 - 10;
+      *(o++)= high_nibble;
+      low_nibble= (ch &0xf);
+      if (low_nibble < 10) low_nibble+= 0x30; else low_nibble+= 0x61 - 10;
+      *(o++)= low_nibble;
+      ++tarantool_tnt_reply_data;
+    }
+    return o - value_as_string;
+  }
+  else if (ext_field_type == MP_ERROR)
+  {
+    printf("**** MP_ERROR\n");
+    unsigned char mp_ext_error_byte= *(tarantool_tnt_reply_data++);
+    if (mp_ext_error_byte == MP_ERROR_STACK) printf("*** MP_ERROR_STACK\n");
+
+    unsigned char mp_ext_error_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
+    if (mp_ext_error_type == MP_ARRAY)
+    {
+      int mp_ext_array_size= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+      printf("  array size = %d\n", mp_ext_array_size);
+      for (int i= 0; i < mp_ext_array_size; ++i)
+      {
+        unsigned char mp_ext_map_type= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+        if (mp_ext_map_type == MP_ERROR_TYPE)
+        {
+          printf("MP_ERROR_TYPE\n");
+        }
+        if (mp_ext_map_type == MP_ERROR_FILE)
+        {
+          printf("MP_ERROR_FILE\n");
+        }
+        if (mp_ext_map_type == MP_ERROR_LINE)
+        {
+          printf("MP_ERROR_LINE\n");
+        }
+        if (mp_ext_map_type == MP_ERROR_MESSAGE)
+        {
+          printf("MP_ERROR_MESSAGE\n");
+        }
+        if (mp_ext_map_type == MP_ERROR_ERRNO)
+        {
+          printf("MP_ERROR_ERRNO\n");
+        }
+        if (mp_ext_map_type == MP_ERROR_CODE)
+        {
+          printf("MP_ERROR_CODE\n");
+        }
+        if (mp_ext_map_type == MP_ERROR_FIELDS)
+        {
+          printf("MP_ERROR_FIELDS\n");
+        }
+        lmysql->ldbms_mp_next(&tarantool_tnt_reply_data);
+      }
+    }
+    exit(0);
+  }
+  else
+  {
+    ; /* Not decimal or uuid or error. Some sort of error. */
+  }
+  strcpy(value_as_string, "EXT");
+  return 3;
+}
 
 /*
   This is for result_set_type == RESULT_TYPE_5, which now has the column names in a "metadata" section.
@@ -15371,10 +15547,10 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         }
         else if (field_type == MP_EXT)
         {
-          lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
-          value_length= sprintf(value_as_string, "%s", "EXT");
+          value_length= tarantool_fetch_row_ext(tarantool_tnt_reply_data_copy, value_as_string);
           value= value_as_string;
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
+          lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
         }
         else
         {

@@ -3518,6 +3518,7 @@ private:
   QString get_statement_type(QString, int *);
   int get_statement_type_low(QString, QString, QString);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
+  int tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data, char *value_as_string);
   QString tarantool_fetch_header_row(int);
   const char * tarantool_seek_0(int*);
   QString tarantool_internal_query(char*, int);
