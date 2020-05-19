@@ -9366,13 +9366,25 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     if (hparse_errno > 0) return;
   }
-  else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET"))
+  else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_4, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET"))
         || (hparse_f_is_in_compound() && hparse_f_accept(FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_SET, "SET")))
   {
     hparse_statement_type= TOKEN_KEYWORD_SET;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_subquery_is_allowed= true;
     int hparse_i_of_set_statement= hparse_i_of_last_accepted;
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL_2_4) != 0)
+    {
+      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_4, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SESSION");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_4, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_4, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_4, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_errno > 0) return;
+      return;
+    }
     bool global_seen= false;
     bool persist_seen= false;
     bool equal_seen= false;

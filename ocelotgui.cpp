@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: May 14 2020
+   Last modified: May 19 2020
 */
 
 /*
@@ -12736,6 +12736,10 @@ void MainWindow::set_dbms_version_mask(QString version)
       {
         dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_3;
       }
+      if (version.contains("2.4") == true)
+      {
+        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_4;
+      }
     }
   }
 #endif
@@ -13604,6 +13608,10 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
     }
   }
   else if (word0 == "SELECT") { statement_type= TOKEN_KEYWORD_SELECT; }
+  else if (word0 == "SET")
+  {
+    if (QString::compare(word1, "SESSION", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_SET;
+  }
   else if (word0 == "START")
   {
     if (strcmp(tarantool_box_execute, "No SQL") != 0)
