@@ -2567,6 +2567,15 @@ static const keywords strvalues[]=
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
 
+/*
+  my_bool might not be in mysql.h due to https://bugs.mysql.com/bug.php?id=85131
+  MariaDB: my_bool STDCALL mysql_more_results(MYSQL *mysql);
+  MySQL:   bool STDCALL mysql_more_results(MYSQL *mysql);
+  I cannot use ifndef to see whether my_bool was used, it is a typedef.
+  So I will use MY_BOOL instead of my_bool or bool, for mysql_more_results.
+*/
+typedef char MY_BOOL;
+
 /* Strangely MYSQL_PORT might not be brought in by #include <mysql.h> */
 /* Now in MariaDB there's a MARIADB_PORT, but it's 3306 anyway. */
 #ifndef MYSQL_PORT
@@ -4519,7 +4528,7 @@ public:
   typedef MYSQL*          (*tmysql_init)         (MYSQL *);
   typedef void            (*tmysql_library_end)  (void);
   typedef int             (*tmysql_library_init) (int, char **, char **);
-  typedef my_bool         (*tmysql_more_results) (MYSQL *);
+  typedef MY_BOOL         (*tmysql_more_results) (MYSQL *);
   typedef int             (*tmysql_next_result)  (MYSQL *);
   typedef unsigned int    (*tmysql_num_fields)   (MYSQL_RES *);
   typedef my_ulonglong    (*tmysql_num_rows)     (MYSQL_RES *);
@@ -5228,7 +5237,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     return t__mysql_library_init(argc, argv, groups);
   }
 
-  my_bool ldbms_mysql_more_results(MYSQL *mysql)
+  MY_BOOL ldbms_mysql_more_results(MYSQL *mysql)
   {
     return t__mysql_more_results(mysql);
   }
