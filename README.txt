@@ -2265,7 +2265,8 @@ For example on Ubuntu:<PRE>
  #Do the following if and only if build is for use with Qt5
  sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools</PRE></P>
 
-<P>On RPM-like systems some packages must be installed first.
+<P>On RPM-like systems some packages must be installed first with
+"yum install" or "dnf install" or "urpmi".
 For example on Mageia:<PRE>
  urpmi gcc gcc-c++ make cmake git
  #The name of the following package (containing mysql.h) varies,
@@ -2275,11 +2276,13 @@ For example on Mageia:<PRE>
  #Do the following if and only if build is for use with Qt4
  urpmi libqt4-devel
  #Do the following if and only if build is for use with Qt5
+ #The name of the following package varies,
+ #it might be qt5-qtbase-devel
  urpmi libqt5-devel</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
  tar -zxvf ocelotgui_1.0.9.orig.tar.gz
- cd ocelotgui</PRE>
+ cd ocelotgui-1.0.9</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
