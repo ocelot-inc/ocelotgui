@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: May 28 2020
+   Last modified: June 12 2020
 */
 
 /*
@@ -14817,7 +14817,9 @@ unsigned int MainWindow::tarantool_num_fields()
   char field_name[TARANTOOL_MAX_FIELD_NAME_LENGTH];
   unsigned int max_field_count;
 
-  QString field_name_list= "";
+  field_name_list_all_rows.clear();
+  field_name_list_all_rows_count.clear();
+  field_name_list_all_rows_address.clear();
 
   /* See tarantool_num_rows for pretty well the same code as this */
   /* Todo: this is wrong, connection_number might not be 0 */
@@ -14850,67 +14852,80 @@ unsigned int MainWindow::tarantool_num_fields()
 
   strcpy(field_name, TARANTOOL_FIELD_NAME_BASE);
   strcat(field_name, "_");
+
   for (long unsigned int r= 0; r < result_row_count; ++r)
   {
     int return_value= tarantool_num_fields_recursive(tarantool_tnt_reply_data,
-                                                     field_name, 0, &field_name_list);
+                                                     field_name, 0,
+                                                     &field_name_list_all_rows,
+                                                     &field_name_list_all_rows_count,
+                                                     &field_name_list_all_rows_address,
+                                                     0);
     if (return_value < 0) assert(0 != 0);
   }
 
-  max_field_count= field_name_list.count(" ");
+  /* Todo: If it's possible to have a column with field_name_list_count == 0, eliminate it here. */
 
-  /* TODO: THIS IS NEVER FREED! LEAK! */
-  tarantool_field_names= new char[max_field_count * TARANTOOL_MAX_FIELD_NAME_LENGTH];
+  /* Field names must be in order. Temporarily change $s so most common map names have precedence. */
+  field_name_list_all_rows.sort();
 
-  unsigned int mid_index= 0;
-  for (unsigned int i= 0; i < max_field_count; ++i)
-  {
-    char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
-    int j= field_name_list.indexOf(" ", mid_index);
-    assert((j != -1) && ((j-mid_index) < TARANTOOL_MAX_FIELD_NAME_LENGTH));
-    QString sv;
-    sv= field_name_list.mid(mid_index, j-mid_index);
-    strcpy(tmp, sv.toUtf8());
-    *(tmp+sv.length())='\0';
-    strcpy(&tarantool_field_names[i*TARANTOOL_MAX_FIELD_NAME_LENGTH], tmp);
-    mid_index= j + 1;
-  }
+  max_field_count= field_name_list_all_rows.count();
 
-  /* The field name list must be in order, so bubble sort. */
-  /* todo: this is unnecessary if row count <= 1 */
-  /* todo: use qsort and swap pointers instead of 64-byte strings, this is undignified code */
-  {
-    unsigned int c, d;
-    char swap[TARANTOOL_MAX_FIELD_NAME_LENGTH];
-    for (c= 0 ; c < (max_field_count - 1); ++c)
-    {
-      for (d= 0 ; d < max_field_count - c - 1; ++d)
-      {
-        if (memcmp(&tarantool_field_names[d*TARANTOOL_MAX_FIELD_NAME_LENGTH],
-                   &tarantool_field_names[(d+1)*TARANTOOL_MAX_FIELD_NAME_LENGTH],
-                   TARANTOOL_MAX_FIELD_NAME_LENGTH) > 0)
-        {
-          memcpy(swap, &tarantool_field_names[d*TARANTOOL_MAX_FIELD_NAME_LENGTH], TARANTOOL_MAX_FIELD_NAME_LENGTH);
-          memcpy(&tarantool_field_names[d*TARANTOOL_MAX_FIELD_NAME_LENGTH],&tarantool_field_names[(d+1)*TARANTOOL_MAX_FIELD_NAME_LENGTH],TARANTOOL_MAX_FIELD_NAME_LENGTH);
-          memcpy(&tarantool_field_names[(d+1)*TARANTOOL_MAX_FIELD_NAME_LENGTH],swap,TARANTOOL_MAX_FIELD_NAME_LENGTH);
-        }
-      }
-    }
-  }
-
+  tarantool_field_names_count= max_field_count; /* tarantool_field_names_count is global */
 
   tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy;
 
   return max_field_count;
 }
 
-
+/*
+  tarantool_num_fields_recursive
+  Called from: tarantool_scan_rows(), tarantool_num_fields(), tarantool_num_fields_recursive()
+  Within a for-each-row loop, we call this with:
+    Initial value of char **tarantool_tnt_reply_data is to start of row.
+    Initial value of char *field_name is TARANTOOL_FIELD_NAME_BASE + "_" e.g. "f_"
+    Initial value of field_number_within_array is 0 (maybe we should rename "i" in the loop)
+    Initial value of QStringList field_name_list is clear (possibly clear() isn't necessary)
+    Initial value of QList<int> field_name_list_count is clear
+    Initial value of int field_name_upper is 0, it can be MP_MAP or (MP_ARRAY << 4) | MAP
+  Inside this routine, we say:
+    p_field_name_end points to after the last "_" in field_name.
+    if (tarantool_tnt_reply_data is to a map or array)
+      add (field number within array + 1) and "_" to field_name
+      for each element in map or array
+        recursive call!
+    else i.e. if (tarantool_tnt_reply_data is to a scalar) skip
+    add (array number + 1) to field_name
+    if field name is not in field_name_list) add field_name to field_name_list
+    Eventually we replace base name with defined field name, if there is one
+  So this is a good place to check for maps (or arrays of maps):
+    If (map) and (key type == string) and (key length not too great) and (value type is scalar)
+    and (number of fields < too many) then the key will be a header.
+    Todo: key type could be number, key length max could be less, number of fields could be more.
+          the numbers plugged in here are arbitrary
+    Todo: what if it is not the right result type?
+    Todo: what if user prefers the old way (as if TARANTOOL_MAX_MAP_FIELDS == 0)?
+    because the ambition is to have map keys as column headers where possible
+    but we try to preserve the order of maps within an array
+    So later we have to associate a key with a heading.
+  Todo: we go through the rows and call this more than once, so speed up or call less often
+        QHash or QMap or a tree or something that searches in a narrow range withthe same prefix
+        or a binary search if it's the second loop after there's been a sort
+  Todo: There might be a point to distinguishing MP_MAP size n from MP_ARRAY size n containing maps.
+        In the former case you know it's all maps and maybe needn't worry about the order.
+*/
+/* If there are 64 or more fields, block creation of new headers from maps. Arbitrary. Must be divisible by 2. */
+#define TARANTOOL_MAX_MAP_FIELDS 64
 int MainWindow::tarantool_num_fields_recursive(const char **tarantool_tnt_reply_data,
                                                char *field_name,
                                                int field_number_within_array,
-                                               QString *field_name_list)
+                                               QStringList *p_field_name_list,
+                                               QList<int> *p_field_name_list_count,
+                                               QList<char*> *p_field_name_list_address,
+                                               int field_type_upper)
 {
   bool is_scalar;
+  int field_name_index;
   char field_type= lmysql->ldbms_mp_typeof(**tarantool_tnt_reply_data);
   if ((field_type == MP_NIL)
    || (field_type == MP_UINT)
@@ -14936,18 +14951,33 @@ int MainWindow::tarantool_num_fields_recursive(const char **tarantool_tnt_reply_
   if (is_scalar == false)
   {
     uint32_t array_size;
+    uint32_t field_type_to_pass;
+    const char *tarantool_tnt_reply_data_before_decode= *tarantool_tnt_reply_data;
     if (field_type == MP_ARRAY)
+    {
+      field_type_to_pass= MP_ARRAY;
       array_size= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
+    }
     else
+    {
+      if (field_type_upper == MP_ARRAY) field_type_to_pass= (MP_ARRAY << 4) | MP_MAP;
+      else field_type_to_pass= MP_MAP;
       array_size= lmysql->ldbms_mp_decode_map(tarantool_tnt_reply_data) * 2;
+    }
+    if (array_size == 0) *tarantool_tnt_reply_data= tarantool_tnt_reply_data_before_decode;
     if (array_size != 0)
     {
       sprintf(p_field_name_end, "%05d_", field_number_within_array + 1);
       for (uint32_t i= 0; i < array_size; ++i)
       {
         int return_value= tarantool_num_fields_recursive(tarantool_tnt_reply_data,
-                                                         field_name, i, field_name_list);
+                                                         field_name,
+                                                         i, p_field_name_list,
+                                                         p_field_name_list_count,
+                                                         p_field_name_list_address,
+                                                         field_type_to_pass);
         if (return_value < 0) return return_value;
+        i+= return_value; /* usually return_value == 0 but return_value == 1 iff we made a map field and skipped value */
       }
       p_field_name_end= field_name + strlen(field_name) - 1;
       while (*p_field_name_end != '_') --p_field_name_end;
@@ -14955,11 +14985,64 @@ int MainWindow::tarantool_num_fields_recursive(const char **tarantool_tnt_reply_
       return 0;
     }
   }
-  if (is_scalar == true)
-    lmysql->ldbms_mp_next(tarantool_tnt_reply_data);
   /* is_scalar == true or array size == 0 which we treat as null */
-  sprintf(p_field_name_end, "%05d ", field_number_within_array + 1);
-  if ((*field_name_list).contains(field_name) == false) (*field_name_list).append(field_name);
+  if ((is_scalar == true)
+   && ((field_type_upper == MP_MAP) || (field_type_upper == ((MP_ARRAY << 4) | MP_MAP)))
+   && ((field_number_within_array % 2) == 0)
+   && (lmysql->ldbms_mp_typeof(**tarantool_tnt_reply_data) == MP_STR))
+  {
+    const char *tarantool_tnt_reply_data_copy= *tarantool_tnt_reply_data;
+    uint32_t key_length;
+    const char *key;
+    unsigned int field_name_length= strlen(field_name);
+    key= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &key_length);
+    if ((key_length + field_name_length + 2) < TARANTOOL_MAX_FIELD_NAME_LENGTH)
+    {
+      int value_field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
+      if ((value_field_type != MP_ARRAY) && (value_field_type != MP_MAP))
+      {
+        char map_field_name[TARANTOOL_MAX_FIELD_NAME_LENGTH];
+        /* Won't include map item number but will include array item number if we're in a map within an array */
+        /* field_name_length -= 6; */
+        memcpy(map_field_name, field_name, field_name_length);
+        *(map_field_name + field_name_length - 1)= '_';
+        memcpy(map_field_name + field_name_length, key, key_length);
+        *(map_field_name + field_name_length + key_length)= '\0';
+        int map_field_name_index= (*p_field_name_list).indexOf(map_field_name);
+        if ((map_field_name_index != -1 || (*p_field_name_list).size() < TARANTOOL_MAX_MAP_FIELDS))
+        {
+          if (map_field_name_index == -1)
+          {
+            (*p_field_name_list).append(map_field_name);
+            (*p_field_name_list_count).append(1);
+            (*p_field_name_list_address).append((char*)tarantool_tnt_reply_data_copy);
+          }
+          else
+          {
+            (*p_field_name_list_count)[map_field_name_index]= (*p_field_name_list_count)[map_field_name_index] + 1;
+            (*p_field_name_list_address)[map_field_name_index]= (char*)tarantool_tnt_reply_data_copy;
+          }
+          lmysql->ldbms_mp_next(tarantool_tnt_reply_data);
+          lmysql->ldbms_mp_next(tarantool_tnt_reply_data);
+          return 1;
+        }
+      }
+    }
+  }
+  sprintf(p_field_name_end, "%05d", field_number_within_array + 1);
+  field_name_index= (*p_field_name_list).indexOf(field_name);
+  if (field_name_index == -1)
+  {
+    (*p_field_name_list).append(field_name);
+    (*p_field_name_list_count).append(1);
+    (*p_field_name_list_address).append((char*)*tarantool_tnt_reply_data);
+  }
+  else
+  {
+    (*p_field_name_list_count)[field_name_index]= (*p_field_name_list_count)[field_name_index] + 1;
+    (*p_field_name_list_address)[field_name_index]= (char*)*tarantool_tnt_reply_data;
+  }
+  lmysql->ldbms_mp_next(tarantool_tnt_reply_data);
   return 0;
 }
 
@@ -15285,11 +15368,8 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
 }
 
 /*
-  This is for result_set_type == RESULT_TYPE_5, which now has the column names in a "metadata" section.
-
-  The same loop as the one in tarantool_fetch_row(), for row#1.
   This is for result_set_type == RESULT_TYPE_5, where row#1 should actually
-  be the header i.e. the field names.
+  be the header i.e. the field names. Ultimately it might be from the format.
   Skip the dd 00 00 00 01 and the row count.
   Skip the first field which is the a1 08 signature.
   For each header field
@@ -15299,66 +15379,57 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
   Todo: Check is it ok to pass connection_number==0 to tarantool_result_set_init
   THIS IS ALL GONE NOW.
 */
-QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
+QString MainWindow::tarantool_fetch_header_row()
 {
-  //const char *tarantool_tnt_reply_data;
-  //tarantool_tnt_reply_data= tarantool_tnt_reply_data_p;
-
-//  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-//  lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
-
-  //char field_type;
-//  field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data);
-//  if (field_type != MP_ARRAY) return "tarantool_fetch_header_row: field_type != MP_ARRAY";
-
-  //long unsigned int tmp_row_count;
-  //int result_set_type;
-
-
   uint32_t value_length;
   const char *value;
-  char *c, *c2;
 
-  //const char *n;
+  int base_length= strlen(TARANTOOL_FIELD_NAME_BASE);
+  char *flags= new char[tarantool_field_names_count];
+  memset(flags, 0, tarantool_field_names_count);
+
   for (uint32_t field_number= 0; ;++field_number)
   {
-
     long unsigned int r;
     value= tarantool_result_set_init_select(&r, field_number);
     if (value == NULL) break; /* no more columns? */
     value_length= r;
-
-    if (value_length >= TARANTOOL_MAX_FIELD_NAME_LENGTH)
-      return "Field name too long";
-    for (int rf= 0; rf < p_result_column_count; ++rf)
+    char what_to_set_to[TARANTOOL_MAX_FIELD_NAME_LENGTH * 2];
+    memcpy(what_to_set_to, value, value_length); /* This is what we set to */
+    *(what_to_set_to + value_length)= '\0';
+    char what_to_search_for[TARANTOOL_MAX_FIELD_NAME_LENGTH];
+    memcpy(what_to_search_for, TARANTOOL_FIELD_NAME_BASE, base_length);
+    //char field_number_as_char[16];
+    sprintf(what_to_search_for, "%s_%d", TARANTOOL_FIELD_NAME_BASE, field_number + 1);
+    int what_to_search_for_length= strlen(what_to_search_for);
+    for (unsigned int j= 0; j < tarantool_field_names_count; ++j)
     {
-      c= &tarantool_field_names[rf*TARANTOOL_MAX_FIELD_NAME_LENGTH];
-      char fn[8];
-      if (memcmp(c, TARANTOOL_FIELD_NAME_BASE, strlen(TARANTOOL_FIELD_NAME_BASE)) == 0)
+      if (*(flags + j) > 0)
       {
-        char cm= *(c + strlen(TARANTOOL_FIELD_NAME_BASE));
-        if (cm == '_')
-        {
-          c2= c + strlen(TARANTOOL_FIELD_NAME_BASE) + 1;
-          int j1, j2;
-          for (j1= 0, j2= 0; *(c2 + j1) != '\0' && *(c2 + j1) != '_'; ++j1, ++j2)
-          {
-            fn[j2]= *(c2 + j1);
-          }
-          fn[j2]= '\0';
-          unsigned int j3= atoi(fn);
-          if ((isdigit(fn[0]) && j3 == field_number + 1))
-          {
-            char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
-            strcpy(tmp, c2 + j1 + strlen(TARANTOOL_FIELD_NAME_BASE) + 1);
-            memcpy(c, value, value_length);
-            *(c + value_length)= '\0';
-            strcat(c, tmp);
-          }
-        }
+        continue;
       }
+      char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH * 2];
+      QString s= field_name_list_all_rows.at(j);
+      strcpy(tmp, s.toUtf8().data());
+      char *what= &tmp[0];
+      int memcmp_result= memcmp(what_to_search_for, what, what_to_search_for_length);
+      if (memcmp_result < 0) break; /* what_to_search_for < what */
+      if (memcmp_result > 0) continue; /* what to search for > what */
+      char char_after_what= *(what + what_to_search_for_length);
+      if ((char_after_what == 0) || (char_after_what == '_'))
+      {
+        *(flags + j)= 1;
+        char new_name[TARANTOOL_MAX_FIELD_NAME_LENGTH * 2];
+        memset(new_name, 0, TARANTOOL_MAX_FIELD_NAME_LENGTH);
+        memcpy(new_name, value, value_length);
+        memcpy(new_name + value_length, what + what_to_search_for_length, TARANTOOL_MAX_FIELD_NAME_LENGTH - what_to_search_for_length);
+        *(new_name + TARANTOOL_MAX_FIELD_NAME_LENGTH)='\0';
+        memcpy(what, new_name, TARANTOOL_MAX_FIELD_NAME_LENGTH);
+      }
+      field_name_list_all_rows[j]= what;
     }
   }
+  delete []flags;
   return "OK";
 }
 
@@ -15369,6 +15440,10 @@ QString MainWindow::tarantool_fetch_header_row(int p_result_column_count)
   Called from: scan_rows in result grid.
   Compare: what we do for first loop in scan_rows().
   Todo: Wonder: any advantage to having more precise field_value_flags since we know MP_UINT etc.?
+  Todo: possible speed improvements
+        field_name_list lookup via QHash, or via QMap, or binary search, or search only where prefix matches
+        do not bother with tarantool_fetch_row, you could figure out allocation size in tarantool_num_fields (?)
+        header-row heroism can end, you will just keep the main field name list until tarantool_scan_rows ends
 */
 QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
                unsigned int p_result_row_count,
@@ -15379,16 +15454,22 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
 {
   (void) p_mysql_res; /* suppress "unused parameter" warning */
   unsigned long int v_r;
-  unsigned int i;
+  //unsigned int i;
   int returned_result_set_type;
-  //char **v_row;
-  //unsigned long *v_lengths;
-//  unsigned int ki;
   const char *tarantool_tnt_reply_data_copy;
+
+  /* Todo: all_rows_address could be done with new or malloc but we have early 'return' statements. */
+  QList<char*> field_name_list_all_rows_address;
+  for (int i= 0; i < field_name_list_all_rows.count(); ++i) field_name_list_all_rows_address.append(NULL);
+
+  assert(p_result_column_count == tarantool_field_names_count); /* does this make sense? */
 
   ResultGrid *rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
 
-  for (i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;
+  /* TODO: The first loop is not necessary because we have data from tarantool_num_fields_recursive()? */
+  /* TODO: Are you sure it's enough to use tarantool_field_names_count not p_result_column_count? */
+
+  for (unsigned int i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;
   /*
     First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
   */
@@ -15404,190 +15485,152 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     tarantool_tnt_reply_data_copy+= bytes;
     total_size+= row_size_1;
     /* per-field overhead includes overhead for missing fields; they are null */
-    int row_size_2= p_result_column_count * (sizeof(unsigned int) + sizeof(char));
+    int row_size_2= tarantool_field_names_count * (sizeof(unsigned int) + sizeof(char) + TARANTOOL_MAX_FIELD_NAME_LENGTH);
     total_size+= row_size_2;
   }
+
   if (total_size > 2000000000) return "tarantool_scan_rows: total_size too big";
   *p_result_set_copy= new char[total_size];                                         /* allocate */
   *p_result_set_copy_rows= new char*[p_result_row_count];
   result_set_copy_pointer= *p_result_set_copy;
   tarantool_tnt_reply_data_copy= tarantool_seek_0(&returned_result_set_type); /* "seek to row 0" */
+  const char **tarantool_tnt_reply_data= &tarantool_tnt_reply_data_copy;
+
+  /*
+    If we found a name when we went through all the rows during tarantool_num_fields,
+    then surely we will find it when we look a a single row.
+    Therefore this pass will not add to the field name list, but will set addresses.
+    That is: For each field in list of current row, we will mark as non-null in list of all rows.
+  */
   for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
   {
     (*p_result_set_copy_rows)[v_r]= result_set_copy_pointer;
     //char *tmp_copy_pointer= result_set_copy_pointer;
     /* Form a field name list the same way you did in tarantool_num_fields */
-    QString field_name_list= "";
+    /* Initialize all addresses */
+    for (int i= 0; i < field_name_list_all_rows.count(); ++i) field_name_list_all_rows_address[i]= NULL;
     {
-      const char *tarantool_tnt_reply_data_copy_2= tarantool_tnt_reply_data_copy;
-      const char **tarantool_tnt_reply_data= &tarantool_tnt_reply_data_copy;
       char field_name[TARANTOOL_MAX_FIELD_NAME_LENGTH];
       strcpy(field_name, TARANTOOL_FIELD_NAME_BASE);
       strcat(field_name, "_");
+
       int return_value= tarantool_num_fields_recursive(tarantool_tnt_reply_data,
-                                                       field_name, 0, &field_name_list);
+                                                       field_name, 0,
+                                                       &field_name_list_all_rows,
+                                                       &field_name_list_all_rows_count,
+                                                       &field_name_list_all_rows_address,
+                                                       0);
+
       if (return_value < 0) return "tarantool_scan_rows: return_value < 0";
-      tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_copy_2;
+      //tarantool_tnt_reply_data_copy_end= tarantool_tnt_reply_data_copy;
     }
-    /* At this point field_name_list is e.g. f_00001_00001 f_00001_00002 */
-    char field_type;
-    field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
-    if (field_type != MP_ARRAY) return "tarantool_scan_rows: field_type != MP_ARRAY";
-    uint32_t field_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
-    if (field_count > p_result_column_count) return "tarantool_scan_rows: field_count > p_result_column_count";
-    const char *value;
-    uint32_t value_length;
-    char value_as_string[320]; /* must be big enough for any sprintf() result */
+
     /*
-      Number of fields = number of names in field_name_list.
-      At this point we can skip over MP_ARRAY and MP_MAP because we only care about scalars.
-      Whenever we get a next field, we know its name is next entry in field_name_list
-      If that's greater than something in the main list (which can only happen if row count > 1),
-      then add NULLs for the missing fields until the main list catches up.
+      At this point, field_name_list_all_rows* stuff has:
+      field_name = name still as base name + numbers e.g. e.g. f_00001_00001,
+      address = NULL or something we can mp_decode.
     */
-    field_count= field_name_list.count(" ");
-    unsigned int mid_index= 0;
-    int field_number_in_main_list= 0;
-    for (uint32_t field_number= 0; field_number < field_count; ++field_number)
+
+    for (int i= 0; i < field_name_list_all_rows.count(); ++i) /* second field loop */
     {
-      int i= field_number;
-      field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
+      unsigned char field_type;
+      const char *all_rows_address= field_name_list_all_rows_address[i];
+
+      if (all_rows_address == 0) field_type= MP_NIL;
+      else field_type= lmysql->ldbms_mp_typeof(*all_rows_address);
+
       if (field_type > MP_EXT) return "tarantool_scan_rows: field_type > MP_EXT";
-      if (field_type == MP_ARRAY)
-      {
-        int array_size= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
-        if (array_size != 0)
-        {
-          --field_number;
-          continue;
-        }
-      }
-      if (field_type == MP_MAP)
-      {
-        int array_size= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_data_copy);
-        if (array_size != 0)
-        {
-          --field_number;
-          continue;
-        }
-      }
-      {
-        char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
-        int j= field_name_list.indexOf(" ", mid_index);
-        if ((j != -1) && ((j-mid_index) < TARANTOOL_MAX_FIELD_NAME_LENGTH)) {;}
-        else return "tarantool_scan_rows: check TARANTOOL_MAX_FIELD_NAME_LENGTH";
-        QString sv;
-        sv= field_name_list.mid(mid_index, j-mid_index);
-        strcpy(tmp, sv.toUtf8());
-        *(tmp+sv.length())='\0';
-        for (;;)
-        {
-          int strcmp_result= strcmp(&tarantool_field_names[field_number_in_main_list*TARANTOOL_MAX_FIELD_NAME_LENGTH], tmp);
-          if (strcmp_result > 0) return "tarantool_scan_rows: strcmp_result > 0";
-          if (strcmp_result == 0) break;
-          /* Dump null. Todo: similar code appears 3 times. */
-          if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
-          memset(result_set_copy_pointer, 0, sizeof(unsigned int));
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
-          result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
-          ++field_number_in_main_list;
-        }
-        mid_index= j + 1;
-        ++field_number_in_main_list;
-      }
+
       if ((field_type == MP_NIL) || (field_type == MP_ARRAY) || (field_type == MP_MAP))
       {
-        if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[field_number_in_main_list - 1]) (*p_result_max_column_widths)[field_number_in_main_list - 1]= sizeof(NULL_STRING) - 1;
-        if (field_type == MP_NIL) lmysql->ldbms_mp_decode_nil(&tarantool_tnt_reply_data_copy);
+        /* Assumption: if MP_ARRAY or MP_MAP, size = 0. */
+        if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
+        if (all_rows_address != 0) lmysql->ldbms_mp_next(&all_rows_address);
         memset(result_set_copy_pointer, 0, sizeof(unsigned int));
         *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
         result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
+        continue;
+      }
+      const char *value;
+      uint32_t value_length;
+      char value_as_string[TARANTOOL_MAX_FIELD_NAME_LENGTH * 2]; /* must be big enough for any sprintf() result */
+      if (field_type == MP_UINT)
+      {
+        uint64_t uint_value= lmysql->ldbms_mp_decode_uint(&all_rows_address);
+        long long unsigned int llu= uint_value;
+        value_length= sprintf(value_as_string, "%llu", llu);
+        value= value_as_string;
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
+      }
+      else if (field_type == MP_INT)
+      {
+        int64_t int_value= lmysql->ldbms_mp_decode_int(&all_rows_address);
+        long long int lli= int_value;
+        value_length= sprintf(value_as_string, "%lld", lli);
+        value= value_as_string;
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
+      }
+      else if (field_type == MP_STR)
+      {
+        value= lmysql->ldbms_mp_decode_str(&all_rows_address, &value_length);
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
+      }
+      else if (field_type == MP_BIN)
+      {
+        value= lmysql->ldbms_mp_decode_bin(&all_rows_address, &value_length);
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
+      }
+      else if (field_type == MP_BOOL)
+      {
+        bool bool_value= lmysql->ldbms_mp_decode_bool(&all_rows_address);
+        if (bool_value == 0) {value_length= 5; strcpy(value_as_string, "FALSE"); }
+        else                 {value_length= 4; strcpy(value_as_string, "TRUE"); }
+        value= value_as_string;
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
+      }
+      else if (field_type == MP_FLOAT)
+      {
+        float float_value= lmysql->ldbms_mp_decode_float(&all_rows_address);
+        value_length= sprintf(value_as_string, "%f", float_value);
+        value= value_as_string;
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
+      }
+      else if (field_type == MP_DOUBLE)
+      {
+        double double_value= lmysql->ldbms_mp_decode_double(&all_rows_address);
+        value_length= sprintf(value_as_string, "%E", double_value);
+        value= value_as_string;
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
+      }
+      else if (field_type == MP_EXT)
+      {
+        value_length= tarantool_fetch_row_ext(all_rows_address, value_as_string);
+        value= value_as_string;
+        lmysql->ldbms_mp_next(&all_rows_address);
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
       }
       else
       {
-        if (field_type == MP_UINT)
-        {
-          uint64_t uint_value= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data_copy);
-          long long unsigned int llu= uint_value;
-          value_length= sprintf(value_as_string, "%llu", llu);
-          value= value_as_string;
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
-        }
-        else if (field_type == MP_INT)
-        {
-          int64_t int_value= lmysql->ldbms_mp_decode_int(&tarantool_tnt_reply_data_copy);
-          long long int lli= int_value;
-          value_length= sprintf(value_as_string, "%lld", lli);
-          value= value_as_string;
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
-        }
-        else if (field_type == MP_STR)
-        {
-          value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
-        }
-        else if (field_type == MP_BIN)
-        {
-          value= lmysql->ldbms_mp_decode_bin(&tarantool_tnt_reply_data_copy, &value_length);
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
-        }
-        else if (field_type == MP_BOOL)
-        {
-          bool bool_value= lmysql->ldbms_mp_decode_bool(&tarantool_tnt_reply_data_copy);
-          if (bool_value == 0) {value_length= 5; strcpy(value_as_string, "FALSE"); }
-          else                 {value_length= 4; strcpy(value_as_string, "TRUE"); }
-          value= value_as_string;
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_OTHER;
-        }
-        else if (field_type == MP_FLOAT)
-        {
-          float float_value= lmysql->ldbms_mp_decode_float(&tarantool_tnt_reply_data_copy);
-          value_length= sprintf(value_as_string, "%f", float_value);
-          value= value_as_string;
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
-        }
-        else if (field_type == MP_DOUBLE)
-        {
-          double double_value= lmysql->ldbms_mp_decode_double(&tarantool_tnt_reply_data_copy);
-          value_length= sprintf(value_as_string, "%E", double_value);
-          value= value_as_string;
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
-        }
-        else if (field_type == MP_EXT)
-        {
-          value_length= tarantool_fetch_row_ext(tarantool_tnt_reply_data_copy, value_as_string);
-          value= value_as_string;
-          lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
-          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
-        }
-        else
-        {
-          /* it probably would be proper to assert() here */
-          value_length= 0;
-          value= "";
-        }
-        //if (value_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= value_length;
-        rg->set_max_column_width(value_length, value, (&(*p_result_max_column_widths)[field_number_in_main_list - 1]));
-        memcpy(result_set_copy_pointer, &value_length, sizeof(unsigned int));
-        result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
-        memcpy(result_set_copy_pointer, value, value_length);
-        result_set_copy_pointer+= value_length;
+        /* it probably would be proper to assert() here */
+        value_length= 0;
+        value= "";
       }
-    }
-    while ((unsigned int) field_number_in_main_list < p_result_column_count)
-    {
-      /* Dump null. Todo: similar code appears 3 times. */
-      if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[field_number_in_main_list]) (*p_result_max_column_widths)[field_number_in_main_list]= sizeof(NULL_STRING) - 1;
-      memset(result_set_copy_pointer, 0, sizeof(unsigned int));
-      *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
+      //if (value_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= value_length;
+      rg->set_max_column_width(value_length, value, (&(*p_result_max_column_widths)[i]));
+      memcpy(result_set_copy_pointer, &value_length, sizeof(unsigned int));
       result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
-      ++field_number_in_main_list;
+      memcpy(result_set_copy_pointer, value, value_length);
+      result_set_copy_pointer+= value_length;
     }
+    /* I think tarantool_tnt_reply_data_copy should be pointing to next row after tarantool_num_fields_recursive */
   }
   /* Now that names are sorted, we can shorten them e.g. f_0001_0007_0001_0001 becomes f_7_1_1. */
-  for (unsigned int i= 0; i < p_result_column_count; ++i)
+  for (int i= 0; i < field_name_list_all_rows.count(); ++i)
   {
-    char *c= &tarantool_field_names[i*TARANTOOL_MAX_FIELD_NAME_LENGTH];
+    char tmp[TARANTOOL_MAX_FIELD_NAME_LENGTH];
+    QString s= field_name_list_all_rows.at(i);
+    strcpy(tmp, s.toUtf8().data());
+    char *c= &tmp[0];
     for (unsigned int j= strlen(TARANTOOL_FIELD_NAME_BASE); *(c + j) != '\0'; ++j)
     {
       if ((*(c + j) == '0') && (*(c + j - 1) == '_'))
@@ -15605,10 +15648,13 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       for (k= j + 2; *(c + k) != '\0'; ++k) *(c + k - 2)= *(c + k);
       *(c + k - 2)= '\0';
     }
+    field_name_list_all_rows[i]= tmp;
   }
+
+  /* Replace result-set arbitrary names with names from format strings */
   if (returned_result_set_type == RESULT_TYPE_5)
   {
-    QString fetch_header_row_result= tarantool_fetch_header_row(p_result_column_count);
+    QString fetch_header_row_result= tarantool_fetch_header_row();
     if (fetch_header_row_result != "OK") return fetch_header_row_result;
   }
 
@@ -15651,8 +15697,8 @@ QString MainWindow::tarantool_scan_field_names(
   for (i= 0; i < p_result_column_count; ++i)                                /* first loop */
   {
     total_size+= sizeof(unsigned int);
-    if (strcmp(which_field, "name") == 0) total_size+= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
-    else if (strcmp(which_field, "org_name") == 0) total_size+= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
+    if (strcmp(which_field, "name") == 0) total_size+= field_name_list_all_rows.at(i).length();
+    else if (strcmp(which_field, "org_name") == 0) total_size+= field_name_list_all_rows.at(i).length();
     else if (strcmp(which_field, "org_table") == 0) total_size+= strlen(tmp_table_name);
     else /* if (strcmp(which_field, "db") == 0) */ total_size+= sizeof(TARANTOOL_FIELD_NAME_BASE);
   }
@@ -15661,15 +15707,18 @@ QString MainWindow::tarantool_scan_field_names(
   result_field_names_pointer= *p_result_field_names;
   for (i= 0; i < p_result_column_count; ++i)                                 /* second loop */
   {
-    if (strcmp(which_field, "name") == 0) v_lengths= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
-    else if (strcmp(which_field, "org_name") == 0) v_lengths= strlen(&tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH]);
+    if (strcmp(which_field, "name") == 0) v_lengths= field_name_list_all_rows.at(i).length();
+    else if (strcmp(which_field, "org_name") == 0) v_lengths= field_name_list_all_rows.at(i).length();
     else if (strcmp(which_field, "org_table") == 0) v_lengths= strlen(tmp_table_name);
     else /* if (strcmp(which_field, "db") == 0) */ v_lengths= sizeof(TARANTOOL_FIELD_NAME_BASE);
     memcpy(result_field_names_pointer, &v_lengths, sizeof(unsigned int));
     if (v_lengths >= TARANTOOL_MAX_FIELD_NAME_LENGTH) return "Field Name Too Long";
     result_field_names_pointer+= sizeof(unsigned int);
-    if (strcmp(which_field, "name") == 0) memcpy(result_field_names_pointer, &tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH], v_lengths);
-    else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, &tarantool_field_names[i * TARANTOOL_MAX_FIELD_NAME_LENGTH], v_lengths);
+    char tmp_field_name[TARANTOOL_MAX_FIELD_NAME_LENGTH * 2];
+    QString s= field_name_list_all_rows.at(i);
+    strcpy(tmp_field_name, s.toUtf8().data());
+    if (strcmp(which_field, "name") == 0) memcpy(result_field_names_pointer, tmp_field_name, v_lengths);
+    else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, tmp_field_name, v_lengths);
     else if (strcmp(which_field, "org_table") == 0) memcpy(result_field_names_pointer, tmp_table_name, v_lengths);
     else /* if (strcmp(which_field, "db") == 0) */ memcpy(result_field_names_pointer, TARANTOOL_FIELD_NAME_BASE, v_lengths);
     result_field_names_pointer+= v_lengths;

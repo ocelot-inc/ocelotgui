@@ -3247,6 +3247,11 @@ public:
   void tparse_f_program(QString text);
 #endif
 #ifdef DBMS_TARANTOOL
+  /* todo: field_name_list_all_rows* stuff could be cleared sometimes, or could be in ResultGrid */
+  QStringList field_name_list_all_rows;
+  QList<int> field_name_list_all_rows_count;
+  QList<char*> field_name_list_all_rows_address;
+
   QString tarantool_add_return(QString);
   const char *tarantool_result_set_init(int,long unsigned int *,int *);
   const char *tarantool_result_set_init_select(long unsigned int *, int);
@@ -3256,7 +3261,10 @@ public:
   int tarantool_num_fields_recursive(const char **tarantool_tnt_reply_data,
                                      char *field_name,
                                      int field_number_within_array,
-                                     QString *field_name_list);
+                                     QStringList *field_name_list,
+                                     QList<int> *field_name_list_count,
+                                     QList<char*> *field_name_list_address,
+                                     int field_type_upper);
   QString tarantool_scan_rows(unsigned int p_result_column_count,
                  unsigned int p_result_row_count,
                  MYSQL_RES *p_mysql_res,
@@ -3529,7 +3537,7 @@ private:
   int get_statement_type_low(QString, QString, QString);
   QString tarantool_fetch_row(const char *tarantool_tnt_reply_data, int *bytes, int *tsize);
   int tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data, char *value_as_string);
-  QString tarantool_fetch_header_row(int);
+  QString tarantool_fetch_header_row();
   const char * tarantool_seek_0(int*);
   QString tarantool_internal_query(char*, int);
 #endif
@@ -3638,7 +3646,7 @@ private:
 #ifdef DBMS_TARANTOOL
   struct tnt_reply tarantool_tnt_reply;
   const char *tarantool_tnt_reply_data_p; /* initially = tarantool_tnt_reply.data. can move if transaction. */
-  char * tarantool_field_names;
+  unsigned int tarantool_field_names_count; /* duplication of field_name_list_all_rows.count() -- unnecessary? */
   bool tarantool_select_nosql;
 #endif
 
