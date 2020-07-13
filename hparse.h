@@ -12973,6 +12973,7 @@ int MainWindow::hparse_f_client_statement()
     /* Todo: strvalues items are in order so you could bsearch(). */
     /* Todo: TOKEN_REFTYPE_ANY is vague, you'd do well with a reftype for ocelot_ items */
     /* Todo: it's really TOKEN_TYPE_IDENTIFIER so see what hovering does */
+    /* Todo: we could have hints for some values e.g. use QFontDatabase to show possible font families */
     {
       int i;
       for (i= TOKEN_KEYWORD_OCELOT_BATCH; i <= TOKEN_KEYWORD_OCELOT_XML; ++i)

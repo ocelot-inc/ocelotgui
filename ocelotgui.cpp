@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: June 12 2020
+   Last modified: July 13 2020
 */
 
 /*
@@ -4224,8 +4224,13 @@ void MainWindow::action_the_manual()
   }
   Message_box *message_box;
   /* Don't use width=960 if screen width is smaller, e.g. on a VGA screen. */
+#if (QT_VERSION >= 0x50000)
+  QScreen *screen= QGuiApplication::primaryScreen();
+  int desktop_width= screen->availableGeometry().width();
+#else
   QDesktopWidget desktop;
   int desktop_width= desktop.availableGeometry().width();
+#endif
   if (desktop_width > (960 + 50)) message_box= new Message_box("Help|The Manual", the_text, 960, this);
   else message_box= new Message_box("Help|The Manual", the_text, desktop_width - 50, this);
   message_box->exec();
@@ -4783,15 +4788,8 @@ void MainWindow::assign_names_for_colors()
   if (ocelot_grid_border_color.left(1) == "#") ocelot_grid_border_color= q_color_list_name(ocelot_grid_border_color);
   if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
   if (ocelot_grid_header_background_color.left(1) == "#") ocelot_grid_header_background_color= q_color_list_name(ocelot_grid_header_background_color);
-  if (ocelot_grid_font_family.left(1) == "#") ocelot_grid_font_family= q_color_list_name(ocelot_grid_font_family);
-  if (ocelot_grid_font_size.left(1) == "#") ocelot_grid_font_size= q_color_list_name(ocelot_grid_font_size);
-  if (ocelot_grid_font_style.left(1) == "#") ocelot_grid_font_style= q_color_list_name(ocelot_grid_font_style);
-  if (ocelot_grid_font_weight.left(1) == "#") ocelot_grid_font_weight= q_color_list_name(ocelot_grid_font_weight);
   if (ocelot_grid_cell_border_color.left(1) == "#") ocelot_grid_cell_border_color= q_color_list_name(ocelot_grid_cell_border_color);
   if (ocelot_grid_cell_drag_line_color.left(1) == "#") ocelot_grid_cell_drag_line_color= q_color_list_name(ocelot_grid_cell_drag_line_color);
-  if (ocelot_grid_border_size.left(1) == "#") ocelot_grid_border_size= q_color_list_name(ocelot_grid_border_size);
-  if (ocelot_grid_cell_border_size.left(1) == "#") ocelot_grid_cell_border_size= q_color_list_name(ocelot_grid_cell_border_size);
-  if (ocelot_grid_cell_drag_line_size.left(1) == "#") ocelot_grid_cell_drag_line_size= q_color_list_name(ocelot_grid_cell_drag_line_size);
   if (ocelot_history_text_color.left(1) == "#") ocelot_history_text_color= q_color_list_name(ocelot_history_text_color);
   if (ocelot_history_background_color.left(1) == "#") ocelot_history_background_color= q_color_list_name(ocelot_history_background_color);
   if (ocelot_history_border_color.left(1) == "#") ocelot_history_border_color= q_color_list_name(ocelot_history_border_color);
@@ -4820,7 +4818,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   ocelot_statement_background_color= statement_edit_widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   font= statement_edit_widget->font();
   ocelot_statement_font_family= font.family();
-  if (font.italic()) ocelot_statement_font_style= "italic"; else ocelot_statement_font_style= "normal";
+  ocelot_statement_font_style= get_font_style_as_string(font);
   ocelot_statement_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_statement_font_weight= canonical_font_weight(QString::number(font.weight()));
 
@@ -4828,7 +4826,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   ocelot_grid_background_color= widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   font= fixed_font;
   ocelot_grid_font_family= font.family();
-  if (font.italic()) ocelot_grid_font_style= "italic"; else ocelot_grid_font_style= "normal";
+  ocelot_grid_font_style= get_font_style_as_string(font);
   ocelot_grid_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_grid_font_weight= canonical_font_weight(QString::number(font.weight()));
 
@@ -4836,7 +4834,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   ocelot_history_background_color=history_edit_widget->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   font= history_edit_widget->font();
   ocelot_history_font_family= font.family();
-  if (font.italic()) ocelot_history_font_style= "italic"; else ocelot_history_font_style= "normal";
+  ocelot_history_font_style= get_font_style_as_string(font);
   ocelot_history_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_history_font_weight= canonical_font_weight(QString::number(font.weight()));
 
@@ -4844,7 +4842,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   ocelot_menu_background_color= ui->menuBar->palette().color(QPalette::Window).name(); /* = QPalette::Background */
   font= ui->menuBar->font();
   ocelot_menu_font_family= font.family();
-  if (font.italic()) ocelot_menu_font_style= "italic"; else ocelot_menu_font_style= "normal";
+  ocelot_menu_font_style= get_font_style_as_string(font);
   ocelot_menu_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_menu_font_weight= canonical_font_weight(QString::number(font.weight()));
 
@@ -4854,6 +4852,13 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   ocelot_extra_rule_1_display_as= "char";
 
   delete widget;
+}
+
+QString MainWindow::get_font_style_as_string(QFont font)
+{
+  if (font.style() == QFont::StyleNormal) return "normal";
+  if (font.style() == QFont::StyleItalic) return "italic";
+  return "oblique";
 }
 
 /*
@@ -4886,6 +4891,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   but I suppress some of the warnings.
   Todo: consider changing QApplication font rather than individual fonts.
   Todo: there's a memory leak, though unimportant (we only call once)
+  Todo: maybe consider italic == oblique and vice versa
 */
 QFont MainWindow::get_fixed_font()
 {
@@ -4895,7 +4901,7 @@ QFont MainWindow::get_fixed_font()
   if (fi.fixedPitch()) return f1;
   int point_size= fi.pointSize();
   int weight= fi.weight();
-  bool italic= fi.italic();
+  QFont::Style font_style= fi.style();
 #if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
   QString first_word= fi.family();
   if (first_word.indexOf(" ") != -1)
@@ -4905,14 +4911,15 @@ QFont MainWindow::get_fixed_font()
 #endif
   QFontDatabase database;
   QPlainTextEdit plain;
-  QFont fo3("NoSuchFont", point_size, weight, italic);
+  QFont fo3("NoSuchFont", point_size, weight);
+  fo3.setStyle(font_style);
   fo3.setStyleHint(QFont::TypeWriter);
   plain.setFont(fo3);
   QString recommended_family= plain.fontInfo().family();
   QString winner_font_family= "";
   int winner_font_point_size= 0;
   int winner_font_weight= 0;
-  bool winner_font_italic= 0;
+  QFont::Style winner_font_font_style= QFont::StyleNormal;
   int winner_font_points= 0;
   foreach (const QString &family, database.families())
   {
@@ -4928,7 +4935,8 @@ QFont MainWindow::get_fixed_font()
     }
 #endif
     int this_points= 0;
-    QFont fo1= QFont(family, point_size, weight, italic);
+    QFont fo1= QFont(family, point_size, weight);
+    fo1.setStyle(font_style);
     fo1.setStyleHint(QFont::TypeWriter);
     plain.setFont(fo1);
     if ((plain.fontInfo().fixedPitch())
@@ -4957,14 +4965,14 @@ QFont MainWindow::get_fixed_font()
         this_points+= 1;
       if (plain.fontInfo().weight() == weight)
         this_points+= 1;
-      if (plain.fontInfo().italic() == italic)
+      if (plain.fontInfo().style() == font_style)
         this_points+= 1;
       if (this_points > winner_font_points)
       {
         winner_font_family= plain.fontInfo().family();
         winner_font_point_size= plain.fontInfo().pointSize();
         winner_font_weight= plain.fontInfo().weight();
-        winner_font_italic= plain.fontInfo().italic();
+        winner_font_font_style= plain.fontInfo().style();
         winner_font_points= this_points;
       }
     }
@@ -4972,8 +4980,8 @@ QFont MainWindow::get_fixed_font()
   if (winner_font_points == 0) return f1;
   QFont winner_font= QFont(winner_font_family,
                            winner_font_point_size,
-                           winner_font_weight,
-                           winner_font_italic);
+                           winner_font_weight);
+  winner_font.setStyle(winner_font_font_style);
   return winner_font;
 }
 
@@ -5156,15 +5164,74 @@ QString MainWindow::canonical_font_weight(QString font_weight_string)
   return "black";
 }
 
+/*
+  Pass font_family. Return font_family lower case stripped, or if it is invalid return "".
+  This may also change font_style.
+  If you set to a family that has neither "italic" nor "oblique", style should be "normal".
+  Re Qt "font matching algorithm":
+    There is no function that checks whether a family exists. We tried looking up the family
+    via QFontDatabase but then QFontDialog can fail, for example "sans serif" is in QFontDatabase but not in QFontDialog,
+    "sans regular" is in QFontDialog but not in QFontDatabase.
+    Todo: make your own QFontDialog that depends on QFontDatabase.
+  Switching to QFontinfo family solves the problem that QDialogBox has alias 'Sans', it's really 'DejaVu Sans'.
+  Unfortunately QFontInfo also changes 'Ubuntu Light' to 'Ubuntu' but I will insist on using QFontInfo()'s decisions.
+  Unfortunately 'padmaa italic' is in QFontDialog but QFontDatabase has only 'Regular' and 'Normal'.
+*/
+QString MainWindow::canonical_font_family(QString font_family_string, QString* font_style_string)
+{
+  QString new_font_family_string= connect_stripper(font_family_string, false);
+  QFontDatabase font_database;
+  QFont font= QFont(new_font_family_string);
+  QFontInfo qfontinfo= QFontInfo(font);
+  new_font_family_string= qfontinfo.family();
+  const QStringList font_styles= font_database.styles(new_font_family_string);
+  if (font_styles.count() == 0) return ""; /* Actually I don't think this is possible */
+  QString new_font_style_string= canonical_font_style(new_font_family_string, *font_style_string);
+  if (new_font_style_string == "") new_font_style_string= canonical_font_style(new_font_family_string, "normal");
+  *font_style_string= new_font_style_string;
+  return new_font_family_string;
+}
 
 /*
   Pass: a string which is supposed to have a font style. Return: a canonical font style.
   If it's not an expected value, return "" which means invalid.
+  We might change "italic" to "oblique" or vice versa depending on family --
+  although you could set italic for a font that allows only oblique,
+  later QDialogBox wouldn't find it.
+  If the return is "" then I think it's safest to ignore and leave unchanged.
+  Some QFontDatabase entries are "Regular" "Bold Oblique" "Light" etc. We only care about "Italic" and/or "Oblique".
+  I don't use QStringList::contains() because it is new in Qt 5.12.
+  Todo: Maybe return "Normal" rather than "" so errors will be ignored.
+  Todo: This doesn't allow for families that have both italic and oblique. Prefer what is passed.
 */
-QString MainWindow::canonical_font_style(QString font_style_string)
+QString MainWindow::canonical_font_style(QString font_family_string, QString font_style_string)
 {
-  if (QString::compare(font_style_string, "normal", Qt::CaseInsensitive) == 0) return "normal";
-  if (QString::compare(font_style_string, "italic", Qt::CaseInsensitive) == 0) return "italic";
+  QFontDatabase font_database;
+  const QStringList font_styles= font_database.styles(font_family_string);
+  if (font_styles.count() == 0) return ""; /* Presumably if there are no styles that means no such family */
+  QString new_font_style_string= font_style_string.toLower();
+  if (new_font_style_string == "normal") return new_font_style_string;
+  if ((new_font_style_string == "italic")
+   || (new_font_style_string == "oblique"))
+  {
+    QString font_database_name;
+    for (int i= 0; i < font_styles.count(); ++i)
+    {
+      font_database_name= font_styles.at(i);
+      if (QString::compare(font_styles.at(i), "italic", Qt::CaseInsensitive) == 0) return "italic";
+      if (QString::compare(font_styles.at(i), "oblique", Qt::CaseInsensitive) == 0) return "oblique";
+    }
+  }
+  /* Some fonts allow italics in QFontDialog but don't show italics in QFontDatabase. */
+  if (new_font_style_string == "italic")
+  {
+    QFont font_of_family= QFont(font_family_string);
+    font_of_family.setStyle(QFont::StyleItalic);
+    QFont::Style style_of_family= font_of_family.style();
+    if (style_of_family == QFont::StyleItalic) return "italic";
+  }
+
+
   return "";
 }
 
@@ -8903,7 +8970,6 @@ int MainWindow::action_execute_one_statement(QString text)
               ++result_grid_table_widget_index;
             }
           }
-
           if ((connections_dbms[0] != DBMS_TARANTOOL)
            && (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION])))
 
@@ -9744,10 +9810,13 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
                because only 'Courier New' exists. There should be a warning, and
                setting some style hint e.g. "at least it should be monospace" would be good.
+               Also ER_UNKNOWN_FONT_STYLE is the wrong error message if family is unknown.
                This applies for all font_family settings. */
       if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY)
       {
-        ocelot_statement_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_statement_font_style);
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
+        ocelot_statement_font_family= ccn;
         make_style_strings();
         statement_edit_widget_setstylesheet();
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
@@ -9763,7 +9832,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
       {
-        QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
+        QString ccn= canonical_font_style(ocelot_statement_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_statement_font_style= ccn;
         make_style_strings();
@@ -9952,7 +10021,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
 
       bool is_result_grid_style_changed= false;
-      bool is_result_grid_font_size_changed= false;
+      bool is_result_grid_font_changed= false;
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR)
       {
         QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
@@ -9983,21 +10052,25 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
       {
-        ocelot_grid_font_family= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_grid_font_style);
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
+        if (ccn != ocelot_grid_font_family) is_result_grid_font_changed= true;
+        ocelot_grid_font_family= ccn;
         is_result_grid_style_changed= true;
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE)
       {
         QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
         if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
-        if (ccn != ocelot_grid_font_size) is_result_grid_font_size_changed= true;
+        if (ccn != ocelot_grid_font_size) is_result_grid_font_changed= true;
         ocelot_grid_font_size= ccn;
         is_result_grid_style_changed= true;
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
       {
-        QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
+        QString ccn= canonical_font_style(ocelot_grid_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
+        if (ccn != ocelot_grid_font_style) is_result_grid_font_changed= true;
         ocelot_grid_font_style= ccn;
         is_result_grid_style_changed= true;
       }
@@ -10050,7 +10123,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
         {
           r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-          r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size, 1, is_result_grid_font_size_changed);
+          r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size, 1, is_result_grid_font_changed);
         }
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
@@ -10151,7 +10224,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY)
       {
-        ocelot_history_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_history_font_style);
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
+        ocelot_history_font_family= ccn;
         make_style_strings();
         history_edit_widget->setStyleSheet(ocelot_history_style_string);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
@@ -10167,7 +10242,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
       {
-        QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
+        QString ccn= canonical_font_style(ocelot_history_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_history_font_style= ccn;
         make_style_strings();
@@ -10257,7 +10332,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY)
       {
-        ocelot_menu_font_family= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
+        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_menu_font_style);
+        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
+        ocelot_menu_font_family= ccn;
         make_style_strings();
         //main_window->setStyleSheet(ocelot_menu_style_string);
         ui->menuBar->setStyleSheet(ocelot_menu_style_string);
@@ -10275,7 +10352,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE)
       {
-        QString ccn= canonical_font_style(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
+        QString ccn= canonical_font_style(ocelot_menu_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
         if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
         ocelot_menu_font_style= ccn;
         make_style_strings();
@@ -15242,7 +15319,7 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
     unsigned char high_nibble, low_nibble;
     unsigned char decimal_output[64];
     unsigned char *decimal_output_pointer= &decimal_output[0];
-    unsigned char sign;
+    unsigned char sign= '+';
     while (tarantool_tnt_reply_data < next_tarantool_tnt_reply_data)
     {
       unsigned char ch= (unsigned char) *tarantool_tnt_reply_data;
@@ -15314,7 +15391,6 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
   }
   else if (ext_field_type == MP_ERROR)
   {
-    printf("**** MP_ERROR\n");
     unsigned char mp_ext_error_byte= *(tarantool_tnt_reply_data++);
     if (mp_ext_error_byte == MP_ERROR_STACK) printf("*** MP_ERROR_STACK\n");
 
@@ -16293,8 +16369,8 @@ TextEditWidget::~TextEditWidget()
 /*
  Finally we're ready to paint a cell inside a frame inside a grid row inside result widget.
  The final decision is: paint as text (default) or paint as image (if blob and if flag).
- If it's a non-blob or if ocelot_blob_flag (?? check this name) is off: default paint.
- If it's a blob and ocelot_blob_flag is on:
+ If it's a non-blob or if the relevant blob flag is off: default paint.
+ If it's a blob and ocelot_extra_rule_1_display_as == "image" is on:
    make a pixmap from the contents
    draw the pixmap
    todo: we're allowing resizing (miraculously) but there's no option for scrolling
@@ -17991,10 +18067,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_border_color= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_grid_header_background_color= ccn; return; }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY) { ocelot_grid_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
+  { ccn= canonical_font_family(token2, &ocelot_grid_font_style); if (ccn != "") ocelot_grid_font_family= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE) { ocelot_grid_font_size= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
-  { ccn= canonical_font_style(token2); if (ccn != "") ocelot_grid_font_style= ccn; return; }
+  { ccn= canonical_font_style(ocelot_grid_font_family, token2); if (ccn != "") ocelot_grid_font_style= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_grid_font_weight= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR)
@@ -18016,10 +18093,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_background_color= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_history_border_color= ccn; return; }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY) { ocelot_history_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY)
+  { ccn= canonical_font_family(token2, &ocelot_history_font_style); if (ccn != "") ocelot_history_font_family= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE) { ocelot_history_font_size= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
-  { ccn= canonical_font_style(token2); if (ccn != "") ocelot_history_font_style= ccn; return; }
+  { ccn= canonical_font_style(ocelot_history_font_family, token2); if (ccn != "") ocelot_history_font_style= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_history_font_weight= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_LEFT) { ocelot_history_left= token2; return; }
@@ -18035,10 +18113,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_background_color= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_menu_border_color= ccn; return; }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY) { ocelot_menu_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY)
+  { ccn= canonical_font_family(token2, &ocelot_menu_font_style); if (ccn != "") ocelot_menu_font_family= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE) { ocelot_menu_font_size= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE)
-  { ccn= canonical_font_style(token2); if (ccn != "") ocelot_menu_font_style= ccn; return; }
+  { ccn= canonical_font_style(ocelot_menu_font_family, token2); if (ccn != "") ocelot_menu_font_style= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_menu_font_weight= ccn; return; }
   /* "ocelot_shortcut_exit" etc. are handled specially */
@@ -18049,10 +18128,11 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_background_color= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR)
   { ccn= canonical_color_name(token2); if (ccn != "") ocelot_statement_border_color= ccn; return; }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY) { ocelot_statement_font_family= token2; return; }
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY)
+  { ccn= canonical_font_family(token2, &ocelot_statement_font_style); if (ccn != "") ocelot_statement_font_family= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE) { ocelot_statement_font_size= token2; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
-  { ccn= canonical_font_style(token2); if (ccn != "") ocelot_statement_font_style= ccn; return; }
+  { ccn= canonical_font_style(ocelot_statement_font_family, token2); if (ccn != "") ocelot_statement_font_style= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT)
   { ccn= canonical_font_weight(token2); if (ccn != "") ocelot_statement_font_weight= ccn; return; }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR)
@@ -20854,7 +20934,7 @@ int MainWindow::setup_determine_what_variables_are_in_scope(
     {
       v_variable_identifier= setup_add_delimiters(v_variable_identifier);
       bool is_shadow= false;
-      /* todo: variable_names.contains() would do this faster, I think. */
+      /* todo: variable_names.contains() would do this faster, I think. But it's in Qt 5.12+. */
       for (int m= 0; m < c_variable_names.count(); ++m)
       {
         if (QString::compare(c_variable_names.at(m), v_variable_identifier, Qt::CaseInsensitive) == 0)
@@ -21199,8 +21279,13 @@ ret:
   /* Similar to how we display Help meessages. */
   Message_box *message_box;
   /* Don't use width=960 if screen width is smaller, e.g. on a VGA screen. */
+#if (QT_VERSION >= 0x50000)
+  QScreen *screen= QGuiApplication::primaryScreen();
+  int desktop_width= screen->availableGeometry().width();
+#else
   QDesktopWidget desktop;
   int desktop_width= desktop.availableGeometry().width();
+#endif
   if (desktop_width > (960 + 50)) message_box= new Message_box("Result", clf_output_final, 960, this);
   else message_box= new Message_box("Result", clf_output_final, desktop_width - 50, this);
   message_box->exec();

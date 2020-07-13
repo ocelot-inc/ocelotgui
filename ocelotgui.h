@@ -2563,6 +2563,11 @@ static const keywords strvalues[]=
 //#include <QWidget>
 #include <QTextStream>
 #include <QDesktopWidget>
+#if (QT_VERSION >= 0x50000)
+#include <QGuiApplication>
+#include <QScreen>
+#endif
+
 
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
@@ -3004,7 +3009,8 @@ public:
   QString canonical_color_name(QString);
   void assign_names_for_colors();
   QString canonical_font_weight(QString);
-  QString canonical_font_style(QString);
+  QString canonical_font_family(QString,QString*);
+  QString canonical_font_style(QString,QString);
   QString connect_stripper(QString value_to_strip, bool strip_doublets_flag);
   QString connect_unstripper(QString value_to_unstrip);
   /* Following were moved from 'private:', merely so all client variables could be together. Cannot be used with SET. */
@@ -3281,6 +3287,7 @@ public:
 #endif
   QVBoxLayout *main_layout;
   QString token_reftype(int i, bool, int, char);
+  QString get_font_style_as_string(QFont);
 
 public slots:
   void action_connect();
@@ -5565,7 +5572,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   Todo: have to think what to do with control characters, e.g. for tabs should I have
         setTabChangesFocus(true), for others should I allow the effects or display specially.
   Todo: I used an eventfilter to detect scrolling because QScrollBar::valueChanged()
-        failed, but someday I should find out why and retry.
+        failed, but someday I should find out why and retry. See vertical_scroll_bar_event().
   Todo: "new" operations should have nothrow checks.
   Todo: different rows have different column heights
   Because they're in a grid with (probably) a scroll bar, I want uniform width and height, and
@@ -5698,7 +5705,9 @@ public:
 //  unsigned int grid_actual_grid_height_in_rows;
   unsigned int grid_actual_row_height_in_lines;
   /* ocelot_grid_height_of_highest_column will be between 1 and ocelot_grid_max_column_height_in_lines, * pixels-per-line */
-  unsigned int max_width_of_a_char, max_height_of_a_char;
+  unsigned int max_height_of_a_char;
+  unsigned int setting_max_width_of_a_char;                  /* changeable with settings_change_calc() */
+  unsigned int setting_min_width_of_a_column;                /* changeable with settings_change_calc() */
 
   QHBoxLayout *hbox_layout;
 
@@ -5721,9 +5730,10 @@ public:
   int border_size;                                             /* used when calculating cell height + width */
   unsigned int ocelot_grid_max_desired_width_in_pixels;        /* used when calculating cell height + width */
   unsigned int ocelot_grid_max_column_height_in_lines;         /* used when calculating cell height + width */
+  unsigned int grid_max_column_height_in_pixels;
 
-  int ocelot_grid_cell_drag_line_size_as_int;
-  int ocelot_grid_cell_border_size_as_int;
+  unsigned int setting_ocelot_grid_cell_drag_line_size_as_int; /* changeable with settings_change_calc() */
+  unsigned int setting_ocelot_grid_cell_border_size_as_int;    /* changeable with settings_change_calc() */
   QString ocelot_grid_text_color;
   QString ocelot_grid_background_color;
   QString ocelot_grid_cell_drag_line_color;
@@ -5747,6 +5757,9 @@ public:
 #define FIELD_VALUE_FLAG_IS_STRING 4
 #define FIELD_VALUE_FLAG_IS_OTHER 8
 #define FIELD_VALUE_FLAG_IS_IMAGE 16
+
+/* Todo: Maybe it would be better to depend on setting_min_width_of_a_column */
+#define MIN_WIDTH_IN_CHARS 3
 
 ResultGrid(
 //        MYSQL_RES *mysql_res,
@@ -5894,6 +5907,10 @@ ResultGrid(
   /* 2018-10-08 Maybe this will finally fix the bug where initial cell height was too small? */
   // text_edit_widget_font= this->font();
   text_edit_widget_font= parent->get_font_from_style_sheet(parent->ocelot_grid_style_string);
+
+  settings_change_calc();
+
+  set_grid_max_column_height_in_pixels((parent->height() / 3) - 11);
 
   set_frame_color_setting();
 
@@ -6319,7 +6336,7 @@ void display(int due_to,
 
   ocelot_grid_text_color= parent->ocelot_grid_text_color;
   ocelot_grid_background_color= parent->ocelot_grid_background_color;
-  /* ocelot_grid_cell_drag_line_size_as_int= parent->ocelot_grid_cell_drag_line_size.toInt(); */
+  /* setting_ocelot_grid_cell_drag_line_size_as_int= parent->ocelot_grid_cell_drag_line_size.toInt(); */
   /* ocelot_grid_cell_drag_line_color= parent->ocelot_grid_cell_drag_line_color; */
 
   //  grid_scroll_area= new QScrollArea(this);                                    /* Todo: see why parent can't be client */
@@ -6352,7 +6369,7 @@ void display(int due_to,
   QFontMetrics mm= QFontMetrics(*pointer_to_font);
 
   /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
-  ocelot_grid_max_desired_width_in_pixels= (parent->width() - (mm.width("W") * 3));
+  ocelot_grid_max_desired_width_in_pixels= (parent->width() - (mm.boundingRect('W').width() * MIN_WIDTH_IN_CHARS));
   {
     /*
       Try to ensure we can fit at least header (if there is a header) plus one row.
@@ -6368,9 +6385,9 @@ void display(int due_to,
     if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
   }
 
-  ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+  //setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
 //  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
-  ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
+  //setting_ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
 
   /*
     Making changes for all in the cell pool.
@@ -6387,11 +6404,11 @@ void display(int due_to,
     for (unsigned int column_number= 0; column_number < gridx_column_count; ++column_number)
     {
       int ki= xrow * gridx_column_count + column_number;
-      text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
+      text_edit_widgets[ki]->setMinimumWidth(fm.boundingRect("W").width() * MIN_WIDTH_IN_CHARS);
       /* This line was replaced in December 2015 */
       //text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
       text_edit_widgets[ki]->setMinimumHeight(fm.lineSpacing());
-      text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
+      text_edit_layouts[ki]->setContentsMargins(QMargins(0, 0, setting_ocelot_grid_cell_drag_line_size_as_int, setting_ocelot_grid_cell_drag_line_size_as_int));
       /*
         Change the color of the frame. Be specific that it's TextEditFrame, because you don't want the
         children e.g. the QTextEdit to inherit the color. TextEditFrame is a custom widget and therefore
@@ -6405,9 +6422,10 @@ void display(int due_to,
       text_edit_frames[ki]->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);   /* This doesn't seem to do anything */
 
       /* Todo: I'm not sure exactly where the following three lines should go. Consider moving them. */
+      /*       I'm not sure they have any effect. I don't know why drag line and scroll bar width aren't added. */
       /* border_size and minimum_width and minimum_height are used by mouseMoveEvent */
       text_edit_frames[ki]->border_size= 10 + border_size;    /* Todo: should just be border_size!! */
-      text_edit_frames[ki]->minimum_width= fm.width("W") * 3 + border_size;
+      text_edit_frames[ki]->minimum_width= fm.boundingRect("W").width() * MIN_WIDTH_IN_CHARS + border_size;
       text_edit_frames[ki]->minimum_height= fm.height() * 2 + border_size; /* todo: this is probably too much */
     }
   }
@@ -6450,6 +6468,7 @@ void display(int due_to,
           text_edit_frames[ki]->is_style_sheet_set_flag= false;
         }
         text_edit_frames[ki]->is_image_flag= false;
+        set_height(ki, text_edit_frames[ki]->width());
       }
       else
       {
@@ -6473,8 +6492,8 @@ void display(int due_to,
     }
   }
   //if (copy_of_ocelot_vertical != 0)
-  //  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
-  //                      ocelot_grid_cell_drag_line_size_as_int,
+  //  grid_column_size_calc(setting_ocelot_grid_cell_border_size_as_int,
+  //                      setting_ocelot_grid_cell_drag_line_size_as_int,
   //                      0); /* get grid_column_widths[] and grid_column_heights[] */
 
   if (copy_of_ocelot_vertical != 0)
@@ -6504,8 +6523,13 @@ void display(int due_to,
     grid detail rows
     While we're passing through, we also get max column lengths (in characters).
     Todo: Take into account: whether there were any nulls.
+    Moved fill_detail_widgets() down from here 2020-06-25
+    ... No, instead we call it twice.
+    Todo: Do only what's necessary here! Don't repeat all fill_detail_widgets()!
+    Todo: Decide whether is_paintable should stay on a while longer!
   */
   fill_detail_widgets(0, connections_dbms);                                        /* details */
+
   grid_vertical_scroll_bar_value= 0;
 
   /*
@@ -6530,8 +6554,8 @@ void display(int due_to,
 
   is_paintable= 1;
   if (copy_of_ocelot_vertical == 0)
-  grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
-                        ocelot_grid_cell_drag_line_size_as_int,
+  grid_column_size_calc(setting_ocelot_grid_cell_border_size_as_int,
+                        setting_ocelot_grid_cell_drag_line_size_as_int,
                         ocelot_result_grid_column_names_copy,
                         connections_dbms); /* get grid_column_widths[] and grid_column_heights[] */
 
@@ -6571,18 +6595,17 @@ void display(int due_to,
           }
           else text_edit_frames[xrow * gridx_column_count + xcol]->is_image_flag= false;
         }
-
         /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
         if (xrow == 0)
         {
           int header_height= max_height_of_a_char
-                           + ocelot_grid_cell_border_size_as_int * 2
-                           + ocelot_grid_cell_drag_line_size_as_int;
+                           + setting_ocelot_grid_cell_border_size_as_int * 2
+                           + setting_ocelot_grid_cell_drag_line_size_as_int;
           frame_resize(xrow * gridx_column_count + xcol, xcol, grid_column_widths[xcol], header_height);
         }
         else
         {
-          frame_resize(xrow * gridx_column_count + xcol, xcol, grid_column_widths[xcol], grid_column_heights[xcol]);
+          frame_resize(xrow * gridx_column_count + xcol,  xcol, grid_column_widths[xcol], grid_column_heights[xcol]);
         }
         /* todo: test whether we really need to show always */
         text_edit_frames[xrow * gridx_column_count + xcol]->show();
@@ -6590,7 +6613,10 @@ void display(int due_to,
       }
     }
   }
-//  grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
+  /* Moved fill_detail_widgets() down to here 2020-06-25 */
+  fill_detail_widgets(0, connections_dbms);
+  //  grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
+
   for (long unsigned int xrow= 0; (xrow < grid_result_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
   {
 //    grid_row_widgets[xrow]->setLayout(grid_row_layouts[xrow]);
@@ -6608,6 +6634,7 @@ void display(int due_to,
     Without client->show(), grid becomes blank after a font change.
     TODO: now grid becomes blank after a font change anyway! So I have to say show().
   */
+
   client->show();
 
   show();
@@ -6633,20 +6660,22 @@ void display(int due_to,
 */
 void frame_resize(int ki, int grid_col, int width, int height)
 {
-  unsigned int text_edit_width= width -
-          (ocelot_grid_cell_drag_line_size_as_int
-           + ocelot_grid_cell_border_size_as_int * 2);
-  unsigned int text_edit_height= height -
-          (ocelot_grid_cell_drag_line_size_as_int
-           + ocelot_grid_cell_border_size_as_int * 2);
-  unsigned int number_of_characters_per_line= text_edit_width / max_width_of_a_char;
-  unsigned int number_of_lines= text_edit_height / max_height_of_a_char;
-  unsigned int number_of_characters_in_cell= number_of_characters_per_line
-                                        * number_of_lines;
-  if (number_of_characters_in_cell < gridx_max_column_widths[grid_col])
-    text_edit_widgets[ki]->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-  else
-    text_edit_widgets[ki]->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  (void) (grid_col);
+  //unsigned int text_edit_width= width -
+  //        (setting_ocelot_grid_cell_drag_line_size_as_int
+  //         + setting_ocelot_grid_cell_border_size_as_int * 2);
+  //unsigned int text_edit_height= height -
+  //        (setting_ocelot_grid_cell_drag_line_size_as_int
+  //         + setting_ocelot_grid_cell_border_size_as_int * 2);
+  //unsigned int number_of_characters_per_line= text_edit_width / setting_max_width_of_a_char;
+  //unsigned int number_of_lines= text_edit_height / max_height_of_a_char;
+  //unsigned int number_of_characters_in_cell= number_of_characters_per_line
+  //                                      * number_of_lines;
+  /* TEST!! Remove temporarily! It's in set_height() now! */
+  //if (number_of_characters_in_cell < gridx_max_column_widths[grid_col])
+  //  text_edit_widgets[ki]->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  //else
+  //  text_edit_widgets[ki]->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   text_edit_frames[ki]->setFixedSize(width, height);
   /* Todo: test if following 2 lines are redundant since setFixedSize does the job. */
   //text_edit_frames[ki]->setMaximumHeight(height);
@@ -7406,6 +7435,7 @@ QByteArray history_padder(char *str, int length,
   * Names and max widths should depend on result_row stuff not gridx_max stuff
   * We should try to keep track of statements so we don't spend too much time going backwards.
   * The "8192" for vertical output is arbitrary. Max should be calculated.
+  * Displaying an image as if it's a bunch of characters is a waste of time.
 */
 #define HISTORY_COLUMN_MARGIN 1
 #define HISTORY_MAX_COLUMN_WIDTH 65535
@@ -7501,8 +7531,11 @@ QString copy_to_history(long int ocelot_history_max_row_count,
         pointer_to_history_line= history_line;
         memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
         pointer_to_field_names+= sizeof(unsigned int);
-        memset(pointer_to_history_line, ' ', longest_column_name_length - column_length);
-        pointer_to_history_line+= longest_column_name_length - column_length;
+        if (longest_column_name_length > column_length)
+        {
+          memset(pointer_to_history_line, ' ', longest_column_name_length - column_length);
+          pointer_to_history_line+= longest_column_name_length - column_length;
+        }
         memcpy(pointer_to_history_line, pointer_to_field_names, column_length);
         pointer_to_field_names+= column_length;
         pointer_to_history_line+= column_length;
@@ -7724,8 +7757,8 @@ QString copy_to_history(long int ocelot_history_max_row_count,
         has no top margin i.e. it hugs the top border.
   Todo: if you ever do Windows or Mac OS, you'll have to revisit this.
 */
-void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
-                           int ocelot_grid_cell_drag_line_size_as_int,
+void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
+                           int setting_ocelot_grid_cell_drag_line_size_as_int,
                            unsigned short int is_using_column_names,
                            int connections_dbms)
 {
@@ -7740,27 +7773,9 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
 
   pointer_to_font= &text_edit_widget_font;
 
-  /* Calculate with rounding up because of inter-character spacing. */
+  /* 2020-07-01 Some calculations here were replaced by settings_change_calc() */
+
   QFontMetrics mm= QFontMetrics(*pointer_to_font);
-  max_width_of_a_char= mm.width("WWWW") / 4;
-  if ((max_width_of_a_char * 4) < (unsigned int) mm.width("WWWW")) ++max_width_of_a_char;
-
-  /*
-     For italic|oblique I sometimes need zero extra pixels, but I
-     sometimes need an incredible number of extra pixels.
-     abs(qfm.rightBearing('W')) + abs(qfm.leftBearing('W')) is not enough
-     Todo: try again to reduce, meanwhile document: don't use italics.
-  */
-  if (pointer_to_font->italic() == true)
-  {
-    max_width_of_a_char*= 2;
-  }
-
-  /* (pointer_to_font->fixedPitch() always == false, I don't know why */
-  if (mm.width("WWWWWWWWWW") != mm.width("I- 1a!~:wX"))
-  {
-    ++max_width_of_a_char;
-  }
 
   /* max_height_of_a_char= mm.lineSpacing(); didn't work */
   max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
@@ -7787,15 +7802,17 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
     }
     else grid_column_widths[i]= 1;
     /*
-      For some reason -- I never figured it out -- if column width < 3
+      For some reason -- I never figured it out -- if column width < MIN_WITH_IN_CHARS
       and there is a drag line, the drag line disappears.
+      If vertical != 0 I compensate for too-short contents a different way.
     */
-    if ((grid_column_widths[i] < 3) && (ocelot_grid_cell_drag_line_size_as_int > 0))
-      grid_column_widths[i]= 3;
+
+    if ((grid_column_widths[i] < MIN_WIDTH_IN_CHARS) && (setting_ocelot_grid_cell_drag_line_size_as_int > 0))
+      grid_column_widths[i]= MIN_WIDTH_IN_CHARS;
     if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
-    grid_column_widths[i]= grid_column_widths[i] * max_width_of_a_char
-                           + ocelot_grid_cell_border_size_as_int * 2
-                           + ocelot_grid_cell_drag_line_size_as_int;
+    grid_column_widths[i]= grid_column_widths[i] * setting_max_width_of_a_char
+                           + setting_ocelot_grid_cell_border_size_as_int * 2
+                           + setting_ocelot_grid_cell_drag_line_size_as_int;
     sum_tmp_column_lengths+= grid_column_widths[i];
   }
 
@@ -7811,23 +7828,20 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   while ((sum_tmp_column_lengths > ocelot_grid_max_desired_width_in_pixels) && (sum_amount_reduced > 0))
   {
     necessary_reduction= sum_tmp_column_lengths - ocelot_grid_max_desired_width_in_pixels;
-    necessary_reduction-= necessary_reduction % max_width_of_a_char;
+    necessary_reduction-= necessary_reduction % setting_max_width_of_a_char;
     sum_amount_reduced= 0;
     for (i= 0; i < gridx_column_count; ++i)
     {
       unsigned int min_width;
-      min_width= mm.width(dbms_get_field_name(i, connections_dbms));
-      if (min_width < max_width_of_a_char + scroll_bar_width + 1)
-        min_width= max_width_of_a_char + scroll_bar_width + 1;
-      min_width+= ocelot_grid_cell_border_size_as_int * 2
-                  + ocelot_grid_cell_drag_line_size_as_int;
+      QString s_header= dbms_get_field_name(i, connections_dbms);
+      min_width= get_column_width_in_pixels(s_header, true, false);
       if (grid_column_widths[i] <= min_width) continue;
       max_reduction= grid_column_widths[i] - min_width;
-      max_reduction-= max_reduction % max_width_of_a_char;
+      max_reduction-= max_reduction % setting_max_width_of_a_char;
       if (grid_column_widths[i] >= (sum_tmp_column_lengths / gridx_column_count))
       {
         amount_being_reduced= grid_column_widths[i] / 2;
-        amount_being_reduced-= amount_being_reduced % max_width_of_a_char;
+        amount_being_reduced-= amount_being_reduced % setting_max_width_of_a_char;
         if (amount_being_reduced > necessary_reduction) amount_being_reduced= necessary_reduction;
         if (amount_being_reduced > max_reduction) amount_being_reduced= max_reduction;
         grid_column_widths[i]= grid_column_widths[i] - amount_being_reduced;
@@ -7835,7 +7849,7 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
         necessary_reduction-= amount_being_reduced;
         sum_tmp_column_lengths-= amount_being_reduced;
       }
-      if (necessary_reduction <= max_width_of_a_char) break; /* todo: consider making this "< 10" */
+      if (necessary_reduction <= setting_max_width_of_a_char) break; /* todo: consider making this "< 10" */
     }
   }
 
@@ -7849,8 +7863,8 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
 
   for (i= 0; i < gridx_column_count; ++i)
   {
-    grid_column_heights[i]= (gridx_max_column_widths[i] * max_width_of_a_char) / grid_column_widths[i]; /* mysql_fields[i].length */
-    if ((grid_column_heights[i] * grid_column_widths[i]) < (gridx_max_column_widths[i] * max_width_of_a_char))
+    grid_column_heights[i]= (gridx_max_column_widths[i] * setting_max_width_of_a_char) / grid_column_widths[i]; /* mysql_fields[i].length */
+    if ((grid_column_heights[i] * grid_column_widths[i]) < (gridx_max_column_widths[i] * setting_max_width_of_a_char))
     {
       ++grid_column_heights[i];
     }
@@ -7863,8 +7877,8 @@ void grid_column_size_calc(int ocelot_grid_cell_border_size_as_int,
   for (i= 0; i < gridx_column_count; ++i)
   {
     grid_column_heights[i]= (grid_column_heights[i] * max_height_of_a_char)
-                            + ocelot_grid_cell_border_size_as_int * 2
-                            + ocelot_grid_cell_drag_line_size_as_int;
+                            + setting_ocelot_grid_cell_border_size_as_int * 2
+                            + setting_ocelot_grid_cell_drag_line_size_as_int;
   }
 }
 
@@ -8077,13 +8091,17 @@ void scan_field_names(
 /*
    Set alignment and height of a cell.
    Todo: There's a terrible amount of duplication:
-   If vertical == false, this happens once before we do any displaying (but we don't call this).
-   If vertical == true, this happens at start and every time we scroll.
+   We only call this if vertical != 0.
+   We call at start and every time we scroll.
+   We allow width to vary but we don't allow it to be more than half of result grid width.
    Todo: pass flags so I don't have to check so many field types
+   Todo: the name is bad, now we set width here too
 */
-void set_alignment_and_height(int ki, int grid_col, int field_type)
+int set_alignment_and_height(int text_edit_frames_index, int grid_col, int field_type,
+                              bool is_header, int maximum_width)
 {
-  TextEditWidget *cell_text_edit_widget= text_edit_widgets[ki];
+  (void)(grid_col);
+  TextEditWidget *cell_text_edit_widget= text_edit_widgets[text_edit_frames_index];
   /* Todo: probably MySQL should be done the same way as Tarantool, no need to check field_type */
   if ((field_type <= MYSQL_TYPE_DOUBLE)
    || (field_type == MYSQL_TYPE_NEWDECIMAL)
@@ -8091,31 +8109,207 @@ void set_alignment_and_height(int ki, int grid_col, int field_type)
    || (field_type == MYSQL_TYPE_INT24))
     text_align(cell_text_edit_widget, Qt::AlignRight);
   else text_align(cell_text_edit_widget, Qt::AlignLeft);
+
+  QString s_header= QString::fromUtf8(text_edit_frames[text_edit_frames_index]->content_pointer,
+                                      text_edit_frames[text_edit_frames_index]->content_length);
+  int width= get_column_width_in_pixels(s_header, is_header, text_edit_frames[text_edit_frames_index]->is_image_flag);
+
+  if (width > maximum_width) width= maximum_width;
+
+  text_edit_frames[text_edit_frames_index]->setFixedWidth(width);
+
   /* Height border size = 1 due to setStyleSheet earlier; right border size is passed */
 //  if (xrow == 0)
 //  {
 //    int header_height= max_height_of_a_char
-//                     + ocelot_grid_cell_border_size_as_int * 2
-//                     + ocelot_grid_cell_drag_line_size_as_int;
-//    if (ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
+//                     + setting_ocelot_grid_cell_border_size_as_int * 2
+//                     + setting_ocelot_grid_cell_drag_line_size_as_int;
+//    if (setting_ocelot_grid_cell_drag_line_size_as_int > 0) header_height+= max_height_of_a_char;
 //    text_edit_frames[xrow * gridx_column_count + col]->setFixedSize(grid_column_widths[col], header_height);
 //    text_edit_frames[xrow * gridx_column_count + col]->setMaximumHeight(header_height);
 //    text_edit_frames[xrow * gridx_column_count + col]->setMinimumHeight(header_height);
 //  }
 //  else
   {
-    int this_width;
+    //int this_width;
     //if (grid_col == 0)
     //{
     //  /* Todo: this should be based on QFontMetrics, 20 is so arbitrary */
     //  this_width= (20) * (text_edit_frames[ki]->content_length + 1);
     //}
     //else
-    this_width= grid_column_widths[grid_col];
-    frame_resize(ki, grid_col, this_width, grid_column_heights[grid_col]);
+    //this_width= grid_column_widths[grid_col];
+    //frame_resize(text_edit_frames_index, grid_col, this_width, grid_column_heights[grid_col]);
+    set_height(text_edit_frames_index, width);
   }
+  return width;
 }
 
+/*
+  Set height of a cell.
+  Before we display we proportionally allocate column widths, they stay the same.
+  But column height varies with text length and \n, Asian long characters, html.
+  We use a Qt routine which effectively handles "given text and width, return height".
+  If height > maximum i.e. grid_max_column_height_in_pixels:
+    Set to maximum and turn on vertical scrollbar i.e. Qt::ScrollBarAlwaysOn.
+    So clicking resultgrid vertical scroll bar goes up/down per row,
+    but finer movement can be done on a cell's vertical scroll bar.
+    See frame_resize() for how it can be done.
+  I think height < minimum i.e. line height is impossible since we start with line height.
+  We don't change text_edit_widgets[], it seems to adjust automatically.
+  We change grid_row_widgets[] later, to the height of the highest text_edit_frame.
+  text_edit_frame[] is QFrame.
+  Re: With font size > 32, select "id", "owner", "name" from "_space" limit 1;
+      has not enough height by 1 or 2 pixels, if family = Chandas | Jamrul | Khmer OS | Umpush.
+      And has missing drag lines if Abyssinica SIL | Carlito | DejaVu Math Tex Gyre.
+      The hight problem happens because height within result grid is too high.
+      It disappears if you detach result grid and make result grid larger.
+  Re italic|oblique: As the Qt manual says, boundingRect() can ignore a font's
+     leftBearing and rightBearing, so it might calculate that there are N characters on a
+     line but at display time there are N-minus-1 characters on a line. Therefore, add "W"
+     for every line that height indicates, and repeat. Todo: any better ideas?
+  Re width. What we pass is text_edit_frames[...]->width()) not text_edit_widgets[...].width().
+     So what we can actually fit is passed frame width - (border width * 2 + drag line width).
+  Todo: see set_alignment_and_height, we probably don't need both functions.
+  Todo: flags could include Qt::TextWordWrap QT::TextDontClip etc. if we specified thus.
+  Todo: are you sure you know the width? Maybe you should be using max column widths?
+        (or maybe not, because there can be dragging)
+  TODO: We should use a similar trick for column width when we make the initial calculation.
+        If it's a header, then width calculation should be based on the trick. But for rows,
+        it would take too long. Unless we based on a sampling.
+  Todo: Find out why "text_edit_frames[ki]->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);" did nothing
+  Todo: Should is_paintable still be off?
+  Todo: Test: what if string length exceeds the maximum?
+  Todo: Test: Kanji with large font. Seems okay now.
+  Todo: Notice assumption that setting_ocelot_grid_cell_border_size_as_int is current. Is that correct?
+        No. When we change border_size and drag_line_size, we do not immediately adjust
+        as we do for changes in size or font
+        (Border and drag line are taken into account correctly for the next time we select)
+  TODO: SELECT '<font color="red" size="+10">Big Red Text</font>' AS x;
+        won't see the size change (probably same problem with <big> etc.).
+        because Qt font metrics are based on text_edit_widget_font only.
+        "Red" is okay. Turning off HTML can be done with <pre> but maybe there's a better way.
+  Todo: Beware images i.e. is_image_flag == true.
+  Todo: This is good for headers too because
+        () scrollbar might still be on for the cell, we don't clear until we get here
+        () if it contains \n then we want it to have a scroll bar, but its maximum is 1 line
+        We say max heading height is 1 line, that's arbitrary.
+        Bug: I can make the scroll bar appear, but cannot scroll unless I drag.
+             Or, if header width > 3, I can scroll.
+  Todo: The "for (int i= 0; i < 2; ++i)" loop for italics might not be necessary.
+  Todo: Rules differ for vertical != 0.
+*/
+void set_height(unsigned int text_edit_frames_index, int width)
+{
+  unsigned int height;
+  QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
+  if (text_edit_frames[text_edit_frames_index]->is_image_flag)
+  {
+    height= 2000; /* arbitrary big maximum */
+  }
+  else
+  {
+    QRect r;
+    r= text_edit_frames[text_edit_frames_index]->rect();
+    QString s;
+
+    if (text_edit_frames[text_edit_frames_index]->content_pointer == 0) /* or check content_field_value_flags */
+    {
+      s= QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1);
+    }
+    else s= QString::fromUtf8(text_edit_frames[text_edit_frames_index]->content_pointer, text_edit_frames[text_edit_frames_index]->content_length);
+    int text_edit_widget_width= width - (setting_ocelot_grid_cell_border_size_as_int * 2 + setting_ocelot_grid_cell_drag_line_size_as_int);
+    QRect r2;
+    /* Saying i < 1 instead of i < 2 disables the kludge for italic. Maybe we won't need it. */
+    for (int i= 0; i < 2; ++i)
+    {
+      r2= text_edit_widget_font_metrics.boundingRect(
+          0, /* int x = x coordinate within original rect */
+          0, /* int y = y coordinate within original rect */
+          text_edit_widget_width, /* int width = r.width(), which we don't change */
+          2000, /* int height = height, which is arbitrary big maximum */
+          Qt::TextWrapAnywhere + Qt::TextIncludeTrailingSpaces, /* int flags = (see comments before start of this routine) */
+          s); /* QString & text= cell contents */
+      if (text_edit_widget_font.style() == QFont::Style::StyleNormal) break;
+      int n= r2.height() / text_edit_widget_font_metrics.lineSpacing();
+      s= s + QString("W").repeated(n);
+    }
+
+    height= r2.height() + setting_ocelot_grid_cell_border_size_as_int * 2 + setting_ocelot_grid_cell_drag_line_size_as_int;
+  }
+  unsigned int max_column_height_in_pixels;
+  if ((text_edit_frames[text_edit_frames_index]->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
+   && (ocelot_vertical_copy == 0))
+  {
+    max_column_height_in_pixels= text_edit_widget_font_metrics.lineSpacing();
+  }
+  else
+  {
+    max_column_height_in_pixels= grid_max_column_height_in_pixels;
+  }
+  if (height > max_column_height_in_pixels)
+  {
+    height= max_column_height_in_pixels;
+    text_edit_widgets[text_edit_frames_index]->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  }
+  else
+    text_edit_widgets[text_edit_frames_index]->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+  text_edit_frames[text_edit_frames_index]->setFixedHeight(height);
+  //text_edit_widgets[text_edit_frames_index]->setFixedHeight(height);
+
+  //TextEditWidget *text_edit= text_edit_frames[text_edit_frames_index]->findChild<TextEditWidget *>();
+  //text_edit_widgets[text_edit_frames_index]->setFixedHeight(nn - 20);
+}
+
+/*
+  Get column width in pixels.
+  Use boundingRect() as you did for set_height() but this time column width isn't fixed.
+  I plan to use this for header width calculation.
+  The question is: how many pixels do we need to fit this string in a cell,
+  given current text_edit_widget_font and border and drag line?
+  We do not check maximum size here.
+  Re images: They have no characters so there's no point getting a font and checking width that way.
+             I could make a QPixMap and call loadFromData() then ask width() but fear that's slow.
+             So for them I just return an arbitrary big value and assume they will be clipped
+             depending on result grid size.
+  Todo: See if it's okay to use this for detail rows.
+        Answers would be better but I worry that it would be slow.
+  Todo: What you really need is:
+        Use the trick for set_max_column_width().
+        Divide by width("W") which should be okay because later you'll multiply by width("W").
+        Or: max_column_widths should be in pixels.
+            The thing that's stopping me is I'm not sure whether we recalculate for font changes.
+        Or: for a particular UTF8 character, decide if it's double-width by calling width().
+*/
+int get_column_width_in_pixels(QString s, bool is_header, bool is_image_flag)
+{
+  if (is_image_flag) return 2000; /* arbitrary big maximum */
+  QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
+  QRect r2= text_edit_widget_font_metrics.boundingRect(
+                                   0, /* int x = x coordinate within original rect */
+                                   0, /* int y = y coordinate within original rect */
+                                   2000, /* int width = width, which we can change */
+                                   2000, /* int height = height, which is arbitrary big maximum */
+                                   Qt::TextWrapAnywhere + Qt::TextIncludeTrailingSpaces, /* int flags = (see comments before start of this routine) */
+                                   s); /* QString & text= cell contents */
+  unsigned int min_width= r2.width();
+
+  /* Kludge alert. It's a mystery, but above min-width calculation sometimes isn't enough.
+     However, increasing it should be okay if this is a detail cell and vertical != 0. */
+  int really_minimal= setting_max_width_of_a_char;
+  if ((ocelot_vertical_copy != 0) && (is_header == false) && (min_width < setting_max_width_of_a_char * MIN_WIDTH_IN_CHARS))
+    really_minimal= setting_max_width_of_a_char * MIN_WIDTH_IN_CHARS;
+
+  if (min_width < really_minimal + scroll_bar_width + 1)
+  {
+    min_width= really_minimal + scroll_bar_width + 1;
+  }
+
+  min_width+= setting_ocelot_grid_cell_border_size_as_int * 2
+              + setting_ocelot_grid_cell_drag_line_size_as_int;
+  return min_width;
+}
 
 /*
   Put lengths and pointers in text_edit_frames.
@@ -8239,8 +8433,8 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         gridx_max_column_widths[column_number_within_gridx]= sizeof(NULL_STRING) - 1;
       }
       else gridx_max_column_widths[column_number_within_gridx]= new_content_length;
-      grid_column_size_calc(ocelot_grid_cell_border_size_as_int,
-                            ocelot_grid_cell_drag_line_size_as_int,
+      grid_column_size_calc(setting_ocelot_grid_cell_border_size_as_int,
+                            setting_ocelot_grid_cell_drag_line_size_as_int,
                             0,
                             connections_dbms); /* get grid_column_widths[] and grid_column_heights[] */
       column_number_within_gridx= 0;
@@ -8252,17 +8446,23 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       //  text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
       //  ++column_number_within_gridx;
       //}
+      int maximum_width= ocelot_grid_max_desired_width_in_pixels / 2;
       if (ocelot_result_grid_column_names_copy != 0)
       {
-        set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
+        int w= set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
                                  column_number_within_gridx,
-                                 MYSQL_TYPE_STRING);
+                                 MYSQL_TYPE_STRING,
+                                 true, maximum_width);
+        /* todo: shouldn't maximum width allow for spacing between cells? */
+        maximum_width= ocelot_grid_max_desired_width_in_pixels - w;
         text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
         ++column_number_within_gridx;
       }
       set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
                                column_number_within_gridx,
-                               result_field_types[result_column_number]);
+                               result_field_types[result_column_number],
+                               false, maximum_width);
+
       text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
       ++result_column_number;
       ++grid_row;
@@ -8310,11 +8510,21 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
           else text_edit_frames[text_edit_frames_index]->content_pointer= row_pointer;
           row_pointer+= text_edit_frames[text_edit_frames_index]->content_length;
         }
+        set_height(text_edit_frames_index, text_edit_frames[text_edit_frames_index]->width());
         text_edit_frames[text_edit_frames_index]->is_retrieved_flag= false;
         text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number= i;
         text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
         text_edit_frames[text_edit_frames_index]->show();
       }
+      /* Make row height = height of highest cell ... todo: makes no sense if vertical != 0? */
+      int highest_height= 0;
+      for (i= 0; i < gridx_column_count; ++i)
+      {
+        text_edit_frames_index= grid_row * gridx_column_count + i;
+        if (highest_height < text_edit_frames[text_edit_frames_index]->height())
+          highest_height= text_edit_frames[text_edit_frames_index]->height();
+      }
+      grid_row_widgets[grid_row]->setFixedHeight(highest_height);
     }
   }
   /* todo: maybe what we really want is to hide as far as # of used rows, which may be < max */
@@ -8348,6 +8558,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
+  set_grid_max_column_height_in_pixels(this->height());
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_html != 0)
    || (copy_of_ocelot_xml != 0))
@@ -8373,6 +8584,36 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
     }
   }
 }
+
+/*
+  Set grid_max_column_height which is a permanently-available calculated maximum in pixels.
+  We call this from from resize_or_font_change(), which should mean
+  (a) we know that result grid size is current,
+  (b) we know that text_edit_widget_font may not be current but will be used in later paint jobs.
+  We also call this when creating, but in that case result grid size is not really known
+  and text_edit_widget_font is still the parent's font.
+  The rule should simply be that no single row + header row (which is one line)
+  can exceed the size of the result grid, until we have a user-specified maximum.
+  We use this in set_height(), where the idea is that you can't make a column higher
+  than the maximum, so the cell will need a vertical scroll bar.
+  Todo: In display, we set int result_grid_height= (parent->height() / 3) - 11;
+        then   ocelot_grid_max_column_height_in_lines= result_grid_height / line_height;
+        This supersedes those calculations so we can stop using them.
+  Todo: Decide: Do we mean maximum for text_edit_widget or do we mean maximum for text_edit_frame?
+  Todo: ocelot_grid_max_column_height_in_lines could be user-settable but overridable.
+  Todo: It should be impossible to resize result grid to < 11 or < line size * 2, eh?
+  Todo: Initially we call with result_grid_height == 0 but that is temporary.
+  Todo: Make sure we call this whenever we change text_edit_widget_font. Put the change in this function?
+*/
+void set_grid_max_column_height_in_pixels(int result_grid_height)
+{
+  QFontMetrics mm= QFontMetrics(text_edit_widget_font);
+  int height_of_line= mm.lineSpacing();
+  int new_height= result_grid_height - (height_of_line * 2);
+  if (new_height < height_of_line) new_height= height_of_line;
+  grid_max_column_height_in_pixels= new_height;
+}
+
 
 /*
   Resize of grid widget. This could be called from eventfilter instead.
@@ -8570,7 +8811,7 @@ void display_garbage_collect()
 
 void set_frame_color_setting()
 {
-  ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+  setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
   ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
   frame_color_setting= "TextEditFrame{background-color: ";
   frame_color_setting.append(ocelot_grid_cell_drag_line_color);
@@ -8590,8 +8831,9 @@ void set_frame_color_setting()
 void set_all_style_sheets(QString new_ocelot_grid_style_string,
                           QString new_ocelot_grid_cell_drag_line_size,
                           int caller,
-                          bool is_result_grid_font_size_changed)
+                          bool is_result_grid_font_changed)
 {
+  (void)(new_ocelot_grid_cell_drag_line_size);
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_html != 0)
    || (copy_of_ocelot_xml != 0))
@@ -8603,22 +8845,98 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
 
   unsigned int i_h;
 
-  ocelot_grid_cell_drag_line_size_as_int= new_ocelot_grid_cell_drag_line_size.toInt();
+  //setting_ocelot_grid_cell_drag_line_size_as_int= new_ocelot_grid_cell_drag_line_size.toInt();
+
+  settings_change_calc();
 
   set_frame_color_setting();
   for (i_h= 0; i_h < cell_pool_size; ++i_h)
   {
     text_edit_frames[i_h]->is_style_sheet_set_flag= false;
-    //text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * 3);
+    //text_edit_widgets[ki]->setMinimumWidth(fm.width("W") * MIN_WIDTH_IN_CHARS);
     //text_edit_widgets[ki]->setMinimumHeight(fm.height() * 2);
-    /* todo: skip following line if ocelot_grid_cell_drag_line_size_as_int did not change */
-    text_edit_layouts[i_h]->setContentsMargins(QMargins(0, 0, ocelot_grid_cell_drag_line_size_as_int, ocelot_grid_cell_drag_line_size_as_int));
+    /* todo: skip following line if setting_ocelot_grid_cell_drag_line_size_as_int did not change */
+    text_edit_layouts[i_h]->setContentsMargins(QMargins(0, 0, setting_ocelot_grid_cell_drag_line_size_as_int, setting_ocelot_grid_cell_drag_line_size_as_int));
   }
   /* todo: is "caller" redundant? if it's 0, then font change is false? */
-  if ((caller == 1) && (is_result_grid_font_size_changed))
+  /* todo: this shouldn't be just is_result_grid_font_changed, it should be any changed. */
+  if ((caller == 1) && (is_result_grid_font_changed))
   {
     resize_or_font_change(this->height(), false);
   }
+}
+
+/*
+  settings_change_calc()
+  called from set_all_style_sheets()
+  Calculate setting_max_width_of_a_char and setting_min_width_of_a_column.
+  We should call this during initialization or settings change (of font or drag line or border).
+  Assume settings apply for all grid columns so don't need to call for every column.
+  width() is deprecated in Qt 5.13.
+  Assume we know text_edit_widget_font, setting_ocelot_grid_cell_border_size_as_int,
+    setting_ocelot_grid_cell_drag_line_size_as_int, scroll_bar_width.
+  The maximum width is based on boundingRect() since width() is deprecated in Qt 5.13.
+  Choosing "W" is good enough for western alphabets, some Asian characters may be wider
+  but in that case we will end up with a higher column see set_height().
+  Assume there might be a vertical scroll bar, although perhaps it isn't possible if
+  there is no drag line and no column could overflow the maximum number of lines.
+  Do not increase if text_edit_widget_fonts.italic()=true, that should be taken care of now.
+  Return true if the results mean that repaint should occur.
+*/
+bool settings_change_calc()
+{
+  unsigned int old_max_width_of_a_char= setting_max_width_of_a_char;
+  unsigned int old_min_width_of_a_column= setting_min_width_of_a_column;
+
+  setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+//  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
+  setting_ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
+
+  QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
+  QRect r2= text_edit_widget_font_metrics.boundingRect(
+                                   0, /* int x = x coordinate within original rect */
+                                   0, /* int y = y coordinate within original rect */
+                                   2000, /* int width = r.width(), which we don't change */
+                                   2000, /* int height = height, which is arbitrary big maximum */
+                                   0, /* int flags = (see comments before start of this routine) */
+                                   "W"); /* QString & text= cell contents */
+  setting_max_width_of_a_char= r2.width();
+
+  setting_min_width_of_a_column= setting_max_width_of_a_char
+                         + scroll_bar_width + 1
+                         + setting_ocelot_grid_cell_border_size_as_int * 2
+                         + setting_ocelot_grid_cell_drag_line_size_as_int;
+
+  if ((setting_max_width_of_a_char != old_max_width_of_a_char)
+   || (setting_min_width_of_a_column != old_min_width_of_a_column))
+    return true;
+  else
+    return false;
+
+  /* The following calculations used to exist in grid_column_size_calc(). Are they obsolete? */
+  //pointer_to_font= &text_edit_widget_font;
+
+  /* Calculate with rounding up because of inter-character spacing. */
+  //QFontMetrics mm= QFontMetrics(*pointer_to_font);
+  //setting_max_width_of_a_char= mm.width("WWWW") / 4;
+  //if ((max_width_of_a_char * 4) < (unsigned int) mm.width("WWWW")) ++setting_max_width_of_a_char;
+
+  /*
+     For italic|oblique I sometimes need zero extra pixels, but I
+     sometimes need an incredible number of extra pixels.
+     abs(qfm.rightBearing('W')) + abs(qfm.leftBearing('W')) is not enough
+     Todo: try again to reduce, meanwhile document: don't use italics.
+  */
+  //if (pointer_to_font->italic() == true)
+  //{
+  //  setting_max_width_of_a_char*= 2;
+  //}
+
+  /* (pointer_to_font->fixedPitch() always == false, I don't know why */
+  //if (mm.width("WWWWWWWWWW") != mm.width("I- 1a!~:wX"))
+  //{
+  //  ++setting_max_width_of_a_char;
+  //}
 }
 
 
@@ -8656,7 +8974,6 @@ unsigned int dbms_get_field_flag(unsigned int column_number, int connections_dbm
   (void) connections_dbms; /* suppress "unused parameter" warning */
   return result_field_flags[column_number];
 }
-
 
 QString dbms_get_field_name(unsigned int column_number, int connections_dbms)
 {
@@ -10254,36 +10571,37 @@ void handle_button_for_font_dialog()
   bool ok;
   QString font_name;
   QFont font;
-  int boldness= QFont::Normal;
-  bool italics= false;
 
   if (current_widget == STATEMENT_WIDGET)
   {
     font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_statement_font_family, false);
-    if (QString::compare(copy_of_parent->new_ocelot_statement_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_statement_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(copy_of_parent->new_ocelot_statement_font_family, copy_of_parent->new_ocelot_statement_font_size.toInt(), boldness, italics), this);
+    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_statement_font_weight));
+    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_statement_font_style));
+    font= call_qfontdialog(&ok, font);
   }
   if (current_widget == GRID_WIDGET)
   {
     font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_grid_font_family, false);
-    if (QString::compare(copy_of_parent->new_ocelot_grid_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_grid_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(font_name, copy_of_parent->new_ocelot_grid_font_size.toInt(), boldness, italics), this);
+    font= QFont(copy_of_parent->new_ocelot_grid_font_family, copy_of_parent->new_ocelot_grid_font_size.toInt());
+    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_grid_font_weight));
+    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_grid_font_style));
+    font= call_qfontdialog(&ok, font);
   }
   if (current_widget == HISTORY_WIDGET)
   {
     font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_history_font_family, false);
-    if (QString::compare(copy_of_parent->new_ocelot_history_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_history_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(font_name, copy_of_parent->new_ocelot_history_font_size.toInt(), boldness, italics), this);
+    font= QFont(copy_of_parent->new_ocelot_history_font_family, copy_of_parent->new_ocelot_history_font_size.toInt());
+    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_history_font_weight));
+    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_history_font_style));
+    font= call_qfontdialog(&ok, font);
   }
   if (current_widget == MAIN_WIDGET)
   {
     font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_menu_font_family, false);
-    if (QString::compare(copy_of_parent->new_ocelot_menu_font_weight, "bold", Qt::CaseInsensitive) == 0) boldness= QFont::Bold;
-    if (QString::compare(copy_of_parent->new_ocelot_menu_font_style, "italic", Qt::CaseInsensitive) == 0) italics= true;
-    font= QFontDialog::getFont(&ok, QFont(font_name, copy_of_parent->new_ocelot_menu_font_size.toInt(), boldness, italics), this);
+    font= QFont(copy_of_parent->new_ocelot_menu_font_family, copy_of_parent->new_ocelot_menu_font_size.toInt());
+    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_menu_font_weight));
+    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_menu_font_style));
+    font= call_qfontdialog(&ok, font);
   }
 
   if (ok)
@@ -10292,8 +10610,7 @@ void handle_button_for_font_dialog()
     if (current_widget == STATEMENT_WIDGET)
     {
       copy_of_parent->new_ocelot_statement_font_family= font.family();
-      if (font.italic()) copy_of_parent->new_ocelot_statement_font_style= "italic";
-      else copy_of_parent->new_ocelot_statement_font_style= "normal";
+      copy_of_parent->new_ocelot_statement_font_style= copy_of_parent->get_font_style_as_string(font);
       copy_of_parent->new_ocelot_statement_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
       if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_statement_font_weight= "bold";
       else copy_of_parent->new_ocelot_statement_font_weight= "normal";
@@ -10301,8 +10618,7 @@ void handle_button_for_font_dialog()
    if (current_widget == GRID_WIDGET)
    {
      copy_of_parent->new_ocelot_grid_font_family= font.family();
-     if (font.italic()) copy_of_parent->new_ocelot_grid_font_style= "italic";
-     else copy_of_parent->new_ocelot_grid_font_style= "normal";
+     copy_of_parent->new_ocelot_grid_font_style= copy_of_parent->get_font_style_as_string(font);
      copy_of_parent->new_ocelot_grid_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
      if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_grid_font_weight= "bold";
      else copy_of_parent->new_ocelot_grid_font_weight= "normal";
@@ -10310,8 +10626,7 @@ void handle_button_for_font_dialog()
    if (current_widget == HISTORY_WIDGET)
    {
      copy_of_parent->new_ocelot_history_font_family= font.family();
-     if (font.italic()) copy_of_parent->new_ocelot_history_font_style= "italic";
-     else copy_of_parent->new_ocelot_history_font_style= "normal";
+     copy_of_parent->new_ocelot_history_font_style= copy_of_parent->get_font_style_as_string(font);
      copy_of_parent->new_ocelot_history_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
      if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_history_font_weight= "bold";
      else copy_of_parent->new_ocelot_history_font_weight= "normal";
@@ -10319,14 +10634,56 @@ void handle_button_for_font_dialog()
    if (current_widget == MAIN_WIDGET)
    {
      copy_of_parent->new_ocelot_menu_font_family= font.family();
-     if (font.italic()) copy_of_parent->new_ocelot_menu_font_style= "italic";
-     else copy_of_parent->new_ocelot_menu_font_style= "normal";
+     copy_of_parent->new_ocelot_menu_font_style= copy_of_parent->get_font_style_as_string(font);
      copy_of_parent->new_ocelot_menu_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
      if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_menu_font_weight= "bold";
      else copy_of_parent->new_ocelot_menu_font_weight= "normal";
     }
     label_for_font_dialog_set_text();
   }
+}
+
+/*
+  There are a few fonts that QFontDialog() won't highlight. This might even be a Qt bug.
+  For example on Ubuntu: Century Schoolbook L, FreeMono Oblique, Kinnari Regular.
+  But if I set to bold weight and normal style, they appear, and I guess that's better than nothing.
+  Other things that cause non-highlighting -- italic/oblique difference, alias -- are handled elsewhere.
+  Todo: This might be a better way to solve the italic/oblique difference, try it sometime.
+  Todo: Often only weight needs changing, though I don't know if an examination is worth the effort.
+*/
+QFont call_qfontdialog(bool *ok, QFont font)
+{
+  QFontDialog *font_dialog= new QFontDialog(this);
+  font_dialog->setCurrentFont(font);
+  QFont font2= font_dialog->currentFont();
+  if (font != font2)
+  {
+    font2= font;
+    font2.setWeight(QFont::Bold);
+    font2.setStyle(QFont::Style::StyleNormal);
+  }
+  QFont font3= QFontDialog::getFont(ok, font2, this);
+  delete font_dialog;
+  return font3;
+}
+
+/* See also comments in canonical_font_weight() */
+QFont::Weight get_font_weight_as_qfont_weight(QString font_weight_string)
+{
+  QString new_font_weight_string= font_weight_string.toLower();
+  if (new_font_weight_string == "light") return QFont::Light;
+  if (new_font_weight_string == "normal") return QFont::Normal;
+  if (new_font_weight_string == "demibold") return QFont::DemiBold;
+  if (new_font_weight_string == "bold") return QFont::Bold;
+  if (new_font_weight_string == "black") return QFont::Black;
+  return QFont::Normal; /* This should never happen */
+}
+
+QFont::Style get_font_style_as_qfont_style(QString font_style_string)
+{
+  if (QString::compare(font_style_string, "italic", Qt::CaseInsensitive) == 0) return QFont::StyleItalic;
+  if (QString::compare(font_style_string, "oblique", Qt::CaseInsensitive) == 0) return QFont::StyleOblique;
+  return QFont::StyleNormal;
 }
 
 /*
