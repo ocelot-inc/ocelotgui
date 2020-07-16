@@ -6426,7 +6426,8 @@ void display(int due_to,
       /* border_size and minimum_width and minimum_height are used by mouseMoveEvent */
       text_edit_frames[ki]->border_size= 10 + border_size;    /* Todo: should just be border_size!! */
       text_edit_frames[ki]->minimum_width= fm.boundingRect("W").width() * MIN_WIDTH_IN_CHARS + border_size;
-      text_edit_frames[ki]->minimum_height= fm.height() * 2 + border_size; /* todo: this is probably too much */
+      /* I used to say "fm.height() * 2 + border_size", but don't know why. That seems like too much. */
+      text_edit_frames[ki]->minimum_height= fm.lineSpacing() + border_size * 2 + setting_ocelot_grid_cell_drag_line_size_as_int;
     }
   }
 
@@ -6650,13 +6651,14 @@ void display(int due_to,
   frame_resize() == Setting text_edit_frames[n] size.
   Called from: display() if vertical == 0 (initial),
                set_alignment_and_height() if vertical != 0 (always),
-               TextEditFrame::mouseMoveEvent() if drag line moved.
   Re scroll bar: we make most of the initial size calculations with the
                  assumption that scroll bar will be off, as it usually
                  will be, and since otherwise grid_column_size_calc()
                  becomes tremendously complicated. Here, if you know
                  the contents will fit, turn off the scroll bar.
   I think the width is of the frame; we want the width of the widget.
+  Re: setVerticalScrollBarPolicy(). set_height() calls it too,
+      so I think we only need to call it when we pull on a drag line.
 */
 void frame_resize(int ki, int grid_col, int width, int height)
 {
@@ -6680,6 +6682,33 @@ void frame_resize(int ki, int grid_col, int width, int height)
   /* Todo: test if following 2 lines are redundant since setFixedSize does the job. */
   //text_edit_frames[ki]->setMaximumHeight(height);
   //text_edit_frames[ki]->setMinimumHeight(height);
+}
+
+/*
+  Called from: TextEditFrame::mouseMoveEvent() if right drag line moved, so probable width change
+  The call to get_column_height_in_pixels() is just so that vertical scroll bar might go on|off.
+*/
+void frame_resize_for_drag_right(int ki, int grid_col, int width, int height)
+{
+  get_column_height_in_pixels(ki, width, height);
+  frame_resize(ki, grid_col, width, height);
+}
+
+/*
+  Called from: TextEditFrame::mouseMoveEvent() if bottom drag line moved, so probable height change
+  Unlike set_height(), we might not stop at the usual maximum height because we know the widget fits on the screen.
+  If vertical is on, passed xrow will be 0 but pay no attention.
+  todo: This is called for all visible rows -- but why? Why not just the row that the frame is in?
+  todo: This changes grid_row_widgets so maybe other columns in the row will be truncated without a scroll bar.
+  todo: It should be possible to change header height too but that is only working if vertical is on.
+  todo: Change is not persistent, if you scroll the result set so row disappears, then come back, it's original height.
+*/
+void frame_resize_for_drag_bottom(long int xrow, int ki, int grid_col, int width, int height)
+{
+  (void) (grid_col);
+  get_column_height_in_pixels(ki, width, height);
+  if (copy_of_ocelot_vertical == 0) grid_row_widgets[xrow]->setFixedHeight(height);
+  text_edit_frames[ki]->setFixedHeight(height);
 }
 
 /*
@@ -8199,7 +8228,7 @@ int set_alignment_and_height(int text_edit_frames_index, int grid_col, int field
   Todo: The "for (int i= 0; i < 2; ++i)" loop for italics might not be necessary.
   Todo: Rules differ for vertical != 0.
 */
-void set_height(unsigned int text_edit_frames_index, int width)
+int get_column_height_in_pixels(unsigned int text_edit_frames_index, int width, int copy_of_grid_max_column_height_in_pixels)
 {
   unsigned int height;
   QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
@@ -8245,7 +8274,7 @@ void set_height(unsigned int text_edit_frames_index, int width)
   }
   else
   {
-    max_column_height_in_pixels= grid_max_column_height_in_pixels;
+    max_column_height_in_pixels= copy_of_grid_max_column_height_in_pixels;
   }
   if (height > max_column_height_in_pixels)
   {
@@ -8254,6 +8283,17 @@ void set_height(unsigned int text_edit_frames_index, int width)
   }
   else
     text_edit_widgets[text_edit_frames_index]->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  return height;
+}
+
+/*
+  Todo: possible better names: set_column_height_in_pixels, set_cell_height_in_points
+*/
+void set_height(unsigned int text_edit_frames_index, int width)
+{
+  int height= get_column_height_in_pixels(text_edit_frames_index,
+                                          width,
+                                          grid_max_column_height_in_pixels);
 
   text_edit_frames[text_edit_frames_index]->setFixedHeight(height);
   //text_edit_widgets[text_edit_frames_index]->setFixedHeight(height);

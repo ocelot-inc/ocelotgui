@@ -70,6 +70,7 @@
           At connect time:
           lmysql->ldbms_mysql_get_host_info() to get the host
           select current_user(), version(), database(), @@port to get other server stuff
+    Todo: For prompt 指事> I don't like the height.
 */
 
 #ifndef CODEEDITOR_H_H
@@ -366,13 +367,13 @@ int CodeEditor::prompt_width_calculate()
   int prompt_width;
 
   sq= prompt_translate(1);
-  line_width_first= fontMetrics().width(sq);
+  line_width_first= fontMetrics().boundingRect(sq).width();
   sq= prompt_translate(blockCount() + 1);
-  line_width_last= fontMetrics().width(sq);
+  line_width_last= fontMetrics().boundingRect(sq).width();
   if (line_width_first < line_width_last) prompt_width= line_width_last;
   else prompt_width= line_width_first;
 #ifdef DEBUGGER
-  if (is_debug_widget == true) prompt_width+= fontMetrics().width("B ");
+  if (is_debug_widget == true) prompt_width+= fontMetrics().boundingRect("B ").width();
 #endif
   return prompt_width;
 }

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: July 13 2020
+   Last modified: July 16 2020
 */
 
 /*
@@ -16224,7 +16224,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
     {
       if (ancestor_result_grid_widget->ocelot_vertical_copy != 0)
       {
-        ancestor_result_grid_widget->frame_resize(text_edit_frames_index, ancestor_grid_column_number, event->x(), height());
+        ancestor_result_grid_widget->frame_resize_for_drag_right(text_edit_frames_index, ancestor_grid_column_number, event->x(), height());
         //setFixedSize(event->x(), height());
       }
       else
@@ -16241,7 +16241,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
           TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
           if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
           if (xrow == 0) xheight= f->height();
-          ancestor_result_grid_widget->frame_resize(f->text_edit_frames_index, ancestor_grid_column_number, event->x(), xheight);
+          ancestor_result_grid_widget->frame_resize_for_drag_right(f->text_edit_frames_index, ancestor_grid_column_number, event->x(), xheight);
           //f->setFixedSize(event->x(), xheight);
         }
       }
@@ -16253,7 +16253,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
     {
       if (ancestor_result_grid_widget->ocelot_vertical_copy > 0)
       {
-        ancestor_result_grid_widget->frame_resize(text_edit_frames_index, ancestor_grid_column_number, width(), event->y());
+        ancestor_result_grid_widget->frame_resize_for_drag_bottom(0, text_edit_frames_index, ancestor_grid_column_number, width(), event->y());
         //setFixedSize(width(), event->y());
       }
       else
@@ -16278,7 +16278,7 @@ void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
             TextEditFrame *f= ancestor_result_grid_widget->text_edit_frames[xrow * ancestor_result_grid_widget->gridx_column_count + ancestor_grid_column_number];
             if (xrow > 0) xheight= ancestor_result_grid_widget->grid_column_heights[ancestor_grid_column_number];
             if (xrow == 0) xheight= f->height();
-            ancestor_result_grid_widget->frame_resize(f->text_edit_frames_index, ancestor_grid_column_number, event->x(), xheight);
+            ancestor_result_grid_widget->frame_resize_for_drag_bottom(xrow, f->text_edit_frames_index, ancestor_grid_column_number, event->x(), xheight);
             //f->setFixedSize(event->x(), xheight);
           }
         }
