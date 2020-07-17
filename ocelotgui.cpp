@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.0.9
-   Last modified: July 16 2020
+   Last modified: July 17 2020
 */
 
 /*
@@ -406,7 +406,7 @@
 
   /* This should correspond to the version number in the comment at the start of this program. */
   static const char ocelotgui_version[]="1.0.9"; /* For --version. Make sure it's in manual too. */
-  unsigned short int dbms_version_mask= FLAG_VERSION_DEFAULT;
+  unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
   static MYSQL mysql[MYSQL_MAX_CONNECTIONS];
@@ -12764,9 +12764,12 @@ void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_num
  from connect_mysql() after connection succeeds, in which case the
  pass would be what "select version()" returns, such as 10.2.0-MariaDB,
  or 8.0.11 (MySQL might not say 'mysql'). Assume Percona is like MySQL.
+ Or we call from connect_tarantool() after connection succeeds.
+ If there's a disconnect later, we don't reset to original flag values.
  If you must know the vendor, then maybe select @@version_comment
  is good, but I don't know if @@version_comment was in old versions.
  Warn: get_sql_mode() might change dbms_version_mask.
+ If we don't see a known version number, we tend to assume it's a later version.
  Todo: a message like "Don't recognize MySQL/MariaDB version" would be nice.
 */
 void MainWindow::set_dbms_version_mask(QString version)
@@ -12804,18 +12807,21 @@ void MainWindow::set_dbms_version_mask(QString version)
     }
     else
     {
-      dbms_version_mask= FLAG_VERSION_TARANTOOL;
       if (version.contains("2.2") == true)
       {
-        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_2;
+        dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2);
       }
-      if (version.contains("2.3") == true)
+      else if (version.contains("2.3") == true)
       {
-        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_3;
+        dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3);
       }
-      if (version.contains("2.4") == true)
+      else if (version.contains("2.4") == true)
       {
-        dbms_version_mask|= FLAG_VERSION_TARANTOOL_2_4;
+        dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4);
+      }
+      else
+      {
+        dbms_version_mask= FLAG_VERSION_TARANTOOL_ALL;
       }
     }
   }

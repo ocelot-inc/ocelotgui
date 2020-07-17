@@ -87,9 +87,10 @@
 #define FLAG_VERSION_CONNECT_OPTION     16384
 #define FLAG_VERSION_OPTION             (8192 | 16384)
 #define FLAG_VERSION_TARANTOOL_2_2  32768
-#define FLAG_VERSION_TARANTOOL_2_3  (65536 | 32768)
+#define FLAG_VERSION_TARANTOOL_2_3  65536
 #define FLAG_VERSION_LUA_OUTPUT       131072
-#define FLAG_VERSION_TARANTOOL_2_4    (262144 | 65536 | 32768)
+#define FLAG_VERSION_TARANTOOL_2_4    262144
+#define FLAG_VERSION_TARANTOOL_ALL    (262144 | 65536 | 32768 | 1024)
 #define FLAG_VERSION_DEFAULT FLAG_VERSION_MYSQL_OR_MARIADB_ALL
 
 #include <assert.h>
@@ -2802,7 +2803,7 @@ extern int MENU_PICK_NEW_FONT;
 
 extern unsigned int menu_off;
 
-extern unsigned short int dbms_version_mask;
+extern unsigned int dbms_version_mask;
 
 namespace Ui
 {

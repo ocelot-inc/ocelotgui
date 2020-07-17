@@ -12412,19 +12412,13 @@ int MainWindow::hparse_f_variables(int *i_of_define)
     statement_edit_widget->dbms_version, will include the string "MariaDB".
     If we are not connected, the default is "mysql" but the user can start with
     ocelotgui --ocelot_dbms=mariadb, and we store that in ocelot_dbms.
-    Todo: see whether set_dbms_version() handles all this nowadays.
+    I think that set_dbms_version() handles all this nowadays.
 */
 void MainWindow::hparse_f_multi_block(QString text)
 {
   log("hparse_f_multi_block start", 90);
   hparse_line_edit->hide();
-  if (connections_is_connected[0] == 1) hparse_dbms_mask= dbms_version_mask;
-  else if (ocelot_dbms == "mariadb") hparse_dbms_mask= FLAG_VERSION_MARIADB_ALL;
-  else if (ocelot_dbms == "mysql") hparse_dbms_mask= FLAG_VERSION_MYSQL_ALL;
-#ifdef DBMS_TARANTOOL
-  else if (ocelot_dbms == "tarantool") hparse_dbms_mask= FLAG_VERSION_TARANTOOL;
-#endif
-  else hparse_dbms_mask= FLAG_VERSION_MYSQL_OR_MARIADB_ALL;
+  hparse_dbms_mask= dbms_version_mask;
   hparse_dbms_mask &= (~FLAG_VERSION_LUA_OUTPUT);
   hparse_sql_mode_ansi_quotes= sql_mode_ansi_quotes;
   hparse_i= -1;
@@ -13173,7 +13167,7 @@ int MainWindow::hparse_f_client_statement()
   The hint line that appears underneath the statement widget if syntax error,
   which probably means that the user is typing and hasn't finished a word.
   This is somewhat like a popup but using "Qt::Popup" caused trouble.
-  Warning: We can call this without going via hparse_f_multi_block()
+  Warning: We can call this without going via hparse_f_multi_block() and before calling dbms_version_mask()
 */
 void MainWindow::hparse_f_parse_hint_line_create()
 {
