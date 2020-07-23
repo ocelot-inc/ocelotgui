@@ -2598,7 +2598,7 @@ typedef char MY_BOOL;
   We use stat() to see if a configuration file is world-writable, therefore include stat.h.
   Todo: There was no error when I didn't do this for FreeBSD. Is it using Qt library and surviving?
 */
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
 #include <dlfcn.h>
 #if (OCELOT_STATIC_LIBRARY == 0)
 #include <link.h>
