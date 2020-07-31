@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -8260,7 +8260,7 @@ int get_column_height_in_pixels(unsigned int text_edit_frames_index, int width, 
           2000, /* int height = height, which is arbitrary big maximum */
           Qt::TextWrapAnywhere + Qt::TextIncludeTrailingSpaces, /* int flags = (see comments before start of this routine) */
           s); /* QString & text= cell contents */
-      if (text_edit_widget_font.style() == QFont::Style::StyleNormal) break;
+      if (text_edit_widget_font.style() == QFont::StyleNormal) break;
       int n= r2.height() / text_edit_widget_font_metrics.lineSpacing();
       s= s + QString("W").repeated(n);
     }
@@ -10616,6 +10616,7 @@ void handle_button_for_font_dialog()
   if (current_widget == STATEMENT_WIDGET)
   {
     font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_statement_font_family, false);
+    font= QFont(copy_of_parent->new_ocelot_statement_font_family, copy_of_parent->new_ocelot_statement_font_size.toInt());
     font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_statement_font_weight));
     font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_statement_font_style));
     font= call_qfontdialog(&ok, font);
@@ -10691,6 +10692,10 @@ void handle_button_for_font_dialog()
   Other things that cause non-highlighting -- italic/oblique difference, alias -- are handled elsewhere.
   Todo: This might be a better way to solve the italic/oblique difference, try it sometime.
   Todo: Often only weight needs changing, though I don't know if an examination is worth the effort.
+  Todo: This causes display of "GtkDialog mapped without a transient parent. This is discouraged."
+        I try to suppress the display with qInstallMessageHandler but that only seems to work with Windows.
+        I try DontUseNativeDialog but, as the Qt manual says, that's for Macs. It did nothing on Ubuntu.
+        The old QFontDialog from Qt 4.8 did not cause this and looked better too.
 */
 QFont call_qfontdialog(bool *ok, QFont font)
 {
@@ -10701,7 +10706,7 @@ QFont call_qfontdialog(bool *ok, QFont font)
   {
     font2= font;
     font2.setWeight(QFont::Bold);
-    font2.setStyle(QFont::Style::StyleNormal);
+    font2.setStyle(QFont::StyleNormal);
   }
   QFont font3= QFontDialog::getFont(ok, font2, this);
   delete font_dialog;

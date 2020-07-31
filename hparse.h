@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -3718,6 +3718,7 @@ void MainWindow::hparse_f_enum_or_set()
   Todo: we no longer need to allow "UNSIGNED INT" for non-CAST.
   Todo: notice how CAST checks are clean and ordered? Do the same for non-CAST.
   Todo: with MariaDB DATE and DATETIME can be followed by (n), both for CAST and for non-CAST.
+  Todo: we check for length if VARCHAR, but don't check for variant spellings
 */
 int MainWindow::hparse_f_data_type(int context)
 {
@@ -3946,12 +3947,7 @@ int MainWindow::hparse_f_data_type(int context)
    || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VARCHAR, "VARCHAR2") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
-    {
-      if (hparse_f_length(false, false, true) == 0) hparse_f_error();
-    }
-    else
-      hparse_f_length(false, false, true);
+    if (hparse_f_length(false, false, true) == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_VARCHAR;
   }

@@ -1,3 +1,9 @@
+ocelotgui (1.1.0-1) UNRELEASED; urgency=low
+
+  * Flexible grid
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Fri, 31 Jul 2020 12:00:00 -0600
+
 ocelotgui (1.0.9-1) UNRELEASED; urgency=low
 
   * Some bug fixes

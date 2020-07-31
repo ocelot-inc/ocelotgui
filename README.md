@@ -1,7 +1,7 @@
 
 Ocelot ocelotgui
 
-<P>Version 1.0.9</P>
+<P>Version 1.1.0</P>
 
 <P>The Ocelot GUI (ocelotgui), a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -9,7 +9,7 @@ Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, result-set displays
 with multi-line rows and resizable columns, and a debugger.</P>
 
-<P>Copyright (c) 2014-2019, Ocelot Computer Services Inc.
+<P>Copyright (c) 2014-2020, Ocelot Computer Services Inc.
 All rights reserved.</P>
 
 <P>For the GPL license terms see <A href="https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL">https://github.com/ocelot-inc/ocelotgui/blob/master/LICENSE.GPL</A>.</P>
@@ -49,7 +49,7 @@ All rights reserved.</P>
 <H4>Appendixes</H4>
 ... <A href="#Appendix-1">Appendix 1 Details about ocelotgui options</A>
 ... <A href="#Appendix-2">Appendix 2 Reference for the Ocelot GUI debugger</A>
-... <A href="#Appendix-3">Appendix 3 Tarantoo</A>
+... <A href="#Appendix-3">Appendix 3 Tarantool</A>
 ... <A href="#Appendix-4">Appendix 4 windows</A>
 ... <A href="#getting-and-using-the-ocelotgui-source">Appendix 5 Getting and using the ocelotgui source</A>
 
@@ -69,7 +69,8 @@ The libmysqlclient library will also be necessary, at runtime.</P>
 since other common packages depend on it. If not, your Linux
 distro's repositories will provide a Qt package.
 For example, on some platforms you can say
-"sudo apt-get install libqt5core5a" , on others you can say "dnf install qt qt-x11".</P>
+"sudo apt-get install libqt5core5a libqt5widgets5" , on others you can say "dnf install qt qt-x11",
+on others you can say "dnf install qt5-qtbase qt5-qtbase-gui".</P>
 
 <P>
 The Qt version number can be found with <i>find /usr/lib -name "libQt*Gui.so*"</i>, or <i>find /usr/lib64 -name "libQt*Gui.so*"</i>.
@@ -117,21 +118,21 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui_1.0.9-1_i386.deb
-sudo apt install ./ocelotgui_1.0.9-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui_1.1.0-1_i386.deb
+sudo apt install ./ocelotgui_1.1.0-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui_1.0.9-1_amd64.deb
-sudo apt install ./ocelotgui_1.0.9-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui_1.1.0-1_amd64.deb
+sudo apt install ./ocelotgui_1.1.0-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui-1.0.9-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.0.9-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui-1.1.0-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.1.0-1.x86_64.rpm</PRE>
 For 64-bit, any Linux, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui-1.0.9.tar.gz
-tar zxvf ocelotgui-1.0.9.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui-1.1.0.tar.gz
+tar zxvf ocelotgui-1.1.0.tar.gz
 ocelotgui/ocelotgui-qt5</PRE>
 For 64-bit, any Linux, Qt4 (deprecated)<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui-1.0.9.tar.gz
-tar zxvf ocelotgui-1.0.9.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui-1.1.0.tar.gz
+tar zxvf ocelotgui-1.1.0.tar.gz
 ocelotgui/ocelotgui-qt4</PRE>
 </P>
 
@@ -165,9 +166,9 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.0.9, June 29 2019</P>
+<P>Version 1.1.0, July 31 2020</P>
 
-<P>Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.</P>
+<P>Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.</P>
   
 <P>This program is free software; you can redistribute it and/or modify  
 it under the terms of the GNU General Public License as published by  
@@ -220,7 +221,7 @@ Instructions for installation will be in the README.md file.
 This location may change, or alternate locations may appear.
 If so there will either be an announcement on github or on ocelot.ca.</P>
 
-<P>The package contains source code and an executable file named ocelotgui.</P>
+<P>The package contains source code and an executable file named ocelotgui-qt5.</P>
 
 <H3 id="starting">Starting</H3><HR>
 
@@ -881,7 +882,7 @@ histfile=/dev/null.</td>
 <tr>
 <td valign="top">histignore</td>
 <td valign="top">Pattern to ignore when writing to histfile.
-For example, if histignoreis "*select*", then statements
+For example, if histignore is "*select*", then statements
 containing the string "select" will not be written.
 </tr>
 
@@ -1694,7 +1695,7 @@ http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt</
 <P>Ordinarily ocelotgui is a client for
 MySQL/MariaDB, and some documentation
 assumes that. However, it is possible
-to connect to Tarantool Tarantool 2.1 (with SQL) instead.
+to connect to Tarantool Tarantool 2.x (with SQL) instead.
 You get all the same features except the debugger.</P>
 
 <P>The ocelotgui connection to Tarantool is not produced or approved by Tarantool.</P>
@@ -1704,11 +1705,10 @@ The official "SQL" release is available now,
 look for it on https://github.com/tarantool/tarantool/releases.
 
 Download it according to the instructions
-<A HREF="https://www.tarantool.io/en/download/?v=2.1">in the Tarantool manual</A>,
+<A HREF="https://www.tarantool.io/en/download">in the Tarantool manual</A>,
 the version number must be 2.1.2 or later.
-For a more current version, download from github.com/tarantool/tarantool:<br>
-git clone -b 2.1 https://github.com/tarantool/tarantool.git ~/tarantool-2.1<br>
-and build from source as instructed in the version-2.1 manual.</P>
+For a more current version, download from github.com/tarantool/tarantool<br>
+and build from source as instructed in the Tarantool manual.</P>
 
 <P>Usually you do not need to install the Tarantool client (libtarantool.so) library,
 but it is possible to use it if you build ocelotgui with "cmake -DTHIRD_PARTY=0".
@@ -1743,7 +1743,7 @@ On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.</P>
 
 <P>You need the latest ocelotgui client.
-The Release 1.0.9 version is okay at the time of release,
+The Release 1.1.0 version is okay at the time of release,
 but some things might not be up to date.
 It is better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.</P>
@@ -1779,9 +1779,8 @@ option --html. It will look quite different.
 But you can't drag and resize with --html.)</P>
 
 <P>Now type any other SQL statements, as described
-in the Tarantool manual. (At time of writing this
-manual is not available but it's similar to SQLite.
-The <A href="https://www.tarantool.io/en/doc/2.1/tutorials/sql_tutorial/">tutorial SQL statements</A>
+in the Tarantool manual.
+The <A href="https://www.tarantool.io/en/doc/2.4/tutorials/sql_tutorial/">tutorial SQL statements</A>
 work.)</P>
 
 <P>Now type<br>
@@ -1913,11 +1912,11 @@ How to get it:<br>
 * Download the ocelotgui zip file from github.
   Check https://github.com/ocelot-inc/ocelotgui/blob/master/README.md
   to see where the latest release is. For example it might be
-  https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui-1.0.9-1.ocelotgui.zip<br>
+  https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui-1.1.0-1.ocelotgui.zip<br>
 * Unzip. It was zipped with 7-zip from http://www.7-zip.org,
   but other utilities should work. For example, on Windows command prompt,
   if you have the PowerShell utility on your path:
-  PowerShell Expand-Archive ocelotgui-1.0.9-1.ocelotgui.zip c:\ocelotgui<br>
+  PowerShell Expand-Archive ocelotgui-1.1.0-1.ocelotgui.zip c:\ocelotgui<br>
 * Read the COPYING and LICENSE arrangements.
   On Windows ocelotgui is statically linked to Qt and MariaDB libraries,
   so the copyright and licensing is not the same as for Linux.<br>
@@ -2169,7 +2168,7 @@ release\ocelotgui.exe --ocelot_dbms=tarantool
 copy release\ocelotgui.exe ocelotgui.exe
 "C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf             ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec
 
-: What we actually put in the release looks like ocelotgui-1.0.9-1.ocelotgui.zip, so rename the .zip file at some point.
+: What we actually put in the release looks like ocelotgui-1.1.0-1.ocelotgui.zip, so rename the .zip file at some point.
 
 
 : (Dynamic linking)
@@ -2222,8 +2221,8 @@ copy release\ocelotgui.exe ocelotgui.exe
 <H3 id="getting-and-using-the-ocelotgui-source">Appendix 5 Getting and using the ocelotgui source</H3><HR>
 
 <P>The ocelotgui source package has everything necessary to compile
-and link and install for any Linux distribution. If the typical
-developer packages such as cmake and the gcc c/c++ compiler has
+and link and install for any Linux distribution, or FreeBSD. If the typical
+developer packages such as cmake and the gcc c/c++ compiler have
 been installed already, building an executable usually takes
 less than fifteen minutes.</P>
 
@@ -2247,14 +2246,14 @@ A release file is highlighted in green
 by github and is named ocelotgui-[version].tar.gz.
 Since version 1.0.9, there is also a release file named ocelotgui_[version].orig.tar.gz
 which is preferable because it does not contain unnecessary executables.
-Thus release 1.0.9 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui_1.0.9.orig.tar.gz.
+Thus release 1.1.0 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui_1.1.0.orig.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.0.9/ocelotgui_1.0.9.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.1.0/ocelotgui_1.1.0.orig.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui_1.0.9.orig.tar.gz.</P>
+and click ocelotgui_1.1.0.orig.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
@@ -2280,9 +2279,13 @@ For example on Mageia:<PRE>
  #it might be qt5-qtbase-devel
  urpmi libqt5-devel</PRE></P>
 
+<P>On Manjaro which is an ArchLinux-like system:<PRE>
+sudo pacman -S cmake
+sudo pacman -S mariadb-clients</PRE</P>
+
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui_1.0.9.orig.tar.gz
- cd ocelotgui-1.0.9</PRE>
+ tar -zxvf ocelotgui_1.1.0.orig.tar.gz
+ cd ocelotgui-1.1.0</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
@@ -2306,14 +2309,14 @@ For Debian-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="DEB"
  make
  cpack
- sudo apt install ocelotgui_1.0.9-1_i386.deb
- #or sudo apt install ocelotgui_1.0.9-1_amd64.deb</PRE>
+ sudo apt install ocelotgui_1.1.0-1_i386.deb
+ #or sudo apt install ocelotgui_1.1.0-1_amd64.deb</PRE>
 For RPM-like platforms say:<PRE>
  cmake . -DCPACK_GENERATOR="RPM"
  make
  cpack
- sudo rpm -i ocelotgui-1.0.9-1.x86_64.rpm
- #or sudo rpm -i ocelotgui-1.0.9-1.i686.rpm if it is supplied</PRE>
+ sudo rpm -i ocelotgui-1.1.0-1.x86_64.rpm
+ #or sudo rpm -i ocelotgui-1.1.0-1.i686.rpm if it is supplied</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
 </P>

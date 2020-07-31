@@ -7,11 +7,11 @@ assumes that. However, it is possible
 to connect to Tarantool 1.8.1 or Tarantool 2.1 (with SQL) instead.
 You get all the same features except the debugger.
 
-The ocelotgui connection to Tarantool is alpha
-and is not produced by Tarantool and has no warranty.
+The ocelotgui connection to Tarantool is
+not produced by Tarantool and has no warranty.
 
 You need the latest Tarantool "SQL" server.
-Tarantool's official "SQL" releases are 1.8.1 and 2.0 and 2.1.
+Tarantool's official "SQL" releases are 1.8.1 and 2.x.
 Release 1.8.1 https://github.com/tarantool/tarantool/releases/tag/1.8.1 is slightly obsolete.
 Release 2.1 beta is available now, look for it on https://github.com/tarantool/tarantool/releases.
 
@@ -52,7 +52,7 @@ On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.
 
 You need the latest ocelotgui client.
-The Release 1.07 version is okay,
+The Release 1.1.0 version is okay,
 but some things might not be up to date.
 It is better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.

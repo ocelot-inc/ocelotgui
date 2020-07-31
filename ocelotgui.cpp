@@ -1,12 +1,12 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.0.9
-   Last modified: July 17 2020
+   Version: 1.1.0
+   Last modified: July 31 2020
 */
 
 /*
-  Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.
+  Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -405,7 +405,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.0.9"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.1.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -482,33 +482,32 @@ volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
    https://github.com/MartinBriza/QGnomePlatform/issues/23 (Fedora)
-   Todo: consider also suppressing "OpenType support missing for script"
-   Todo: Actually the GtkDialog warning is happening now with Linux too e.g. see
-         above-mentioned Fedora bug report. But there's not much I can do except
-         maybe replace all native dialogs (I use QFontDialog) with substitutes in
-         this program. Quite a lot of work just to suppress a useless message, eh?
+   Originally we only suppressed if Windows but then it started to apper for Linux too.
+   There's not much I can do except maybe replace all native dialogs (I use QFontDialog)
+   with substitutes in this program. Qutie a lot of work just to suppress a useless message, eh?
    Todo: Failed to load module "canberra-gtk-module" which has something to do with sound
          https://cromwell-intl.com/open-source/missing-gtk-modules.html
          We don't need special sounds so suppressing would be okay.
          But I didn't bother because I only saw it with Linux + Qt4.
+   Todo: consider also suppressing "OpenType support missing for script"
 */
-#if (defined(_WIN32) && (QT_VERSION >= 0x50000))
+#if (QT_VERSION >= 0x50000)
 void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QString &msg)
 {
+  (void) context;
   if (type == QtWarningMsg)
   {
     if (msg.contains("CreateFontFaceFromHDC")) return;
     if (msg.contains("GtkDialog mapped without a transient parent")) return;
   }
   QByteArray localMsg = msg.toLocal8Bit();
-  printf("Qt message: %u: %s.\n", context.line, localMsg.constData());
   if (type == QtFatalMsg) abort();
 }
 #endif
 
 int main(int argc, char *argv[])
 {
-#if (defined(_WIN32) && (QT_VERSION >= 0x50000))
+#if (QT_VERSION >= 0x50000)
   qInstallMessageHandler(dump_qtmessage);
 #endif
 
@@ -720,6 +719,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     If the command-line option was -p but not a password, then password input is necessary
     so put up the connection dialog box. Otherwise try immediately to connect.
     Todo: better messages so the user gets the hint: connection is necessary / password is necessary.
+    Todo: check: Can you handle password with special characters?
   */
   if (ocelot_password_was_specified == 0)
   {
@@ -4095,7 +4095,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2019 by Ocelot Computer Services Inc.<br>\
+<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2020 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -4175,10 +4175,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.0.9, June 30 2019  \
+  <BR>Version 1.1.0, July 31 2020  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2014-2019 by Ocelot Computer Services Inc. All rights reserved.  \
+  <BR>Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -18839,7 +18839,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2014-2019 by Ocelot Computer Services Inc. and others\n");
+  printf("Copyright (c) 2014-2020 by Ocelot Computer Services Inc. and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");
