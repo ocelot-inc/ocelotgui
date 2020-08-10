@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: July 31 2020
+   Last modified: August 10 2020
 */
 
 /*
@@ -9644,6 +9644,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     return 1;
   }
   /* TODO: "STATUS" should output as much information as the mysql client does. */
+  /* Todo: connections_is_connected is still 1 after lost connection or SHUTDOWN, fix that somewhere */
   if (statement_type == TOKEN_KEYWORD_STATUS)
   {
     if (connections_is_connected[0] != 1) make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
@@ -9657,6 +9658,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       strcpy(dbms_host, statement_edit_widget->dbms_host.toUtf8());
       strcpy(dbms_port, statement_edit_widget->dbms_port.toUtf8());
       sprintf(buffer, er_strings[er_off + ER_STATUS], dbms_version, dbms_host, dbms_port);
+#ifdef DBMS_TARANTOOL
+      if (connections_dbms[0] == DBMS_TARANTOOL)
+      {
+        char tmp[32];
+        sprintf(tmp, " iproto_schema_version = %ld", tarantool_tnt_reply.schema_id);
+        strcat(buffer, tmp);
+      }
+#endif
       put_message_in_result(buffer);
     }
     return 1;
