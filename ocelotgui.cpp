@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 10 2020
+   Last modified: August 11 2020
 */
 
 /*
@@ -13272,6 +13272,12 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
       tarantool_errno[connection_number]= 9999;
       strcpy(tarantool_errmsg, "Connection refused for ");
       strcat(tarantool_errmsg, connection_string);
+      enum tnt_error j= lmysql->ldbms_tnt_error(tnt[connection_number]);
+      if ((j >= 0) && (j < TNT_LAST))
+      {
+        strcat(tarantool_errmsg, " ");
+        strcat(tarantool_errmsg, lmysql->ldbms_tnt_strerror(tnt[connection_number]));
+      }
     }
     else
     {

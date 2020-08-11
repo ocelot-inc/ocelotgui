@@ -5630,6 +5630,7 @@ tnt_iob_free(struct tnt_iob *iob);
    COPY: file name = include/tarantool/tnt_net.h.
    Copying Date = 2017-09-14.
    Changes: commented out #includes.
+            rename enum tnt_error tnt_error() to xtnt_error() because it shadows enum tnt_error, and pre-declare.
 */
 
 #ifndef TNT_NET_H_INCLUDED
@@ -5714,6 +5715,9 @@ struct tnt_stream_net {
     struct tnt_schema *schema; /*!< Collation for space/index string<->number */
     int inited; /*!< 1 if iob/schema were allocated */
 };
+
+enum tnt_error
+xtnt_error(struct tnt_stream *);
 
 /*!
  * \internal
@@ -19368,7 +19372,7 @@ int tnt_fd(struct tnt_stream *s) {
     return sn->fd;
 }
 
-enum tnt_error tnt_error(struct tnt_stream *s) {
+enum tnt_error xtnt_error(struct tnt_stream *s) {
     struct tnt_stream_net *sn = TNT_SNET_CAST(s);
     return sn->error;
 }

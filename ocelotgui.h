@@ -2737,6 +2737,19 @@ typedef char MY_BOOL;
       int index_base; /*!< field offset for UPDATE */
       int alloc; /*!< allocation mark */
   };
+  enum tnt_error {
+      TNT_EOK, /*!< Everything is OK */
+      TNT_EFAIL, /*!< Fail */
+      TNT_EMEMORY, /*!< Memory allocation failed */
+      TNT_ESYSTEM, /*!< System error */
+      TNT_EBIG, /*!< Buffer is too big */
+      TNT_ESIZE, /*!< Bad buffer size */
+      TNT_ERESOLVE, /*!< gethostbyname(2) failed */
+      TNT_ETMOUT, /*!< Operation timeout */
+      TNT_EBADVAL, /*!< Bad argument (value) */
+      TNT_ELOGIN, /*!< Failed to login */
+      TNT_LAST /*!< Not an error */
+  };
 #endif
 
 #endif
@@ -4623,6 +4636,8 @@ public:
   typedef ssize_t         (*ttnt_select)         (struct tnt_stream *, uint32_t, uint32_t, uint32_t, uint32_t, uint8_t, struct tnt_stream *);
   typedef int             (*ttnt_set)            (struct tnt_stream *, int, char *);
   typedef ssize_t         (*ttnt_update)         (struct tnt_stream *, uint32_t, uint32_t, struct tnt_stream *, struct tnt_stream *);
+  typedef enum tnt_error  (*ttnt_error)          (struct tnt_stream *);
+  typedef char*           (*ttnt_strerror)       (struct tnt_stream *);
 #endif
 
   tmysql_affected_rows t__mysql_affected_rows;   /* libmysqlclient */
@@ -4709,6 +4724,8 @@ public:
   ttnt_select t__tnt_select;
   ttnt_set t__tnt_set;
   ttnt_update t__tnt_update;
+  ttnt_error t__tnt_error;
+  ttnt_strerror t__tnt_strerror;
 #endif
 
 ldbms() : QWidget()
@@ -4831,6 +4848,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       t__tnt_select= (ttnt_select) &tnt_select;
       t__tnt_set= (ttnt_set) &tnt_set;
       t__tnt_update= (ttnt_update) &tnt_update;
+      t__tnt_error= (ttnt_error) &xtnt_error;
+      t__tnt_strerror= (ttnt_strerror) &tnt_strerror;
       *is_library_loaded= 1;
       return;
     }
@@ -5103,6 +5122,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__tnt_select= (ttnt_select) dlsym(dlopen_handle, "tnt_select"); if (dlerror() != 0) s.append("tnt_select ");
         t__tnt_set= (ttnt_set) dlsym(dlopen_handle, "tnt_set"); if (dlerror() != 0) s.append("tnt_set ");
         t__tnt_update= (ttnt_update) dlsym(dlopen_handle, "tnt_update"); if (dlerror() != 0) s.append("tnt_update ");
+        t__tnt_error= (ttnt_error) dlsym(dlopen_handle, "tnt_error"); if (dlerror() != 0) s.append("tnt_error ");
+        t__tnt_strerror= (ttnt_strerror) dlsym(dlopen_handle, "tnt_strerror"); if (dlerror() != 0) s.append("tnt_strerror ");
       }
 #endif
 #endif //#ifdef OCELOT_OS_LINUX
@@ -5545,6 +5566,14 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   ssize_t ldbms_tnt_update(struct tnt_stream *a, uint32_t b, uint32_t c, struct tnt_stream *d, struct tnt_stream *e)
   {
     return t__tnt_update(a,b,c,d,e);
+  }
+  enum tnt_error ldbms_tnt_error(struct tnt_stream *a)
+  {
+    return t__tnt_error(a);
+  }
+  char* ldbms_tnt_strerror(struct tnt_stream *a)
+  {
+    return t__tnt_strerror(a);
   }
 #endif
 };
