@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 11 2020
+   Last modified: August 16 2020
 */
 
 /*
@@ -10519,20 +10519,74 @@ int MainWindow::rehash_scan()
   if (connections_dbms[0] == DBMS_TARANTOOL)
   {
     int result;
-    /* Todo: It makes no sense that you get "name" twice from _index. You need table name. */
-    /* Todo: Maybe wait for _index and _table and _column views to get set up. */
-    sprintf(query, "select 'T', \"name\",'T' "
-                   "from \"_space\" "
-                   "union all "
-                   "select 't', \"name\",'' "
-                   "from \"_trigger\" "
-                   "union all "
-                   "select 'I', \"name\",\"name\" "
-                   "from \"_index\";"
+    if (strcmp(tarantool_box_execute, "No SQL") == 0)
+    {
+      tarantool_errno[0]= 9998;
+      make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
+      return tarantool_errno[0];
+    }
+    /*
+      This is how to use Lua to produce what looks like an SQL result set.
+      Todo:: This does 'C', 'T', 'I'. 't' would be simple but decide: only SQL triggers?
+    */
+    char lua_request[]=
+       "do\
+         local output_tuple\
+         local output_table_of_tuples = {}\
+         local space_list = {}\
+         local x, y\
+         local space_row_number, space_row, space_name, space_row_column_count, space_row_column_number\
+         local index_list = {}\
+         local index_row_number, index_row, index_name\
+         x, y = pcall(function () space_list = box.space._space:select() end)\
+         if x then\
+           for space_row_number = 1,#space_list do\
+             space_row = space_list[space_row_number]\
+             space_name = space_row[3]\
+             space_row_column_count = #space_row[7]\
+             if space_row_column_count ~= nil and space_row_column_count > 0 then\
+               for space_row_column_number = 1, space_row_column_count do\
+                 output_tuple = box.tuple.new('C', space_name, space_row[7][space_row_column_number].name)\
+                 table.insert(output_table_of_tuples, output_tuple)\
+                end\
+             end\
+           end\
+           for space_row_number = 1,#space_list do\
+             space_row = space_list[space_row_number]\
+             space_name = space_row[3]\
+             output_tuple = box.tuple.new('T', space_name, 'T')\
+             table.insert(output_table_of_tuples, output_tuple)\
+           end\
+           x, y = pcall(function () index_list = box.space._index:select() end)\
+           if x then\
+             for index_row_number = 1,#index_list do\
+               index_row = index_list[index_row_number]\
+               index_name = index_row[3]\
+               space_name = box.space._space:select(index_row[1])[1][3]\
+               output_tuple = box.tuple.new('I', space_name, index_name)\
+               table.insert(output_table_of_tuples, output_tuple)\
+             end\
+           end\
+         end\
+         local output_table_final = \
+         {\
+           ['metadata']=\
+           {\
+             {['name']='COLUMN_1',['type']='string'},\
+             {['name']='COLUMN_2',['type']='string'},\
+             {['name']='COLUMN_3',['type']='string'}\
+           }\
+           ,\
+           ['rows']=\
+           output_table_of_tuples\
+         }\
+         return output_table_final\
+       end\
+     ";
 
-           );
+    /* Todo: Solve this mystery: why does result == 0 even if tarantool_execute_sql fails? */
 
-    result= tarantool_execute_sql(query, strlen(query), 0);
+    result= tarantool_execute_lua(lua_request, strlen(lua_request), 0);
 
     if (result != 0)
     {
@@ -10684,8 +10738,22 @@ int MainWindow::rehash_scan()
 }
 
 /*
+  Called from hparse_f_multi_block() for adding to the "Expecting:" list
   Pass: search string. Return: column name matching searching string.
+  Re ""s: An identifier if starts-with-digit or has-lower-case or has-non-alpha-or-digit isn't regular.
+          So making it a delimited identifier seems reasonable in this context.
+          But in MySQL/MariaDB it's complicated due to ansi-quotes, backtick use, and whether lower-case matters.
+          So for now we only check for Tarantool.
   Todo: We only look at column[1] column_name. We should look at column[0] table_name.
+  Todo: Matching reftype is fine but we could also match column's table or index's table if we know it.
+  Todo: Should not the search be case insensitive?
+  Todo: Consider stopping display after TARANTOOL_MAX_FIELD_NAME_LENGTH or MYSQL_MAX_IDENTIFIER_LENGTH characters.
+  Todo: "count_of_hits > 10" is arbitrary, and also you should add "..."
+  Todo: Perhaps the QByteArray() trick here could be used elsewhere where we're currently using strncpy().
+  Todo: We avoid duplicates e.g. "primary".
+        But that disturbs the order, and something that occurs more often should be first.
+        And if you ever get more info e.g. column-type or table-of-index then it will be ambiguous.
+  Todo: We could call QStringList::sort()
 */
 QString MainWindow::rehash_search(char *search_string, int reftype)
 {
@@ -10693,14 +10761,15 @@ QString MainWindow::rehash_search(char *search_string, int reftype)
   char *row_pointer;
   unsigned int column_length;
   unsigned int i;
-  char column_value[512];
+  QString column_value;
+  QStringList column_value_list;
   unsigned int search_string_length;
   QString tmp_word= "";
   int count_of_hits= 0;
   char desired_types[TOKEN_REFTYPE_MAX]= "";
   unsigned int column_to_match= 0;
   search_string_length= strlen(search_string);
-  column_value[0]= '\0';
+  column_value_list.clear();
   if ((reftype == TOKEN_REFTYPE_COLUMN)
    || (reftype == TOKEN_REFTYPE_TABLE_OR_COLUMN)
    || (reftype == TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN)
@@ -10774,18 +10843,52 @@ QString MainWindow::rehash_search(char *search_string, int reftype)
         {
           if (strncmp(row_pointer, search_string, search_string_length) == 0)
           {
-            strncpy(column_value, row_pointer, column_length);
-            column_value[column_length]= '\0';
-            tmp_word.append(column_value);
-            tmp_word.append(" ");
-            ++count_of_hits;
-            if (count_of_hits > 10) break;
+            QByteArray column_value_as_qbytearray= QByteArray(row_pointer, column_length);
+            column_value= column_value_as_qbytearray;
+#ifdef DBMS_TARANTOOL
+            if (connections_dbms[0] == DBMS_TARANTOOL)
+            {
+              bool is_regular= true;
+              for (int i= 0; i < column_value.length(); ++i)
+              {
+                QChar c= column_value.at(i);
+                if (c.isLetter())
+                {
+                  if (c.isLower()) {is_regular= false; break; }
+                }
+                else if (c.isNumber())
+                {
+                  if (i == 0) {is_regular= false; break; }
+                }
+                else if (c == '_')
+                {
+                  continue;
+                }
+                else
+                {
+                  is_regular= false; break;
+                }
+              }
+              if (is_regular == false) column_value= "\"" + column_value + "\"";
+            }
+#endif
+            if (column_value_list.contains(column_value) == false)
+            {
+              column_value_list.append(column_value);
+              ++count_of_hits;
+              if (count_of_hits > 10) break;
+            }
           }
         }
       }
       row_pointer+= column_length;
     }
     if (count_of_hits > 10) break;
+  }
+  for (int i= 0; i < column_value_list.size(); ++i)
+  {
+    tmp_word.append(column_value_list.at(i));
+    tmp_word.append(" ");
   }
   return tmp_word;
 }
