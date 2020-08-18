@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 16 2020
+   Last modified: August 19 2020
 */
 
 /*
@@ -4156,7 +4156,7 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
     the_text.replace("img src=\"", img_path);
   }
   Message_box *message_box;
-  message_box= new Message_box("Help|About", the_text, 500, this);
+  message_box= new Message_box("Help|About", the_text, 500, "", er_strings[er_off + ER_OK], "", this);
   message_box->exec();
   delete message_box;
 }
@@ -4231,8 +4231,8 @@ void MainWindow::action_the_manual()
   QDesktopWidget desktop;
   int desktop_width= desktop.availableGeometry().width();
 #endif
-  if (desktop_width > (960 + 50)) message_box= new Message_box("Help|The Manual", the_text, 960, this);
-  else message_box= new Message_box("Help|The Manual", the_text, desktop_width - 50, this);
+  if (desktop_width > (960 + 50)) message_box= new Message_box("Help|The Manual", the_text, 960, "", er_strings[er_off + ER_OK], "", this);
+  else message_box= new Message_box("Help|The Manual", the_text, desktop_width - 50, "", er_strings[er_off + ER_OK], "", this);
   message_box->exec();
   delete message_box;
 }
@@ -4265,7 +4265,7 @@ void MainWindow::action_libmysqlclient()
   libmariadb.so in the same fashion but will look first for \
   libmysqlclient.so unless one starts with ocelot_dbms='mariadb'.";
   Message_box *message_box;
-  message_box= new Message_box("Help|libmysqlclient", the_text, 500, this);
+  message_box= new Message_box("Help|libmysqlclient", the_text, 500, "", er_strings[er_off + ER_OK], "", this);
   message_box->exec();
   delete message_box;
 }
@@ -4317,7 +4317,7 @@ void MainWindow::action_settings()
   Some extremely large font sizes will be accepted but \
   the results will be ugly.";
   Message_box *message_box;
-  message_box= new Message_box("Help|libmysqlclient", the_text, 500, this);
+  message_box= new Message_box("Help|libmysqlclient", the_text, 500, "", er_strings[er_off + ER_OK], "", this);
   message_box->exec();
   delete message_box;
 }
@@ -8604,22 +8604,18 @@ int MainWindow::action_execute(int force)
       /* TODO: QMessageBox jiggle, it displays then moves to centre */
       if ((hparse_errno != 0) || (hparse_errno_count != 0))
       {
-        QString s;
-        QMessageBox *msgbox= new QMessageBox(this);
-        s= er_strings[er_off + ER_THE_SYNTAX_CHECKER_THINKS];
-        s.append(hparse_errmsg);
-        msgbox->setText(s);
-        msgbox->setInformativeText(er_strings[er_off + ER_DO_YOU_WANT_TO_CONTINUE]);
-        QPushButton *yes_button= msgbox->addButton(er_strings[er_off + ER_YES], QMessageBox::YesRole);
-        QPushButton *no_button= msgbox->addButton(er_strings[er_off + ER_NO], QMessageBox::NoRole);
-        msgbox->setDefaultButton(yes_button);
-        msgbox->exec();
-        if (msgbox->clickedButton() == no_button)
+        Message_box *message_box;
+        message_box= new Message_box(er_strings[er_off + ER_THE_SYNTAX_CHECKER_THINKS], hparse_errmsg, 500,
+                                     er_strings[er_off + ER_DO_YOU_WANT_TO_CONTINUE],
+                                     er_strings[er_off + ER_YES], er_strings[er_off + ER_NO],
+                                     this);
+        message_box->exec();
+        if (message_box->result == 2)
         {
-          delete msgbox;
+          delete message_box;
           return 1;
         }
-        delete msgbox;
+        delete message_box;
       }
       log("FLAG_FOR_ERRORS seen. end of if", 90);
     }
@@ -21410,8 +21406,8 @@ ret:
   QDesktopWidget desktop;
   int desktop_width= desktop.availableGeometry().width();
 #endif
-  if (desktop_width > (960 + 50)) message_box= new Message_box("Result", clf_output_final, 960, this);
-  else message_box= new Message_box("Result", clf_output_final, desktop_width - 50, this);
+  if (desktop_width > (960 + 50)) message_box= new Message_box("Result", clf_output_final, 960, "", er_strings[er_off + ER_OK], "", this);
+  else message_box= new Message_box("Result", clf_output_final, desktop_width - 50, "", er_strings[er_off + ER_OK], "", this);
   message_box->exec();
   delete message_box;
   log("clf end", 90);

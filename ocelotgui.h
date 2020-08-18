@@ -2843,6 +2843,7 @@ class QScrollAreaWithSize;
 class QThread48;
 class QTabWidget48;
 class TextEditHistory;
+class TextEditWidget2;
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -4059,7 +4060,6 @@ void menu_context_t(const QPoint & pos)
 
 #endif // TEXTEDITWIDGET_H
 
-
 /*********************************************************************************************************/
 /* THE ROW_FORM_BOX WIDGET */
 
@@ -4365,6 +4365,52 @@ void garbage_collect ()
 #endif // ROW_FORM_BOX_H
 
 
+#ifndef TEXTEDITWIDGET2_H
+#define TEXTEDITWIDGET2_H
+
+/*
+  This is for when we want to size a QTextEdit based on its initial content.
+  Minimum width is passed. Maximum height is assumed = 500.
+  I suppose I don't really have to say "explicit" but it's harmless.
+*/
+
+class TextEditWidget2 : public QTextEdit
+{
+  Q_OBJECT
+
+public:
+
+    int passed_minimum_width;
+
+~TextEditWidget2()
+{
+}
+
+explicit TextEditWidget2(QString the_text, QWidget *parent, int minimum_width) :
+        QTextEdit(the_text, parent)
+    {
+      passed_minimum_width= minimum_width;
+    }
+
+QSize sizeHint() const
+{
+  QRect text_edit_rect;
+  QFontMetrics fm= QFontMetrics(font());
+  text_edit_rect= fm.boundingRect(
+        0, /* int x = x coordinate within original rect */
+        0, /* int y = y coordinate within original rect */
+        passed_minimum_width, /* int width = r.width(), which we don't change */
+        2000, /* int height = height, which is arbitrary big maximum */
+        Qt::TextWordWrap + Qt::TextIncludeTrailingSpaces, /* int flags = (see comments before start of this routine) */
+        toPlainText()); /* QString & text= cell contents */
+  int n= text_edit_rect.height() + fm.lineSpacing();
+  if (n > 500) n= 500;
+  return QSize(passed_minimum_width, n);
+}
+
+};
+#endif // TEXTEDITWIDGET2_H
+
 /***********************************************************/
 /* THE MESSAGE_BOX WIDGET */
 /***********************************************************/
@@ -4373,8 +4419,20 @@ void garbage_collect ()
   QMessageBox equivalent, but with scroll bars.
   (A simple QMessageBox has no scroll bars.)
   We need scroll bars for some Help displays especially if screen size is small.
+  Pass: button text e.g. "ok" or "yes" or "no". Sometimes two buttons.
+  Return: 1 if button_1 pushed (default). 2 if button_2 pushed. Or equivalents e.g. Alt+Y for Yes.
+  Also for hparse_f_multi_block() errors that get too long.
+  Re size: We pass width to Message_box which passes it on to TextEditWidg2. But it doesn't mean that we
+           will never go outside the bounds of MainWindow. And maximum height is hardcoded = 500.
+  Re font: We use the same font as the statement, which might be a good choice when the dialog
+           is for a syntax error on the statement widget, but less good for Help -- for Help,
+           the menu font might be a better choice. We only use font and not other style sheet
+           settings, and assume that it's best if QTextEdit2 and QPushButton have the same font.
   Todo: size calculation as in Row_form_box.
-  Todo: Use colors and fonts specified for menu.
+  Todo: Earlier, this had to exist for the scroll bar to work:
+        layout->setSizeConstraint(QLayout::SetFixedSize);
+        See if you can figure out why.
+  Todo: Guarantee that initial width is enough so that entire header is visible.
 */
 #ifndef MESSAGE_BOX_H
 #define MESSAGE_BOX_H
@@ -4382,39 +4440,51 @@ void garbage_collect ()
 class Message_box: public QDialog
 {
   Q_OBJECT
-public:
-  QDialog *message_box;
-  bool is_ok;
-
-private:
-  int width_for_size_hint, height_for_size_hint;
 
 public:
-Message_box(QString the_title, QString the_text, int minimum_width, MainWindow *parent): QDialog(parent)
+  int result;
+Message_box(QString the_title, QString the_text, int minimum_width,
+            QString prompter, QString button_1_text, QString button_2_text, MainWindow *parent): QDialog(parent)
 {
-
+  result= 1;
+  this->setFont(parent->get_font_from_style_sheet(parent->ocelot_statement_style_string));
   QScrollArea *scroll_area= new QScrollArea(this);
-  scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-  scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-
-  QWidget *widget = new QWidget(this);
+  // scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded); This is default anyway.
+  //scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded); This is default anyway.
+  QWidget *widget= new QWidget(this);
   scroll_area->setWidget(widget);
   scroll_area->setWidgetResizable(true);
-
-  QVBoxLayout *layout = new QVBoxLayout(widget);
-  widget->setLayout(layout);
-
-  QTextEdit *text_edit= new QTextEdit(this);
-  text_edit->setText(the_text);
+  QVBoxLayout *layout= new QVBoxLayout(widget);
+  TextEditWidget2 *text_edit= new TextEditWidget2(the_text, this, minimum_width);
   text_edit->setReadOnly(true);
   layout->addWidget(text_edit);
-
-  QPushButton *push_button= new QPushButton(this);
-  push_button->setText("OK");
-  layout->addWidget(push_button);
-
-  connect(push_button, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
-  this->setMinimumHeight(500);
+  QVBoxLayout *prompter_and_buttons_layout= new QVBoxLayout(widget);
+  QWidget *prompter_and_buttons_widget= new QWidget(this);
+  if (prompter > "")
+  {
+    QLabel *prompter_label= new QLabel(prompter, this);
+    prompter_and_buttons_layout->addWidget(prompter_label);
+  }
+  QHBoxLayout *buttons_layout= new QHBoxLayout(widget);
+  QWidget *buttons_widget= new QWidget(this);
+  QPushButton *push_button_1= new QPushButton(this);
+  push_button_1->setText("&"+button_1_text);
+  buttons_layout->addWidget(push_button_1);
+  push_button_1->setAutoDefault(true);
+  connect(push_button_1, SIGNAL(clicked()), this, SLOT(handle_button_1()));
+  if (button_2_text > "")
+  {
+    QPushButton *push_button_2= new QPushButton(this);
+    push_button_2->setText("&"+button_2_text);
+    buttons_layout->addWidget(push_button_2);
+    push_button_2->setAutoDefault(false);
+    connect(push_button_2, SIGNAL(clicked()), this, SLOT(handle_button_2()));
+  }
+  buttons_widget->setLayout(buttons_layout);
+  prompter_and_buttons_layout->addWidget(buttons_widget);
+  prompter_and_buttons_widget->setLayout(prompter_and_buttons_layout);
+  layout->addWidget(prompter_and_buttons_widget);
+  widget->setLayout(layout);
   this->setMinimumWidth(minimum_width);
   this->setWindowTitle(the_title);
   QHBoxLayout *dialog_layout= new QHBoxLayout(this);
@@ -4424,11 +4494,20 @@ Message_box(QString the_title, QString the_text, int minimum_width, MainWindow *
 
 private slots:
 
-void handle_button_for_ok()
+void handle_button_1()
 {
+  result= 1;
   /* Skipping garbage collect this time. */
   close();
 }
+
+void handle_button_2()
+{
+  result= 2;
+  /* Skipping garbage collect this time. */
+  close();
+}
+
 
 };
 
@@ -10880,8 +10959,10 @@ public:
     main_window= parent;
   }
 
-  /* Following line caused an incomprehensible error. Removed temporarily. */
+  /* TODO: Following line caused an incomprehensible error. Removed temporarily. */
   /* Hmm. Maybe because we can call it for widgets that aren't subclasses of QTextEdit? */
+  /* Notice there are other classes in this file where we use ~ without problem. */
+  /* Watch for other classes where we fail to specify a destructor. */
   //~TextEditHistory();
 
 public:
@@ -10903,4 +10984,3 @@ bool eventFilter(QObject *obj, QEvent *event)
 #endif // TEXTEDITHISTORY_H
 
 #endif // OCELOTGUI_H
-
