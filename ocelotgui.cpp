@@ -13838,6 +13838,7 @@ int MainWindow::get_statement_type_low(QString word0, QString word1, QString wor
   }
   else if (word0 == "WITH")
   {
+    if (QString::compare(word1, "RECURSIVE", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_WITH;
     if (QString::compare(word2, "AS", Qt::CaseInsensitive) == 0) statement_type= TOKEN_KEYWORD_WITH;
   }
   else { statement_type= TOKEN_KEYWORD_DO_LUA; }
