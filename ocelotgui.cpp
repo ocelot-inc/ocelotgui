@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 19 2020
+   Last modified: August 20 2020
 */
 
 /*
@@ -10523,43 +10523,54 @@ int MainWindow::rehash_scan()
     }
     /*
       This is how to use Lua to produce what looks like an SQL result set.
-      Todo:: This does 'C', 'T', 'I'. 't' would be simple but decide: only SQL triggers?
+      Todo:: This does 'C', 'T', 't', 'I'. It could do more, see MySQL/MariaDB SELECT below.
     */
     char lua_request[]=
        "do\
          local output_tuple\
          local output_table_of_tuples = {}\
-         local space_list = {}\
+         local vspace_list = {}\
          local x, y\
-         local space_row_number, space_row, space_name, space_row_column_count, space_row_column_number\
-         local index_list = {}\
-         local index_row_number, index_row, index_name\
-         x, y = pcall(function () space_list = box.space._space:select() end)\
+         local vspace_row_number, vspace_row, vspace_name, vspace_row_column_count, vspace_row_column_number\
+         local vindex_list = {}\
+         local vindex_row_number, vindex_row, vindex_name\
+         local trigger_list = {}\
+         local trigger_row_number, trigger_row, trigger_name\
+         x, y = pcall(function () vspace_list = box.space._vspace:select() end)\
          if x then\
-           for space_row_number = 1,#space_list do\
-             space_row = space_list[space_row_number]\
-             space_name = space_row[3]\
-             space_row_column_count = #space_row[7]\
-             if space_row_column_count ~= nil and space_row_column_count > 0 then\
-               for space_row_column_number = 1, space_row_column_count do\
-                 output_tuple = box.tuple.new('C', space_name, space_row[7][space_row_column_number].name)\
+           for vspace_row_number = 1,#vspace_list do\
+             vspace_row = vspace_list[vspace_row_number]\
+             vspace_name = vspace_row[3]\
+             vspace_row_column_count = #vspace_row[7]\
+             if vspace_row_column_count ~= nil and vspace_row_column_count > 0 then\
+               for vspace_row_column_number = 1, vspace_row_column_count do\
+                 output_tuple = box.tuple.new('C', vspace_name, vspace_row[7][vspace_row_column_number].name)\
                  table.insert(output_table_of_tuples, output_tuple)\
                 end\
              end\
            end\
-           for space_row_number = 1,#space_list do\
-             space_row = space_list[space_row_number]\
-             space_name = space_row[3]\
-             output_tuple = box.tuple.new('T', space_name, 'T')\
+           for vspace_row_number = 1,#vspace_list do\
+             vspace_row = vspace_list[vspace_row_number]\
+             vspace_name = vspace_row[3]\
+             output_tuple = box.tuple.new('T', vspace_name, 'T')\
              table.insert(output_table_of_tuples, output_tuple)\
            end\
-           x, y = pcall(function () index_list = box.space._index:select() end)\
+           x, y = pcall(function () trigger_list = box.space._trigger:select() end)\
            if x then\
-             for index_row_number = 1,#index_list do\
-               index_row = index_list[index_row_number]\
-               index_name = index_row[3]\
-               space_name = box.space._space:select(index_row[1])[1][3]\
-               output_tuple = box.tuple.new('I', space_name, index_name)\
+             for trigger_row_number = 1,#trigger_list do\
+               trigger_row = trigger_list[trigger_row_number]\
+               trigger_name = trigger_row[1]\
+               output_tuple = box.tuple.new('t', trigger_name, '')\
+               table.insert(output_table_of_tuples, output_tuple)\
+             end\
+           end\
+           x, y = pcall(function () vindex_list = box.space._vindex:select() end)\
+           if x then\
+             for vindex_row_number = 1,#vindex_list do\
+               vindex_row = vindex_list[vindex_row_number]\
+               vindex_name = vindex_row[3]\
+               vspace_name = box.space._vspace:select(vindex_row[1])[1][3]\
+               output_tuple = box.tuple.new('I', vspace_name, vindex_name)\
                table.insert(output_table_of_tuples, output_tuple)\
              end\
            end\
