@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 20 2020
+   Last modified: August 21 2020
 */
 
 /*
@@ -1293,10 +1293,9 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
   if (qk == ocelot_shortcut_zoomin_keysequence){menu_edit_zoomin(); return true; }
   if (qk == ocelot_shortcut_zoomout_keysequence){menu_edit_zoomout(); return true; }
-  if (menu_edit_action_autocomplete->isEnabled() == true)
+  if (qk == ocelot_shortcut_autocomplete_keysequence)
   {
-    if (qk == ocelot_shortcut_autocomplete_keysequence) {
-      return menu_edit_autocomplete(); }
+    return menu_edit_autocomplete();  /* even if menu_edit_action_autocomplete->isEnabled() == false */
   }
   if (menu_run_action_kill->isEnabled() == true)
   {
@@ -10427,6 +10426,13 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
         ocelot_xml= i;
         if (i == 1) ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= 0;
+        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
+      }
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_LOG_LEVEL)
+      {
+        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
+        ocelot_log_level= to_long(ccn);
         make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
       }
       {
