@@ -12563,7 +12563,7 @@ error:
           search_string_len= s.toUtf8().size();
           memcpy(search_string, s.toUtf8().constData(), search_string_len);
           search_string[search_string_len]= '\0';
-          QString rehash_search_result= rehash_search(search_string, main_token_reftypes[hparse_i]);
+          QString rehash_search_result= rehash_search(hparse_f_pre_rehash_search(), search_string, main_token_reftypes[hparse_i]);
           if (rehash_search_result > "")
           {
             expected_list= "Expecting: ";
@@ -12636,6 +12636,109 @@ bool MainWindow::hparse_f_is_nosql(QString text)
   return false;
 }
 #endif
+
+/*
+  Pass: hparse_i and text are assumed good
+  Return: i of start of statement-or-subquery that hparse_i is inside
+  This is not the same as hparse_i_of_statement, if there are compound statements.
+  We expect that statements are always flagged with TOKEN_FLAG_IS_START_STATEMENT, subqueries are not.
+  Todo: is there a better way to check for a subquery start?
+*/
+int MainWindow::i_of_elementary_statement()
+{
+  int i;
+  int parentheses_count= 0;
+  for (i= hparse_i; i >= 0; --i)
+  {
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) != 0) break;
+    if ((main_token_types[i] == TOKEN_KEYWORD_SELECT)
+     || (main_token_types[i] == TOKEN_KEYWORD_WITH)
+     || (main_token_types[i] == TOKEN_KEYWORD_VALUES))
+    {
+      if (parentheses_count <= 0)
+      {
+        int j= next_i(i, -1);
+        if (hparse_text_copy.mid(main_token_offsets[j], main_token_lengths[j]) == "(") break;
+      }
+    }
+    if (main_token_types[i] == TOKEN_TYPE_OPERATOR)
+    {
+      QString operator_token= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (operator_token == ")")
+      {
+        ++parentheses_count;
+      }
+      if (operator_token == "(")
+      {
+        --parentheses_count;
+      }
+    }
+  }
+  return i;
+}
+
+/*
+  hparse_f_pre_rehash_search() -- looking for a column's table.
+  In hparse_f_multi_block() when we see errmsg has column identifier and we know rehash happened,
+  we skip back to the start of the statement or subquery that contains hparse_i,
+  then skip forward till we reach hparse_i, looking for a table name (if hparse_i might be at a column name).
+  Ignore anything inside ()s.
+  Return a table name. When we get to rehash_search, column names will be restricted to columns of the table.
+  Restrictions:
+    We only return one table, the last one seen, or the one that's a qualifier. QStringList would be better.
+    We only do the searching for columns, but other objects could be in a hierarchy too.
+    We don't notice SELECT x1 AS x2 FROM t ORDER BY x2;
+    We skip anything inside ()s but FROM clauses can have table names inside ()s.
+    We stop at hparse_i though if we're in a select-list then FROM table-list is after hparse_i.
+  Example for 'I': DELETE FROM T INDEXED BY `
+  Todo: See the comments preceding QString MainWindow::rehash_search(char *search_string, int reftype)
+        "Todo: We only look at column[1] column_name. We should look at column[0] table_name."
+        We haven't done this yet.
+  Todo: we perhaps should hint by saying X (table-qualifier) ... x (select-list name) ... x (column in table) etc.
+  Todo: expand, it might be more than TOKEN_REFTYPE_COLUMN
+        but there is no equivalent search for table because our rehash only does one database, the current one.
+*/
+QString MainWindow::hparse_f_pre_rehash_search()
+{
+  if (rehash_result_row_count == 0) return ""; /* If there has been no rehash return "" */
+  int reftype= main_token_reftypes[hparse_i];
+  /* Similar checks are in rehash_search */
+  if ((reftype != TOKEN_REFTYPE_COLUMN)
+   && (reftype != TOKEN_REFTYPE_TABLE_OR_COLUMN)
+   && (reftype != TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN)
+   && (reftype != TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION)
+   && (reftype != TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE)
+   && (reftype != TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE)
+   && (reftype != TOKEN_REFTYPE_COLUMN_OR_VARIABLE)
+   && (reftype != TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION)
+   && (reftype != TOKEN_REFTYPE_INDEX))
+    return "";
+  int i_start= i_of_elementary_statement();
+  QString table_name= "";
+  int parentheses_count= 0;
+  for (int i= i_start; i <= hparse_i; ++i)
+  {
+    if (main_token_types[i] == TOKEN_TYPE_OPERATOR)
+    {
+      QString operator_token= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+      if (operator_token == ")") ++parentheses_count;
+      if (operator_token == "(") --parentheses_count;
+    }
+    if (parentheses_count != 0) continue;
+    if (main_token_reftypes[i] == TOKEN_REFTYPE_TABLE)
+    {
+      int j= next_token(i);
+      if (hparse_text_copy.mid(main_token_offsets[j], main_token_lengths[j]) == ".")
+      {
+        if (next_token(j) != hparse_i) continue;
+        table_name= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+        break;
+      }
+      table_name= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
+    }
+  }
+  return table_name;
+}
 
 /*
   A client statement can be "\" followed by a character, for example \C.

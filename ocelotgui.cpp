@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 21 2020
+   Last modified: August 24 2020
 */
 
 /*
@@ -10759,6 +10759,7 @@ int MainWindow::rehash_scan()
           So for now we only check for Tarantool.
   Todo: We only look at column[1] column_name. We should look at column[0] table_name.
   Todo: Matching reftype is fine but we could also match column's table or index's table if we know it.
+        !! NOW WE KNOW IT! Well, for column anyway.
   Todo: Should not the search be case insensitive?
   Todo: Consider stopping display after TARANTOOL_MAX_FIELD_NAME_LENGTH or MYSQL_MAX_IDENTIFIER_LENGTH characters.
   Todo: "count_of_hits > 10" is arbitrary, and also you should add "..."
@@ -10767,8 +10768,9 @@ int MainWindow::rehash_scan()
         But that disturbs the order, and something that occurs more often should be first.
         And if you ever get more info e.g. column-type or table-of-index then it will be ambiguous.
   Todo: We could call QStringList::sort()
+  Todo: Comparisons are case insensitive but don't have to be if "" encloses
 */
-QString MainWindow::rehash_search(char *search_string, int reftype)
+QString MainWindow::rehash_search(QString table_name, char *search_string, int reftype)
 {
   long unsigned int r;
   char *row_pointer;
@@ -10840,6 +10842,7 @@ QString MainWindow::rehash_search(char *search_string, int reftype)
   for (r= 0; r < rehash_result_row_count; ++r)
   {
     row_pointer= rehash_result_set_copy_rows[r];
+    bool is_table_matched= true;
     for (i= 0; i < rehash_result_column_count; ++i)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
@@ -10850,13 +10853,19 @@ QString MainWindow::rehash_search(char *search_string, int reftype)
         assert(column_length == 1);
         if (strchr(desired_types, *row_pointer) == NULL) break;
       }
-      if (i == column_to_match)
+      if ((i == 1) && (column_to_match == 2) && (table_name > ""))
+      {
+        QByteArray table_value_as_qbytearray= QByteArray(row_pointer, column_length);
+        if (QString::compare(table_value_as_qbytearray, table_name, Qt::CaseInsensitive) != 0) is_table_matched= false;
+      }
+      if ((i == column_to_match) && (is_table_matched == true))
       {
         if (search_string_length < column_length)
         {
-          if (strncmp(row_pointer, search_string, search_string_length) == 0)
+          QByteArray column_value_as_qbytearray= QByteArray(row_pointer, search_string_length);
+          if (QString::compare(column_value_as_qbytearray, search_string, Qt::CaseInsensitive) == 0)
           {
-            QByteArray column_value_as_qbytearray= QByteArray(row_pointer, column_length);
+            column_value_as_qbytearray= QByteArray(row_pointer, column_length);
             column_value= column_value_as_qbytearray;
 #ifdef DBMS_TARANTOOL
             if (connections_dbms[0] == DBMS_TARANTOOL)

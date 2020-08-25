@@ -3248,6 +3248,8 @@ public:
   int hparse_f_variables(int*);
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
+  int i_of_elementary_statement();
+  QString hparse_f_pre_rehash_search();
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
   int hparse_f_client_statement();
@@ -3421,7 +3423,7 @@ private:
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
   int rehash_scan();
-  QString rehash_search(char *search_string, int reftype);
+  QString rehash_search(QString table_name, char *search_string, int reftype);
   void rehash_get_database_name(char *);
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
