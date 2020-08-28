@@ -3422,7 +3422,8 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
-  void set_ocelot_value(int keyword_index, QString new_value);
+  int ocelot_variable_set(int keyword_index, QString new_value);
+  bool ocelot_variable_is_color(int keyword);
   int rehash_scan();
   QString rehash_search(QString table_name, char *search_string, int reftype);
   void rehash_get_database_name(char *);
