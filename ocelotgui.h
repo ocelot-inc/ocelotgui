@@ -3422,6 +3422,7 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
+  void set_ocelot_value(int keyword_index, QString new_value);
   int rehash_scan();
   QString rehash_search(QString table_name, char *search_string, int reftype);
   void rehash_get_database_name(char *);
@@ -9871,7 +9872,7 @@ if (current_widget != DEBUG_WIDGET)
     combo_box_for_size[0]->addItem("");
     combo_box_for_size[0]->addItem("data_type LIKE '%BLOB'");
     combo_box_for_size[0]->addItem("data_type LIKE '%BINARY'");
-    //label_for_size[0]->setFixedWidth(label_for_color_width * 30);
+    //label_for_size[0]->setFixedWidth(label_for_color_width * 30);    
     combo_box_for_size[0]->setCurrentIndex(combo_box_for_size[0]->findText(copy_of_parent->new_ocelot_extra_rule_1_condition));
 
     hbox_layout_for_size[0]= new QHBoxLayout();

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 24 2020
+   Last modified: August 27 2020
 */
 
 /*
@@ -268,7 +268,7 @@
   static unsigned short ocelot_line_numbers= 0;   /* --line_numbers */
   static unsigned short ocelot_opt_local_infile= 0;    /* --local_infile[=n]  for MYSQL_OPT_LOCAL_INFILE */
   /* QString ocelot_login_path */            /* --login_path=s */
-  static int ocelot_log_level= 100;          /* --ocelot_log_level */
+  static unsigned short int ocelot_log_level= 100;          /* --ocelot_log_level */
   static unsigned long int ocelot_max_allowed_packet= 16777216; /* --max_allowed_packet=n */
   static unsigned long int ocelot_max_join_size= 1000000; /* --max_join_size = n */
   static unsigned short ocelot_named_commands= 0;         /* --named_commands */
@@ -9349,6 +9349,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     }
   }
 
+
 #ifdef DBMS_TARANTOOL
   /*
     CREATE SERVER id FOREIGN DATA WRAPPER tarantool
@@ -9459,6 +9460,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     }
     return 1;
   }
+
 
   /* SOURCE or \.: mysql equivalent. */
   if (statement_type == TOKEN_KEYWORD_SOURCE)
@@ -9782,676 +9784,369 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
-      int keyword_index= sub_token_types[1];
-      /* Todo: figure out why sometimes we say connect_stripper() and sometimes we don't */
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_text_color= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_background_color= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_border_color= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
+      set_ocelot_value(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+      return 1;
+    }
+  }
+  return 0;
+}
+
+/*
+  For e.g. SET ocelot_statement_text_color='red'; or ocelotgui --statement_text_color='red'
+  Call with e.g. set_ocelot_value(TOKEN_KEYWORD_STATEMENT_TEXT_COLOR, text.mid(sub_token_offsets[3], sub_token_lengths[3])
+  We used to have a lot of repetitive code here, now it's reduced.
+  Todo: if debug compile, check that nobody changed keywords -- just put something in a comment?
+  Todo: __attribute__((packed)) if gcc, but maybe it's enough to put char stuff at the end
+  Todo: if compiled with debug, we need asserts at start to check that qstring_target addresses match token strings.
+  Todo: in the original, we were doing nothing with ocelot_vertical, so it needs an extra look.
+  Todo: Make sure ocelot_horizontal and ocelot_htmlraw, which have no variables, actually cause the changes.
+  Todo: Check whether there has actually been a style change.
+  Todo: For grid's set_all_style_sheets, we only redo existing display if there has been a font change.
+  Todo: ocelot_grid_border_size isn't on the settings menu
+*/
+void MainWindow::set_ocelot_value(int keyword_index, QString new_value)
+{
+  #define FLAG_SET_COLOR          0x01
+  #define FLAG_SET_FONT           0x02
+  #define FLAG_SET_FONT_FAMILY    0x12
+  #define FLAG_SET_FONT_STYLE     0x22
+  #define FLAG_SET_FONT_SIZE      0x42
+  #define FLAG_SET_FONT_WEIGHT    0x82
+  #define FLAG_SET_FOR_STATEMENT    0x01
+  #define FLAG_SET_FOR_GRID         0x02
+  #define FLAG_SET_FOR_HISTORY      0x04
+  #define FLAG_SET_FOR_MENU         0x08
+  #define FLAG_SET_FOR_EXTRA_RULE_1 0x10
+  struct keywords {
+    QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
+    short unsigned int *int_target;         /* e.g. NULL */
+    int maximum;                            /* e.g. -1 because it's not an int target */
+    unsigned char flags_style;              /* e.g. FLAG_STYLE_COLOR */
+    unsigned char flags_for;                /* e.g. FLAG_SET_FOR_STATEMENT */
+  };
+  static const keywords setvalues[]=
+  {
+    {NULL, &ocelot_batch, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_BATCH */
+    {NULL, &ocelot_client_side_functions, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS */
+    {&ocelot_dbms, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DBMS */
+    {&ocelot_debug_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED */
+    {&ocelot_debug_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT */
+    {&ocelot_debug_left, NULL,10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_LEFT */
+    {&ocelot_debug_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_TOP */
+    {&ocelot_debug_width, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH */
+    {&ocelot_extra_rule_1_background_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR */
+    {&ocelot_extra_rule_1_condition, NULL, -1, 0, FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION */
+    {&ocelot_extra_rule_1_display_as, NULL, -1, 0, FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS */
+    {&ocelot_extra_rule_1_text_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR */
+    {&ocelot_grid_background_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR */
+    {&ocelot_grid_border_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR */
+    {&ocelot_grid_border_size, NULL, 9, 0, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE */
+    {&ocelot_grid_cell_border_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR */
+    {&ocelot_grid_cell_border_size, NULL, 10, 0, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE */
+    {&ocelot_grid_cell_drag_line_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR */
+    {&ocelot_grid_cell_drag_line_size, NULL, 10, 0, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE */
+    {&ocelot_grid_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_DETACHED */
+    {&ocelot_grid_font_family, NULL, -1, FLAG_SET_FONT_FAMILY, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY */
+    {&ocelot_grid_font_size, NULL, -1, FLAG_SET_FONT_SIZE, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE */
+    {&ocelot_grid_font_style, NULL, -1, FLAG_SET_FONT_STYLE, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE */
+    {&ocelot_grid_font_weight, NULL, -1, FLAG_SET_FONT_WEIGHT, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT */
+    {&ocelot_grid_header_background_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR */
+    {&ocelot_grid_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_HEIGHT */
+    {&ocelot_grid_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_LEFT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_TABS */
+    {&ocelot_grid_text_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR */
+    {&ocelot_grid_top, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_TOP */
+    {&ocelot_grid_width, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_WIDTH */
+    {&ocelot_history_background_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR */
+    {&ocelot_history_border_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR */
+    {&ocelot_history_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED */
+    {&ocelot_history_font_family, NULL, -1, FLAG_SET_FONT_FAMILY, FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY */
+    {&ocelot_history_font_size, NULL, -1, FLAG_SET_FONT_SIZE, FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE */
+    {&ocelot_history_font_style, NULL, -1, FLAG_SET_FONT_STYLE, FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE */
+    {&ocelot_history_font_weight, NULL, -1, FLAG_SET_FONT_WEIGHT, FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT */
+    {&ocelot_history_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT */
+    {&ocelot_history_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_LEFT */
+    {&ocelot_history_max_row_count, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT */
+    {&ocelot_history_text_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR */
+    {&ocelot_history_top, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_TOP */
+    {&ocelot_history_width, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH */
+    {NULL, NULL, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HORIZONTAL */
+    {NULL, &ocelot_html, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HTML */
+    {NULL, NULL, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HTMLRAW */
+    {&ocelot_language, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_LANGUAGE */
+    {NULL, &ocelot_log_level, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_LOG_LEVEL */
+    {&ocelot_menu_background_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR */
+    {&ocelot_menu_border_color, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR */
+    {&ocelot_menu_font_family, NULL, -1, FLAG_SET_FONT_FAMILY, FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY */
+    {&ocelot_menu_font_size, NULL, -1, FLAG_SET_FONT_SIZE, FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE */
+    {&ocelot_menu_font_style, NULL, -1, FLAG_SET_FONT_STYLE, FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE */
+    {&ocelot_menu_font_weight, NULL, -1, FLAG_SET_FONT_WEIGHT, FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT */
+    {&ocelot_menu_text_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR */
+    {NULL, &ocelot_raw, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_RAW */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_COPY */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CUT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_USER_VARIABLES */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_VARIABLES */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_XML */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN */
+    {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT */
+    {&ocelot_statement_background_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR */
+    {&ocelot_statement_border_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR */
+    {&ocelot_statement_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED */
+    {&ocelot_statement_font_family, NULL, -1, FLAG_SET_FONT_FAMILY, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY */
+    {&ocelot_statement_font_size, NULL, -1, FLAG_SET_FONT_SIZE, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE */
+    {&ocelot_statement_font_style, NULL, -1, FLAG_SET_FONT_STYLE, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE */
+    {&ocelot_statement_font_weight, NULL, -1, FLAG_SET_FONT_WEIGHT, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT */
+    {&ocelot_statement_format_clause_indent, NULL, 8, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT */
+    {&ocelot_statement_format_keyword_case, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE */
+    {&ocelot_statement_format_statement_indent, NULL, 8, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT */
+    {&ocelot_statement_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT */
+    {&ocelot_statement_highlight_comment_color, NULL, -1, FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR */
+    {&ocelot_statement_highlight_current_line_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR */
+    {&ocelot_statement_highlight_function_color, NULL, -1, FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR */
+    {&ocelot_statement_highlight_identifier_color, NULL, -1, FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR */
+    {&ocelot_statement_highlight_keyword_color, NULL, -1, FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR */
+    {&ocelot_statement_highlight_literal_color, NULL, -1, FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR */
+    {&ocelot_statement_highlight_operator_color, NULL, -1, FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR */
+    {&ocelot_statement_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT */
+    {&ocelot_statement_prompt_background_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR */
+    {&ocelot_statement_syntax_checker, NULL, 3, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER */
+    {&ocelot_statement_text_color, NULL, -1, FLAG_SET_COLOR, FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR */
+    {&ocelot_statement_top, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_TOP */
+    {&ocelot_statement_width, NULL,10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH */
+    {NULL, &ocelot_vertical, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_VERTICAL */
+    {NULL, &ocelot_xml, 1, 0, 0}  /* TOKEN_KEYWORD_OCELOT_XML */
+  };
+
+  bool is_font_changed= false;
+  QString qv;
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION) qv= connect_stripper(new_value, true);
+  else qv= connect_stripper(new_value, false);
+  int offset= keyword_index - TOKEN_KEYWORD_OCELOT_BATCH;
+  char flags_style= setvalues[offset].flags_style;
+  char flags_for= setvalues[offset].flags_for;
+  QString *qstring_target= setvalues[offset].qstring_target;
+  short unsigned int *int_target= setvalues[offset].int_target;
+
+  int maximum= setvalues[offset].maximum;
+  if (maximum != -1)
+  {
+    int value_as_int= qv.toInt();
+    if ((qv == "") || (value_as_int < 0) || (value_as_int > maximum))
+    {
+      int er= ER_ILLEGAL_VALUE; /* default = most common */
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER) er= ER_SYNTAX;
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT) er= ER_FORMAT_STATEMENT;
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT) er= ER_FORMAT_CLAUSE;
+      make_and_put_message_in_result(er, 0, (char*)"");
+      return;
+    }
+  }
+
+  if ((keyword_index >= TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE) && (keyword_index <= TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT))
+  {
+    int ii= shortcut(keyword_index, qv, true, true);
+    if (ii == 1)
+    {
+      make_and_put_message_in_result(ER_OK, 0, (char*)""); return;
+    }
+    if (ii == -1)
+    {
+      make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return;
+    }
+  }
+
+  if ((keyword_index == TOKEN_KEYWORD_OCELOT_BATCH)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_RAW)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_XML))
+  {
+    int i= qv.toInt();
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_BATCH)
+      if (i == 1) ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL)
+      if (i == 1) ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
+      if (i == 1) ocelot_batch= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW)
+    {
+      ocelot_html= ocelot_raw= i;
+      if (i == 1) ocelot_batch= ocelot_vertical= ocelot_xml= 0;
+    }
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_RAW)
+      if (i == 1) ocelot_batch= ocelot_html= ocelot_vertical= ocelot_xml= 0;
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_XML)
+      if (i == 1) ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= 0;
+  }
+
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE)
+  {
+    qv= qv.toLower();
+    if ((qv != "upper") && (qv != "lower") && (qv!= "unchanged"))
+    { make_and_put_message_in_result(ER_FORMAT_KEY_CASE, 0, (char*)""); return; }
+  }
+
+  if ((keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED))
+  {
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
+    {
+      if (qv == "no") { menu_options_action_option_detach_statement_widget->setChecked(false); detach_statement_widget(false); }
+      else { menu_options_action_option_detach_statement_widget->setChecked(true); detach_statement_widget(true); }
+    }
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
+    {
+      if (qv == "no") { menu_options_action_option_detach_debug_widget->setChecked(false); detach_debug_widget(false); }
+      else { menu_options_action_option_detach_debug_widget->setChecked(true); detach_debug_widget(true); }
+    }
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
+    {
+      if (qv == "no") { menu_options_action_option_detach_result_grid_widget->setChecked(false); detach_result_grid_widget(false); }
+      else { menu_options_action_option_detach_result_grid_widget->setChecked(true); detach_result_grid_widget(true); }
+    }
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
+    {
+      if (qv == "no") { menu_options_action_option_detach_history_widget->setChecked(false); detach_history_widget(false); }
+      else { menu_options_action_option_detach_history_widget->setChecked(true); detach_history_widget(true); }
+    }
+  }
+   if (flags_style == 0)
+  {
+    if (qstring_target != NULL) *qstring_target= qv;
+    if (int_target != NULL) *int_target=qv.toInt();
+  }
+
+  if (flags_style == FLAG_SET_COLOR)
+  {
+    QString ccn= canonical_color_name(qv);
+    if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return; }
+    *qstring_target= ccn;
+    assign_names_for_colors();
+  }
+
+  if ((flags_style & FLAG_SET_FONT) != 0)
+  {
+    QString ccn;
+    if (flags_style == FLAG_SET_FONT_FAMILY)
+    {
       /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
                because only 'Courier New' exists. There should be a warning, and
                setting some style hint e.g. "at least it should be monospace" would be good.
                Also ER_UNKNOWN_FONT_STYLE is the wrong error message if family is unknown.
-               This applies for all font_family settings. */
+      */
       if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY)
-      {
-        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_statement_font_style);
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        ocelot_statement_font_family= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
-        ocelot_statement_font_size= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
-      {
-        QString ccn= canonical_font_style(ocelot_statement_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        ocelot_statement_font_style= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT)
-      {
-        QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
-        ocelot_statement_font_weight= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_highlight_literal_color= ccn;
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_highlight_identifier_color= ccn;
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_highlight_comment_color= ccn;
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_highlight_operator_color= ccn;
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_highlight_keyword_color= ccn;
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_prompt_background_color= ccn;
-        make_style_strings();
-        statement_edit_widget_setstylesheet();
-        statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_highlight_current_line_color= ccn;
-        statement_edit_widget->highlightCurrentLine();
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_statement_highlight_function_color= ccn;
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER)
-      {
-        QString syntax_checker= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int syntax_checker_as_int= syntax_checker.toInt();
-        if ((syntax_checker_as_int < 0) || (syntax_checker_as_int > 3))
-        { make_and_put_message_in_result(ER_SYNTAX, 0, (char*)""); return 1; }
-        ocelot_statement_syntax_checker= syntax_checker;
-        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT)
-      {
-        QString format_indent= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int format_indent_as_int= format_indent.toInt();
-        if ((format_indent_as_int < 0) || (format_indent_as_int > 8))
-        { make_and_put_message_in_result(ER_FORMAT_STATEMENT, 0, (char*)""); return 1; }
-        ocelot_statement_format_statement_indent= format_indent;
-        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT)
-      {
-        QString format_indent= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int format_indent_as_int= format_indent.toInt();
-        if ((format_indent_as_int < 0) || (format_indent_as_int > 8))
-        { make_and_put_message_in_result(ER_FORMAT_CLAUSE, 0, (char*)""); return 1; }
-        ocelot_statement_format_clause_indent= format_indent;
-        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE)
-      {
-        QString format_case= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        format_case= format_case.toLower();
-        if ((format_case != "upper") && (format_case != "lower") && (format_case != "unchanged"))
-        { make_and_put_message_in_result(ER_FORMAT_KEY_CASE, 0, (char*)""); return 1; }
-        ocelot_statement_format_keyword_case= format_case;
-        make_and_put_message_in_result(ER_OK, 0, (char*)"");return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_statement_height= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_statement_left= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_TOP)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_statement_top= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_statement_width= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
-      {
-        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (ccn == "no") { menu_options_action_option_detach_statement_widget->setChecked(false); detach_statement_widget(false); }
-        else { menu_options_action_option_detach_statement_widget->setChecked(true); detach_statement_widget(true); }
-        ocelot_statement_detached= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_debug_height= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_LEFT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_debug_left= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_TOP)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_debug_top= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_debug_width= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
-      {
-        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (ccn == "no") { menu_options_action_option_detach_debug_widget->setChecked(false); detach_debug_widget(false); }
-        else { menu_options_action_option_detach_debug_widget->setChecked(true); detach_debug_widget(true); }
-        ocelot_debug_detached= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-
-      bool is_result_grid_style_changed= false;
-      bool is_result_grid_font_changed= false;
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_grid_text_color= ccn;
-        assign_names_for_colors(); is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_grid_border_color= ccn;
-        assign_names_for_colors(); is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_grid_background_color= ccn;
-        assign_names_for_colors(); is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_grid_header_background_color= ccn;
-        assign_names_for_colors(); is_result_grid_style_changed= true;
-      }
+         ccn= canonical_font_family(qv, &ocelot_statement_font_style);
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
-      {
-        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_grid_font_style);
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        if (ccn != ocelot_grid_font_family) is_result_grid_font_changed= true;
-        ocelot_grid_font_family= ccn;
-        is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
-        if (ccn != ocelot_grid_font_size) is_result_grid_font_changed= true;
-        ocelot_grid_font_size= ccn;
-        is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
-      {
-        QString ccn= canonical_font_style(ocelot_grid_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        if (ccn != ocelot_grid_font_style) is_result_grid_font_changed= true;
-        ocelot_grid_font_style= ccn;
-        is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT)
-      {
-        QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
-        ocelot_grid_font_weight= ccn;
-        is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_grid_cell_border_color= ccn;
-        assign_names_for_colors(); is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_grid_cell_drag_line_color= ccn;
-        assign_names_for_colors(); is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 9)) { make_and_put_message_in_result(ER_UNKNOWN_BORDER_SIZE, 0, (char*)""); return 1; }
-        ocelot_grid_border_size= ccn;
-        is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 10)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_BORDER_SIZE, 0, (char*)""); return 1; }
-        ocelot_grid_cell_border_size= ccn;
-        is_result_grid_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < 0) || (ccn.toInt() > 10)) { make_and_put_message_in_result(ER_UNKNOWN_CELL_DRAG_LINE_SIZE, 0, (char*)""); return 1; }
-        ocelot_grid_cell_drag_line_size= ccn;
-        is_result_grid_style_changed= true;
-      }
-      if (is_result_grid_style_changed == true)
-      {
-        ResultGrid* r;
-        make_style_strings();
-        for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
-        {
-          r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-          r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size, 1, is_result_grid_font_changed);
-        }
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_HEIGHT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_grid_height= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_LEFT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_grid_left= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_TOP)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_grid_top= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_WIDTH)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_grid_width= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
-      {
-        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (ccn == "no") { menu_options_action_option_detach_result_grid_widget->setChecked(false); detach_result_grid_widget(false); }
-        else { menu_options_action_option_detach_result_grid_widget->setChecked(true); detach_result_grid_widget(true); }
-        ocelot_grid_detached= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      bool is_extra_rule_1_style_changed= false;
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_extra_rule_1_text_color= ccn;
-        assign_names_for_colors(); is_extra_rule_1_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_extra_rule_1_background_color= ccn;
-        assign_names_for_colors(); is_extra_rule_1_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION)
-      {
-        ocelot_extra_rule_1_condition= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), true);
-        is_extra_rule_1_style_changed= true;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS)
-      {
-        ocelot_extra_rule_1_display_as= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        is_extra_rule_1_style_changed= true;
-      }
-      if (is_extra_rule_1_style_changed == true)
-      {
-        make_style_strings();
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_history_text_color= ccn;
-        make_style_strings();
-        history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_history_background_color= ccn;
-        make_style_strings();
-        history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_history_border_color= ccn;
-        make_style_strings();
-        history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
+         ccn= canonical_font_family(qv, &ocelot_grid_font_style);
       if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY)
-      {
-        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_history_font_style);
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        ocelot_history_font_family= ccn;
-        make_style_strings();
-        history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
-        ocelot_history_font_size= ccn;
-        make_style_strings();
-        history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
-      {
-        QString ccn= canonical_font_style(ocelot_history_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        ocelot_history_font_style= ccn;
-        make_style_strings();
-        history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT)
-      {
-        QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
-        ocelot_history_font_weight= ccn;
-        make_style_strings();
-        history_edit_widget->setStyleSheet(ocelot_history_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_history_height= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_LEFT)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_history_left= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if (ccn.toInt() < 0) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_history_max_row_count= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_TOP)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_history_top= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_history_width= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
-      {
-        QString ccn= detached_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-
-        if (ccn == "no") { menu_options_action_option_detach_history_widget->setChecked(false); detach_history_widget(false); }
-        else { menu_options_action_option_detach_history_widget->setChecked(true); detach_history_widget(true); }
-        ocelot_history_detached= ccn;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_menu_text_color= ccn;
-        make_style_strings();
-        ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_menu_background_color= ccn;
-        make_style_strings();
-        ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR)
-      {
-        QString ccn= canonical_color_name(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_COLOR, 0, (char*)""); return 1; }
-        ocelot_menu_border_color= ccn;
-        make_style_strings();
-        ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        assign_names_for_colors(); make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
+         ccn= canonical_font_family(qv, &ocelot_history_font_style);
       if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY)
-      {
-        QString ccn= canonical_font_family(text.mid(sub_token_offsets[3], sub_token_lengths[3]), &ocelot_menu_font_style);
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        ocelot_menu_font_family= ccn;
-        make_style_strings();
-        //main_window->setStyleSheet(ocelot_menu_style_string);
-        ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return 1; }
-        ocelot_menu_font_size= ccn;
-        make_style_strings();
-        //main_window->setStyleSheet(ocelot_menu_style_string);
-        ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
+         ccn= canonical_font_family(qv, &ocelot_menu_font_style);
+      if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return; }
+    }
+    if (flags_style == FLAG_SET_FONT_STYLE)
+    {
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
+        ccn= canonical_font_style(ocelot_statement_font_family, qv);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
+        ccn= canonical_font_style(ocelot_grid_font_family, qv);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
+         ccn= canonical_font_style(ocelot_history_font_family, qv);
       if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE)
-      {
-        QString ccn= canonical_font_style(ocelot_menu_font_family, connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return 1; }
-        ocelot_menu_font_style= ccn;
-        make_style_strings();
-        //main_window->setStyleSheet(ocelot_menu_style_string);
-        ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT)
-      {
-        QString ccn= canonical_font_weight(connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false));
-        if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_WEIGHT, 0, (char*)""); return 1; }
-        ocelot_menu_font_weight= ccn;
-        make_style_strings();
-        //main_window->setStyleSheet(ocelot_menu_style_string);
-        ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_BATCH)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int i= ccn.toInt();
-        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_batch= i;
-        if (i == 1) ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int i= ccn.toInt();
-        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        if (i == 1) ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int i= ccn.toInt();
-        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_html= i;
-        if (i == 1) ocelot_batch= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int i= ccn.toInt();
-        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_html= ocelot_raw= i;
-        if (i == 1) ocelot_batch= ocelot_vertical= ocelot_xml= 0;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_RAW)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int i= ccn.toInt();
-        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_raw= i;
-        if (i == 1) ocelot_batch= ocelot_html= ocelot_vertical= ocelot_xml= 0;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_XML)
-      {
-        QString ccn= connect_stripper(text.mid(sub_token_offsets[3], sub_token_lengths[3]), false);
-        int i= ccn.toInt();
-        if ((i != 0) && (i != 1)) { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_xml= i;
-        if (i == 1) ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= 0;
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_LOG_LEVEL)
-      {
-        QString ccn= rect_value(text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (ccn == "") { make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1; }
-        ocelot_log_level= to_long(ccn);
-        make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-      }
-      {
-        int ii= shortcut(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]), true, true);
-        if (ii == 1)
-        {
-          make_and_put_message_in_result(ER_OK, 0, (char*)""); return 1;
-        }
-        if (ii == -1)
-        {
-          make_and_put_message_in_result(ER_ILLEGAL_VALUE, 0, (char*)""); return 1;
-        }
-      }
+        ccn= canonical_font_style(ocelot_menu_font_family, qv);
+      if (ccn == "") { make_and_put_message_in_result(ER_UNKNOWN_FONT_STYLE, 0, (char*)""); return; }
+    }
+    if (flags_style == FLAG_SET_FONT_SIZE)
+    {
+      ccn= qv;
+      if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) { make_and_put_message_in_result(ER_UNKNOWN_FONT_SIZE, 0, (char*)""); return; }
+    }
+    if (flags_style == (char) FLAG_SET_FONT_WEIGHT)
+    {
+      ccn= canonical_font_weight(qv);
+    }
+    if (ccn != *qstring_target)
+    {
+      *qstring_target= ccn;
+      is_font_changed= true;
     }
   }
 
-  return 0;
+  if (flags_for == FLAG_SET_FOR_STATEMENT)
+  {
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR)
+    {
+      statement_edit_widget->highlightCurrentLine();
+    }
+    else
+    {
+      make_style_strings();
+      statement_edit_widget_setstylesheet();
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR)
+      {
+        statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
+      }
+    }
+  }
+  if (flags_for == FLAG_SET_FOR_GRID)
+  {
+    ResultGrid* r;
+    make_style_strings();
+    for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
+    {
+      r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
+      r->set_all_style_sheets(ocelot_grid_style_string, *qstring_target, 1, is_font_changed);
+    }
+  }
+  if (flags_for == FLAG_SET_FOR_HISTORY)
+  {
+    make_style_strings();
+    history_edit_widget->setStyleSheet(ocelot_history_style_string);
+  }
+  if (flags_for == FLAG_SET_FOR_MENU)
+  {
+    make_style_strings();
+    ui->menuBar->setStyleSheet(ocelot_menu_style_string);
+  }
+  if (flags_for == FLAG_SET_FOR_EXTRA_RULE_1)
+  {
+    make_style_strings();
+  }
+  make_and_put_message_in_result(ER_OK, 0, (char*)"");;
 }
-
 
 /*
   REHASH
