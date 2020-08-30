@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 28 2020
+   Last modified: August 29 2020
 */
 
 /*
@@ -17171,17 +17171,45 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
     /* If there are two '-'s then token0=argv[i] left, token1='=', token2=argv[i] right */
     else
     {
-      QString equaller;
-      int argv_length;
-      argv_length= strlen(argv[i]);
-      equaller= "=";
-      int equaller_index;
-      equaller_index= s_argv.indexOf(equaller);
+      QString equaller= "=";
+      int equaller_index= s_argv.indexOf(equaller);
+      int argv_length= strlen(argv[i]);
       if (equaller_index == -1)
       {
         token0= s_argv.mid(2, argv_length - 2);
         token1= "";
         token2= "";
+        if (i < (argc - 1))
+        {
+          QString token_next= argv[i + 1];
+          if (token_next.mid(0, 1) == "=")
+          {
+            ++i;
+            if (token_next.size() == 1)
+            {
+              if (i < (argc - 1))
+              {
+                token2= argv[i + 1];
+                ++i;
+              }
+            }
+            else
+            {
+              token2= token_next.mid(1, token_next.size() - 1);
+            }
+          }
+        }
+      }
+      else if ((equaller_index == (argv_length - 1)) && (argv_length > 3))
+      {
+        token0= s_argv.mid(2, argv_length - 3);
+        token1= "=";
+        token2= "";
+        if (i < (argc - 1))
+        {
+          token2= argv[i + 1];
+          ++i;
+        }
       }
       else
       {
