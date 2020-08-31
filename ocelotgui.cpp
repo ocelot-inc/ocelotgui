@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: August 29 2020
+   Last modified: August 31 2020
 */
 
 /*
@@ -477,7 +477,6 @@ int dbms_query_connection_number;
 volatile int dbms_long_query_result;
 volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   
-  
 /*
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -638,6 +637,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_history_detached= "no";
 
   lmysql= new ldbms();                               /* lmysql will be deleted in action_exit(). */
+
+  xsettings_widget= new XSettings(this);
 
   /* picking up possible settings options from argc+argv after setting initial defaults, so late */
   /* as a result, ocelotgui --version and ocelotgui --help will look slow */
@@ -4726,7 +4727,7 @@ void MainWindow::action_change_one_setting(QString old_setting,
     text.append(" = ");
     text.append("'");
     QString source= new_setting;
-    if (ocelot_variable_is_color(keyword_index) == true)
+    if (xsettings_widget->ocelot_variable_is_color(keyword_index) == true)
       source= rgb_to_color(new_setting);
     for (int i= 0; i < source.length(); ++i)
     {
@@ -9785,8 +9786,8 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
-      // what if it isn't ocelot_?
-      int er= ocelot_variable_set(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+      // todo: I think we won't get here if name doesn't start with ocelot_, but maybe make sure again
+      int er= xsettings_widget->ocelot_variable_set(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]));
       if (er != ER_OVERFLOW)
       {
         make_and_put_message_in_result(er, 0, (char*)"");
@@ -9796,386 +9797,6 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   }
   return 0;
 }
-
-
-/************* ocelot_ variables start **********/
-
-/*
- This could be a separate .h file or even a separate class.
- For variables whose names begin with "ocelot_".
-*/
-
-/*
-  For e.g. SET ocelot_statement_text_color='red'; or ocelotgui --statement_text_color='red'
-  Call with e.g. ocelot_variable_set(TOKEN_KEYWORD_STATEMENT_TEXT_COLOR, text.mid(sub_token_offsets[3], sub_token_lengths[3])
-  We used to have a lot of repetitive code here, now it's reduced.
-  Todo: if debug compile, check that nobody changed keywords -- just put something in a comment?
-  Todo: __attribute__((packed)) if gcc, but maybe it's enough to put char stuff at the end
-  Todo: if compiled with debug, we need asserts at start to check that qstring_target addresses match token strings.
-  Todo: in the original, we were doing nothing with ocelot_vertical, so it needs an extra look.
-  Todo: Make sure ocelot_horizontal and ocelot_htmlraw, which have no variables, actually cause the changes.
-  Todo: Check whether there has actually been a style change.
-  Todo: For grid's set_all_style_sheets, we only redo existing display if there has been a font change.
-  Todo: ocelot_grid_border_size isn't on the settings menu
-*/
-int MainWindow::ocelot_variable_set(int keyword_index, QString new_value)
-{
-#define OCELOT_VARIABLE_FLAG_SET_COLOR          0x01
-#define OCELOT_VARIABLE_FLAG_SET_FONT           0x02
-#define OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY    0x12
-#define OCELOT_VARIABLE_FLAG_SET_FONT_STYLE     0x22
-#define OCELOT_VARIABLE_FLAG_SET_FONT_SIZE      0x42
-#define OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT    0x82
-#define OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT    0x01
-#define OCELOT_VARIABLE_FLAG_SET_FOR_GRID         0x02
-#define OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY      0x04
-#define OCELOT_VARIABLE_FLAG_SET_FOR_MENU         0x08
-#define OCELOT_VARIABLE_FLAG_SET_FOR_EXTRA_RULE_1 0x10
-
-struct ocelot_variable_keywords {
-  QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
-  short unsigned int *int_target;         /* e.g. NULL */
-  int maximum;                            /* e.g. -1 because it's not an int target */
-  unsigned char flags_style;              /* e.g. OCELOT_VARIABLE_FLAG_STYLE_COLOR */
-  unsigned char flags_for;                /* e.g. OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT */
-};
-static const ocelot_variable_keywords ocelot_variable_values[]=
-{
-  {NULL, &ocelot_batch, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_BATCH */
-  {NULL, &ocelot_client_side_functions, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS */
-  {&ocelot_dbms, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DBMS */
-  {&ocelot_debug_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED */
-  {&ocelot_debug_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT */
-  {&ocelot_debug_left, NULL,10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_LEFT */
-  {&ocelot_debug_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_TOP */
-  {&ocelot_debug_width, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH */
-  {&ocelot_extra_rule_1_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR */
-  {&ocelot_extra_rule_1_condition, NULL, -1, 0, OCELOT_VARIABLE_FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION */
-  {&ocelot_extra_rule_1_display_as, NULL, -1, 0, OCELOT_VARIABLE_FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS */
-  {&ocelot_extra_rule_1_text_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_EXTRA_RULE_1}, /* TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR */
-  {&ocelot_grid_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR */
-  {&ocelot_grid_border_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR */
-  {&ocelot_grid_border_size, NULL, 9, 0, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE */
-  {&ocelot_grid_cell_border_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR */
-  {&ocelot_grid_cell_border_size, NULL, 10, 0, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE */
-  {&ocelot_grid_cell_drag_line_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR */
-  {&ocelot_grid_cell_drag_line_size, NULL, 10, 0, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE */
-  {&ocelot_grid_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_DETACHED */
-  {&ocelot_grid_font_family, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY */
-  {&ocelot_grid_font_size, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE */
-  {&ocelot_grid_font_style, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE */
-  {&ocelot_grid_font_weight, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT */
-  {&ocelot_grid_header_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR */
-  {&ocelot_grid_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_HEIGHT */
-  {&ocelot_grid_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_LEFT */
-  {NULL, &ocelot_grid_tabs, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_TABS */
-  {&ocelot_grid_text_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_GRID}, /* TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR */
-  {&ocelot_grid_top, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_TOP */
-  {&ocelot_grid_width, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_GRID_WIDTH */
-  {&ocelot_history_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR */
-  {&ocelot_history_border_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR */
-  {&ocelot_history_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED */
-  {&ocelot_history_font_family, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY */
-  {&ocelot_history_font_size, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE */
-  {&ocelot_history_font_style, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE */
-  {&ocelot_history_font_weight, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT */
-  {&ocelot_history_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT */
-  {&ocelot_history_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_LEFT */
-  {&ocelot_history_max_row_count, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT */
-  {&ocelot_history_text_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY}, /* TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR */
-  {&ocelot_history_top, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_TOP */
-  {&ocelot_history_width, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH */
-  {NULL, &ocelot_vertical, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HORIZONTAL */
-  {NULL, &ocelot_html, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HTML */
-  {NULL, &ocelot_html, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_HTMLRAW */
-  {&ocelot_language, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_LANGUAGE */
-  {NULL, &ocelot_log_level, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_LOG_LEVEL */
-  {&ocelot_menu_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR */
-  {&ocelot_menu_border_color, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR */
-  {&ocelot_menu_font_family, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY */
-  {&ocelot_menu_font_size, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE */
-  {&ocelot_menu_font_style, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE */
-  {&ocelot_menu_font_weight, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT */
-  {&ocelot_menu_text_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_MENU}, /* TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR */
-  {NULL, &ocelot_raw, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_RAW */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_COPY */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_CUT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_USER_VARIABLES */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_VARIABLES */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_XML */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN */
-  {NULL, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT */
-  {&ocelot_statement_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR */
-  {&ocelot_statement_border_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR */
-  {&ocelot_statement_detached, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED */
-  {&ocelot_statement_font_family, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY */
-  {&ocelot_statement_font_size, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE */
-  {&ocelot_statement_font_style, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE */
-  {&ocelot_statement_font_weight, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT */
-  {&ocelot_statement_format_clause_indent, NULL, 8, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT */
-  {&ocelot_statement_format_keyword_case, NULL, -1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE */
-  {&ocelot_statement_format_statement_indent, NULL, 8, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT */
-  {&ocelot_statement_height, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT */
-  {&ocelot_statement_highlight_comment_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR */
-  {&ocelot_statement_highlight_current_line_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR */
-  {&ocelot_statement_highlight_function_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR */
-  {&ocelot_statement_highlight_identifier_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR */
-  {&ocelot_statement_highlight_keyword_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR */
-  {&ocelot_statement_highlight_literal_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR */
-  {&ocelot_statement_highlight_operator_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR */
-  {&ocelot_statement_left, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT */
-  {&ocelot_statement_prompt_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR */
-  {&ocelot_statement_syntax_checker, NULL, 3, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER */
-  {&ocelot_statement_text_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR */
-  {&ocelot_statement_top, NULL, 10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_TOP */
-  {&ocelot_statement_width, NULL,10000, 0, 0}, /* TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH */
-  {NULL, &ocelot_vertical, 1, 0, 0}, /* TOKEN_KEYWORD_OCELOT_VERTICAL */
-  {NULL, &ocelot_xml, 1, 0, 0}  /* TOKEN_KEYWORD_OCELOT_XML */
-};
-
-  if ((keyword_index < TOKEN_KEYWORD_OCELOT_BATCH) || (keyword_index > TOKEN_KEYWORD_OCELOT_XML)) return ER_OVERFLOW;
-  bool is_font_changed= false;
-  QString qv;
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION) qv= connect_stripper(new_value, true);
-  else qv= connect_stripper(new_value, false);
-  int offset= keyword_index - TOKEN_KEYWORD_OCELOT_BATCH;
-  char flags_style= ocelot_variable_values[offset].flags_style;
-  char flags_for= ocelot_variable_values[offset].flags_for;
-  QString *qstring_target= ocelot_variable_values[offset].qstring_target;
-  short unsigned int *int_target= ocelot_variable_values[offset].int_target;
-
-  if (qv == "Return ER_OK if color")
-  {
-    if (flags_style == OCELOT_VARIABLE_FLAG_SET_COLOR) return ER_OK;
-    else return ER_ERROR;
-  }
-
-  int maximum= ocelot_variable_values[offset].maximum;
-  if (maximum != -1)
-  {
-    bool is_digits= true;
-    if (qv == "") is_digits= false;
-    else for (int i= 0; i < qv.size(); ++i) {if (qv[i].isDigit() == false) is_digits= false; }
-    if ((is_digits == false) || (qv.toInt() > maximum))
-    {
-      int er= ER_ILLEGAL_VALUE; /* default = most common */
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER) er= ER_SYNTAX;
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT) er= ER_FORMAT_STATEMENT;
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT) er= ER_FORMAT_CLAUSE;
-      return er;
-    }
-  }
-
-  if ((keyword_index >= TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE) && (keyword_index <= TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT))
-  {
-    int ii= shortcut(keyword_index, qv, true, true);
-    if (ii == 1)
-    {
-      return ER_OK;
-    }
-    if (ii == -1)
-    {
-      return ER_ILLEGAL_VALUE;
-    }
-  }
-
-  if ((keyword_index == TOKEN_KEYWORD_OCELOT_BATCH)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_RAW)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_VERTICAL)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_XML))
-  {
-    ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
-    int i= qv.toInt();
-    if (i == 1)
-    {
-      *int_target= i;
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW) ocelot_html= ocelot_raw= i;
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL) ocelot_vertical= 0;
-    }
-    return ER_OK;
-  }
-
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE)
-  {
-    qv= qv.toLower();
-    if ((qv != "upper") && (qv != "lower") && (qv!= "unchanged"))
-    return ER_FORMAT_KEY_CASE;
-  }
-
-  if ((keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
-   || (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED))
-  {
-    if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
-    {
-      if (qv == "no") { menu_options_action_option_detach_statement_widget->setChecked(false); detach_statement_widget(false); }
-      else { menu_options_action_option_detach_statement_widget->setChecked(true); detach_statement_widget(true); }
-    }
-    if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
-    {
-      if (qv == "no") { menu_options_action_option_detach_debug_widget->setChecked(false); detach_debug_widget(false); }
-      else { menu_options_action_option_detach_debug_widget->setChecked(true); detach_debug_widget(true); }
-    }
-    if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
-    {
-      if (qv == "no") { menu_options_action_option_detach_result_grid_widget->setChecked(false); detach_result_grid_widget(false); }
-      else { menu_options_action_option_detach_result_grid_widget->setChecked(true); detach_result_grid_widget(true); }
-    }
-    if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
-    {
-      if (qv == "no") { menu_options_action_option_detach_history_widget->setChecked(false); detach_history_widget(false); }
-      else { menu_options_action_option_detach_history_widget->setChecked(true); detach_history_widget(true); }
-    }
-  }
-   if (flags_style == 0)
-  {
-    if (qstring_target != NULL) *qstring_target= qv;
-    if (int_target != NULL) *int_target=qv.toInt();
-  }
-
-  if (flags_style == OCELOT_VARIABLE_FLAG_SET_COLOR)
-  {
-    QString ccn= canonical_color_name(qv);
-    if (ccn == "") return ER_UNKNOWN_COLOR;
-    *qstring_target= ccn;
-    assign_names_for_colors();
-  }
-
-  if ((flags_style & OCELOT_VARIABLE_FLAG_SET_FONT) != 0)
-  {
-    QString ccn;
-    if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY)
-    {
-      /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
-               because only 'Courier New' exists. There should be a warning, and
-               setting some style hint e.g. "at least it should be monospace" would be good.
-               Also ER_UNKNOWN_FONT_STYLE is the wrong error message if family is unknown.
-      */
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY)
-         ccn= canonical_font_family(qv, &ocelot_statement_font_style);
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
-         ccn= canonical_font_family(qv, &ocelot_grid_font_style);
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY)
-         ccn= canonical_font_family(qv, &ocelot_history_font_style);
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY)
-         ccn= canonical_font_family(qv, &ocelot_menu_font_style);
-      if (ccn == "") return ER_UNKNOWN_FONT_STYLE;
-    }
-    if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_STYLE)
-    {
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
-        ccn= canonical_font_style(ocelot_statement_font_family, qv);
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
-        ccn= canonical_font_style(ocelot_grid_font_family, qv);
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
-         ccn= canonical_font_style(ocelot_history_font_family, qv);
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE)
-        ccn= canonical_font_style(ocelot_menu_font_family, qv);
-      if (ccn == "") return ER_UNKNOWN_FONT_STYLE;
-    }
-    if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_SIZE)
-    {
-      ccn= qv;
-      if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) return ER_UNKNOWN_FONT_SIZE;
-    }
-    if (flags_style == (char) OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT)
-    {
-      ccn= canonical_font_weight(qv);
-    }
-    if (ccn != *qstring_target)
-    {
-      *qstring_target= ccn;
-      is_font_changed= true;
-    }
-  }
-
-  if (flags_for == OCELOT_VARIABLE_FLAG_SET_FOR_STATEMENT)
-  {
-    if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR)
-    {
-      statement_edit_widget->highlightCurrentLine();
-    }
-    else
-    {
-      make_style_strings();
-      statement_edit_widget_setstylesheet();
-      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR)
-      {
-        statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(ocelot_statement_prompt_background_color);
-      }
-    }
-  }
-  if (flags_for == OCELOT_VARIABLE_FLAG_SET_FOR_GRID)
-  {
-    ResultGrid* r;
-    make_style_strings();
-    for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
-    {
-      r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-      r->set_all_style_sheets(ocelot_grid_style_string, *qstring_target, 1, is_font_changed);
-    }
-  }
-  if (flags_for == OCELOT_VARIABLE_FLAG_SET_FOR_HISTORY)
-  {
-    make_style_strings();
-    history_edit_widget->setStyleSheet(ocelot_history_style_string);
-  }
-  if (flags_for == OCELOT_VARIABLE_FLAG_SET_FOR_MENU)
-  {
-    make_style_strings();
-    ui->menuBar->setStyleSheet(ocelot_menu_style_string);
-  }
-  if (flags_for == OCELOT_VARIABLE_FLAG_SET_FOR_EXTRA_RULE_1)
-  {
-    make_style_strings();
-  }
-  return ER_OK;
-}
-
-/* Return true iff keyword_index is for an ocelot_ variable for a color setting */
-bool MainWindow::ocelot_variable_is_color(int keyword_index)
-{
-  int er= ocelot_variable_set(keyword_index, "Return ER_OK if color");
-  if (er == ER_OK) return true;
-  return false;
-}
-
-/************* ocelot_ variables end **********/
-
-
 
 /*
   REHASH
@@ -17954,7 +17575,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   else
   {
     /* Anything that starts with "ocelot_" except "ocelot_dbms" and "ocelot_client_side_functions" */
-    if (ocelot_variable_set(keyword_index, token2) != ER_OVERFLOW)
+    if (xsettings_widget->ocelot_variable_set(keyword_index, token2) != ER_OVERFLOW)
     {
       /* It might not be ER_OK but we ignore errors here */
       return;
@@ -22447,6 +22068,476 @@ void MainWindow::clf_make_sql_execute_function(QString *clf_output)
 */
 
 #include "install_sql.cpp"
+
+#ifndef XSETTINGS
+#define XSETTINGS
+
+int XSettings::ocelot_variables_create()
+{
+ int i= 0;
+  ocelot_variables[i]= {NULL, NULL,  1, 0, 0, TOKEN_KEYWORD_OCELOT_BATCH};
+    ocelot_variables[i++].int_target= &ocelot_batch;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS};
+    ocelot_variables[i++].int_target= &ocelot_client_side_functions;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_DBMS};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_dbms;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_debug_detached;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_debug_height;
+  ocelot_variables[i]= {NULL, NULL, 10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_debug_left;
+  ocelot_variables[i]= {NULL, NULL, 10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_debug_top;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_debug_width;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_extra_rule_1_background_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_extra_rule_1_condition;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_extra_rule_1_display_as;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_extra_rule_1_text_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_background_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_border_color;
+  ocelot_variables[i]= {NULL, NULL,  9, 0, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_border_size;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_cell_border_color;
+  ocelot_variables[i]= {NULL, NULL,  10, 0, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_cell_border_size;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_cell_drag_line_color;
+  ocelot_variables[i]= {NULL, NULL,  10, 0, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_cell_drag_line_size;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_DETACHED};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_detached;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_font_family;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_font_size;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_font_style;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_font_weight;
+  ocelot_variables[i]= {NULL, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_header_background_color;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_height;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_left;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TABS};
+    ocelot_variables[i++].int_target= &ocelot_grid_tabs;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_text_color;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TOP};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_top;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_WIDTH};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_grid_width;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_background_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_border_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_detached;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_font_family;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_SIZE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_font_size;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_font_style;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_FONT_WEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_font_weight;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_HEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_height;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_LEFT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_left;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_MAX_ROW_COUNT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_max_row_count;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_text_color;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_TOP};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_top;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_history_width;
+  ocelot_variables[i]= {NULL, NULL,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HORIZONTAL};
+    ocelot_variables[i++].int_target= &ocelot_vertical;
+  ocelot_variables[i]= {NULL, NULL,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HTML};
+    ocelot_variables[i++].int_target= &ocelot_html;
+  ocelot_variables[i]= {NULL, NULL,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW};
+    ocelot_variables[i++].int_target= &ocelot_html;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_language;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL};
+    ocelot_variables[i++].int_target= &ocelot_log_level;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_menu_background_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_menu_border_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_menu_font_family;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_FONT_SIZE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_menu_font_size;
+  ocelot_variables[i]= {NULL, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_menu_font_style;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_menu_font_weight;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_menu_text_color;
+  ocelot_variables[i]= {NULL, NULL,  1, 0, 0, TOKEN_KEYWORD_OCELOT_RAW};
+    ocelot_variables[i++].int_target= &ocelot_raw;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_COPY};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_CUT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML};
+    ocelot_variables[i++].int_target=NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW};
+    ocelot_variables[i++].int_target=NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW};
+    ocelot_variables[i++].int_target=NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO};
+    ocelot_variables[i++].int_target=NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_USER_VARIABLES};
+    ocelot_variables[i++].int_target=NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_VARIABLES};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL};
+    ocelot_variables[i++].int_target=NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_XML};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT};
+    ocelot_variables[i++].int_target= NULL;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_BACKGROUND_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_background_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_BORDER_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_border_color;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_detached;
+  ocelot_variables[i]= {NULL, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_font_family;
+  ocelot_variables[i]= {NULL, NULL, -1, OCELOT_VARIABLE_FLAG_SET_FONT_SIZE, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_SIZE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_font_size;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_font_style;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_font_weight;
+  ocelot_variables[i]= {NULL, NULL,  8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_format_clause_indent;
+  ocelot_variables[i]= {NULL, NULL, -1, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_format_keyword_case;
+  ocelot_variables[i]= {NULL, NULL, 8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_format_statement_indent;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_height;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_highlight_comment_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_highlight_current_line_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_FUNCTION_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_highlight_function_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_highlight_identifier_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_KEYWORD_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_highlight_keyword_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_LITERAL_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_highlight_literal_color;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_highlight_operator_color;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_left;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_prompt_background_color;
+  ocelot_variables[i]= {NULL, NULL,  3, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_syntax_checker;
+  ocelot_variables[i]= {NULL, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_text_color;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_TOP};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_top;
+  ocelot_variables[i]= {NULL, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH};
+    ocelot_variables[i++].qstring_target= &main_window->ocelot_statement_width;
+  ocelot_variables[i]= {NULL, NULL,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL};
+    ocelot_variables[i++].int_target= &ocelot_vertical;
+  ocelot_variables[i]= {NULL, NULL,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML};
+    ocelot_variables[i++].int_target= &ocelot_xml;
+  return i;
+}
+
+int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
+{
+  int offset= ocelot_variable_offset(keyword_index);
+  if (offset == -1) return ER_OVERFLOW;
+  bool is_font_changed= false;
+  QString qv;
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION) qv= main_window->connect_stripper(new_value, true);
+  else qv= main_window->connect_stripper(new_value, false);
+
+  char flags_style= ocelot_variables[offset].flags_style;
+  char enums_for= ocelot_variables[offset].enums_for;
+  QString *qstring_target= ocelot_variables[offset].qstring_target;
+  short unsigned int *int_target= ocelot_variables[offset].int_target;
+
+  int maximum= ocelot_variables[offset].maximum;
+  if (maximum != -1)
+  {
+    bool is_digits= true;
+    if (qv == "") is_digits= false;
+    else for (int i= 0; i < qv.size(); ++i) {if (qv[i].isDigit() == false) is_digits= false; }
+    if ((is_digits == false) || (qv.toInt() > maximum))
+    {
+      int er= ER_ILLEGAL_VALUE; /* default = most common */
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER) er= ER_SYNTAX;
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT) er= ER_FORMAT_STATEMENT;
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT) er= ER_FORMAT_CLAUSE;
+      return er;
+    }
+  }
+
+  if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT)
+  {
+    int ii= main_window->shortcut(keyword_index, qv, true, true);
+    if (ii == 1)
+    {
+      return ER_OK;
+    }
+    if (ii == -1)
+    {
+      return ER_ILLEGAL_VALUE;
+    }
+  }
+
+  if ((keyword_index == TOKEN_KEYWORD_OCELOT_BATCH)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_RAW)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_VERTICAL)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_XML))
+  {
+    ocelot_batch= ocelot_html= ocelot_raw= ocelot_vertical= ocelot_xml= 0;
+    int i= qv.toInt();
+    if (i == 1)
+    {
+      *int_target= i;
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW) ocelot_html= ocelot_raw= i;
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL) ocelot_vertical= 0;
+    }
+    return ER_OK;
+  }
+
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE)
+  {
+    qv= qv.toLower();
+    if ((qv != "upper") && (qv != "lower") && (qv!= "unchanged"))
+    return ER_FORMAT_KEY_CASE;
+  }
+
+  if ((keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED))
+  {
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
+    {
+      if (qv == "no") { main_window->menu_options_action_option_detach_statement_widget->setChecked(false); main_window->detach_statement_widget(false); }
+      else {main_window->menu_options_action_option_detach_statement_widget->setChecked(true); main_window->detach_statement_widget(true); }
+    }
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
+    {
+      if (qv == "no") { main_window->menu_options_action_option_detach_debug_widget->setChecked(false); main_window->detach_debug_widget(false); }
+      else { main_window->menu_options_action_option_detach_debug_widget->setChecked(true); main_window->detach_debug_widget(true); }
+    }
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
+    {
+      if (qv == "no") { main_window->menu_options_action_option_detach_result_grid_widget->setChecked(false); main_window->detach_result_grid_widget(false); }
+      else { main_window->menu_options_action_option_detach_result_grid_widget->setChecked(true); main_window->detach_result_grid_widget(true); }
+    }
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
+    {
+      if (qv == "no") { main_window->menu_options_action_option_detach_history_widget->setChecked(false); main_window->detach_history_widget(false); }
+      else { main_window->menu_options_action_option_detach_history_widget->setChecked(true); main_window->detach_history_widget(true); }
+    }
+  }
+
+   if (flags_style == 0)
+  {
+    if (qstring_target != NULL) *qstring_target= qv;
+    if (int_target != NULL) *int_target=qv.toInt();
+  }
+
+  if (flags_style == OCELOT_VARIABLE_FLAG_SET_COLOR)
+  {
+    QString ccn= main_window->canonical_color_name(qv);
+    if (ccn == "") return ER_UNKNOWN_COLOR;
+    *qstring_target= ccn;
+    main_window->assign_names_for_colors();
+  }
+
+  if ((flags_style & OCELOT_VARIABLE_FLAG_SET_FONT) != 0)
+  {
+    QString ccn;
+    if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY)
+    {
+      /* TODO: setting font_family can fail e.g. say 'Courier' and you could get 'Sans'
+               because only 'Courier New' exists. There should be a warning, and
+               setting some style hint e.g. "at least it should be monospace" would be good.
+               Also ER_UNKNOWN_FONT_STYLE is the wrong error message if family is unknown.
+      */
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_FAMILY)
+         ccn= main_window->canonical_font_family(qv, &main_window->ocelot_statement_font_style);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
+         ccn= main_window->canonical_font_family(qv, &main_window->ocelot_grid_font_style);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_FAMILY)
+         ccn= main_window->canonical_font_family(qv, &main_window->ocelot_history_font_style);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY)
+         ccn= main_window->canonical_font_family(qv, &main_window->ocelot_menu_font_style);
+      if (ccn == "") return ER_UNKNOWN_FONT_STYLE;
+    }
+    if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_STYLE)
+    {
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE)
+        ccn= main_window->canonical_font_style(main_window->ocelot_statement_font_family, qv);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
+        ccn= main_window->canonical_font_style(main_window->ocelot_grid_font_family, qv);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_FONT_STYLE)
+         ccn= main_window->canonical_font_style(main_window->ocelot_history_font_family, qv);
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE)
+        ccn= main_window->canonical_font_style(main_window->ocelot_menu_font_family, qv);
+      if (ccn == "") return ER_UNKNOWN_FONT_STYLE;
+    }
+    if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_SIZE)
+    {
+      ccn= qv;
+      if ((ccn.toInt() < FONT_SIZE_MIN) || (ccn.toInt() > FONT_SIZE_MAX)) return ER_UNKNOWN_FONT_SIZE;
+    }
+    if (flags_style == (char) OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT)
+    {
+      ccn= main_window->canonical_font_weight(qv);
+    }
+    if (ccn != *qstring_target)
+    {
+      *qstring_target= ccn;
+      is_font_changed= true;
+    }
+  }
+
+  if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT)
+  {
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR)
+    {
+      main_window->statement_edit_widget->highlightCurrentLine();
+    }
+    else
+    {
+      main_window->make_style_strings();
+      main_window->statement_edit_widget_setstylesheet();
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR)
+      {
+        main_window->statement_edit_widget->statement_edit_widget_left_bgcolor= QColor(main_window->ocelot_statement_prompt_background_color);
+      }
+    }
+  }
+  if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_GRID)
+  {
+    ResultGrid* r;
+    main_window->make_style_strings();
+    for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
+    {
+      r= qobject_cast<ResultGrid*>(main_window->result_grid_tab_widget->widget(i_r));
+      r->set_all_style_sheets(main_window->ocelot_grid_style_string, *qstring_target, 1, is_font_changed);
+    }
+  }
+  if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY)
+  {
+    main_window->make_style_strings();
+    main_window->history_edit_widget->setStyleSheet(main_window->ocelot_history_style_string);
+  }
+  if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_MENU)
+  {
+    main_window->make_style_strings();
+    main_window->ui->menuBar->setStyleSheet(main_window->ocelot_menu_style_string);
+  }
+  if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1)
+  {
+    main_window->make_style_strings();
+  }
+  return ER_OK;
+}
+
+/* Return true iff keyword_index is for an ocelot_ variable for a color setting */
+bool XSettings::ocelot_variable_is_color(int keyword_index)
+{
+  int offset= ocelot_variable_offset(keyword_index);
+  if (offset < 0) return false;
+  char flags_style= ocelot_variables[offset].flags_style;
+  if (flags_style == OCELOT_VARIABLE_FLAG_SET_COLOR) return true;
+  return false;
+}
+
+int XSettings::ocelot_variables_size()
+{
+  return OCELOT_VARIABLES_SIZE;
+}
+
+XSettings::~XSettings()
+{
+  delete[] ocelot_variables;
+}
+
+#endif // XSETTINGS
 
 #ifdef DBMS_TARANTOOL
 #if (OCELOT_THIRD_PARTY==1)

@@ -2844,6 +2844,7 @@ class QThread48;
 class QTabWidget48;
 class TextEditHistory;
 class TextEditWidget2;
+class XSettings;
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -3045,7 +3046,6 @@ public:
   QFile ocelot_history_tee_file;             /* see comment=tee+hist */
   QString ocelot_history_hist_file_name;     /* see comment=tee+hist */
   QFile ocelot_history_hist_file;            /* see comment=tee+hist */
-
   CodeEditor *statement_edit_widget;
 
   int position_for_redo;
@@ -3405,7 +3405,9 @@ protected:
   void resizeEvent(QResizeEvent *ev);
 
 private:
+public:
   Ui::MainWindow *ui;
+private:
   int history_markup_previous_or_next();
   void initialize_widget_history();
   int result_grid_add_tab();
@@ -3422,8 +3424,6 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
-  int ocelot_variable_set(int keyword_index, QString new_value);
-  bool ocelot_variable_is_color(int keyword);
   int rehash_scan();
   QString rehash_search(QString table_name, char *search_string, int reftype);
   void rehash_get_database_name(char *);
@@ -3487,7 +3487,9 @@ private:
   void connect_init();
   void set_current_colors_and_font(QFont);
   QFont get_fixed_font();
+public:
   void make_style_strings();
+private:
   //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
   int make_statement_ready_to_send(QString, char *, int, int);
@@ -3501,8 +3503,9 @@ private:
   void history_file_stop(QString);                 /* see comment=tee+hist */
   void history_file_write(QString, QString);       /* see comment=tee+hist */
   void history_file_to_history_widget();           /* see comment=tee+hist */
-
+public:
   void statement_edit_widget_setstylesheet();
+private:
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
 
@@ -3570,8 +3573,9 @@ private:
   QString select_1_row(const char *select_statement);
 
   QWidget *main_window;
-
+public:
   TextEditHistory *history_edit_widget;
+private:
   QLineEdit *hparse_line_edit;
 #ifdef DEBUGGER
 #define DEBUG_TAB_WIDGET_MAX 10
@@ -3581,6 +3585,7 @@ private:
   QTabWidget *debug_tab_widget;
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
+  XSettings *xsettings_widget;
 
   QMenu *menu_file;
     QAction *menu_file_action_connect;
@@ -3608,8 +3613,9 @@ private:
     QAction *menu_settings_action_statement;
     QAction *menu_settings_action_debug;
     QAction *menu_settings_action_extra_rule_1;
+public:
   QMenu *menu_options;
-    QAction *menu_options_action_option_detach_history_widget;
+  QAction *menu_options_action_option_detach_history_widget;
     QAction *menu_options_action_option_detach_result_grid_widget;
     QAction *menu_options_action_option_detach_debug_widget;
     QAction *menu_options_action_option_detach_statement_widget;
@@ -3622,7 +3628,7 @@ private:
     QAction *menu_options_action_raw;
     QAction *menu_options_action_vertical;
     QAction *menu_options_action_xml;
-
+private:
 #ifdef DEBUGGER
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
@@ -3655,8 +3661,9 @@ private:
   //  QPushButton *the_manual_pushbutton;
 
   /* QTableWidget *grid_table_widget; */
+public:
   QTabWidget48 *result_grid_tab_widget;
-
+private:
   unsigned long result_row_count;
 
   int history_markup_counter; /* 0 when execute, +1 when "previous statement", -1 for "next statement" */
@@ -10986,5 +10993,92 @@ bool eventFilter(QObject *obj, QEvent *event)
 
 };
 #endif // TEXTEDITHISTORY_H
+
+#ifndef XSETTINGS_H
+#define XSETTINGS_H
+class XSettings : public QWidget
+{
+  Q_OBJECT
+
+/*
+ This could be a separate .h file.
+ For variables whose names begin with "ocelot_".
+*/
+
+/*
+  For e.g. SET ocelot_statement_text_color='red'; or ocelotgui --statement_text_color='red'
+  Call with e.g. ocelot_variable_set(TOKEN_KEYWORD_STATEMENT_TEXT_COLOR, text.mid(sub_token_offsets[3], sub_token_lengths[3])
+  We used to have a lot of repetitive code here, now it's reduced.
+  Todo: if debug compile, check that nobody changed keywords -- just put something in a comment?
+  Todo: __attribute__((packed)) if gcc, but maybe it's enough to put char stuff at the end
+  Todo: if compiled with debug, we need asserts at start to check that qstring_target addresses match token strings.
+  Todo: in the original, we were doing nothing with ocelot_vertical, so it needs an extra look.
+  Todo: Make sure ocelot_horizontal and ocelot_htmlraw, which have no variables, actually cause the changes.
+  Todo: Check whether there has actually been a style change.
+  Todo: For grid's set_all_style_sheets, we only redo existing display if there has been a font change.
+  Todo: ocelot_grid_border_size isn't on the settings menu
+  Todo: merge with Settings class?
+*/
+
+private:
+#define OCELOT_VARIABLE_FLAG_SET_COLOR          0x01
+#define OCELOT_VARIABLE_FLAG_SET_FONT           0x02
+#define OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY    0x12
+#define OCELOT_VARIABLE_FLAG_SET_FONT_STYLE     0x22
+#define OCELOT_VARIABLE_FLAG_SET_FONT_SIZE      0x42
+#define OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT    0x82
+#define OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT    1
+#define OCELOT_VARIABLE_ENUM_SET_FOR_GRID         2
+#define OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY      3
+#define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
+#define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
+#define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
+#define OCELOT_VARIABLES_SIZE 119
+
+struct ocelot_variable_keywords {
+  QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
+  short unsigned int *int_target;         /* e.g. NULL */
+  int maximum;                            /* e.g. -1 because it's not an int target */
+  unsigned char flags_style;              /* e.g. OCELOT_VARIABLE_FLAG_STYLE_COLOR */
+  unsigned char enums_for;                /* e.g. OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT */
+  unsigned short int k_i;                 /* keyword_index */
+};
+
+ocelot_variable_keywords *ocelot_variables;
+MainWindow *main_window;
+int ocelot_variables_create();
+
+int ocelot_variable_offset(int keyword_index)
+{
+  for (int i= 0; i < OCELOT_VARIABLES_SIZE; ++i)
+  {
+    if (ocelot_variables[i].k_i == keyword_index) return i;
+  }
+  return -1;
+}
+
+public:
+
+XSettings(MainWindow *parent)
+{
+  main_window= parent;
+#ifndef NDEBUG
+  int v_size;
+  ocelot_variables= new ocelot_variable_keywords[TOKEN_KEYWORD__UTF8MB4]; /* just to get ocelot_variables_size */
+  v_size= ocelot_variables_create();
+  delete[] ocelot_variables;
+  assert(v_size == OCELOT_VARIABLES_SIZE);
+#endif //NDEBUG
+  ocelot_variables= new ocelot_variable_keywords[OCELOT_VARIABLES_SIZE]; /* permanent */
+  ocelot_variables_create();
+}
+
+int ocelot_variable_set(int keyword_index, QString new_value);
+bool ocelot_variable_is_color(int keyword);
+int ocelot_variables_size();
+~XSettings();
+
+};
+#endif //#ifndef XSETTINGS_H
 
 #endif // OCELOTGUI_H
