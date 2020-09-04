@@ -12250,6 +12250,7 @@ void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_num
  Warn: get_sql_mode() might change dbms_version_mask.
  If we don't see a known version number, we tend to assume it's a later version.
  Todo: a message like "Don't recognize MySQL/MariaDB version" would be nice.
+ Todo: if command line had a version number, don't let version() override it.
 */
 void MainWindow::set_dbms_version_mask(QString version)
 {
@@ -12279,22 +12280,16 @@ void MainWindow::set_dbms_version_mask(QString version)
 #ifdef DBMS_TARANTOOL
   else if (version.contains("tarantool", Qt::CaseInsensitive) == true)
   {
-    if ((dbms_version_mask & FLAG_VERSION_TARANTOOL_2_2) != 0)
     {
-      /* Apparently user specified tarantool-2.2 on startup, keep it */
-      dbms_version_mask= FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2;
-    }
-    else
-    {
-      if (version.contains("2.2") == true)
+      if (version.contains("2.2.") == true)
       {
         dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2);
       }
-      else if (version.contains("2.3") == true)
+      else if (version.contains("2.3.") == true)
       {
         dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3);
       }
-      else if (version.contains("2.4") == true)
+      else if (version.contains("2.4.") == true)
       {
         dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4);
       }
