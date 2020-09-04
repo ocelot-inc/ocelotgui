@@ -2325,7 +2325,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     }
     return 1;
   }
-  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT)
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO)
   {
     if (is_set) strcpy(ocelot_shortcut_undo, source_as_utf8);
     if (is_do)
