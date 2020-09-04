@@ -6871,6 +6871,8 @@ void frame_resize_for_drag_bottom(long int xrow, int ki, int grid_col, int width
         the changed row when modes are switched
   Todo: xml statement="" and field name="" contents lack escaping.
   Todo: "<" wrecks the cell, we need character entities
+  Todo: If you remove "batch_text_edit->setWordWrapMode(QTextOption::NoWrap);"
+        the effect is interesting, it might be a desirable option.
 */
 /*
   Eventually ...
@@ -7043,15 +7045,45 @@ void display_batch()
     strcpy(ocelot_grid_detail_char_column_end , "</field>");
     strcpy(ocelot_grid_table_end, "</resultset>");
   }
-  hide();
-  batch_text_edit->clear();
-  grid_main_layout->setSizeConstraint(QLayout::SetMinimumSize);
+  hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
+  //batch_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
+
+  /*
+    Kludge #1: if I don't delete batch_text_edit and create it again, then after
+    ocelot_html=1; big select; ocelot_html=0; big select; ocelot_html=1;big select;
+    the horizontal scroll bar won't work.
+    KLudge #2: without the show() and hide()s here, if I said
+    SET ocelot_html=0; SELECT * FROM "_space"; SET ocelot_html=1; SELECT * FROM "_space";
+    the vertical scroll bar was absent. I wish I knew why doing this can fix it.
+    Kludge #3: with something other than SetMaximumSize later, this wil cause too-small window:
+    SET ocelot_html=0; SELECT 5; SET ocelot_html=1; SELECT * FROM "_space";
+    Kludge #4: If we don't break off early when row count or column count = 0, we will crash.
+    But by doing so, we fail to add html or xml markup and we don't allow for message translation.
+    I don't bother to say batch_text_edit_hide() so this->show() makes it visible, momentarily.
+    I think batch_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
+  */
+  delete batch_text_edit;
+  batch_text_edit= new QTextEdit(this);
+  this->show();
+  client->show();
+  client->hide();
+  this->hide();
+
+  grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
   grid_vertical_scroll_bar->setVisible(false);
   grid_main_layout->addWidget(batch_text_edit);
 
+  if ((result_row_count == 0) || (result_column_count == 0))
+  {
+    batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
+    this->show();
+    client->show();
+    return;
+  }
+
   if (copy_of_ocelot_html == 0)
     batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
-  /* Todo: next four lines could be done during the initial setup */
+  /* Todo: next four lines could be done during the initial setup (well, not any more, because of the kludges) */
   batch_text_edit->setReadOnly(true);
   batch_text_edit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
   batch_text_edit->setWordWrapMode(QTextOption::NoWrap);
