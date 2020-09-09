@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: September 4 2020
+   Last modified: September 8 2020
 */
 
 /*
@@ -2963,7 +2963,7 @@ void MainWindow::menu_edit_autocomplete_via_menu()
 bool MainWindow::menu_edit_autocomplete()
 {
   QString text;
-  if (ocelot_auto_rehash > 0)
+  if (rehash_result_row_count > 0)
   {
     if (hparse_line_edit->isHidden() == false)
     {
@@ -4454,7 +4454,7 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
     is_can_format= is_can_zoomin= is_can_zoomout= !doc->isEmpty();
-    if (ocelot_auto_rehash > 0)
+    if (rehash_result_row_count > 0)
     {
       if (hparse_line_edit->isHidden() == false)
       {
@@ -9458,6 +9458,16 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else
     {
       statement_edit_widget->dbms_database= s;
+      if (ocelot_auto_rehash != 0)
+      {
+        char error_or_ok_message[ER_MAX_LENGTH];
+        int i= rehash_scan(error_or_ok_message);
+        if (i == ER_OK_REHASH)
+        {
+          put_message_in_result(error_or_ok_message);
+          return 1;
+        }
+      }
       make_and_put_message_in_result(ER_DATABASE_CHANGED, 0, (char*)"");
     }
     return 1;
@@ -9635,11 +9645,11 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     make_and_put_message_in_result(ER_PRINT, 0, (char*)"");
     return 1;
   }
-  if (statement_type == TOKEN_KEYWORD_REHASH)   /* This overrides a command-line option */
+  if (statement_type == TOKEN_KEYWORD_REHASH)   /* Regardless whether ocelot_auto_rehash = 1 */
   {
-    int i= rehash_scan();
-    if (i > 0) ocelot_auto_rehash= 1;
-    else ocelot_auto_rehash= 0;
+    char error_or_ok_message[ER_MAX_LENGTH];
+    rehash_scan(error_or_ok_message); /* We don't check if return = ER_OK but if it failed then rehash_result_row_count = 0 */
+    put_message_in_result(error_or_ok_message);
     return 1;
   }
   /* TODO: "STATUS" should output as much information as the mysql client does. */
@@ -9805,6 +9815,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   vaguely similar (they store some column names with a hash) (we don't).
   Currently we're taking in table_name, column_name from information_schema
   for the current database, into result_set_copy.
+  Called if: REHASH statement, USE statement + auto_rehash > 0. and connect?
 
   Todo: Allow REHASH [TABLES|TRIGGERS|etc.] [database.]name or *
         There might be multiple databases and multiple connections
@@ -9842,15 +9853,25 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   TODO: TEST!! This is not working properly for Tarantool.
 */
 
-int MainWindow::rehash_scan()
+int MainWindow::rehash_scan(char *error_or_ok_message)
 {
   MYSQL_RES *res= NULL;
+  ResultGrid *rg= NULL;
 //  QString s;
+  int er;                                                  /* for errors e.g. ER_NOT_CONNECTED */
   unsigned int *result_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
 
   result_max_column_widths= 0;
 
-  /* garbage_collect from the last rehash, if any */
+  int count_of_columns= 0;
+  int count_of_tables= 0;
+  int count_of_functions= 0;
+  int count_of_procedures= 0;
+  int count_of_triggers= 0;
+  int count_of_events= 0;
+  int count_of_indexes= 0;
+
+  /* garbage_collect from the last rehash, if any. These statements are repeated in error_return. */
   if (rehash_result_set_copy != 0) { delete [] rehash_result_set_copy; rehash_result_set_copy= 0; }
   if (rehash_result_set_copy_rows != 0) { delete [] rehash_result_set_copy_rows; rehash_result_set_copy_rows= 0; }
   rehash_result_column_count= 0;
@@ -9858,8 +9879,8 @@ int MainWindow::rehash_scan()
 
   if (connections_is_connected[0] != 1)
   {
-    make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
-    return 0;
+    er= ER_NOT_CONNECTED;
+    goto error_return;
   }
   char query[1024];
 
@@ -9869,8 +9890,8 @@ int MainWindow::rehash_scan()
     if (strcmp(tarantool_box_execute, "No SQL") == 0)
     {
       tarantool_errno[0]= 9998;
-      make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
-      return tarantool_errno[0];
+      er= ER_SELECT_FAILED;
+      goto error_return;
     }
     /*
       This is how to use Lua to produce what looks like an SQL result set.
@@ -9948,11 +9969,10 @@ int MainWindow::rehash_scan()
 
     if (result != 0)
     {
-      make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
-      return 0;
+      er= ER_SELECT_FAILED;
+      goto error_return;
     }
-    /* Todo: Memory leak here */
-    ResultGrid *rg= new ResultGrid(lmysql, this, false);
+    rg= new ResultGrid(lmysql, this, false);
     MYSQL_RES *mysql_res_for_new_result_set= NULL;
     rg->fillup(mysql_res_for_new_result_set,
               //&tarantool_tnt_reply,
@@ -9967,8 +9987,8 @@ int MainWindow::rehash_scan()
     rehash_result_row_count= tarantool_num_rows(MYSQL_MAIN_CONNECTION);
     if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
     {
-      make_and_put_message_in_result(ER_0_ROWS_RETURNED, 0, (char*)"");
-      return 0;
+      er= ER_0_ROWS_RETURNED;
+      goto error_return;
     }
   }
   else
@@ -10005,22 +10025,22 @@ int MainWindow::rehash_scan()
            );
     if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], query))
       {
-        make_and_put_message_in_result(ER_SELECT_FAILED, 0, (char*)"");
-        return 0;
+        er= ER_SELECT_FAILED;
+        goto error_return;
       }
 
     res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
     if (res == NULL)
     {
-      make_and_put_message_in_result(ER_MYSQL_STORE_RESULT_FAILED, 0, (char*)"");
-      return 0;
+      er= ER_MYSQL_STORE_RESULT_FAILED;
+      goto error_return;
     }
     rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
     rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
     if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
     {
-      make_and_put_message_in_result(ER_0_ROWS_RETURNED, 0, (char*)"");
-      return 0;
+      er= ER_0_ROWS_RETURNED;
+      goto error_return;
     }
   }
   result_max_column_widths= new unsigned int[rehash_result_column_count];
@@ -10058,18 +10078,11 @@ int MainWindow::rehash_scan()
     rehash_get_database_name(database_name);
     if (database_name[0] == '\0')
     {
-      make_and_put_message_in_result(ER_NO_DATABASE_SELECTED, 0, (char*)"");
-      return 0;
+      er= ER_NO_DATABASE_SELECTED;
+      goto error_return;
     }
   }
   long unsigned int r;
-  int count_of_columns= 0;
-  int count_of_tables= 0;
-  int count_of_functions= 0;
-  int count_of_procedures= 0;
-  int count_of_triggers= 0;
-  int count_of_events= 0;
-  int count_of_indexes= 0;
   for (r= 0; r < rehash_result_row_count; ++r)
   {
     char *row_pointer;
@@ -10088,11 +10101,20 @@ int MainWindow::rehash_scan()
     if (strcmp(column_value, "E") == 0) ++count_of_events;
     if (strcmp(column_value, "I") == 0) ++count_of_indexes;
   }
-  char buffer[ER_MAX_LENGTH];
-  sprintf(buffer, er_strings[er_off + ER_OK_REHASH],
+  if (rg != NULL) delete rg;
+  er= ER_OK_REHASH;
+  sprintf(error_or_ok_message, er_strings[er_off + er],
           database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
-  put_message_in_result(buffer);
-  return 1;
+  return er;
+error_return:
+  if (rg != 0) delete rg;
+  /* garbage_collect from the aborted rehash. These statements are the same as ones at the start of this routine. */
+  if (rehash_result_set_copy != 0) { delete [] rehash_result_set_copy; rehash_result_set_copy= 0; }
+  if (rehash_result_set_copy_rows != 0) { delete [] rehash_result_set_copy_rows; rehash_result_set_copy_rows= 0; }
+  rehash_result_column_count= 0;
+  rehash_result_row_count= 0;
+  strcpy(error_or_ok_message, er_strings[er_off + er]);
+  return er;
 }
 
 /*
@@ -12171,7 +12193,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (query_result != 0 )
   {
     connect_mysql_error_box(er_strings[er_off + ER_MYSQL_QUERY_FAILED], connection_number);
-    connections_is_connected[0]= 1;
+    connect_init(connection_number);
     return 0;
   }
   MYSQL_RES *mysql_res_for_connect;
@@ -12184,14 +12206,14 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   if (mysql_res_for_connect == NULL)
   {
     connect_mysql_error_box(er_strings[er_off + ER_MYSQL_STORE_RESULT_FAILED], connection_number);
-    connections_is_connected[0]= 1;
+    connect_init(connection_number);
     return 0;
   }
   connect_row= lmysql->ldbms_mysql_fetch_row(mysql_res_for_connect);
   if (connect_row == NULL)
   {
     connect_mysql_error_box(er_strings[er_off + ER_MYSQL_FETCH_ROW_FAILED], connection_number);
-    connections_is_connected[0]= 1;
+    connect_init(connection_number);
     return 0;
   }
   /* lengths= lmysql->ldbms_mysql_fetch_lengths(mysql_res_for_connect); */
@@ -12212,7 +12234,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   statement_edit_widget->dbms_host= s;
   lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
   get_sql_mode(TOKEN_KEYWORD_CONNECT, "", false, main_token_number);
-  connections_is_connected[0]= 1;
+  connect_init(connection_number);
   set_dbms_version_mask(statement_edit_widget->dbms_version);
   return 0;
 }
@@ -12766,7 +12788,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     return 1;
   }
   make_and_put_message_in_result(ER_OK, 0, (char*)"");
-  connections_is_connected[connection_number]= 1;
+  connect_init(connection_number);
   QString session_id, version;
   {
     char query_string[1024];
@@ -12819,7 +12841,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   statement_edit_widget->dbms_current_user_without_host= ocelot_user;
   statement_edit_widget->dbms_connection_id= session_id.toInt();
   statement_edit_widget->dbms_host= ocelot_host;
-  //connections_is_connected[connection_number]= 1;
+  //connect_init(connection_number);
   tarantool_initialize(connection_number);
   if (connection_number == 0) set_dbms_version_mask("tarantool-" + version);
   return 0;
@@ -18183,6 +18205,23 @@ int MainWindow::the_connect(unsigned int connection_number)
   return x;
 }
 
+/*
+  We should do this after any successful connection
+  Todo: Check that we're not calling this twice. There are too many connect routines.
+  Todo: I'm guessing that somewhere in the connection we specified a database option, or it isn't necessary.
+        If I'm wrong then I guess rehash_scan() will fail which is no big deal.
+*/
+void MainWindow::connect_init(int connection_number)
+{
+  connections_is_connected[connection_number]= 1;
+
+  if ((ocelot_auto_rehash != 0)
+   && (connection_number == 0))
+  {
+    char error_or_ok_message[ER_MAX_LENGTH];
+    rehash_scan(error_or_ok_message); /* Todo: should we display the error/ok message that rehash_scan() produces? */
+  }
+}
 
 /*
   For telling the user version info of ocelotgui itself,

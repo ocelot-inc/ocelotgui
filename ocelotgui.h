@@ -3424,7 +3424,7 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
-  int rehash_scan();
+  int rehash_scan(char *);
   QString rehash_search(QString table_name, char *search_string, int reftype);
   void rehash_get_database_name(char *);
   void widget_sizer();
@@ -3484,7 +3484,7 @@ private:
   int the_connect(unsigned int connection_number);
   int the_connect_2(); /* intended replacement for the_connect() */
   //my_bool get_one_option(int optid, const struct my_option *opt __attribute__((unused)),char *argument);
-  void connect_init();
+  void connect_init(int connection_number);
   void set_current_colors_and_font(QFont);
   QFont get_fixed_font();
 public:

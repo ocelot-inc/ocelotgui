@@ -7242,25 +7242,29 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned in
   }
 }
 
-/* ; or (; + delimiter) or delimiter or \G or \g */
+/*
+  ; or (; + delimiter) or delimiter or \G or \g
+  Re calling_statement_type:
+    It might be it might be TOKEN_KEYWORD_PROCEDURE | TOKEN_KEYWORD_EVENT | TOKEN_KEYWORD_TRIGGER |  TOKEN_KEYWORD_FUNCTION | 0
+    so something to do with blocks, I suppose. But we no longer use it.
+  Re semicolon:
+    We want to check for ; before checking for \G so that ; comes first in the Expecteds list.
+    It's silly but possible to have delimiter // and end with ;// in which case we'll accept // but not add it to the Expecteds list.
+*/
 int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
 {
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_DELIMITER, "\\G") == 1)
+  (void) calling_statement_type;  /* to avoid "unused parameter" warning */
+  if (hparse_f_accept(FLAG_VERSION_ALL_OR_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";") == 1)
+  {
+    hparse_f_accept(FLAG_VERSION_ALL_OR_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_DELIMITER, hparse_delimiter_str);
+    return 1;
+  }
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_DELIMITER, "\\G") == 1)
   {
     return 1;
   }
-  /* TEST!! removed next line */
-  if ((calling_statement_type == 0) || (calling_statement_type != 0))
-  {
-    if (hparse_f_accept(FLAG_VERSION_ALL_OR_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";") == 1)
-    {
-      hparse_f_accept(FLAG_VERSION_ALL_OR_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_DELIMITER, hparse_delimiter_str);
-      return 1;
-    }
-    else if (hparse_f_accept(FLAG_VERSION_ALL_OR_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_DELIMITER, hparse_delimiter_str) == 1) return 1;
-    return 0;
-  }
-  else return (hparse_f_accept(FLAG_VERSION_ALL_OR_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ";"));
+  else if (hparse_f_accept(FLAG_VERSION_ALL_OR_LUA, TOKEN_REFTYPE_ANY,TOKEN_TYPE_DELIMITER, hparse_delimiter_str) == 1) return 1;
+  return 0;
 }
 
 /*
@@ -12548,7 +12552,7 @@ error:
     else if ((token.left(1) == "`") && (token.right(1) != "`")) missing_termination= true;
     if (missing_termination == true)
     {
-      if (ocelot_auto_rehash > 0)
+      if (rehash_result_row_count > 0)
       {
         QString errmsg= hparse_errmsg;
         if (errmsg.contains("identifier]") == true)
