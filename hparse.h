@@ -226,6 +226,7 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
       //main_token_types[hparse_i]= proposed_type;
       //main_token_types[hparse_i + 1]= proposed_type;
       hparse_expected= "";
+      completer_widget->clear();
       hparse_f_nexttoken();
       hparse_i_of_last_accepted= hparse_i;
       hparse_f_nexttoken();
@@ -258,30 +259,30 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
         if ((hparse_token.size() == 1) || (hparse_token.right(1) != "`"))
         {
           /* Starts with ` but doesn't end with ` so identifier required but not there yet. */
-          /* TODO: hparse_expected= ""; equality stays false; fall though */
-          main_token_reftypes[hparse_i]= reftype;
-          hparse_expected= hparse_f_token_to_appendee(token, hparse_i, reftype);
-          return 0;
+          int ret= hparse_f_expected_exact(reftype);
+          if (ret == 1) equality= true;
+          if (ret == 2) return 0;
         }
+        else equality= true; /* starts and ends with ` */
       }
       if (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
       {
         if ((hparse_token.size() == 1) || (hparse_token.right(1) != "\""))
         {
-         /* Starts with " but doesn't end with " so identifier required but not there yet. */
-            /* TODO: hparse_expected= ""; equality stays false; fall though */
-          main_token_reftypes[hparse_i]= reftype;
-          hparse_expected= hparse_f_token_to_appendee(token, hparse_i, reftype);
-          return 0;
+          /* Starts with " but doesn't end with " so identifier required but not there yet. */
+          int ret= hparse_f_expected_exact(reftype);
+          if (ret == 1) equality= true;
+          if (ret == 2) return 0;
         }
+        else equality= true; /* starts and ends with " */
       }
-      if ((hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
-       || (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
-       || (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_AT)
+      // if ((hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+      // || (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
+      if ((hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_AT)
        || ((hparse_token_type >= TOKEN_TYPE_OTHER)
         && ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_RESERVED) == 0)))
       {
-        equality= true;
+        if (hparse_f_expected_exact(reftype) > 0) equality= true;
       }
     }
   }
@@ -384,16 +385,144 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
      && (main_token_types[hparse_i] < TOKEN_TYPE_LITERAL)) {;}
     else main_token_types[hparse_i]= proposed_type;
     main_token_reftypes[hparse_i]= reftype;
-    hparse_expected= "";
+    hparse_f_expected_clear();
     hparse_i_of_last_accepted= hparse_i;
     hparse_f_nexttoken();
     ++hparse_count_of_accepts;
     return 1;
   }
-  /* these 2 lines are duplicated in hparse_f_accept_dotted() */
+  hparse_f_expected_append(token, reftype);
+  return 0;
+}
+
+/*
+  We tracked "what is expected" with global QString hparse_expected and with a  private QListWidget in class completer_widget.
+  * hparse_expect = the possible error message if syntax checker == 3,
+    just keywords and [identifiers] separated by " or ", all possibilities even if something has been typed
+     ... we wwill call token_reftype so it's more specific about the possibilities
+  * completer_widget =   the autocomplete helper, [identifiers] established if REHASH happened,
+    wipe out entries if something has been typed and won't match
+  * when entering, clear them with hparse_f_expected_initialize()
+  * When accept succeeds i.e. equality == true, clear them with hparse_f_expected_clear()
+  * When accept fails and accept() is about to return 0, add to them with hparse_f_expected_append().
+  todo: maybe I should call hparse_f_token_to_appendee for completer_widget too
+  todo: there are other places where we might append a token
+*/
+
+void MainWindow::hparse_f_expected_initialize()
+{
+  hparse_expected= "";
+  completer_widget->clear();
+}
+
+void MainWindow::hparse_f_expected_clear()
+{
+  hparse_expected= "";
+  completer_widget->clear();
+}
+
+/*
+  If there was no REHASH, then anything that looks like a valid identifier is considered equal, return true.
+  If there was a REHASH, then return true iff the string, not just partial string, is found by rehash_search().
+  This can result in false if rehash_scan() was not done recently, so we add:
+  even if it is not found, if there is something ahead i.e. user kept typing anyway, regard it as true.
+  This means we can call rehash_search twice -- once for expected_exact, once for expected_append.
+  Todo: there are various places where we do QString-to-char* conversions that are less neat than this.
+  Todo: if rehash_result_row_count == 0, shouldn't we check anyway for missing " or `?
+  Return 0 = false, 1 = true, 2 = true but missing terminating " or `
+*/
+int MainWindow::hparse_f_expected_exact(int reftype)
+{
+  if (rehash_result_row_count == 0) return 1;
+  if (main_token_lengths[hparse_i + 1] != 0) return 1;
+  QByteArray ba= hparse_token.toUtf8();
+  char *tmp= ba.data();
+  //printf("tmp=%s.\n", tmp);
+  QString rehash_search_result= rehash_search(hparse_f_pre_rehash_search(reftype), tmp, reftype,
+                                              hparse_token,
+                                              true);
+  if (rehash_search_result > "")
+  {
+    if ((hparse_token.left(1) == "\"") && (hparse_token.right(1) != "\""))
+    {
+      hparse_f_expected_append_endquote("\"");
+      return 2;
+    }
+    if ((hparse_token.left(1) == "`") && (hparse_token.right(1) != "`"))
+    {
+      hparse_f_expected_append_endquote("`");
+      return 2;
+    }
+    return 1;
+  }
+  return 0;
+}
+
+/*
+  But do not append ; if prev was ; -- a kludge of a kludge, as in hparse_f_create_package() .
+*/
+void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype)
+{
   if (hparse_expected > "") hparse_expected.append(" or ");
   hparse_expected.append(hparse_f_token_to_appendee(token, hparse_i, reftype));
-  return 0;
+  if (token == ";")
+  {
+    if ((hparse_i > 0) && (main_token_lengths[hparse_i - 1] == 1) && (main_token_types[hparse_i - 1] == TOKEN_TYPE_OPERATOR))
+    {
+      if (hparse_text_copy.mid(main_token_offsets[hparse_i - 1], main_token_lengths[hparse_i - 1]) == ";") return;
+    }
+  }
+  if (rehash_result_row_count > 0)
+  {
+    if (token.contains("identifier]") == true)
+    {
+      QString rehash_search_result= rehash_search(hparse_f_pre_rehash_search(reftype), (char*)"", reftype,
+                                                  hparse_token,
+                                                  false);
+    }
+  }
+//    {
+//      QString s;
+//      char search_string[512];
+//      int search_string_len;
+//      s= text.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
+//      if (s.left(1) == "`") s= s.right(s.size() - 1);
+//      else if (s.left(1) == "\"") s= s.right(s.size() - 1);
+//      search_string_len= s.toUtf8().size();
+//      memcpy(search_string, s.toUtf8().constData(), search_string_len);
+//      search_string[search_string_len]= '\0';
+//      QString rehash_search_result= rehash_search(hparse_f_pre_rehash_search(), search_string, main_token_reftypes[hparse_i]);
+//      if (rehash_search_result > "")
+//      {
+//        expected_list= "Expecting: ";
+//        expected_list.append(rehash_search_result);
+//        unfinished_identifier_seen= true;
+//      }
+//    }
+//  }
+
+  hparse_f_variables_append(hparse_i, hparse_text_copy, reftype); /* this is in ocelotgui.cpp */
+
+  /* If user has typed DROP TABLE " then possibilities should not include IF */
+  if ((hparse_token_type== TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) || (hparse_token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE))
+  {
+    if (token != "[identifier]") return;
+  }
+
+  completer_widget->append(token, hparse_token, main_token_types[hparse_i], main_token_flags[hparse_i], "K");
+}
+
+/*
+  E.g. call this after DROP table "x -- because we should finish the identifier so it's DROP TABLE "x"
+  An endquote is " or ` but maybe somewhere it's useful to call this for '
+  Todo: really the type is not "K", we would like the tooltip to say "O" operator, or better still "terminating quote"
+*/
+void MainWindow::hparse_f_expected_append_endquote(QString token)
+{
+  if (hparse_expected > "") hparse_expected.append(" or ");
+  hparse_expected= token;
+  completer_widget->clear();
+  completer_widget->append(token, "", TOKEN_TYPE_OPERATOR, TOKEN_REFTYPE_ANY, "K");
 }
 
 /*
@@ -422,12 +551,11 @@ int MainWindow::hparse_f_acceptn(int proposed_type, QString token, int n)
   if (QString::compare(hparse_token, token_to_compare, Qt::CaseInsensitive) == 0)
   {
     main_token_types[hparse_i]= proposed_type;
-    hparse_expected= "";
+    hparse_f_expected_clear();
     hparse_f_nexttoken();
     return 1;
   }
-  if (hparse_expected > "") hparse_expected.append(" or ");
-  hparse_expected.append(token);
+  hparse_f_expected_append(token, 0);
   return 0;
 }
 
@@ -1064,6 +1192,7 @@ bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
 */
 int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
 {
+  bool is_variable_possible= false;
   bool m= false;
   if (hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) m= true;
   if (v & f & s)
@@ -1156,7 +1285,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
       return 1;
     }
   }
-
   int i_plus[5]= {0,0,0,0,0};
   i_plus[0]= hparse_i;
   bool q_plus_1_is_percent= false;
@@ -1187,7 +1315,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
       q_plus[i]= token;
     }
   }
-
   /*
     Todo: We did not anticipate that MariaDB 10.3 would support PLSQL
     with cursor-name % attribute. There's no F_CUR. So before we see
@@ -1212,7 +1339,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
     main_token_types[hparse_i_of_last_accepted]= TOKEN_TYPE_IDENTIFIER;
     return 1;
   }
-
   /* Start with: possibles are database|table|column|var|func
   Eliminate as you go along.
   We never use e[1] or e[3] they would correspond to "."s. */
@@ -1244,7 +1370,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
     e[0]&= F_TBL;
     e[0]&= F_COL;
   }
-
   /* Todo: Don't look for "." if e[2]&(F_VAR|F_COL|F_FUNC) == 0 */
   if (q_plus[1] == ".")
   {
@@ -1263,13 +1388,14 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
   else if (q_plus[1] == "(") e[0]&= F_FUNC;
   else if (q_plus[1] == "") { e[2]= 0; e[4]= 0; }
   else /* other */ e[0]&= (~F_FUNC);
-
   for (int i= 0; i < 5; ++i)
   {
-    if ((q_plus[i] == "") || (q_plus[i] == "/*Other*/"))
-      e[i]= 0;
+    /* TEST!!!! I'm baffled by these two lines, I'm replacing them. */
+    //if ((q_plus[i] == "") || (q_plus[i] == "/*Other*/"))
+    //  e[i]= 0;
+    if (q_plus[i] == "") break;
+    if (q_plus[i] == "/*Other*/") e[i]= 0;
   }
-
   for (int i= 0; i < 4; ++i)
   {
     if (q_plus[i+1] == "/*Other*/")
@@ -1282,7 +1408,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
       if (i == 2) e[0]&= F_DB;
     }
   }
-
   if (q_plus[3] == "/*Other*/") e[0]&= (~F_DB);
 
   /*
@@ -1297,9 +1422,9 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
            here. Currently for SET sql_mode='' we say sql_mode is
            a generic identifier.
   */
-
   if ((e[0]&F_VAR) != 0)
   {
+    is_variable_possible= true;
     if (hparse_f_is_variable(i_plus[0], 0) == false) e[0]&= (~F_VAR);
     else  e[0]&= (~F_COL);
   }
@@ -1335,7 +1460,6 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
      (The problem is the "." not the identifier.)
      Use a saved copy of e[0].
      Same applies if qualifiers == 2. */
-
   /* Todo: I dunno, maybe hparse_f_expect is better sometimes? */
   if (qualifiers == 2)
   {
@@ -1370,7 +1494,9 @@ int MainWindow::hparse_f_qualified_name_of_operand(bool v, bool f, bool s)
     ; /* Todo: eliminate F_VAR if it isn't declared earlier */
     ; /*       but if it IS declared earlier, eliminate F_COL */
     if (q_plus[1] == "/*Other*/") e[0]&= (~(F_DB | F_TBL | F_ROW));
+    if (is_variable_possible == true) hparse_variable_is_allowed= true;
     if (hparse_f_accept(FLAG_VERSION_ALL, hparse_f_e_to_reftype(e[0]),TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0) return 0;
+    hparse_variable_is_allowed= false;
     return 1;
   }
   return 0;
@@ -10429,13 +10555,15 @@ void MainWindow::hparse_f_statement(int block_top)
   }
   else
   {
+    /* Check for Lua unless it's first word (hmm, won't it always be?) and there are partial matches. */
     if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
      && ((hparse_dbms_mask & FLAG_VERSION_LUA_OUTPUT) == 0)
      && (hparse_f_is_in_compound() == false))
     {
       if (hparse_errno > 0) return;
 #ifdef DBMS_TARANTOOL
-      hparse_f_lua_blocklist(0, hparse_i);
+      if ((hparse_i == 0) && (completer_widget->list_widget->count() > 0)) hparse_f_error();
+      else hparse_f_lua_blocklist(0, hparse_i);
 #endif
     }
     else hparse_f_error();
@@ -12417,7 +12545,11 @@ int MainWindow::hparse_f_variables(int *i_of_define)
 void MainWindow::hparse_f_multi_block(QString text)
 {
   log("hparse_f_multi_block start", 90);
-  hparse_line_edit->hide();
+
+  /* Todo: decide whether this is a good time to move below the cursor, and decide whether clear() is necessary here */
+  completer_widget->clear();
+
+  completer_widget->hide_wrapper();
   hparse_dbms_mask= dbms_version_mask;
   hparse_dbms_mask &= (~FLAG_VERSION_LUA_OUTPUT);
   hparse_sql_mode_ansi_quotes= sql_mode_ansi_quotes;
@@ -12428,7 +12560,6 @@ void MainWindow::hparse_f_multi_block(QString text)
   {
     hparse_statement_type= -1;
     hparse_errno= 0;
-    hparse_expected= "";
     hparse_text_copy= text;
     hparse_begin_count= 0;
     hparse_as_seen= false;
@@ -12447,6 +12578,7 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_next_next_next_next_token_type= 0;
     hparse_prev_token= "";
     hparse_subquery_is_allowed= false;
+    hparse_variable_is_allowed= false;
     hparse_count_of_accepts= 0;
     hparse_i_of_last_accepted= 0;
     if (hparse_i == -1) hparse_f_nexttoken();
@@ -12552,35 +12684,13 @@ error:
     else if ((token.left(1) == "`") && (token.right(1) != "`")) missing_termination= true;
     if (missing_termination == true)
     {
-      if (rehash_result_row_count > 0)
-      {
-        QString errmsg= hparse_errmsg;
-        if (errmsg.contains("identifier]") == true)
-        {
-          QString s;
-          char search_string[512];
-          int search_string_len;
-          s= text.mid(main_token_offsets[hparse_i], main_token_lengths[hparse_i]);
-          if (s.left(1) == "`") s= s.right(s.size() - 1);
-          else if (s.left(1) == "\"") s= s.right(s.size() - 1);
-
-          search_string_len= s.toUtf8().size();
-          memcpy(search_string, s.toUtf8().constData(), search_string_len);
-          search_string[search_string_len]= '\0';
-          QString rehash_search_result= rehash_search(hparse_f_pre_rehash_search(), search_string, main_token_reftypes[hparse_i]);
-          if (rehash_search_result > "")
-          {
-            expected_list= "Expecting: ";
-            expected_list.append(rehash_search_result);
-            unfinished_identifier_seen= true;
-          }
-        }
-      }
+      ; /* This is the place where we used to have rehash_search(), which is now moved to hparse_f_expected_append */
     }
   }
 
   if ((unfinished_comment_seen == false) && (unfinished_identifier_seen == false))
   {
+    // completer_widget->show_wrapper();
     expected_list= "Expecting: ";
     QString s_token;
     QString errmsg= hparse_errmsg;
@@ -12612,9 +12722,6 @@ error:
       if (word_start >= errmsg.size()) break;
     }
   }
-  hparse_line_edit->setText(expected_list);
-  hparse_line_edit->setCursorPosition(0);
-  hparse_line_edit->show();
   log("hparse_f_multi_block error end", 90);
 }
 
@@ -12702,10 +12809,10 @@ int MainWindow::i_of_elementary_statement()
   Todo: expand, it might be more than TOKEN_REFTYPE_COLUMN
         but there is no equivalent search for table because our rehash only does one database, the current one.
 */
-QString MainWindow::hparse_f_pre_rehash_search()
+QString MainWindow::hparse_f_pre_rehash_search(int reftype)
 {
   if (rehash_result_row_count == 0) return ""; /* If there has been no rehash return "" */
-  int reftype= main_token_reftypes[hparse_i];
+  //int reftype= main_token_reftypes[hparse_i];
   /* Similar checks are in rehash_search */
   if ((reftype != TOKEN_REFTYPE_COLUMN)
    && (reftype != TOKEN_REFTYPE_TABLE_OR_COLUMN)
@@ -13264,19 +13371,6 @@ int MainWindow::hparse_f_client_statement()
     return 0;
   }
   return 1;
-}
-
-/*
-  The hint line that appears underneath the statement widget if syntax error,
-  which probably means that the user is typing and hasn't finished a word.
-  This is somewhat like a popup but using "Qt::Popup" caused trouble.
-  Warning: We can call this without going via hparse_f_multi_block() and before calling dbms_version_mask()
-*/
-void MainWindow::hparse_f_parse_hint_line_create()
-{
-  hparse_line_edit= new QLineEdit(this);
-  hparse_line_edit->setReadOnly(true);
-  hparse_line_edit->hide();
 }
 
 #ifdef DBMS_TARANTOOL

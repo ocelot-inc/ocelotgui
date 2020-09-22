@@ -723,6 +723,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_NVARCHAR2,
     TOKEN_KEYWORD_OCELOT_BATCH,
     TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS,
+    TOKEN_KEYWORD_OCELOT_COMPLETER_TIMEOUT,
         TOKEN_KEYWORD_OCELOT_DBMS,
     TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED,
     TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT,
@@ -1361,7 +1362,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1149
+#define KEYWORD_LIST_SIZE 1150
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1939,6 +1940,7 @@ static const keywords strvalues[]=
 
     {"OCELOT_BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_BATCH},
     {"OCELOT_CLIENT_SIDE_FUNCTIONS", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS},
+    {"OCELOT_COMPLETER_TIMEOUT", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_OCELOT_COMPLETER_TIMEOUT},
     {"OCELOT_DBMS", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_OCELOT_DBMS},
     {"OCELOT_DEBUG_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED},
     {"OCELOT_DEBUG_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT},
@@ -2564,6 +2566,7 @@ static const keywords strvalues[]=
 //#include <QWidget>
 #include <QTextStream>
 #include <QDesktopWidget>
+#include <QListWidget>
 #if (QT_VERSION >= 0x50000)
 #include <QGuiApplication>
 #include <QScreen>
@@ -2845,6 +2848,8 @@ class QTabWidget48;
 class TextEditHistory;
 class TextEditWidget2;
 class XSettings;
+class Completer_widget;
+class QListWidget;
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -3069,6 +3074,11 @@ public:
   bool hparse_f_is_special_verb(int);
   int hparse_f_accept(unsigned int,unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
+  void hparse_f_expected_initialize();
+  void hparse_f_expected_clear();
+  int hparse_f_expected_exact(int reftype);
+  void hparse_f_expected_append(QString token, unsigned char reftype);
+  void hparse_f_expected_append_endquote(QString token);
   QString hparse_f_token_to_appendee(QString,int,char);
   int hparse_f_expect(unsigned int,unsigned char,int,QString);
   int hparse_f_literal(unsigned char,unsigned int,int);
@@ -3249,12 +3259,13 @@ public:
   void msgBoxClosed(QAbstractButton*);
   void hparse_f_multi_block(QString text);
   int i_of_elementary_statement();
-  QString hparse_f_pre_rehash_search();
+  QString hparse_f_pre_rehash_search(int reftype);
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
   bool hparse_f_is_nosql(QString);
+  void hparse_f_variables_append(int i_of_statement_start, QString text, unsigned char reftype);
   void log(const char*,int);
   void extra_result_set(int, unsigned short int);
   int execute_real_query(QString, int, const QString *);
@@ -3318,6 +3329,7 @@ public slots:
   void action_libmysqlclient();
   void action_settings();
   void action_statement_edit_widget_text_changed(int,int,int);
+  QTextCharFormat get_format_of_current_token(int token_type, int token_flags, QString mid_next_token);
   void action_undo();
   void action_redo();
   void menu_activations(QObject*, QEvent::Type);
@@ -3425,7 +3437,9 @@ private:
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
   int rehash_scan(char *);
-  QString rehash_search(QString table_name, char *search_string, int reftype);
+  QString rehash_search(QString table_name, char *search_string, int reftype,
+                        QString hparse_token,
+                        bool is_exact_required);
   void rehash_get_database_name(char *);
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
@@ -3571,12 +3585,11 @@ private:
   QString tarantool_internal_query(char*, int);
 #endif
   QString select_1_row(const char *select_statement);
-
   QWidget *main_window;
 public:
   TextEditHistory *history_edit_widget;
 private:
-  QLineEdit *hparse_line_edit;
+
 #ifdef DEBUGGER
 #define DEBUG_TAB_WIDGET_MAX 10
   QWidget *debug_top_widget;
@@ -3586,7 +3599,6 @@ private:
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
   XSettings *xsettings_widget;
-
   QMenu *menu_file;
     QAction *menu_file_action_connect;
     QAction *menu_file_action_exit;
@@ -3602,7 +3614,9 @@ private:
     QAction *menu_edit_action_formatter;
     QAction *menu_edit_action_zoomin;
     QAction *menu_edit_action_zoomout;
+public:
     QAction *menu_edit_action_autocomplete;
+private:
   QMenu *menu_run;
     QAction *menu_run_action_execute;
     QAction *menu_run_action_kill;
@@ -4523,6 +4537,57 @@ void handle_button_2()
 };
 
 #endif // MESSAGE_BOX_H
+
+#ifndef COMPLETER_WIDGET_H
+#define COMPLETER_WIDGET_H
+
+/* See comments just before Completer_widget::construct() */
+
+class Completer_widget: public QWidget
+{
+  Q_OBJECT
+
+private:
+  QWidget *widget;
+
+  QListWidgetItem *list_widget_item;
+  QVBoxLayout *layout;
+  MainWindow *p;
+  QTimer *timer;
+
+private slots:
+void timer_expired();
+
+public:
+void construct();
+void set_timer_interval();
+void hide_wrapper();
+void show_wrapper();
+void initialize();
+void clear();
+QString get_selected_item(QString *tool_tip);
+void size_and_position_change();
+void append(QString token, QString hparse_token, int token_type, int flags, QString final_letter);
+bool key_down();
+void timer_reset();
+
+/* Todo: move this to private: */
+  QListWidget *list_widget;
+
+Completer_widget(MainWindow *main_window)
+{
+  p= main_window;
+  construct();
+}
+
+~Completer_widget()
+{
+  ;
+}
+
+};
+
+#endif // COMPLETER_WIDGET_H
 
 /***********************************************************/
 /* The Low-Level DBMS calls */
@@ -11065,7 +11130,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 119
+#define OCELOT_VARIABLES_SIZE 120
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: September 8 2020
+   Last modified: September 22 2020
 */
 
 /*
@@ -334,6 +334,7 @@
   static unsigned short int ocelot_grid_tabs= 16;
   static unsigned short int ocelot_grid_actual_tabs= 0; /* Todo: move this, it's not an option. */
   static unsigned short int ocelot_client_side_functions= 1;
+  static unsigned short int ocelot_completer_timeout= 10;
   static char ocelot_shortcut_connect[80]= "default";
   static char ocelot_shortcut_exit[80]= "default";
   static char ocelot_shortcut_undo[80]= "default";
@@ -455,6 +456,7 @@
   static QString hparse_prev_token;
   static bool hparse_like_seen;
   static bool hparse_subquery_is_allowed;
+  static bool hparse_variable_is_allowed;
   static QString hparse_delimiter_str;
   static bool hparse_sql_mode_ansi_quotes= false;
   static unsigned int hparse_dbms_mask= FLAG_VERSION_DEFAULT;
@@ -476,7 +478,10 @@ int dbms_query_len;
 int dbms_query_connection_number;
 volatile int dbms_long_query_result;
 volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
-  
+
+
+Completer_widget *completer_widget= NULL;
+
 /*
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -595,9 +600,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   create_widget_debug();
 #endif
 
-  hparse_f_parse_hint_line_create();
-
   main_window= new QWidget(this);                  /* 2015-08-25 added "this" */
+
+  completer_widget= new Completer_widget(this);
 
   /*
     Defaults for items that can be changed with Settings menu item.
@@ -695,7 +700,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #ifdef DEBUGGER
   main_layout->addWidget(debug_top_widget);
 #endif
-  main_layout->addWidget(hparse_line_edit);
 
   main_window->setLayout(main_layout);
 
@@ -733,6 +737,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   }
 
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
+
   log("MainWindow end", 90);
 }
 
@@ -864,6 +869,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
       debug_widget[debug_widget_index]->setStyleSheet(ocelot_statement_style_string);
     }
   }
+  completer_widget->initialize();
 }
 
 /*
@@ -1177,6 +1183,14 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   if (event->type() == QEvent::FocusIn)
   {
     menu_activations(obj, QEvent::FocusIn);
+    if ((obj == statement_edit_widget) || (obj == completer_widget))
+    {
+      if (completer_widget->isHidden() == false)
+      {
+        completer_widget->timer_reset();
+      }
+    }
+    else completer_widget->hide_wrapper();
     return false;
   }
 
@@ -1220,6 +1234,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   /* See comment with label "Shortcut Duplication" */
   if (keypress_shortcut_handler(key, false) == true) return true;
   if (obj != statement_edit_widget) return false;
+  if ((key->key() == Qt::Key_Down) && (completer_widget->key_down())) return true;
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
   if (key->modifiers() & Qt::ControlModifier)
@@ -2959,21 +2974,20 @@ void MainWindow::menu_edit_autocomplete_via_menu()
   The extra checking here applies because default key is Tab Qt::Key_Tab,
   we want to return false if we don't handle it as a shortcut,
   so that it will simply be added to the widget contents.
+  Put ``s or ""s around if they appear to be necessary.
+  Todo: in MySQL/MariaDB lower-case letters might apper in regular identifiers, depending on settings.
+  Todo: should we be using sql_mode_ansi_quotes or hparse_sql_mode_ansi_quotes?
 */
 bool MainWindow::menu_edit_autocomplete()
 {
   QString text;
-  if (rehash_result_row_count > 0)
   {
-    if (hparse_line_edit->isHidden() == false)
+    if (completer_widget->isHidden() == false)
     {
       if (statement_edit_widget->hasFocus() == true)
       {
-        QString s= hparse_line_edit->text();
-        int word_start= s.indexOf(": ", 0);
-        int word_end= s.indexOf(" ", word_start + 2);
-        if (word_end == -1) word_end= s.size();
-        QString word= s.mid(word_start + 2, (word_end - word_start) - 1);
+        QString tool_tip;
+        QString word= completer_widget->get_selected_item(&tool_tip);
         int i;
         for (i= 0; main_token_lengths[i] != 0; ++i)
         {
@@ -2981,6 +2995,35 @@ bool MainWindow::menu_edit_autocomplete()
         }
         if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) == 0) return true;
         text= statement_edit_widget->toPlainText();
+        if (tool_tip == "i")
+        {
+          bool is_regular= true;
+          for (int i= 0; i < word.length(); ++i)
+          {
+            QChar c= word.at(i);
+            if (c.isLetter())
+            {
+              if (c.isLower()) {is_regular= false; break; }
+            }
+            else if (c.isNumber())
+            {
+              if (i == 0) {is_regular= false; break; }
+            }
+            else if (c == '_')
+            {
+              continue;
+            }
+            else
+            {
+              is_regular= false; break;
+            }
+          }
+          if (is_regular == false)
+          {
+            if (sql_mode_ansi_quotes == true) word= "\"" + word + "\"";
+            else word= "`" + word + "`";
+          }
+        }
         if (word.left(1) != "[")
         {
           int offset;
@@ -2998,6 +3041,7 @@ bool MainWindow::menu_edit_autocomplete()
           QTextCursor c= statement_edit_widget->textCursor();
           c.movePosition(QTextCursor::End);
           statement_edit_widget->setTextCursor(c);
+          completer_widget->size_and_position_change();
           return true;
         }
       }
@@ -3163,18 +3207,6 @@ void MainWindow::action_statement_edit_widget_text_changed(int position,int char
 
   /* cur.select (QTextCursor::Document); */ /* desperate attempt to fix so undo/redo is not destroyed ... does not work */
 
-  QTextCharFormat format_of_literal;
-  format_of_literal.setForeground(QColor(qt_color(ocelot_statement_highlight_literal_color)));
-  QTextCharFormat format_of_identifier;
-  format_of_identifier.setForeground(QColor(qt_color(ocelot_statement_highlight_identifier_color)));
-  QTextCharFormat format_of_comment;
-  format_of_comment.setForeground(QColor(qt_color(ocelot_statement_highlight_comment_color)));
-  QTextCharFormat format_of_operator;
-  format_of_operator.setForeground(QColor(qt_color(ocelot_statement_highlight_operator_color)));
-  QTextCharFormat format_of_reserved_word;
-  format_of_reserved_word.setForeground(QColor(qt_color(ocelot_statement_highlight_keyword_color)));
-  QTextCharFormat format_of_function;
-  format_of_function.setForeground(QColor(qt_color(ocelot_statement_highlight_function_color)));
   QTextCharFormat format_of_other;
   format_of_other.setForeground(QColor(qt_color(ocelot_statement_text_color)));
 
@@ -3216,32 +3248,9 @@ void MainWindow::action_statement_edit_widget_text_changed(int position,int char
       cur.setCharFormat(format_of_current_token);
       /* cur.clearSelection(); */
     }
-    int t= main_token_types[i];
-    if (t == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) format_of_current_token= format_of_literal;
-    if (t == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_literal;
-    if (t == TOKEN_TYPE_LITERAL_WITH_DIGIT) format_of_current_token= format_of_literal;
-    /* literal_with_brace == literal */
-    if (t == TOKEN_TYPE_LITERAL_WITH_BRACE) format_of_current_token= format_of_literal; /* obsolete? */
-    if (t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) format_of_current_token= format_of_identifier;
-    if (t == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_identifier;
-    if (t == TOKEN_TYPE_IDENTIFIER) format_of_current_token= format_of_identifier;
-    if (t == TOKEN_TYPE_IDENTIFIER_WITH_AT) format_of_current_token= format_of_identifier;
-    if (t == TOKEN_TYPE_COMMENT_WITH_SLASH) format_of_current_token= format_of_comment;
-    if (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE) format_of_current_token= format_of_comment;
-    if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) format_of_current_token= format_of_comment;
-    if (t == TOKEN_TYPE_OPERATOR) format_of_current_token= format_of_operator;
-    if (t >= TOKEN_KEYWORDS_START)
-    {
-      if (((main_token_flags[i] & TOKEN_FLAG_IS_FUNCTION) != 0)
-       && (main_token_lengths[i + 1] == 1)
-       && (text.mid(main_token_offsets[i + 1], 1) == "("))
-      {
-        format_of_current_token= format_of_function;
-      }
-      else format_of_current_token= format_of_reserved_word;
-    }
-    if (t == TOKEN_TYPE_OTHER) format_of_current_token= format_of_other;
-
+    QString mid_next_token= "";
+    if (main_token_lengths[i + 1] == 1) mid_next_token= text.mid(main_token_offsets[i + 1], 1);
+    format_of_current_token= get_format_of_current_token(main_token_types[i], main_token_flags[i], mid_next_token);
     /* Todo: consider using SpellCheckUnderline instead of WaveUnderline. */
     if ((main_token_flags[i] & TOKEN_FLAG_IS_ERROR) != 0)
     {
@@ -3270,6 +3279,52 @@ void MainWindow::action_statement_edit_widget_text_changed(int position,int char
   connect(statement_edit_widget->document(), SIGNAL(contentsChange(int,int,int)), this, SLOT(action_statement_edit_widget_text_changed(int,int,int)));
   //statement_edit_widget_text_changed_flag= 0;
   log("action_statement_edit_widget_text_changed end", 90);
+}
+
+
+QTextCharFormat MainWindow::get_format_of_current_token(int token_type, int token_flags, QString mid_next_token)
+{
+  QTextCharFormat format_of_literal;
+  format_of_literal.setForeground(QColor(qt_color(ocelot_statement_highlight_literal_color)));
+  QTextCharFormat format_of_identifier;
+  format_of_identifier.setForeground(QColor(qt_color(ocelot_statement_highlight_identifier_color)));
+  QTextCharFormat format_of_comment;
+  format_of_comment.setForeground(QColor(qt_color(ocelot_statement_highlight_comment_color)));
+  QTextCharFormat format_of_operator;
+  format_of_operator.setForeground(QColor(qt_color(ocelot_statement_highlight_operator_color)));
+  QTextCharFormat format_of_reserved_word;
+  format_of_reserved_word.setForeground(QColor(qt_color(ocelot_statement_highlight_keyword_color)));
+  QTextCharFormat format_of_function;
+  format_of_function.setForeground(QColor(qt_color(ocelot_statement_highlight_function_color)));
+  QTextCharFormat format_of_other;
+  format_of_other.setForeground(QColor(qt_color(ocelot_statement_text_color)));
+  QTextCharFormat format_of_current_token;
+  int t= token_type;
+  if (t == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) format_of_current_token= format_of_literal;
+  if (t == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_literal;
+  if (t == TOKEN_TYPE_LITERAL_WITH_DIGIT) format_of_current_token= format_of_literal;
+  /* literal_with_brace == literal */
+  if (t == TOKEN_TYPE_LITERAL_WITH_BRACE) format_of_current_token= format_of_literal; /* obsolete? */
+  if (t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) format_of_current_token= format_of_identifier;
+  if (t == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_identifier;
+  if (t == TOKEN_TYPE_IDENTIFIER) format_of_current_token= format_of_identifier;
+  if (t == TOKEN_TYPE_IDENTIFIER_WITH_AT) format_of_current_token= format_of_identifier;
+  if (t == TOKEN_TYPE_COMMENT_WITH_SLASH) format_of_current_token= format_of_comment;
+  if (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE) format_of_current_token= format_of_comment;
+  if (t == TOKEN_TYPE_COMMENT_WITH_MINUS) format_of_current_token= format_of_comment;
+  if (t == TOKEN_TYPE_OPERATOR) format_of_current_token= format_of_operator;
+  if (t >= TOKEN_KEYWORDS_START)
+  {
+    if (((token_flags & TOKEN_FLAG_IS_FUNCTION) != 0)
+     && (mid_next_token == "("))
+    {
+      format_of_current_token= format_of_function;
+    }
+    else format_of_current_token= format_of_reserved_word;
+  }
+  if (t == TOKEN_TYPE_OTHER) format_of_current_token= format_of_other;
+
+  return format_of_current_token;
 }
 
 /*
@@ -3596,6 +3651,7 @@ void MainWindow::action_exit()
   delete_utf8_copies();
   log("action_exit mid", 90);
   close();
+
   log("action_exit end", 90);
 }
 
@@ -3942,7 +3998,7 @@ void MainWindow::detach_statement_widget(bool checked)
     whether we want from grid to statement (or tried to), and how to go to the
     first cell in a grid from history. It could be more complicated if
     there are more detached windows, and some might be hidden
-    e.g. hparse_line_edit.
+    e.g. completer_widget.
     Trick: by comparing QApplication::focusWidget() you can see if focus changed.
     Trick: by seeing if focusNextPrevChild returned false you can see if focus changed.
     But how do you specify you are going to a grid from history?
@@ -4433,6 +4489,7 @@ void MainWindow::action_redo()
   Todo: if font_size already <= FONT_SIZE_MIN, disable zoomout.
         if font_size already >= FONT_SIZE_MAX, disable zoomout.
         (Get the widget's ->styleSheet() as you do elsewhere.)
+  Todo: check if ExpectedWidget can be affected here
 */
 void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
 {
@@ -4454,16 +4511,7 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
     is_can_format= is_can_zoomin= is_can_zoomout= !doc->isEmpty();
-    if (rehash_result_row_count > 0)
-    {
-      if (hparse_line_edit->isHidden() == false)
-      {
-        if (statement_edit_widget->hasFocus() == true)
-        {
-          is_can_autocomplete= true;
-        }
-      }
-    }
+    is_can_autocomplete= !completer_widget->isHidden();
   }
   else if (strcmp(class_name, "TextEditWidget") == 0)
   {
@@ -5246,6 +5294,7 @@ QString MainWindow::canonical_font_style(QString font_family_string, QString fon
         E.g. QMenu:item:selected if you can decide on a colour.
   TODO: Also for QTextedit we should have ...:selected because right now
         when you select and then change focus, you lose the colour.
+  Warning: Changing border:1px could affect Completer_widget::size_and_position_change()
 */
 void MainWindow::make_style_strings()
 {
@@ -9833,7 +9882,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   Beware: Names might be case sensitive.
   Beware: Qualifier might indicate a different database.
   Columns are "table.column"
-  When is rehash_scan() called:
+  Symbols: 'D' database 'C' column 'T' table 'F' function 'P' procedure 't' trigger 'E' event 'I' index
+           'K' keyword and 'i' identifier-unknown-type (temporary) 'V' variable
+   When is rehash_scan() called:
     Only the "REHASH" statement does anything.
     During connect | reconnect | "use" statement, we could look at
     --auto-rehash or --no-auto-rehash or --skip-auto-rehash. We don't.
@@ -10129,16 +10180,23 @@ error_return:
         !! NOW WE KNOW IT! Well, for column anyway.
   Todo: Should not the search be case insensitive?
   Todo: Consider stopping display after TARANTOOL_MAX_FIELD_NAME_LENGTH or MYSQL_MAX_IDENTIFIER_LENGTH characters.
-  Todo: "count_of_hits > 10" is arbitrary, and also you should add "..."
+  Todo: "count_of_hits > 100" is arbitrary, and also you should add "..."
   Todo: Perhaps the QByteArray() trick here could be used elsewhere where we're currently using strncpy().
   Todo: We avoid duplicates e.g. "primary".
         But that disturbs the order, and something that occurs more often should be first.
         And if you ever get more info e.g. column-type or table-of-index then it will be ambiguous.
   Todo: We could call QStringList::sort()
   Todo: Comparisons are case insensitive but don't have to be if "" encloses
+  Todo: Change pass of TOKEN_TYPE_IDENTIFIER if in fact it's within backticks or ""s
+  Todo: If it's a function, call completer_widget->append with final argument i.e. flags|= TOKEN_FLAG_IS_FUNCTION
 */
-QString MainWindow::rehash_search(QString table_name, char *search_string, int reftype)
+QString MainWindow::rehash_search(QString table_name, char *search_string, int reftype,
+                    QString hparse_token,
+                    bool is_exact_required)
 {
+  if (search_string[0] == '"') ++search_string;
+  else if (search_string[0] == '`') ++search_string;
+
   long unsigned int r;
   char *row_pointer;
   unsigned int column_length;
@@ -10205,7 +10263,10 @@ QString MainWindow::rehash_search(QString table_name, char *search_string, int r
     strcpy(desired_types, "I");
     column_to_match= 2;
   }
-  else return tmp_word;
+  else
+  {
+    return "not rehashed";
+  }
   for (r= 0; r < rehash_result_row_count; ++r)
   {
     row_pointer= rehash_result_set_copy_rows[r];
@@ -10227,59 +10288,53 @@ QString MainWindow::rehash_search(QString table_name, char *search_string, int r
       }
       if ((i == column_to_match) && (is_table_matched == true))
       {
-        if (search_string_length < column_length)
+        if (is_exact_required == true)
         {
-          QByteArray column_value_as_qbytearray= QByteArray(row_pointer, search_string_length);
+          QByteArray column_value_as_qbytearray= QByteArray(row_pointer, column_length);
           if (QString::compare(column_value_as_qbytearray, search_string, Qt::CaseInsensitive) == 0)
           {
-            column_value_as_qbytearray= QByteArray(row_pointer, column_length);
-            column_value= column_value_as_qbytearray;
-#ifdef DBMS_TARANTOOL
-            if (connections_dbms[0] == DBMS_TARANTOOL)
+            QString s= column_value_as_qbytearray;
+            return s;
+          }
+          else
+          {
+            ;
+          }
+        }
+        else
+        {
+          QByteArray column_value_as_qbytearray= QByteArray(row_pointer, column_length);
+          if (search_string_length < column_length)
+          {
             {
-              bool is_regular= true;
-              for (int i= 0; i < column_value.length(); ++i)
+              column_value= column_value_as_qbytearray;
+              if (column_value_list.contains(column_value) == false)
               {
-                QChar c= column_value.at(i);
-                if (c.isLetter())
-                {
-                  if (c.isLower()) {is_regular= false; break; }
-                }
-                else if (c.isNumber())
-                {
-                  if (i == 0) {is_regular= false; break; }
-                }
-                else if (c == '_')
-                {
-                  continue;
-                }
-                else
-                {
-                  is_regular= false; break;
-                }
+                column_value_list.append(column_value);
+                ++count_of_hits;
+                if (count_of_hits > 10) break;
               }
-              if (is_regular == false) column_value= "\"" + column_value + "\"";
-            }
-#endif
-            if (column_value_list.contains(column_value) == false)
-            {
-              column_value_list.append(column_value);
-              ++count_of_hits;
-              if (count_of_hits > 10) break;
             }
           }
         }
       }
       row_pointer+= column_length;
     }
-    if (count_of_hits > 10) break;
+    if (count_of_hits > 100) break;
   }
+  if (count_of_hits == 0) return "";
   for (int i= 0; i < column_value_list.size(); ++i)
   {
-    tmp_word.append(column_value_list.at(i));
-    tmp_word.append(" ");
+    QString token= column_value_list.at(i);
+    /* TEST!!!! */
+    QString hparse_s= hparse_token;
+    if (hparse_s.left(1) == "\"") hparse_s= hparse_s.right(hparse_s.size() - 1);
+    if (hparse_s.left(1) == "`") hparse_s= hparse_s.right(hparse_s.size() - 1);
+    completer_widget->append(token, hparse_s, TOKEN_TYPE_IDENTIFIER, 0, "i");
+    //tmp_word.append(column_value_list.at(i));
+    //tmp_word.append(" ");
   }
-  return tmp_word;
+  return "OK";
 }
 
 void MainWindow::rehash_get_database_name(char *database_name)
@@ -11118,18 +11173,18 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "115" to the new size */
+  /* That is okay but you must change this occurrence of "119" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 118);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 119);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
   assert(TOKEN_KEYWORD_QUESTIONMARK == TOKEN_KEYWORDS_START);
 
-  ///* Test strvalues is ordered by bsearching for every item. */
-  ///* This is commented out unless there has been a change to the list
+  //* Test strvalues is ordered by bsearching for every item. */
+  // This is commented out unless there has been a change to the list */
   //char *p_item;
   //unsigned long index;
   //char l[MAX_KEYWORD_LENGTH+1]= "";
@@ -15671,6 +15726,353 @@ void MainWindow::menu_context(const QPoint &pos)
 
 #include "codeeditor.h"
 
+/******************** completer_widget start ************************************/
+
+/*
+  The hint list box that appears (hopefully underneath the statement widget) if syntax error,
+  which probably means that the user is typing and hasn't finished a word.
+  This is somewhat like a popup but using "Qt::Popup" caused trouble. We don't want modal.
+  Warning: We can call this without going via hparse_f_multi_block() and before calling dbms_version_mask()
+  Re timer:
+    We hide the widget after ocelot_completer_widget_timeout, default = 10 (seconds). Todo: check what normal amount is.
+    We should reset the timer (by stopping and starting it) if there is activity either in statement_edit_widget or completer_widget
+    Todo: if user says SET ocelot_completer_timeout=0; interpret that as: disable the widget.
+  Todo: some sort of in-context help if --i-am-a-dummy or menu = Help
+        users are supposed to know that Tab will complete, down-arrow will navigate, timeout is 3 seconds,
+        setting focus elsewhere will cause hide
+  * Possible experiments with flags:
+    Tried Qt::Dialog and Qt::Window, they cause trouble
+    Try Qt::CustomizeWindowHint |  Qt::Tool | Qt::WindowDoesNotAcceptFocus | Qt::FramelessWindowHint
+    setWindowFlags must follow setParent, otherwise hide() will not be totally reversed by show()
+  * todo: maybe it should be initially hidden
+  Unusually main_window will not be the parent, we call setParent(p->statement_edit_widget);.
+  todo: references to p->statement_edit_widget are a bit convoluted since it is the parent.
+*/
+
+/* call from constructor */
+/* Todo: you could just put the constructor here, sams as what you do with TextEditFrame::TextEditFrame */
+void Completer_widget::construct()
+{
+  setParent(p->statement_edit_widget);
+  //this->setWindowTitle("Choose");
+  //setWindowFlags(Qt::Dialog | Qt::WindowStaysOnTopHint | Qt::Tool | Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus);
+
+  //setWindowFlags(Qt::CustomizeWindowHint | Qt::WindowStaysOnTopHint);
+  setWindowFlags(Qt::WindowStaysOnTopHint);
+
+  //setAttribute(Qt::WA_ShowWithoutActivating);
+  widget= new QWidget(this);
+  layout= new QVBoxLayout(widget);
+  layout->setContentsMargins(0, 0, 0, 0);
+  list_widget= new QListWidget;
+
+  layout->addWidget(list_widget);
+  this->setLayout(layout);
+  timer= new QTimer(this);
+  timer->setSingleShot(true);
+  set_timer_interval();
+  QObject::connect(timer, SIGNAL(timeout()), this, SLOT(timer_expired(void)));
+}
+
+/*
+  Todo: we could perhapse ocelot_completer_timeout for tooltips too, if we can use QtToolTip msecDisplayTime
+*/
+void Completer_widget::set_timer_interval()
+{
+  timer->setInterval(ocelot_completer_timeout * 1000);
+}
+
+/*
+  Saying completer_widget->hide() ... completer_widget->show() used to be tricky ... the widget would disapper.
+  Now that seems to be solved but let us leave these in as wrappers and not call hide() or show() directly.
+  this won't work; setWindowFlag(Qt::WindowStaysOnTopHint, false);
+*/
+/* call when list_widget size == 0 (due to clear, probably) (but also if you append and there are no candidates) */
+/* call when statement edit widget loses focus, except when the focus is going to be completer_widget */
+/* call after an interval, maybe there must be a timer */
+void Completer_widget::hide_wrapper()
+{
+  timer->stop();
+  hide();
+  p->menu_edit_action_autocomplete->setEnabled(false);
+}
+
+/*
+  call when adding something
+  Todo: We decide here that we won't show if statement_edit_widget is empty.
+        But we could show if it seemed worthwhile.
+        And maybe there's a quicker way to know if it is empty.
+*/
+void Completer_widget::show_wrapper()
+{
+  if (p->statement_edit_widget->document()->isEmpty()) return;
+  show();
+  timer_reset(); /* although timer->stop((); is maybe unnecessary */
+  p->menu_edit_action_autocomplete->setEnabled(true);
+}
+
+/*
+  call when statement_edit_widgt stylesheet change
+  we could use something different from the statement_edit_widget style string, but I haven't seen a reason
+*/
+void Completer_widget::initialize()
+{
+  list_widget->setStyleSheet(p->ocelot_statement_style_string);
+  size_and_position_change();
+}
+
+void Completer_widget::clear()
+{
+  list_widget->clear();
+  hide_wrapper();
+}
+
+/* todo: I suppose you'll need some error check although it's impossible that there are no selected items */
+QString Completer_widget::get_selected_item(QString *tool_tip)
+{
+  QListWidgetItem *list_widget_item;
+  QList<QListWidgetItem *> x= list_widget->selectedItems();
+  list_widget_item= x.at(0);
+  *tool_tip= list_widget_item->toolTip();
+  return list_widget_item->text();
+}
+
+/*
+  This is so that the list won't have a bunch of blank lines, and might have a vertical scroll bar.
+  Re scroll bars:
+    There might be a vertical scroll bar if number_of_choices i.e. lines > what we calculate will fit.
+    There might be a horizontal scroll bar if number_of_choices i.e. characters-in-a-line >what we calculate will fit.
+    If we expect a horizontal scroll bar, then we will add horizontal-scroll-bar-height to height.
+  Re space at the bottom if there is a vertical scroll bar:
+     See https://stackoverflow.com/questions/41827513/getting-rid-of-blank-area-at-the-bottom-of-a-qlistwidget
+     The recommendation re setFixedSize type will fail.
+     The recommendation re scrollPerPixel was tried and failed, e.g.
+     list_widget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+     and anyway maybe that has an effect that's worse than the extra space.
+*/
+
+/*
+  Get desired width and height of completer_widget based on width of its largest item and number of items.
+  Possibly reduce so it won't be dominant.
+  Get desired position based on where it will fit, and reduce more if there is trouble fitting within statement_edit_widget.
+
+Usually this should mean there is no above/below switching and left moving, but frequent size change.
+
+Separate resize should be unnecessary
+
+This should be done in reaction to statement_edit_widget->resize too, but
+-- beware, completer_widget might not exist yet
+-- it would be good if we didn't recalculate for each pixel moved
+-- so maybe don't respond, it will get figured out next time user types something
+-- we could depend on our timer
+-- if boundingRect() seems too slow, we could reduce by only sampling a few, but there might be horizontal overflow
+-- todo: if list_widget hasn't changed since last time you called this, skip initial recalculation of width and height
+*/
+
+/*
+   This should put completer_widget below the text cursor in statement_edit_widget, which is the parent.
+   If it is too close to the right, shift to the left (even covering the prompt).
+   If it is too close to the bottom, try the top.
+   Todo: the minimum width/height calculations here are silliness for emergencies, we ordinarily calculate actual width + height.
+*/
+
+void Completer_widget::size_and_position_change()
+{
+  QFont f= p->get_font_from_style_sheet(p->ocelot_statement_style_string);
+  QFontMetrics fm(f);
+  QString s= "";
+  for (int i= 0; i < list_widget->count(); ++i)
+  {
+    s= s + list_widget->item(i)-> text() + "\n";
+  }
+  s= s.left(s.size() - 1); /* otherwise there's a blank at the end? */
+  QRect r= fm.boundingRect(
+            0, /* int x = x coordinate within original rect */
+            0, /* int y = y coordinate within original rect */
+            4000, /* int width = width, which is arbitrary big maximum */
+            4000, /* int height = height, which is arbitrary big maximum */
+            Qt::TextDontClip,
+            s); /* QString & text= cell contents */
+  int desired_width= r.width();
+  int desired_height= r.height();
+  int desired_height_of_one_line;
+  if (list_widget->count() == 0) desired_height_of_one_line= desired_height;
+  else desired_height_of_one_line= desired_height / list_widget->count();
+
+  desired_width+= list_widget->verticalScrollBar()->width();
+  desired_width+= 2 * list_widget->frameWidth() + 6; /* why + 6? I don't know. But it helps. */
+
+  int maximum_width= p->statement_edit_widget->width();
+  int maximum_height= p->statement_edit_widget->height();
+  if (desired_width > maximum_width)
+  {
+    desired_height+= list_widget->horizontalScrollBar()->height(); /* do this only if there will be a horizontal scroll bar */
+  }
+
+  desired_height+= 2 * list_widget->frameWidth() + 2;
+  if (list_widget->count() != 1) desired_height+= 4; /* why + 4? I don't know. But it helps. */
+
+  QRect r3= p->statement_edit_widget->cursorRect();
+  int desired_x= r3.x() + p->statement_edit_widget->prompt_width_calculate();
+  int desired_y= r3.y() + r3.height();
+  /* If there isn't enough width, try to shift completer_widget left. If still not enough, shift to x=0 and reduce width. */
+  int space_after_x= maximum_width - (desired_x + desired_width);
+  if (space_after_x < 0)
+  {
+    if (desired_width > maximum_width) desired_width= maximum_width;
+    desired_x= maximum_width - desired_width;
+  }
+  /* If there isn't enough height, see if it would fit much better above. If not, reduce height. */
+  int space_after_y= maximum_height - (desired_y + desired_height);
+  if (space_after_y < 0)
+  {
+    if (r3.y() > (maximum_height - desired_y) + 100)
+    {
+      desired_y= r3.y() - desired_height;
+      if (desired_y < 0)
+      {
+        desired_y= 0;
+        desired_height= r3.y();
+      }
+    }
+    else
+    {
+     while (desired_height > (maximum_height - desired_y))
+     {
+       /* Something initially comes up with size = 10, covering the prompt, if show_wrapper() activates while statement is empty */
+       if (desired_height < 10) break;
+       desired_height -= desired_height_of_one_line;
+     }
+     //desired_height= maximum_height - desired_y;
+    }
+    list_widget->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+  }
+  else
+  {
+    /* If we know that it will fit, let's try reducing to eliminate that extra blank lne? Nope, doesn't work */
+    //desired_height-= r3.height();
+    list_widget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  }
+  resize(desired_width, desired_height);
+  move(desired_x, desired_y);
+}
+
+/*
+  Re final_letter:
+    Symbols: 'D' database 'C' column 'T' table 'F' function 'P' procedure 't' trigger 'E' event 'I' index (from database)
+             'K' keyword (not from database) or operator
+    We use this for setToolTip() so the user can see the object type (reftype?) when hovering, but more importantly we use this
+    to decide whether it's an identifier because in that case we might want to put ""s around it
+    (depending on foreground color would be wrong because users can set multiple things to the same color for multiple things).
+    todo: maybe we should be setting with setStatusTip() or setWhatsThis instead of setToolTip()
+  todo: Some junk remains because you aren't calling when looking at Lua. I guess when you just type 'i' there's no call?
+  todo: You must be suspicious about removeWidget
+  todo: at the time we call this, we also know reftype. and we could look ahead to see if "(" follows
+  todo: I'm a bit uncertain why hparse_token can be "", maybe it's something during start
+  todo: it's inefficient to add in and then take out what was just added in
+  todo: we must pass type() but we don't need icon (or, we need icon)
+*/
+void Completer_widget::append(QString token, QString hparse_token, int token_type, int flags, QString final_letter)
+{
+  QString s_hparse_token= hparse_token;
+  if (s_hparse_token.left(1) == "\"") s_hparse_token= s_hparse_token.right(hparse_token.size() - 1);
+  if (s_hparse_token.left(1) == "`") s_hparse_token= s_hparse_token.right(hparse_token.size() - 1);
+  QListWidgetItem *list_widget_item;
+
+  /* Do not add token if there is already a match in the list. todo: should be checking type + reftype too, somehow */
+  bool is_already_a_match= false;
+  for (int i= 0; i < list_widget->count(); ++i)
+  {
+    list_widget_item= list_widget->item(i);
+    if (QString::compare(token, list_widget_item->text(), Qt::CaseInsensitive) == 0)
+    {
+      is_already_a_match= true;
+      break;
+    }
+  }
+  if (is_already_a_match == false)
+  {
+    int item_number= list_widget->count();
+    list_widget->addItem(token);
+    list_widget_item= list_widget->item(item_number);
+    QTextCharFormat format_of_current_token= p->get_format_of_current_token(token_type, flags, "");
+    list_widget_item->setForeground(format_of_current_token.foreground());
+    list_widget_item->setToolTip(final_letter);
+  }
+  if (s_hparse_token > "")
+  {
+    int hps= s_hparse_token.size();
+    for (int i= list_widget->count() - 1; i >= 0; --i)
+    {
+      list_widget_item= list_widget->item(i);
+      QString s= list_widget_item->text().left(hps);
+      if (QString::compare(s_hparse_token, s, Qt::CaseInsensitive) != 0)
+      {
+        list_widget->removeItemWidget(list_widget_item);
+        delete list_widget_item;
+      }
+    }
+  }
+  list_widget->setCurrentRow(0, QItemSelectionModel::Select);
+  if (list_widget->count() > 0)
+  {
+    size_and_position_change();
+    show_wrapper();
+  }
+  else
+  {
+    hide_wrapper();
+  }
+}
+
+/*
+  Down arrow will go down in completer_widget without changing focus.
+  Todo: this should be something we can change with "set ocelot_shortcut_..."
+  Todo: how can we be sure this won't go to statement edit widgets' slot?
+  In eventfilter_function check:
+    if (key->key() == Qt::Key_Down) && (completer_widget->key_down()) return true;
+
+    if completer_widget is not hidden (and we are at end of input?)
+      change what is selected -- go forward 1
+      return true
+*/
+
+bool Completer_widget::key_down()
+{
+  if (isHidden() == true) return false;
+  timer_reset();
+  int i= list_widget->currentRow();
+  if (i < list_widget->count() - 1)
+  {
+    list_widget->setCurrentRow(i, QItemSelectionModel::Deselect);
+    list_widget->setCurrentRow(i + 1, QItemSelectionModel::Select);
+  }
+  return true;
+}
+
+void Completer_widget::timer_reset()
+{
+  timer->stop();
+  timer->start();
+}
+
+//private slots:
+
+/*
+  ocelot_completer_timeout has expired so we hide completer_widget, unless it has focus (because user clicked on it).
+*/
+void Completer_widget::timer_expired()
+{
+  if ((hasFocus()) || (list_widget->hasFocus()))
+  {
+    timer->start();
+    return;
+  }
+  hide_wrapper();
+}
+
+/******************** completer_widget end   ************************************/
+
 /*
   TextEditFrame
   This is one of the components of result_grid
@@ -17598,7 +18000,6 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
       return;
     }
   }
-
   if (keyword_index == TOKEN_KEYWORD_ONE_DATABASE) { ocelot_one_database= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PAGER) { ocelot_pager= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PASSWORD)
@@ -22021,6 +22422,35 @@ void MainWindow::clf_make_sql_execute_function(QString *clf_output)
   }
 }
 
+
+/*
+  Add matching in-scope variable names to completer_widget. Only relevant for MySQL/MariaDB compound statements.
+  Todo: bool hparse_is_variable_allowed was set up because hparse_f_variables might eliminate -- but are false positives possible?
+        anyway reftype will only mention variable if there was an exact match, so it is not very useful
+  Todo: We could ask hparse_f_is_in_compound() though it's not really necessary.
+  Todo: This was moved out of hparse.h because it depends on things that were defined after #include "hparse.h". Reorganize.
+  Todo: setup_determine_what_variables_are_in_scope() returns a list that is in ``s and may be lower case.
+        We simply strip the ``s and call upper() -- but what if the DECLARE actually had ``s or ""s?
+*/
+void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hparse_text_copy, unsigned char reftype)
+{
+  if ((reftype != 0) && (hparse_variable_is_allowed == true))
+  {
+    int declared_variables_count= 0;
+    setup_determine_what_variables_are_in_scope(hparse_i_of_statement, hparse_text_copy);
+    declared_variables_count= c_variable_names.count();
+    for (int i= 0; i < declared_variables_count; ++i)
+    {
+      QString token= c_variable_names.at(i);
+      if (token.left(1) == "`") token= token.right(token.size() - 1);
+      if (token.right(1) == "`") token= token.left(token.size() - 1);
+      token= token.toUpper();
+      completer_widget->append(token, hparse_token, main_token_types[hparse_i], main_token_flags[hparse_i], "V");
+    }
+  }
+}
+
+
 /*
   SSL test
   --------
@@ -22113,6 +22543,8 @@ int XSettings::ocelot_variables_create()
     ocelot_variables[i++].int_target= &ocelot_batch;
   ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS};
     ocelot_variables[i++].int_target= &ocelot_client_side_functions;
+  ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_COMPLETER_TIMEOUT};
+    ocelot_variables[i++].int_target= &ocelot_completer_timeout;
   ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_DBMS};
     ocelot_variables[i++].qstring_target= &main_window->ocelot_dbms;
   ocelot_variables[i]= {NULL, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED};
@@ -22548,6 +22980,12 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
   {
     main_window->make_style_strings();
   }
+
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_COMPLETER_TIMEOUT)
+  {
+    if (completer_widget != 0) completer_widget->set_timer_interval();
+  }
+
   return ER_OK;
 }
 
