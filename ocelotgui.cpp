@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: September 22 2020
+   Last modified: October 5 2020
 */
 
 /*
@@ -9901,11 +9901,16 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     more. But this means there could be thousands of entries
     in the cache, and searches are sequential.
     Todo: add an order-by in the select, and do binary searches.
-  TODO: TEST!! This is not working properly for Tarantool.
+  TODO: TEST!! This wasn't working properly for Tarantool but I think we've got it fixed now.
 */
 
 int MainWindow::rehash_scan(char *error_or_ok_message)
 {
+#ifdef DBMS_TARANTOOL
+  if ((connections_is_connected[0] == 1) && (connections_dbms[0] == DBMS_TARANTOOL))
+    return rehash_scan_for_tarantool(error_or_ok_message);
+#endif
+
   MYSQL_RES *res= NULL;
   ResultGrid *rg= NULL;
 //  QString s;
@@ -9935,15 +9940,148 @@ int MainWindow::rehash_scan(char *error_or_ok_message)
   }
   char query[1024];
 
-  if (connections_dbms[0] == DBMS_TARANTOOL)
+  sprintf(query, "select 'D',database(),'' "
+                 "union all "
+                 "select 'C',table_name,column_name "
+                   "from information_schema.columns "
+                 "where table_schema = database() "
+                 "union all "
+                 "select 'T',table_name,table_type "
+                 "from information_schema.tables "
+                 "where table_schema = database() "
+                 "union all "
+                 "select 'F',routine_name,routine_type "
+                 "from information_schema.routines "
+                 "where routine_schema = database() and routine_type = 'FUNCTION' "
+                 "union all "
+                 "select 'P',routine_name,routine_type "
+                 "from information_schema.routines "
+                 "where routine_schema = database() and routine_type = 'PROCEDURE' "
+                 "union all "
+                 "select 't',trigger_name,'' "
+                 "from information_schema.triggers "
+                 "where trigger_schema = database() "
+                 "union all "
+                 "select 'E',event_name,'' "
+                 "from information_schema.events "
+                 "where event_schema = database() "
+                 "union all "
+                 "select 'I',table_name,index_name "
+                 "from information_schema.statistics "
+                 "where table_schema = database() "
+         );
+  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], query))
   {
-    int result;
+    er= ER_SELECT_FAILED;
+    goto error_return;
+  }
+
+  res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  if (res == NULL)
+  {
+    er= ER_MYSQL_STORE_RESULT_FAILED;
+    goto error_return;
+  }
+  rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
+  rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
+  if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
+  {
+    er= ER_0_ROWS_RETURNED;
+    goto error_return;
+  }
+
+  result_max_column_widths= new unsigned int[rehash_result_column_count];
+  ResultGrid* result_grid;
+  result_grid= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+  {
+    result_grid->scan_rows(
+            rehash_result_column_count, /* result_column_count, */
+            rehash_result_row_count, /* result_row_count, */
+            res, /* grid_mysql_res, */
+            &rehash_result_set_copy,
+            &rehash_result_set_copy_rows,
+            &result_max_column_widths);
+    lmysql->ldbms_mysql_free_result(res);
+  }
+  delete [] result_max_column_widths;
+  /* First set of rows is 'D',database(),''. If it's null, error. */
+  char database_name[512];
+  {
+    rehash_get_database_name(database_name);
+    if (database_name[0] == '\0')
+    {
+      er= ER_NO_DATABASE_SELECTED;
+      goto error_return;
+    }
+  }
+  long unsigned int r;
+  for (r= 0; r < rehash_result_row_count; ++r)
+  {
+    char *row_pointer;
+    unsigned int column_length;
+    char column_value[512];
+    row_pointer= rehash_result_set_copy_rows[r];
+    memcpy(&column_length, row_pointer, sizeof(unsigned int));
+    row_pointer+= sizeof(unsigned int) + sizeof(char);
+    strncpy(column_value, row_pointer, column_length);
+    column_value[column_length]= '\0';
+    if (strcmp(column_value, "C") == 0) ++count_of_columns;
+    if (strcmp(column_value, "T") == 0) ++count_of_tables;
+    if (strcmp(column_value, "F") == 0) ++count_of_functions;
+    if (strcmp(column_value, "P") == 0) ++count_of_procedures;
+    if (strcmp(column_value, "t") == 0) ++count_of_triggers;
+    if (strcmp(column_value, "E") == 0) ++count_of_events;
+    if (strcmp(column_value, "I") == 0) ++count_of_indexes;
+  }
+  if (rg != NULL) delete rg;
+
+  er= ER_OK_REHASH;
+  sprintf(error_or_ok_message, er_strings[er_off + er],
+          database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
+  return er;
+error_return:
+  if (rg != 0) delete rg;
+  /* garbage_collect from the aborted rehash. These statements are the same as ones at the start of this routine. */
+  if (rehash_result_set_copy != 0) { delete [] rehash_result_set_copy; rehash_result_set_copy= 0; }
+  if (rehash_result_set_copy_rows != 0) { delete [] rehash_result_set_copy_rows; rehash_result_set_copy_rows= 0; }
+  rehash_result_column_count= 0;
+  rehash_result_row_count= 0;
+  strcpy(error_or_ok_message, er_strings[er_off + er]);
+  return er;
+}
+
+#ifdef DBMS_TARANTOOL
+int MainWindow::rehash_scan_for_tarantool(char *error_or_ok_message)
+{
+  int count_of_columns= 0;
+  int count_of_tables= 0;
+  int count_of_functions= 0;
+  int count_of_procedures= 0;
+  int count_of_triggers= 0;
+  int count_of_events= 0;
+  int count_of_indexes= 0;
+  int er;                                                  /* for errors e.g. ER_NOT_CONNECTED */
+  {
     if (strcmp(tarantool_box_execute, "No SQL") == 0)
     {
       tarantool_errno[0]= 9998;
       er= ER_SELECT_FAILED;
       goto error_return;
     }
+
+    /* We replaced eval() with tnt_select calls so we can use fewer privileges. */
+    tarantool_table_ids.clear(); tarantool_table_names.clear();
+    tarantool_column_table_names.clear(); tarantool_column_names.clear();
+    tarantool_index_table_names.clear(); tarantool_index_names.clear();
+    tarantool_trigger_names.clear();
+    rehash_scan_one_space(281); /* 281 is "_vspace" */
+    rehash_scan_one_space(289); /* 289 is "_vindex" */
+    rehash_scan_one_space(328); /* 328 is "_trigger" */
+    count_of_tables= tarantool_table_names.count();
+    count_of_columns= tarantool_column_names.count();
+    count_of_indexes= tarantool_index_names.count();
+    count_of_triggers= tarantool_trigger_names.count();
+#ifdef OLD_STYLE
     /*
       This is how to use Lua to produce what looks like an SQL result set.
       Todo:: This does 'C', 'T', 't', 'I'. It could do more, see MySQL/MariaDB SELECT below.
@@ -10041,132 +10179,151 @@ int MainWindow::rehash_scan(char *error_or_ok_message)
       er= ER_0_ROWS_RETURNED;
       goto error_return;
     }
+#endif // OLD_STYLE
   }
-  else
-  {
-    sprintf(query, "select 'D',database(),'' "
-                   "union all "
-                   "select 'C',table_name,column_name "
-                     "from information_schema.columns "
-                   "where table_schema = database() "
-                   "union all "
-                   "select 'T',table_name,table_type "
-                   "from information_schema.tables "
-                   "where table_schema = database() "
-                   "union all "
-                   "select 'F',routine_name,routine_type "
-                   "from information_schema.routines "
-                   "where routine_schema = database() and routine_type = 'FUNCTION' "
-                   "union all "
-                   "select 'P',routine_name,routine_type "
-                   "from information_schema.routines "
-                   "where routine_schema = database() and routine_type = 'PROCEDURE' "
-                   "union all "
-                   "select 't',trigger_name,'' "
-                   "from information_schema.triggers "
-                   "where trigger_schema = database() "
-                   "union all "
-                   "select 'E',event_name,'' "
-                   "from information_schema.events "
-                   "where event_schema = database() "
-                   "union all "
-                   "select 'I',table_name,index_name "
-                   "from information_schema.statistics "
-                   "where table_schema = database() "
-           );
-    if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], query))
-      {
-        er= ER_SELECT_FAILED;
-        goto error_return;
-      }
 
-    res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
-    if (res == NULL)
-    {
-      er= ER_MYSQL_STORE_RESULT_FAILED;
-      goto error_return;
-    }
-    rehash_result_column_count= lmysql->ldbms_mysql_num_fields(res);
-    rehash_result_row_count= lmysql->ldbms_mysql_num_rows(res);
-    if ((rehash_result_column_count == 0) || (rehash_result_row_count == 0))
-    {
-      er= ER_0_ROWS_RETURNED;
-      goto error_return;
-    }
-  }
-  result_max_column_widths= new unsigned int[rehash_result_column_count];
-  ResultGrid* result_grid;
-  result_grid= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
-
-  if (connections_dbms[0] == DBMS_TARANTOOL)
-  {
-    tarantool_scan_rows(
-            rehash_result_column_count, /* result_column_count, */
-            rehash_result_row_count, /* result_row_count, */
-            res, /* grid_mysql_res, */
-            &rehash_result_set_copy,
-            &rehash_result_set_copy_rows,
-            &result_max_column_widths);
-    /* Todo: another leak (?) -- we don't free the result set */
-  }
-  else
-  {
-    result_grid->scan_rows(
-            rehash_result_column_count, /* result_column_count, */
-            rehash_result_row_count, /* result_row_count, */
-            res, /* grid_mysql_res, */
-            &rehash_result_set_copy,
-            &rehash_result_set_copy_rows,
-            &result_max_column_widths);
-    lmysql->ldbms_mysql_free_result(res);
-  }
-  delete [] result_max_column_widths;
-  /* First set of rows is 'D',database(),''. If it's null, error. */
   char database_name[512];
-  if (connections_dbms[0] == DBMS_TARANTOOL) strcpy(database_name, "main");
-  else
-  {
-    rehash_get_database_name(database_name);
-    if (database_name[0] == '\0')
-    {
-      er= ER_NO_DATABASE_SELECTED;
-      goto error_return;
-    }
-  }
-  long unsigned int r;
-  for (r= 0; r < rehash_result_row_count; ++r)
-  {
-    char *row_pointer;
-    unsigned int column_length;
-    char column_value[512];
-    row_pointer= rehash_result_set_copy_rows[r];
-    memcpy(&column_length, row_pointer, sizeof(unsigned int));
-    row_pointer+= sizeof(unsigned int) + sizeof(char);
-    strncpy(column_value, row_pointer, column_length);
-    column_value[column_length]= '\0';
-    if (strcmp(column_value, "C") == 0) ++count_of_columns;
-    if (strcmp(column_value, "T") == 0) ++count_of_tables;
-    if (strcmp(column_value, "F") == 0) ++count_of_functions;
-    if (strcmp(column_value, "P") == 0) ++count_of_procedures;
-    if (strcmp(column_value, "t") == 0) ++count_of_triggers;
-    if (strcmp(column_value, "E") == 0) ++count_of_events;
-    if (strcmp(column_value, "I") == 0) ++count_of_indexes;
-  }
-  if (rg != NULL) delete rg;
+  strcpy(database_name, "main");
   er= ER_OK_REHASH;
   sprintf(error_or_ok_message, er_strings[er_off + er],
           database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
+  rehash_result_row_count= count_of_tables + count_of_columns + count_of_triggers + count_of_indexes;
   return er;
 error_return:
-  if (rg != 0) delete rg;
-  /* garbage_collect from the aborted rehash. These statements are the same as ones at the start of this routine. */
-  if (rehash_result_set_copy != 0) { delete [] rehash_result_set_copy; rehash_result_set_copy= 0; }
-  if (rehash_result_set_copy_rows != 0) { delete [] rehash_result_set_copy_rows; rehash_result_set_copy_rows= 0; }
   rehash_result_column_count= 0;
   rehash_result_row_count= 0;
   strcpy(error_or_ok_message, er_strings[er_off + er]);
   return er;
 }
+
+/*
+  For picking out fields we want from Tarantool system spaces _vspace or _vindex or _trigger
+  Re possible changes in format:
+    Todo: This will fail if the name fields are not in the expected positions. We should check "format" clauses in _space.
+    If new fields are added at the end, or if the order ofiems in the column list changes, we should be safe.
+*/
+void MainWindow::rehash_scan_one_space(int space_number)
+{
+  int field_number_of_id;
+  int field_number_of_name;
+  int field_number_of_columns;
+  if (space_number == 281) /* 281 is "_vspace" */
+  {
+    field_number_of_id= 0;
+    field_number_of_name= 2;
+    field_number_of_columns= 6;
+  }
+  if (space_number == 289) /* 289 is "_vindex" */
+  {
+    field_number_of_id= 0;
+    field_number_of_name= 2;
+    field_number_of_columns= -1;
+  }
+  if (space_number == 328) /* 328 is "_trigger" */
+  {
+    field_number_of_id= 1;
+    field_number_of_name= 0;
+    field_number_of_columns= -1;
+  }
+  int returned_result_set_type;
+  tarantool_execute_lua_select(0, space_number); /* 0 is assumed connection number, e.g. space_number is 280 "_space" */
+  if (tarantool_errno[0] != 0)
+  {
+    result_row_count= 0;
+    return;
+  }
+  result_row_count= tarantool_num_rows(0); /* hmm. maybe I should prefer result_set_init()? */
+  if (result_row_count == 0) return;
+  const char *tarantool_tnt_reply_data_copy;
+  tarantool_tnt_reply_data_copy= tarantool_seek_0(&returned_result_set_type); /* "seek to row 0" */
+  for (unsigned int row_number= 0; row_number < result_row_count; ++row_number)
+  {
+    QString table_id;
+    QString table_name;
+    int number_of_fields= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
+    for (int field_number= 0; field_number < number_of_fields; ++field_number)
+    {
+      if ((field_number == field_number_of_id)
+       && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) == MP_UINT))
+      {
+        uint32_t id= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data_copy);
+        table_id= QString::number(id);
+      }
+      else if ((field_number == field_number_of_name)
+            && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) == MP_STR))
+      {
+        const char *value;
+        uint32_t value_length;
+        value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+        QString returned_string= QString::fromUtf8(value, value_length);
+        if (space_number == 281)
+        {
+          table_name= returned_string;
+          tarantool_table_ids << table_id;
+          tarantool_table_names << table_name;
+        }
+        if (space_number == 289)
+        {
+          int index_of_table_name= tarantool_table_ids.indexOf(table_id);
+          if (index_of_table_name >= 0)
+          {
+            tarantool_index_table_names << tarantool_table_names.at(index_of_table_name);
+            tarantool_index_names << returned_string;
+          }
+        }
+        if (space_number == 328)
+        {
+          tarantool_trigger_names << returned_string;
+        }
+      }
+      else if ((field_number == field_number_of_columns)
+            && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) == MP_ARRAY))
+      {
+        uint32_t number_of_columns= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
+        for (unsigned int column_number= 0; column_number < number_of_columns; ++column_number)
+        {
+          uint32_t number_of_map_members= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_data_copy);
+          for (unsigned int i= 0; i < number_of_map_members; ++i)
+          {
+            const char *value;
+            uint32_t value_length;
+            QString returned_string;
+            if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) != MP_STR)
+            {
+              value_length= 0;
+              lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
+            }
+            else
+            {
+              value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+              returned_string= QString::fromUtf8(value, value_length);
+            }
+            if ((value_length == 4) && (returned_string == "name"))
+            {
+              if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) != MP_STR)
+              {
+                lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
+              }
+              else
+              {
+                value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+                returned_string= QString::fromUtf8(value, value_length);
+                tarantool_column_table_names << table_name;
+                tarantool_column_names << returned_string;
+              }
+            }
+            else lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy); /* skip type */
+          }
+        }
+      }
+      else
+      {
+        lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);      /* skip */
+      }
+    }
+  }
+}
+#endif
 
 /*
   Called from hparse_f_multi_block() for adding to the "Expecting:" list
@@ -10204,7 +10361,7 @@ QString MainWindow::rehash_search(QString table_name, char *search_string, int r
   QString column_value;
   QStringList column_value_list;
   unsigned int search_string_length;
-  QString tmp_word= "";
+//  QString tmp_word= "";
   int count_of_hits= 0;
   char desired_types[TOKEN_REFTYPE_MAX]= "";
   unsigned int column_to_match= 0;
@@ -10267,6 +10424,46 @@ QString MainWindow::rehash_search(QString table_name, char *search_string, int r
   {
     return "not rehashed";
   }
+
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms[0] == DBMS_TARANTOOL)
+  {
+    QStringList *q= NULL;
+    QStringList *q2= NULL;
+    if (desired_types[0] == 'T') q= &tarantool_table_names;
+    else if (desired_types[0] == 't') q= &tarantool_trigger_names;
+    else if (desired_types[0] == 'I') { q= &tarantool_index_names; q2= &tarantool_index_table_names; }
+    else if (desired_types[0] == 'C') { q= &tarantool_column_names; q2= &tarantool_column_table_names; }
+    if (q != NULL)
+    {
+      for (int i= 0; i < (*q).count(); ++i)
+      {
+        QString s= (*q).at(i);
+        if ((q2 != NULL) && (table_name > ""))
+        {
+          if (QString::compare((*q2).at(i), table_name, Qt::CaseInsensitive) != 0) continue;
+        }
+        if (is_exact_required == true)
+        {
+          if (QString::compare(s, search_string, Qt::CaseInsensitive) == 0) return s;
+        }
+        else
+        {
+          if (search_string_length < (unsigned) s.length())
+          {
+            if (QString::compare(s.left(search_string_length), search_string, Qt::CaseInsensitive) == 0)
+            {
+              if (count_of_hits > 100) break;
+              ++count_of_hits;
+              column_value_list.append(s);
+            }
+          }
+        }
+      }
+    }
+    goto ok_return;
+  }
+#endif
   for (r= 0; r < rehash_result_row_count; ++r)
   {
     row_pointer= rehash_result_set_copy_rows[r];
@@ -10322,6 +10519,7 @@ QString MainWindow::rehash_search(QString table_name, char *search_string, int r
     }
     if (count_of_hits > 100) break;
   }
+ok_return:
   if (count_of_hits == 0) return "";
   for (int i= 0; i < column_value_list.size(); ++i)
   {
@@ -12844,6 +13042,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   }
   make_and_put_message_in_result(ER_OK, 0, (char*)"");
   connect_init(connection_number);
+  /* Todo: Consider saying select version(); instead of an internal query for box.info.version. */
   QString session_id, version;
   {
     char query_string[1024];
@@ -12859,17 +13058,11 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   /* If box.execute() fails and box.sql.execute() fails, SQL is impossible. */
   if (connection_number == 0)
   {
-    tarantool_internal_query((char*)"box.execute('select 5;');", 0);
-    if (tarantool_errno[0] == 0) strcpy(tarantool_box_execute, "box.execute");
-    else
+    tarantool_execute_sql("select 5;", strlen("select 5;"), connection_number);
+    if (tarantool_errno[0] != 0)
     {
-      tarantool_internal_query((char*)"box.sql.execute('select 5;');", 0);
-      if (tarantool_errno[0] == 0) strcpy(tarantool_box_execute, "box.sql.execute");
-      else
-      {
-        tarantool_internal_query((char*)"return box.info().id;", 0); /* Just to clear the error */
-        strcpy(tarantool_box_execute, "No SQL");
-      }
+      strcpy(tarantool_box_execute, "No SQL");
+      /* Todo: how to clear the error? */
     }
   }
 
@@ -12910,15 +13103,34 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   returns tarantool_errmsg[connection_number]
   if first word is "return" and no error, return a scalar
   the scalar must be MP_STR or MP_UINT or MP_INT, otherwise return = ""
+  The preferred way is with tnt_eval but it will fail if user lacks privilege.
+  The second-choice way is with tnt_execute but it might fail in a future Tarantool version.
+
 */
 QString MainWindow::tarantool_internal_query(char *query,
                                             int connection_number)
 {
   QString returned_string;
-  struct tnt_stream *empty= lmysql->ldbms_tnt_object(NULL);
+  struct tnt_stream *empty;
+  empty= lmysql->ldbms_tnt_object(NULL);
   lmysql->ldbms_tnt_object_add_array(empty, 0);
   lmysql->ldbms_tnt_eval(tnt[connection_number], query, strlen(query), empty);
   tarantool_flush_and_save_reply(connection_number);
+  if (tarantool_errno[connection_number] != 0)
+  {
+    empty= lmysql->ldbms_tnt_object(NULL);
+    QString co= query;
+    if (co.contains("''")) co= co.replace("'", "''");
+    co= "select lua('" + co;
+    if (strncmp(query, "return ", 7) != 0) co= co + " return 0";
+    co= co + "');";
+    QByteArray ba= co.toUtf8();
+    char *tmp= ba.data();
+    lmysql->ldbms_tnt_object_add_array(empty, 0);
+    lmysql->ldbms_tnt_execute(tnt[connection_number], tmp, strlen(tmp), empty);
+    tarantool_flush_and_save_reply(connection_number);
+  }
+
   if ((tarantool_errno[connection_number] == 0)
    && (strncmp(query, "return ", 7) == 0))
   {
@@ -12929,11 +13141,17 @@ QString MainWindow::tarantool_internal_query(char *query,
     /* if field_type != MP_ARRAY that's an error but we just return "" */
     if (field_type == MP_ARRAY)
     {
-      /* The first item will be dd 00 00 01 i.e. "array of length = 1" */
+      /* The first item will be dd 00 00 01 i.e. "array of length = 1". Or, nowadays: 91,91. */
       long unsigned int result;
       result= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_p);
       if (result == 1)
         field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_p);
+      if (field_type == MP_ARRAY)
+      {
+        result= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_p);
+        if (result == 1)
+          field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_p);
+      }
     }
     if (field_type == MP_STR)
     {
@@ -13073,7 +13291,7 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
     Because of a Tarantool bug "Result code is sometimes 0 when there is an error"
     I cannot trust reply.code, so decide it is an error if error message is set.
     Also I notice that reply.data == NULL, which probably is the cause of later trouble.
-    Todo: But this is not a fix. Follow issue#4177 and change this when it is fixed.
+    Todo: But this is not a fix. Follow issue#4177 and change this when it is fixed. (Hmm. It is now fixed.)
     Todo: ocelotgui will crash if this kludge is not present. Make it more robust, eh?
   */
   if (tarantool_tnt_reply.code == 0)
@@ -13082,6 +13300,8 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
   }
 
   tarantool_tnt_reply_data_p= tarantool_tnt_reply.data;
+
+  /* Todo: check: should this be != 0 or should it be == -1? */
   if (read_result != 0)
   {
     tarantool_errno[connection_number]= 1;
@@ -13442,6 +13662,8 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
 
     if (statement_number > 0) q_dbms_query= q_dbms_query.append(" ");
 
+    /* TEST!!!! If we survive removing these two lines, we can rethink SQL transactions. */
+    /*          ... but we don't survive. */
     if ((tarantool_start_transaction_seen == false)
      && (statement_type != TOKEN_KEYWORD_START))
     {
@@ -13691,9 +13913,9 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     /* If there are no rows, then there are no fields, so we cannot put up a grid. */
     /* Todo: don't forget to free if there are zero rows. */
     {
-      const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_p;
+      const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_p; /* push */
 //      unsigned long r= tarantool_num_rows(connection_number);
-      tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy;
+      tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy; /* pop */
 //      if (r == 0)
 //      {
 //        strcpy(tarantool_errmsg, "Zero rows.");
@@ -13730,11 +13952,18 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   Todo: 0xd9 only should be interpreted as an error if it's preceded by start transaction
   If and only if you see a result set that is not at start, change tarantool_tnt_reply_data_p.
 */
+/*
+  For tnt_execute(query) of SQL, over the wire we have metadata and then data. The tarantool-c folks
+  decided to split them so that struct tnt_reply has a data component and a metadata component,
+  but not if tnt_call(box.execute(query)) or (I guess) tnt_eval('box.execute(query)').
+  We try to handle both.
+*/
 
 int MainWindow::tarantool_get_result_set(int connection_number, int desired_result_set_number)
 {
   long int number_of_results;
   const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply.data;
+  if (tarantool_tnt_reply_data_copy == NULL) return 0; /* Actually this shouldn't happen, must be an error */
 
   if (tarantool_is_result_count(tarantool_tnt_reply_data_copy))
     number_of_results= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
@@ -13772,8 +14001,11 @@ QString MainWindow::tarantool_get_messages(int connection_number)
   /* !! IF IT ASSUMES WRONG, YOU COULD CRASH! */
   if (tarantool_tnt_reply.data == 0)
   {
-    messages= er_strings[er_off + ER_ERROR];
-    messages.append(". ");
+    if (strcmp(tarantool_errmsg, "OK") != 0)
+    {
+      messages= er_strings[er_off + ER_ERROR];
+      messages.append(". ");
+    }
     messages.append(tarantool_errmsg);
     return messages;
   }
@@ -13854,10 +14086,13 @@ QString MainWindow::tarantool_get_messages(int connection_number)
   Or: (array)(map) in which case the map is almost certainly "row_count"
   This happens for a transaction, in which case the number of results will always be > 1.
   This happens for a certain type of Lua request, in which case the number of results will always be 1.
+  Do not be fooled by array+array from tnt_execute, which can be distinguished by checking if .metadata != 0
   If return == false, then assume the number of results is 1.
 */
 bool MainWindow::tarantool_is_result_count(const char *tarantool_tnt_reply_data_copy)
 {
+  if (tarantool_tnt_reply_data_copy == NULL) return false; /* actually this should never happen, there is an error somewhere */
+  if (tarantool_tnt_reply.metadata != 0) return false;
   const char *tarantool_tnt_reply_data_copy_copy= tarantool_tnt_reply_data_copy;
   char field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy_copy);
   if (field_type != MP_ARRAY) return false;
@@ -13885,11 +14120,11 @@ const char * MainWindow::tarantool_get_result_type(
         const char *tarantool_tnt_reply_data_copy,
         int *result_type)
 {
-  const char *tarantool_tnt_reply_data_p_saved= tarantool_tnt_reply_data_p;
+  const char *tarantool_tnt_reply_data_p_saved= tarantool_tnt_reply_data_p; /* push */
   long unsigned int result_row_count;
   tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy;
   tarantool_result_set_init(connection_number, &result_row_count, result_type);
-  tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_p_saved;
+  tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_p_saved; /* pop */
   return tarantool_tnt_reply_data_p_saved;
 
   /* EVERYTHING AFTER THIS IS CANCELLED */
@@ -13978,7 +14213,7 @@ const char * MainWindow::tarantool_get_result_type(
   2 == array-32 == field count, then fields. so assume row_count == 1
   3 == array-32 == 1, array-x = row count, array-x == field count
   4 == array-32 == row count, then array-x == field count
-  5 == same as 3, but first row is 0xa1 0x08 then column names.
+  5 == same as 3, but first row is 0xa1 0x08 then column names. Or .metadata != 0
   6 == (map-1)(str-9)"row_count"(uint) i.e. 1-item map as happens for most ddl + dml
   7 == (str)"Error: ..." i.e. string as happens for errors in transactions
   7 == (str)"nil" etc. but we return 7 anyway just to get over this hump. It will be in the error line.
@@ -13991,10 +14226,21 @@ const char *MainWindow::tarantool_result_set_init(
         int *result_set_type)
 {
   log("tarantool_result_set_init start", 80);
-  const char *tarantool_tnt_reply_data= tarantool_tnt_reply_data_p;
+  const char *tarantool_tnt_reply_data= tarantool_tnt_reply_data_p; /* not a push */
   char field_type;
   long unsigned int r= 0;
   //unsigned int data_length;
+
+  if ((tarantool_tnt_reply.metadata != 0) && (tarantool_tnt_reply_data_p != 0))
+  {
+    if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_p) == MP_ARRAY)
+    {
+      /* We are looking at an array but it is column count not row count */
+      r= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data);
+      *result_set_type= RESULT_TYPE_5;
+      goto return_point;
+    }
+  }
 
   if ((tarantool_tnt_reply_data_p == NULL)
    || (tarantool_tnt_reply.data_end == NULL))
@@ -14229,6 +14475,19 @@ erret:
      91                                 1-element array (for row count)
      91                                 1-element array (for field count)
      5                                  contents
+  OR, if it was done via tnt_execute rather than tnt_call or tnt_eval
+    [metadata]
+    91                                  1-element array = number of fields
+      82                                2-element map (there might be more elements if details are requested)
+        0                               IPROTO_FIELD_NAME
+        a1,'5'                          string
+        1                               IPROTO_FIELD_TYPE
+        a7,'integer'                    string
+    [data]
+    91                                  1-element array = number of rows
+      91                                1-element array = number of fields
+        a1,'5'                          contents
+
   Return: pointer to first row
   Re column_number: If it is >= 0, we return pointer to column name not pointer to first data row.
                     Then the caller can say
@@ -14241,6 +14500,7 @@ const char * MainWindow::tarantool_result_set_init_select(
         long unsigned int *result_row_count,
         int column_number)
 {
+
   char field_type; /* for return from lmysql->ldbms_mp_typeof */
   uint32_t array_size; /* for return from lmyswl->dbms_mp_decode_array */
   uint32_t value_length; /* for return from lmysql->ldbms_mp_decode_str */
@@ -14248,11 +14508,63 @@ const char * MainWindow::tarantool_result_set_init_select(
   uint64_t row_count;
   uint32_t field_count;
 
-  const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_p;
+  const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_p; /* push */
   const char* new_tarantool_tnt_reply_data;
 
   const char **tarantool_tnt_reply_data= &tarantool_tnt_reply_data_p;
 
+  if ((tarantool_tnt_reply.metadata != 0) && (tarantool_tnt_reply_data_p != 0))
+  {
+    const char *tarantool_tnt_reply_metadata_copy= tarantool_tnt_reply.metadata;
+
+    field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy);
+    if (field_type != MP_ARRAY) { goto x; }
+    field_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_metadata_copy);
+    for (unsigned int field_no= 0; field_no < field_count; ++field_no)
+    {
+      field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy);
+      if (field_type != MP_MAP) { goto x; }
+      unsigned int member_count= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_metadata_copy);
+      const char *name_value;
+      uint32_t name_value_length;
+      for (unsigned int j= 0; j < member_count; ++j)
+      {
+        if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy) != MP_UINT) { goto x; }
+        int member_type= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_metadata_copy);
+        if (member_type == 0) /* 0 == IPROTO_FIELD_NAME */
+        {
+          if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy) != MP_STR) { goto x; }
+          name_value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_metadata_copy, &name_value_length);
+        }
+        else /* 1 == IPROTO_FIELD_TYPE etc. */
+        {
+          if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy) != MP_STR) { goto x; }
+          value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_metadata_copy, &value_length);
+        }
+      }
+      if (field_no == (unsigned) column_number)
+      {
+        *result_row_count= name_value_length;
+        tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy; /* pop */
+        return name_value;
+      }
+    }
+    const char *tnt_reply_data_p= tarantool_tnt_reply_data_p; /* push */
+    if (lmysql->ldbms_mp_typeof(*tnt_reply_data_p) != MP_ARRAY) goto x;
+    long int row_count= lmysql->ldbms_mp_decode_array(&tnt_reply_data_p);
+    *result_row_count= row_count;
+    if (column_number != -1)
+    {
+      tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy; /* pop */
+      return NULL;
+    }
+    /* and now we are pointing to the first row */
+    new_tarantool_tnt_reply_data= tnt_reply_data_p;
+    tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy; /* pop */
+    return new_tarantool_tnt_reply_data;
+  }
+
+  /* Todo: be suspicious of this, I fear it could be true in many cases */
   if (tarantool_tnt_reply_data_p > tarantool_tnt_reply.data)
   {
     /* dd, 0, 0, 1 will be missing if this is part of a transaction return */
@@ -14265,6 +14577,7 @@ const char * MainWindow::tarantool_result_set_init_select(
     array_size= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
     if (array_size != 1) { goto x; }
   }
+
   field_type= lmysql->ldbms_mp_typeof(**tarantool_tnt_reply_data);
   if (field_type != MP_MAP) { goto x; }
   array_size= lmysql->ldbms_mp_decode_map(tarantool_tnt_reply_data) * 2;
@@ -14292,7 +14605,7 @@ const char * MainWindow::tarantool_result_set_init_select(
     if ((int)field_no == column_number)
     {
       *result_row_count= value_length;
-      tarantool_tnt_reply_data_p=tarantool_tnt_reply_data_copy;
+      tarantool_tnt_reply_data_p=tarantool_tnt_reply_data_copy; /* pop */
       return value;
     }
     /* value = column name */
@@ -14311,17 +14624,16 @@ const char * MainWindow::tarantool_result_set_init_select(
 
   if (field_type != MP_ARRAY) { goto x; }
   row_count= lmysql->ldbms_mp_decode_array(tarantool_tnt_reply_data);
-
   /* and now we are pointing to the first row */
   *result_row_count= row_count;
   if (column_number != -1) return NULL;
 
     new_tarantool_tnt_reply_data= *tarantool_tnt_reply_data;
-  tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy;
+  tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy; /* pop */
 
   return new_tarantool_tnt_reply_data;
 x:  *result_row_count= 0;
-  tarantool_tnt_reply_data_p=tarantool_tnt_reply_data_copy;
+  tarantool_tnt_reply_data_p=tarantool_tnt_reply_data_copy; /* pop */
   return 0;
 }
 
@@ -14349,7 +14661,9 @@ long unsigned int MainWindow::tarantool_num_rows(unsigned int connection_number)
 */
 
 /*
-  Execute a single SQL statement by calling tarantool_tnt_call("box.execute",...).
+  Execute a single SQL statement by calling Tarantool tnt_execute().
+  Until 2020-09-23 we used to call Tarantool tnt_call("box.execute", ...).
+  That worked but it required one more privilege, and Tarantool supports tnt_execute since version 2.1 (April 2019).
   For multiple SQL statements we call ocelot_sqle instead.
   This should be faster on the server because it does not make a local copy of the result.
   Also we get tarantool_errno, which ocelot_sqle does not deliver (hmm, it does, as part of message).
@@ -14360,6 +14674,10 @@ long unsigned int MainWindow::tarantool_num_rows(unsigned int connection_number)
         tarantool_select_nosql= false;
         result_row_count= r;
     I am not sure whether something is still expecting that.
+  Todo: This does not expect ? placeholders because Tarantool-C doesn't have tnt_prepare at this moment.
+        When it does, we want to add something like (for one string parameter):
+          lmysql->ldbms_tnt_object_add_array(tuple, 1);
+          lmysql->ldbms_tnt_object_add_str(tuple, str, str_len);
 */
 int MainWindow::tarantool_execute_sql(
         const char *dbms_query,
@@ -14368,17 +14686,22 @@ int MainWindow::tarantool_execute_sql(
 {
   struct tnt_stream *tuple= lmysql->ldbms_tnt_object(NULL);
   lmysql->ldbms_tnt_object_reset(tuple); /* Todo: check if this is necessary. Doc is a bit unclear. */
-  tarantool_tnt_reply.data= NULL;
-  tarantool_tnt_reply.error= NULL;
+  //tarantool_tnt_reply.data= NULL;
+  //tarantool_tnt_reply.metadata= NULL;
+  //tarantool_tnt_reply.error= NULL;
+  /* TEST!!!! Let's not check, for the moment. */
   if (strcmp(tarantool_box_execute, "No SQL") == 0)
   {
     tarantool_errno[connection_number]= 9998;
     strcpy(tarantool_errmsg, "(Warning) Tarantool server won't accept SQL, only Lua");
     return tarantool_errno[connection_number];
   }
-  lmysql->ldbms_tnt_object_add_array(tuple, 1);
-  lmysql->ldbms_tnt_object_add_str(tuple, dbms_query, dbms_query_len);
-  lmysql->ldbms_tnt_call(tnt[connection_number], tarantool_box_execute, strlen(tarantool_box_execute), tuple);
+  /* TEST!!!! I want tarantool_tnt_connect, but am I better off without? */
+  lmysql->ldbms_tnt_object_add_array(tuple, 0);
+  lmysql->ldbms_tnt_execute(tnt[connection_number], dbms_query, dbms_query_len, tuple);
+  //lmysql->ldbms_tnt_object_add_array(tuple, 1);
+  //lmysql->ldbms_tnt_object_add_str(tuple, dbms_query, dbms_query_len);
+  //lmysql->ldbms_tnt_call(tnt[connection_number], tarantool_box_execute, strlen(tarantool_box_execute), tuple);
   tarantool_flush_and_save_reply(connection_number);
   if (tarantool_errno[connection_number] != 0) return tarantool_errno[connection_number];
   return 0;
@@ -14393,6 +14716,31 @@ int MainWindow::tarantool_execute_lua(
   lmysql->ldbms_tnt_object_reset(tuple); /* Todo: check if this is necessary. Doc is a bit unclear. */
   lmysql->ldbms_tnt_object_add_array(tuple, 0);
   lmysql->ldbms_tnt_eval(tnt[connection_number], dbms_query, dbms_query_len, tuple);
+  tarantool_flush_and_save_reply(connection_number);
+  if (tarantool_errno[connection_number] != 0)  return tarantool_errno[connection_number];
+  return 0;
+}
+
+/*
+  Select everything in a space.
+  See description of tnt_select in third_party.h.
+*/
+int MainWindow::tarantool_execute_lua_select(int connection_number, int space_number)
+{
+  struct tnt_stream *tuple= lmysql->ldbms_tnt_object(NULL);
+  lmysql->ldbms_tnt_object_reset(tuple); /* Todo: check if this is necessary. Doc is a bit unclear. */
+  //tarantool_tnt_reply.data= NULL;
+  //tarantool_tnt_reply.metadata= NULL;
+  //tarantool_tnt_reply.error= NULL;
+  lmysql->ldbms_tnt_object_add_array(tuple, 0);
+  lmysql->ldbms_tnt_select(
+                 tnt[connection_number], /* struct tnt_stream * s */
+                 space_number,           /* uint32_t space no */
+                 0,                      /* uint32_t index no */
+                 UINT32_MAX,             /* uint32_t limit */
+                 0,                      /* uint32_t offset */
+                 TNT_ITER_ALL,          /* uint8_t iterator */
+                 tuple);                 /* struct tnt_stream * key */
   tarantool_flush_and_save_reply(connection_number);
   if (tarantool_errno[connection_number] != 0)  return tarantool_errno[connection_number];
   return 0;
@@ -14453,7 +14801,7 @@ QString MainWindow::tarantool_add_return(QString s)
 */
 unsigned int MainWindow::tarantool_num_fields()
 {
-  const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_p;
+  const char *tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_p; /* push */
   const char **tarantool_tnt_reply_data= &tarantool_tnt_reply_data_p;
   char field_name[TARANTOOL_MAX_FIELD_NAME_LENGTH];
   unsigned int max_field_count;
@@ -14514,7 +14862,7 @@ unsigned int MainWindow::tarantool_num_fields()
 
   tarantool_field_names_count= max_field_count; /* tarantool_field_names_count is global */
 
-  tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy;
+  tarantool_tnt_reply_data_p= tarantool_tnt_reply_data_copy; /* pop */
 
   return max_field_count;
 }
@@ -14701,7 +15049,6 @@ const char * MainWindow::tarantool_seek_0(int *returned_result_set_type)
   int result_set_type;
   tarantool_tnt_reply_data= tarantool_result_set_init(0, &tmp_row_count, &result_set_type);
   row_count= tmp_row_count;
-
   if ((result_set_type == RESULT_TYPE_0) || (result_set_type == RESULT_TYPE_1))
   {
     assert(result_set_type > RESULT_TYPE_1);
@@ -15129,7 +15476,7 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     total_size+= row_size_2;
   }
 
-  if (total_size > 2000000000) return "tarantool_scan_rows: total_size too big";
+  if (total_size > 2000000000) return ": total_size too big";
   *p_result_set_copy= new char[total_size];                                         /* allocate */
   *p_result_set_copy_rows= new char*[p_result_row_count];
   result_set_copy_pointer= *p_result_set_copy;

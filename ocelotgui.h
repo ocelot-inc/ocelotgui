@@ -3436,7 +3436,8 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu();
-  int rehash_scan(char *);
+  int rehash_scan(char *); int rehash_scan_for_tarantool(char *);
+  void rehash_scan_one_space(int space_number);
   QString rehash_search(QString table_name, char *search_string, int reftype,
                         QString hparse_token,
                         bool is_exact_required);
@@ -3571,6 +3572,7 @@ private:
   int connect_tarantool(unsigned int connection_number, QString, QString, QString, QString);
   void tarantool_initialize(int connection_number);
   void tarantool_flush_and_save_reply(unsigned int);
+  const char *tarantool_point_to_data();
   int tarantool_real_query(const char *dbms_query, unsigned long dbms_query_len, unsigned int, unsigned int, unsigned int, const QString *);
   int tarantool_get_result_set(int, int);
   QString tarantool_get_messages(int);
@@ -3695,6 +3697,13 @@ private:
   const char *tarantool_tnt_reply_data_p; /* initially = tarantool_tnt_reply.data. can move if transaction. */
   unsigned int tarantool_field_names_count; /* duplication of field_name_list_all_rows.count() -- unnecessary? */
   bool tarantool_select_nosql;
+  QStringList tarantool_table_ids;
+  QStringList tarantool_table_names;
+  QStringList tarantool_column_table_names;
+  QStringList tarantool_column_names;
+  QStringList tarantool_index_table_names;
+  QStringList tarantool_index_names;
+  QStringList tarantool_trigger_names;
 #endif
 
   QKeySequence ocelot_shortcut_connect_keysequence;
@@ -3738,6 +3747,7 @@ public:
   bool keypress_shortcut_handler(QKeyEvent *, bool);
   int tarantool_execute_sql(const char *, unsigned int, int);
   int tarantool_execute_lua(const char *, unsigned int, int);
+  int tarantool_execute_lua_select(int, int);
   QString query_utf16;
   QString query_utf16_copy;
   /* main_token_offsets|lengths|types|flags|pointers are alloc'd in main_token_new() */
@@ -3773,6 +3783,7 @@ public:
     5 == result set of SQL select|values, with "metadata" signature
     6 == result of SQL not select|values, with "row_count" signature
     7 == error with "Error: " signature (but maybe RESULT_TYPE_0 is error as well?)
+    8 = result set from box.execute() so tarantool_tnt_reply.metadata != 0
   */
   #define RESULT_TYPE_0 0
   #define RESULT_TYPE_1 1
@@ -3782,6 +3793,7 @@ public:
   #define RESULT_TYPE_5 5
   #define RESULT_TYPE_6 6
   #define RESULT_TYPE_7 7
+  #define RESULT_TYPE_8 8
 
   /* main_token_flags[] values. so far there are only sixteen but we expect there will be more. */
   #define TOKEN_FLAG_IS_RESERVED 1
@@ -4760,6 +4772,7 @@ public:
   typedef int             (*ttnt_connect)        (struct tnt_stream *);
   typedef ssize_t         (*ttnt_eval)           (struct tnt_stream *, const char *, size_t, struct tnt_stream *);
   typedef ssize_t         (*ttnt_delete)         (struct tnt_stream *, uint32_t, uint32_t, tnt_stream *);
+  typedef ssize_t         (*ttnt_execute)        (struct tnt_stream *, const char *, size_t, struct tnt_stream *);
   typedef ssize_t         (*ttnt_flush)          (struct tnt_stream *);
   typedef int             (*ttnt_get_indexno)    (struct tnt_stream *, int, const char *, size_t);
   typedef int             (*ttnt_get_spaceno)    (struct tnt_stream *, const char *, size_t);
@@ -4849,6 +4862,7 @@ public:
   ttnt_delete t__tnt_delete;
   ttnt_eval t__tnt_eval;
   ttnt_flush t__tnt_flush;
+  ttnt_execute t__tnt_execute;
   ttnt_get_indexno t__tnt_get_indexno;
   ttnt_get_spaceno t__tnt_get_spaceno;
   ttnt_stream_free t__tnt_stream_free;
@@ -4973,6 +4987,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       t__tnt_delete= (ttnt_delete) &tnt_delete;
       t__tnt_eval= (ttnt_eval) &tnt_eval;
       t__tnt_flush= (ttnt_flush) &tnt_flush;
+      t__tnt_execute= (ttnt_execute) &tnt_execute;
       t__tnt_get_indexno= (ttnt_get_indexno) &tnt_get_indexno;
       t__tnt_get_spaceno= (ttnt_get_spaceno) &tnt_get_spaceno;
       t__tnt_stream_free= (ttnt_stream_free) &tnt_stream_free;
@@ -5247,6 +5262,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__tnt_delete= (ttnt_delete) dlsym(dlopen_handle, "tnt_delete"); if (dlerror() != 0) s.append("tnt_delete");
         t__tnt_eval= (ttnt_eval) dlsym(dlopen_handle, "tnt_eval"); if (dlerror() != 0) s.append("tnt_eval ");
         t__tnt_flush= (ttnt_flush) dlsym(dlopen_handle, "tnt_flush"); if (dlerror() != 0) s.append("tnt_flush ");
+        t__tnt_execute= (ttnt_execute) dlsym(dlopen_handle, "tnt_execute"); if (dlerror() != 0) s.append("tnt_execute ");
         t__tnt_get_indexno= (ttnt_get_indexno) dlsym(dlopen_handle, "tnt_get_indexno"); if (dlerror() != 0) s.append("tnt_get_indexno ");
         t__tnt_get_spaceno= (ttnt_get_spaceno) dlsym(dlopen_handle, "tnt_get_spaceno"); if (dlerror() != 0) s.append("tnt_get_spaceno ");
         t__tnt_stream_free= (ttnt_stream_free) dlsym(dlopen_handle, "tnt_stream_free"); if (dlerror() != 0) s.append("tnt_stream_Free ");
@@ -5601,6 +5617,10 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   ssize_t ldbms_tnt_flush(struct tnt_stream *a)
   {
     return t__tnt_flush(a);
+  }
+  ssize_t ldbms_tnt_execute(struct tnt_stream *a, const char *b, size_t c, struct tnt_stream *d)
+  {
+    return t__tnt_execute(a,b,c,d);
   }
   int ldbms_tnt_get_indexno(struct tnt_stream *a, int b, const char *c, size_t d)
   {
