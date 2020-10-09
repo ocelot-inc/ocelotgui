@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: October 5 2020
+   Last modified: October 9 2020
 */
 
 /*
@@ -15380,6 +15380,7 @@ QString MainWindow::tarantool_fetch_header_row()
     long unsigned int r;
     value= tarantool_result_set_init_select(&r, field_number);
     if (value == NULL) break; /* no more columns? */
+    if (r >= TARANTOOL_MAX_FIELD_NAME_LENGTH) goto error_return;
     value_length= r;
     char what_to_set_to[TARANTOOL_MAX_FIELD_NAME_LENGTH * 2];
     memcpy(what_to_set_to, value, value_length); /* This is what we set to */
@@ -15418,6 +15419,9 @@ QString MainWindow::tarantool_fetch_header_row()
   }
   delete []flags;
   return "OK";
+error_return:
+  delete []flags;
+  return "Field name too long";
 }
 
 
