@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: October 9 2020
+   Last modified: October 19 2020
 */
 
 /*
@@ -1234,7 +1234,8 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   /* See comment with label "Shortcut Duplication" */
   if (keypress_shortcut_handler(key, false) == true) return true;
   if (obj != statement_edit_widget) return false;
-  if ((key->key() == Qt::Key_Down) && (completer_widget->key_down())) return true;
+  if ((key->key() == Qt::Key_Down) && (completer_widget->key_up_or_down(+1))) return true;
+  if ((key->key() == Qt::Key_Up) && (completer_widget->key_up_or_down(-1))) return true;
   if ((key->key() != Qt::Key_Enter) && (key->key() != Qt::Key_Return)) return false;
   /* No delimiter needed if Ctrl+Enter, which we'll regard as a synonym for Ctrl+E */
   if (key->modifiers() & Qt::ControlModifier)
@@ -3041,7 +3042,7 @@ bool MainWindow::menu_edit_autocomplete()
           QTextCursor c= statement_edit_widget->textCursor();
           c.movePosition(QTextCursor::End);
           statement_edit_widget->setTextCursor(c);
-          completer_widget->size_and_position_change();
+          completer_widget->updater();
           return true;
         }
       }
@@ -3200,6 +3201,7 @@ void MainWindow::action_statement_edit_widget_text_changed(int position,int char
     hparse_f_multi_block(text); /* recognizer */
   }
   log("action_statement_edit_widget_text_changed after hparse_f_multi_block", 90);
+  completer_widget->updater();
   /* This "sets" the colour, it does not "merge" it. */
   /* Do not try to set underlines, they won't go away. */
   QTextDocument *pDoc= statement_edit_widget->document();
@@ -10345,7 +10347,7 @@ void MainWindow::rehash_scan_one_space(int space_number)
   Todo: We could call QStringList::sort()
   Todo: Comparisons are case insensitive but don't have to be if "" encloses
   Todo: Change pass of TOKEN_TYPE_IDENTIFIER if in fact it's within backticks or ""s
-  Todo: If it's a function, call completer_widget->append with final argument i.e. flags|= TOKEN_FLAG_IS_FUNCTION
+  Todo: If it's a function, call completer_widget->append_wrapper with final argument i.e. flags|= TOKEN_FLAG_IS_FUNCTION
 */
 QString MainWindow::rehash_search(QString table_name, char *search_string, int reftype,
                     QString hparse_token,
@@ -10528,7 +10530,7 @@ ok_return:
     QString hparse_s= hparse_token;
     if (hparse_s.left(1) == "\"") hparse_s= hparse_s.right(hparse_s.size() - 1);
     if (hparse_s.left(1) == "`") hparse_s= hparse_s.right(hparse_s.size() - 1);
-    completer_widget->append(token, hparse_s, TOKEN_TYPE_IDENTIFIER, 0, "i");
+    completer_widget->append_wrapper(token, hparse_s, TOKEN_TYPE_IDENTIFIER, 0, "i");
     //tmp_word.append(column_value_list.at(i));
     //tmp_word.append(" ");
   }
@@ -16084,50 +16086,66 @@ void MainWindow::menu_context(const QPoint &pos)
   which probably means that the user is typing and hasn't finished a word.
   This is somewhat like a popup but using "Qt::Popup" caused trouble. We don't want modal.
   Warning: We can call this without going via hparse_f_multi_block() and before calling dbms_version_mask()
+  Re class = subclass of QTextEdit:
+    Originally it was a subclass of QListWidget and that worked well enough with Ubuntu 18 + Qt 5.9,
+    but worked very poorly with Fedora 32 + Qt 5.13, the size was too small and the reported size was false.
   Re timer:
-    We hide the widget after ocelot_completer_widget_timeout, default = 10 (seconds). Todo: check what normal amount is.
+    We hide the widget after ocelot_completer_timeout, default = 10 (seconds). Todo: check what normal amount is.
     We should reset the timer (by stopping and starting it) if there is activity either in statement_edit_widget or completer_widget
     Todo: if user says SET ocelot_completer_timeout=0; interpret that as: disable the widget.
   Todo: some sort of in-context help if --i-am-a-dummy or menu = Help
-        users are supposed to know that Tab will complete, down-arrow will navigate, timeout is 3 seconds,
-        setting focus elsewhere will cause hide
+        users are supposed to know that Tab will complete, down-arrow will navigate, timeout is 10 seconds,
   * Possible experiments with flags:
     Tried Qt::Dialog and Qt::Window, they cause trouble
     Try Qt::CustomizeWindowHint |  Qt::Tool | Qt::WindowDoesNotAcceptFocus | Qt::FramelessWindowHint
     setWindowFlags must follow setParent, otherwise hide() will not be totally reversed by show()
   * todo: maybe it should be initially hidden
   Unusually main_window will not be the parent, we call setParent(p->statement_edit_widget);.
-  todo: references to p->statement_edit_widget are a bit convoluted since it is the parent.
+  todo: references to main_window->statement_edit_widget are a bit convoluted since it is the parent.
+  todo: there's no point in Completer_widget if we aren't recognizing, in that case make sure it's suppressed
+  Re eventfilter_function:
+    Checks for key_up or key_down events and calls key_up_or_down().
+    Could check for MousePressEvent and hide completer_widget -- the idea is that for a tooltip | popup if one clicks
+    outside the tooltip then the tooltip disappears. But there's no point checking within eventfilter function because
+    if you click outside statement_edit_widget then it loses focus and then completer_widget gets hidden anyway,
+    and if you click inside statement_edit_widget then eventfilter_function won't notice. The real solution would be to
+    put a MousePressEvent function in codeeditor.
+  Todo: Some inputs we don't handle well: right-click, select-all + copy, ctrl-+ ctrl--
 */
 
 /* call from constructor */
-/* Todo: you could just put the constructor here, sams as what you do with TextEditFrame::TextEditFrame */
+/* Todo: you could just put the constructor here, same as what you do with TextEditFrame::TextEditFrame */
+/*
+  Warning: QStringList QList etc. are "implicitly shared" classes https://doc.qt.io/qt-5/implicit-sharing.html
+           I have only slight experience with this concept and might be initializing wrong.
+           Supposedly the private area never shrinks; maybe I should try occasional delete + recreate of whole Completer_widget.
+*/
 void Completer_widget::construct()
 {
-  setParent(p->statement_edit_widget);
-  //this->setWindowTitle("Choose");
-  //setWindowFlags(Qt::Dialog | Qt::WindowStaysOnTopHint | Qt::Tool | Qt::FramelessWindowHint | Qt::WindowDoesNotAcceptFocus);
-
-  //setWindowFlags(Qt::CustomizeWindowHint | Qt::WindowStaysOnTopHint);
+  setParent(main_window->statement_edit_widget);
   setWindowFlags(Qt::WindowStaysOnTopHint);
-
-  //setAttribute(Qt::WA_ShowWithoutActivating);
-  widget= new QWidget(this);
-  layout= new QVBoxLayout(widget);
-  layout->setContentsMargins(0, 0, 0, 0);
-  list_widget= new QListWidget;
-
-  layout->addWidget(list_widget);
-  this->setLayout(layout);
   timer= new QTimer(this);
   timer->setSingleShot(true);
   set_timer_interval();
+  current_row= 0;
+  string_list= QStringList ();        /* Qt default constructors create empty lists but I worry anyway. */
+  string_list_tooltips= QStringList ();
+  token_type_list= QList<int> ();
+  setReadOnly(true);
   QObject::connect(timer, SIGNAL(timeout()), this, SLOT(timer_expired(void)));
 }
 
-/*
-  Todo: we could perhapse ocelot_completer_timeout for tooltips too, if we can use QtToolTip msecDisplayTime
-*/
+/* todo: replace this with QStringList::join()? or do appends to QTextEdit so you're sure there are blocks? */
+void Completer_widget::copy_string_list()
+{
+  QString s= "";
+  for (int i= 0; i < string_list.size(); ++i)
+  {
+    s= s + string_list.at(i) + "\n";
+  }
+  setText(s);
+}
+
 void Completer_widget::set_timer_interval()
 {
   timer->setInterval(ocelot_completer_timeout * 1000);
@@ -16136,16 +16154,15 @@ void Completer_widget::set_timer_interval()
 /*
   Saying completer_widget->hide() ... completer_widget->show() used to be tricky ... the widget would disapper.
   Now that seems to be solved but let us leave these in as wrappers and not call hide() or show() directly.
-  this won't work; setWindowFlag(Qt::WindowStaysOnTopHint, false);
 */
-/* call when list_widget size == 0 (due to clear, probably) (but also if you append and there are no candidates) */
+/* call when list widget size == 0 (due to clear, probably) (but also if you append and there are no candidates) */
 /* call when statement edit widget loses focus, except when the focus is going to be completer_widget */
 /* call after an interval, maybe there must be a timer */
 void Completer_widget::hide_wrapper()
 {
   timer->stop();
   hide();
-  p->menu_edit_action_autocomplete->setEnabled(false);
+  main_window->menu_edit_action_autocomplete->setEnabled(false);
 }
 
 /*
@@ -16153,52 +16170,101 @@ void Completer_widget::hide_wrapper()
   Todo: We decide here that we won't show if statement_edit_widget is empty.
         But we could show if it seemed worthwhile.
         And maybe there's a quicker way to know if it is empty.
+  Todo: Merge with updater() if that is the only thing that calls show_wrapper().
 */
 void Completer_widget::show_wrapper()
 {
-  if (p->statement_edit_widget->document()->isEmpty()) return;
+  if (main_window->statement_edit_widget->document()->isEmpty()) return;
+  line_colors();
   show();
   timer_reset(); /* although timer->stop((); is maybe unnecessary */
-  p->menu_edit_action_autocomplete->setEnabled(true);
+  main_window->menu_edit_action_autocomplete->setEnabled(true);
+}
+
+/* Similar to something in codeeditor.h */
+void Completer_widget::line_colors()
+{
+  QList<QTextEdit::ExtraSelection> extraSelections;
+  QTextCursor tc= textCursor();
+  tc.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
+  QColor line_color;
+  for (int i= 0; i < count_wrapper(); ++i)
+  {
+    if (i != 0) tc.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, 1);
+    setTextCursor(tc);
+    QTextEdit::ExtraSelection selection;
+    int token_type= token_type_list.at(i);
+    int flags= 0;
+    QTextCharFormat format_of_current_token= main_window->get_format_of_current_token(token_type, flags, "");
+    line_color= format_of_current_token.foreground().color();
+    selection.format.setForeground(line_color);
+    selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+    selection.cursor= textCursor();
+    selection.cursor.clearSelection();
+    extraSelections.append(selection);
+    setExtraSelections(extraSelections);
+    if (i != current_row)
+    {
+      line_color= QColor(main_window->ocelot_statement_background_color);
+    }
+    else
+    {
+      line_color= QColor(main_window->ocelot_statement_highlight_current_line_color).lighter(160);
+    }
+    selection.format.setBackground(line_color);
+    selection.format.setProperty(QTextFormat::FullWidthSelection, true);
+    selection.cursor= textCursor();
+    selection.cursor.clearSelection();
+    extraSelections.append(selection);
+    setExtraSelections(extraSelections);
+  }
+  tc.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
+  setTextCursor(tc);
 }
 
 /*
-  call when statement_edit_widgt stylesheet change
+  call when statement_edit_widget stylesheet change
   we could use something different from the statement_edit_widget style string, but I haven't seen a reason
 */
 void Completer_widget::initialize()
 {
-  list_widget->setStyleSheet(p->ocelot_statement_style_string);
+  setStyleSheet(main_window->ocelot_statement_style_string);
   size_and_position_change();
 }
 
-void Completer_widget::clear()
+void Completer_widget::clear_wrapper()
 {
-  list_widget->clear();
+  string_list.clear();
+  string_list_tooltips.clear();
+  token_type_list.clear();
+  current_row= 0;
   hide_wrapper();
+}
+
+int Completer_widget::count_wrapper()
+{
+  return string_list.count();
 }
 
 /* todo: I suppose you'll need some error check although it's impossible that there are no selected items */
 QString Completer_widget::get_selected_item(QString *tool_tip)
 {
-  QListWidgetItem *list_widget_item;
-  QList<QListWidgetItem *> x= list_widget->selectedItems();
-  list_widget_item= x.at(0);
-  *tool_tip= list_widget_item->toolTip();
-  return list_widget_item->text();
+  *tool_tip= string_list_tooltips.at(current_row);
+  return string_list.at(current_row);
 }
 
 /*
+  Allow just enough size for Completer_widget, in the best possible location within statement_edit_widget.
   This is so that the list won't have a bunch of blank lines, and might have a vertical scroll bar.
   Re scroll bars:
     There might be a vertical scroll bar if number_of_choices i.e. lines > what we calculate will fit.
-    There might be a horizontal scroll bar if number_of_choices i.e. characters-in-a-line >what we calculate will fit.
+    There might be a horizontal scroll bar if number_of_choices i.e. characters-in-a-line > what we calculate will fit.
     If we expect a horizontal scroll bar, then we will add horizontal-scroll-bar-height to height.
   Re space at the bottom if there is a vertical scroll bar:
      See https://stackoverflow.com/questions/41827513/getting-rid-of-blank-area-at-the-bottom-of-a-qlistwidget
      The recommendation re setFixedSize type will fail.
      The recommendation re scrollPerPixel was tried and failed, e.g.
-     list_widget->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
+      ->setVerticalScrollMode(QAbstractItemView::ScrollPerPixel);
      and anyway maybe that has an effect that's worse than the extra space.
 */
 
@@ -16229,13 +16295,11 @@ This should be done in reaction to statement_edit_widget->resize too, but
 
 void Completer_widget::size_and_position_change()
 {
-  QFont f= p->get_font_from_style_sheet(p->ocelot_statement_style_string);
+  QFont f= main_window->get_font_from_style_sheet(main_window->ocelot_statement_style_string);
   QFontMetrics fm(f);
   QString s= "";
-  for (int i= 0; i < list_widget->count(); ++i)
-  {
-    s= s + list_widget->item(i)-> text() + "\n";
-  }
+  copy_string_list();
+  s= toPlainText();
   s= s.left(s.size() - 1); /* otherwise there's a blank at the end? */
   QRect r= fm.boundingRect(
             0, /* int x = x coordinate within original rect */
@@ -16247,24 +16311,24 @@ void Completer_widget::size_and_position_change()
   int desired_width= r.width();
   int desired_height= r.height();
   int desired_height_of_one_line;
-  if (list_widget->count() == 0) desired_height_of_one_line= desired_height;
-  else desired_height_of_one_line= desired_height / list_widget->count();
+  if (count_wrapper() == 0) desired_height_of_one_line= desired_height;
+  else desired_height_of_one_line= desired_height / count_wrapper();
 
-  desired_width+= list_widget->verticalScrollBar()->width();
-  desired_width+= 2 * list_widget->frameWidth() + 6; /* why + 6? I don't know. But it helps. */
+  desired_width+= verticalScrollBar()->width();
+  desired_width+= 2 * frameWidth() + 16; /* why + 16? I don't know. But it helps. */
 
-  int maximum_width= p->statement_edit_widget->width();
-  int maximum_height= p->statement_edit_widget->height();
+  int maximum_width= main_window->statement_edit_widget->width();
+  int maximum_height= main_window->statement_edit_widget->height();
   if (desired_width > maximum_width)
   {
-    desired_height+= list_widget->horizontalScrollBar()->height(); /* do this only if there will be a horizontal scroll bar */
+    desired_height+= horizontalScrollBar()->height(); /* do this only if there will be a horizontal scroll bar */
   }
 
-  desired_height+= 2 * list_widget->frameWidth() + 2;
-  if (list_widget->count() != 1) desired_height+= 4; /* why + 4? I don't know. But it helps. */
+  desired_height+= 2 * frameWidth();
+  desired_height+= count_wrapper() * 2; /* why * 2? I don't know. But it helps. */
 
-  QRect r3= p->statement_edit_widget->cursorRect();
-  int desired_x= r3.x() + p->statement_edit_widget->prompt_width_calculate();
+  QRect r3= main_window->statement_edit_widget->cursorRect();
+  int desired_x= r3.x() + main_window->statement_edit_widget->prompt_width_calculate();
   int desired_y= r3.y() + r3.height();
   /* If there isn't enough width, try to shift completer_widget left. If still not enough, shift to x=0 and reduce width. */
   int space_after_x= maximum_width - (desired_x + desired_width);
@@ -16296,14 +16360,14 @@ void Completer_widget::size_and_position_change()
      }
      //desired_height= maximum_height - desired_y;
     }
-    list_widget->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
   }
   else
   {
     /* If we know that it will fit, let's try reducing to eliminate that extra blank lne? Nope, doesn't work */
-    //desired_height-= r3.height();
-    list_widget->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   }
+  //setFixedSize(desired_width, desired_height);
   resize(desired_width, desired_height);
   move(desired_x, desired_y);
 }
@@ -16314,7 +16378,7 @@ void Completer_widget::size_and_position_change()
              'K' keyword (not from database) or operator
     We use this for setToolTip() so the user can see the object type (reftype?) when hovering, but more importantly we use this
     to decide whether it's an identifier because in that case we might want to put ""s around it
-    (depending on foreground color would be wrong because users can set multiple things to the same color for multiple things).
+    (depending on foreground color would be wrong because users can set the same color for multiple things).
     todo: maybe we should be setting with setStatusTip() or setWhatsThis instead of setToolTip()
   todo: Some junk remains because you aren't calling when looking at Lua. I guess when you just type 'i' there's no call?
   todo: You must be suspicious about removeWidget
@@ -16322,50 +16386,40 @@ void Completer_widget::size_and_position_change()
   todo: I'm a bit uncertain why hparse_token can be "", maybe it's something during start
   todo: it's inefficient to add in and then take out what was just added in
   todo: we must pass type() but we don't need icon (or, we need icon)
+  todo: don't sort string_list, but you could insert to string_list and string_list_tooltips in order
 */
-void Completer_widget::append(QString token, QString hparse_token, int token_type, int flags, QString final_letter)
+void Completer_widget::append_wrapper(QString token, QString hparse_token, int token_type, int flags, QString final_letter)
 {
+  (void) flags; /* suppress "unused parameter" warning */
   QString s_hparse_token= hparse_token;
   if (s_hparse_token.left(1) == "\"") s_hparse_token= s_hparse_token.right(hparse_token.size() - 1);
   if (s_hparse_token.left(1) == "`") s_hparse_token= s_hparse_token.right(hparse_token.size() - 1);
-  QListWidgetItem *list_widget_item;
-
   /* Do not add token if there is already a match in the list. todo: should be checking type + reftype too, somehow */
-  bool is_already_a_match= false;
-  for (int i= 0; i < list_widget->count(); ++i)
+  if (string_list.contains(token, Qt::CaseInsensitive) == false)
   {
-    list_widget_item= list_widget->item(i);
-    if (QString::compare(token, list_widget_item->text(), Qt::CaseInsensitive) == 0)
-    {
-      is_already_a_match= true;
-      break;
-    }
-  }
-  if (is_already_a_match == false)
-  {
-    int item_number= list_widget->count();
-    list_widget->addItem(token);
-    list_widget_item= list_widget->item(item_number);
-    QTextCharFormat format_of_current_token= p->get_format_of_current_token(token_type, flags, "");
-    list_widget_item->setForeground(format_of_current_token.foreground());
-    list_widget_item->setToolTip(final_letter);
+    string_list.append(token);
+    string_list_tooltips.append(final_letter);
+    token_type_list.append(token_type);
   }
   if (s_hparse_token > "")
   {
     int hps= s_hparse_token.size();
-    for (int i= list_widget->count() - 1; i >= 0; --i)
+    for (int i= count_wrapper() - 1; i >= 0; --i)
     {
-      list_widget_item= list_widget->item(i);
-      QString s= list_widget_item->text().left(hps);
+      QString s= string_list.at(i).left(hps);
       if (QString::compare(s_hparse_token, s, Qt::CaseInsensitive) != 0)
       {
-        list_widget->removeItemWidget(list_widget_item);
-        delete list_widget_item;
+        string_list.removeAt(i);
+        string_list_tooltips.removeAt(i);
+        token_type_list.removeAt(i);
       }
     }
   }
-  list_widget->setCurrentRow(0, QItemSelectionModel::Select);
-  if (list_widget->count() > 0)
+}
+
+void Completer_widget::updater()
+{
+  if (count_wrapper() > 0)
   {
     size_and_position_change();
     show_wrapper();
@@ -16378,27 +16432,64 @@ void Completer_widget::append(QString token, QString hparse_token, int token_typ
 
 /*
   Down arrow will go down in completer_widget without changing focus.
+  Up arrow will go up in completer_widget without changing focus but if we're at top then it will go up in statement widget.
   Todo: this should be something we can change with "set ocelot_shortcut_..."
   Todo: how can we be sure this won't go to statement edit widgets' slot?
   In eventfilter_function check:
-    if (key->key() == Qt::Key_Down) && (completer_widget->key_down()) return true;
-
+    if (key->key() == Qt::Key_Down) && (completer_widget->key_up_or_down(+1)) return true;
     if completer_widget is not hidden (and we are at end of input?)
       change what is selected -- go forward 1
       return true
 */
-
-bool Completer_widget::key_down()
+bool Completer_widget::key_up_or_down(int plus_or_minus_one)
 {
   if (isHidden() == true) return false;
   timer_reset();
-  int i= list_widget->currentRow();
-  if (i < list_widget->count() - 1)
+  if ((plus_or_minus_one == +1) && (current_row >= count_wrapper() - 1)) return true;
+  if ((plus_or_minus_one == -1) && (current_row <= 0)) return false;
   {
-    list_widget->setCurrentRow(i, QItemSelectionModel::Deselect);
-    list_widget->setCurrentRow(i + 1, QItemSelectionModel::Select);
+    current_row+= plus_or_minus_one;
+    setToolTip(string_list_tooltips.at(current_row));
+    line_colors();
   }
+  /* Todo: This works but is a ridiculous way to ensure cursor stays visible. */
+  QTextCursor cursor= textCursor();
+  int p= 0;
+  for (int i= 0; i < current_row; ++i)
+  {
+    p+= string_list.at(i).size() + 1;
+  }
+  QString s= string_list.at(current_row);
+  ensureCursorVisible();
+  cursor.setPosition(p, QTextCursor::MoveAnchor);
+  setTextCursor(cursor);
   return true;
+}
+
+/* If user clicks an item, it should become current_row. Compare key_up_or_down(). */
+void Completer_widget::mousePressEvent(QMouseEvent *event)
+{
+  timer_reset();
+  QTextCursor tc= cursorForPosition(event->pos());
+  int tc_original_block_number= tc.blockNumber();
+  current_row= tc_original_block_number;
+  setToolTip(string_list_tooltips.at(current_row));
+  line_colors();
+  tc.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
+  tc.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, tc_original_block_number);
+  setTextCursor(tc);
+  main_window->statement_edit_widget->setFocus();
+}
+
+/*
+  If user double-clicks an item, that's equivalent to single-click followed by autocomplete key.
+  When you double click, you get mousePressEvent first, so current_row is known by this time.
+*/
+void Completer_widget::mouseDoubleClickEvent(QMouseEvent *event)
+{
+  (void) event;
+  main_window->statement_edit_widget->setFocus();
+  main_window->menu_edit_autocomplete();
 }
 
 void Completer_widget::timer_reset()
@@ -16407,14 +16498,12 @@ void Completer_widget::timer_reset()
   timer->start();
 }
 
-//private slots:
-
 /*
-  ocelot_completer_timeout has expired so we hide completer_widget, unless it has focus (because user clicked on it).
+  ocelot_completer_timeout has expired so we hide completer_widget, unless it has focus (because user clicked on its vertical scroll bar).
 */
 void Completer_widget::timer_expired()
 {
-  if ((hasFocus()) || (list_widget->hasFocus()))
+  if (hasFocus())
   {
     timer->start();
     return;
@@ -22796,7 +22885,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
       if (token.left(1) == "`") token= token.right(token.size() - 1);
       if (token.right(1) == "`") token= token.left(token.size() - 1);
       token= token.toUpper();
-      completer_widget->append(token, hparse_token, main_token_types[hparse_i], main_token_flags[hparse_i], "V");
+      completer_widget->append_wrapper(token, hparse_token, main_token_types[hparse_i], main_token_flags[hparse_i], "V");
     }
   }
 }

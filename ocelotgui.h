@@ -2849,7 +2849,6 @@ class TextEditHistory;
 class TextEditWidget2;
 class XSettings;
 class Completer_widget;
-class QListWidget;
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -3077,7 +3076,7 @@ public:
   void hparse_f_expected_initialize();
   void hparse_f_expected_clear();
   int hparse_f_expected_exact(int reftype);
-  void hparse_f_expected_append(QString token, unsigned char reftype);
+  void hparse_f_expected_append(QString token, unsigned char reftype, int proposed_type);
   void hparse_f_expected_append_endquote(QString token);
   QString hparse_f_token_to_appendee(QString,int,char);
   int hparse_f_expect(unsigned int,unsigned char,int,QString);
@@ -4555,40 +4554,45 @@ void handle_button_2()
 
 /* See comments just before Completer_widget::construct() */
 
-class Completer_widget: public QWidget
+class Completer_widget: public QTextEdit
 {
   Q_OBJECT
 
 private:
-  QWidget *widget;
-
-  QListWidgetItem *list_widget_item;
-  QVBoxLayout *layout;
-  MainWindow *p;
+  MainWindow *main_window;
   QTimer *timer;
+  QStringList string_list;
+  QStringList string_list_tooltips;
+  int current_row;
+  QList<int> token_type_list;
+void copy_string_list();
+void construct();
+void show_wrapper();
+void line_colors();
 
 private slots:
 void timer_expired();
 
+protected:
+void mousePressEvent(QMouseEvent *event);
+void mouseDoubleClickEvent(QMouseEvent *event);
+
 public:
-void construct();
 void set_timer_interval();
-void hide_wrapper();
-void show_wrapper();
 void initialize();
-void clear();
+void hide_wrapper();
+void clear_wrapper();
+int count_wrapper();
 QString get_selected_item(QString *tool_tip);
 void size_and_position_change();
-void append(QString token, QString hparse_token, int token_type, int flags, QString final_letter);
-bool key_down();
+void append_wrapper(QString token, QString hparse_token, int token_type, int flags, QString final_letter);
+bool key_up_or_down(int);
+void updater();
 void timer_reset();
 
-/* Todo: move this to private: */
-  QListWidget *list_widget;
-
-Completer_widget(MainWindow *main_window)
+Completer_widget(MainWindow *m)
 {
-  p= main_window;
+  main_window= m;
   construct();
 }
 
@@ -9428,6 +9432,7 @@ private:
    text= statement_edit_widget->toPlainText(); but maybe I won't care.
    Todo: Consider: QToolTip::showText() instead of setToolTip()
          (it would cause immediate change but might be distracting).
+         (it would allow us to cntrol duration with ocelot_completer_timeout)
 */
 void mouseMoveEvent(QMouseEvent *event)
 {
@@ -9456,7 +9461,6 @@ void mouseMoveEvent(QMouseEvent *event)
   QPlainTextEdit::mouseMoveEvent(event);
   }
 };
-
 
 class prompt_class : public QWidget
 {

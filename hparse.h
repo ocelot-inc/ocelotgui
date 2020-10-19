@@ -226,7 +226,7 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
       //main_token_types[hparse_i]= proposed_type;
       //main_token_types[hparse_i + 1]= proposed_type;
       hparse_expected= "";
-      completer_widget->clear();
+      completer_widget->clear_wrapper();
       hparse_f_nexttoken();
       hparse_i_of_last_accepted= hparse_i;
       hparse_f_nexttoken();
@@ -391,7 +391,7 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
     ++hparse_count_of_accepts;
     return 1;
   }
-  hparse_f_expected_append(token, reftype);
+  hparse_f_expected_append(token, reftype, proposed_type);
   return 0;
 }
 
@@ -412,13 +412,13 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
 void MainWindow::hparse_f_expected_initialize()
 {
   hparse_expected= "";
-  completer_widget->clear();
+  completer_widget->clear_wrapper();
 }
 
 void MainWindow::hparse_f_expected_clear()
 {
   hparse_expected= "";
-  completer_widget->clear();
+  completer_widget->clear_wrapper();
 }
 
 /*
@@ -461,7 +461,7 @@ int MainWindow::hparse_f_expected_exact(int reftype)
 /*
   But do not append ; if prev was ; -- a kludge of a kludge, as in hparse_f_create_package() .
 */
-void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype)
+void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype, int proposed_type)
 {
   if (hparse_expected > "") hparse_expected.append(" or ");
   hparse_expected.append(hparse_f_token_to_appendee(token, hparse_i, reftype));
@@ -508,8 +508,8 @@ void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype)
   {
     if (token != "[identifier]") return;
   }
-
-  completer_widget->append(token, hparse_token, main_token_types[hparse_i], main_token_flags[hparse_i], "K");
+  /* This was passing main_token_types[hparse_i], which would be the type of the unfinished input */
+  completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "K");
 }
 
 /*
@@ -521,8 +521,8 @@ void MainWindow::hparse_f_expected_append_endquote(QString token)
 {
   if (hparse_expected > "") hparse_expected.append(" or ");
   hparse_expected= token;
-  completer_widget->clear();
-  completer_widget->append(token, "", TOKEN_TYPE_OPERATOR, TOKEN_REFTYPE_ANY, "K");
+  completer_widget->clear_wrapper();
+  completer_widget->append_wrapper(token, "", TOKEN_TYPE_OPERATOR, TOKEN_REFTYPE_ANY, "K");
 }
 
 /*
@@ -555,7 +555,7 @@ int MainWindow::hparse_f_acceptn(int proposed_type, QString token, int n)
     hparse_f_nexttoken();
     return 1;
   }
-  hparse_f_expected_append(token, 0);
+  hparse_f_expected_append(token, 0, TOKEN_TYPE_KEYWORD);
   return 0;
 }
 
@@ -10562,7 +10562,7 @@ void MainWindow::hparse_f_statement(int block_top)
     {
       if (hparse_errno > 0) return;
 #ifdef DBMS_TARANTOOL
-      if ((hparse_i == 0) && (completer_widget->list_widget->count() > 0)) hparse_f_error();
+      if ((hparse_i == 0) && (completer_widget->count_wrapper() > 0)) hparse_f_error();
       else hparse_f_lua_blocklist(0, hparse_i);
 #endif
     }
@@ -12547,7 +12547,7 @@ void MainWindow::hparse_f_multi_block(QString text)
   log("hparse_f_multi_block start", 90);
 
   /* Todo: decide whether this is a good time to move below the cursor, and decide whether clear() is necessary here */
-  completer_widget->clear();
+  completer_widget->clear_wrapper();
 
   completer_widget->hide_wrapper();
   hparse_dbms_mask= dbms_version_mask;
