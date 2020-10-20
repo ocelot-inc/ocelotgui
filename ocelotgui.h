@@ -3316,6 +3316,9 @@ public:
   QString token_reftype(int i, bool, int, char);
   QString get_font_style_as_string(QFont);
 
+  Completer_widget *completer_widget= NULL;
+
+
 public slots:
   void action_connect();
   void action_connect_once(QString);
@@ -4569,6 +4572,7 @@ void copy_string_list();
 void construct();
 void show_wrapper();
 void line_colors();
+void set_current_row(int);
 
 private slots:
 void timer_expired();
@@ -9421,6 +9425,12 @@ private slots:
 
 private:
     QWidget *prompt_widget;
+
+void mousePressEvent(QMouseEvent *event)
+{
+  main_window->completer_widget->hide_wrapper();
+  QPlainTextEdit::mousePressEvent(event);
+}
 
 /*
    Here is where we show a tooltip help hint e.g. "reserved keyword"

@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.1.0
-   Last modified: October 19 2020
+   Last modified: October 20 2020
 */
 
 /*
@@ -480,7 +480,6 @@ volatile int dbms_long_query_result;
 volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
 
-Completer_widget *completer_widget= NULL;
 
 /*
    Suppress useless messages
@@ -10530,7 +10529,7 @@ ok_return:
     QString hparse_s= hparse_token;
     if (hparse_s.left(1) == "\"") hparse_s= hparse_s.right(hparse_s.size() - 1);
     if (hparse_s.left(1) == "`") hparse_s= hparse_s.right(hparse_s.size() - 1);
-    completer_widget->append_wrapper(token, hparse_s, TOKEN_TYPE_IDENTIFIER, 0, "i");
+    completer_widget->append_wrapper(token, hparse_s, TOKEN_TYPE_IDENTIFIER, 0, desired_types);
     //tmp_word.append(column_value_list.at(i));
     //tmp_word.append(" ");
   }
@@ -16415,6 +16414,7 @@ void Completer_widget::append_wrapper(QString token, QString hparse_token, int t
       }
     }
   }
+  set_current_row(current_row);
 }
 
 void Completer_widget::updater()
@@ -16428,6 +16428,45 @@ void Completer_widget::updater()
   {
     hide_wrapper();
   }
+}
+
+/* todo: change ostrings.h so tooltip text can be in French */
+/* todo: don't change the tooltip unless there's something different to say, but this checking might be inefficient */
+void Completer_widget::set_current_row(int new_current_row)
+{
+  if ((new_current_row != current_row) || (string_list_tooltips.count() < 3))
+  {
+   if (string_list_tooltips.count() > new_current_row)
+    {
+      QString s;
+      if (string_list_tooltips.count() == 1) s= "Autocompletion hint.\n";
+      else
+      {
+        s= "Autocompletion hints.\n";
+        s= s + "Change selection with down-arrow key or mouse.\n";
+        QString s3= ocelot_shortcut_autocomplete;
+        if (s3 == "default") s3= "tab key";
+        s= s + "Choose selection with " + s3 + ".\n";
+      }
+      s= s + "Current selection is ";
+      QString s2= string_list_tooltips.at(new_current_row);
+      if      (s2 == "C") s= s + "a Column name.";
+      else if (s2 == "D") s= s + "a Database name.";
+      else if (s2 == "E") s= s + "an Event name.";
+      else if (s2 == "F") s= s + "a Function name.";
+      else if (s2 == "FP") s= s + "a Function or Procedure name";
+      else if (s2 == "I") s= s + "an Index name.";
+      else if (s2 == "i") s= s + "an identifier.";
+      else if (s2 == "K") s= s + "a Keyword.";
+      else if (s2 == "P") s= s + "a Procedure name.";
+      else if (s2 == "T") s= s + "A Table name.";
+      else if (s2 == "t") s= s + "a Trigger name.";
+      else if (s2 == "V") s= s + "a Variable. name.";
+      else s= s + "a (" + s2 + ") token.";
+      setToolTip(s);
+    }
+  }
+  current_row= new_current_row;
 }
 
 /*
@@ -16447,11 +16486,9 @@ bool Completer_widget::key_up_or_down(int plus_or_minus_one)
   timer_reset();
   if ((plus_or_minus_one == +1) && (current_row >= count_wrapper() - 1)) return true;
   if ((plus_or_minus_one == -1) && (current_row <= 0)) return false;
-  {
-    current_row+= plus_or_minus_one;
-    setToolTip(string_list_tooltips.at(current_row));
-    line_colors();
-  }
+  set_current_row(current_row + plus_or_minus_one);
+  line_colors();
+
   /* Todo: This works but is a ridiculous way to ensure cursor stays visible. */
   QTextCursor cursor= textCursor();
   int p= 0;
@@ -16472,8 +16509,7 @@ void Completer_widget::mousePressEvent(QMouseEvent *event)
   timer_reset();
   QTextCursor tc= cursorForPosition(event->pos());
   int tc_original_block_number= tc.blockNumber();
-  current_row= tc_original_block_number;
-  setToolTip(string_list_tooltips.at(current_row));
+  set_current_row(tc_original_block_number);
   line_colors();
   tc.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
   tc.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, tc_original_block_number);
@@ -23423,7 +23459,7 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
 
   if (keyword_index == TOKEN_KEYWORD_OCELOT_COMPLETER_TIMEOUT)
   {
-    if (completer_widget != 0) completer_widget->set_timer_interval();
+    if (main_window->completer_widget != NULL) main_window->completer_widget->set_timer_interval();
   }
 
   return ER_OK;
