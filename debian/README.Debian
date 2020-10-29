@@ -13,15 +13,15 @@ The ocelotgui source package includes a script deb_build.sh which builds a .deb 
 # Get the prerequisites for build: apt-get install git cmake g++ default-libmysqlclient-dev qtbase5-dev
 # Get the prerequisites for debuild:  apt-get install devscripts build-essential lintian
 
-# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.1.0.tar.gz.
+# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.2.0.tar.gz.
 # (Internally Ocelot has a script for "Making a package" but we do not supply it, you must make your own tar.gz.) 
-# (Since release 1.0.9, you're able to simply download ocelotgui-1.1.0.tar.gz from the github release files.)
+# (Since release 1.0.9, you're able to simply download ocelotgui-1.2.0.tar.gz from the github release files.)
 cd ~
 rm -r -f ~/debian2
 mkdir ~/debian2
 cd ~/debian2
-cp ~/ocelotgui-1.1.0.tar.gz ocelotgui_1.1.0.orig.tar.gz
-tar -xvf ocelotgui_1.1.0.orig.tar.gz
+cp ~/ocelotgui-1.2.0.tar.gz ocelotgui_1.2.0.orig.tar.gz
+tar -xvf ocelotgui_1.2.0.orig.tar.gz
 cd ./ocelotgui/debian
 debuild
 
@@ -30,9 +30,9 @@ dpkg-genchanges: info: including full source code in upload ... but source isn't
 .png files were subjected to normalizing by "dh_strip_nondeterminism"
 
 # Lintian results
-After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.1.0_amd64.deb":
+After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.2.0_amd64.deb":
   There are no errors. There are no warnings. There are no informative messages. Hurrah.
-On some distros, after "debuild" and after "lintian -I ocelotgui_1.1.0-1_amd64.changes":
+On some distros, after "debuild" and after "lintian -I ocelotgui_1.2.0-1_amd64.changes":
   I: ocelotgui source: ored-build-depends-on-obsolete-package build-depends: libmysqlclient-dev => default-libmysqlclient-dev
   I: ocelotgui source: out-of-date-standards-version 3.9.7 (released 2016-02-01) (current is 4.1.4)
   I: ocelotgui source: testsuite-autopkgtest-missing

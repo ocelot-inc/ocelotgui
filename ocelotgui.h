@@ -2565,13 +2565,12 @@ static const keywords strvalues[]=
 #include <QTimer>
 //#include <QWidget>
 #include <QTextStream>
-#include <QDesktopWidget>
-#include <QListWidget>
 #if (QT_VERSION >= 0x50000)
 #include <QGuiApplication>
 #include <QScreen>
+#else
+#include <QDesktopWidget>
 #endif
-
 
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
