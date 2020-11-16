@@ -53,7 +53,9 @@
 
 #Re Group:
 #  Usually this is Group: Applications/Databases
-#  On Mageia we change it to Group: Databases
+#  On Mageia we change it to Group: Databases -- lintian doesn't seem to realize that this is
+#  inside if/endif and complains anyway, but I can't think of anything to do about that except
+#  have a separate .spec file for Mageia.
 #Re Release:
 #   Although 1[[percent-sign]{?{dist}, instead of 1, is the right thing for packaging
 #   for a specific distro, it adds to the .rpm name, and we don't want that for a
@@ -64,6 +66,12 @@
 #  and in any case it would unpack to ocelotgui not ocelotgui-1.2.0.
 #  The assumption is that Source0: is the file name and the directory
 #  is $HOME and the file needs pre-processing as described above.
+#  Todo: Consider that this is possible:
+#        wget -P ~/ https://github.com/ocelot-inc/ocelotgui/archive/master.tar.gz
+#Re Packager:
+#  I used to say Packager: Peter Gulutzan but rpmlint warns hardcoded-packager-tag
+#  Saying Packager:\n causes rpmlint to be quiet but you'll get an error if you try to use it.
+#  So I remove Packager: altogether although rpmlint might warn no-packager-tag.
 #Re Build-Requires:
 #  * qt5-qttools-devel implies that we assume Qt version 5.
 #    In fact Qt version 4 will work well.
@@ -89,6 +97,7 @@
 #Re install:
 #  * On Fedora we let the macros expand and all is well.
 #    On SUSE if we let the macros expand then the "cd" would not be to /build.
+#  * On SUSE we have to tell CMakeLists.to add -pie for the linker.
 #  * On SUSE and Mageia we need to cd to the build subdirectory.
 #    On Fedora this is automatic.
 #    So no problem -- but a mystery that it's not automatic for everybody.
@@ -109,23 +118,27 @@
 #    click on the search bar (where it says "Type to search ..."), search
 #    ocelotgui, right click on the ocelotgui logo, click "Add to favorites".
 #Re if and endif for different Linux distros:
-#  The mdvver test is for Mageia.
-#  The suse_version test is for openSUSE.
+#  Convoluted "if" conditions containing "mdvver" are tests whether mdvver is defined as in Mageia.
+#  Convoluted "if" conditions containing "suse_version" are tests whether suse_version is defined as in openSuSE.
+#  The "defined" macro is not dependable.
 #  The else path is for Fedora but other distros will go on the same path.
+
 #TODO
 #----
 # * Copy or download the file mentioned in "Source:", as part of ocelotgui.spec rather than a prerequisite.
 # * Currently we pass suggested c_flags and cxx_flags but not ldflags.
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
 # * Keep track of howtobuild.txt
-# * (Mageia warnings) no-signature, manpage-not-compressed
-# * (SUSE warnings) package-with-huge-docs, position-independent-executable suggested
+# * (Mageia warnings) no-signature (this can be ignored), manpage-not-compressed
 # * (Fedora-26 warnings) non-standard-group Databases
 # * Instead of if/endif for 3 distros, make 3 directories = rpm_fedora | rpm_suse | rpm_mageia,
 #   and each directory contains an ocelotgui.spec file that's only got the spec for that distro.
 # It would be great to have ifdef equivalents for sourcedir etc.
+# (fixed?) rpmlint will warn "standard-dir-owned-by-package" for /usr/share/man and /usr/share/man/man1, which we ignore.
+# (fixed?) rpmlint will warn "no-signature", which we ignore.
+# (fixed?) rpmlint will warn "no-packager-tag", which we ignore.
 
-%if %{defined suse_version}
+%if %{?suse_version:1}%{!?suse_version:0}
 #
 # spec file for package ocelotgui
 #
@@ -156,16 +169,16 @@ Name:           ocelotgui
 Version:        1.2.0
 Release:        1
 
-%if %{defined suse_version}
+%if %{?suse_version:1}%{!?suse_version:0}
 License:        GPL-2.0-only
 %else
 License:        GPLv2
 %endif
 
-%if "%?mdvver" != ""
+%if %{?mdvver:1}%{!?mdvver:0}
 Group:          Applications/Databases
 %else
-%if %{defined suse_version}
+%if %{?suse_version:1}%{!?suse_version:0}
 Group:          Productivity/Databases/Clients
 %else
 Group:          Databases
@@ -175,14 +188,11 @@ Vendor:         Ocelot Computer Services Inc.
 Url:            http://ocelot.ca
 #Source0:        ocelotgui-1.2.0.tar.gz
 Source:         https://github.com/ocelot-inc/%name/releases/download/1.2.0/%name-%{version}.tar.gz
-%if "%?mdvver" != ""
-Packager:       Peter Gulutzan
-%endif
 
-%if %{defined suse_version}
+%if %{?suse_version:1}%{!?suse_version:0}
 BuildRequires:  libqt5-qttools-devel
 %else
-%if "%?mdvver" != ""
+%if %{?mdvver:1}%{!?mdvver:0}
 BuildRequires:  qt5-devel
 %else
 BuildRequires:  qt5-qttools-devel
@@ -213,11 +223,11 @@ GUI client for MySQL or MariaDB or similar servers
 sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{version}/%{name}.desktop
 
 %build
-%if %{defined suse_version}
+%if %{?suse_version:1}%{!?suse_version:0}
 %cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name} \
-       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
+       -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags" -DOCELOT_LD_FLAGS:STRING="-pie"
 %else
-%if "%?mdvver" != ""
+%if %{?mdvver:1}%{!?mdvver:0}
 %cmake %{_builddir}/%{name}-%{version} -DPACKAGE_TYPE="RPM" -DCMAKE_SKIP_RPATH=TRUE -DCMAKE_INSTALL_DOCDIR=%{_docdir}/%{name} \
        -DOCELOT_C_FLAGS:STRING="%optflags" -DOCELOT_CXX_FLAGS:STRING="%optflags"
 %else
@@ -227,12 +237,12 @@ sed -i 's|Icon=%{name}-logo.png|Icon=%{name}-logo|g' %{_builddir}/%{name}-%{vers
 %endif
 %make_build
 
-%if %{defined suse_version}
+%if %{?suse_version:1}%{!?suse_version:0}
 %install
 cd %{_builddir}/%{name}-%{version}/build
 %make_install
 %else
-%if "%?mdvver" != ""
+%if %{?mdvver:1}%{!?mdvver:0}
 %install
 cd %{_builddir}/%{name}-%{version}/build
 %make_install
@@ -266,16 +276,9 @@ cd %{_builddir}/%{name}-%{version}/build
 %doc ocelotgui_logo.png
 %doc result-widget-example.png
 %doc shot1.jpg
-%doc shot10.jpg
 %doc shot11.png
 %doc shot2.jpg
 %doc shot3.png
-%doc shot4.jpg
-%doc shot5.jpg
-%doc shot6.jpg
-%doc shot7.jpg
-%doc shot8.jpg
-%doc shot9.jpg
 %doc special-detach.png
 %doc special-images.png
 %doc special-settings.png
