@@ -40,9 +40,12 @@ On some distros, after "debuild" and after "lintian -I ocelotgui_1.2.0-1_amd64.c
   The first one means prefer default-libmysqlclient-dev, but we already do so.
   The second one means change standards-version, but we deliberately build on Ubuntu 16, not the latest.
   The third one means a test would be good, but we'd have to install a server to connect to.
-On some distros, there is one other note: that our documentation size is large.
+On some distros, there was one other note: that our documentation size is large.
   This happens because our documentation contains pictures in .png and .jpg files.
   We do not expect users to depend on man for documentation, we want them to see pictures for README.htm.
+  However, recently we used pngquant to compress .png files and jpegoptim to compress .jpg files.
+  So the warning will not happen any more.
+lintian will warn about permissions if you are not root, which we work around by being root.
 
 # Contents of debian/control
 "Source ... Build-Depends":
@@ -117,6 +120,3 @@ We believe that we are compliant except for these items:
    because a GUI manual depends on pictures.
 6. No GnuGPG key.
 We will welcome comments from anyone who thinks we have missed anything else.
-
-
-

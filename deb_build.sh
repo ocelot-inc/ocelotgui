@@ -70,13 +70,13 @@ cp -p $SOURCE/special-detach.png /tmp/ocelotgui-$VERSION/special-detach.png
 cp -p $SOURCE/shot1.jpg /tmp/ocelotgui-$VERSION/shot1.jpg
 cp -p $SOURCE/shot2.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
 cp -p $SOURCE/shot3.png /tmp/ocelotgui-$VERSION/shot3.png
-cp -p $SOURCE/shot4.jpg /tmp/ocelotgui-$VERSION/shot4.jpg
-cp -p $SOURCE/shot5.jpg /tmp/ocelotgui-$VERSION/shot5.jpg
-cp -p $SOURCE/shot6.jpg /tmp/ocelotgui-$VERSION/shot6.jpg
-cp -p $SOURCE/shot7.jpg /tmp/ocelotgui-$VERSION/shot7.jpg
-cp -p $SOURCE/shot8.jpg /tmp/ocelotgui-$VERSION/shot8.jpg
-cp -p $SOURCE/shot9.jpg /tmp/ocelotgui-$VERSION/shot9.jpg
-cp -p $SOURCE/shot10.jpg /tmp/ocelotgui-$VERSION/shot10.jpg
+cp -p $SOURCE/shot4.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
+cp -p $SOURCE/shot5.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
+cp -p $SOURCE/shot6.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
+cp -p $SOURCE/shot7.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
+cp -p $SOURCE/shot8.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
+cp -p $SOURCE/shot9.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
+cp -p $SOURCE/shot10.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
 cp -p $SOURCE/shot11.png /tmp/ocelotgui-$VERSION/shot11.png
 cp -p $SOURCE/ocelotgui-logo.png /tmp/ocelotgui-$VERSION/ocelotgui-logo.png
 cp -p $SOURCE/ocelotgui_logo.png /tmp/ocelotgui-$VERSION/ocelotgui_logo.png
@@ -104,6 +104,8 @@ cp -p $SOURCE/debian/source/format /tmp/ocelotgui-$VERSION/debian/source/format
 cp -p $SOURCE/debian/source/local-options /tmp/ocelotgui-$VERSION/debian/source/local-options
 cp -p $SOURCE/deb_build.sh /tmp/ocelotgui-$VERSION/deb_build.sh
 
+cd /tmp
+
 tar -zcvf ocelotgui-$VERSION.tar.gz ocelotgui-$VERSION
 rm -r -f /tmp/debian3
 mkdir /tmp/debian3
@@ -123,4 +125,3 @@ export DEBFILENAME=`ls *.deb`
 sudo piuparts $DEBFILENAME -d $CODENAME
 lintian -I $DEBFILENAME
 lintian -I $DEBFILENAME
-

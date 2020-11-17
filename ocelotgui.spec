@@ -279,6 +279,13 @@ cd %{_builddir}/%{name}-%{version}/build
 %doc shot11.png
 %doc shot2.jpg
 %doc shot3.png
+%doc shot4.jpg
+%doc shot5.jpg
+%doc shot6.jpg
+%doc shot7.jpg
+%doc shot8.jpg
+%doc shot9.jpg
+%doc shot10.jpg
 %doc special-detach.png
 %doc special-images.png
 %doc special-settings.png
