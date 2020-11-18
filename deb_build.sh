@@ -70,13 +70,13 @@ cp -p $SOURCE/special-detach.png /tmp/ocelotgui-$VERSION/special-detach.png
 cp -p $SOURCE/shot1.jpg /tmp/ocelotgui-$VERSION/shot1.jpg
 cp -p $SOURCE/shot2.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
 cp -p $SOURCE/shot3.png /tmp/ocelotgui-$VERSION/shot3.png
-cp -p $SOURCE/shot4.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
-cp -p $SOURCE/shot5.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
-cp -p $SOURCE/shot6.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
-cp -p $SOURCE/shot7.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
-cp -p $SOURCE/shot8.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
-cp -p $SOURCE/shot9.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
-cp -p $SOURCE/shot10.jpg /tmp/ocelotgui-$VERSION/shot2.jpg
+cp -p $SOURCE/shot4.jpg /tmp/ocelotgui-$VERSION/shot4.jpg
+cp -p $SOURCE/shot5.jpg /tmp/ocelotgui-$VERSION/shot5.jpg
+cp -p $SOURCE/shot6.jpg /tmp/ocelotgui-$VERSION/shot6.jpg
+cp -p $SOURCE/shot7.jpg /tmp/ocelotgui-$VERSION/shot7.jpg
+cp -p $SOURCE/shot8.jpg /tmp/ocelotgui-$VERSION/shot8.jpg
+cp -p $SOURCE/shot9.jpg /tmp/ocelotgui-$VERSION/shot9.jpg
+cp -p $SOURCE/shot10.jpg /tmp/ocelotgui-$VERSION/shot10.jpg
 cp -p $SOURCE/shot11.png /tmp/ocelotgui-$VERSION/shot11.png
 cp -p $SOURCE/ocelotgui-logo.png /tmp/ocelotgui-$VERSION/ocelotgui-logo.png
 cp -p $SOURCE/ocelotgui_logo.png /tmp/ocelotgui-$VERSION/ocelotgui_logo.png
@@ -121,7 +121,8 @@ debuild
 # Final lines of output should show: piuparts says "PASS: All tests." and lintian -I says nothing.
 export CODENAME=`lsb_release --codename --short`
 cd /tmp/debian3
+export CHANGESFILENAME=`ls *.changes`
 export DEBFILENAME=`ls *.deb`
 sudo piuparts $DEBFILENAME -d $CODENAME
-lintian -I $DEBFILENAME
+lintian -I $CHANGESFILENAME
 lintian -I $DEBFILENAME
