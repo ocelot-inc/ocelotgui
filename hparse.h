@@ -13231,6 +13231,7 @@ int MainWindow::hparse_f_client_statement()
   {
     if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
   }
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   else if ((hparse_token.mid(0, 1) == "$")
     && ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0))
   {
@@ -13366,6 +13367,7 @@ int MainWindow::hparse_f_client_statement()
     else return 0;
     return 1;
   }
+#endif //if (OCELOT_MYSQL_DEBUGGER == 1)
   else
   {
     return 0;

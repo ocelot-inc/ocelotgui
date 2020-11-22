@@ -53,7 +53,7 @@
  ** $QT_END_LICENSE$
 */
 
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 /*
   The routine named debug_mdbug_install inside this program is taken and modified from
   https://launchpad.net/mdbug, specifically http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/install.sql,

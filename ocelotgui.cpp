@@ -4,7 +4,6 @@
    Version: 1.2.0
    Last modified: October 29 2020
 */
-
 /*
   Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
 
@@ -65,7 +64,7 @@
  ** $QT_END_LICENSE$
 */
 
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 /*
   The routine named debug_mdbug_install inside this program is taken and modified from
   https://launchpad.net/mdbug, specifically http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/install.sql,
@@ -353,6 +352,7 @@
   static char ocelot_shortcut_kill[80]= "default";
   static char ocelot_shortcut_next_window[80]= "default";
   static char ocelot_shortcut_previous_window[80]= "default";
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   static char ocelot_shortcut_breakpoint[80]= "default";
   static char ocelot_shortcut_continue[80]= "default";
   static char ocelot_shortcut_next[80]= "default";
@@ -364,7 +364,7 @@
   static char ocelot_shortcut_refresh_user_variables[80]= "default";
   static char ocelot_shortcut_refresh_variables[80]= "default";
   static char ocelot_shortcut_refresh_call_stack[80]= "default";
-
+#endif
   static char ocelot_shortcut_batch[80]= "default";
   static char ocelot_shortcut_horizontal[80]= "default";
   static char ocelot_shortcut_html[80]= "default";
@@ -380,7 +380,9 @@
 
   static bool ocelot_detach_history_widget= false;
   static bool ocelot_detach_result_grid_widget= false;
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   static bool ocelot_detach_debug_widget= false;
+#endif
   static bool ocelot_detach_statement_edit_widget= false;
 
   static int is_libmysqlclient_loaded= 0;
@@ -589,13 +591,14 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   history_edit_widget= new TextEditHistory(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   statement_edit_widget->is_debug_widget= false;
-
+#endif
   QFont fixed_font= get_fixed_font();
   history_edit_widget->setFont(fixed_font);
   statement_edit_widget->setFont(fixed_font);
 
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   create_widget_debug();
 #endif
 
@@ -696,7 +699,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   main_layout->addWidget(history_edit_widget);
   main_layout->addWidget(result_grid_tab_widget);
   main_layout->addWidget(statement_edit_widget);
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   main_layout->addWidget(debug_top_widget);
 #endif
 
@@ -717,7 +720,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   if (ocelot_history_detached.toInt() == 1) detach_history_widget(true);
   if (ocelot_grid_detached.toInt() == 1) detach_result_grid_widget(true);
   if (ocelot_statement_detached.toInt() == 1) detach_statement_widget(true);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   if (ocelot_debug_detached.toInt() == 1) detach_debug_widget(true);
+#endif
 
   /*
     If the command-line option was -p but not a password, then password input is necessary
@@ -860,7 +865,7 @@ void MainWindow::initialize_widget_statement()
 void MainWindow::statement_edit_widget_setstylesheet()
 {
   statement_edit_widget->setStyleSheet(ocelot_statement_style_string);
-
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   for (int debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
   {
     if (debug_widget[debug_widget_index] != 0)
@@ -868,6 +873,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
       debug_widget[debug_widget_index]->setStyleSheet(ocelot_statement_style_string);
     }
   }
+#endif
   completer_widget->initialize();
 }
 
@@ -1215,7 +1221,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
       }
     }
   }
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   for (int debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
   {
     if (obj == debug_widget[debug_widget_index])
@@ -1326,7 +1332,7 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   if (qk == ocelot_shortcut_raw_keysequence){action_option_raw(); return true; }
   if (qk == ocelot_shortcut_vertical_keysequence){action_option_vertical(); return true; }
   if (qk == ocelot_shortcut_xml_keysequence){action_option_xml(); return true; }
-
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   if (menu_debug_action_breakpoint->isEnabled())
     if (qk == ocelot_shortcut_breakpoint_keysequence) { action_debug_breakpoint(); return true; }
   if (menu_debug_action_continue->isEnabled())
@@ -1349,6 +1355,7 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
     if (qk == ocelot_shortcut_refresh_variables_keysequence) { action_debug_refresh_variables(); return true; }
   if (menu_debug_action_refresh_call_stack->isEnabled())
     if (qk == ocelot_shortcut_refresh_call_stack_keysequence) { action_debug_refresh_call_stack(); return true; }
+#endif
   return false;
 }
 
@@ -2105,13 +2112,17 @@ void MainWindow::create_menu()
   menu_settings_action_history= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_HISTORY_WIDGET]);
   menu_settings_action_grid= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_GRID_WIDGET]);
   menu_settings_action_statement= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_STATEMENT_WIDGET]);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   menu_settings_action_debug= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_DEBUG_WIDGET]);
+#endif
   menu_settings_action_extra_rule_1= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_EXTRA_RULE_1]);
   connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
   connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
   connect(menu_settings_action_grid, SIGNAL(triggered()), this, SLOT(action_grid()));
   connect(menu_settings_action_statement, SIGNAL(triggered()), this, SLOT(action_statement()));
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   connect(menu_settings_action_debug, SIGNAL(triggered()), this, SLOT(action_debug()));
+#endif
   connect(menu_settings_action_extra_rule_1, SIGNAL(triggered()), this, SLOT(action_extra_rule_1()));
   menu_options= ui->menuBar->addMenu(menu_strings[menu_off + MENU_OPTIONS]);
   menu_options_action_option_detach_history_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
@@ -2122,10 +2133,12 @@ void MainWindow::create_menu()
   menu_options_action_option_detach_result_grid_widget->setCheckable(true);
   menu_options_action_option_detach_result_grid_widget->setChecked(ocelot_detach_result_grid_widget);
   connect(menu_options_action_option_detach_result_grid_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_result_grid_widget(bool)));
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   menu_options_action_option_detach_debug_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
   menu_options_action_option_detach_debug_widget->setCheckable(true);
   menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
   connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
+#endif
   menu_options_action_option_detach_statement_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
   menu_options_action_option_detach_statement_widget->setCheckable(true);
   menu_options_action_option_detach_statement_widget->setChecked(ocelot_detach_statement_edit_widget);
@@ -2159,7 +2172,7 @@ void MainWindow::create_menu()
   connect(menu_options_action_xml, SIGNAL(triggered(bool)), this, SLOT(action_option_xml()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_XML, "", false, true);
 
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   menu_debug= ui->menuBar->addMenu(menu_strings[menu_off + MENU_DEBUG]);
 //  menu_debug_action_install= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
 //  connect(menu_debug_action_install, SIGNAL(triggered()), this, SLOT(action_debug_install()));
@@ -2648,6 +2661,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     return 1;
   }
 
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT)
   {
     if (is_set) strcpy(ocelot_shortcut_breakpoint, source_as_utf8);
@@ -2789,7 +2803,9 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_refresh_call_stack_keysequence= QKeySequence(ocelot_shortcut_refresh_call_stack);
       menu_debug_action_refresh_call_stack->setShortcut(ocelot_shortcut_refresh_call_stack_keysequence);
     }
+    /* todo: check why there is no "return 1;" here. */
   }
+#endif // if (OCELOT_MYSQL_DEBUGGER == 1)
   return 0;
 }
 
@@ -3618,7 +3634,7 @@ void MainWindow::action_exit()
   }
   else
   {
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     /* Get rid of debuggee if it's still around. */
     /* Todo: this might not be enough. Maybe you should be intercepting the "close window" event. */
     if (menu_debug_action_exit->isEnabled() == true) action_debug_exit();
@@ -3840,6 +3856,7 @@ void MainWindow::detach_result_grid_widget(bool checked)
   if (is_visible) result_grid_tab_widget->show();
 }
 
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 void MainWindow::action_option_detach_debug_widget(bool checked)
 {
   if (checked)
@@ -3854,8 +3871,9 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
   }
   action_change_one_setting(ocelot_debug_detached, new_ocelot_debug_detached, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED);
 }
+#endif
 
-
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 /*
   For SET ocelot_debug_detached= "yes|no"; perhaps caused by menu item = Options|detach debug widget
 */
@@ -3907,6 +3925,7 @@ void MainWindow::detach_debug_widget(bool checked)
   }
   if (is_visible) debug_tab_widget->show();
 }
+#endif //if (OCELOT_MYSQL_DEBUGGER == 1)
 
 void MainWindow::action_option_detach_statement_widget(bool checked)
 {
@@ -4672,6 +4691,7 @@ void MainWindow::action_grid()
   delete(se);
 }
 
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 /* !!!!! FIX !!!!! */
 void MainWindow::action_debug()
 {
@@ -4688,6 +4708,7 @@ void MainWindow::action_debug()
  }
   delete(se);
 }
+#endif
 
 /*
   TODO: extra_rule_1 could affect statement | prompt | word, not just cell
@@ -5967,7 +5988,7 @@ QString MainWindow::select_1_row(const char *select_statement)
 
 /* volatile ints were here. moved up on 2019-01-01 */
 
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 
 /*
   Debug
@@ -8518,7 +8539,7 @@ void MainWindow::action_debug_timer_status()
   }
   log("action_debug_timer_status end", 20);
 }
-#endif
+#endif // if (OCELOT_MYSQL_DEBUGGER == 1)
 
 
 /*
@@ -8681,7 +8702,9 @@ int MainWindow::action_execute(int force)
     menu_run_action_execute->setEnabled(false);
     if (ocelot_sigint_ignore == 0) menu_run_action_kill->setEnabled(true);
     menu_settings->setEnabled(false);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     menu_debug->setEnabled(false);
+#endif
     menu_help->setEnabled(false);
     statement_edit_widget->setReadOnly(true);
     is_kill_requested= false;
@@ -8692,7 +8715,9 @@ int MainWindow::action_execute(int force)
     menu_run_action_execute->setEnabled(true);
     menu_run_action_kill->setEnabled(false);
     menu_settings->setEnabled(true);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     menu_debug->setEnabled(true);
+#endif
     menu_help->setEnabled(true);
     statement_edit_widget->setReadOnly(false);
     /*
@@ -9721,7 +9746,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (connections_dbms[0] == DBMS_TARANTOOL)
       {
         char tmp[32];
-        sprintf(tmp, " iproto_schema_version = %ld", tarantool_tnt_reply.schema_id);
+        sprintf(tmp, " iproto_schema_version = %lu", (long) tarantool_tnt_reply.schema_id);
         strcat(buffer, tmp);
       }
 #endif
@@ -9774,7 +9799,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else make_and_put_message_in_result(ER_OK, 0, (char*)"");
     return 1;
   }
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG)
   {
     debug_debug_go(text);
@@ -11462,7 +11487,7 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
         //index+= TOKEN_KEYWORDS_START; commented out on 2019-02-27
         main_token_types[i2]= index;
       }
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
       else
       {
         /* It's not in the list, but if it's unambiguously $DEB[UG] etc. then consider it a debug keyword. */
@@ -11648,9 +11673,11 @@ bool MainWindow::is_client_statement(int token, int i,QString text)
       }
     }
   }
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   if ((token >= TOKEN_KEYWORD_DEBUG_BREAKPOINT)
    && (token <= TOKEN_KEYWORD_DEBUG_TBREAKPOINT))
     return true;
+#endif
   return false;
 }
 
@@ -19165,6 +19192,8 @@ void MainWindow::print_help()
   action_connect_once("Print");
 }
 
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+
 QStringList debug_routine_list_schemas;
 QStringList debug_routine_list_names;
 QStringList debug_routine_list_types;
@@ -19173,8 +19202,10 @@ QStringList debug_routine_list_surrogates;
 QStringList debug_routine_list_texts;
 int debug_v_statement_number; /* the number for all routines */
 QString debug_xxxmdbug_icc_core_surrogate_name;
+#endif
 QStringList c_variable_names;  /* (declared) in reverse order */
 QStringList c_variable_tokens; /* (declared) in reverse order */
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 QStringList debug_tmp_user_variables;
 QString debug_v_g;
 QString debug_xxxmdbug_debugger_name;
@@ -19182,13 +19213,17 @@ QString debug_xxxmdbug_debugger_version;
 int debug_xxxmdbug_signal_errno;
 QString debug_xxxmdbug_timestamp;
 QString debug_xxxmdbug_setup_group_name;
+#endif
 int i_of_start_of_parameters, i_of_end_of_parameters;
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 QStringList debug_label_list;
 QString debug_xxxmdbug_default_schema;
 int debug_track_statements;
 int debug_track_user_variables;
 int debug_track_declared_variables;
+#endif
 bool debug_ansi_quotes;
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 QString debug_lf;
 QString debug_plugins;
 QString debug_session_sql_mode_original;
@@ -19328,7 +19363,7 @@ void MainWindow::debug_setup_go(QString text)
   setup_cleanup();
   return;
 }
-#endif
+#endif // if (NEW_SETUP == 1)
 
 
 /*
@@ -20109,7 +20144,7 @@ int MainWindow::setup_get_setup_group_name()
   }
   return 0;
 }
-
+#endif
 
 /*
   Identifiers in routines might be "delimited" or `delimited` or bare.
@@ -20136,7 +20171,7 @@ QString MainWindow::setup_add_delimiters(QString name)
   return n;
 }
 
-
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 /* We finished with declared variables.
    Now user variables, that is, any token that starts with '@'.
    Here we dump names that start with '@' into a variables list.
@@ -20148,6 +20183,7 @@ QString MainWindow::setup_add_delimiters(QString name)
    todo: check: do we need to check for TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE?
    todo: I would much prefer to look for TOKEN_REFTYPE_USER_VARIABLE, but
          for some reason hparse isn't generating it. Have a look there.
+   todo: BUG: (probably): setup_add_delimiters depends on debug_ansi_quotes which maybe we didn't set
 */
 int MainWindow::setup_insert_into_variables_user_variables(QString text, int i_of_end_of_parameters)
 {
@@ -21165,6 +21201,7 @@ int MainWindow::setup_generate_label(int i_of_start_of_statement, QString text, 
   }
   return 0;
 }
+#endif //if (OCELOT_MYSQL_DEBUGGER == 1)
 
 /* Todo: I'm excluding MariaDB variables defined as row type or
    within FOR var-name IN, since $debug can't handle them.
@@ -21283,6 +21320,7 @@ int MainWindow::setup_determine_what_variables_are_in_scope(
   return 0;
 }
 
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 /*
   Generate the statement text, but replace routine names
   with surrogate routine names if they are in the $setup list,
@@ -21439,6 +21477,7 @@ int MainWindow::setup_generate_statement_text_as_is(int i_of_statement_start,
   if (setup_append(d, text, i)) return 1;
   return 0;
 }
+#endif //if (OCELOT_MYSQL_DEBUGGER == 1)
 
 /*
   clf stands for create lua function. All its sub-functions begin with clf_.
@@ -23007,7 +23046,9 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
     }
 */
 
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 #include "install_sql.cpp"
+#endif
 
 #ifndef XSETTINGS
 #define XSETTINGS
@@ -23218,7 +23259,9 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
   }
 
   if ((keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
+#if (OCELOT_MYSQL_DEBUGGER == 1)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
+#endif
    || (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED))
   {
@@ -23227,11 +23270,13 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
       if (qv == "no") { main_window->menu_options_action_option_detach_statement_widget->setChecked(false); main_window->detach_statement_widget(false); }
       else {main_window->menu_options_action_option_detach_statement_widget->setChecked(true); main_window->detach_statement_widget(true); }
     }
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
     {
       if (qv == "no") { main_window->menu_options_action_option_detach_debug_widget->setChecked(false); main_window->detach_debug_widget(false); }
       else { main_window->menu_options_action_option_detach_debug_widget->setChecked(true); main_window->detach_debug_widget(true); }
     }
+#endif
     if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
     {
       if (qv == "no") { main_window->menu_options_action_option_detach_result_grid_widget->setChecked(false); main_window->detach_result_grid_widget(false); }

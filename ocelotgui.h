@@ -17,8 +17,12 @@
 #ifndef OCELOTGUI_H
 #define OCELOTGUI_H
 
-/* The debugger is integrated now, but "ifdef DEBUGGER" directives help to delineate code that is debugger-specific. */
-#define DEBUGGER
+/* TEST!!!!!! */
+
+/* The debugger is integrated now, but "if (OCELOT_MYSQL_DEBUGGER = 1)" directives help to delineate code that is debugger-specific. */
+#ifndef OCELOT_MYSQL_DEBUGGER
+#define OCELOT_MYSQL_DEBUGGER 1
+#endif
 
 /*
   Predefined OS macro
@@ -1307,7 +1311,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD__UTF32,
     TOKEN_KEYWORD__UTF8,
     TOKEN_KEYWORD__UTF8MB4,
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   TOKEN_KEYWORD_DEBUG_BREAKPOINT = TOKEN_KEYWORD__UTF8MB4 + 1,
   TOKEN_KEYWORD_DEBUG_CLEAR= TOKEN_KEYWORD_DEBUG_BREAKPOINT + 1,
   TOKEN_KEYWORD_DEBUG_CONTINUE= TOKEN_KEYWORD_DEBUG_CLEAR + 1,
@@ -3340,13 +3344,17 @@ public slots:
   void action_history();
   void action_grid();
   void action_statement();
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_debug();
+#endif
   void action_extra_rule_1();
   void history_markup_previous();
   void history_markup_next();
   void action_option_detach_history_widget(bool checked); void detach_history_widget(bool checked);
   void action_option_detach_result_grid_widget(bool checked); void detach_result_grid_widget(bool checked);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_option_detach_debug_widget(bool checked); void detach_debug_widget(bool checked);
+#endif
   void action_option_detach_statement_widget(bool checked); void detach_statement_widget(bool checked);
   void action_option_next_window();
   void action_option_previous_window();
@@ -3359,7 +3367,7 @@ public slots:
   void action_option_vertical();
   void action_option_xml();
 
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
   int debug_parse_statement(QString text,
                              char *returned_command_string,
@@ -3426,7 +3434,7 @@ private:
   int result_grid_add_tab();
   void initialize_widget_statement();
   void menu_edit_zoominorout(int);
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   void debug_menu_enable_or_disable(int statement_type);
   void create_widget_debug();
   int debug_information_status(char *last_command);
@@ -3593,7 +3601,7 @@ public:
   TextEditHistory *history_edit_widget;
 private:
 
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 #define DEBUG_TAB_WIDGET_MAX 10
   QWidget *debug_top_widget;
   QVBoxLayout *debug_top_widget_layout;
@@ -3634,7 +3642,9 @@ public:
   QMenu *menu_options;
   QAction *menu_options_action_option_detach_history_widget;
     QAction *menu_options_action_option_detach_result_grid_widget;
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     QAction *menu_options_action_option_detach_debug_widget;
+#endif
     QAction *menu_options_action_option_detach_statement_widget;
     QAction *menu_options_action_next_window;
     QAction *menu_options_action_previous_window;
@@ -3646,7 +3656,7 @@ public:
     QAction *menu_options_action_vertical;
     QAction *menu_options_action_xml;
 private:
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   QMenu *menu_debug;
 //    QAction *menu_debug_action_install;
 //    QAction *menu_debug_action_setup;
@@ -3732,6 +3742,7 @@ private:
   QKeySequence ocelot_shortcut_raw_keysequence;
   QKeySequence ocelot_shortcut_vertical_keysequence;
   QKeySequence ocelot_shortcut_xml_keysequence;
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   QKeySequence ocelot_shortcut_breakpoint_keysequence;
   QKeySequence ocelot_shortcut_continue_keysequence;
   QKeySequence ocelot_shortcut_next_keysequence;
@@ -3743,6 +3754,7 @@ private:
   QKeySequence ocelot_shortcut_refresh_user_variables_keysequence;
   QKeySequence ocelot_shortcut_refresh_variables_keysequence;
   QKeySequence ocelot_shortcut_refresh_call_stack_keysequence;
+#endif
 
 public:
   bool keypress_shortcut_handler(QKeyEvent *, bool);
@@ -9376,10 +9388,10 @@ public:
     QString prompt_translate(int line_number);
     int prompt_translate_k(QString s, int i);
     unsigned int statement_count;                                            /* used if "prompt \c ..." */
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     unsigned int block_number;                                               /* current line number, base 0 */
-#endif
     bool is_debug_widget;
+#endif
     QString dbms_version; /* Set to "" at start, select version() at connect, maybe display in prompt. */
     QString dbms_database;/* Set to "" at start, select database() at connect, maybe display in prompt. */
     QString dbms_port;/* Set to "" at start, select @@port at connect, maybe display in prompt. */
@@ -9741,15 +9753,18 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     if (current_widget == HISTORY_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_HISTORY];
     if (current_widget == GRID_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_GRID];
     if (current_widget == STATEMENT_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_STATEMENT];
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     if (current_widget == DEBUG_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_DEBUG];
+#endif
     if (current_widget == EXTRA_RULE_1) s= menu_strings[menu_off + MENU_SETTINGS_FOR_EXTRA_RULE_1];
     setWindowTitle(s);                                                /* affects "this"] */
   }
 
   /* Todo: following calculation should actually be width of largest tr(label) + approximately 5. */
   int label_for_color_width= this->fontMetrics().boundingRect("W").width();
-
+#if (OCELOT_MYSQL_DEBUGGER == 1)
 if (current_widget != DEBUG_WIDGET)
+#endif
 {
   /* Hboxes for foreground, background, and highlights */
 
@@ -10047,7 +10062,9 @@ if (current_widget != DEBUG_WIDGET)
   widget_3->setLayout(hbox_layout_3);
   /* Put the HBoxes in a VBox */
   main_layout= new QVBoxLayout();
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   if (current_widget != DEBUG_WIDGET)
+#endif
   {
     for (int ci= 0; ci < 11; ++ci) main_layout->addWidget(widget_for_color[ci]);
     main_layout->addWidget(widget_font_label);

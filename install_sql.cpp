@@ -35,13 +35,15 @@
   clause, due to a change in MySQL 8.0.
 */
 
+/* #include "install_sql.h" relies on "#if (OCELOT_MYSQL_DEBUGGER == 1)" which is true by default. */
+/* Todo: This file's routines are unneccessary if NEW_SETUP == 1 but I haven't gotten around to removing all references to them. */
+
 #ifndef INSTALL_SQL_CPP
 
 /* todo: ensure this doesn't waste space by including things in ocelotgui.h that are unnecessary */
 //TEST!! #include "ocelotgui.h"
 //#include "ui_ocelotgui.h"
 
-#ifdef DEBUGGER
 int MainWindow::debug_mdbug_install_sql(MYSQL *mysql, char *x)
 {
 strcpy(x,
@@ -7844,6 +7846,5 @@ if (lmysql->ldbms_mysql_real_query(mysql, x, strlen(x))) return -1;
   return 0;
 }
 /* End of debug_mdbug_install_sql(). End of effect of licence of install_sql function contents. */
-#endif
 #endif
 

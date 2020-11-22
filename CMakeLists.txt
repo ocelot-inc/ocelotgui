@@ -127,6 +127,9 @@
 # OCELOT_LD_FLAGS
 # This might contain "-pie".
 
+# OCELOT_MYSQL_DEBUGGER
+# By default this is 1. If it is 0, code related to the debugger is not included.
+
 # FILENAME_EXTRA
 # Default is blank. Ocelot passes -DFILENAME_EXTRA="qt4" when building with qt4,
 # so the final package name will look like ocelotgui_1.2.0qt4-1_amd64.deb or
@@ -252,6 +255,11 @@ add_definitions(-DOCELOTGUI_DOCDIR="${CMAKE_INSTALL_FULL_DOCDIR}")
 if (DEFINED OCELOT_THIRD_PARTY)
 add_definitions(-DOCELOT_THIRD_PARTY=${OCELOT_THIRD_PARTY})
 endif(DEFINED OCELOT_THIRD_PARTY)
+
+#If cmake . -DOCELOT_MYSQL_DEBUGGER=0 then code related to the debugger will not be included
+if (DEFINED OCELOT_MYSQL_DEBUGGER)
+add_definitions(-DOCELOT_MYSQL_DEBUGGER=${OCELOT_MYSQL_DEBUGGER})
+endif(DEFINED OCELOT_MYSQL_DEBUGGER)
 
 if (NOT QT_VERSION EQUAL "4")
   if (QT_VERSION EQUAL "5")

@@ -372,7 +372,7 @@ int CodeEditor::prompt_width_calculate()
   line_width_last= fontMetrics().boundingRect(sq).width();
   if (line_width_first < line_width_last) prompt_width= line_width_last;
   else prompt_width= line_width_first;
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   if (is_debug_widget == true) prompt_width+= fontMetrics().boundingRect("B ").width();
 #endif
   return prompt_width;
@@ -441,7 +441,7 @@ void CodeEditor::highlightCurrentLine()
     selection.format.setBackground(lineColor);
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
     selection.cursor= textCursor();
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     block_number= selection.cursor.blockNumber();                           /* effectively = line number base 0 */
 #endif
     selection.cursor.clearSelection();
@@ -491,7 +491,7 @@ void CodeEditor::prompt_widget_paintevent(QPaintEvent *event)
       prompt_text= prompt_translate(blockNumber + 1);
       QString s= prompt_text;
       /* QString number= QString::number(blockNumber + 1); */
-#ifdef DEBUGGER
+#if (OCELOT_MYSQL_DEBUGGER == 1)
       /* hmm, actually this loop could stop when k_line_number[k_index] == -1 too */
       for (int k_index= 0; k_index < K_SIZE; ++k_index)
       {
