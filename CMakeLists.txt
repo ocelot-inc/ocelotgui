@@ -10,7 +10,6 @@
 #  GNU General Public License for more details.
 #
 
-
 #  You should have received a copy of the GNU General Public License
 #  along with this program; if not, write to the Free Software
 #  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301  USA
@@ -130,6 +129,9 @@
 # OCELOT_MYSQL_DEBUGGER
 # By default this is 1. If it is 0, code related to the debugger is not included.
 
+# OCELOT_MYSQL_INCLUDE
+# By default this is 1. If it is 0, most code related to MySQL/MariaDB is not included.
+
 # FILENAME_EXTRA
 # Default is blank. Ocelot passes -DFILENAME_EXTRA="qt4" when building with qt4,
 # so the final package name will look like ocelotgui_1.2.0qt4-1_amd64.deb or
@@ -176,6 +178,13 @@ cmake_minimum_required(VERSION 2.8.11)
 
 project(ocelotgui)
 
+if (DEFINED OCELOT_MYSQL_INCLUDE)
+  set(TMP_OCELOT_MYSQL_INCLUDE ${OCELOT_MYSQL_INCLUDE})
+else (DEFINED OCELOT_MYSQL_INCLUDE)
+  set(TMP_OCELOT_MYSQL_INCLUDE TRUE)
+endif (DEFINED OCELOT_MYSQL_INCLUDE)
+
+if (TMP_OCELOT_MYSQL_INCLUDE)
 # Find MYSQL include.
 # The suggestion at https://cmake.org/Wiki/CMakeUserFindMySQL has too few choices.
 # See comments in ocelotgui.pro for more explanation.
@@ -216,6 +225,7 @@ if (MYSQL_INCLUDE_DIR_RESULT)
 else (MYSQL_INCLUDE_DIR_RESULT)
   message(FATAL ERROR "-- mysql.h not found in CMake default path or Ocelot hard-coded path")
 endif (MYSQL_INCLUDE_DIR_RESULT)
+endif (TMP_OCELOT_MYSQL_INCLUDE)
 
 # Make sure .h files in current directory are found e.g. ocelotgui.h or what uic produces
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
@@ -223,8 +233,10 @@ set(CMAKE_INCLUDE_CURRENT_DIR ON)
 #automoc requires "cmake_minimum_required(VERSION 2.8.6)" but that's okay.
 set(CMAKE_AUTOMOC ON)
 
+if (TMP_OCELOT_MYSQL_INCLUDE)
 # Add MYSQL headers.
 include_directories(${MYSQL_INCLUDE_DIR_RESULT})
+endif (TMP_OCELOT_MYSQL_INCLUDE)
 
 #lintian complained about "unstripped-binary-or-object"
 # SET(CMAKE_BUILD_TYPE "Release" was useless
@@ -260,6 +272,11 @@ endif(DEFINED OCELOT_THIRD_PARTY)
 if (DEFINED OCELOT_MYSQL_DEBUGGER)
 add_definitions(-DOCELOT_MYSQL_DEBUGGER=${OCELOT_MYSQL_DEBUGGER})
 endif(DEFINED OCELOT_MYSQL_DEBUGGER)
+
+#If cmake . -DOCELOT_MYSQL_INCLUDE=0 then most code related to MySQL/MariaDB will not be included
+if (DEFINED OCELOT_MYSQL_INCLUDE)
+add_definitions(-DOCELOT_MYSQL_INCLUDE=${OCELOT_MYSQL_INCLUDE})
+endif(DEFINED OCELOT_MYSQL_INCLUDE)
 
 if (NOT QT_VERSION EQUAL "4")
   if (QT_VERSION EQUAL "5")
@@ -338,6 +355,7 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 target_link_libraries(ocelotgui ws2_32)
 endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
+if (TMP_OCELOT_MYSQL_INCLUDE)
 # See comments at the start of this file regarding CMAKE_SKIP_RPATH and CMAKE_INSTALL_RPATH.
 if (DEFINED CMAKE_SKIP_RPATH)
   set(TMP_CMAKE_SKIP_RPATH ${CMAKE_SKIP_RPATH})
@@ -368,6 +386,7 @@ if (NOT TMP_CMAKE_SKIP_RPATH)
 else (NOT TMP_CMAKE_SKIP_RPATH)
   message("-- No rpath")
 endif (NOT TMP_CMAKE_SKIP_RPATH)
+endif (TMP_OCELOT_MYSQL_INCLUDE)
 
 if (Qt5Widgets_FOUND)
   target_link_libraries(ocelotgui Qt5::Widgets)

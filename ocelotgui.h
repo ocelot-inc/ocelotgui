@@ -17,12 +17,22 @@
 #ifndef OCELOTGUI_H
 #define OCELOTGUI_H
 
-/* TEST!!!!!! */
+/* If you tell CMakeLists.txt -DOCELOT_MYSQL_INCLUDE=0, you can't access MySQL/MariaDB. Of course default is 1 and recommended. */
+#ifndef OCELOT_MYSQL_INCLUDE
+#define OCELOT_MYSQL_INCLUDE 1
+#endif
 
 /* The debugger is integrated now, but "if (OCELOT_MYSQL_DEBUGGER = 1)" directives help to delineate code that is debugger-specific. */
 #ifndef OCELOT_MYSQL_DEBUGGER
-#define OCELOT_MYSQL_DEBUGGER 1
+#define OCELOT_MYSQL_DEBUGGER OCELOT_MYSQL_INCLUDE
 #endif
+
+#if (OCELOT_MYSQL_INCLUDE == 0)
+typedef struct
+{
+  int not_really_mysql_res;
+} MYSQL_RES;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 0)
 
 /*
   Predefined OS macro
@@ -2576,8 +2586,10 @@ static const keywords strvalues[]=
 #include <QDesktopWidget>
 #endif
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /*
   my_bool might not be in mysql.h due to https://bugs.mysql.com/bug.php?id=85131
@@ -3331,7 +3343,9 @@ public slots:
   void action_kill();
   void action_about();
   void action_the_manual();
+#if (OCELOT_MYSQL_INCLUDE == 1)
   void action_libmysqlclient();
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   void action_settings();
   void action_statement_edit_widget_text_changed(int,int,int);
   QTextCharFormat get_format_of_current_token(int token_type, int token_flags, QString mid_next_token);
@@ -3505,7 +3519,9 @@ private:
   void copy_options_to_main_window();
   void delete_utf8_copies();
   void copy_connect_strings_to_utf8(); /* in effect, copy options from main_window */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   int the_connect(unsigned int connection_number);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   int the_connect_2(); /* intended replacement for the_connect() */
   //my_bool get_one_option(int optid, const struct my_option *opt __attribute__((unused)),char *argument);
   void connect_init(int connection_number);
@@ -3575,8 +3591,10 @@ private:
   int get_keyword_index(const char *, char *);
   bool is_client_statement(int, int, QString);
   int find_start_of_body(QString text, int start, int *i_of_function, int *i_of_do);
+#if (OCELOT_MYSQL_INCLUDE == 1)
   int connect_mysql(unsigned int connection_number);
   void connect_mysql_error_box(QString, unsigned int);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
   int connect_tarantool(unsigned int connection_number, QString, QString, QString, QString);
   void tarantool_initialize(int connection_number);
@@ -3595,7 +3613,9 @@ private:
   const char * tarantool_seek_0(int*);
   QString tarantool_internal_query(char*, int);
 #endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
   QString select_1_row(const char *select_statement);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   QWidget *main_window;
 public:
   TextEditHistory *history_edit_widget;
@@ -3679,7 +3699,9 @@ private:
   QMenu *menu_help;
     QAction *menu_help_action_about;
     QAction *menu_help_action_the_manual;
+#if (OCELOT_MYSQL_INCLUDE == 1)
     QAction *menu_help_action_libmysqlclient;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
     QAction *menu_help_action_settings;
 
   //QWidget *the_manual_widget;
@@ -4726,6 +4748,7 @@ public:
 
   void *dlopen_handle;
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
   /* For Qt typedef example see http://doc.qt.io/qt-4.8/qlibrary.html#fileName-prop */
 
   typedef my_ulonglong    (*tmysql_affected_rows)(MYSQL *);
@@ -4770,6 +4793,7 @@ public:
   typedef unsigned int    (*tmysql_warning_count)(MYSQL *);
   typedef int             (*tAES_set_decrypt_key)(unsigned char *, int, AES_KEY *);
   typedef void            (*tAES_decrypt)        (unsigned char *, unsigned char *, AES_KEY *);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
   typedef uint32_t        (*tmp_decode_array)    (const char **data);
   typedef const char*     (*tmp_decode_bin)      (const char **data, uint32_t *len);
@@ -4827,6 +4851,7 @@ public:
   typedef char*           (*ttnt_strerror)       (struct tnt_stream *);
 #endif
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
   tmysql_affected_rows t__mysql_affected_rows;   /* libmysqlclient */
   tmysql_close t__mysql_close;
   tmysql_data_seek t__mysql_data_seek;
@@ -4859,6 +4884,7 @@ public:
   tmysql_warning_count t__mysql_warning_count;
   tAES_set_decrypt_key t__AES_set_decrypt_key;
   tAES_decrypt t__AES_decrypt;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
   tmp_decode_array t__mp_decode_array;
   tmp_decode_bin t__mp_decode_bin;
@@ -4938,6 +4964,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         QString *return_string,
         int which_library)                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
 {
+#if (OCELOT_MYSQL_INCLUDE == 1)
 #if (OCELOT_STATIC_LIBRARY==1)
     if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
     {
@@ -4978,6 +5005,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       return;
     }
 #endif
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 #if (OCELOT_THIRD_PARTY==1)
     /* If Tarantool we can use third_party.h we don't need to load. */
@@ -5080,16 +5108,20 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       return;
     }
 #ifdef OCELOT_OS_NONLINUX
+#if (OCELOT_MYSQL_INCLUDE == 1)
     /* I don't know how Windows handles shared-library version numbers */
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileNameAndVersion("libmysql", 18);
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysql");
     if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libeay32");
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
     if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
     //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
 #endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
     if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) lib.setFileName("libmariadbclient");
     if (which_library == WHICH_LIBRARY_LIBMARIADB) lib.setFileName("libmariadb");
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #endif
     /*
       Finding libmysqlclient
@@ -5121,9 +5153,11 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if (ld_run_path_part > "")
         {
 #ifdef OCELOT_OS_LINUX
+#if (OCELOT_MYSQL_INCLUDE == 1)
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient.so.18");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient.so");
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto.so");
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
           if (which_library == WHICH_LIBRARY_LIBTARANTOOL) ld_run_path_part.append("/libtarantool.so");
           //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet.so");
@@ -5139,9 +5173,11 @@ void ldbms_get_library(QString ocelot_ld_run_path,
           *library_handle= dlopen_handle;
 #endif //#ifdef OCELOT_OS_LINUX
 #ifdef OCELOT_OS_NONLINUX
+#if (OCELOT_MYSQL_INCLUDE == 1)
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBCRYPTO) ld_run_path_part.append("/libcrypto");
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
           if (which_library == WHICH_LIBRARY_LIBTARANTOOL) ld_run_path_part.append("/libtarantool");
           //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) ld_run_path_part.append("/libtarantoolnet");
@@ -5168,29 +5204,37 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     if (*is_library_loaded == 0)
     {
 #ifdef OCELOT_OS_LINUX
+#if (OCELOT_MYSQL_INCLUDE == 1)
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) dlopen_handle= dlopen("libmysqlclient.so.18",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) dlopen_handle= dlopen("libcrypto.so",  RTLD_DEEPBIND | RTLD_NOW);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL) dlopen_handle= dlopen("libtarantool.so",  RTLD_DEEPBIND | RTLD_NOW);
       //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) dlopen_handle= dlopen("libtarantoolnet.so",  RTLD_DEEPBIND | RTLD_NOW);
 #endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
       if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) dlopen_handle= dlopen("libmariadbclient.so",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBMARIADB) dlopen_handle= dlopen("libmariadb.so",  RTLD_DEEPBIND | RTLD_NOW);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
       if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
       else *is_library_loaded= 1;
       *library_handle= dlopen_handle;
 #endif //#ifdef OCELOT_OS_LINUX
 #ifdef OCELOT_OS_NONLINUX
+#if (OCELOT_MYSQL_INCLUDE == 1)
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysql");
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysql");
       if (which_library == WHICH_LIBRARY_LIBCRYPTO) lib.setFileName("libeay32");
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL) lib.setFileName("libtarantool");
       //if (which_library == WHICH_LIBRARY_LIBTARANTOOLNET) lib.setFileName("libtarantoolnet");
 #endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
       if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) lib.setFileName("libmariadbclient");
       if (which_library == WHICH_LIBRARY_LIBMARIADB) lib.setFileName("libmariadb");
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
       *is_library_loaded= lib.load();
       error_string= lib.errorString();
 #endif //#ifdef OCELOT_OS_NONLINUX
@@ -5205,6 +5249,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     {
       QString s= "";
 #ifdef OCELOT_OS_LINUX
+#if (OCELOT_MYSQL_INCLUDE == 1)
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
       {
         t__mysql_affected_rows= (tmysql_affected_rows) dlsym(dlopen_handle, "mysql_affected_rows"); if (dlerror() != 0) s.append("mysql_affected_rows ");
@@ -5257,6 +5302,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         t__AES_set_decrypt_key= (tAES_set_decrypt_key) dlsym(dlopen_handle, "AES_set_decrypt_key"); if (dlerror() != 0) s.append("AES_set_decrypt_key ");
         t__AES_decrypt= (tAES_decrypt) dlsym(dlopen_handle, "AES_decrypt"); if (dlerror() != 0) s.append("AES_decrypt ");
       }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
       {
@@ -5318,6 +5364,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 #endif
 #endif //#ifdef OCELOT_OS_LINUX
 #ifdef OCELOT_OS_NONLINUX
+#if (OCELOT_MYSQL_INCLUDE == 1)
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
       {
         if ((t__mysql_affected_rows= (tmysql_affected_rows) lib.resolve("mysql_affected_rows")) == 0) s.append("mysql_affected_rows ");
@@ -5370,6 +5417,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__AES_set_decrypt_key= (tAES_set_decrypt_key) lib.resolve("AES_set_decrypt_key")) == 0) s.append("AES_set_decrypt_key ");
         if ((t__AES_decrypt= (tAES_decrypt) lib.resolve("AES_decrypt")) == 0) s.append("AES_decrypt ");
       }
+#endif //if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
       if (which_library == WHICH_LIBRARY_LIBTARANTOOL)
       {
@@ -5389,6 +5437,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
     }
   }
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
   my_ulonglong ldbms_mysql_affected_rows(MYSQL *mysql)
   {
     return t__mysql_affected_rows(mysql);
@@ -5550,6 +5599,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     t__AES_decrypt(a, b, c);
   }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 #ifdef DBMS_TARANTOOL
   uint32_t ldbms_mp_decode_array(const char **data)
@@ -5893,13 +5943,16 @@ public:
   unsigned int *result_field_charsetnrs;           /* dynamic-sized list of character set numbers */
   unsigned int *result_field_flags;                /* dynamic-sized list of flags */
   unsigned long result_row_number;                    /* row number in result set */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   MYSQL_ROW row;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   int is_paintable;
   unsigned int max_text_edit_frames_count;                       /* used for a strange error check during paint events */
 
   unsigned int result_grid_widget_max_height_in_lines;
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
   MYSQL_FIELD *mysql_fields;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   QScrollArea *grid_scroll_area;
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
@@ -6282,6 +6335,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 #define OCELOT_DATA_TYPE_VARBINARY   10002
 #define OCELOT_DATA_TYPE_TEXT        10003
 #define OCELOT_DATA_TYPE_SCALAR      12001     /* Tarantool */
+
 /*
   Return true if what's at pointer has an image signature.
   We only do this for Tarantool, we set data type = OCELOT_DATA_TYPE_BLOB
@@ -6338,9 +6392,13 @@ QString fillup(MYSQL_RES *mysql_res,
   else
 #endif
   {
+#if (OCELOT_MYSQL_INCLUDE == 1)
     result_column_count= lmysql->ldbms_mysql_num_fields(grid_mysql_res);
     result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
     mysql_fields= lmysql->ldbms_mysql_fetch_fields(grid_mysql_res);
+#else
+    ;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
   result_max_column_widths= new unsigned int[result_column_count];
   result_field_types= new unsigned short int[result_column_count];
@@ -6362,10 +6420,14 @@ QString fillup(MYSQL_RES *mysql_res,
   }
   else
 #endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
     scan_rows(result_column_count, result_row_count,
               grid_mysql_res,
               &result_set_copy, &result_set_copy_rows,
               &result_max_column_widths);
+#else
+    {;}
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
   {
@@ -6380,11 +6442,13 @@ QString fillup(MYSQL_RES *mysql_res,
   else
 #endif
   {
+#if (OCELOT_MYSQL_INCLUDE == 1)
     scan_field_names("name", result_column_count, &result_field_names);
     /* Next three scan_field_names calls are only needed if user will edit the result set */
     scan_field_names("org_name", result_column_count, &result_original_field_names);
     scan_field_names("org_table", result_column_count, &result_original_table_names);
     scan_field_names("db", result_column_count, &result_original_database_names);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
 #ifdef DBMS_TARANTOOL
   /* Scan entire result set to determine if NUM_FLAG should go on. */
@@ -6436,12 +6500,14 @@ QString fillup(MYSQL_RES *mysql_res,
 #endif
 
   {
+#if (OCELOT_MYSQL_INCLUDE == 1)
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
       result_field_types[i]= mysql_fields[i].type;
       result_field_charsetnrs[i]= mysql_fields[i].charsetnr;
       result_field_flags[i]= mysql_fields[i].flags;
     }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
   /*
     At this point, we have:
@@ -8168,6 +8234,7 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
 }
 
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   Make a copy of mysql_res.
     It's insane that I have to make a copy of what was in mysql_res, = result_set_copy.
@@ -8279,7 +8346,7 @@ void scan_rows(unsigned int p_result_column_count,
     }
   }
 }
-
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /*
   How many UTF-8 characters are there, maximum?
@@ -8317,7 +8384,7 @@ void set_max_column_width(unsigned int v_length,
   if (j > *p_result_max_column_width) *p_result_max_column_width= j;
 }
 
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   Using the same technique as in scan_rows, make a copy of field names.
 
@@ -8371,7 +8438,7 @@ void scan_field_names(
     result_field_names_pointer+= v_lengths;
   }
 }
-
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /*
    Set alignment and height of a cell.
@@ -8388,10 +8455,10 @@ int set_alignment_and_height(int text_edit_frames_index, int grid_col, int field
   (void)(grid_col);
   TextEditWidget *cell_text_edit_widget= text_edit_widgets[text_edit_frames_index];
   /* Todo: probably MySQL should be done the same way as Tarantool, no need to check field_type */
-  if ((field_type <= MYSQL_TYPE_DOUBLE)
-   || (field_type == MYSQL_TYPE_NEWDECIMAL)
-   || (field_type == MYSQL_TYPE_LONGLONG)
-   || (field_type == MYSQL_TYPE_INT24))
+  if ((field_type <= OCELOT_DATA_TYPE_DOUBLE)
+   || (field_type == OCELOT_DATA_TYPE_NEWDECIMAL)
+   || (field_type == OCELOT_DATA_TYPE_LONGLONG)
+   || (field_type == OCELOT_DATA_TYPE_INT24))
     text_align(cell_text_edit_widget, Qt::AlignRight);
   else text_align(cell_text_edit_widget, Qt::AlignLeft);
 
@@ -8738,7 +8805,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       //{
       //  set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
       //                           column_number_within_gridx,
-      //                           MYSQL_TYPE_SHORT);
+      //                           OCELOT_DATA_TYPE_SHORT);
       //  text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
       //  ++column_number_within_gridx;
       //}
@@ -8747,7 +8814,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       {
         int w= set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
                                  column_number_within_gridx,
-                                 MYSQL_TYPE_STRING,
+                                 OCELOT_DATA_TYPE_STRING,
                                  true, maximum_width);
         /* todo: shouldn't maximum width allow for spacing between cells? */
         maximum_width= ocelot_grid_max_desired_width_in_pixels - w;

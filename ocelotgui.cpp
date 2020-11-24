@@ -386,9 +386,11 @@
   static bool ocelot_detach_statement_edit_widget= false;
 
   static int is_libmysqlclient_loaded= 0;
+#if (OCELOT_MYSQL_INCLUDE == 1)
   static int is_libcrypto_loaded= 0;
   static void *libmysqlclient_handle= NULL;
   static void *libcrypto_handle= NULL;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
   static int is_libtarantool_loaded= 0;
   //static int is_libtarantoolnet_loaded= 0;
@@ -412,8 +414,10 @@
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   static MYSQL mysql[MYSQL_MAX_CONNECTIONS];
   static int connected[MYSQL_MAX_CONNECTIONS]= {0, 0, 0, 0};
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   pthread_t debug_thread_id;
   bool debug_thread_exists= false;
   static int connections_is_connected[MYSQL_MAX_CONNECTIONS];  /* == 1 if is connected */
@@ -428,9 +432,9 @@
 #endif
 
   static ldbms *lmysql= 0;
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
   static bool is_mysql_library_init_done= false;
-
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   unsigned int mysql_errno_result= 0;
 
 
@@ -565,8 +569,13 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   /* client variable defaults */
   /* Most settings done here might be overridden when connect_mysql_options_2 reads options. */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   ocelot_dbms= "mysql";
   connections_dbms[0]= DBMS_MYSQL;
+#else
+  ocelot_dbms= "tarantool";
+  connections_dbms[0]= DBMS_TARANTOOL;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
   ocelot_statement_prompt_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1]; /* set early because initialize_widget_statement() depends on this */
   ocelot_grid_border_color= s_color_list[COLOR_BLACK*2 + 1];;
@@ -2235,8 +2244,10 @@ void MainWindow::create_menu()
   /* Qt says I should also do "addSeparator" if Motif style. Harmless. */
   ui->menuBar->addSeparator();
   /* exitAction->setPriority(QAction::LowPriority); */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   menu_help_action_libmysqlclient= menu_help->addAction(menu_strings[menu_off + MENU_HELP_LIBMYSQLCLIENT]);
   connect(menu_help_action_libmysqlclient, SIGNAL(triggered()), this, SLOT(action_libmysqlclient()));
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   menu_help_action_settings= menu_help->addAction(menu_strings[menu_off + MENU_HELP_SETTINGS]);
   connect(menu_help_action_settings, SIGNAL(triggered()), this, SLOT(action_settings()));
 }
@@ -3632,6 +3643,7 @@ void MainWindow::action_exit()
 #endif
 #endif
   }
+#if (OCELOT_MYSQL_INCLUDE == 1)
   else
   {
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -3665,6 +3677,7 @@ void MainWindow::action_exit()
     if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
 #endif
   }
+#endif //if (OCELOT_MYSQL_INCLUDE == 1)
   delete_utf8_copies();
   log("action_exit mid", 90);
   close();
@@ -4187,6 +4200,7 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 
   the_text.append("<br><br>");
   the_text.append(get_version());
+#if (OCELOT_MYSQL_INCLUDE == 1)
   if (is_mysql_library_init_done == true)
   {
     the_text.append("<br>using DBMS client library version ");
@@ -4207,6 +4221,7 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 #endif
 #endif
   }
+#endif //if (OCELOT_MYSQL_INCLUDE == 1)
   if (statement_edit_widget->dbms_version > "")
   {
     the_text.append("<br>using ");
@@ -4216,8 +4231,10 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
     the_text.append("DBMS server version ");
     the_text.append(statement_edit_widget->dbms_version);
   }
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   the_text.append("<br>Some source code related to the debugger feature is ");
   the_text.append("<br>(c) Copyright 2012 Hewlett-Packard Development Company, L.P.");
+#endif
 #if (OCELOT_STATIC_LIBRARY == 1)
   the_text.append("<br>Static-linked to MariaDB Connector C library");
   the_text.append("<br>Copyright (C) 2000 MySQL AB & MySQL Finland AB & TCX DataKonsult AB");
@@ -4314,7 +4331,7 @@ void MainWindow::action_the_manual()
   delete message_box;
 }
 
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
 void MainWindow::action_libmysqlclient()
 {
   QString the_text= "<b>libmysqlclient</b><br>\
@@ -4346,7 +4363,7 @@ void MainWindow::action_libmysqlclient()
   message_box->exec();
   delete message_box;
 }
-
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 void MainWindow::action_settings()
 {
@@ -5926,6 +5943,7 @@ int MainWindow::make_statement_ready_to_send(QString text, char *dbms_query, int
   return (strlen(dbms_query));
 }
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   select_1_row() is a convenience routine, made because frequently there are single-row selects.
   And if they are multiple-row selects, we can always do them one-at-a-time with limit and offset clauses.
@@ -5985,6 +6003,7 @@ QString MainWindow::select_1_row(const char *select_statement)
 
   return s;
 }
+#endif //if (OCELOT_MYSQL_INCLUDE == 1)
 
 /* volatile ints were here. moved up on 2019-01-01 */
 
@@ -8551,9 +8570,9 @@ void MainWindow::action_debug_timer_status()
 void* kill_thread(void* unused)
 {
   (void) unused; /* suppress "unused parameter" warning */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   char call_statement[512];
   int is_connected;
-
   is_connected= 0;
   kill_state= KILL_STATE_CONNECT_THREAD_STARTED;
   for (;;)
@@ -8576,6 +8595,7 @@ void* kill_thread(void* unused)
   }
   if (is_connected == 1) lmysql->ldbms_mysql_close(&mysql[MYSQL_KILL_CONNECTION]);
   lmysql->ldbms_mysql_thread_end();
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   return ((void*) NULL);
 }
 
@@ -8599,6 +8619,7 @@ void MainWindow::action_kill()
   }
 }
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   Implementing ^C i.e. control-C i.e. menu item Run|Kill ...
   Once an SQL statement or SQL statement series has been accepted, user input
@@ -8624,7 +8645,9 @@ void* dbms_long_query_thread(void* unused)
   dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   return ((void*) NULL);
 }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /* Todo: This assumes connection_number must be MYSQL_MAIN_CONNECTION */
 void* dbms_long_next_result_thread(void* unused)
 {
@@ -8634,6 +8657,7 @@ void* dbms_long_next_result_thread(void* unused)
   dbms_long_query_state= LONG_QUERY_STATE_ENDED;
   return ((void*) NULL);
 }
+#endif //#if (ocelot_MYSQL_INCLUDE == 1)
 
 void MainWindow::action_execute_force()
 {
@@ -8939,14 +8963,20 @@ int MainWindow::action_execute_one_statement(QString text)
         }
         if (connections_dbms[0] != DBMS_TARANTOOL)
 #endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
         mysql_res_for_new_result_set= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+#else
+        {;}
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
         if (mysql_res_for_new_result_set == 0)
         {
           /*
             Last statement did not cause a result set. We could hide the grid and shrink the
             central window with "result_grid_tab_widget[0]->hide()", but we don't.
           */
+#if (OCELOT_MYSQL_INCLUDE == 1)
           get_sql_mode(main_token_types[main_token_number], text, false, main_token_number);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
           put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
         }
         else
@@ -8962,11 +8992,13 @@ int MainWindow::action_execute_one_statement(QString text)
           {
           if (mysql_res != 0)
             {
+#if (OCELOT_MYSQL_INCLUDE == 1)
               lmysql->ldbms_mysql_free_result(mysql_res); /* This is the place we free if myql_more_results wasn't true, see below. */
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
             }
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
             mysql_res= mysql_res_for_new_result_set;
-
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
             /* We need to think better what to do if we exceed MAX_COLUMNS */
             /* ... or maybe not, it seems we got rid of MAX_COLUMNS */
             /*
@@ -8974,8 +9006,9 @@ int MainWindow::action_execute_one_statement(QString text)
               result_grid_tab_widget[0]->result_column_count= lmysql->ldbms_mysql_num_fields(mysql_res);
               but it may be unnecessary, and may cause a crash in garbage_collect()
             */
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
             result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
           }
           ResultGrid *rg;
           {
@@ -9042,12 +9075,10 @@ int MainWindow::action_execute_one_statement(QString text)
               ++result_grid_table_widget_index;
             }
           }
+#endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
           if ((connections_dbms[0] != DBMS_TARANTOOL)
            && (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION])))
-
-#else
-          if (lmysql->ldbms_mysql_more_results(&mysql[MYSQL_MAIN_CONNECTION]))
-#endif
           {
             lmysql->ldbms_mysql_free_result(mysql_res);
             /*
@@ -9094,6 +9125,7 @@ int MainWindow::action_execute_one_statement(QString text)
             log("sleep loop end", 90);
             mysql_res= 0;
           }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
         }
       }
       //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
@@ -9136,9 +9168,10 @@ void MainWindow::extra_result_set(int result_grid_table_widget_index, unsigned s
     result_grid_tab_widget->tabBar()->show(); /* is this in the wrong place? */
     if (connections_dbms[0] == DBMS_TARANTOOL)
     { result_row_count= 1; } /* TODO: YOU OUGHT TO BE DOING SOMETHING! */
+#if (OCELOT_MYSQL_INCLUDE == 1)
     else
       result_row_count= lmysql->ldbms_mysql_num_rows(mysql_res);                /* this will be the height of the grid */
-
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
     QString fillup_result= r->fillup(mysql_res,
               //&tarantool_tnt_reply,
               connections_dbms[0],
@@ -9179,6 +9212,7 @@ void MainWindow::extra_result_set(int result_grid_table_widget_index, unsigned s
 */
 int MainWindow::execute_real_query(QString query, int connection_number, const QString *alltext)
 {
+#if (OCELOT_MYSQL_INCLUDE == 1)
   /*
     If the last error was CR_SERVER_LOST 2013 or CR_SERVER_GONE_ERROR 2006,
     and it might be possible to reconnect, try.
@@ -9188,6 +9222,7 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
   {
     if (ocelot_opt_reconnect > 0) lmysql->ldbms_mysql_ping(&mysql[MYSQL_MAIN_CONNECTION]);
   }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   /* todo: figure out why you used global dbms_query for this */
   /* TODO: BUG. This statement caused a crash when ocelot_comments == 0:
          create procedure p27 ()
@@ -9219,6 +9254,7 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
   else
 #endif
   {
+#if (OCELOT_MYSQL_INCLUDE == 1)
     pthread_t thread_id;
     dbms_long_query_state= LONG_QUERY_STATE_STARTED;
     pthread_create(&thread_id, NULL, &dbms_long_query_thread, NULL);
@@ -9231,6 +9267,7 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
     pthread_join(thread_id, NULL);
     //     dbms_long_query_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], dbms_query, dbms_query_len);
     //     dbms_long_query_state= LONG_QUERY_STATE_ENDED;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
   delete []dbms_query;
   return dbms_long_query_result;
@@ -9405,10 +9442,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     history_file_to_history_widget(); /* TODO: Maybe this is the wrong time to call? */
     history_file_start("HIST", ocelot_history_hist_file_name);
+#if (OCELOT_MYSQL_INCLUDE == 1)
     if (connections_dbms[0] == DBMS_MYSQL) connect_mysql(MYSQL_MAIN_CONNECTION);
 #ifdef DBMS_MARIADB
     if (connections_dbms[0] == DBMS_MARIADB) connect_mysql(MYSQL_MAIN_CONNECTION);
 #endif
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #ifdef DBMS_TARANTOOL
     if (connections_dbms[0] == DBMS_TARANTOOL) connect_tarantool(MYSQL_MAIN_CONNECTION, "DEFAULT", "DEFAULT", "DEFAULT", "DEFAULT");
 #endif
@@ -9509,6 +9548,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     return 1;
   }
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
   /* USE or \u: mysql equivalent. */
   if (statement_type == TOKEN_KEYWORD_USE)
   {
@@ -9547,7 +9587,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     }
     return 1;
   }
-
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
   /* SOURCE or \.: mysql equivalent. */
   if (statement_type == TOKEN_KEYWORD_SOURCE)
@@ -9936,15 +9976,15 @@ int MainWindow::rehash_scan(char *error_or_ok_message)
   if ((connections_is_connected[0] == 1) && (connections_dbms[0] == DBMS_TARANTOOL))
     return rehash_scan_for_tarantool(error_or_ok_message);
 #endif
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
   MYSQL_RES *res= NULL;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   ResultGrid *rg= NULL;
 //  QString s;
   int er;                                                  /* for errors e.g. ER_NOT_CONNECTED */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   unsigned int *result_max_column_widths;                     /* dynamic-sized list of actual maximum widths in detail columns */
-
   result_max_column_widths= 0;
-
   int count_of_columns= 0;
   int count_of_tables= 0;
   int count_of_functions= 0;
@@ -9952,7 +9992,7 @@ int MainWindow::rehash_scan(char *error_or_ok_message)
   int count_of_triggers= 0;
   int count_of_events= 0;
   int count_of_indexes= 0;
-
+#endif //#OCELOT_MYSQL_INCLUDE == 1)
   /* garbage_collect from the last rehash, if any. These statements are repeated in error_return. */
   if (rehash_result_set_copy != 0) { delete [] rehash_result_set_copy; rehash_result_set_copy= 0; }
   if (rehash_result_set_copy_rows != 0) { delete [] rehash_result_set_copy_rows; rehash_result_set_copy_rows= 0; }
@@ -9964,8 +10004,8 @@ int MainWindow::rehash_scan(char *error_or_ok_message)
     er= ER_NOT_CONNECTED;
     goto error_return;
   }
+#if (OCELOT_MYSQL_INCLUDE == 1)
   char query[1024];
-
   sprintf(query, "select 'D',database(),'' "
                  "union all "
                  "select 'C',table_name,column_name "
@@ -10065,6 +10105,7 @@ int MainWindow::rehash_scan(char *error_or_ok_message)
   sprintf(error_or_ok_message, er_strings[er_off + er],
           database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
   return er;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 error_return:
   if (rg != 0) delete rg;
   /* garbage_collect from the aborted rehash. These statements are the same as ones at the start of this routine. */
@@ -10627,8 +10668,10 @@ void MainWindow::widget_sizer()
 */
 void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
 {
+#if (OCELOT_MYSQL_INCLUDE == 1)
   unsigned int mysql_warning_count;
   char mysql_error_and_state[50]; /* actually we should need less than 50 */
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   char elapsed_time_string[50];   /* actually we should need less than 50 */
   QString s1, s2;
   /* Display may include: how long the statement took, to nearest tenth of a second. Todo: fix calculation. */
@@ -10654,6 +10697,7 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
     statement_edit_widget->result= "Bad connection."; /* shouldn't happen! */
     return;
   }
+#if (OCELOT_MYSQL_INCLUDE == 1)
   mysql_errno_result= lmysql->ldbms_mysql_errno(&mysql[connection_number]);
   mysql_warning_count= lmysql->ldbms_mysql_warning_count(&mysql[connection_number]);
   if (mysql_errno_result == 0)
@@ -10721,6 +10765,7 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
     s1.append(s2);
   }
   statement_edit_widget->result= s1;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 }
 
 
@@ -12325,6 +12370,7 @@ struct reftypewords {
   return s;
 }
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   Todo: disconnect old if already connected.
   TODO: LOTS OF ERROR CHECKS NEEDED IN THIS!
@@ -12519,7 +12565,9 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   set_dbms_version_mask(statement_edit_widget->dbms_version);
   return 0;
 }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_number)
 {
   QString s2;
@@ -12535,6 +12583,7 @@ void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_num
   msgbox.setText(s1);
   msgbox.exec();
 }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /*
  We call set_dbms_version_mask(ocelot_dbms) from MainWindow() after
@@ -12653,6 +12702,7 @@ int MainWindow::next_i(int i_start, int i_increment)
   return i;
 }
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   We use sql_mode to decide whether "..." is an identifier or a literal.
   So we try to get its value at connect time or if user says
@@ -12894,6 +12944,7 @@ bool MainWindow::get_sql_mode(int who_is_calling,
   if (hparse_sql_mode_ansi_quotes == old_hparse_sql_mode_ansi_quotes) return false;
   else return true;
 }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /* 20160915: moved hparse_* and tparse_* routines to a new file. */
 #include "hparse.h"
@@ -13109,7 +13160,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   */
   statement_edit_widget->prompt_default= ocelot_prompt;
   statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
-
   statement_edit_widget->dbms_version= version;
   statement_edit_widget->dbms_database= ocelot_database;
   statement_edit_widget->dbms_port= QString::number(ocelot_port);
@@ -17319,7 +17369,9 @@ void TextEditWidget::focusInEvent(QFocusEvent *event)
 
 void connect_set_variable(QString token0, QString token2);
 void connect_read_command_line(int argc, char *argv[]);
+#if (OCELOT_MYSQL_INCLUDE == 1)
 void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 //#include <pwd.h>
 //#include <unistd.h>
@@ -17802,6 +17854,8 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   }
   //file= fopen(file_name, "r");                           /* Open specified file, read only */
   //if (file == NULL) return;                              /* (if file doesn't exist, ok, no error */
+  /* Todo: Even if OCELOT_MYSQL_INCLUDE == 0) we should be able to read mylogin.cnf, find another way to get AES_decrypt */
+#if (OCELOT_MYSQL_INCLUDE == 1)
   if (is_mylogin_cnf == 1)
   {
       /*
@@ -17875,6 +17929,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         //return 0;
       }
   }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   options_files_read.append(file_name); options_files_read.append(" ");
   char *fgets_result;
   int file_offset= 0;
@@ -18491,6 +18546,9 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
     }
 #endif
     else connections_dbms[0]= DBMS_MYSQL; /* default */
+#if (OCELOT_MYSQL_INCLUDE == 0)
+    connections_dbms[0]= DBMS_TARANTOOL; /* default if no MySQL */
+#endif //#if (OCELOT_MYSQL_INCLUDE == 0)
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS) { ocelot_client_side_functions= is_enable; return; }
@@ -18755,7 +18813,7 @@ unsigned int MainWindow::get_ocelot_protocol_as_int(QString ocelot_protocol)
   return 0;
 }
 
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   Todo: this routine calls mysql_options() iff option value != 0,
   forgetting that 0 might be non-default, or a change from non-0.
@@ -18929,6 +18987,7 @@ int options_and_connect(
   connected[connection_number]= 1;
   return 0;
 }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /*
   Convert string to long.
@@ -19096,18 +19155,17 @@ void MainWindow::copy_connect_strings_to_utf8()
   memcpy(ocelot_shared_memory_base_name_as_utf8, ocelot_shared_memory_base_name.toUtf8().constData(), tmp_shared_memory_base_name_len + 1);
 }
 
-
+#if (OCELOT_MYSQL_INCLUDE == 1)
 int MainWindow::the_connect(unsigned int connection_number)
 {
   int x;
 
   /* options_and_connect() cannot use QStrings because it is not in MainWindow */
   copy_connect_strings_to_utf8();
-
   x= options_and_connect(connection_number, ocelot_database_as_utf8);
-
   return x;
 }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /*
   We should do this after any successful connection
@@ -20544,25 +20602,25 @@ int MainWindow::setup_generate_icc_process_user_command_r_server_variables()
       for (int i= 0; i < num_fields; ++i)
       {
         t= fields[i].type;
-        if ((t == MYSQL_TYPE_LONGLONG)
+        if ((t == OCELOT_DATA_TYPE_LONGLONG)
          || (t == MYSQL_TYPE_TINY)
-         || (t == MYSQL_TYPE_SHORT)
+         || (t == OCELOT_DATA_TYPE_SHORT)
          || (t == MYSQL_TYPE_LONG)
-         || (t == MYSQL_TYPE_INT24))
+         || (t == OCELOT_DATA_TYPE_INT24))
          v_data_type= "BIGINT";
         else if ((t == MYSQL_TYPE_LONG_BLOB)
               || (t == MYSQL_TYPE_VAR_STRING)
               || (t == MYSQL_TYPE_TIMESTAMP)
               || (t == MYSQL_TYPE_SET)
               || (t == MYSQL_TYPE_ENUM)
-              || (t == MYSQL_TYPE_STRING))
+              || (t == OCELOT_DATA_TYPE_STRING))
         {
           if (fields[i].charsetnr == 63) v_data_type= "LONGBLOB";
           else v_data_type= "LONGTEXT";
         }
-        else if (t == MYSQL_TYPE_DECIMAL) v_data_type= "DECIMAL";
+        else if (t == OCELOT_DATA_TYPE_DECIMAL) v_data_type= "DECIMAL";
         else if ((t == MYSQL_TYPE_FLOAT)
-              || (t == MYSQL_TYPE_DOUBLE))
+              || (t == OCELOT_DATA_TYPE_DOUBLE))
                 v_data_type= "DOUBLE";
         else v_data_type= "UNKNOWN";
         c_variable_types << v_data_type;

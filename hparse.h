@@ -9498,7 +9498,9 @@ void MainWindow::hparse_f_statement(int block_top)
     hparse_statement_type= TOKEN_KEYWORD_SET;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     hparse_subquery_is_allowed= true;
+#if (OCELOT_MYSQL_INCLUDE == 1)
     int hparse_i_of_set_statement= hparse_i_of_last_accepted;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
     if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL_2_4) != 0)
     {
       hparse_f_expect(FLAG_VERSION_TARANTOOL_2_4, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SESSION");
@@ -9718,6 +9720,7 @@ void MainWindow::hparse_f_statement(int block_top)
        "x" is a literal or an identifier.
        Not always reliable, see get_sql_mode() for details.
     */
+#if (OCELOT_MYSQL_INCLUDE == 1)
     if (hparse_i_of_set_statement == block_top)
     {
       if (get_sql_mode(TOKEN_KEYWORD_SET, hparse_text_copy, true, hparse_i_of_set_statement) == true)
@@ -9725,6 +9728,7 @@ void MainWindow::hparse_f_statement(int block_top)
         tokens_to_keywords(hparse_text_copy, hparse_i, hparse_sql_mode_ansi_quotes);
       }
     }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW") == 1)
   {
