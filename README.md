@@ -152,7 +152,6 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="some-screenshots">Some screenshots</H2><HR>
 
-<A href="https://github.com/ocelot-inc/ocelotgui/blob/master/shot1.jpg"><img src="https://github.com/ocelot-inc/ocelotgui/blob/master/shot1.jpg" alt="shot1.jpg" align="left" height="150"></A>
 <A href="shot1.jpg"><img src="shot1.jpg" alt="shot1.jpg" align="left" height="150"></A>
 <A href="shot2.jpg"><img src="shot2.jpg" alt="shot2.jpg" height="150"></A>
 <A href="shot3.png"><img src="shot3.png" alt="shot3.png" height="150"></A>
