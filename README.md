@@ -1700,6 +1700,10 @@ http://bazaar.launchpad.net/~hp-mdbug-team/mdbug/trunk/view/head:/debugger.txt</
 
 <H3 id="Appendix-3">Appendix 3 Tarantool</H3><HR>
 
+<P>NB: There is a better description of ocelotgui for Tarantool in
+<a href="https://github.com/ocelot-inc/ocelotgui-tarantool">
+https://github.com/ocelot-inc/ocelotgui-tarantool</a>.</P>
+
 <P>Ordinarily ocelotgui is a client for
 MySQL/MariaDB, and some documentation
 assumes that. However, it is possible
