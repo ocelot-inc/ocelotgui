@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.2.0
-   Last modified: October 29 2020
+   Last modified: December 7 2020
 */
 /*
   Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
@@ -9912,11 +9912,19 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
       // todo: I think we won't get here if name doesn't start with ocelot_, but maybe make sure again
-      int er= xsettings_widget->ocelot_variable_set(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-      if (er != ER_OVERFLOW)
+      if (sub_token_types[4] == TOKEN_KEYWORD_WHERE)
       {
-        make_and_put_message_in_result(er, 0, (char*)"");
+        conditional_settings.insert(1, text);
         return 1;
+      }
+      else
+      {
+        int er= xsettings_widget->ocelot_variable_set(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]));
+        if (er != ER_OVERFLOW)
+        {
+          make_and_put_message_in_result(er, 0, (char*)"");
+          return 1;
+        }
       }
     }
   }
@@ -16757,6 +16765,78 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
   if (!(event->buttons() != 0)) left_mouse_button_was_pressed= 0;
 }
 
+/*
+  Usually use the style sheet default or style sheet from SET statements, which may be conditional.
+  Todo: Make sure there's only one statement in each conditional_settings.
+  Todo: This appends background-color. It should replace any existing background color.
+*/
+void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit)
+{
+  ResultGrid *rg= text_frame ->ancestor_result_grid_widget;
+  MainWindow *mw= rg->copy_of_parent;
+  setStyleSheet(rg->frame_color_setting); /* for drag line color */
+  if (mw->conditional_settings.count() > 0)
+  {
+    int token_offsets[100]; /* Surely a single assignable target can't have more */
+    int token_lengths[100];
+    for (int i= 0; i < mw->conditional_settings.count(); ++i)
+    {
+      QString text= mw->conditional_settings.at(i);
+      QString color= "";
+      QString value= "";
+      mw->tokenize(text.data(),
+               text.size(),
+               &token_lengths[0], &token_offsets[0], 100 - 1,
+              (QChar*)"33333", 2, "", 1);
+      QString token= "";
+      bool is_row_number_seen= false;
+      for (int j= 0; token_lengths[j] != 0; ++j)
+      {
+        token= text.mid(token_offsets[j], token_lengths[j]).toUpper();
+        if (token_lengths[j] > 1)
+        {
+          if (token.mid(0, 2) == "/*") continue;
+          if (token.mid(0, 2) == "--") continue;
+          if ((token == "SET") || (token == "WHERE") || (token == "OCELOT_GRID_BACKGROUND_COLOR")) continue;
+          if (token == "ROW_NUMBER")
+          {
+            is_row_number_seen= true;
+            continue;
+          }
+        }
+        else
+        {
+          if (token == "=") continue;
+          if (token == ";") break;
+        }
+        QString c= token.mid(0, 1);
+        if (c == "#") continue;
+        if (c == "'") token= token.mid(1, token_lengths[j] - 2);
+        if (is_row_number_seen == false)
+        {
+          char x[64];
+          strcpy(x, token.toUtf8());
+          x[token.length()]= '\0';
+          color= token;
+        }
+        else
+        {
+          value= token;
+        }
+      }
+      if (text_frame->ancestor_grid_result_row_number == value.toInt())
+      {
+        QString s= mw->ocelot_grid_style_string;
+        s.append(";background-color: " + color);
+        text_edit->setStyleSheet(s);
+        return;
+      }
+    }
+  }
+  if (text_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER) text_edit->setStyleSheet(mw->ocelot_grid_header_style_string);
+  else if (text_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL) text_edit->setStyleSheet(mw->ocelot_grid_style_string);
+  else text_edit->setStyleSheet(mw->ocelot_extra_rule_1_style_string);
+}
 
 /*
   This is an event that happens if a result-set grid cell comes into view due to scrolling.
@@ -16788,10 +16868,7 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
       {
         if (is_style_sheet_set_flag == false)
         {
-          setStyleSheet(ancestor_result_grid_widget->frame_color_setting); /* for drag line color */
-          if (cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER) text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_header_style_string);
-          else if (cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL) text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_grid_style_string);
-          else text_edit->setStyleSheet(ancestor_result_grid_widget->copy_of_parent->ocelot_extra_rule_1_style_string);
+          style_sheet_setter(this, text_edit);
           is_style_sheet_set_flag= true;
         }
         if (is_retrieved_flag == false)

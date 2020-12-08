@@ -13177,6 +13177,7 @@ int MainWindow::hparse_f_client_statement()
         return 0;
       }
     }
+    bool is_conditional_settings_possible= false;
     /* If you add to this, hparse_errmsg might not be big enough. */
     /* Todo: strvalues items are in order so you could bsearch(). */
     /* Todo: TOKEN_REFTYPE_ANY is vague, you'd do well with a reftype for ocelot_ items */
@@ -13190,6 +13191,7 @@ int MainWindow::hparse_f_client_statement()
           break;
       }
       if (i > TOKEN_KEYWORD_OCELOT_XML) hparse_f_error();
+      if (i == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) is_conditional_settings_possible= true;
     }
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
@@ -13198,6 +13200,18 @@ int MainWindow::hparse_f_client_statement()
     main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
+    if (is_conditional_settings_possible)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_WHERE, "WHERE"))
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_ROW_NUMBER, "ROW_NUMBER");
+        if (hparse_errno > 0) return 0;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_errno > 0) return 0;
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
+        if (hparse_errno > 0) return 0;
+      }
+    }
   }
   else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
   {

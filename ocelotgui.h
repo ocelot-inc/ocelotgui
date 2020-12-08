@@ -2992,6 +2992,8 @@ public:
   QString ocelot_menu_font_weight, new_ocelot_menu_font_weight;
   QString ocelot_menu_style_string;
 
+  QStringList conditional_settings;
+
   QString ocelot_language;
 
   /* Strings for CONNECT. Some of these will be converted e.g. ocelot_host to ocelot_host_as_utf8 */
@@ -3545,6 +3547,7 @@ private:
   void history_file_to_history_widget();           /* see comment=tee+hist */
 public:
   void statement_edit_widget_setstylesheet();
+  void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
 private:
   bool is_statement_complete(QString);
   void message_box(QString the_title, QString the_text);
@@ -3582,7 +3585,6 @@ private:
 #define FLAG_FOR_HIGHLIGHTS 1
 #define FLAG_FOR_ERRORS     2
 
-  void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
   int token_type(QChar *token, int token_length, bool ansi_quotes);
   void initial_asserts();
   void tokens_to_keywords(QString text, int start, bool ansi_quotes);
@@ -4090,6 +4092,7 @@ private:
   int left_mouse_button_was_pressed;
   int widget_side;
   enum {LEFT= 1, RIGHT= 2, TOP= 3, BOTTOM= 4};
+  void style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit);
 };
 #endif // TEXTEDITFRAME_H
 
@@ -6509,6 +6512,12 @@ QString fillup(MYSQL_RES *mysql_res,
     }
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
+
+  if (copy_of_parent->conditional_settings.count() > 0)
+  {
+    /* Todo: filter conditional_settings so for some frames we won't need to check every time */
+  }
+
   /*
     At this point, we have:
       result_column_count, result_row_count
