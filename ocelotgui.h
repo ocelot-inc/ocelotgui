@@ -290,8 +290,9 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_COLUMN_GET,
     TOKEN_KEYWORD_COLUMN_JSON,
     TOKEN_KEYWORD_COLUMN_LIST,
-
+    TOKEN_KEYWORD_COLUMN_NAME,
     TOKEN_KEYWORD_COLUMN_NAMES,
+    TOKEN_KEYWORD_COLUMN_NUMBER,
     TOKEN_KEYWORD_COLUMN_TYPE_INFO,
 
 
@@ -1376,7 +1377,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1150
+#define KEYWORD_LIST_SIZE 1152
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1511,8 +1512,10 @@ static const keywords strvalues[]=
       {"COLUMN_GET", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_GET},
       {"COLUMN_JSON", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_JSON},
       {"COLUMN_LIST", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_LIST},
-          {"COLUMN_NAMES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COLUMN_NAMES},
-        {"COLUMN_TYPE_INFO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COLUMN_TYPE_INFO},
+      {"COLUMN_NAME", 0, 0, TOKEN_KEYWORD_COLUMN_NAME},
+      {"COLUMN_NAMES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COLUMN_NAMES},
+      {"COLUMN_NUMBER", 0, 0, TOKEN_KEYWORD_COLUMN_NUMBER},
+      {"COLUMN_TYPE_INFO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COLUMN_TYPE_INFO},
       {"COMMENT", 0, 0, TOKEN_KEYWORD_COMMENT},
         {"COMMENTS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COMMENTS},
       {"COMMIT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_COMMIT},
@@ -2582,6 +2585,7 @@ static const keywords strvalues[]=
 #if (QT_VERSION >= 0x50000)
 #include <QGuiApplication>
 #include <QScreen>
+#include <QRegularExpression>
 #else
 #include <QDesktopWidget>
 #endif
@@ -3118,6 +3122,7 @@ public:
   void hparse_f_table_index_hint_list();
   int hparse_f_table_index_hint();
   int hparse_f_table_index_list();
+  int hparse_f_comp_op();
   void hparse_f_opr_1(int,int),hparse_f_opr_2(int,int),hparse_f_opr_3(int,int),hparse_f_opr_4(int,int);
   void hparse_f_opr_5(int,int),hparse_f_opr_6(int,int),hparse_f_opr_7(int,int);
   void hparse_f_opr_8(int,int);
@@ -3472,6 +3477,7 @@ private:
   QString detached_value(QString);
   QString rect_value(QString);
   int execute_client_statement(QString text, int *additional_result);
+  int conditional_settings_insert(QString text);
   void put_diagnostics_in_result(unsigned int);
   void put_message_in_result(QString);
   void make_and_put_message_in_result(unsigned int, int, char*);
@@ -4092,6 +4098,7 @@ private:
   int left_mouse_button_was_pressed;
   int widget_side;
   enum {LEFT= 1, RIGHT= 2, TOP= 3, BOTTOM= 4};
+  bool comparer(QString opd1, QString opd2, QString opr, char field_value_flags);
   void style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit);
 };
 #endif // TEXTEDITFRAME_H

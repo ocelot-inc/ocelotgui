@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.2.0
-   Last modified: December 7 2020
+   Last modified: December 16 2020
 */
 /*
   Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
@@ -9914,8 +9914,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       // todo: I think we won't get here if name doesn't start with ocelot_, but maybe make sure again
       if (sub_token_types[4] == TOKEN_KEYWORD_WHERE)
       {
-        conditional_settings.insert(1, text);
-        return 1;
+        int er= conditional_settings_insert(text);
+        if (er != ER_OVERFLOW)
+        {
+          make_and_put_message_in_result(er, 0, (char*)"");
+          return 1;
+        }
       }
       else
       {
@@ -9930,6 +9934,114 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   }
   return 0;
 }
+
+/*
+  For a client statement: SET target = 'literal' WHERE x opr y [AND x opr y...]; + comments
+  Canonize so that style_sheet_setter() can parse easily.
+  Probably hparse will catch errors before we get here but maybe we don't call hparse.
+  Todo: Everything could be fixed-size (space padded) except the final comparand to make it even easier for style_sheet_setter().
+        And you could disallow ''s in the final comparand.
+*/
+#define MAX_CONDITIONAL_STATEMENT_TOKENS 100
+int MainWindow::conditional_settings_insert(QString text)
+{
+  int token_offsets[MAX_CONDITIONAL_STATEMENT_TOKENS];
+  int token_lengths[MAX_CONDITIONAL_STATEMENT_TOKENS];
+  tokenize(text.data(),
+           text.size(),
+           &token_lengths[0], &token_offsets[0], MAX_CONDITIONAL_STATEMENT_TOKENS - 1,
+          (QChar*)"33333", 2, "", 1);
+  QString o= "";
+  int o_token_number= 0;
+  int condition_token_number= 1000;
+  QString token;
+  for (int i= 0;; ++i)
+  {
+    token= text.mid(token_offsets[i], token_lengths[i]);
+    if ((token.mid(0, 2) == "/*") || (token.mid(0, 2) == "--") || (token.mid(0, 1) == "#")) continue; /* skip comments */
+    ++o_token_number;
+    QString token_upper= token.toUpper();
+    if (o_token_number == 1)
+    {
+      if (token_upper != "SET") return ER_ERROR;
+      o.append(token_upper + " ");
+    }
+    if (o_token_number == 2)
+    {
+      if (token_upper != "OCELOT_GRID_BACKGROUND_COLOR") return ER_ERROR;
+      o.append(token_upper + " ");
+    }
+    if (o_token_number == 3)
+    {
+      if (token != "=") return ER_OVERFLOW;
+      o.append(token_upper + " ");
+    }
+    if (o_token_number == 4)
+    {
+      if ((token.left(1) != "'") || (token.right(1) != "'")) return ER_ILLEGAL_VALUE;
+      token= token.mid(1, token.size() -2);
+      QString ccn= canonical_color_name(token);
+      if (ccn == "") return ER_UNKNOWN_COLOR;
+      o.append("'" + ccn.toLower() + "' ");
+    }
+    if (o_token_number == 5)
+    {
+      if (token_upper != "WHERE") return ER_ERROR;
+      o.append(token_upper + " ");
+      condition_token_number= 6;
+      continue;
+    }
+    if (o_token_number == condition_token_number)
+    {
+      if ((token_upper != "COLUMN_NAME")
+       && (token_upper != "COLUMN_NUMBER")
+       && (token_upper != "ROW_NUMBER")
+       && (token_upper != "VALUE"))
+        return ER_ERROR;
+      o.append(token_upper + " ");
+    }
+    if (o_token_number == condition_token_number + 1)
+    {
+      if ((token_upper != "=")
+       && (token_upper != ">=")
+       && (token_upper != ">")
+       && (token_upper != "<=")
+       && (token_upper != "<")
+       && (token_upper != "<>")
+       && (token_upper != "==")
+       && (token_upper != "!=")
+       && (token_upper != "IS")
+       && (token_upper != "REGEXP"))
+        return ER_ERROR;
+      o.append(token_upper + " ");
+    }
+    if (o_token_number == condition_token_number + 2)
+    {
+      if (token.size() == 0) return ER_ILLEGAL_VALUE;
+      o.append(token + " ");
+    }
+    if (o_token_number == condition_token_number + 3)
+    {
+      if (token == ";")
+      {
+        o.append(";");
+        break;
+      }
+      else if (token_upper == "AND")
+      {
+        o.append(token_upper + " ");
+        condition_token_number= condition_token_number + 4;
+      }
+      else return ER_ERROR;
+    }
+    if (o_token_number > condition_token_number + 3) return ER_OVERFLOW;
+  }
+  /* This makes maximum number of statements = 1. It should be temporary! */
+  conditional_settings.clear();
+  conditional_settings.insert(0, o);
+  return 0;
+}
+
 
 /*
   REHASH
@@ -11472,7 +11584,7 @@ void MainWindow::initial_asserts()
   //   printf("ii=%d\n", ii);
   //   printf("k=%s.\n", k);
   //   p_item= (char*) bsearch(k, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
-   //   assert(p_item != NULL);
+  //   assert(p_item != NULL);
   //   index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
   //   printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
   //   if (index != strvalues[ii].token_keyword) exit(0);
@@ -16765,77 +16877,178 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
   if (!(event->buttons() != 0)) left_mouse_button_was_pressed= 0;
 }
 
+
+/*
+  If opd2 is inside 'quotes', then string comparison. Else int comparison.
+  todo: when to exclude images?
+  todo: it's variable when we'll see nulls
+  todo: your idea of row number seems wrong, you're getting the display's row not the result set's row
+*/
+bool TextEditFrame::comparer(
+        QString opd1,
+        QString opd2,
+        QString opr,                /* = or >= or > or <= or < or <> or == or != or IS NULL or LIKE */
+        char field_value_flags)     /* FIELD_VALUE_FLAG_IS_NULL FIELD_VALUE_FLAG_IS_IMAGE etc. */
+{
+  if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0)
+  {
+    return (opr == "IS");
+  }
+  if (opd2.mid(0, 1) == "'")
+  {
+    QString opd1_str= opd1.toUpper();
+    QString opd2_str= opd2.mid(1, opd2.size() - 2).toUpper();
+    if ((opr == "=") || (opr == "==")) return (opd1_str == opd2_str);
+    if (opr == ">=") return (opd1_str >= opd2_str);
+    if (opr == ">") return (opd1_str > opd2_str);
+    if (opr == "<=") return (opd1_str <= opd2_str);
+    if (opr == "<") return (opd1_str < opd2_str);
+    if ((opr == "<>") || (opr == "!=")) return (opd1_str != opd2_str);
+#if (QT_VERSION >= 0x50000)
+    if (opr == "REGEXP")
+    {
+      QRegularExpression re(opd2_str);
+      QRegularExpressionMatch match= re.match(opd1_str);
+      return match.hasMatch();
+    }
+#endif
+    return false;
+  }
+  else
+  {
+    int opd1_int= opd1.toInt();
+    int opd2_int= opd2.toInt();
+    if ((opr == "=") || (opr == "==")) return (opd1_int == opd2_int);
+    if (opr == ">=") return (opd1_int >= opd2_int);
+    if (opr == ">") return (opd1_int > opd2_int);
+    if (opr == "<=") return (opd1_int <= opd2_int);
+    if (opr == "<") return (opd1_int < opd2_int);
+    if ((opr == "<>") || (opr == "!=")) return (opd1_int != opd2_int);
+    return false;
+  }
+  return false;
+}
+
 /*
   Usually use the style sheet default or style sheet from SET statements, which may be conditional.
-  Todo: Make sure there's only one statement in each conditional_settings.
-  Todo: This appends background-color. It should replace any existing background color.
+  Note: If there are conditions then we aren't checking is_style_sheet_set_flag,
+        we are checking whether background color is different after evaluating the condition.
+        This seems to avoid earlier bugs but it's checking conditions more often than necessary.
+        Maybe speed up by doing something clever with is_retrieved_flag.
+        Maybe speed up by making canonical version with fixed lengths so there's no need to call tokenize.
+  Todo: We clear conditional_settings before inserting, so temporarily there can't be more than one.
+  Todo: Call SELECT * FROM "_vindex"; then call it again. Second time, there are calls to setStyleSheet(). Why?
+  Todo: You are splitting into separate statements if there are carriage returns, as is typical with SET.
+        It's somewhere in get_next_statement_in_string().
+  Todo: Allow viewing conditional statements
+  Todo: Allow clearing all conditional statements
+  Todo: Allow setup of conditional statements in Settings menu
+  Todo: SET ocelot_grid_background_color='blue', ocelot_grid_color='red' WHERE row = 5 AND column_name REGEX 'x';
+  Todo: More comparands e.g. TYPE = 'binary'.
+  Todo: Test with vertical=1.
 */
 void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit)
 {
   ResultGrid *rg= text_frame ->ancestor_result_grid_widget;
   MainWindow *mw= rg->copy_of_parent;
-  setStyleSheet(rg->frame_color_setting); /* for drag line color */
   if (mw->conditional_settings.count() > 0)
   {
-    int token_offsets[100]; /* Surely a single assignable target can't have more */
-    int token_lengths[100];
+    int token_offsets[MAX_CONDITIONAL_STATEMENT_TOKENS];
+    int token_lengths[MAX_CONDITIONAL_STATEMENT_TOKENS];
     for (int i= 0; i < mw->conditional_settings.count(); ++i)
     {
       QString text= mw->conditional_settings.at(i);
-      QString color= "";
-      QString value= "";
       mw->tokenize(text.data(),
                text.size(),
-               &token_lengths[0], &token_offsets[0], 100 - 1,
+               &token_lengths[0], &token_offsets[0], MAX_CONDITIONAL_STATEMENT_TOKENS - 1,
               (QChar*)"33333", 2, "", 1);
-      QString token= "";
-      bool is_row_number_seen= false;
-      for (int j= 0; token_lengths[j] != 0; ++j)
+      int token_index= 4; /* We're sure that WHERE comes after SET ocelot_grid_background_color='...' */
+      while ((token_lengths[token_index] != 5) || (text.mid(token_offsets[token_index], 5) != "WHERE")) ++token_index;
+      bool result= false;
+      for (;;)
       {
-        token= text.mid(token_offsets[j], token_lengths[j]).toUpper();
-        if (token_lengths[j] > 1)
+        QString target= text.mid(token_offsets[token_index + 1], token_lengths[token_index + 1]);
+        QString opr= text.mid(token_offsets[token_index + 2], token_lengths[token_index + 2]);
+        QString value= text.mid(token_offsets[token_index + 3], token_lengths[token_index + 3]);
+        QString and_or_semicolon= text.mid(token_offsets[token_index + 4], token_lengths[token_index + 4]);
+        if (target == "COLUMN_NAME")
         {
-          if (token.mid(0, 2) == "/*") continue;
-          if (token.mid(0, 2) == "--") continue;
-          if ((token == "SET") || (token == "WHERE") || (token == "OCELOT_GRID_BACKGROUND_COLOR")) continue;
-          if (token == "ROW_NUMBER")
+          char *result_field_names_pointer= &rg->result_field_names[0];
+          unsigned int v_length;
+          for (unsigned int i= 0; i < rg->result_column_count; ++i)
           {
-            is_row_number_seen= true;
-            continue;
+            memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+            result_field_names_pointer+= sizeof(unsigned int);
+            if (i == (unsigned int) text_frame->ancestor_grid_column_number)
+            {
+              QString s= QString(QByteArray(result_field_names_pointer, v_length));
+              result= comparer(s, value, opr, 0);
+              break;
+            }
+            result_field_names_pointer+= v_length;
           }
         }
-        else
+        if (target == "COLUMN_NUMBER")
+          result= comparer(QString::number(text_frame->ancestor_grid_column_number), value, opr, 0);
+        if (target == "ROW_NUMBER")
         {
-          if (token == "=") continue;
-          if (token == ";") break;
+          result= comparer(QString::number(text_frame->ancestor_grid_result_row_number), value, opr, 0);
         }
-        QString c= token.mid(0, 1);
-        if (c == "#") continue;
-        if (c == "'") token= token.mid(1, token_lengths[j] - 2);
-        if (is_row_number_seen == false)
+        if (target == "VALUE")
         {
-          char x[64];
-          strcpy(x, token.toUtf8());
-          x[token.length()]= '\0';
-          color= token;
+          if (text_frame->content_pointer == 0)
+          {
+            result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
+          }
+          else
+          {
+            QString s= QString(QByteArray(text_frame->content_pointer, text_frame->content_length));
+            /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
+            /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
+            result= comparer(s, value, opr, 0);
+          }
         }
-        else
+        if ((and_or_semicolon == "AND") && (result == true))
         {
-          value= token;
+          token_index= token_index + 4;
+          continue;
         }
+        break; /* either we've reached ; or we've seen false so there's no point doing more evaluating */
       }
-      if (text_frame->ancestor_grid_result_row_number == value.toInt())
+      QString new_style_sheet= mw->ocelot_grid_style_string;
+      if (result == true)
       {
-        QString s= mw->ocelot_grid_style_string;
-        s.append(";background-color: " + color);
-        text_edit->setStyleSheet(s);
-        return;
+        QString color= text.mid(token_offsets[3], token_lengths[3]);
+        color= color.mid(1, color.size() - 2);
+        int k= new_style_sheet.indexOf("background-color:") + 17;
+        int l= new_style_sheet.indexOf(";", k + 1);
+        new_style_sheet.replace(k, l - k, color);
       }
+      else
+      {
+        ;
+      }
+      QString old_style_sheet= text_edit->styleSheet();
+      if (new_style_sheet != old_style_sheet)
+      {
+        text_edit->setStyleSheet(new_style_sheet);
+      }
+      if (text_frame->is_style_sheet_set_flag == false)
+      {
+        text_frame->setStyleSheet(rg->frame_color_setting); /* for drag line color */
+        text_frame->is_style_sheet_set_flag= true;
+      }
+      return; /* !! Too early! We only have evaluated one condition! */
     }
   }
-  if (text_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER) text_edit->setStyleSheet(mw->ocelot_grid_header_style_string);
-  else if (text_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL) text_edit->setStyleSheet(mw->ocelot_grid_style_string);
-  else text_edit->setStyleSheet(mw->ocelot_extra_rule_1_style_string);
+  if (text_frame->is_style_sheet_set_flag == false)
+  {
+    text_frame->setStyleSheet(rg->frame_color_setting); /* for drag line color */
+    if (text_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER) text_edit->setStyleSheet(mw->ocelot_grid_header_style_string);
+    else if (text_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL) text_edit->setStyleSheet(mw->ocelot_grid_style_string);
+    else text_edit->setStyleSheet(mw->ocelot_extra_rule_1_style_string);
+    text_frame->is_style_sheet_set_flag= true;
+  }
 }
 
 /*
@@ -16844,6 +17057,7 @@ void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget
   But it's great for handling result sets that have many cells, because some actions are slow.
   For example, setStyleSheet takes 2+ seconds when there are hundreds of child widgets.
   Todo: only apply setStyleSheet if new cell or if style change
+  Todo: check if anything that we're calling from paintEvent is causing another paintEvent
 */
 void TextEditFrame::paintEvent(QPaintEvent *event)
 {
@@ -16866,11 +17080,7 @@ void TextEditFrame::paintEvent(QPaintEvent *event)
       TextEditWidget *text_edit= findChild<TextEditWidget *>();
       if (text_edit != 0)
       {
-        if (is_style_sheet_set_flag == false)
-        {
-          style_sheet_setter(this, text_edit);
-          is_style_sheet_set_flag= true;
-        }
+        style_sheet_setter(this, text_edit);
         if (is_retrieved_flag == false)
         {
           if (is_image_flag == false)

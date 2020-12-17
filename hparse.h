@@ -2071,6 +2071,20 @@ void MainWindow::hparse_f_opr_6(int who_is_calling, int allow_flags) /* Preceden
   if (hparse_errno > 0) return;
 }
 
+int MainWindow::hparse_f_comp_op()
+{
+  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">=") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<=") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<>") == 1)
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "==") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!=") == 1))
+    return 1;
+  return 0;
+}
+
 /* Most comp-ops can be chained e.g. "a <> b <> c", but not LIKE or IN. */
 void MainWindow::hparse_f_opr_7(int who_is_calling, int allow_flags) /* Precedence = 7 */
 {
@@ -2132,16 +2146,7 @@ void MainWindow::hparse_f_opr_7(int who_is_calling, int allow_flags) /* Preceden
       if (hparse_errno > 0) return;
       continue;
     }
-    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">=") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ">") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<=") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "<>") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "==") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!<") == 1)
-     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!>") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "!=") == 1))
+    if (hparse_f_comp_op() == 1) /* = or >= or > or <= or < or <> or == or != */
     {
       if (hparse_subquery_is_allowed == true)
       {
@@ -13204,12 +13209,32 @@ int MainWindow::hparse_f_client_statement()
     {
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_WHERE, "WHERE"))
       {
-        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_ROW_NUMBER, "ROW_NUMBER");
-        if (hparse_errno > 0) return 0;
-        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
-        if (hparse_errno > 0) return 0;
-        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
-        if (hparse_errno > 0) return 0;
+        for (;;)
+        {
+          if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NAME, "COLUMN_NAME") == 0)
+           && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NUMBER, "COLUMN_NUMBER") == 0)
+           && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_ROW_NUMBER, "ROW_NUMBER") == 0)
+           && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_VALUE, "VALUE") == 0))
+          {
+            hparse_f_error();
+            return 0;
+          }
+          bool is_is_seen= false;
+          if (hparse_f_comp_op() == 0)
+          {
+           if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_IS, "IS") == 1)
+           {
+             is_is_seen= true;
+             hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL");
+           }
+           else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LIKE, "REGEXP");
+          }
+          if (hparse_errno > 0) return 0;
+          if (is_is_seen == false)
+            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
+          if (hparse_errno > 0) return 0;
+          if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_AND, "AND") != 1) break;
+        }
       }
     }
   }
