@@ -9969,7 +9969,7 @@ int MainWindow::conditional_settings_insert(QString text)
     }
     if (o_token_number == 2)
     {
-      if (token_upper != "OCELOT_GRID_BACKGROUND_COLOR") return ER_ERROR;
+      if ((token_upper != "OCELOT_GRID_BACKGROUND_COLOR") && (token_upper != "OCELOT_GRID_TEXT_COLOR")) return ER_ERROR;
       o.append(token_upper + " ");
     }
     if (o_token_number == 3)
@@ -10028,7 +10028,7 @@ int MainWindow::conditional_settings_insert(QString text)
         o.append(";");
         break;
       }
-      else if (token_upper == "AND")
+      else if ((token_upper == "AND") || (token_upper == "OR"))
       {
         o.append(token_upper + " ");
         condition_token_number= condition_token_number + 4;
@@ -16946,7 +16946,6 @@ bool TextEditFrame::comparer(
   Todo: Allow setup of conditional statements in Settings menu
   Todo: SET ocelot_grid_background_color='blue', ocelot_grid_color='red' WHERE row = 5 AND column_name REGEX 'x';
   Todo: More comparands e.g. TYPE = 'binary'.
-  Todo: Test with vertical=1.
 */
 void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit)
 {
@@ -16963,65 +16962,73 @@ void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget
                text.size(),
                &token_lengths[0], &token_offsets[0], MAX_CONDITIONAL_STATEMENT_TOKENS - 1,
               (QChar*)"33333", 2, "", 1);
-      int token_index= 4; /* We're sure that WHERE comes after SET ocelot_grid_background_color='...' */
+      int token_index= 4; /* We're sure that WHERE comes after SET ocelot_grid_background|text_color='...' */
       while ((token_lengths[token_index] != 5) || (text.mid(token_offsets[token_index], 5) != "WHERE")) ++token_index;
       bool result= false;
+      QString next_clause_start= "WHERE";
+      bool is_skippable= false;
       for (;;)
       {
+        if ((next_clause_start == "AND") && (result == false)) is_skippable= true;
+        else if ((next_clause_start == "OR") && (result == true)) is_skippable= true;
+        else is_skippable= false;
         QString target= text.mid(token_offsets[token_index + 1], token_lengths[token_index + 1]);
         QString opr= text.mid(token_offsets[token_index + 2], token_lengths[token_index + 2]);
         QString value= text.mid(token_offsets[token_index + 3], token_lengths[token_index + 3]);
-        QString and_or_semicolon= text.mid(token_offsets[token_index + 4], token_lengths[token_index + 4]);
-        if (target == "COLUMN_NAME")
+        next_clause_start= text.mid(token_offsets[token_index + 4], token_lengths[token_index + 4]);
+        if (is_skippable == false)
         {
-          char *result_field_names_pointer= &rg->result_field_names[0];
-          unsigned int v_length;
-          for (unsigned int i= 0; i < rg->result_column_count; ++i)
+          if (target == "COLUMN_NAME")
           {
-            memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
-            result_field_names_pointer+= sizeof(unsigned int);
-            if (i == (unsigned int) text_frame->ancestor_grid_column_number)
+            char *result_field_names_pointer= &rg->result_field_names[0];
+            unsigned int v_length;
+            for (unsigned int i= 0; i < rg->result_column_count; ++i)
             {
-              QString s= QString(QByteArray(result_field_names_pointer, v_length));
-              result= comparer(s, value, opr, 0);
-              break;
+              memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+              result_field_names_pointer+= sizeof(unsigned int);
+              if (i == (unsigned int) text_frame->ancestor_grid_column_number)
+              {
+                QString s= QString(QByteArray(result_field_names_pointer, v_length));
+                result= comparer(s, value, opr, 0);
+                break;
+              }
+              result_field_names_pointer+= v_length;
             }
-            result_field_names_pointer+= v_length;
           }
-        }
-        if (target == "COLUMN_NUMBER")
-          result= comparer(QString::number(text_frame->ancestor_grid_column_number), value, opr, 0);
-        if (target == "ROW_NUMBER")
-        {
-          result= comparer(QString::number(text_frame->ancestor_grid_result_row_number), value, opr, 0);
-        }
-        if (target == "VALUE")
-        {
-          if (text_frame->content_pointer == 0)
+          if (target == "COLUMN_NUMBER")
+            result= comparer(QString::number(text_frame->ancestor_grid_column_number), value, opr, 0);
+          if (target == "ROW_NUMBER")
           {
-            result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
+            result= comparer(QString::number(text_frame->ancestor_grid_result_row_number), value, opr, 0);
           }
-          else
+          if (target == "VALUE")
           {
-            QString s= QString(QByteArray(text_frame->content_pointer, text_frame->content_length));
-            /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
-            /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
-            result= comparer(s, value, opr, 0);
+            if (text_frame->content_pointer == 0)
+            {
+              result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
+            }
+            else
+            {
+              QString s= QString(QByteArray(text_frame->content_pointer, text_frame->content_length));
+              /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
+              /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
+              result= comparer(s, value, opr, 0);
+            }
           }
         }
-        if ((and_or_semicolon == "AND") && (result == true))
-        {
-          token_index= token_index + 4;
-          continue;
-        }
-        break; /* either we've reached ; or we've seen false so there's no point doing more evaluating */
+        if (next_clause_start == ";") break;
+        token_index= token_index + 4; /* it's AND | OR, continue, but next condition might be skippable */
+        continue;
       }
       QString new_style_sheet= mw->ocelot_grid_style_string;
       if (result == true)
       {
+        int k;
+        QString setting= text.mid(token_offsets[1], token_lengths[1]);
+        if (setting == "OCELOT_GRID_BACKGROUND_COLOR") k= new_style_sheet.indexOf("background-color:") + 17;
+        else k= new_style_sheet.indexOf("color:" ) + 6;
         QString color= text.mid(token_offsets[3], token_lengths[3]);
         color= color.mid(1, color.size() - 2);
-        int k= new_style_sheet.indexOf("background-color:") + 17;
         int l= new_style_sheet.indexOf(";", k + 1);
         new_style_sheet.replace(k, l - k, color);
       }

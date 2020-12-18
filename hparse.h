@@ -13198,7 +13198,7 @@ int MainWindow::hparse_f_client_statement()
           break;
       }
       if (i > TOKEN_KEYWORD_OCELOT_XML) hparse_f_error();
-      if (i == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) is_conditional_settings_possible= true;
+      if ((i == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) || (i == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR))is_conditional_settings_possible= true;
     }
     if (hparse_errno > 0) return 0;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
@@ -13235,7 +13235,8 @@ int MainWindow::hparse_f_client_statement()
           if (is_is_seen == false)
             if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
           if (hparse_errno > 0) return 0;
-          if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_AND, "AND") != 1) break;
+          if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_AND, "AND") != 1)
+           && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_OR, "OR") != 1)) break;
         }
       }
     }
