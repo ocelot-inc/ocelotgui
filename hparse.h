@@ -12592,16 +12592,17 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_i_of_last_accepted= 0;
     if (hparse_i == -1) hparse_f_nexttoken();
     hparse_i_of_statement= hparse_i;
-    if (hparse_f_client_statement() == 1)
+    int hparse_f_client_statement_result= hparse_f_client_statement();
+    if (hparse_f_client_statement_result > 0)
     {
-      if (main_token_lengths[hparse_i] == 0)
+      if ((main_token_lengths[hparse_i] == 0) && (hparse_f_client_statement_result != TOKEN_KEYWORD_SET))
       {
         log("hparse_f_multi_block end", 90);
         return; /* empty token marks end of input */
       }
       if ((hparse_prev_token != ";") && (hparse_prev_token != hparse_delimiter_str))
       {
-        hparse_f_semicolon_and_or_delimiter(0);
+        if ((hparse_f_semicolon_and_or_delimiter(0) == 0) && (hparse_f_client_statement_result == TOKEN_KEYWORD_SET)) hparse_f_error();
         if (hparse_errno > 0) goto error;
         if (main_token_lengths[hparse_i] == 0)
         {
@@ -13012,6 +13013,7 @@ void MainWindow::hparse_f_other(int flags)
   SET is a special problem because it can be either client or server (flaw in our design?).
   Within client statements, reserved words don't count so we turn the reserved flag off.
   HELP is a special problem because it can be either client or server (flaw in mysql design).
+  Return 0 = not client statement, 1 = client statement but not SET, TOKEN_KEYWORD_SET = client statement specifically SET
 */
 int MainWindow::hparse_f_client_statement()
 {
@@ -13237,6 +13239,7 @@ int MainWindow::hparse_f_client_statement()
         }
       }
     }
+    return TOKEN_KEYWORD_SET;
   }
   else if ((slash_token == TOKEN_KEYWORD_SOURCE) || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SOURCE, "SOURCE") == 1))
   {
@@ -13413,9 +13416,9 @@ int MainWindow::hparse_f_client_statement()
 #endif //if (OCELOT_MYSQL_DEBUGGER == 1)
   else
   {
-    return 0;
+    return 0; /* not client statement */
   }
-  return 1;
+  return 1; /* client statement but not SET */
 }
 
 #ifdef DBMS_TARANTOOL

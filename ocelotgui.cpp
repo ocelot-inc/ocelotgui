@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.2.0
-   Last modified: December 16 2020
+   Last modified: December 18 2020
 */
 /*
   Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
@@ -1413,10 +1413,10 @@ bool MainWindow::is_statement_complete(QString text)
     break;
   }
   /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
-  /* Todo: Check: does this mean that a client statement cannot be spread over two lines? */
+  /* Todo: this means that a client statement cannot be spread over two lines but for SET client-statement we wait for ; */
   if (is_client_statement(first_token_type, first_token_i, text) == true)
   {
-    return true;
+    if (first_token_type != TOKEN_KEYWORD_SET) return true;
   }
 
   /* "go" or "ego", alone on the line, if --named-commands, is statement end */
@@ -5569,9 +5569,11 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   }
   if ((client_statement_seen == true) && (check_if_client == true))
   {
+    int client_statement_type= main_token_types[i];
     for (i= i; main_token_lengths[i] != 0; ++i)
     {
-      if (main_token_lengths[i + 1] != 0)
+      /* Client statements can end with \n alone but SET (which is Ocelot-specific not defined by MySQL) needs ; */
+      if ((main_token_lengths[i + 1] != 0) && (client_statement_type != TOKEN_KEYWORD_SET))
       {
         int j= main_token_offsets[i] + main_token_lengths[i];
         bool line_break_seen= false;
@@ -8715,7 +8717,6 @@ int MainWindow::action_execute(int force)
       }
       log("FLAG_FOR_ERRORS seen. end of if", 90);
     }
-
     /* While executing, we allow no more statements, but a few things are enabled. */
     /* This makes the menu seem to blink. If that's not OK, turn off sub-items not main menu items. */
     /* Todo: maybe other things should be disabled|enabled as we do with is_can_copy. */
