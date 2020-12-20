@@ -3283,6 +3283,7 @@ public:
   QString hparse_f_pre_rehash_search(int reftype);
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
+  int hparse_f_client_set();
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
   bool hparse_f_is_nosql(QString);

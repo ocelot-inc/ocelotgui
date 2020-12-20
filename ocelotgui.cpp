@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.2.0
-   Last modified: December 18 2020
+   Last modified: December 20 2020
 */
 /*
   Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
@@ -9913,7 +9913,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     if (sub_token_types[0] == TOKEN_KEYWORD_SET)
     {
       // todo: I think we won't get here if name doesn't start with ocelot_, but maybe make sure again
-      if (sub_token_types[4] == TOKEN_KEYWORD_WHERE)
+      if ((sub_token_types[4] == TOKEN_KEYWORD_WHERE) || (text.mid(sub_token_offsets[4], sub_token_lengths[4]) == ","))
       {
         int er= conditional_settings_insert(text);
         if (er != ER_OVERFLOW)
@@ -9953,46 +9953,58 @@ int MainWindow::conditional_settings_insert(QString text)
            &token_lengths[0], &token_offsets[0], MAX_CONDITIONAL_STATEMENT_TOKENS - 1,
           (QChar*)"33333", 2, "", 1);
   QString o= "";
-  int o_token_number= 0;
-  int condition_token_number= 1000;
   QString token;
+  int expected_token= 1;
   for (int i= 0;; ++i)
   {
     token= text.mid(token_offsets[i], token_lengths[i]);
     if ((token.mid(0, 2) == "/*") || (token.mid(0, 2) == "--") || (token.mid(0, 1) == "#")) continue; /* skip comments */
-    ++o_token_number;
     QString token_upper= token.toUpper();
-    if (o_token_number == 1)
+    if (expected_token == 1)
     {
       if (token_upper != "SET") return ER_ERROR;
       o.append(token_upper + " ");
+      expected_token= 2;
+      continue;
     }
-    if (o_token_number == 2)
+    if (expected_token == 2)
     {
       if ((token_upper != "OCELOT_GRID_BACKGROUND_COLOR") && (token_upper != "OCELOT_GRID_TEXT_COLOR")) return ER_ERROR;
       o.append(token_upper + " ");
+      expected_token= 3;
+      continue;
     }
-    if (o_token_number == 3)
+    if (expected_token == 3)
     {
-      if (token != "=") return ER_OVERFLOW;
+      if (token != "=") return ER_ERROR;
       o.append(token_upper + " ");
+      expected_token= 4;
+      continue;
     }
-    if (o_token_number == 4)
+    if (expected_token == 4)
     {
       if ((token.left(1) != "'") || (token.right(1) != "'")) return ER_ILLEGAL_VALUE;
       token= token.mid(1, token.size() -2);
       QString ccn= canonical_color_name(token);
       if (ccn == "") return ER_UNKNOWN_COLOR;
       o.append("'" + ccn.toLower() + "' ");
-    }
-    if (o_token_number == 5)
-    {
-      if (token_upper != "WHERE") return ER_ERROR;
-      o.append(token_upper + " ");
-      condition_token_number= 6;
+      expected_token= 5;
       continue;
     }
-    if (o_token_number == condition_token_number)
+    if (expected_token == 5)
+    {
+      if (token == ",")
+      {
+        o.append(", ");
+        expected_token= 2;
+        continue;
+      }
+      if (token_upper != "WHERE") return ER_ERROR;
+      o.append(token_upper + " ");
+      expected_token= 6;
+      continue;
+    }
+    if (expected_token == 6)
     {
       if ((token_upper != "COLUMN_NAME")
        && (token_upper != "COLUMN_NUMBER")
@@ -10000,8 +10012,10 @@ int MainWindow::conditional_settings_insert(QString text)
        && (token_upper != "VALUE"))
         return ER_ERROR;
       o.append(token_upper + " ");
+      expected_token= 7;
+      continue;
     }
-    if (o_token_number == condition_token_number + 1)
+    if (expected_token == 7)
     {
       if ((token_upper != "=")
        && (token_upper != ">=")
@@ -10015,13 +10029,17 @@ int MainWindow::conditional_settings_insert(QString text)
        && (token_upper != "REGEXP"))
         return ER_ERROR;
       o.append(token_upper + " ");
+      expected_token= 8;
+      continue;
     }
-    if (o_token_number == condition_token_number + 2)
+    if (expected_token == 8)
     {
       if (token.size() == 0) return ER_ILLEGAL_VALUE;
       o.append(token + " ");
+      expected_token= 9;
+      continue;
     }
-    if (o_token_number == condition_token_number + 3)
+    if (expected_token == 9)
     {
       if (token == ";")
       {
@@ -10031,11 +10049,11 @@ int MainWindow::conditional_settings_insert(QString text)
       else if ((token_upper == "AND") || (token_upper == "OR"))
       {
         o.append(token_upper + " ");
-        condition_token_number= condition_token_number + 4;
+        expected_token= 6;
+        continue;
       }
       else return ER_ERROR;
     }
-    if (o_token_number > condition_token_number + 3) return ER_OVERFLOW;
   }
   /* This makes maximum number of statements = 1. It should be temporary! */
   conditional_settings.clear();
@@ -17023,14 +17041,18 @@ void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget
       QString new_style_sheet= mw->ocelot_grid_style_string;
       if (result == true)
       {
-        int k;
-        QString setting= text.mid(token_offsets[1], token_lengths[1]);
-        if (setting == "OCELOT_GRID_BACKGROUND_COLOR") k= new_style_sheet.indexOf("background-color:") + 17;
-        else k= new_style_sheet.indexOf("color:" ) + 6;
-        QString color= text.mid(token_offsets[3], token_lengths[3]);
-        color= color.mid(1, color.size() - 2);
-        int l= new_style_sheet.indexOf(";", k + 1);
-        new_style_sheet.replace(k, l - k, color);
+        for (int target_index= 1;; target_index+= 4)
+        {
+          int k;
+          QString setting= text.mid(token_offsets[target_index], token_lengths[target_index]);
+          if (setting == "OCELOT_GRID_BACKGROUND_COLOR") k= new_style_sheet.indexOf("background-color:") + 17;
+          else if (setting == "OCELOT_GRID_TEXT_COLOR") k= new_style_sheet.indexOf("color:" ) + 6;
+          else break;
+          QString color= text.mid(token_offsets[target_index + 2], token_lengths[target_index + 2]);
+          color= color.mid(1, color.size() - 2);
+          int l= new_style_sheet.indexOf(";", k + 1);
+          new_style_sheet.replace(k, l - k, color);
+        }
       }
       else
       {
