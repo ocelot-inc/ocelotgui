@@ -509,7 +509,8 @@ void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype, 
     if (token != "[identifier]") return;
   }
   /* This was passing main_token_types[hparse_i], which would be the type of the unfinished input */
-  completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "K");
+  if (proposed_type == TOKEN_TYPE_OPERATOR)   completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "O");
+  else completer_widget->append_wrapper(token, hparse_token, proposed_type, main_token_flags[hparse_i], "K");
 }
 
 /*
@@ -13008,7 +13009,7 @@ void MainWindow::hparse_f_other(int flags)
 
 /*
   Called from hparse_f_client_statement() for special handling of SET ocelot_... = literal
-  Return: 0 = not ocelot_ (with hparse_errno > 0), 1 = ocelot_, 3 = ocelot_ and conditional setting possible
+  Return: 0 = not ocelot_ (with hparse_errno > 0), 1 = ocelot_ but no conditional possible, 3 = ocelot_ and conditional possible
   Todo: if it ends with _COLOR then be specific about what color literals are ok
   Todo: if it can be conditional then , is ok but later WHERE is mandatory
   If you add to this, hparse_errmsg might not be big enough.
@@ -13021,12 +13022,31 @@ void MainWindow::hparse_f_other(int flags)
 int MainWindow::hparse_f_client_set()
 {
   bool is_conditional_settings_possible= false;
-  int i;
+
+  int flags= 0; /* 1 = grid_background_color seen. 2 = grid_text_color seen. */
+
+  for (int i= hparse_i_of_last_accepted;;)
   {
-    for (i= TOKEN_KEYWORD_OCELOT_BATCH; i <= TOKEN_KEYWORD_OCELOT_XML; ++i)
+    if ((i == 0) || (main_token_types[i] == TOKEN_KEYWORD_SET)) break;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) flags|= 1;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR) flags|= 2;
+    i= next_i(i, -1);
+  }
+
+  if (flags == 1 + 2) return 0; /* all flags seen? */
+  if (flags != 0) /* at least one flag seen? */
+  {
+     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 0) return 0;
+  }
+
+  int i_of_keyword;
+  {
+    for (i_of_keyword= TOKEN_KEYWORD_OCELOT_BATCH; i_of_keyword <= TOKEN_KEYWORD_OCELOT_XML; ++i_of_keyword)
     {
-      if ((i == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) || (i == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR))
+      if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR))
       {
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) && ((flags & 1) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR) && ((flags & 2) != 0)) continue;
         is_conditional_settings_possible= true;
       }
       else
@@ -13034,17 +13054,40 @@ int MainWindow::hparse_f_client_set()
         if (main_token_types[hparse_i_of_last_accepted] != TOKEN_KEYWORD_SET) continue;
         is_conditional_settings_possible= false;
       }
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,i, strvalues[i].chars) == 1)
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,i_of_keyword, strvalues[i_of_keyword].chars) == 1)
         break;
     }
-    if (i > TOKEN_KEYWORD_OCELOT_XML) hparse_f_error();
+    if (i_of_keyword > TOKEN_KEYWORD_OCELOT_XML) hparse_f_error();
   }
   if (hparse_errno > 0) return 0;
+
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
   if (hparse_errno > 0) return 0;
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-  if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
+
+  if (xsettings_widget->ocelot_variable_is_color(i_of_keyword) == true)
+  {
+    int q_i= 0;
+    bool is_color_found= false;
+    for (; strcmp(s_color_list[q_i]," ") > 0; q_i+= 2)
+    {
+      char tmp[64];
+      strcpy(tmp, "'");
+      strcat(tmp, s_color_list[q_i]);
+      strcat(tmp, "'");
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, tmp) == 1)
+      {
+        is_color_found= true;
+        break;
+      }
+    }
+    if (is_color_found == false)
+    {
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+    }
+  }
+  else if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
   if (hparse_errno > 0) return 0;
   if (is_conditional_settings_possible == true) return 3;
   return 1;
@@ -13232,32 +13275,36 @@ int MainWindow::hparse_f_client_statement()
     if (hparse_errno > 0) return 0;
     if (hparse_client_set_result == 3) /* i.e. is conditional_settings possible? */
     {
-      while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",")) hparse_f_client_set();
+      while (hparse_f_client_set() == 3) {;} /* possible series of "," + ocelot_grid color settings */
+      if (hparse_errno > 0) return 0;
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_WHERE, "WHERE"))
       {
         for (;;)
         {
-          if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NAME, "COLUMN_NAME") == 0)
-           && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NUMBER, "COLUMN_NUMBER") == 0)
-           && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_ROW_NUMBER, "ROW_NUMBER") == 0)
-           && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_VALUE, "VALUE") == 0))
-          {
-            hparse_f_error();
-            return 0;
-          }
+          int tlf= TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT;
+          if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NAME, "COLUMN_NAME") == 1) tlf= TOKEN_LITERAL_FLAG_STRING;
+          else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NAME, "COLUMN_NUMBER") == 1) tlf= TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER;
+          else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NAME, "ROW_NUMBER") == 1) tlf= TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER;
+          else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NAME, "VALUE") == 1) tlf= TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT;
+          else hparse_f_error();
+          if (hparse_errno > 0) return 0;
           bool is_is_seen= false;
           if (hparse_f_comp_op() == 0)
           {
-           if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_IS, "IS") == 1)
-           {
-             is_is_seen= true;
-             hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL");
-           }
-           else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LIKE, "REGEXP");
+            if ((tlf & TOKEN_LITERAL_FLAG_STRING) != 0)
+            {
+              if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_IS, "IS") == 1)
+              {
+                is_is_seen= true;
+                hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL");
+              }
+              else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LIKE, "REGEXP");
+            }
+            else hparse_f_error();
           }
           if (hparse_errno > 0) return 0;
           if (is_is_seen == false)
-            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
+            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, tlf) == 0) hparse_f_error();
           if (hparse_errno > 0) return 0;
           if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_AND, "AND") != 1)
            && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_OR, "OR") != 1)) break;

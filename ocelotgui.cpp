@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.2.0
-   Last modified: December 20 2020
+   Last modified: December 22 2020
 */
 /*
   Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
@@ -16674,6 +16674,7 @@ void Completer_widget::set_current_row(int new_current_row)
       else if (s2 == "I") s= s + "an Index name.";
       else if (s2 == "i") s= s + "an identifier.";
       else if (s2 == "K") s= s + "a Keyword.";
+      else if (s2 == "O") s= s + "an Operator.";
       else if (s2 == "P") s= s + "a Procedure name.";
       else if (s2 == "T") s= s + "A Table name.";
       else if (s2 == "t") s= s + "a Trigger name.";
@@ -23439,7 +23440,7 @@ int XSettings::ocelot_variables_create()
   {
     {NULL, &ocelot_batch,  1, 0, 0, TOKEN_KEYWORD_OCELOT_BATCH},
     {NULL, &ocelot_client_side_functions,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS},
-    {NULL, &ocelot_completer_timeout,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_COMPLETER_TIMEOUT},
+    {NULL, &ocelot_completer_timeout,  1000000, 0, 0, TOKEN_KEYWORD_OCELOT_COMPLETER_TIMEOUT},
     {&main_window->ocelot_dbms, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_DBMS},
     {&main_window->ocelot_debug_detached, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED},
     {&main_window->ocelot_debug_height, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_HEIGHT},

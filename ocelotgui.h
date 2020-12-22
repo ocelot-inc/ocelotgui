@@ -11270,7 +11270,7 @@ struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
   short unsigned int *int_target;         /* e.g. NULL */
   int maximum;                            /* e.g. -1 because it's not an int target */
-  unsigned char flags_style;              /* e.g. OCELOT_VARIABLE_FLAG_STYLE_COLOR */
+  unsigned char flags_style;              /* e.g. OCELOT_VARIABLE_FLAG_SET_COLOR */
   unsigned char enums_for;                /* e.g. OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT */
   unsigned short int k_i;                 /* keyword_index */
 };
