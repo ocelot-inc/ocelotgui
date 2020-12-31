@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.2.0
-   Last modified: December 22 2020
+   Last modified: December 30 2020
 */
 /*
   Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
@@ -9954,6 +9954,7 @@ int MainWindow::conditional_settings_insert(QString text)
           (QChar*)"33333", 2, "", 1);
   QString o= "";
   QString token;
+  QString token_2;
   int expected_token= 1;
   for (int i= 0;; ++i)
   {
@@ -9969,7 +9970,15 @@ int MainWindow::conditional_settings_insert(QString text)
     }
     if (expected_token == 2)
     {
-      if ((token_upper != "OCELOT_GRID_BACKGROUND_COLOR") && (token_upper != "OCELOT_GRID_TEXT_COLOR")) return ER_ERROR;
+      if ((token_upper != "OCELOT_GRID_BACKGROUND_COLOR")
+       && (token_upper != "OCELOT_GRID_TEXT_COLOR")
+       && (token_upper != "OCELOT_GRID_FONT_SIZE")
+       && (token_upper != "OCELOT_GRID_BORDER_COLOR")
+       && (token_upper != "OCELOT_GRID_FONT_STYLE")
+       && (token_upper != "OCELOT_GRID_FONT_WEIGHT")
+       && (token_upper != "OCELOT_GRID_FONT_FAMILY")
+       && (token_upper != "OCELOT_GRID_BORDER_SIZE")) return ER_ERROR;
+      token_2= token_upper;
       o.append(token_upper + " ");
       expected_token= 3;
       continue;
@@ -9983,11 +9992,15 @@ int MainWindow::conditional_settings_insert(QString text)
     }
     if (expected_token == 4)
     {
-      if ((token.left(1) != "'") || (token.right(1) != "'")) return ER_ILLEGAL_VALUE;
-      token= token.mid(1, token.size() -2);
-      QString ccn= canonical_color_name(token);
-      if (ccn == "") return ER_UNKNOWN_COLOR;
-      o.append("'" + ccn.toLower() + "' ");
+      if (token_2.left(17) == "OCELOT_GRID_FONT_") o.append(token + " ");
+      else if (token_2 == "OCELOT_GRID_BORDER_SIZE") o.append(token + " ");
+      else {
+        if ((token.left(1) != "'") || (token.right(1) != "'")) return ER_ILLEGAL_VALUE;
+        token= token.mid(1, token.size() -2);
+        QString ccn= canonical_color_name(token);
+        if (ccn == "") return ER_UNKNOWN_COLOR;
+        o.append("'" + ccn.toLower() + "' ");
+      }
       expected_token= 5;
       continue;
     }
@@ -17045,14 +17058,36 @@ void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget
         for (int target_index= 1;; target_index+= 4)
         {
           int k;
+          QString setting_value= text.mid(token_offsets[target_index + 2], token_lengths[target_index + 2]);
+          if (setting_value.mid(0, 1) == "'") setting_value= setting_value.mid(1, setting_value.size() - 2);
           QString setting= text.mid(token_offsets[target_index], token_lengths[target_index]);
           if (setting == "OCELOT_GRID_BACKGROUND_COLOR") k= new_style_sheet.indexOf("background-color:") + 17;
-          else if (setting == "OCELOT_GRID_TEXT_COLOR") k= new_style_sheet.indexOf("color:" ) + 6;
+          else if (setting == "OCELOT_GRID_TEXT_COLOR") k= new_style_sheet.indexOf("color:") + 6;
+          else if (setting == "OCELOT_GRID_FONT_SIZE")
+          {
+            k= new_style_sheet.indexOf("font-size:") + 10;
+            setting_value= setting_value + "pt";
+          }
+          else if (setting == "OCELOT_GRID_BORDER_COLOR")
+          {
+            k= new_style_sheet.indexOf("border:") + 7;
+            k= new_style_sheet.indexOf(" ", k) + 1;
+            k= new_style_sheet.indexOf(" ", k) + 1;
+          }
+          else if (setting == "OCELOT_GRID_FONT_STYLE") k= new_style_sheet.indexOf("font-style:") + 11;
+          else if (setting == "OCELOT_GRID_FONT_WEIGHT") k= new_style_sheet.indexOf("font-weight:") + 12;
+          else if (setting == "OCELOT_GRID_FONT_FAMILY") k= new_style_sheet.indexOf("font-family:") + 12;
+          else if (setting == "OCELOT_GRID_BORDER_SIZE")
+          {
+            k= new_style_sheet.indexOf("border:") + 7;
+            setting_value= setting_value + "px";
+          }
           else break;
-          QString color= text.mid(token_offsets[target_index + 2], token_lengths[target_index + 2]);
-          color= color.mid(1, color.size() - 2);
-          int l= new_style_sheet.indexOf(";", k + 1);
-          new_style_sheet.replace(k, l - k, color);
+          int l;
+          if (setting == "OCELOT_GRID_BORDER_SIZE") l= new_style_sheet.indexOf(" ", k + 1);
+          else l= new_style_sheet.indexOf(";", k + 1);
+          if (l == -1) l= new_style_sheet.size();
+          new_style_sheet.replace(k, l - k, setting_value);
         }
       }
       else

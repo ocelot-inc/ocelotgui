@@ -13023,17 +13023,24 @@ int MainWindow::hparse_f_client_set()
 {
   bool is_conditional_settings_possible= false;
 
-  int flags= 0; /* 1 = grid_background_color seen. 2 = grid_text_color seen. */
-
+  /* 1=grid_background_color. 2=grid_text_color. 4=grid_font_size. 8=grid_border_color.
+     16=grid_font_style. 32=grid_font_weight. 64=grid_font_family. 128=grid_border_size*/
+  int flags= 0;
   for (int i= hparse_i_of_last_accepted;;)
   {
     if ((i == 0) || (main_token_types[i] == TOKEN_KEYWORD_SET)) break;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) flags|= 1;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR) flags|= 2;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE) flags|= 4;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR) flags|= 8;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE) flags|= 16;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT) flags|= 32;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY) flags|= 64;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) flags|= 128;
     i= next_i(i, -1);
   }
 
-  if (flags == 1 + 2) return 0; /* all flags seen? */
+  if (flags == 1 + 2 + 4 + 8 + 16 + 32 + 64 + 128) return 0; /* all flags seen? */
   if (flags != 0) /* at least one flag seen? */
   {
      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 0) return 0;
@@ -13043,10 +13050,23 @@ int MainWindow::hparse_f_client_set()
   {
     for (i_of_keyword= TOKEN_KEYWORD_OCELOT_BATCH; i_of_keyword <= TOKEN_KEYWORD_OCELOT_XML; ++i_of_keyword)
     {
-      if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR))
+      if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE))
       {
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) && ((flags & 1) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR) && ((flags & 2) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE) && ((flags & 4) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR) && ((flags & 8) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE) && ((flags & 16) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT) && ((flags & 32) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY) && ((flags & 64) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) && ((flags & 128) != 0)) continue;
         is_conditional_settings_possible= true;
       }
       else
