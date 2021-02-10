@@ -1,11 +1,11 @@
 /*
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
-   Version: 1.2.0
-   Last modified: December 30 2020
+   Version: 1.3.0
+   Last modified: Februry 9 2021
 */
 /*
-  Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
+  Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -220,7 +220,7 @@
 #define STRING_LENGTH_512 512
 
 /* MAX_HPARSE_ERRMSG_LENGTH should be enough for all keywords that begin with "OCELOT_" */
-#define MAX_HPARSE_ERRMSG_LENGTH 3600
+#define MAX_HPARSE_ERRMSG_LENGTH 3650
 
 /* Connect arguments and options */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
@@ -410,7 +410,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.2.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.3.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -4185,7 +4185,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2020 by Ocelot Computer Services Inc.<br>\
+<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2021 by Ocelot Computer Services Inc.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -4269,10 +4269,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.2.0, October 29 2020  \
+  <BR>Version 1.3.0, February 9 2021  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.  \
+  <BR>Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -9977,7 +9977,11 @@ int MainWindow::conditional_settings_insert(QString text)
        && (token_upper != "OCELOT_GRID_FONT_STYLE")
        && (token_upper != "OCELOT_GRID_FONT_WEIGHT")
        && (token_upper != "OCELOT_GRID_FONT_FAMILY")
-       && (token_upper != "OCELOT_GRID_BORDER_SIZE")) return ER_ERROR;
+       && (token_upper != "OCELOT_GRID_BORDER_SIZE")
+       && (token_upper != "OCELOT_GRID_TOOLTIP")
+       && (token_upper != "OCELOT_GRID_CELL_HEIGHT")
+       && (token_upper != "OCELOT_GRID_CELL_WIDTH"))
+         return ER_ERROR;
       token_2= token_upper;
       o.append(token_upper + " ");
       expected_token= 3;
@@ -9994,6 +9998,9 @@ int MainWindow::conditional_settings_insert(QString text)
     {
       if (token_2.left(17) == "OCELOT_GRID_FONT_") o.append(token + " ");
       else if (token_2 == "OCELOT_GRID_BORDER_SIZE") o.append(token + " ");
+      else if (token_2 == "OCELOT_GRID_TOOLTIP") o.append(token + " ");
+      else if (token_2 == "OCELOT_GRID_CELL_HEIGHT") o.append(token + " ");
+      else if (token_2 == "OCELOT_GRID_CELL_WIDTH") o.append(token + " ");
       else {
         if ((token.left(1) != "'") || (token.right(1) != "'")) return ER_ILLEGAL_VALUE;
         token= token.mid(1, token.size() -2);
@@ -10021,6 +10028,7 @@ int MainWindow::conditional_settings_insert(QString text)
     {
       if ((token_upper != "COLUMN_NAME")
        && (token_upper != "COLUMN_NUMBER")
+       && (token_upper != "COLUMN_TYPE")
        && (token_upper != "ROW_NUMBER")
        && (token_upper != "VALUE"))
         return ER_ERROR;
@@ -11594,52 +11602,54 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "119" to the new size */
+  /* That is okay but you must change this occurrence of "120" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 119);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 122);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
   assert(TOKEN_KEYWORD_QUESTIONMARK == TOKEN_KEYWORDS_START);
 
+#ifdef ADDITIONAL_ASSERTS
   //* Test strvalues is ordered by bsearching for every item. */
-  // This is commented out unless there has been a change to the list */
-  //char *p_item;
-  //unsigned long index;
-  //char l[MAX_KEYWORD_LENGTH+1]= "";
-  //for (int ii= TOKEN_KEYWORD_QUESTIONMARK; ii < KEYWORD_LIST_SIZE; ++ii)
-  // {
-  //   char *k= (char*) &strvalues[ii].chars;
-  //   if (strcmp(k, l) <= 0) {printf("k <= l!\n"); exit(0); }
-  //   printf("ii=%d\n", ii);
-  //   printf("k=%s.\n", k);
-  //   p_item= (char*) bsearch(k, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
-  //   assert(p_item != NULL);
-  //   index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
-  //   printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
-  //   if (index != strvalues[ii].token_keyword) exit(0);
-  //   assert(index == strvalues[ii].token_keyword);
-  //   strcpy(l, k);
-  // }
-  //assert(strcmp(strvalues[TOKEN_KEYWORD_QUESTIONMARK].chars, "?") == 0);
-  //assert(strcmp(strvalues[TOKEN_KEYWORD__UTF8MB4].chars, "_UTF8MB4") == 0);
-  //{
-  //  int ocelot_keyword_lengths= 200; /* approximately what hparse_f_errormsg() adds */
-  //  for (int ii= TOKEN_KEYWORD_OCELOT_BATCH; ii <= TOKEN_KEYWORD_OCELOT_XML; ++ii)
-  //  {
-  //    char *k= (char*) &strvalues[ii].chars;
-  //    printf("k=%s.\n", k);
-  //    ocelot_keyword_lengths+= strlen(k) + 3;
-  //  }
-  //  if (ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH)
-  //  {
-  //    printf("ocelot_keyword_lengths=%d\n", ocelot_keyword_lengths);
-  //    printf("MAX_HPARSE_ERRMSG_LENGTH=%d\n", MAX_HPARSE_ERRMSG_LENGTH);
-  //    exit(0);
-  //  }
-  //}
+  // This is commented out i.e. we don't define ADDITIONAL_ASSERTS unless there has been a change to the list */
+  char *p_item;
+  unsigned long index;
+  char l[MAX_KEYWORD_LENGTH+1]= "";
+  for (int ii= TOKEN_KEYWORD_QUESTIONMARK; ii < KEYWORD_LIST_SIZE; ++ii)
+   {
+     char *k= (char*) &strvalues[ii].chars;
+     if (strcmp(k, l) <= 0) {printf("k <= l!\n"); exit(0); }
+     printf("ii=%d\n", ii);
+     printf("k=%s.\n", k);
+     p_item= (char*) bsearch(k, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
+     assert(p_item != NULL);
+     index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
+     printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
+     if (index != strvalues[ii].token_keyword) exit(0);
+     assert(index == strvalues[ii].token_keyword);
+     strcpy(l, k);
+   }
+  assert(strcmp(strvalues[TOKEN_KEYWORD_QUESTIONMARK].chars, "?") == 0);
+  assert(strcmp(strvalues[TOKEN_KEYWORD__UTF8MB4].chars, "_UTF8MB4") == 0);
+  {
+    int ocelot_keyword_lengths= 200; /* approximately what hparse_f_errormsg() adds */
+    for (int ii= TOKEN_KEYWORD_OCELOT_BATCH; ii <= TOKEN_KEYWORD_OCELOT_XML; ++ii)
+    {
+      char *k= (char*) &strvalues[ii].chars;
+      printf("k=%s.\n", k);
+      ocelot_keyword_lengths+= strlen(k) + 3;
+    }
+    if (ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH)
+    {
+      printf("ocelot_keyword_lengths=%d\n", ocelot_keyword_lengths);
+      printf("MAX_HPARSE_ERRMSG_LENGTH=%d\n", MAX_HPARSE_ERRMSG_LENGTH);
+      exit(0);
+    }
+  }
+#endif //ADDITIONAL_ASSERTS
 }
 
 void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
@@ -14558,7 +14568,7 @@ const char *MainWindow::tarantool_result_set_init(
   {
     const char *n;
 
-    n= tarantool_result_set_init_select(&r, -1);
+    n= tarantool_result_set_init_select(&r, -1, -1);
     if (n != NULL)
     {
       tarantool_tnt_reply_data= n;
@@ -14728,7 +14738,8 @@ erret:
 */
 const char * MainWindow::tarantool_result_set_init_select(
         long unsigned int *result_row_count,
-        int column_number)
+        int column_number,
+        int what_to_return)         /* -1 if column_number=-1, 0 if we want name, 1 if we want type */
 {
 
   char field_type; /* for return from lmysql->ldbms_mp_typeof */
@@ -14755,19 +14766,20 @@ const char * MainWindow::tarantool_result_set_init_select(
       field_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy);
       if (field_type != MP_MAP) { goto x; }
       unsigned int member_count= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_metadata_copy);
-      const char *name_value;
+      const char *name_value; /* actually it's name value or type value */
       uint32_t name_value_length;
       for (unsigned int j= 0; j < member_count; ++j)
       {
         if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy) != MP_UINT) { goto x; }
         int member_type= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_metadata_copy);
-        if (member_type == 0) /* 0 == IPROTO_FIELD_NAME */
+        if (member_type == what_to_return) /* = IPROTO_FIELD_NAME or IPROTO_FIELD_TYPE */
         {
           if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy) != MP_STR) { goto x; }
           name_value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_metadata_copy, &name_value_length);
         }
-        else /* 1 == IPROTO_FIELD_TYPE etc. */
+        else /* 2 == IPROTO_FIELD_COLL 3 = IPROTO_FIELD_IS_NULLABLE 4 = IPROTO_FIELD_IS_AUTOINCREMENT etc. */
         {
+          /* todo: check: what is this line for? surely it's no problem if it's not a string */
           if (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_metadata_copy) != MP_STR) { goto x; }
           value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_metadata_copy, &value_length);
         }
@@ -15039,6 +15051,7 @@ unsigned int MainWindow::tarantool_num_fields()
   field_name_list_all_rows.clear();
   field_name_list_all_rows_count.clear();
   field_name_list_all_rows_address.clear();
+  field_type_list_all_rows.clear();
 
   /* See tarantool_num_rows for pretty well the same code as this */
   /* Todo: this is wrong, connection_number might not be 0 */
@@ -15608,7 +15621,7 @@ QString MainWindow::tarantool_fetch_header_row()
   for (uint32_t field_number= 0; ;++field_number)
   {
     long unsigned int r;
-    value= tarantool_result_set_init_select(&r, field_number);
+    value= tarantool_result_set_init_select(&r, field_number, 0);
     if (value == NULL) break; /* no more columns? */
     if (r >= TARANTOOL_MAX_FIELD_NAME_LENGTH) goto error_return;
     value_length= r;
@@ -15633,6 +15646,7 @@ QString MainWindow::tarantool_fetch_header_row()
       int memcmp_result= memcmp(what_to_search_for, what, what_to_search_for_length);
       if (memcmp_result < 0) break; /* what_to_search_for < what */
       if (memcmp_result > 0) continue; /* what to search for > what */
+
       char char_after_what= *(what + what_to_search_for_length);
       if ((char_after_what == 0) || (char_after_what == '_'))
       {
@@ -15645,6 +15659,21 @@ QString MainWindow::tarantool_fetch_header_row()
         memcpy(what, new_name, TARANTOOL_MAX_FIELD_NAME_LENGTH);
       }
       field_name_list_all_rows[j]= what;
+      value= tarantool_result_set_init_select(&r, field_number, 1);
+      value_length= r;
+      if (value == NULL) {;} /* I don't know whether we should care about null */
+      /* Todo: Some field types here are wrong, and we don't have all possible types here. */
+      /* Todo: varbinary check disabled because we think it's image. This makes us think it's string! */
+      if ((value_length == 7) && (memcmp(value, "integer", 7) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_INTEGER;
+      if ((value_length == 6) && (memcmp(value, "string", 6) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_VAR_STRING;
+      if ((value_length == 3) && (memcmp(value, "map", 3) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_MAP;
+      if ((value_length == 5) && (memcmp(value, "array", 5) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_ARRAY;
+      if ((value_length == 8) && (memcmp(value, "unsigned", 8) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_UNSIGNED;
+      //if ((value_length == 9) && (memcmp(value, "varbinary", 9) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_VARBINARY;
+      if ((value_length == 7) && (memcmp(value, "boolean", 7) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_BOOLEAN;
+      if ((value_length == 6) && (memcmp(value, "number", 6) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_DOUBLE;
+      if ((value_length == 6) && (memcmp(value, "scalar", 6) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_SCALAR;
+      if ((value_length == 6) && (memcmp(value, "double", 6) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_DOUBLE;
     }
   }
   delete []flags;
@@ -15871,8 +15900,10 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
     }
     field_name_list_all_rows[i]= tmp;
   }
+  for (int i= 0; i < field_name_list_all_rows.count(); ++i) field_type_list_all_rows.insert(i, OCELOT_DATA_TYPE_VAR_STRING);
 
   /* Replace result-set arbitrary names with names from format strings */
+  /* Replace result-set guessed types with types from format strings */
   if (returned_result_set_type == RESULT_TYPE_5)
   {
     QString fetch_header_row_result= tarantool_fetch_header_row();
@@ -16304,6 +16335,92 @@ void MainWindow::menu_context(const QPoint &pos)
 {
   menu_edit->exec(statement_edit_widget->mapToGlobal(pos));
 }
+
+/******************** typer start ***********************************************/
+/*
+  We want a list of data types as numbers, corresponding to a list of data types as strings.
+  But, alas, OCELOT_DATA_TYPE_LONG won't tell us TOKEN_KEYWORD_INTEGER.
+*/
+struct typer {
+   unsigned int ocelot_data_type;
+   unsigned int keyword_data_type;
+};
+static const typer typer_list[]=
+{
+    {OCELOT_DATA_TYPE_DECIMAL, TOKEN_KEYWORD_DECIMAL},
+    {OCELOT_DATA_TYPE_TINY, TOKEN_KEYWORD_TINYINT},
+    {OCELOT_DATA_TYPE_SHORT, TOKEN_KEYWORD_INTEGER},
+    {OCELOT_DATA_TYPE_LONG, TOKEN_KEYWORD_LONG},
+    {OCELOT_DATA_TYPE_FLOAT, TOKEN_KEYWORD_FLOAT},
+    {OCELOT_DATA_TYPE_DOUBLE, TOKEN_KEYWORD_DOUBLE},
+    {OCELOT_DATA_TYPE_NULL, TOKEN_KEYWORD_NULL},
+    {OCELOT_DATA_TYPE_TIMESTAMP, TOKEN_KEYWORD_TIMESTAMP},
+    {OCELOT_DATA_TYPE_LONGLONG, TOKEN_KEYWORD_INTEGER},
+    {OCELOT_DATA_TYPE_INT24, TOKEN_KEYWORD_INTEGER},
+    {OCELOT_DATA_TYPE_DATE, TOKEN_KEYWORD_DATE},
+    {OCELOT_DATA_TYPE_TIME, TOKEN_KEYWORD_TIME},
+    {OCELOT_DATA_TYPE_DATETIME, TOKEN_KEYWORD_DATETIME},
+    {OCELOT_DATA_TYPE_YEAR, TOKEN_KEYWORD_YEAR},
+    {OCELOT_DATA_TYPE_BIT, TOKEN_KEYWORD_BIT},
+    {OCELOT_DATA_TYPE_JSON, TOKEN_KEYWORD_JSON},
+    {OCELOT_DATA_TYPE_NEWDECIMAL, TOKEN_KEYWORD_DECIMAL},
+    {OCELOT_DATA_TYPE_ENUM, TOKEN_KEYWORD_ENUM},
+    {OCELOT_DATA_TYPE_SET, TOKEN_KEYWORD_SET},
+    {OCELOT_DATA_TYPE_BLOB, TOKEN_KEYWORD_BLOB},
+    {OCELOT_DATA_TYPE_VAR_STRING, TOKEN_KEYWORD_STRING},
+    {OCELOT_DATA_TYPE_STRING, TOKEN_KEYWORD_STRING},
+    {OCELOT_DATA_TYPE_GEOMETRY, TOKEN_KEYWORD_GEOMETRY},
+    {OCELOT_DATA_TYPE_BINARY, TOKEN_KEYWORD_BINARY},
+    {OCELOT_DATA_TYPE_VARBINARY, TOKEN_KEYWORD_VARBINARY},
+    {OCELOT_DATA_TYPE_TEXT, TOKEN_KEYWORD_TEXT},
+    {OCELOT_DATA_TYPE_SCALAR, TOKEN_KEYWORD_SCALAR},
+    {OCELOT_DATA_TYPE_BOOLEAN, TOKEN_KEYWORD_BOOLEAN},
+    {OCELOT_DATA_TYPE_MAP, TOKEN_KEYWORD_MAP},
+    {OCELOT_DATA_TYPE_ARRAY, TOKEN_KEYWORD_ARRAY},
+    {OCELOT_DATA_TYPE_INTEGER, TOKEN_KEYWORD_INTEGER},
+    {OCELOT_DATA_TYPE_UNSIGNED, TOKEN_KEYWORD_UNSIGNED},
+    {OCELOT_DATA_TYPE_NUMBER, TOKEN_KEYWORD_NUMBER},
+    {0, 0}
+};
+
+/*
+  Pass: string with a data type. Return: OCELOT_DATA_TYPE_xxx
+  This works, but for now we use the slightly cheaper-looking
+  if ((value_length == 7) && (memcmp(value, "integer", 7) == 0)) field_type_list_all_rows[field_number]= OCELOT_DATA_TYPE_LONG;
+  etc. So for now it's commented out, it's "in reserve".
+*/
+//int MainWindow::typer_to_ocelot_data_type(char *s)
+//{
+//  char key2[MAX_KEYWORD_LENGTH + 1];
+//  int keyword_index;
+//  keyword_index= get_keyword_index(s, key2);
+//  for (int i= 0; ; ++i)
+//  {
+//    if (typer_list[i].keyword_data_type == 0) break;
+//    if (typer_list[i].keyword_data_type == (unsigned int)keyword_index)
+//    {
+//      printf("**** match! %d\n", typer_list[i].ocelot_data_type);
+//      return typer_list[i].ocelot_data_type;
+//    }
+//  }
+//  return OCELOT_DATA_TYPE_NULL;
+//}
+
+char * MainWindow::typer_to_keyword(unsigned int ocelot_type)
+{
+  for (int i= 0; ;++i)
+  {
+    if (typer_list[i].keyword_data_type == 0) break;
+    if (typer_list[i].ocelot_data_type == ocelot_type)
+    {
+      int k= typer_list[i].keyword_data_type;
+      return (char*)strvalues[k].chars;
+    }
+  }
+  return (char*)strvalues[TOKEN_KEYWORD_NULL].chars;
+}
+
+/******************** typer end ***********************************************/
 
 #include "codeeditor.h"
 
@@ -16910,202 +17027,29 @@ void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
   if (!(event->buttons() != 0)) left_mouse_button_was_pressed= 0;
 }
 
-
-/*
-  If opd2 is inside 'quotes', then string comparison. Else int comparison.
-  todo: when to exclude images?
-  todo: it's variable when we'll see nulls
-  todo: your idea of row number seems wrong, you're getting the display's row not the result set's row
-*/
-bool TextEditFrame::comparer(
-        QString opd1,
-        QString opd2,
-        QString opr,                /* = or >= or > or <= or < or <> or == or != or IS NULL or LIKE */
-        char field_value_flags)     /* FIELD_VALUE_FLAG_IS_NULL FIELD_VALUE_FLAG_IS_IMAGE etc. */
-{
-  if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0)
-  {
-    return (opr == "IS");
-  }
-  if (opd2.mid(0, 1) == "'")
-  {
-    QString opd1_str= opd1.toUpper();
-    QString opd2_str= opd2.mid(1, opd2.size() - 2).toUpper();
-    if ((opr == "=") || (opr == "==")) return (opd1_str == opd2_str);
-    if (opr == ">=") return (opd1_str >= opd2_str);
-    if (opr == ">") return (opd1_str > opd2_str);
-    if (opr == "<=") return (opd1_str <= opd2_str);
-    if (opr == "<") return (opd1_str < opd2_str);
-    if ((opr == "<>") || (opr == "!=")) return (opd1_str != opd2_str);
-#if (QT_VERSION >= 0x50000)
-    if (opr == "REGEXP")
-    {
-      QRegularExpression re(opd2_str);
-      QRegularExpressionMatch match= re.match(opd1_str);
-      return match.hasMatch();
-    }
-#endif
-    return false;
-  }
-  else
-  {
-    int opd1_int= opd1.toInt();
-    int opd2_int= opd2.toInt();
-    if ((opr == "=") || (opr == "==")) return (opd1_int == opd2_int);
-    if (opr == ">=") return (opd1_int >= opd2_int);
-    if (opr == ">") return (opd1_int > opd2_int);
-    if (opr == "<=") return (opd1_int <= opd2_int);
-    if (opr == "<") return (opd1_int < opd2_int);
-    if ((opr == "<>") || (opr == "!=")) return (opd1_int != opd2_int);
-    return false;
-  }
-  return false;
-}
-
-/*
-  Usually use the style sheet default or style sheet from SET statements, which may be conditional.
-  Note: If there are conditions then we aren't checking is_style_sheet_set_flag,
-        we are checking whether background color is different after evaluating the condition.
-        This seems to avoid earlier bugs but it's checking conditions more often than necessary.
-        Maybe speed up by doing something clever with is_retrieved_flag.
-        Maybe speed up by making canonical version with fixed lengths so there's no need to call tokenize.
-  Todo: We clear conditional_settings before inserting, so temporarily there can't be more than one.
-  Todo: Call SELECT * FROM "_vindex"; then call it again. Second time, there are calls to setStyleSheet(). Why?
-  Todo: You are splitting into separate statements if there are carriage returns, as is typical with SET.
-        It's somewhere in get_next_statement_in_string().
-  Todo: Allow viewing conditional statements
-  Todo: Allow clearing all conditional statements
-  Todo: Allow setup of conditional statements in Settings menu
-  Todo: SET ocelot_grid_background_color='blue', ocelot_grid_color='red' WHERE row = 5 AND column_name REGEX 'x';
-  Todo: More comparands e.g. TYPE = 'binary'.
-*/
 void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit)
 {
   ResultGrid *rg= text_frame ->ancestor_result_grid_widget;
   MainWindow *mw= rg->copy_of_parent;
-  if (mw->conditional_settings.count() > 0)
+  QString new_tooltip= "";
+  QString new_style_sheet= mw->ocelot_grid_style_string;
+  QString new_cell_height= "";
+  QString new_cell_width= "";
+  bool result= rg->conditional_setting_evaluate(1, text_frame->ancestor_grid_column_number, text_frame->ancestor_grid_result_row_number, text_frame->content_pointer, text_frame->content_length, text_frame->cell_type, &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width);
+  if (result == true)
   {
-    int token_offsets[MAX_CONDITIONAL_STATEMENT_TOKENS];
-    int token_lengths[MAX_CONDITIONAL_STATEMENT_TOKENS];
-    for (int i= 0; i < mw->conditional_settings.count(); ++i)
+    if (new_tooltip != "") text_edit->setToolTip(new_tooltip);
+    QString old_style_sheet= text_edit->styleSheet();
+    if (new_style_sheet != old_style_sheet)
     {
-      QString text= mw->conditional_settings.at(i);
-      mw->tokenize(text.data(),
-               text.size(),
-               &token_lengths[0], &token_offsets[0], MAX_CONDITIONAL_STATEMENT_TOKENS - 1,
-              (QChar*)"33333", 2, "", 1);
-      int token_index= 4; /* We're sure that WHERE comes after SET ocelot_grid_background|text_color='...' */
-      while ((token_lengths[token_index] != 5) || (text.mid(token_offsets[token_index], 5) != "WHERE")) ++token_index;
-      bool result= false;
-      QString next_clause_start= "WHERE";
-      bool is_skippable= false;
-      for (;;)
-      {
-        if ((next_clause_start == "AND") && (result == false)) is_skippable= true;
-        else if ((next_clause_start == "OR") && (result == true)) is_skippable= true;
-        else is_skippable= false;
-        QString target= text.mid(token_offsets[token_index + 1], token_lengths[token_index + 1]);
-        QString opr= text.mid(token_offsets[token_index + 2], token_lengths[token_index + 2]);
-        QString value= text.mid(token_offsets[token_index + 3], token_lengths[token_index + 3]);
-        next_clause_start= text.mid(token_offsets[token_index + 4], token_lengths[token_index + 4]);
-        if (is_skippable == false)
-        {
-          if (target == "COLUMN_NAME")
-          {
-            char *result_field_names_pointer= &rg->result_field_names[0];
-            unsigned int v_length;
-            for (unsigned int i= 0; i < rg->result_column_count; ++i)
-            {
-              memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
-              result_field_names_pointer+= sizeof(unsigned int);
-              if (i == (unsigned int) text_frame->ancestor_grid_column_number)
-              {
-                QString s= QString(QByteArray(result_field_names_pointer, v_length));
-                result= comparer(s, value, opr, 0);
-                break;
-              }
-              result_field_names_pointer+= v_length;
-            }
-          }
-          if (target == "COLUMN_NUMBER")
-            result= comparer(QString::number(text_frame->ancestor_grid_column_number), value, opr, 0);
-          if (target == "ROW_NUMBER")
-          {
-            result= comparer(QString::number(text_frame->ancestor_grid_result_row_number), value, opr, 0);
-          }
-          if (target == "VALUE")
-          {
-            if (text_frame->content_pointer == 0)
-            {
-              result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
-            }
-            else
-            {
-              QString s= QString(QByteArray(text_frame->content_pointer, text_frame->content_length));
-              /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
-              /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
-              result= comparer(s, value, opr, 0);
-            }
-          }
-        }
-        if (next_clause_start == ";") break;
-        token_index= token_index + 4; /* it's AND | OR, continue, but next condition might be skippable */
-        continue;
-      }
-      QString new_style_sheet= mw->ocelot_grid_style_string;
-      if (result == true)
-      {
-        for (int target_index= 1;; target_index+= 4)
-        {
-          int k;
-          QString setting_value= text.mid(token_offsets[target_index + 2], token_lengths[target_index + 2]);
-          if (setting_value.mid(0, 1) == "'") setting_value= setting_value.mid(1, setting_value.size() - 2);
-          QString setting= text.mid(token_offsets[target_index], token_lengths[target_index]);
-          if (setting == "OCELOT_GRID_BACKGROUND_COLOR") k= new_style_sheet.indexOf("background-color:") + 17;
-          else if (setting == "OCELOT_GRID_TEXT_COLOR") k= new_style_sheet.indexOf("color:") + 6;
-          else if (setting == "OCELOT_GRID_FONT_SIZE")
-          {
-            k= new_style_sheet.indexOf("font-size:") + 10;
-            setting_value= setting_value + "pt";
-          }
-          else if (setting == "OCELOT_GRID_BORDER_COLOR")
-          {
-            k= new_style_sheet.indexOf("border:") + 7;
-            k= new_style_sheet.indexOf(" ", k) + 1;
-            k= new_style_sheet.indexOf(" ", k) + 1;
-          }
-          else if (setting == "OCELOT_GRID_FONT_STYLE") k= new_style_sheet.indexOf("font-style:") + 11;
-          else if (setting == "OCELOT_GRID_FONT_WEIGHT") k= new_style_sheet.indexOf("font-weight:") + 12;
-          else if (setting == "OCELOT_GRID_FONT_FAMILY") k= new_style_sheet.indexOf("font-family:") + 12;
-          else if (setting == "OCELOT_GRID_BORDER_SIZE")
-          {
-            k= new_style_sheet.indexOf("border:") + 7;
-            setting_value= setting_value + "px";
-          }
-          else break;
-          int l;
-          if (setting == "OCELOT_GRID_BORDER_SIZE") l= new_style_sheet.indexOf(" ", k + 1);
-          else l= new_style_sheet.indexOf(";", k + 1);
-          if (l == -1) l= new_style_sheet.size();
-          new_style_sheet.replace(k, l - k, setting_value);
-        }
-      }
-      else
-      {
-        ;
-      }
-      QString old_style_sheet= text_edit->styleSheet();
-      if (new_style_sheet != old_style_sheet)
-      {
-        text_edit->setStyleSheet(new_style_sheet);
-      }
-      if (text_frame->is_style_sheet_set_flag == false)
-      {
-        text_frame->setStyleSheet(rg->frame_color_setting); /* for drag line color */
-        text_frame->is_style_sheet_set_flag= true;
-      }
-      return; /* !! Too early! We only have evaluated one condition! */
+      text_edit->setStyleSheet(new_style_sheet);
     }
+    if (text_frame->is_style_sheet_set_flag == false)
+    {
+      text_frame->setStyleSheet(rg->frame_color_setting); /* for drag line color */
+      text_frame->is_style_sheet_set_flag= true;
+    }
+    return; /* !! Too early! We only have evaluated one condition! */
   }
   if (text_frame->is_style_sheet_set_flag == false)
   {
@@ -19240,6 +19184,7 @@ int options_and_connect(
       }
     }
   }
+
   /*
     If dlopen() failed for "myql_ssl_set" then ldbms_mysql_ssl_set is a no-op, which is not an error.
     For some options use mysql_ssl_set because it's in MySQL 5.5, for others use mysql_options.
@@ -19269,7 +19214,8 @@ int options_and_connect(
   if (ocelot_read_default_file_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_4, ocelot_read_default_file_as_utf8);
   if (ocelot_read_default_group_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_5, ocelot_read_default_group_as_utf8);
   if (ocelot_report_data_truncation > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_19, (char*) &ocelot_report_data_truncation);
-  if (ocelot_secure_auth > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_18, (char *) &ocelot_secure_auth);
+  /* secure_auth causes trouble in MySQL 8 and hasn't been useful for years so do not pass it */
+  //if (ocelot_secure_auth > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_18, (char *) &ocelot_secure_auth);
   if (ocelot_server_public_key_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_35, ocelot_server_public_key_as_utf8);
   if (ocelot_set_charset_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_6, ocelot_set_charset_dir_as_utf8);
   if (ocelot_set_charset_name_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_7, ocelot_set_charset_name_as_utf8);
@@ -19284,6 +19230,7 @@ int options_and_connect(
   }
   /* CLIENT_MULTI_RESULTS but not CLIENT_MULTI_STATEMENTS */
   unsigned long real_connect_flags= CLIENT_MULTI_RESULTS;
+
   if (ocelot_opt_can_handle_expired_passwords != 0)
     real_connect_flags|= (1UL << 22); /* CLIENT_CAN_HANDLE_EXPIRED_PASSWORDS */
 
@@ -19589,7 +19536,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2014-2020 by Ocelot Computer Services Inc. and others\n");
+  printf("Copyright (c) 2014-2021 by Ocelot Computer Services Inc. and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");

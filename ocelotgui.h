@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -74,7 +74,7 @@ typedef struct
   In set_dbms_version_mask we set for the version and for lower versions,
   e.g. if it's MySQL 5.6 we set both FLAG_VERSION_MYSQL_5_5 and
   FLAG_VERSION_MYSQL_5_6.
-  Todo: eventually FLAG_VERSION_TARANTOOL_2_2 has to be part of FLAG_VERSION_ALL
+  Todo: eventually FLAG_VERSION_TARANTOOL_2_2 etc. has to be part of FLAG_VERSION_ALL
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -104,6 +104,7 @@ typedef struct
 #define FLAG_VERSION_TARANTOOL_2_3  65536
 #define FLAG_VERSION_LUA_OUTPUT       131072
 #define FLAG_VERSION_TARANTOOL_2_4    262144
+#define FLAG_VERSION_TARANTOOL_2_7    262144
 #define FLAG_VERSION_TARANTOOL_ALL    (262144 | 65536 | 32768 | 1024)
 #define FLAG_VERSION_DEFAULT FLAG_VERSION_MYSQL_OR_MARIADB_ALL
 
@@ -200,6 +201,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_ANY,
     TOKEN_KEYWORD_ANY_VALUE,
     TOKEN_KEYWORD_AREA,
+    TOKEN_KEYWORD_ARRAY,
     TOKEN_KEYWORD_AS,
     TOKEN_KEYWORD_ASBINARY,
     TOKEN_KEYWORD_ASC,
@@ -293,6 +295,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_COLUMN_NAME,
     TOKEN_KEYWORD_COLUMN_NAMES,
     TOKEN_KEYWORD_COLUMN_NUMBER,
+    TOKEN_KEYWORD_COLUMN_TYPE,
     TOKEN_KEYWORD_COLUMN_TYPE_INFO,
 
 
@@ -651,6 +654,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_MAKEDATE,
     TOKEN_KEYWORD_MAKETIME,
     TOKEN_KEYWORD_MAKE_SET,
+    TOKEN_KEYWORD_MAP,
     TOKEN_KEYWORD_MASTER_BIND,
     TOKEN_KEYWORD_MASTER_HEARTBEAT_PERIOD,
     TOKEN_KEYWORD_MASTER_POS_WAIT,
@@ -756,6 +760,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE,
+    TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT,
+    TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH,
     TOKEN_KEYWORD_OCELOT_GRID_DETACHED,
     TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY,
     TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE,
@@ -766,6 +772,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_GRID_LEFT,
     TOKEN_KEYWORD_OCELOT_GRID_TABS,
     TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR,
+    TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP,
     TOKEN_KEYWORD_OCELOT_GRID_TOP,
     TOKEN_KEYWORD_OCELOT_GRID_WIDTH,
     TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR,
@@ -1377,7 +1384,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1152
+#define KEYWORD_LIST_SIZE 1158
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1425,6 +1432,7 @@ static const keywords strvalues[]=
       {"ANY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ANY},
       {"ANY_VALUE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ANY_VALUE},
       {"AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AREA}, /* deprecated in MySQL 5.7.6 */
+      {"ARRAY", 0, 0, TOKEN_KEYWORD_ARRAY},
       {"AS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_AS},
       {"ASBINARY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ASBINARY}, /* deprecated in MySQL 5.7.6 */
       {"ASC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ASC},
@@ -1515,6 +1523,7 @@ static const keywords strvalues[]=
       {"COLUMN_NAME", 0, 0, TOKEN_KEYWORD_COLUMN_NAME},
       {"COLUMN_NAMES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COLUMN_NAMES},
       {"COLUMN_NUMBER", 0, 0, TOKEN_KEYWORD_COLUMN_NUMBER},
+      {"COLUMN_TYPE", 0, 0, TOKEN_KEYWORD_COLUMN_TYPE},
       {"COLUMN_TYPE_INFO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COLUMN_TYPE_INFO},
       {"COMMENT", 0, 0, TOKEN_KEYWORD_COMMENT},
         {"COMMENTS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COMMENTS},
@@ -1869,6 +1878,7 @@ static const keywords strvalues[]=
       {"MAKEDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKEDATE},
       {"MAKETIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKETIME},
       {"MAKE_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKE_SET},
+      {"MAP", 0, 0, TOKEN_KEYWORD_MAP},
       {"MASTER_BIND", FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_MASTER_BIND},
       {"MASTER_HEARTBEAT_PERIOD", 0, 0, TOKEN_KEYWORD_MASTER_HEARTBEAT_PERIOD},
       {"MASTER_POS_WAIT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MASTER_POS_WAIT},
@@ -1975,6 +1985,8 @@ static const keywords strvalues[]=
     {"OCELOT_GRID_CELL_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
     {"OCELOT_GRID_CELL_DRAG_LINE_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR},
     {"OCELOT_GRID_CELL_DRAG_LINE_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE},
+    {"OCELOT_GRID_CELL_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
+    {"OCELOT_GRID_CELL_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH},
     {"OCELOT_GRID_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_DETACHED},
     {"OCELOT_GRID_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY},
     {"OCELOT_GRID_FONT_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE},
@@ -1985,6 +1997,7 @@ static const keywords strvalues[]=
     {"OCELOT_GRID_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT},
     {"OCELOT_GRID_TABS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TABS},
     {"OCELOT_GRID_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR},
+    {"OCELOT_GRID_TOOLTIP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP},
     {"OCELOT_GRID_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TOP},
     {"OCELOT_GRID_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_WIDTH},
     {"OCELOT_HISTORY_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR},
@@ -3107,12 +3120,12 @@ public:
   int hparse_f_character_set_name();
   int hparse_f_collation_name();
   int hparse_f_qualified_name_with_star();
-  int hparse_f_qualified_name_of_object(int,int);
+  int hparse_f_qualified_name_of_object(unsigned int,int,int);
   int hparse_f_qualified_name_of_object_with_star(int,int);
   int hparse_f_e_to_reftype(int);
   int hparse_f_accept_qualifier(unsigned int,unsigned char,int,QString);
   bool hparse_f_is_variable(int, int);
-  int hparse_f_qualified_name_of_operand(bool,bool,bool);
+  int hparse_f_qualified_name_of_operand(unsigned int,bool,bool,bool);
   int hparse_f_table_references();
   void hparse_f_table_escaped_table_reference();
   int hparse_f_table_reference(int);
@@ -3281,6 +3294,7 @@ public:
   void hparse_f_multi_block(QString text);
   int i_of_elementary_statement();
   QString hparse_f_pre_rehash_search(int reftype);
+  bool hparse_f_is_rehash_searchable();
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
   int hparse_f_client_set();
@@ -3307,10 +3321,10 @@ public:
   QStringList field_name_list_all_rows;
   QList<int> field_name_list_all_rows_count;
   QList<char*> field_name_list_all_rows_address;
-
+  QList<int> field_type_list_all_rows;
   QString tarantool_add_return(QString);
   const char *tarantool_result_set_init(int,long unsigned int *,int *);
-  const char *tarantool_result_set_init_select(long unsigned int *, int);
+  const char *tarantool_result_set_init_select(long unsigned int *, int, int);
 
   long unsigned int tarantool_num_rows(unsigned int connection_number);
   unsigned int tarantool_num_fields();
@@ -3442,6 +3456,8 @@ public slots:
   bool menu_edit_autocomplete();
   bool eventfilter_function(QObject *obj, QEvent *event);
   void menu_context(const QPoint &);
+//  int typer_to_ocelot_data_type(char *s); /* exists in ocelotgui.cpp but is commented out */
+  char *typer_to_keyword(unsigned int);
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
@@ -3859,6 +3875,7 @@ public:
   #define TOKEN_FLAG_IS_DECLARE 65536
   #define TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON 131072
   //#define TOKEN_FLAG_IS_ASSIGNEE 262144
+  #define TOKEN_FLAG_IS_NEW 262144
 
 /* The enum for TOKEN_TYPE_LITERAL etc. was here, but moved outside MainWindow on 2019-02-26 */
 
@@ -6313,6 +6330,7 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
   But we have additional TEXT and BINARY types because we distinguish when charsetnr=63.
   DECIMAL and NEWDECIMAL are both DECIMAL. LONG is INT. INT24 is MEDIUMINT. LONGLONG is BIGINT.
   STRING is CHAR (only). VAR_STRING is VARCHAR (only). BLOB is BLOB (only).
+  See also struct typer.
 */
 #define OCELOT_DATA_TYPE_DECIMAL     0
 #define OCELOT_DATA_TYPE_TINY        1
@@ -6345,7 +6363,13 @@ void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size
 #define OCELOT_DATA_TYPE_BINARY      10001
 #define OCELOT_DATA_TYPE_VARBINARY   10002
 #define OCELOT_DATA_TYPE_TEXT        10003
-#define OCELOT_DATA_TYPE_SCALAR      12001     /* Tarantool */
+#define OCELOT_DATA_TYPE_SCALAR      12001     /* numbers > 12000 are Tarantool-specific */
+#define OCELOT_DATA_TYPE_BOOLEAN     12002
+#define OCELOT_DATA_TYPE_MAP         12003
+#define OCELOT_DATA_TYPE_ARRAY       12004
+#define OCELOT_DATA_TYPE_INTEGER     12005
+#define OCELOT_DATA_TYPE_UNSIGNED    12006
+#define OCELOT_DATA_TYPE_NUMBER      12007
 
 /*
   Return true if what's at pointer has an image signature.
@@ -6468,7 +6492,8 @@ QString fillup(MYSQL_RES *mysql_res,
   {
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
-      result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING;
+      //result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING; replaced on 2021-01-03
+      result_field_types[i]= copy_of_parent->field_type_list_all_rows[i];
       result_field_charsetnrs[i]= 83; /* utf8, utf8_bin */
       result_field_flags[i]= 0; /* todo: decide if it's numeric */
     }
@@ -8466,22 +8491,45 @@ void scan_field_names(
    Todo: pass flags so I don't have to check so many field types
    Todo: the name is bad, now we set width here too
 */
-int set_alignment_and_height(int text_edit_frames_index, int grid_col, int field_type,
+int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, int field_type,
                               bool is_header, int maximum_width)
 {
-  (void)(grid_col);
   TextEditWidget *cell_text_edit_widget= text_edit_widgets[text_edit_frames_index];
   /* Todo: probably MySQL should be done the same way as Tarantool, no need to check field_type */
+  /* Todo: maybe it would be better to check content_field_value_flags & FIELD_VALUE_FLAG_IS_NUMBER */
   if ((field_type <= OCELOT_DATA_TYPE_DOUBLE)
    || (field_type == OCELOT_DATA_TYPE_NEWDECIMAL)
    || (field_type == OCELOT_DATA_TYPE_LONGLONG)
    || (field_type == OCELOT_DATA_TYPE_INT24))
     text_align(cell_text_edit_widget, Qt::AlignRight);
   else text_align(cell_text_edit_widget, Qt::AlignLeft);
+  QString s;
+  if (text_edit_frames[text_edit_frames_index]->content_pointer == 0) /* or check content_field_value_flags */
+  {
+    s= QString::fromUtf8(NULL_STRING, sizeof(NULL_STRING) - 1);
+  }
+  else s= QString::fromUtf8(text_edit_frames[text_edit_frames_index]->content_pointer, text_edit_frames[text_edit_frames_index]->content_length);
+  int width= get_column_width_in_pixels(s, is_header, text_edit_frames[text_edit_frames_index]->is_image_flag);
 
-  QString s_header= QString::fromUtf8(text_edit_frames[text_edit_frames_index]->content_pointer,
-                                      text_edit_frames[text_edit_frames_index]->content_length);
-  int width= get_column_width_in_pixels(s_header, is_header, text_edit_frames[text_edit_frames_index]->is_image_flag);
+  /* Test: will we override? */
+  QString new_tooltip= "";
+  QString new_style_sheet= copy_of_parent->ocelot_grid_style_string;
+  QString new_cell_height= "";
+  QString new_cell_width= "";
+  bool result= conditional_setting_evaluate(1,
+       text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number,
+       text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number,
+       text_edit_frames[text_edit_frames_index]->content_pointer,
+       text_edit_frames[text_edit_frames_index]->content_length,
+       text_edit_frames[text_edit_frames_index]->cell_type,
+       &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width);
+  if (result == true)
+  {
+    if (new_cell_width.toInt() > 0)
+    {
+      width= new_cell_width.toInt();
+    }
+  }
 
   if (width > maximum_width) width= maximum_width;
 
@@ -8509,8 +8557,19 @@ int set_alignment_and_height(int text_edit_frames_index, int grid_col, int field
     //else
     //this_width= grid_column_widths[grid_col];
     //frame_resize(text_edit_frames_index, grid_col, this_width, grid_column_heights[grid_col]);
-    set_height(text_edit_frames_index, width);
+
+    if ((result == true) && (new_cell_height > ""))
+    {
+      text_edit_frames[text_edit_frames_index]->setFixedHeight(new_cell_height.toInt());
+      grid_row_widgets[grid_row]->setFixedHeight(new_cell_height.toInt());
+    }
+    else
+    {
+      int h= set_height(text_edit_frames_index, width);
+      grid_row_widgets[grid_row]->setFixedHeight(h);
+    }
   }
+
   return width;
 }
 
@@ -8629,7 +8688,7 @@ int get_column_height_in_pixels(unsigned int text_edit_frames_index, int width, 
 /*
   Todo: possible better names: set_column_height_in_pixels, set_cell_height_in_points
 */
-void set_height(unsigned int text_edit_frames_index, int width)
+int set_height(unsigned int text_edit_frames_index, int width)
 {
   int height= get_column_height_in_pixels(text_edit_frames_index,
                                           width,
@@ -8640,6 +8699,7 @@ void set_height(unsigned int text_edit_frames_index, int width)
 
   //TextEditWidget *text_edit= text_edit_frames[text_edit_frames_index]->findChild<TextEditWidget *>();
   //text_edit_widgets[text_edit_frames_index]->setFixedHeight(nn - 20);
+  return height;
 }
 
 /*
@@ -8821,7 +8881,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       //if (ocelot_client_side_functions_copy != 0)
       //{
       //  set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
-      //                           column_number_within_gridx,
+      //                           column_number_within_gridx, -- but nowadays we pass grid_row not this
       //                           OCELOT_DATA_TYPE_SHORT);
       //  text_edit_frames[o_text_edit_frames_index + column_number_within_gridx]->show();
       //  ++column_number_within_gridx;
@@ -8830,7 +8890,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
       if (ocelot_result_grid_column_names_copy != 0)
       {
         int w= set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
-                                 column_number_within_gridx,
+                                 grid_row,
                                  OCELOT_DATA_TYPE_STRING,
                                  true, maximum_width);
         /* todo: shouldn't maximum width allow for spacing between cells? */
@@ -8839,7 +8899,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         ++column_number_within_gridx;
       }
       set_alignment_and_height(o_text_edit_frames_index + column_number_within_gridx,
-                               column_number_within_gridx,
+                               grid_row,
                                result_field_types[result_column_number],
                                false, maximum_width);
 
@@ -8862,6 +8922,11 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 
   else /* if ocelot_vertical_copy == 0 */
   {
+    if (ocelot_result_grid_column_names_copy != 0)
+    {
+      int h= get_column_height_in_pixels(0, 5000, grid_max_column_height_in_pixels);
+      grid_row_widgets[0]->setFixedHeight(h);
+    }
     for (result_row_number= first_row, grid_row= 1;
          (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
          ++result_row_number, ++grid_row)
@@ -8896,7 +8961,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
         text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number= result_row_number;
         text_edit_frames[text_edit_frames_index]->show();
       }
-      /* Make row height = height of highest cell ... todo: makes no sense if vertical != 0? */
+      /* Make row height = height of highest cell ... remember to do it differently if vertical != 0! */
       int highest_height= 0;
       for (i= 0; i < gridx_column_count; ++i)
       {
@@ -9429,6 +9494,236 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
     cell_pool_size= 0;
   }
 }
+
+
+/*
+  If opd2 is inside 'quotes', then string comparison. Else int comparison.
+  todo: when to exclude images?
+  todo: it's variable when we'll see nulls
+  todo: your idea of row number seems wrong, you're getting the display's row not the result set's row
+  todo: remove this, it's all in ResultGrid now
+*/
+bool comparer(
+        QString opd1,
+        QString opd2,
+        QString opr,                /* = or >= or > or <= or < or <> or == or != or IS NULL or LIKE */
+        char field_value_flags)     /* FIELD_VALUE_FLAG_IS_NULL FIELD_VALUE_FLAG_IS_IMAGE etc. */
+{
+  if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0)
+  {
+    return (opr == "IS");
+  }
+  if (opd2.mid(0, 1) == "'")
+  {
+    QString opd1_str= opd1.toUpper();
+    QString opd2_str= opd2.mid(1, opd2.size() - 2).toUpper();
+    if ((opr == "=") || (opr == "==")) return (opd1_str == opd2_str);
+    if (opr == ">=") return (opd1_str >= opd2_str);
+    if (opr == ">") return (opd1_str > opd2_str);
+    if (opr == "<=") return (opd1_str <= opd2_str);
+    if (opr == "<") return (opd1_str < opd2_str);
+    if ((opr == "<>") || (opr == "!=")) return (opd1_str != opd2_str);
+#if (QT_VERSION >= 0x50000)
+    if (opr == "REGEXP")
+    {
+      QRegularExpression re(opd2_str);
+      QRegularExpressionMatch match= re.match(opd1_str);
+      return match.hasMatch();
+    }
+#endif
+    return false;
+  }
+  else
+  {
+    int opd1_int= opd1.toInt();
+    int opd2_int= opd2.toInt();
+    if ((opr == "=") || (opr == "==")) return (opd1_int == opd2_int);
+    if (opr == ">=") return (opd1_int >= opd2_int);
+    if (opr == ">") return (opd1_int > opd2_int);
+    if (opr == "<=") return (opd1_int <= opd2_int);
+    if (opr == "<") return (opd1_int < opd2_int);
+    if ((opr == "<>") || (opr == "!=")) return (opd1_int != opd2_int);
+    return false;
+  }
+  return false;
+}
+
+
+/*
+  Usually use the style sheet default or style sheet from SET statements, which may be conditional.
+  Note: If there are conditions then we aren't checking is_style_sheet_set_flag,
+        we are checking whether background color is different after evaluating the condition.
+        This seems to avoid earlier bugs but it's checking conditions more often than necessary.
+        Maybe speed up by doing something clever with is_retrieved_flag.
+        Maybe speed up by making canonical version with fixed lengths so there's no need to call tokenize.
+  Todo: We clear conditional_settings before inserting, so temporarily there can't be more than one.
+  Todo: Call SELECT * FROM "_vindex"; then call it again. Second time, there are calls to setStyleSheet(). Why?
+  Todo: You are splitting into separate statements if there are carriage returns, as is typical with SET.
+        It's somewhere in get_next_statement_in_string().
+  Todo: Allow viewing conditional statements
+  Todo: Allow clearing all conditional statements
+  Todo: Allow setup of conditional statements in Settings menu
+  Todo: SET ocelot_grid_background_color='blue', ocelot_grid_color='red' WHERE row = 5 AND column_name REGEX 'x';
+  Todo: More comparands e.g. COLUMN_TYPE = 'binary'.
+*/
+#define MAX_CONDITIONAL_STATEMENT_TOKENS 100 /* todo: this is a duplicate of what's defined in MainWindow */
+bool conditional_setting_evaluate(int cs_number,
+                                  int cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
+                                  int cs_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
+                                  char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
+                                  unsigned int cs_content_length, /* e.g. text_frame->content_length */
+                                  unsigned short int cs_cell_type,  /* e.g. text_frame->cell_type */
+                                  QString *cs_new_tooltip,        /* return */
+                                  QString *cs_new_style_sheet,    /* return */
+                                  QString *cs_new_cell_height,    /* return */
+                                  QString *cs_new_cell_width)     /* return */
+{
+  (void) (cs_number);
+  if (cs_cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL) return false; /* Temporary till we handle heders */
+
+  ResultGrid *rg= this;
+  MainWindow *mw= rg->copy_of_parent;
+  if (mw->conditional_settings.count() > 0)
+  {
+    int token_offsets[MAX_CONDITIONAL_STATEMENT_TOKENS];
+    int token_lengths[MAX_CONDITIONAL_STATEMENT_TOKENS];
+    for (int i= 0; i < mw->conditional_settings.count(); ++i)
+    {
+      QString text= mw->conditional_settings.at(i);
+      mw->tokenize(text.data(),
+               text.size(),
+               &token_lengths[0], &token_offsets[0], MAX_CONDITIONAL_STATEMENT_TOKENS - 1,
+              (QChar*)"33333", 2, "", 1);
+      int token_index= 4; /* We're sure that WHERE comes after SET ocelot_grid_background|text_color='...' */
+      while ((token_lengths[token_index] != 5) || (text.mid(token_offsets[token_index], 5) != "WHERE")) ++token_index;
+      bool result= false;
+      QString next_clause_start= "WHERE";
+      bool is_skippable= false;
+      for (;;)
+      {
+        if ((next_clause_start == "AND") && (result == false)) is_skippable= true;
+        else if ((next_clause_start == "OR") && (result == true)) is_skippable= true;
+        else is_skippable= false;
+        QString target= text.mid(token_offsets[token_index + 1], token_lengths[token_index + 1]);
+        QString opr= text.mid(token_offsets[token_index + 2], token_lengths[token_index + 2]);
+        QString value= text.mid(token_offsets[token_index + 3], token_lengths[token_index + 3]);
+        next_clause_start= text.mid(token_offsets[token_index + 4], token_lengths[token_index + 4]);
+        if (is_skippable == false)
+        {
+          if (target == "COLUMN_NAME")
+          {
+            char *result_field_names_pointer= &rg->result_field_names[0];
+            unsigned int v_length;
+            for (unsigned int i= 0; i < rg->result_column_count; ++i)
+            {
+              memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+              result_field_names_pointer+= sizeof(unsigned int);
+              if (i == (unsigned int) cs_column_number)
+              {
+                QString s= QString(QByteArray(result_field_names_pointer, v_length));
+                result= comparer(s, value, opr, 0);
+                break;
+              }
+              result_field_names_pointer+= v_length;
+            }
+          }
+          if (target == "COLUMN_NUMBER")
+            result= comparer(QString::number(cs_column_number + 1), value, opr, 0);
+          if (target == "COLUMN_TYPE")
+          {
+            int a= cs_column_number;
+            char *b= mw->typer_to_keyword(rg->result_field_types[a]);
+            result= comparer(b, value, opr, 0);
+          }
+          if (target == "ROW_NUMBER")
+          {
+            int crn= cs_row_number;
+            if (ocelot_result_grid_column_names_copy == 1) ++crn;
+            result= comparer(QString::number(crn), value, opr, 0);
+          }
+          if (target == "VALUE")
+          {
+            if (cs_content_pointer == 0)
+            {
+              result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
+            }
+            else
+            {
+              QString s= QString(QByteArray(cs_content_pointer, cs_content_length));
+              /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
+              /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
+              result= comparer(s, value, opr, 0);
+            }
+          }
+        }
+        if (next_clause_start == ";") break;
+        token_index= token_index + 4; /* it's AND | OR, continue, but next condition might be skippable */
+        continue;
+      }
+      QString new_style_sheet= mw->ocelot_grid_style_string;
+      if (result == true)
+      {
+        for (int target_index= 1;; target_index+= 4)
+        {
+          int k;
+          QString setting_value= text.mid(token_offsets[target_index + 2], token_lengths[target_index + 2]);
+          if (setting_value.mid(0, 1) == "'") setting_value= setting_value.mid(1, setting_value.size() - 2);
+          QString setting= text.mid(token_offsets[target_index], token_lengths[target_index]);
+          if (setting == "OCELOT_GRID_BACKGROUND_COLOR") k= new_style_sheet.indexOf("background-color:") + 17;
+          else if (setting == "OCELOT_GRID_TEXT_COLOR") k= new_style_sheet.indexOf("color:") + 6;
+          else if (setting == "OCELOT_GRID_FONT_SIZE")
+          {
+            k= new_style_sheet.indexOf("font-size:") + 10;
+            setting_value= setting_value + "pt";
+          }
+          else if (setting == "OCELOT_GRID_BORDER_COLOR")
+          {
+            k= new_style_sheet.indexOf("border:") + 7;
+            k= new_style_sheet.indexOf(" ", k) + 1;
+            k= new_style_sheet.indexOf(" ", k) + 1;
+          }
+          else if (setting == "OCELOT_GRID_FONT_STYLE") k= new_style_sheet.indexOf("font-style:") + 11;
+          else if (setting == "OCELOT_GRID_FONT_WEIGHT") k= new_style_sheet.indexOf("font-weight:") + 12;
+          else if (setting == "OCELOT_GRID_FONT_FAMILY") k= new_style_sheet.indexOf("font-family:") + 12;
+          else if (setting == "OCELOT_GRID_BORDER_SIZE")
+          {
+            k= new_style_sheet.indexOf("border:") + 7;
+            setting_value= setting_value + "px";
+          }
+          else if (setting == "OCELOT_GRID_TOOLTIP")
+          {
+            *cs_new_tooltip= setting_value; /* caller can say setTooltip */
+            continue;
+          }
+          else if (setting == "OCELOT_GRID_CELL_HEIGHT")
+          {
+            *cs_new_cell_height= setting_value; /* caller can change */
+            continue;
+          }
+          else if (setting == "OCELOT_GRID_CELL_WIDTH")
+          {
+            *cs_new_cell_width= setting_value; /* caller can change */
+            continue;
+          }
+          else break;
+          int l;
+          if (setting == "OCELOT_GRID_BORDER_SIZE") l= new_style_sheet.indexOf(" ", k + 1);
+          else l= new_style_sheet.indexOf(";", k + 1);
+          if (l == -1) l= new_style_sheet.size();
+          new_style_sheet.replace(k, l - k, setting_value);
+        }
+      }
+      else
+      {
+        ;
+      }
+      *cs_new_style_sheet= new_style_sheet; /* caller can say setstylesheet */
+      return true; /* !! Too early! We only have evaluated one condition! */
+    }
+  }
+  return false;
+}
+
 
 public slots:
 

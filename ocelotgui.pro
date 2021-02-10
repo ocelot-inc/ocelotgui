@@ -1,4 +1,4 @@
-#  Copyright (c) 2014-2020 by Ocelot Computer Services Inc. All rights reserved.
+#  Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by

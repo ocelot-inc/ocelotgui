@@ -1,15 +1,15 @@
-# rpmbuild.sh -- produce ocelotgui-1.2.0 .rpm from ~/ocelotgui
+# rpmbuild.sh -- produce ocelotgui-1.3.0 .rpm from ~/ocelotgui
 
 # Ocelot uses this script to produce a .rpm file from a source directory ~/ocelotgui on Fedora 28.
 # Only advanced users will want this, ordinary users will download the official-release .rpm file or make with cmake.
 
-# For 1.2.0 32-bit Ocelot was on Fedora 26 from archives.fedoraproject.org/pub/archive/fedora-secondary/releases/26, with pae.
+# For 1.3.0 32-bit Ocelot was on Fedora 26 from archives.fedoraproject.org/pub/archive/fedora-secondary/releases/26, with pae.
 
 # An easy way to get ~/ocelotgui is "cd ~" + "git clone https://github.com/ocelot-inc/ocelotgui ocelotgui".
 # This script uses /tmp and cheerily deletes existing files in /tmp.
 # This script uses $HOME and cheerily overwrites $HOME/ocelotgui-$VERSION.tar.gz ocelotgui-$VERSION + $HOME/ocelotgui-$VERSION + $HOME/ocelotgui.spec.
 # This script uses $HOME/rpm_build and cheerily deletes existing files in $HOME/rpm_build.
-# The result will be / ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.2.0-1.x86_64.rpm or  ~/ocelotgui_rpm//rp/rpmbuild/RPMS/i686/ocelotgui-1.2.0-1.i686.rpm
+# The result will be / ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.3.0-1.x86_64.rpm or  ~/ocelotgui_rpm//rp/rpmbuild/RPMS/i686/ocelotgui-1.3.0-1.i686.rpm
 # See also the comments in ocelotgui.spec.
 
 #For SUSE, replace following line with sudo yum install libqt5-qttools-devel
@@ -21,7 +21,7 @@ sudo yum install gcc gcc-c++ make cmake
 sudo yum install sed rpm rpm-build rpmlint desktop-file-utils
 sudo yum install python
 
-export VERSION=1.2.0
+export VERSION=1.3.0
 export SOURCE=$HOME/ocelotgui
 
 cd /tmp
@@ -57,6 +57,7 @@ cp -p $SOURCE/options.txt /tmp/ocelotgui-$VERSION/options.txt
 cp -p $SOURCE/completer_1.png /tmp/ocelotgui-$VERSION/completer_1.png
 cp -p $SOURCE/completer_2.png /tmp/ocelotgui-$VERSION/completer_2.png
 cp -p $SOURCE/completer_3.png /tmp/ocelotgui-$VERSION/completer_3.png
+cp -p $SOURCE/conditional.png /tmp/ocelotgui-$VERSION/conditional.png
 cp -p $SOURCE/starting-dialog.png /tmp/ocelotgui-$VERSION/starting-dialog.png
 cp -p $SOURCE/starting.png /tmp/ocelotgui-$VERSION/starting.png
 cp -p $SOURCE/statement-widget-example.png /tmp/ocelotgui-$VERSION/statement-widget-example.png
@@ -120,7 +121,7 @@ cd ~
 tar -xf ocelotgui-$VERSION.tar.gz
 
 rm -r -f $HOME/ocelotgui_rpm
-cp ~/ocelotgui-1.2.0/ocelotgui.spec $HOME/ocelotgui.spec
+cp ~/ocelotgui-1.3.0/ocelotgui.spec $HOME/ocelotgui.spec
 
 rpmbuild -ba $HOME/ocelotgui.spec --define "_topdir $HOME/ocelotgui_rpm/rp/rpmbuild" --define "_sourcedir $HOME"
 
@@ -128,4 +129,4 @@ rpmbuild -ba $HOME/ocelotgui.spec --define "_topdir $HOME/ocelotgui_rpm/rp/rpmbu
 # The result of rpmbuild should be ocelotgui_$VERSION-1.x86_64.rpm or ocelotgui_$VERSION-1_i686.rpm if 32-bit
 # Final lines of output should show: rpmlint says 0 errors, 0 warnings.
 rpmlint ~/ocelotgui.spec
-rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.2.0-1.x86_64.rpm
+rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.3.0-1.x86_64.rpm
