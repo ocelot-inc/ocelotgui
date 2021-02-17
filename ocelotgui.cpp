@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: Februry 9 2021
+   Last modified: Februry 17 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -13284,6 +13284,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   make_and_put_message_in_result(ER_OK, 0, (char*)"");
   connect_init(connection_number);
   /* Todo: Consider saying select version(); instead of an internal query for box.info.version. */
+  /* Todo: I gave up on memtx_use_mvcc_engine. Revive when I see how to make remote transactions work. */
   QString session_id, version;
   {
     char query_string[1024];
@@ -13293,6 +13294,12 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     version= tarantool_internal_query(query_string, connection_number);
     int index_of_hyphen= version.indexOf("-");
     if (index_of_hyphen > 0) version= version.left(index_of_hyphen);
+    //tarantool_memtx_use_mvcc_engine= 0;
+    //if (version >= "2.6")
+    //{
+    //  sprintf(query_string, "return box.cfg.memtx_use_mvcc_engine and 1 or 0");
+    //  tarantool_memtx_use_mvcc_engine= tarantool_internal_query(query_string, connection_number).toInt();
+    //}
   }
 
   /* Old Tarantool (before 2.1.2?) need box.sql.execute not box.execute */
@@ -13972,7 +13979,6 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
     log("tarantool_real_query end", 80);
     return 0; /* Todo: in fact I suppose commit|rollback could fail, we should be passing it on */
   }
-
   /* If something is NoSQL, transactions don't work. */
   /* This section is rarely tested, I'm thinking of abandoning it. */
    /* It might be saved if I could push + pop main_tokens. */

@@ -101,27 +101,23 @@ CodeEditor::CodeEditor(MainWindow *parent) : QPlainTextEdit(parent)
 
 /* Todo: translate, i.e. convert \\ to \, convert \linenumber to (binary) 0x00, etc. */
 /* On lines 2ff, the prompt is merely ">" unless there was a preceding "\2" */
+/*
+  Todo: Getting date and time is slow.
+  You should find out in advance (when user changes the prompt) whether you really will need it.
+  Or you should calculate it only when you see \D etc., but that might cause apparent inconsistencies.
+  Or you could check "Has the time already been calculated?"
+  Todo: \C is nonsense if there is no connection
+  Todo: \c includes client statements in the count, but mysql client doesn't seem to do that
+  Todo: \d is blank if there is no current database, but mysql client says "(none)"
+*/
 QString CodeEditor::prompt_translate(int line_number_x)
 {
   QString s, s_char, s_out;
   int is_2_seen= 0;
-  time_t basetime;
-  struct tm * timeinfo;
-  char formatted_time[80];
   int k_index;
 
   for (k_index= 0; k_index < K_SIZE; ++k_index) k_line_number[k_index]= -1;
-  /*
-    Todo: Getting date and time is slow.
-    You should find out in advance (when user changes the prompt) whether you really will need it.
-    Or you should calculate it only when you see \D etc., but that might cause apparent inconsistencies.
-    Or you could check "Has the time already been calculated?"
-  */
-#ifdef OCELOT_OS_LINUX
-  time(&basetime);
-  timeinfo= localtime(&basetime);
-#endif
-
+  QDateTime qdt= QDateTime::currentDateTime();
   s= this->prompt_as_input_by_user;
   s_out= (QString)"";
   for (int i= 0; i < s.size(); ++i)
@@ -135,30 +131,27 @@ QString CodeEditor::prompt_translate(int line_number_x)
       {
         s_char= (QString)""; is_2_seen= 1;
       }
-      if (s_char == "C")        /* \C is for connection_id, mysql 5.7.6ff. */
+      else if (s_char == "C")        /* \C is for connection_id, mysql 5.7.6ff. */
       {
         s_char= QString::number(dbms_connection_id);
       }
-      if (s_char == "c")        /* \c is for statement counter. We keep it in statement_edit_widget, not main window -- maybe that's bad. */
+      else if (s_char == "c")        /* \c is for statement counter. We keep it in statement_edit_widget, not main window -- maybe that's bad. */
       {
         s_char= QString::number(statement_count);
       }
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "D")        /* \D is for full current date, e.g. "Fri May 23 14:26:18 2014" */
+      else if (s_char == "D")        /* \D is for full current date, e.g. "Fri May 23 14:26:18 2014" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%a %b %e %H:%M:%S %Y", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("ddd").left(3) + " " + qdt.toString("MMM").left(3) + qdt.toString(" dd hh:mm:ss yyyy");
       }
-#endif
-      if (s_char == "d")        /* \d is for database. Discovered at connect time. Changed if user says "use". */
+      else if (s_char == "d")        /* \d is for database. Discovered at connect time. Changed if user says "use". */
       {
         s_char= dbms_database;
       }
-      if (s_char == "h")        /* \h is for host. */
+      else if (s_char == "h")        /* \h is for host. */
       {
         s_char= dbms_host;
       }
-      if (s_char == "K")
+      else if (s_char == "K")
       {
         int k_result= prompt_translate_k(s, i);
         if (k_result != 0)
@@ -167,113 +160,84 @@ QString CodeEditor::prompt_translate(int line_number_x)
           continue;
         }
       }
-      if (s_char == "L")        /* \L is for line number. Ocelot-only. Most effective if \2 seen. */
+      else if (s_char == "L")        /* \L is for line number. Ocelot-only. Most effective if \2 seen. */
       {
         s_char= QString::number(line_number_x);
       }
-      if (s_char == "l")        /* \l is for delimiter. */
+      else if (s_char == "l")        /* \l is for delimiter. */
       {
         s_char= delimiter;
       }
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "m")        /* \m is for minutes of the current time, e.g. "18" */
+      else if (s_char == "m")        /* \m is for minutes of the current time, e.g. "18" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%M", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("mm");
       }
-#endif
-      if (s_char == "n")        /* \n is for newline. It goes in the stream but there's no apparent effect. */
+      else if (s_char == "n")        /* \n is for newline. It goes in the stream but there's no apparent effect. */
                                 /* todo: try harder. use markup instead of \n? crlf? */
       {
         s_char= "\n";
       }
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "O")        /* \O is for current month in 3-letter format, e.g. "Feb" */
+      else if (s_char == "O")        /* \O is for current month in 3-letter format, e.g. "Feb" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%b", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("MMM").left(3);
       }
-#endif
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "o")        /* \o is for current month in numeric format, e.g. "12" */
+      else if (s_char == "o")        /* \o is for current month in numeric format, e.g. "12" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%m", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("MM");
       }
-#endif
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "P")        /* \P is for am/pm, e.g. "PM" */
+      else if (s_char == "P")        /* \P is for am/pm, e.g. "PM" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%p", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("AP");
+        if (s_char == "P.M.") s_char= "PM"; else s_char= "AM";
       }
-#endif
-      if (s_char == "p") {        /* \p is for port */
+      else if (s_char == "p") {        /* \p is for port */
         s_char= dbms_port;
       }
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "R")        /* \R is for current hour on a 24-hour clock, e.g. "19" */
+      else if (s_char == "R")        /* \R is for current hour on a 24-hour clock, e.g. "19" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%H", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("hh");
       }
-#endif
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "r")        /* \r is for current hour on a 12-hour clock, e.g. "11" */
+      else if (s_char == "r")        /* \r is for current hour on a 12-hour clock, e.g. "11" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%r", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("hh AP").left(2);
       }
-#endif
-      if (s_char == "S")        /* \S is for semicolon i.e. ";" */
+      else if (s_char == "S")        /* \S is for semicolon i.e. ";" */
       {
         s_char= ";";
       }
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "s")        /* \s is for seconds of the current time, e.g. "58" */
+      else if (s_char == "s")        /* \s is for seconds of the current time, e.g. "58" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%S", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("ss");
       }
-#endif
-      if (s_char == "t")        /* \t is for tab. Appearance can be inconsistent. */
+      else if (s_char == "t")        /* \t is for tab. Appearance can be inconsistent. */
       {
         s_char= "\t";
       }
-      if (s_char == "U")        /* \U is for user@host. */
+      else if (s_char == "U")        /* \U is for user@host. */
       {
         s_char= dbms_current_user;
       }
-      if (s_char == "u")        /* \u is for user. */
+      else if (s_char == "u")        /* \u is for user. */
       {
         s_char= dbms_current_user_without_host;
       }
-      if (s_char == "v")        /* \v is for server version. Discovered at connect time. */
+      else if (s_char == "v")        /* \v is for server version. Discovered at connect time. */
       {
         s_char= dbms_version;
       }
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "w")        /* \w is for current day of the week in three-letter format, e.g. "Mon" */
+      else if (s_char == "w")        /* \w is for current day of the week in three-letter format, e.g. "Mon" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%a", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("ddd").left(3);
       }
-#endif
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "Y")        /* \Y is for current year in four-digit format, e.g. "2014" */
+      else if (s_char == "Y")        /* \Y is for current year in four-digit format, e.g. "2014" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%Y", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("yyyy");
       }
-#endif
-#ifdef OCELOT_OS_LINUX
-      if (s_char == "y")        /* \y is for current year in 2-digit format, e.g. "14" */
+      else if (s_char == "y")        /* \y is for current year in 2-digit format, e.g. "14" */
       {
-        strftime(formatted_time, sizeof(formatted_time) - 1, "%y", timeinfo);
-        s_char= formatted_time;
+        s_char= qdt.toString("yy");
       }
-#endif
-      if (s_char == "_")        /* \_ is space. Odd, since "\ " is space and more obvious. */
+      else if (s_char == "_")        /* \_ is space. Odd, since "\ " is space and more obvious. */
       {
         s_char= " ";
       }
