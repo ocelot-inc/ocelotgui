@@ -322,7 +322,8 @@ int CodeEditor::prompt_translate_k(QString s, int i)
 /*
   We'll be setting left margin of viewport to the size we need to draw the prompt.
   Take the width of the first line or the width of the last line, whichever is greater.
-  Add the width of "B " if this CodEditor is for a debug widget rather than for the statement widget.
+  Add the width of "B " if this CodeEditor is for a debug widget rather than for the statement widget.
+  Re the isPunct() check: I found that if the last letter is . or [ etc. the width is too small, dunno why.
 */
 int CodeEditor::prompt_width_calculate()
 {
@@ -331,6 +332,8 @@ int CodeEditor::prompt_width_calculate()
   int prompt_width;
 
   sq= prompt_translate(1);
+  if ((sq.size() > 1) && (sq.at(sq.size() - 1).isPunct() == true))
+    sq= sq.left(sq.size() - 1) + "W";
   line_width_first= fontMetrics().boundingRect(sq).width();
   sq= prompt_translate(blockCount() + 1);
   line_width_last= fontMetrics().boundingRect(sq).width();
