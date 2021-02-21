@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: Februry 17 2021
+   Last modified: Februry 22 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -9452,6 +9452,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 #ifdef DBMS_TARANTOOL
     if (connections_dbms[0] == DBMS_TARANTOOL) connect_tarantool(MYSQL_MAIN_CONNECTION, "DEFAULT", "DEFAULT", "DEFAULT", "DEFAULT");
 #endif
+    if (ocelot_prompt_is_default == true) prompt_default();
     return 1;
   }
   /* Todo: this isn't robust, it will fail if we ever allow other words e.g. IF NOT EXISTS after CREATE. */
@@ -9662,12 +9663,17 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     if ((i2 >= 2) && (sub_token_types[1] != TOKEN_KEYWORD_USE))
       s= text.mid(sub_token_offsets[1], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
     else if (i2 >= 3) s= text.mid(sub_token_offsets[2], statement_length - (sub_token_offsets[1] - sub_token_offsets[0]));
+    else if (i2 == 1)
+    {
+      prompt_default(); /* Just "prompt" or "prompt;" with no args */
+      return 1;
+    }
     else
     {
+      ocelot_prompt_is_default= false; /* todo: check: shouldn't this be true? */
       statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
       ocelot_prompt= statement_edit_widget->prompt_default;
     emit statement_edit_widget->update_prompt_width(0); /* not necessary with Qt 5.2 */
-      ocelot_prompt_is_default= false; /* todo: check: shouldn't this be true? */
       /* Todo: output a message */
       return 1;
     }
@@ -9934,6 +9940,29 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     }
   }
   return 0;
+}
+
+/*
+  Set prompt to default default.
+  Do this if (user says prompt;) or (at start if ocelot_prompt_is_default == true)
+  If --ocelot_dbms was specified: ocelot_dbms + >
+  Else if connection happened to MariaDB: MariaDB>
+  Else mysql>
+*/
+void MainWindow::prompt_default()
+{
+  QString s= ocelot_dbms;
+  if (s.contains("Tarantool", Qt::CaseInsensitive)) ocelot_prompt= "tarantool>";
+  else
+  {
+    if (connections_is_connected[0] == 1) s= statement_edit_widget->dbms_version;
+    if (s.contains("MariaDB", Qt::CaseInsensitive)) ocelot_prompt= "mariadb>";
+    else ocelot_prompt= "mysql>";
+  }
+  ocelot_prompt_is_default= true;
+  statement_edit_widget->prompt_default= ocelot_prompt;
+  statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
+  emit statement_edit_widget->update_prompt_width(0); /* not necessary with Qt 5.2 */
 }
 
 /*

@@ -3494,6 +3494,7 @@ private:
   QString detached_value(QString);
   QString rect_value(QString);
   int execute_client_statement(QString text, int *additional_result);
+  void prompt_default();
   int conditional_settings_insert(QString text);
   void put_diagnostics_in_result(unsigned int);
   void put_message_in_result(QString);
