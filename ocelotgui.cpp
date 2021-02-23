@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: Februry 22 2021
+   Last modified: Februry 23 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -739,7 +739,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     Todo: better messages so the user gets the hint: connection is necessary / password is necessary.
     Todo: check: Can you handle password with special characters?
   */
-  if (ocelot_password_was_specified == 0)
+  if (ocelot_password_was_specified != 2)
   {
     statement_edit_widget->insertPlainText("CONNECT");
     action_execute(1);
@@ -3564,7 +3564,7 @@ void MainWindow::action_connect_once(QString message)
       ocelot_net_buffer_length= to_long(row_form_data[i++].trimmed());
       ocelot_no_beep= to_long(row_form_data[i++].trimmed());
       ocelot_no_defaults= to_long(row_form_data[i++].trimmed());
-      connect_set_variable("ocelot_dbms", row_form_data[i++].trimmed());
+      connect_set_variable("ocelot_dbms", "=", row_form_data[i++].trimmed());
       ocelot_one_database= to_long(row_form_data[i++].trimmed());
       ocelot_pager= row_form_data[i++].trimmed();
       ocelot_pipe= to_long(row_form_data[i++].trimmed());
@@ -17699,7 +17699,7 @@ void TextEditWidget::focusInEvent(QFocusEvent *event)
 
 //#include <dirent.h>
 
-void connect_set_variable(QString token0, QString token2);
+void connect_set_variable(QString token0, QString token1, QString token2);
 void connect_read_command_line(int argc, char *argv[]);
 #if (OCELOT_MYSQL_INCLUDE == 1)
 void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
@@ -18145,7 +18145,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
         token2= s_argv.mid(equaller_index + 1, (argv_length - equaller_index) - 1);
       }
     }
-    connect_set_variable(token0, token2);
+    connect_set_variable(token0, token1, token2);
   }
 }
 
@@ -18429,7 +18429,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
       token_for_value= token_for_value + c;
     }
     token2= token_for_value;
-    connect_set_variable(token0, token2);
+    connect_set_variable(token0, token1, token2);
   }
   file.close();
   //fclose(file);
@@ -18594,7 +18594,7 @@ QString MainWindow::connect_unstripper(QString value_to_unstrip)
     * For variables beginning "ocelot_" we may use strcasecmp rather than strcmp.
     * This is different from mysql which is usually case sensitive all the way
 */
-void MainWindow::connect_set_variable(QString token0, QString token2)
+void MainWindow::connect_set_variable(QString token0, QString token1, QString token2)
 {
   unsigned int token0_length;
   char token0_as_utf8[80 + 1];
@@ -18899,6 +18899,7 @@ void MainWindow::connect_set_variable(QString token0, QString token2)
   {
     ocelot_password= token2;
     ocelot_password_was_specified= is_enable;
+    if ((is_enable == 1) && (token1 != "=")) ocelot_password_was_specified= 2;
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_PIPE) /* Not sure about this. Windows. Same as protocol? */

@@ -3509,7 +3509,7 @@ private:
   void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
   int connect_readmylogin(QFile&, unsigned char *);
   //int connect_readmylogin(FILE *, unsigned char *);
-  void connect_set_variable(QString token0, QString token2);
+  void connect_set_variable(QString token0, QString token1, QString token2);
   void connect_make_statement();
   long to_long(QString token);
   QString get_version();
@@ -3745,7 +3745,7 @@ private:
 
   int statement_edit_widget_text_changed_flag;
   QString ocelot_delimiter_str;                                           /* set up in connect section */
-  int ocelot_password_was_specified;
+  int ocelot_password_was_specified; /* 0: never mentioned. 1: "--password=". 2: "password" but not "=". */
 
   /* MYSQL mysql; */
   MYSQL_RES *mysql_res;
