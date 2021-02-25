@@ -13028,6 +13028,28 @@ void MainWindow::hparse_f_other(int flags)
 }
 
 /*
+  Called from hparse_f_client_statement() for special handling of SET ocelot_statement_rule.
+  See comments in ocelotgui.cpp before statement_format_rule()
+  Return 1 = ocelot_ but no conditional possible
+*/
+int MainWindow::hparse_f_client_set_rule()
+{
+  if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0)
+  {
+    hparse_f_error();
+    return 1;
+  }
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BECOMES, "BECOMES");
+  if (hparse_errno > 0) return 1;
+  if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0)
+  {
+    hparse_f_error();
+    return 1;
+  }
+  return 1;
+}
+
+/*
   Called from hparse_f_client_statement() for special handling of SET ocelot_... = literal
   Return: 0 = not ocelot_ (with hparse_errno > 0), 1 = ocelot_ but no conditional possible, 3 = ocelot_ and conditional possible
   Todo: if it ends with _COLOR then be specific about what color literals are ok
@@ -13110,6 +13132,11 @@ int MainWindow::hparse_f_client_set()
     if (i_of_keyword > TOKEN_KEYWORD_OCELOT_XML) hparse_f_error();
   }
   if (hparse_errno > 0) return 0;
+
+  if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
+  {
+    return hparse_f_client_set_rule();
+  }
 
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
   if (hparse_errno > 0) return 0;

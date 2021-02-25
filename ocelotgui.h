@@ -226,6 +226,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_AVG,
     TOKEN_KEYWORD_BACKUP_ADMIN,
     TOKEN_KEYWORD_BATCH,
+    TOKEN_KEYWORD_BECOMES,
     TOKEN_KEYWORD_BEFORE,
     TOKEN_KEYWORD_BEGIN,
     TOKEN_KEYWORD_BENCHMARK,
@@ -846,6 +847,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT,
     TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT,
     TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE,
+    TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE,
     TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT,
     TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT,
     TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR,
@@ -1384,7 +1386,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1158
+#define KEYWORD_LIST_SIZE 1160
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1457,6 +1459,7 @@ static const keywords strvalues[]=
       {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
           {"BACKUP_ADMIN", 0, 0, TOKEN_KEYWORD_BACKUP_ADMIN},
         {"BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BATCH},
+    {"BECOMES", 0, 0, TOKEN_KEYWORD_BECOMES},
       {"BEFORE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BEFORE},
       {"BEGIN", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BEGIN},
       {"BENCHMARK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BENCHMARK},
@@ -2071,6 +2074,7 @@ static const keywords strvalues[]=
     {"OCELOT_STATEMENT_FONT_WEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT},
     {"OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT},
     {"OCELOT_STATEMENT_FORMAT_KEYWORD_CASE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE},
+    {"OCELOT_STATEMENT_FORMAT_RULE", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE},
     {"OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT},
     {"OCELOT_STATEMENT_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT},
     {"OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR},
@@ -2951,6 +2955,7 @@ public:
   QString ocelot_statement_format_statement_indent;
   QString ocelot_statement_format_clause_indent;
   QString ocelot_statement_format_keyword_case;
+  QString ocelot_statement_format_rule;
   QString ocelot_statement_height, new_ocelot_statement_height;
   QString ocelot_statement_left, new_ocelot_statement_left;
   QString ocelot_statement_top, new_ocelot_statement_top;
@@ -3297,6 +3302,7 @@ public:
   bool hparse_f_is_rehash_searchable();
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
+  int hparse_f_client_set_rule();
   int hparse_f_client_set();
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
@@ -3375,6 +3381,8 @@ public slots:
   void action_redo();
   void menu_activations(QObject*, QEvent::Type);
   void statement_edit_widget_formatter();
+  int statement_format_rule_set(QString text);
+  QString statement_format_rule_apply(QString);
   void action_change_one_setting(QString old_setting, QString new_setting, int keyword_index);
   void action_menu();
   void action_history();
@@ -11560,7 +11568,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 120
+#define OCELOT_VARIABLES_SIZE 121
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
