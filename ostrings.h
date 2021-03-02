@@ -109,7 +109,7 @@ static const char *string_languages[]=
 #define ER_SYNTAX                         32
 #define ER_FORMAT_STATEMENT               33
 #define ER_FORMAT_CLAUSE                  34
-#define ER_FORMAT_KEY_CASE                35
+#define ER_FORMAT_RULE                    35
 #define ER_UNKNOWN_BORDER_SIZE            36
 #define ER_UNKNOWN_CELL_BORDER_SIZE       37
 #define ER_UNKNOWN_CELL_DRAG_LINE_SIZE    38
@@ -200,7 +200,7 @@ static const char *er_strings[]=
   "Syntax checker value must be between 0 and 3", /* ER_SYNTAX */
   "Format statement indent value must be between 0 and 8", /* ER_FORMAT_STATEMENT */
   "Format clause indent value must be between 0 and 8", /* ER_FORMAT_CLAUSE */
-  "Format key case value must be be 'upper' or 'lower' or 'unchanged'", /* FORMAT_KEY_CASE */
+  "Syntax checker value must be 3 (Menu item Settings | Statement widget)'", /* ER_FORMAT_RULE */
   "Unknown border size", /* ER_UNKNOWN_BORDER_SIZE */
   "Unknown cell border size", /* ER_UNKNOWN_CELL_BORDER_SIZE */
   "Unknown cell drag line size", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */
@@ -286,7 +286,7 @@ static const char *er_strings[]=
     "Syntaxe valeur (pour vérificateur de syntaxe) doit être comprise entre 0 et 3", /* ER_SYNTAX */
     "Format déclaration  valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_STATEMENT */
     "Format clause valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_CLAUSE */
-    "Format valeur de cas clé doit être soit «supérieure» ou «inférieur» ou «inchangé»", /* FORMAT_KEY_CASE */
+    "Syntaxe valeur (pour vérificateur de syntaxe) doit être 3", /* FORMAT_RULE */
     "Taille de la bordure inconnu", /* ER_UNKNOWN_BORDER_SIZE */
     "Taille de la bordure de la cellule inconnu ", /* ER_UNKNOWN_CELL_BORDER_SIZE */
     "Taille de dragline cellulaire inconnu", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */

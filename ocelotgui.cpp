@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: Februry 24 2021
+   Last modified: March 1 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -636,8 +636,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_syntax_checker= "1";
   ocelot_statement_format_statement_indent= "2";
   ocelot_statement_format_clause_indent= "4";
-  ocelot_statement_format_keyword_case= "upper";
-  ocelot_statement_format_rule= "";
+  ocelot_statement_format_rule= "keyword becomes keyword-upper;";
   ocelot_statement_height= ocelot_statement_left= ocelot_statement_top= ocelot_statement_width= "default";
   ocelot_statement_detached= "no";
 
@@ -893,7 +892,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
   All we're trying to accomplish is
     "different statements different lines"
     "block start causes indent"
-    "keywords upper case"
+    "token replacement rules user-settable"
     "lists of columns lined up in select/update/insert/set".
   Cursor will go back to start.
   Indentation is meaningless unless there is a fixed font.
@@ -901,14 +900,35 @@ void MainWindow::statement_edit_widget_setstylesheet()
   eventfilter, I forget why) is Alt+Shift+F. Statements which can affect it are
     SET ocelot_statement_format_clause_indent = integer 0-8; default='4'
     SET ocelot_statement_format_statement_indent = integer 0-8; default='2'
-    SET ocelot_statement_format_keyword_case = 'upper'|'lower'|'unchanged'; default='upper'
-    SET ocelot_statement_format_rule ...
+    SET ocelot_statement_format_rule = e.g. 'identifier becomes identifier-upper'
   Todo: stop giving up when you see DELIMITER, it can be figured out.
+  Todo: max_rule_tokens is # of characters, we only need # of tokens.
+  Todo: worry: can output_offsets overflow?
 */
 void MainWindow::statement_edit_widget_formatter()
 {
   if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return;
-
+  int max_rule_tokens= ocelot_statement_format_rule.size();
+  int *rule_token_offsets= new int[max_rule_tokens];
+  int *rule_token_lengths= new int[max_rule_tokens];
+  int *rule_token_types= new int[max_rule_tokens];
+  tokenize(ocelot_statement_format_rule.data(),
+           ocelot_statement_format_rule.size(),
+           &rule_token_lengths[0], &rule_token_offsets[0], max_rule_tokens - 1,
+          (QChar*)"33333", 1, "", 1);
+  for (int i2= 0; rule_token_lengths[i2] != 0; ++i2)
+  {
+    QString rule_token= ocelot_statement_format_rule.mid(rule_token_offsets[i2], rule_token_lengths[i2]);
+    int t= token_type(rule_token.data(), rule_token_lengths[i2], sql_mode_ansi_quotes);
+    if ((t == TOKEN_TYPE_OTHER) && (rule_token_lengths[i2] < MAX_KEYWORD_LENGTH))
+    {
+      char key1[MAX_KEYWORD_LENGTH + 1];
+      char key2[MAX_KEYWORD_LENGTH + 1];
+      strcpy(key1, rule_token.toUtf8());
+      t= get_keyword_index(key1, key2);
+    }
+    rule_token_types[i2]= t;
+  }
   int *output_offsets;
   int i;
   for (i= 0; main_token_lengths[i] != 0; ++i) ;
@@ -919,7 +939,7 @@ void MainWindow::statement_edit_widget_formatter()
   int indent_base= 0;
   int statement_indent= ocelot_statement_format_statement_indent.toInt();
   int clause_indent= ocelot_statement_format_clause_indent.toInt();
-  QString keyword_case= ocelot_statement_format_keyword_case.toLower();
+
   int token;
   QString s;
   int token_type;
@@ -1122,12 +1142,7 @@ void MainWindow::statement_edit_widget_formatter()
           else output.append(" ");
         }
       }
-      if (main_token_types[i] >= TOKEN_KEYWORDS_START)
-      {
-        if (keyword_case == "upper") s= s.toUpper();
-        if (keyword_case == "lower") s= s.toLower();
-      }
-      s= statement_format_rule_apply(s);
+      s= statement_format_rule_apply(s, main_token_types[i], main_token_reftypes[i], main_token_flags[i], rule_token_offsets, rule_token_lengths, rule_token_types);
       output.append(s);
     }
   }
@@ -1140,170 +1155,225 @@ void MainWindow::statement_edit_widget_formatter()
   cur.insertText(output);
   cur.endEditBlock();
   delete [] output_offsets;
+  delete [] rule_token_types;
+  delete [] rule_token_lengths;
+  delete [] rule_token_offsets;
+  action_statement_edit_widget_text_changed(0, 0, 0); /* This is new, trying to solve the ^Z problem */
 }
 
 /*
 
-  This will be an implementation of the format rules described by
+  This will help with implementation of the format rules described by
   Descriptive SQL Style Guide
   https://github.com/pgulutzan/descriptive-sql-style-guide/blob/master/style.md
   The rules are applied to a current statement when user chooses Edit|Format.
   See statement_edit_widget_formatter() above.
 
-  It is "in progress". So far we're still figuring out the rules.
+  Rules are for replacing tokens.
+  They are applied once per token. If rule doesn't match, skip. If does match, replace and skip the rest.
 
   Client statement =
   SET STATEMENT_FORMAT_RULE rule [, rule ...] ;
 
   rule =
-  word-or-phrase TO word-or-phrase
-  or
-  INDENT_VALUE = certain escape sequences << this is handled in formatter
+  token-or-category BECOMES zero or more tokens or categories
 
-  word-or-phrase =
-  SQL-keyword e.g. THEN
-  or literal
-  or operator
-  or format-keyword
+  token-or-category =
+  category name i.e. COMMENT | IDENTIFIER | KEYWORD | LITERAL| OPERATOR
+  token i.e. anything that is legal in an SQL statement e.g. THEN or 'THEN', or character name
+        optionally followed by modifier(s)
 
-  ?? In what follows, I have pretended modifiers are -modifier. They could instead be preceding, or in parentheses, or whatever.
-     Combining modifiers is okay.
-  ?? In what follows, I have used the word TO but realize it should be something else, or we cannot change the keyword TO
+  character name = COMMA | NEWLINE | SEMICOLON | SPACE | TAB but these cannot be tokens
 
-  Format-keyword =
-  KEYWORD
-    Not just "anything in the DBMS's keyword list", it has to be used as a keyword
-    Modifier: KEYWORD-RESERVED
-    MOdifier: KEYWORD-LOWER KEYWORD-UPPER KEYWORD-CAPITALIZED
-    Modifier: KEYWORD-DATATYPE KEYWORD-VERB (i.e. statement start)
-    Perhaps CLAUSE START and STATEMENT START should be modifiers too, but sometimes clauses will start with parentheses instead
-  COMMENT
-    Modifier: COMMENT-BRACKETED or COMMENT-WITH-HYPHENS or COMMENT-WITH-OCTOTHORPE
-  NOTHING
-    although I suspect that '' will take care of this
-  LITERAL
-    Modifier: LITERAL-STRING LITERAL-FLOAT LITERAL-DECIMAL LITERAL-BINARY
-    Modifier: LITERAL-LONG
-    Modifier: LITERAL-STRINGCONTAININGQUOTES
-  OPERATOR
-    Modifier: OPERATOR-ARITHMETIC or OPERATOR-COMPARISON or OPERATOR-PUNCTUATION
-  IDENTIFIER
-    Modifier: IDENTIFIER-DELIMITED IDENTIFIER-REGULAR IDENTIFIER-QUOTED IDENTIFIER-BACKTICKED
-    Modifier: IDENTIFIER-ROUTINE IDENTIFIER-TABLE
-    Modifier: IDENTIFIER-LOWER IDENTIFIER-UPPER IDENTIFIER-CAPITALIZED IDENTIFIER-CAMELCASE
-  \; or \, or \_ or \t or \n i.e. certain escape sequences
-  INDENT signed integer e.g. INDENT-+1 or INDENT-2 ? Or some sort of ALIGN instruction
-  WHITESPACE i.e. space or tab or \n
-  UNCHANGED
-    i.e. in "to" section we keep as is (? Do we need an EXCEPTION clause?)
-    but this is unnecessary, since we can say END TO END
-  STATEMENT
-    Modifier: STATEMENT-START
-    Modifier: STATEMENT-END because we might want to add ';' or DELIMITER
-  CLAUSE
-    This means entire clause from start-word to end-word
-    Modifiers: CLAUSE-FROM CLAUSE-WHERE ? But actually WHERE is a keyword that starts a WHERE clause, maybe my modifying is wrong
-  EXPRESSION
-    Modifier: EXPRESSION-CONDITION (because we might want to add parentheses around OR conditions)
-  ORDINAL as in ORDER BY 1 although I'm not sure I can handle this all the time, don't forget that GROUP BY 1 exists in some places too
-    But this could be handled with ORDER BY INTEGER to ORDER BY name-of-first-column, if and only if we have an AS clause
-  ... as in ALTER TABLE ... ADD (because we might want to add COLUMN) but maybe we won't need this or maybe we'll only need to say what statement
-  any combination of the above
+  modifier = -UPPER | -LOWER
 
-  FORMAT cannot be undone.
-    Or maybe it can be undone. I'm not sure what the effect of ^Z might be.
-  FORMAT can itself be formatted, and may contain comments, like any client statement.
-  FORMAT can be part of an initialization file.
-  There is a default format, which follows the rules that effectively existed before ocelotgui 1.4.
-  There is no way to specify "this rule has precedence" or "specific trumps general".
-    So rules come in order, and rule 2 is applied not to the original item but to the item as changed after rule 1.
-  Flaw: what if the keyword is TO? Maybe we need something other than TO for FORMAT ... TO ...
-  --format=string is legal but you will need to come up with a new way to delimit the string
-  Flaw: What if there is a rule for OPERATOR and also a rule for '='?
-  Flaw: No plan for too-long clause
-  Todo: just say what rules would be violated or applicable ("This is not formatted according to rules 1 and 77")
-        or say what rules are being followed e.g. "To get this we would have to make these rules")
-  Flaw: nothing for "Statement within routine"
-  Flaw: need something more special for lists
+  Default rule is keyword becomes keyword-upper;
 
   Tips:
-    To remove all whitespace: WHITESPACE to '', though it might make more sense to say WHITESPACE to ' '
-    To add a newline after THEN: THEN TO THEN '\n';
-    To say that indent is 4 spaces: INDENT_VALUE TO
-    To say that CamelCase beomes xcase: CamelCase TO under_line;
-    To say that all keywords are upper case etc.: KEYWORD to UPPER | lower | Capitalized KEYWORD
-    To say that != should be <>: '!=' TO '<>'
-    To say that INT should be INTEGER: INT TO INTEGER
-    We can provide a set of rules that equate to Oracle rules, MySQL rules, or Tarantool rules
-
-  Todo: EXPLAIN FORMAT, or else explanation is part of okay message.
-
-It is okay to apply multiple rules that can apply to the same word.
-X BECOMES Y
-  X can be: literal or keyword or category.
-  So category can only be a keyword in the CHANGE statement, otherwise it would be confused with keyword.
-  Category is one of: LITERAL KEYWORD and then can be subcategories e.g. LITERAL-NUMBER
-
-If there is more than one rule, then, each time you see a word, you must ask:
-does this word fit in any of the previous rules?
-If so, it is considered to be already handled, so it is ignored.
-For example,
-SET OCELOT_STATEMENT_FORMAT_RULE THEN BECOMES ' ' THEN, KEYWORD BECOMES '' KEYWORD;
-means when you see THEN you apply the first rule, therefore you do not apply the second rule.
-? The problem is not everything is a word, sometimes it is a clause or expression or statement.
-Todo: ER_SYNTAX is not helpful. Maybe you just shouldn't bother to check.
-Todo: I guess it's also possible to set with --ocelot_statement_format_rule='rule'
-Todo: will we need a category SEMICOLON? Maybe some \; trick?
-Todo: we are calling statement_format_rule_apply() for every word, we could pass tokenize() results
-So far: success with:
-  SET ocelot_statement_format_rule 'x' becomes 'y';
+    To add a newline after THEN: THEN BECOMES THEN NEWLINE
+    To say that all keywords are upper case etc.: KEYWORD BECOMES KEYWORD-UPPER
+    To say that != should be <>: != BECOMES <>
+    To say that INT should be INTEGER: INT BECOMES INTEGER
+    To say 'x' should be 'y': SET ocelot_statement_format_rule 'x' BECOMES 'y';
+    So far: success with:
+    SET ocelot_statement_format_rule 'x' becomes 'y';
+    SET ocelot_statement_format_rule 'm' becomes 'y' 'z', 'x' becomes 'k';
+    set ocelot_statement_format_rule identifier becomes identifier 5;
+    set ocelot_statement_format_rule identifier becomes identifier-upper;
+    SET ocelot_statement_format_rule comment becomes ;
+    SET ocelot_statement_format_rule IDENTIFIER-LOWER BECOMES IDENTIFIER-UPPER;
+  If there is more than one rule:
+    If the token does not match, then the rule is ignored.
+    If the token does match, then the token is replaced and all subsequent rules are ignored.
+    Therefore sensible people will put specific rules before category rules.
+    For example
+      SET OCELOT_STATEMENT_FORMAT_RULE THEN BECOMES SPACE THEN, KEYWORD BECOMES KEYWORD;
+      means when you see THEN you apply the first rule, therefore you do not apply the second rule.
+  Todo: I guess it's also possible to set with --ocelot_statement_format_rule='rule'
+  Todo: consider escape character e.g. \; and escape reserved word e.g. \IDENTIFIER
+        consider doing rules at start rather than at end
+  Todo: OK message should say how many times rules were applied.
+  Todo: additional modifiers:
+        (KEYWORD) -RESERVED -CAPITALIZED -DATATYPE -VERB -CLAUSE_START -STATEMENT_START -IN_COMPOUND
+        (COMMENT) -BRACKETED -SIMPLE -OCTOTHORPE
+        (LITERAL) -STRING -FLOAT -DECIMAL -BINARY -LONG -DOUBLEQUOTED -ORDINAL
+        (OPERATOR) -ARITHMETIC -COMPARISON -PUNCTUATION
+        (IDENTIFIER) -DELIMITED -REGULAR -QUOTED -BACKTICKED -TABLE -COLUMN -ROUTINE
+  Todo: rules for INDENT and WHITESPACE
+  Todo: Additional categories: STATEMENT CLAUSE EXPRESSION SUBQUERY LIST
+  Todo: Phrases e.g. CREATE ... TABLE or ALTER ... TABLE ... ADD
+  Todo: just say what rules would be violated or applicable ("This is not formatted according to rules 1 and 77")
+        or say what rules are being followed e.g. "To get this we would have to make these rules")
+  PROBLEM: ACCEPTED: SET ocelot_statement_format_rule operator becomes identifier-upper;
+  PROBLEM: MAYBE ^Z IS NOT CALLING HPARSE AGAIN? So you can't format twice.
 */
 
 int MainWindow::statement_format_rule_set(QString text)
 {
-  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0)
+  if ((ocelot_statement_syntax_checker.toInt()) != 3) return ER_FORMAT_RULE;
+  int i;
+  for (i= 0; main_token_lengths[i] != 0; ++i)
   {
-    return ER_SYNTAX;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
+    {
+      ocelot_statement_format_rule= text.mid(main_token_offsets[i + 1]);
+    }
   }
-
-  ocelot_statement_format_rule= text;
   return ER_OK;
 }
 
-#define MAX_RULE_TOKENS 100
-QString MainWindow::statement_format_rule_apply(QString s)
+QString MainWindow::statement_format_rule_apply(QString main_token, int main_token_type, unsigned char main_token_reftype, unsigned int main_token_flag, int *rule_token_offsets, int *rule_token_lengths, int *rule_token_types)
 {
-  int token_offsets[MAX_CONDITIONAL_STATEMENT_TOKENS];
-  int token_lengths[MAX_CONDITIONAL_STATEMENT_TOKENS];
-  tokenize(ocelot_statement_format_rule.data(),
-           ocelot_statement_format_rule.size(),
-           &token_lengths[0], &token_offsets[0], MAX_RULE_TOKENS - 1,
-          (QChar*)"33333", 2, "", 1);
-  QString first_token, second_token;
-  bool is_becomes_seen= false;
-  for (int i= 1; token_lengths[i] != 0; ++i)
+  (void) main_token_reftype; /* suppress "unused parameter" warning */
+  (void) main_token_flag; /* suppress "unused parameter" warning */
+  /* main_token_type might be an unreserved keyword but in context be used as an identifier */
+  //if ((main_token_type >= TOKEN_KEYWORDS_START)
+  // && ((main_token_flag & TOKEN_FLAG_IS_RESERVED) == 0)
+  // && (main_token_reftype == TOKEN_REFTYPE_ANY))
+  //  main_token_type= TOKEN_TYPE_IDENTIFIER;
+  QString rule_token, replacee, replacer;
+  int rule_type, rule_modifier_type;
+  int i= 0;
+  int match_type= 0; /* 0 is not match, 1 is = match, 2 is category match */
+  for (; rule_token_lengths[i] != 0;)
   {
-    QString token= ocelot_statement_format_rule.mid(token_offsets[i], token_lengths[i]);
-    int t= token_type(token.data(), token_lengths[i], sql_mode_ansi_quotes);
-    if ((t == TOKEN_TYPE_COMMENT_WITH_SLASH)
-     || (t == TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
-     || (t == TOKEN_TYPE_COMMENT_WITH_MINUS))
-      continue;
-    if (QString::compare(token, "BECOMES", Qt::CaseInsensitive) == 0)
+    replacee= "";
+    replacer= "";
+    bool is_becomes_seen= false;
+    match_type= 0;
+    for (; rule_token_lengths[i] != 0; ++i)
     {
-      is_becomes_seen= true;
-      continue;
+      rule_token= ocelot_statement_format_rule.mid(rule_token_offsets[i], rule_token_lengths[i]);
+      rule_type= rule_token_types[i];
+      rule_modifier_type= 0;
+      if ((rule_token_lengths[i + 1] == 1)
+       && (ocelot_statement_format_rule.mid(rule_token_offsets[i + 1], 1) == "-")
+       && (rule_token_lengths[i + 2] != 0))
+      {
+        i+= 2;
+        rule_modifier_type= rule_token_types[i];
+      }
+      if (rule_type == TOKEN_KEYWORD_BECOMES)
+      {
+        is_becomes_seen= true;
+        continue;
+      }
+      if (rule_type == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE) /* won't happen */
+      {
+        continue;
+      }
+      if ((rule_token == ",") || (rule_token == ";")) break;
+      if (is_becomes_seen == false)
+      {
+        if (rule_type == TOKEN_KEYWORD_COMMENT)
+        {
+          if ((main_token_type >= TOKEN_TYPE_COMMENT_WITH_SLASH)
+           && (main_token_type <= TOKEN_TYPE_COMMENT_WITH_MINUS))
+          {
+            replacee= main_token;
+            match_type= 2;
+          }
+        }
+        else if (rule_type == TOKEN_KEYWORD_IDENTIFIER)
+        {
+          if ((main_token_type >= TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+           && (main_token_type <= TOKEN_TYPE_IDENTIFIER_WITH_AT))
+          {
+            replacee= main_token;
+            match_type= 2;
+          }
+        }
+        if (rule_type == TOKEN_KEYWORD_KEYWORD)
+        {
+          if (main_token_type >= TOKEN_KEYWORDS_START)
+          {
+            replacee= main_token;
+            match_type= 2;
+          }
+        }
+        else if (rule_type == TOKEN_KEYWORD_LITERAL)
+        {
+          if ((main_token_type >= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+           && (main_token_type <= TOKEN_TYPE_LITERAL_WITH_BRACE))
+          {
+            replacee= main_token;
+            match_type= 2;
+          }
+        }
+        if (rule_type == TOKEN_KEYWORD_OPERATOR)
+        {
+          if (main_token_type == TOKEN_TYPE_OPERATOR)
+          {
+            replacee= main_token;
+            match_type= 2;
+          }
+        }
+        else
+        {
+          if ((main_token == rule_token) && (rule_type != TOKEN_KEYWORD_KEYWORD))
+          {
+            replacee= rule_token;
+            match_type= 1;
+          }
+        }
+        if ((rule_modifier_type == TOKEN_KEYWORD_UPPER)
+         && (main_token.toUpper() != main_token))
+          match_type= 0;
+        if ((rule_modifier_type == TOKEN_KEYWORD_LOWER)
+         && (main_token.toLower() != main_token))
+          match_type= 0;
+      }
+      else /* is_becomes_seen == true */
+      {
+        if (match_type > 0)
+        {
+          if (match_type == 2)
+          {
+            /* if category matched and this is category keyword */
+            if ((rule_type == TOKEN_KEYWORD_COMMENT)
+             || (rule_type == TOKEN_KEYWORD_IDENTIFIER)
+             || (rule_type == TOKEN_KEYWORD_LITERAL)
+             || (rule_type == TOKEN_KEYWORD_KEYWORD)
+             || (rule_type == TOKEN_KEYWORD_OPERATOR))
+            rule_token= replacee;
+          }
+          if (rule_modifier_type == TOKEN_KEYWORD_UPPER) rule_token= rule_token.toUpper();
+          if (rule_modifier_type == TOKEN_KEYWORD_LOWER) rule_token= rule_token.toLower();
+          if (rule_type == TOKEN_KEYWORD_COMMA) rule_token= ",";
+          if (rule_type == TOKEN_KEYWORD_NEWLINE) rule_token= "\n";
+          if (rule_type == TOKEN_KEYWORD_SEMICOLON) rule_token= ";";
+          if (rule_type == TOKEN_KEYWORD_SPACE) rule_token= " ";
+          if (rule_type == TOKEN_KEYWORD_TAB) rule_token= "\t";
+          replacer.append(rule_token);
+        }
+      }
     }
-    if (QString::compare(token, "OCELOT_STATEMENT_FORMAT_RULE", Qt::CaseInsensitive) == 0)
-    {
-      continue;
-    }
-    if (token == ";") break;
-    if (is_becomes_seen == false) first_token= token;
-    else second_token= token;
+    if (match_type > 0) break;
+    if (rule_token == ";") break;
+    ++i;
   }
-  if (s == first_token) return second_token;
-  return s;
+  if (match_type > 0) return replacer;
+  return main_token;
 }
 
 /*
@@ -11803,11 +11873,11 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "121" to the new size */
+  /* That is okay but you must change this occurrence of "120" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 123);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 122);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -23622,7 +23692,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 121 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 120 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
 */
 int XSettings::ocelot_variables_create()
 {
@@ -23730,8 +23800,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_statement_font_style, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE},
     {&main_window->ocelot_statement_font_weight, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT},
     {&main_window->ocelot_statement_format_clause_indent, NULL,  8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT},
-    {&main_window->ocelot_statement_format_keyword_case, NULL, -1, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE},
-    {&main_window->ocelot_statement_format_statement_indent, NULL, 8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE}, /* unused */
+    {&main_window->ocelot_statement_format_rule, NULL, 8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE}, /* unused */
     {&main_window->ocelot_statement_format_statement_indent, NULL, 8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT},
     {&main_window->ocelot_statement_height, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT},
     {&main_window->ocelot_statement_highlight_comment_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR},
@@ -23750,7 +23819,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 121;
+  int i= 120;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;
@@ -23818,11 +23887,9 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
     return ER_OK;
   }
 
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE)
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
   {
-    qv= qv.toLower();
-    if ((qv != "upper") && (qv != "lower") && (qv!= "unchanged"))
-    return ER_FORMAT_KEY_CASE;
+    ; /* Todo: check validity of qv here? */
   }
 
   if ((keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)

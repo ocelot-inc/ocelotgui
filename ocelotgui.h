@@ -299,7 +299,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_COLUMN_TYPE,
     TOKEN_KEYWORD_COLUMN_TYPE_INFO,
 
-
+    TOKEN_KEYWORD_COMMA,
     TOKEN_KEYWORD_COMMENT,
         TOKEN_KEYWORD_COMMENTS,
     TOKEN_KEYWORD_COMMIT,
@@ -521,6 +521,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_HOUR_MINUTE,
     TOKEN_KEYWORD_HOUR_SECOND,
         TOKEN_KEYWORD_HTML,
+    TOKEN_KEYWORD_IDENTIFIER,
     TOKEN_KEYWORD_IF,
     TOKEN_KEYWORD_IFNULL,
     TOKEN_KEYWORD_IGNORE,
@@ -601,6 +602,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_JULIANDAY,
     TOKEN_KEYWORD_KEY,
     TOKEN_KEYWORD_KEYS,
+    TOKEN_KEYWORD_KEYWORD,
     TOKEN_KEYWORD_KILL,
     TOKEN_KEYWORD_LAG,
     TOKEN_KEYWORD_LANGUAGE,
@@ -629,6 +631,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_LINESTRINGFROMTEXT,
     TOKEN_KEYWORD_LINESTRINGFROMWKB,
         TOKEN_KEYWORD_LINE_NUMBERS,
+    TOKEN_KEYWORD_LITERAL,
     TOKEN_KEYWORD_LN,
     TOKEN_KEYWORD_LOAD,
     TOKEN_KEYWORD_LOAD_FILE,
@@ -714,6 +717,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_NATURAL,
     TOKEN_KEYWORD_NCHAR,
         TOKEN_KEYWORD_NET_BUFFER_LENGTH,
+    TOKEN_KEYWORD_NEWLINE,
     TOKEN_KEYWORD_NEXTVAL,
     TOKEN_KEYWORD_NIL,
     TOKEN_KEYWORD_NO,
@@ -846,7 +850,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE,
     TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT,
     TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT,
-    TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE,
     TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE,
     TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT,
     TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT,
@@ -875,6 +878,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_ON,
         TOKEN_KEYWORD_ONE_DATABASE,
     TOKEN_KEYWORD_OPEN,
+    TOKEN_KEYWORD_OPERATOR,
     TOKEN_KEYWORD_OPTIMIZE,
     TOKEN_KEYWORD_OPTIMIZER_COSTS,
     TOKEN_KEYWORD_OPTION,
@@ -1009,6 +1013,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SEC_TO_TIME,
     TOKEN_KEYWORD_SELECT,
         TOKEN_KEYWORD_SELECT_LIMIT,
+    TOKEN_KEYWORD_SEMICOLON,
     TOKEN_KEYWORD_SENSITIVE,
     TOKEN_KEYWORD_SEPARATOR,
     TOKEN_KEYWORD_SEQUENCE,
@@ -1180,6 +1185,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SYSTEM,
     TOKEN_KEYWORD_SYSTEM_USER,
     TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN,
+    TOKEN_KEYWORD_TAB,
     TOKEN_KEYWORD_TABLE,
     TOKEN_KEYWORD_TABLESPACE,
     TOKEN_KEYWORD_TABLE_INFO,
@@ -1386,7 +1392,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1160
+#define KEYWORD_LIST_SIZE 1167
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1459,7 +1465,7 @@ static const keywords strvalues[]=
       {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
           {"BACKUP_ADMIN", 0, 0, TOKEN_KEYWORD_BACKUP_ADMIN},
         {"BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BATCH},
-    {"BECOMES", 0, 0, TOKEN_KEYWORD_BECOMES},
+    {"BECOMES", 0, 0, TOKEN_KEYWORD_BECOMES},  /* for format rule */
       {"BEFORE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BEFORE},
       {"BEGIN", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BEGIN},
       {"BENCHMARK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BENCHMARK},
@@ -1528,6 +1534,7 @@ static const keywords strvalues[]=
       {"COLUMN_NUMBER", 0, 0, TOKEN_KEYWORD_COLUMN_NUMBER},
       {"COLUMN_TYPE", 0, 0, TOKEN_KEYWORD_COLUMN_TYPE},
       {"COLUMN_TYPE_INFO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COLUMN_TYPE_INFO},
+      {"COMMA", 0, 0, TOKEN_KEYWORD_COMMA}, /* for format rule */
       {"COMMENT", 0, 0, TOKEN_KEYWORD_COMMENT},
         {"COMMENTS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_COMMENTS},
       {"COMMIT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_COMMIT},
@@ -1747,6 +1754,7 @@ static const keywords strvalues[]=
       {"HOUR_MINUTE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_MINUTE},
       {"HOUR_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_HOUR_SECOND},
         {"HTML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_HTML},
+      {"IDENTIFIER", 0, 0, TOKEN_KEYWORD_IDENTIFIER}, /* for format rule */
       {"IF", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IF},
       {"IFNULL", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_IFNULL},
       {"IGNORE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_IGNORE},
@@ -1827,6 +1835,7 @@ static const keywords strvalues[]=
       {"JULIANDAY", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JULIANDAY},
       {"KEY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_KEY},
       {"KEYS", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KEYS},
+      {"KEYWORD", 0, 0, TOKEN_KEYWORD_KEYWORD}, /* for format rule */
       {"KILL", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_KILL},
       {"LAG", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LAG}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"LANGUAGE", 0, 0, TOKEN_KEYWORD_LANGUAGE},
@@ -1855,6 +1864,7 @@ static const keywords strvalues[]=
       {"LINESTRINGFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINESTRINGFROMTEXT}, /* deprecated in MySQL 5.7.6 */
       {"LINESTRINGFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINESTRINGFROMWKB},   /* deprecated in MySQL 5.7.6 */
         {"LINE_NUMBERS", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_LINE_NUMBERS},
+      {"LITERAL", 0, 0, TOKEN_KEYWORD_LITERAL}, /* for format rule */
       {"LN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LN},
       {"LOAD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LOAD},
       {"LOAD_FILE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LOAD_FILE},
@@ -1940,6 +1950,7 @@ static const keywords strvalues[]=
       {"NATURAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NATURAL},
       {"NCHAR", 0, 0, TOKEN_KEYWORD_NCHAR},
         {"NET_BUFFER_LENGTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_NET_BUFFER_LENGTH},
+      {"NEWLINE", 0, 0, TOKEN_KEYWORD_NEWLINE}, /* for format rule */
       {"NEXTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NEXTVAL},
       {"NIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NIL},
       {"NO", 0, 0, TOKEN_KEYWORD_NO},
@@ -2073,7 +2084,6 @@ static const keywords strvalues[]=
     {"OCELOT_STATEMENT_FONT_STYLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE},
     {"OCELOT_STATEMENT_FONT_WEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT},
     {"OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT},
-    {"OCELOT_STATEMENT_FORMAT_KEYWORD_CASE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_KEYWORD_CASE},
     {"OCELOT_STATEMENT_FORMAT_RULE", 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE},
     {"OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT},
     {"OCELOT_STATEMENT_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT},
@@ -2103,6 +2113,7 @@ static const keywords strvalues[]=
       {"ON", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ON},
         {"ONE_DATABASE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_ONE_DATABASE},
       {"OPEN", 0, 0, TOKEN_KEYWORD_OPEN},
+      {"OPERATOR", 0, 0, TOKEN_KEYWORD_OPERATOR}, /* for format rule */
       {"OPTIMIZE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTIMIZE},
       {"OPTIMIZER_COSTS", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_OPTIMIZER_COSTS},
       {"OPTION", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTION},
@@ -2237,6 +2248,7 @@ static const keywords strvalues[]=
       {"SEC_TO_TIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SEC_TO_TIME},
       {"SELECT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SELECT},
         {"SELECT_LIMIT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SELECT_LIMIT},
+      {"SEMICOLON", 0, 0, TOKEN_KEYWORD_SEMICOLON}, /* for format rule */
       {"SENSITIVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SENSITIVE},
       {"SEPARATOR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SEPARATOR},
       {"SEQUENCE", 0, 0, TOKEN_KEYWORD_SEQUENCE},
@@ -2408,6 +2420,7 @@ static const keywords strvalues[]=
       {"SYSTEM", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SYSTEM}, /* Ocelot keyword */
       {"SYSTEM_USER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SYSTEM_USER},
           {"SYSTEM_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN},
+      {"TAB", 0, 0, TOKEN_KEYWORD_TAB}, /* for format rule */
       {"TABLE", FLAG_VERSION_ALL | FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TABLE},
       {"TABLESPACE", 0, 0, TOKEN_KEYWORD_TABLESPACE},
       {"TABLE_INFO", 0, 0, TOKEN_KEYWORD_TABLE_INFO},
@@ -2954,7 +2967,6 @@ public:
   QString ocelot_statement_style_string;
   QString ocelot_statement_format_statement_indent;
   QString ocelot_statement_format_clause_indent;
-  QString ocelot_statement_format_keyword_case;
   QString ocelot_statement_format_rule;
   QString ocelot_statement_height, new_ocelot_statement_height;
   QString ocelot_statement_left, new_ocelot_statement_left;
@@ -3112,6 +3124,7 @@ public:
   bool hparse_f_is_special_verb(int);
   int hparse_f_accept(unsigned int,unsigned char,int,QString);
   int hparse_f_acceptn(int,QString,int);
+  int hparse_f_acceptf(int pass_number, QString replacee);
   void hparse_f_expected_initialize();
   void hparse_f_expected_clear();
   int hparse_f_expected_exact(int reftype);
@@ -3382,7 +3395,7 @@ public slots:
   void menu_activations(QObject*, QEvent::Type);
   void statement_edit_widget_formatter();
   int statement_format_rule_set(QString text);
-  QString statement_format_rule_apply(QString);
+  QString statement_format_rule_apply(QString, int, unsigned char, unsigned int, int*, int*, int*);
   void action_change_one_setting(QString old_setting, QString new_setting, int keyword_index);
   void action_menu();
   void action_history();
@@ -11568,7 +11581,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 121
+#define OCELOT_VARIABLES_SIZE 120
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */

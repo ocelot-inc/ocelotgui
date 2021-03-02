@@ -560,6 +560,65 @@ int MainWindow::hparse_f_acceptn(int proposed_type, QString token, int n)
   return 0;
 }
 
+/* A variant of hparse_f_accept for statement_format_rule words e.g. [keyword] [operator] */
+/* TODO: are you checking properly for eof or ; ??? */
+/* We won't match , or ; so there will have to be some other way to specify them. */
+/* We won't match comments. */
+int MainWindow::hparse_f_acceptf(int pass_number, QString replacee)
+{
+  if (hparse_errno > 0) return 0;
+  bool is_accepted= false;
+  for (int i= 0; i < 5; ++i)
+  {
+    QString k;
+    if (i == 0) k= "COMMENT";
+    if (i == 1) k= "IDENTIFIER";
+    if (i == 2) k= "KEYWORD";
+    if (i == 3) k= "LITERAL";
+    if (i == 4) k= "OPERATOR";
+    if ((pass_number == 1) || (k == replacee))
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, k) == 1)
+      {
+        is_accepted= true;
+        break;
+      }
+    }
+  }
+  if (is_accepted == false)
+  {
+    int i= main_token_types[hparse_i];
+    if ((hparse_token != ",") && (hparse_token != ";"))
+    {
+       if (((i >= TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) && (i <= TOKEN_TYPE_IDENTIFIER_WITH_AT))
+       || (i >= TOKEN_KEYWORDS_START)
+       || ((i >= TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) && (i <= TOKEN_TYPE_LITERAL_WITH_BRACE))
+       || (i == TOKEN_TYPE_OPERATOR))
+      {
+        hparse_f_expected_clear();
+        hparse_f_nexttoken();
+        is_accepted= true;
+      }
+    }
+  }
+  if (is_accepted == true)
+  {
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "-") == 1)
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOWER") == 0)
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPPER");
+        if (hparse_errno > 0) return 0;
+      }
+    return 1;
+  }
+  /* guaranteed to fail */
+  hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "[identifier]");
+  hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "[keyword]]");
+  hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[literal]");
+  hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[operator]");
+  return 0;
+}
+
 /* expect means: if current == expected then get next and return 1; else error */
 int MainWindow::hparse_f_expect(unsigned int flag_version, unsigned char reftype,int proposed_type, QString token)
 {
@@ -13034,17 +13093,20 @@ void MainWindow::hparse_f_other(int flags)
 */
 int MainWindow::hparse_f_client_set_rule()
 {
-  if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0)
+  QString replacee;
+  for (;;)
   {
-    hparse_f_error();
-    return 1;
-  }
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BECOMES, "BECOMES");
-  if (hparse_errno > 0) return 1;
-  if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0)
-  {
-    hparse_f_error();
-    return 1;
+    replacee= hparse_token.toUpper();
+    if (hparse_f_acceptf(1, "") == 0)
+    {
+      hparse_f_error();
+      return 1;
+    }
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BECOMES, "BECOMES");
+    if (hparse_errno > 0) return 1;
+    while (hparse_f_acceptf(2, replacee) == 1) {;}
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1) continue;
+    break;
   }
   return 1;
 }
