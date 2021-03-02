@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: March 1 2021
+   Last modified: March 2 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -1162,7 +1162,7 @@ void MainWindow::statement_edit_widget_formatter()
 }
 
 /*
-
+  ocelot_statement_format_rule_set()
   This will help with implementation of the format rules described by
   Descriptive SQL Style Guide
   https://github.com/pgulutzan/descriptive-sql-style-guide/blob/master/style.md
@@ -1209,7 +1209,7 @@ void MainWindow::statement_edit_widget_formatter()
     For example
       SET OCELOT_STATEMENT_FORMAT_RULE THEN BECOMES SPACE THEN, KEYWORD BECOMES KEYWORD;
       means when you see THEN you apply the first rule, therefore you do not apply the second rule.
-  Todo: I guess it's also possible to set with --ocelot_statement_format_rule='rule'
+  It's also possible to set with --ocelot_statement_format_rule='rule'
   Todo: consider escape character e.g. \; and escape reserved word e.g. \IDENTIFIER
         consider doing rules at start rather than at end
   Todo: OK message should say how many times rules were applied.
@@ -1230,7 +1230,7 @@ void MainWindow::statement_edit_widget_formatter()
 
 int MainWindow::statement_format_rule_set(QString text)
 {
-  if ((ocelot_statement_syntax_checker.toInt()) != 3) return ER_FORMAT_RULE;
+  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return ER_FORMAT_RULE;
   int i;
   for (i= 0; main_token_lengths[i] != 0; ++i)
   {
@@ -1525,8 +1525,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   Todo: Now there's useless code -- we have setShortcut() for most of
         these combinations, but keypress_shortcut_handler() happens
         first (?? I think), so they're useless. But a few things are
-        still handled by shortcuts, e.g. format, which is harmless
-        because there's only one widget that format works with.
+        still handled by shortcuts, maybe, and if one fails try the other.
   Todo: can we get here for a disabled menu item? I think it's possible
         if we're coming not from edit filter but from textedit key press
         event, so we should check "isenabled()" for more things.
@@ -1558,6 +1557,7 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   if (qk == ocelot_shortcut_history_markup_previous_keysequence) { history_markup_previous(); return true; }
   if (qk == ocelot_shortcut_history_markup_next_keysequence) { history_markup_next(); return true; }
   if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
+  if (qk == ocelot_shortcut_format_keysequence){ statement_edit_widget_formatter(); return true; }
   if (qk == ocelot_shortcut_zoomin_keysequence){menu_edit_zoomin(); return true; }
   if (qk == ocelot_shortcut_zoomout_keysequence){menu_edit_zoomout(); return true; }
   if (qk == ocelot_shortcut_autocomplete_keysequence)
@@ -23800,7 +23800,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_statement_font_style, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_STYLE, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_STYLE},
     {&main_window->ocelot_statement_font_weight, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_FONT_WEIGHT},
     {&main_window->ocelot_statement_format_clause_indent, NULL,  8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_CLAUSE_INDENT},
-    {&main_window->ocelot_statement_format_rule, NULL, 8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE}, /* unused */
+    {&main_window->ocelot_statement_format_rule, NULL, -1, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE}, /* only used during connect */
     {&main_window->ocelot_statement_format_statement_indent, NULL, 8, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_STATEMENT_INDENT},
     {&main_window->ocelot_statement_height, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HEIGHT},
     {&main_window->ocelot_statement_highlight_comment_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_COMMENT_COLOR},
@@ -23833,12 +23833,10 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
   QString qv;
   if (keyword_index == TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION) qv= main_window->connect_stripper(new_value, true);
   else qv= main_window->connect_stripper(new_value, false);
-
   char flags_style= ocelot_variables[offset].flags_style;
   char enums_for= ocelot_variables[offset].enums_for;
   QString *qstring_target= ocelot_variables[offset].qstring_target;
   short unsigned int *int_target= ocelot_variables[offset].int_target;
-
   int maximum= ocelot_variables[offset].maximum;
   if (maximum != -1)
   {
@@ -23854,7 +23852,6 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
       return er;
     }
   }
-
   if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT)
   {
     int ii= main_window->shortcut(keyword_index, qv, true, true);
@@ -23867,7 +23864,6 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
       return ER_ILLEGAL_VALUE;
     }
   }
-
   if ((keyword_index == TOKEN_KEYWORD_OCELOT_BATCH)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_HORIZONTAL)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_HTML)
@@ -23886,12 +23882,10 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
     }
     return ER_OK;
   }
-
   if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
   {
     ; /* Todo: check validity of qv here? */
   }
-
   if ((keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
 #if (OCELOT_MYSQL_DEBUGGER == 1)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)

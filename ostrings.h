@@ -200,7 +200,7 @@ static const char *er_strings[]=
   "Syntax checker value must be between 0 and 3", /* ER_SYNTAX */
   "Format statement indent value must be between 0 and 8", /* ER_FORMAT_STATEMENT */
   "Format clause indent value must be between 0 and 8", /* ER_FORMAT_CLAUSE */
-  "Syntax checker value must be 3 (Menu item Settings | Statement widget)'", /* ER_FORMAT_RULE */
+  "Syntax checker value must be 1 or 3 (Menu item Settings | Statement widget)'", /* ER_FORMAT_RULE */
   "Unknown border size", /* ER_UNKNOWN_BORDER_SIZE */
   "Unknown cell border size", /* ER_UNKNOWN_CELL_BORDER_SIZE */
   "Unknown cell drag line size", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */
@@ -286,7 +286,7 @@ static const char *er_strings[]=
     "Syntaxe valeur (pour vérificateur de syntaxe) doit être comprise entre 0 et 3", /* ER_SYNTAX */
     "Format déclaration  valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_STATEMENT */
     "Format clause valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_CLAUSE */
-    "Syntaxe valeur (pour vérificateur de syntaxe) doit être 3", /* FORMAT_RULE */
+    "Syntaxe valeur (pour vérificateur de syntaxe) doit être 1 ou 3", /* FORMAT_RULE */
     "Taille de la bordure inconnu", /* ER_UNKNOWN_BORDER_SIZE */
     "Taille de la bordure de la cellule inconnu ", /* ER_UNKNOWN_CELL_BORDER_SIZE */
     "Taille de dragline cellulaire inconnu", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */
