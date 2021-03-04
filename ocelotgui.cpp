@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: March 2 2021
+   Last modified: March 4 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -9062,6 +9062,7 @@ void MainWindow::remove_statement(QString text)
 int MainWindow::action_execute_one_statement(QString text)
 {
   log("action_execute_one_statement", 80);
+  log(".. raw:: html", 1000);
   //QString text;
   MYSQL_RES *mysql_res_for_new_result_set= NULL;
   unsigned short int is_vertical= ocelot_vertical; /* true if --vertical or \G or ego */
@@ -16545,6 +16546,10 @@ QString MainWindow::tarantool_read_format(QString lua_request)
     Of course it's not really nanoseconds and sometimes it's based on ticks or milliseconds.
     So printf doesn't really say anything with %.9f especially since printf itself takes so much time.
     If this is never used, then #include #include <QElapsedTimer> can be removed from ocelotgui.h.
+  Undocumented: if level == 1000, show part of statement_edit_widget html.
+                see https://github.com/tarantool/doc/issues/1835
+                Initially I tried toHtml() but it requires too much massaging
+                Works better if connected because e.g. otherwise ansi_quotes might be wrong.
   Todo: consider using stderr or a named file.
   Todo: attach a timer or counter so printf occurs if dangers exist.
   Todo: consider using a bit mask instead of a greater-than comparison.
@@ -16554,6 +16559,52 @@ QString MainWindow::tarantool_read_format(QString lua_request)
 */
 void MainWindow::log(const char *message, int level)
 {
+  if (ocelot_log_level == 1000)
+  {
+    if (level == 1000)
+    {
+      QString indenter= QString(" ").repeated(ocelot_statement_format_statement_indent.toInt());
+      QString s_in= statement_edit_widget->toPlainText();
+      QString s_out= indenter + "<p style='font-family:monospace; white-space:pre;'>\n" + indenter;
+      QTextCursor text_cursor= statement_edit_widget->textCursor();
+      text_cursor.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor);
+      QString last_color= "";
+      int ii= 0;
+      bool is_in_span= false;
+      while(text_cursor.movePosition(QTextCursor::NextCharacter, QTextCursor::MoveAnchor))
+      {
+        QTextCharFormat text_cursor_format = text_cursor.charFormat();
+        QString this_color= text_cursor_format.foreground().color().name();
+        this_color= rgb_to_color(this_color).toLower();
+        QString m= s_in.mid(ii, 1);
+        QChar c= m.at(0);
+        if ((c.isPrint() == true) && (c.isSpace() == false))
+        {
+          if (this_color != last_color)
+          {
+            if (is_in_span == true) s_out.append("</span>");
+            s_out.append("<span style=\"color:"); s_out.append(this_color); s_out.append("\">");
+            last_color= this_color;
+            is_in_span= true;
+          }
+        }
+        s_out.append(m);
+        if (c == QChar(10)) s_out.append(indenter);
+        ++ii;
+      }
+      if (is_in_span == true) s_out.append("</span>");
+      s_out.append("</p>");
+      char *tmp= new char[s_out.size() * 3 + 1];
+      strcpy(tmp, s_out.toUtf8());
+      printf("\n.. raw:: html\n\n");
+      printf("%s\n\n", tmp);
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
+      fflush(stdout);
+#endif
+      delete []tmp;
+      return;
+    }
+  }
   static QElapsedTimer* timer;
   static long int elapsed_nanoseconds= 0;
   if (level > ocelot_log_level)
