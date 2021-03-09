@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: March 4 2021
+   Last modified: March 9 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -220,7 +220,7 @@
 #define STRING_LENGTH_512 512
 
 /* MAX_HPARSE_ERRMSG_LENGTH should be enough for all keywords that begin with "OCELOT_" */
-#define MAX_HPARSE_ERRMSG_LENGTH 3670
+#define MAX_HPARSE_ERRMSG_LENGTH 3690
 
 /* Connect arguments and options */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
@@ -651,7 +651,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_history_height= ocelot_history_left= ocelot_history_top= ocelot_history_width= "default";
   ocelot_history_max_row_count= "0";
   ocelot_history_detached= "no";
-
+  ocelot_histfileflags= "L";
+  ocelot_histfilesize= "2000000000";
+  ocelot_histsize= "500";
   lmysql= new ldbms();                               /* lmysql will be deleted in action_exit(). */
 
   xsettings_widget= new XSettings(this);
@@ -1739,6 +1741,9 @@ bool MainWindow::is_statement_complete(QString text)
   ocelot_history_includes_warnings                 default = 0 (no)
   ocelot_history_max_row_count                     default = 0 (suppressed)
   ocelot_history_{left|top|width|height}           default
+  ocelot_histfileflags                             (default is "L") see also HIST and HISTIGNORE
+  ocelot_histfilesize                              (default is "2000000000")
+  ocelot_histsize                                  (default is "500")
 
   The statement is always followed by an error message,
   but ocelot_history_includes_warnings is affected by ...
@@ -2072,9 +2077,19 @@ int MainWindow::history_markup_previous_or_next()
   HIST
   * read http://ocelot.ca/blog/blog/2015/08/04/mysql_histfile-and-mysql_history/
   * bool ocelot_history_hist_file_is_open initially is false but it's opened if successful connect
-  * --batch or --silent or setting name to /deev/null turns history off
+  * --batch or --silent or setting name to /dev/null turns history off
   EITHER
   * Ignore if filename is "", is "/dev/null", or is a link to "/dev/null"
+  HANDLE ^P AND ^N
+    If a statement is multi-line:
+      In history_file_write() if ocelot_histfileflags>"" (default is "L"), we precede with a comment:
+      -- lines: n
+      In history_file_to_history_widget() if we see "-- lines: " we read n lines together
+  COMPATIBILITY:
+    mysql and ocelotgui can both read and write .mysql_history
+    mysql does not have our multi-line trick so won't show multi-line statements correctly
+    mysql writes statements that fail, ocelotgui doesn't
+    mysql will of course see our added comment line but user can ignore it, or set ocelot_histfileflags
 */
 void MainWindow::history_file_write(QString history_type, QString text_line)  /* see comment=tee+hist */
 {
@@ -2117,6 +2132,22 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
   }
   else
   {
+    if (ocelot_histfileflags > "")
+    {
+      char f_line[4096];
+      int lines_count= 1;
+      for (char *cquery= query; *cquery != '\0'; ++cquery) if (*cquery == '\n') ++lines_count;
+      char prompt[64 * 3 + 1];
+      if (ocelot_histfileflags.contains("P", Qt::CaseInsensitive) == true)
+      {
+        QString s_prompt= statement_edit_widget->prompt_translate(1);
+        if (s_prompt.size() > 64) s_prompt= s_prompt.right(64);
+        strcpy(prompt, s_prompt.toUtf8());
+      }
+      else prompt[0]= '\0';
+      sprintf(f_line, "-- lines: %d %s\n", lines_count, prompt);
+      ocelot_history_hist_file.write(f_line, strlen(f_line));
+    }
     ocelot_history_hist_file.write(query, strlen(query));
     ocelot_history_hist_file.write("\n", strlen("\n"));
     ocelot_history_hist_file.flush();
@@ -2206,22 +2237,23 @@ void MainWindow::history_file_stop(QString history_type)   /* see comment=tee+hi
   }
 }
 
-
 /*
   This is putting in the history widget, indeed, BUT ...
-  2. The history widget seems to grow when I type something for the first time
-  4. Make sure there's no disaster if file is /dev/null or blank.
-  5. ^P doesn't work, and that's probably because we depend on markup to see statement start.
-  TODO: Fix for ^P
-  Nothing happens if --batch or --silent
+  Todo: The history widget seems to grow when I type something for the first time
+  Todo: Make sure there's no disaster if file is /dev/null or blank.
   We try to open the history file during each connect.
   If we successfully open, but only the first time, we copy its lines to the history widget.
-  3. We have to limit the number of lines, since the file might be big.
-     So we do an fseek to the last 10000 bytes of the file, then skip the first line from there.
+  Re histsize: Read file backward searching for \n, then read forward dumping to history_widget.
+  Re histfilesize: If we need to shrink, at end, re-open for write, copy what's kept, truncate.
+  We back up statement-at-a-time rather than line-at-a-time if there are -- lines: comments.
+  Todo: Do it all with QFile
 */
-#define HISTFILESIZE 10000
+#define HISTORY_BUFFER_SIZE 8192
+#define LINES_SIZE 10
 void MainWindow::history_file_to_history_widget()         /* see comment=tee+hist */
 {
+  char history_buffer[HISTORY_BUFFER_SIZE + LINES_SIZE + 16];
+  history_buffer[0]= '\0';
   FILE *history_file;
   if (ocelot_batch != 0) return;                          /* if --batch happened, no history */
   if (ocelot_silent != 0) return;                         /* if --silent happened, no history */
@@ -2235,25 +2267,130 @@ void MainWindow::history_file_to_history_widget()         /* see comment=tee+his
     history_file= fopen(query, "r");
     delete []query;
   }
-  if (history_file == NULL) return;
-  if (fseek(history_file, 0 , SEEK_END) == 0)
+  int histfilesize= ocelot_histfilesize.toInt();
+  int histsize= ocelot_histsize.toInt();
+  int file_size; /* could be size_t but history files won't be multi-gigabyte */
+  int file_position;
+  int file_position_at_histsize= -1;
+  int file_position_at_histfilesize= -1;
+  int line_counter= 0;
+  if (history_file == NULL) goto returner;
+  if (fseek(history_file, 0 , SEEK_END) != 0) {fclose(history_file); goto returner; }
+  file_size= ftell(history_file);
+  file_position= file_size;
+  if (file_size <= histfilesize)
   {
-    int file_size = ftell(history_file);
-    if (file_size > HISTFILESIZE) fseek(history_file, file_size - HISTFILESIZE, SEEK_SET);
-    else fseek(history_file, 0, SEEK_SET);
+    /* We will not need to truncate */
+    if (histsize == 0) {fclose(history_file); goto returner; } /* Don't need to read or write */
+    file_position_at_histfilesize= 0;
   }
-  char line[4096];
-  while(fgets(line, sizeof line, history_file) != NULL) /* put all non-"" in history  widget */
+  if (histsize == 0) file_position_at_histsize= file_size;
+  if (histfilesize == 0) file_position_at_histfilesize= 0;
+  if (histsize != 0) ++histsize; /* +1 because to go back 5 lines we skip 6 newlines */
+  if (histfilesize != 0) ++histfilesize;
+  for (;;)
   {
-    query_utf16= line;
+    int file_read_size;
+    if (file_position > HISTORY_BUFFER_SIZE) file_read_size= HISTORY_BUFFER_SIZE;
+    else file_read_size= file_position;
+    file_position-= file_read_size;
+    if (file_read_size == 0) break;
+    memcpy(history_buffer + file_read_size, history_buffer, LINES_SIZE + 16);
+    if (fseek(history_file, file_position, SEEK_SET) != 0) {fclose(history_file); goto returner; }
+    int l= fread(history_buffer, 1, file_read_size, history_file);
+    if (l != file_read_size) {fclose(history_file); goto returner; }
+    for (int j= file_read_size - 1; j >= 0; --j)
+    {
+      if (*(history_buffer + j) == '\n')
+      {
+        ++line_counter;
+        int statement_line_count= history_line(history_buffer + j + 1);
+        if (statement_line_count > 0) line_counter-= statement_line_count; /* partial skip "lines: " */
+        if ((line_counter == histsize) || (line_counter == histfilesize))
+        {
+          int file_position_at_lf= file_position + j;
+          if (line_counter == histsize)
+          {
+            file_position_at_histsize= file_position_at_lf;
+          }
+          if (line_counter == histfilesize)
+          {
+            file_position_at_histfilesize= file_position_at_lf;
+          }
+          if ((file_position_at_histsize != -1) && (file_position_at_histfilesize != -1)) break;
+        }
+      }
+    }
+    if ((file_position_at_histsize != -1) && (file_position_at_histfilesize != -1)) break;
+  }
+  ++file_position_at_histsize; /* ?? what if there's nothing here? */
+  if (fseek(history_file, file_position_at_histsize, SEEK_SET) != 0) {fclose(history_file); goto returner; }
+  while (fgets(history_buffer, sizeof history_buffer, history_file) != NULL) /* put all non-"" in history  widget */
+  {
+    int statement_line_count= history_line(history_buffer);
+    if (statement_line_count > 0)
+    {
+      query_utf16= "";
+      for (int j= 0; j < statement_line_count; ++j)
+      {
+        if (fgets(history_buffer, sizeof history_buffer, history_file) == NULL) break;
+        query_utf16.append(history_buffer);
+      }
+    }
+    else query_utf16= history_buffer;
     query_utf16= query_utf16.trimmed();
     if (query_utf16 > "") history_markup_append("", false);
   }
   fclose(history_file);
+  if ((file_position_at_histfilesize > 0) || (histfilesize == 0)) /* must we truncate the file? */
+  {
+    ocelot_history_hist_file.setFileName(ocelot_history_hist_file_name);
+    if (ocelot_history_hist_file.open(QIODevice::ReadWrite | QIODevice::Text) == true)
+    {
+      int new_file_size;
+      if (histfilesize == 0) new_file_size= 0;
+      else
+      {
+        int o= file_position_at_histfilesize + 1;
+        new_file_size= file_size - o;
+        int n= 0;
+        for (;;)
+        {
+          ocelot_history_hist_file.seek(o);
+          int l= ocelot_history_hist_file.read(history_buffer, HISTORY_BUFFER_SIZE);
+          if (l <= 0) break;
+          o+= l;
+          ocelot_history_hist_file.seek(n);
+          int l2= ocelot_history_hist_file.write(history_buffer, l);
+          n+= l2;
+          if (l < HISTORY_BUFFER_SIZE) break;
+        }
+      }
+      ocelot_history_hist_file.resize(new_file_size);
+      ocelot_history_hist_file.close();
+    }
+  }
+returner:
   ocelot_history_hist_file_is_copied= true;
   query_utf16= er_strings[er_off + ER_START_OF_SESSION];
+  return;
 }
 
+/* Pass: history line, which might be -- lines: n */
+/* Return: n. 0 if it isn't -- lines: n. */
+int MainWindow::history_line(char *l)
+{
+  if (strncmp(l, "-- lines: ", LINES_SIZE) == 0)
+  {
+    char tmp[64];
+    int i= 0;
+    char *c;
+    for (c= l + LINES_SIZE; isdigit(*c); ++c) tmp[i++]= *c;
+    tmp[i]= '\0';
+    return atoi(tmp);
+   }
+  return 0;
+}
 
 /*
   Shortcut duplication
@@ -11874,11 +12011,11 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "120" to the new size */
+  /* That is okay but you must change this occurrence of "123" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 122);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 125);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -16605,6 +16742,7 @@ void MainWindow::log(const char *message, int level)
       return;
     }
   }
+  if (level == 1000) return;
   static QElapsedTimer* timer;
   static long int elapsed_nanoseconds= 0;
   if (level > ocelot_log_level)
@@ -23743,7 +23881,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 120 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 123 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
 */
 int XSettings::ocelot_variables_create()
 {
@@ -23781,6 +23919,8 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_grid_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR},
     {&main_window->ocelot_grid_top, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TOP},
     {&main_window->ocelot_grid_width, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_WIDTH},
+    {&main_window->ocelot_histfileflags, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_HISTFILEFLAGS},
+    {&main_window->ocelot_histfilesize, NULL,  2000000000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTFILESIZE},
     {&main_window->ocelot_history_background_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR},
     {&main_window->ocelot_history_border_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR},
     {&main_window->ocelot_history_detached, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED},
@@ -23794,6 +23934,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_history_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY, TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR},
     {&main_window->ocelot_history_top, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_TOP},
     {&main_window->ocelot_history_width, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH},
+    {&main_window->ocelot_histsize, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_HISTSIZE},
     {NULL,  &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HORIZONTAL},
     {NULL, &ocelot_html,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HTML},
     {NULL, &ocelot_html,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW},
@@ -23870,7 +24011,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 120;
+  int i= 123;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;

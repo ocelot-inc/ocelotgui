@@ -780,6 +780,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP,
     TOKEN_KEYWORD_OCELOT_GRID_TOP,
     TOKEN_KEYWORD_OCELOT_GRID_WIDTH,
+    TOKEN_KEYWORD_OCELOT_HISTFILEFLAGS,
+    TOKEN_KEYWORD_OCELOT_HISTFILESIZE,
     TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR,
     TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED,
@@ -793,6 +795,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_HISTORY_TOP,
     TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH,
+    TOKEN_KEYWORD_OCELOT_HISTSIZE,
     TOKEN_KEYWORD_OCELOT_HORIZONTAL,
     TOKEN_KEYWORD_OCELOT_HTML,
     TOKEN_KEYWORD_OCELOT_HTMLRAW,
@@ -1392,7 +1395,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1167
+#define KEYWORD_LIST_SIZE 1170
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2014,6 +2017,8 @@ static const keywords strvalues[]=
     {"OCELOT_GRID_TOOLTIP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP},
     {"OCELOT_GRID_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TOP},
     {"OCELOT_GRID_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_WIDTH},
+    {"OCELOT_HISTFILEFLAGS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTFILEFLAGS},
+    {"OCELOT_HISTFILESIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTFILESIZE},
     {"OCELOT_HISTORY_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_BACKGROUND_COLOR},
     {"OCELOT_HISTORY_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_BORDER_COLOR},
     {"OCELOT_HISTORY_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED},
@@ -2027,6 +2032,7 @@ static const keywords strvalues[]=
     {"OCELOT_HISTORY_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_TEXT_COLOR},
     {"OCELOT_HISTORY_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_TOP},
     {"OCELOT_HISTORY_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTORY_WIDTH},
+    {"OCELOT_HISTSIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTSIZE},
     {"OCELOT_HORIZONTAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HORIZONTAL},
     {"OCELOT_HTML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTML},
     {"OCELOT_HTMLRAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW},
@@ -3017,6 +3023,9 @@ public:
   QString ocelot_history_width, new_ocelot_history_width;
   QString ocelot_history_max_row_count, new_ocelot_history_max_row_count;
   QString ocelot_history_detached, new_ocelot_history_detached;
+  QString ocelot_histfileflags;
+  QString ocelot_histfilesize;
+  QString ocelot_histsize;
   QString ocelot_menu_text_color, new_ocelot_menu_text_color;
   QString ocelot_menu_background_color, new_ocelot_menu_background_color;
   QString ocelot_menu_border_color, new_ocelot_menu_border_color;
@@ -3590,6 +3599,7 @@ private:
   void history_file_stop(QString);                 /* see comment=tee+hist */
   void history_file_write(QString, QString);       /* see comment=tee+hist */
   void history_file_to_history_widget();           /* see comment=tee+hist */
+  int history_line(char *);
 public:
   void statement_edit_widget_setstylesheet();
   void tokenize(QChar *text, int text_length, int *token_lengths, int *token_offsets, int max_tokens, QChar *version, int passed_comment_behaviour, QString special_token, int minus_behaviour);
@@ -11581,7 +11591,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 120
+#define OCELOT_VARIABLES_SIZE 123
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
