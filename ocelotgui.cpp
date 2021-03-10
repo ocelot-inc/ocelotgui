@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: March 9 2021
+   Last modified: March 10 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -18563,7 +18563,8 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
         token0= s_argv.mid(2, argv_length - 3);
         token1= "=";
         token2= "";
-        if (i < (argc - 1))
+        /* 2021-03-10 it turns out that password= --user=root should work (password is blank) */
+        if ((i < (argc - 1)) && (argv[i + 1][0] != '-'))
         {
           token2= argv[i + 1];
           ++i;
