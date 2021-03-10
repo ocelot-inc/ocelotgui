@@ -13628,6 +13628,8 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_SEND_BUF, 0);
     lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_RECV_BUF, 0);
   }
+  sql_mode_ansi_quotes= true;        /* see comment = ansi_quotes */
+  hparse_sql_mode_ansi_quotes= true; /* probably not necessary */
   {
     char connection_string[1024];
     char connection_port[128];
@@ -13728,8 +13730,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     /* The caller should save the connection for the server id. */
     return 0;
   }
-  sql_mode_ansi_quotes= true;        /* see comment = ansi_quotes */
-  hparse_sql_mode_ansi_quotes= true; /* probably not necessary */
 
   /*
     Todo: This overrides any earlier PROMPT statements by user.
