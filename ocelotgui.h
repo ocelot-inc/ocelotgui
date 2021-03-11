@@ -3687,7 +3687,9 @@ private:
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
   XSettings *xsettings_widget;
+public:
   QMenu *menu_file;
+private:
     QAction *menu_file_action_connect;
     QAction *menu_file_action_exit;
   QMenu *menu_edit;
