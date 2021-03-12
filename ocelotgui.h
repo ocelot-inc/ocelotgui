@@ -3512,7 +3512,7 @@ private:
   QString debug_privilege_check(int statement_type);
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
-  void create_menu();
+  void create_menu(); void fill_menu();
   int rehash_scan(char *); int rehash_scan_for_tarantool(char *);
   void rehash_scan_one_space(int space_number);
   QString rehash_search(QString table_name, char *search_string, int reftype,
@@ -3687,9 +3687,7 @@ private:
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
   XSettings *xsettings_widget;
-public:
   QMenu *menu_file;
-private:
     QAction *menu_file_action_connect;
     QAction *menu_file_action_exit;
   QMenu *menu_edit;

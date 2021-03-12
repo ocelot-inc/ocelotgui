@@ -2,7 +2,7 @@
   ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
 
    Version: 1.3.0
-   Last modified: March 11 2021
+   Last modified: March 12 2021
 */
 /*
   Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
@@ -561,7 +561,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #ifdef OCELOT_OS_LINUX
   ui->menuBar->setNativeMenuBar(false);
 #endif
-  menu_file= NULL;                                   /* if this is null that means create_menu isn't done */
+  create_menu();
 
   setWindowTitle("ocelotgui");
 
@@ -715,7 +715,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   setCentralWidget(main_window);
 
-  create_menu();    /* Do this at a late stage because widgets must exist before we call connect() */
+  fill_menu();    /* Do this at a late stage because widgets must exist before we call connect() */
   history_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(history_edit_widget, SIGNAL(customContextMenuRequested(const QPoint &)),
       this, SLOT(menu_context(const QPoint &)));
@@ -2424,75 +2424,156 @@ int MainWindow::history_line(char *l)
     I should show what the shortcuts are; unfortunately for most actions the shortcut differs according to platform
     Maybe instead of "Execute ctrl+E" I should be using "Run ctrl+R"
     Sure, I tried using & for various menu items e.g. E&xit -- but then Alt+x did not work!
-  We say menu_file= NULL; early so we know to skip menu actions if create_menu() hasn't happened.
+  create_menu() makes a skeleton, fill_menu() comes when we know options from command-line and my.cnf
 */
 void MainWindow::create_menu()
 {
-  menu_file= ui->menuBar->addMenu(menu_strings[menu_off + MENU_FILE]);
+  menu_file= ui->menuBar->addMenu("");
   /* Todo: consider adding fileMenu = new QMenu(tr("&File"), this); -*/
-  menu_file_action_connect= menu_file->addAction(menu_strings[menu_off + MENU_FILE_CONNECT]);
+  menu_file_action_connect= menu_file->addAction("");
+  menu_file_action_exit= menu_file->addAction("");
+  menu_edit= ui->menuBar->addMenu("");
+  menu_edit_action_undo= menu_edit->addAction("");
+  menu_edit_action_redo= menu_edit->addAction("");
+  menu_edit->addSeparator();
+  menu_edit_action_cut= menu_edit->addAction("");
+  menu_edit_action_copy= menu_edit->addAction("");
+  menu_edit_action_paste= menu_edit->addAction("");
+  menu_edit->addSeparator();
+  menu_edit_action_select_all= menu_edit->addAction("");
+  menu_edit_action_history_markup_previous= menu_edit->addAction("");
+  menu_edit_action_history_markup_next= menu_edit->addAction("");
+  menu_edit_action_formatter= menu_edit->addAction("");
+  menu_edit_action_zoomin= menu_edit->addAction("");
+  menu_edit_action_zoomout= menu_edit->addAction("");
+  menu_edit_action_autocomplete= menu_edit->addAction("");
+  menu_run= ui->menuBar->addMenu("");
+  menu_run_action_execute= menu_run->addAction("");
+  menu_run_action_kill= menu_run->addAction("");
+  menu_settings= ui->menuBar->addMenu("");
+  menu_settings_action_menu= menu_settings->addAction("");
+  menu_settings_action_history= menu_settings->addAction("");
+  menu_settings_action_grid= menu_settings->addAction("");
+  menu_settings_action_statement= menu_settings->addAction("");
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  menu_settings_action_debug= menu_settings->addAction("");
+#endif
+  menu_settings_action_extra_rule_1= menu_settings->addAction("");
+  menu_options= ui->menuBar->addMenu("");
+  menu_options_action_option_detach_history_widget= menu_options->addAction("");
+  menu_options_action_option_detach_result_grid_widget= menu_options->addAction("");
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  menu_options_action_option_detach_debug_widget= menu_options->addAction("");
+#endif
+  menu_options_action_option_detach_statement_widget= menu_options->addAction("");
+  menu_options_action_next_window= menu_options->addAction("");
+  menu_options_action_previous_window= menu_options->addAction("");
+  menu_options_action_batch= menu_options->addAction("");
+  menu_options_action_horizontal= menu_options->addAction("");
+  menu_options_action_html= menu_options->addAction("");
+  menu_options_action_htmlraw= menu_options->addAction("");
+  menu_options_action_raw= menu_options->addAction("");
+  menu_options_action_vertical= menu_options->addAction("");
+  menu_options_action_xml= menu_options->addAction("");
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  menu_debug= ui->menuBar->addMenu("");
+//  menu_debug_action_install= menu_debug->addAction("");
+//  menu_debug_action_setup= menu_debug->addAction("");
+//  menu_debug_action_debug= menu_debug->addAction("");
+  menu_debug_action_breakpoint= menu_debug->addAction("");
+  menu_debug_action_continue= menu_debug->addAction("");
+//  menu_debug_action_leave= menu_debug->addAction("");
+  menu_debug_action_next= menu_debug->addAction("");
+//  menu_debug_action_skip= menu_debug->addAction("");
+  menu_debug_action_step= menu_debug->addAction("");
+  menu_debug_action_clear= menu_debug->addAction("");
+//  menu_debug_action_delete= menu_debug->addAction("");
+  menu_debug_action_exit= menu_debug->addAction("");
+  menu_debug_action_information= menu_debug->addAction("");
+  menu_debug_action_refresh_server_variables= menu_debug->addAction("");
+  menu_debug_action_refresh_user_variables= menu_debug->addAction("");
+  menu_debug_action_refresh_variables= menu_debug->addAction("");
+  menu_debug_action_refresh_call_stack= menu_debug->addAction("");
+#endif
+  menu_help= ui->menuBar->addMenu("");
+  menu_help_action_about= menu_help->addAction("");
+  menu_help_action_the_manual= menu_help->addAction("");
+  /* Qt says I should also do "addSeparator" if Motif style. Harmless. */
+  ui->menuBar->addSeparator();
+  /* exitAction->setPriority(QAction::LowPriority); */
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  menu_help_action_libmysqlclient= menu_help->addAction("");
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+  menu_help_action_settings= menu_help->addAction("");
+}
 
+/*
+  This was split out from create_menu() because there are things we won't know till after
+  we read .cnf files and command-line parameters.
+*/
+void MainWindow::fill_menu()
+{
+  menu_file->setTitle(menu_strings[menu_off + MENU_FILE]);
+  menu_file_action_connect->setText(menu_strings[menu_off + MENU_FILE_CONNECT]);
   connect(menu_file_action_connect, SIGNAL(triggered()), this, SLOT(action_connect()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT, "", false, true);
-  menu_file_action_exit= menu_file->addAction(menu_strings[menu_off + MENU_FILE_EXIT]);
+  menu_file_action_exit->setText(menu_strings[menu_off + MENU_FILE_EXIT]);
   connect(menu_file_action_exit, SIGNAL(triggered()), this, SLOT(action_exit()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT, "", false, true);
-  menu_edit= ui->menuBar->addMenu(menu_strings[menu_off + MENU_EDIT]);
-  menu_edit_action_undo= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_UNDO]);
+  menu_edit->setTitle(menu_strings[menu_off + MENU_EDIT]);
+  menu_edit_action_undo->setText(menu_strings[menu_off + MENU_EDIT_UNDO]);
   connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO, "", false, true);
-  menu_edit_action_redo= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_REDO]);
+  menu_edit_action_redo->setText(menu_strings[menu_off + MENU_EDIT_REDO]);
   connect(menu_edit_action_redo, SIGNAL(triggered()), this, SLOT(menu_edit_redo()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO, "", false, true);
-  menu_edit->addSeparator();
-  menu_edit_action_cut= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_CUT]);
+  menu_edit_action_cut->setText(menu_strings[menu_off + MENU_EDIT_CUT]);
   connect(menu_edit_action_cut, SIGNAL(triggered()), this, SLOT(menu_edit_cut()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CUT, "", false, true);
-  menu_edit_action_copy= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_COPY]);
+  menu_edit_action_copy->setText(menu_strings[menu_off + MENU_EDIT_COPY]);
   connect(menu_edit_action_copy, SIGNAL(triggered()), this, SLOT(menu_edit_copy()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_COPY, "", false, true);
-  menu_edit_action_paste= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_PASTE]);
+  menu_edit_action_paste->setText(menu_strings[menu_off + MENU_EDIT_PASTE]);
   connect(menu_edit_action_paste, SIGNAL(triggered()), this, SLOT(menu_edit_paste()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE, "", false, true);
-  menu_edit->addSeparator();
-  menu_edit_action_select_all= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_SELECT_ALL]);
+  menu_edit_action_select_all->setText(menu_strings[menu_off + MENU_EDIT_SELECT_ALL]);
   connect(menu_edit_action_select_all, SIGNAL(triggered()), this, SLOT(menu_edit_select_all()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_SELECT_ALL, "", false, true);
-  menu_edit_action_history_markup_previous= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_PREVIOUS_STATEMENT]);
+  menu_edit_action_history_markup_previous->setText(menu_strings[menu_off + MENU_EDIT_PREVIOUS_STATEMENT]);
   connect(menu_edit_action_history_markup_previous, SIGNAL(triggered()), this, SLOT(history_markup_previous()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS, "", false, true);
-  menu_edit_action_history_markup_next= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_NEXT_STATEMENT]);
+  menu_edit_action_history_markup_next->setText(menu_strings[menu_off + MENU_EDIT_NEXT_STATEMENT]);
   connect(menu_edit_action_history_markup_next, SIGNAL(triggered()), this, SLOT(history_markup_next()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT, "", false, true);
-  menu_edit_action_formatter= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_FORMAT]);
+  menu_edit_action_formatter->setText(menu_strings[menu_off + MENU_EDIT_FORMAT]);
   connect(menu_edit_action_formatter, SIGNAL(triggered()), this, SLOT(statement_edit_widget_formatter()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT, "", false, true);
-  menu_edit_action_zoomin= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_ZOOMIN]);
+  menu_edit_action_zoomin->setText(menu_strings[menu_off + MENU_EDIT_ZOOMIN]);
   connect(menu_edit_action_zoomin, SIGNAL(triggered()), this, SLOT(menu_edit_zoomin()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMIN, "", false, true);
-  menu_edit_action_zoomout= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_ZOOMOUT]);
+  menu_edit_action_zoomout->setText(menu_strings[menu_off + MENU_EDIT_ZOOMOUT]);
   connect(menu_edit_action_zoomout, SIGNAL(triggered()), this, SLOT(menu_edit_zoomout()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_ZOOMOUT, "", false, true);
-  menu_edit_action_autocomplete= menu_edit->addAction(menu_strings[menu_off + MENU_EDIT_AUTOCOMPLETE]);
+  menu_edit_action_autocomplete->setText(menu_strings[menu_off + MENU_EDIT_AUTOCOMPLETE]);
   connect(menu_edit_action_autocomplete, SIGNAL(triggered()), this, SLOT(menu_edit_autocomplete_via_menu()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE, "", false, true);
-  menu_run= ui->menuBar->addMenu(menu_strings[menu_off + MENU_RUN]);
-  menu_run_action_execute= menu_run->addAction(menu_strings[menu_off + MENU_RUN_EXECUTE]);
+  menu_run->setTitle(menu_strings[menu_off + MENU_RUN]);
+  menu_run_action_execute->setText(menu_strings[menu_off + MENU_RUN_EXECUTE]);
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE, "", false, true);
-  menu_run_action_kill= menu_run->addAction(menu_strings[menu_off + MENU_RUN_KILL]);
+  menu_run_action_kill->setText(menu_strings[menu_off + MENU_RUN_KILL]);
   connect(menu_run_action_kill, SIGNAL(triggered()), this, SLOT(action_kill()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL, "", false, true);
   menu_run_action_kill->setEnabled(false);
-  menu_settings= ui->menuBar->addMenu(menu_strings[menu_off + MENU_SETTINGS]);
-  menu_settings_action_menu= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_MENU]);
-  menu_settings_action_history= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_HISTORY_WIDGET]);
-  menu_settings_action_grid= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_GRID_WIDGET]);
-  menu_settings_action_statement= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_STATEMENT_WIDGET]);
+  menu_settings->setTitle(menu_strings[menu_off + MENU_SETTINGS]);
+  menu_settings_action_menu->setText(menu_strings[menu_off + MENU_SETTINGS_MENU]);
+  menu_settings_action_history->setText(menu_strings[menu_off + MENU_SETTINGS_HISTORY_WIDGET]);
+  menu_settings_action_grid->setText(menu_strings[menu_off + MENU_SETTINGS_GRID_WIDGET]);
+  menu_settings_action_statement->setText(menu_strings[menu_off + MENU_SETTINGS_STATEMENT_WIDGET]);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
-  menu_settings_action_debug= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_DEBUG_WIDGET]);
+  menu_settings_action_debug->setText(menu_strings[menu_off + MENU_SETTINGS_DEBUG_WIDGET]);
 #endif
-  menu_settings_action_extra_rule_1= menu_settings->addAction(menu_strings[menu_off + MENU_SETTINGS_EXTRA_RULE_1]);
+  menu_settings_action_extra_rule_1->setText(menu_strings[menu_off + MENU_SETTINGS_EXTRA_RULE_1]);
   connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
   connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
   connect(menu_settings_action_grid, SIGNAL(triggered()), this, SLOT(action_grid()));
@@ -2501,122 +2582,119 @@ void MainWindow::create_menu()
   connect(menu_settings_action_debug, SIGNAL(triggered()), this, SLOT(action_debug()));
 #endif
   connect(menu_settings_action_extra_rule_1, SIGNAL(triggered()), this, SLOT(action_extra_rule_1()));
-  menu_options= ui->menuBar->addMenu(menu_strings[menu_off + MENU_OPTIONS]);
-  menu_options_action_option_detach_history_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
+  menu_options->setTitle(menu_strings[menu_off + MENU_OPTIONS]);
+  menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
   menu_options_action_option_detach_history_widget->setCheckable(true);
   menu_options_action_option_detach_history_widget->setChecked(ocelot_detach_history_widget);
   connect(menu_options_action_option_detach_history_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_history_widget(bool)));
-  menu_options_action_option_detach_result_grid_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
+  menu_options_action_option_detach_result_grid_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
   menu_options_action_option_detach_result_grid_widget->setCheckable(true);
   menu_options_action_option_detach_result_grid_widget->setChecked(ocelot_detach_result_grid_widget);
   connect(menu_options_action_option_detach_result_grid_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_result_grid_widget(bool)));
 #if (OCELOT_MYSQL_DEBUGGER == 1)
-  menu_options_action_option_detach_debug_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
+  menu_options_action_option_detach_debug_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
   menu_options_action_option_detach_debug_widget->setCheckable(true);
   menu_options_action_option_detach_debug_widget->setChecked(ocelot_detach_debug_widget);
   connect(menu_options_action_option_detach_debug_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_debug_widget(bool)));
 #endif
-  menu_options_action_option_detach_statement_widget= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
+  menu_options_action_option_detach_statement_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
   menu_options_action_option_detach_statement_widget->setCheckable(true);
   menu_options_action_option_detach_statement_widget->setChecked(ocelot_detach_statement_edit_widget);
   connect(menu_options_action_option_detach_statement_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_statement_widget(bool)));
-  menu_options_action_next_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
+  menu_options_action_next_window->setText(menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
   connect(menu_options_action_next_window, SIGNAL(triggered(bool)), this, SLOT(action_option_next_window()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW, "", false, true);
-  menu_options_action_previous_window= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
+  menu_options_action_previous_window->setText(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
   connect(menu_options_action_previous_window, SIGNAL(triggered(bool)), this, SLOT(action_option_previous_window()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW, "", false, true);
-
-  menu_options_action_batch= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BATCH]);
+  menu_options_action_batch->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BATCH]);
   connect(menu_options_action_batch, SIGNAL(triggered(bool)), this, SLOT(action_option_batch()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH, "", false, true);
-  menu_options_action_horizontal= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL]);
+  menu_options_action_horizontal->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL]);
   connect(menu_options_action_horizontal, SIGNAL(triggered(bool)), this, SLOT(action_option_horizontal()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HORIZONTAL, "", false, true);
-  menu_options_action_html= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTML]);
+  menu_options_action_html->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTML]);
   connect(menu_options_action_html, SIGNAL(triggered(bool)), this, SLOT(action_option_html()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HTML, "", false, true);
-  menu_options_action_htmlraw= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW]);
+  menu_options_action_htmlraw->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW]);
   connect(menu_options_action_htmlraw, SIGNAL(triggered(bool)), this, SLOT(action_option_htmlraw()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW, "", false, true);
-  menu_options_action_raw= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_RAW]);
+  menu_options_action_raw->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_RAW]);
   connect(menu_options_action_raw, SIGNAL(triggered(bool)), this, SLOT(action_option_raw()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW, "", false, true);
-  menu_options_action_vertical= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_VERTICAL]);
+  menu_options_action_vertical->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_VERTICAL]);
   connect(menu_options_action_vertical, SIGNAL(triggered(bool)), this, SLOT(action_option_vertical()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_VERTICAL, "", false, true);
-  menu_options_action_xml= menu_options->addAction(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_XML]);
+  menu_options_action_xml->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_XML]);
   connect(menu_options_action_xml, SIGNAL(triggered(bool)), this, SLOT(action_option_xml()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_XML, "", false, true);
-
 #if (OCELOT_MYSQL_DEBUGGER == 1)
-  menu_debug= ui->menuBar->addMenu(menu_strings[menu_off + MENU_DEBUG]);
-//  menu_debug_action_install= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
+menu_debug->setTitle(menu_strings[menu_off + MENU_DEBUG]);
+//  menu_debug_action_install->setText(menu_strings[menu_off + MENU_DEBUG_INSTALL]);
 //  connect(menu_debug_action_install, SIGNAL(triggered()), this, SLOT(action_debug_install()));
 //=shortcut(?)  menu_debug_action_install->setShortcut(QKeySequence(tr("Alt+A")));
-//  menu_debug_action_setup= menu_debug->addAction(tr("Setup"));
+//  menu_debug_action_setup->setText(tr("Setup"));
 //  connect(menu_debug_action_setup, SIGNAL(triggered()), this, SLOT(action_debug_setup()));
 //=shortcut(?)  menu_debug_action_setup->setShortcut(QKeySequence(tr("Alt+5")));
-//  menu_debug_action_debug= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG]);
+//  menu_debug_action_debug->setText(menu_strings[menu_off + MENU_DEBUG]);
 //  connect(menu_debug_action_debug, SIGNAL(triggered()), this, SLOT(action_debug_debug()));
 //=shortcut(?)  menu_debug_action_debug->setShortcut(QKeySequence(tr("Alt+3")));
-  menu_debug_action_breakpoint= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_BREAKPOINT]);
+  menu_debug_action_breakpoint->setText(menu_strings[menu_off + MENU_DEBUG_BREAKPOINT]);
   connect(menu_debug_action_breakpoint, SIGNAL(triggered()), this, SLOT(action_debug_breakpoint()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT, "", false, true);
-  menu_debug_action_continue= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_CONTINUE]);
+  menu_debug_action_continue->setText(menu_strings[menu_off + MENU_DEBUG_CONTINUE]);
   connect(menu_debug_action_continue, SIGNAL(triggered()), this, SLOT(action_debug_continue()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE, "", false, true);
-//  menu_debug_action_leave= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_LEAVE);
+//  menu_debug_action_leave->setText(menu_strings[menu_off + MENU_DEBUG_LEAVE);
 //  connect(menu_debug_action_leave, SIGNAL(triggered()), this, SLOT(action_debug_leave()));
 //=shortcut(?)  menu_debug_action_leave->setShortcut(QKeySequence(tr("Alt+B")));
-  menu_debug_action_next= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_NEXT]);
+  menu_debug_action_next->setText(menu_strings[menu_off + MENU_DEBUG_NEXT]);
   connect(menu_debug_action_next, SIGNAL(triggered()), this, SLOT(action_debug_next()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT, "", false, true);
-//  menu_debug_action_skip= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_SKIP);
+//  menu_debug_action_skip->setText(menu_strings[menu_off + MENU_DEBUG_SKIP);
 //  connect(menu_debug_action_skip, SIGNAL(triggered()), this, SLOT(action_debug_skip()));
 //=shortcut(?)  menu_debug_action_skip->setShortcut(QKeySequence(tr("Alt+4")));
-  menu_debug_action_step= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_STEP]);
+  menu_debug_action_step->setText(menu_strings[menu_off + MENU_DEBUG_STEP]);
   connect(menu_debug_action_step, SIGNAL(triggered()), this, SLOT(action_debug_step()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_STEP, "", false, true);
-  menu_debug_action_clear= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_CLEAR]);
+  menu_debug_action_clear->setText(menu_strings[menu_off + MENU_DEBUG_CLEAR]);
   connect(menu_debug_action_clear, SIGNAL(triggered()), this, SLOT(action_debug_clear()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR, "", false, true);
-//  menu_debug_action_delete= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_DELETE]);
+//  menu_debug_action_delete->setText(menu_strings[menu_off + MENU_DEBUG_DELETE]);
 //  connect(menu_debug_action_delete, SIGNAL(triggered()), this, SLOT(action_debug_delete()));
 //=shortcut(?)  menu_debug_action_delete->setShortcut(QKeySequence(tr("Alt+G")));
-  menu_debug_action_exit= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_EXIT]);
+  menu_debug_action_exit->setText(menu_strings[menu_off + MENU_DEBUG_EXIT]);
   connect(menu_debug_action_exit, SIGNAL(triggered()), this, SLOT(action_debug_exit()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT, "", false, true);
-  menu_debug_action_information= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_INFORMATION]);
+  menu_debug_action_information->setText(menu_strings[menu_off + MENU_DEBUG_INFORMATION]);
   connect(menu_debug_action_information, SIGNAL(triggered()), this, SLOT(action_debug_information()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION, "", false, true);
-  menu_debug_action_refresh_server_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_SERVER_VARIABLES]);
+  menu_debug_action_refresh_server_variables->setText(menu_strings[menu_off + MENU_DEBUG_REFRESH_SERVER_VARIABLES]);
   connect(menu_debug_action_refresh_server_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_server_variables()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_SERVER_VARIABLES, "", false, true);
-  menu_debug_action_refresh_user_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_USER_VARIABLES]);
+  menu_debug_action_refresh_user_variables->setText(menu_strings[menu_off + MENU_DEBUG_REFRESH_USER_VARIABLES]);
   connect(menu_debug_action_refresh_user_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_user_variables()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_USER_VARIABLES, "", false, true);
-  menu_debug_action_refresh_variables= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_VARIABLES]);
+  menu_debug_action_refresh_variables->setText(menu_strings[menu_off + MENU_DEBUG_REFRESH_VARIABLES]);
   connect(menu_debug_action_refresh_variables, SIGNAL(triggered()), this, SLOT(action_debug_refresh_variables()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_VARIABLES, "", false, true);
-  menu_debug_action_refresh_call_stack= menu_debug->addAction(menu_strings[menu_off + MENU_DEBUG_REFRESH_CALL_STACK]);
+  menu_debug_action_refresh_call_stack->setText(menu_strings[menu_off + MENU_DEBUG_REFRESH_CALL_STACK]);
   connect(menu_debug_action_refresh_call_stack, SIGNAL(triggered()), this, SLOT(action_debug_refresh_call_stack()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_REFRESH_CALL_STACK, "", false, true);
   debug_menu_enable_or_disable(TOKEN_KEYWORD_BEGIN); /* Disable most of debug menu */
 #endif
-  menu_help= ui->menuBar->addMenu(menu_strings[menu_off + MENU_HELP]);
-  menu_help_action_about= menu_help->addAction(menu_strings[menu_off + MENU_HELP_ABOUT]);
+  menu_help->setTitle(menu_strings[menu_off + MENU_HELP]);
+  menu_help_action_about->setText(menu_strings[menu_off + MENU_HELP_ABOUT]);
   connect(menu_help_action_about, SIGNAL(triggered()), this, SLOT(action_about()));
-  menu_help_action_the_manual= menu_help->addAction(menu_strings[menu_off + MENU_HELP_THE_MANUAL]);
+  menu_help_action_the_manual->setText(menu_strings[menu_off + MENU_HELP_THE_MANUAL]);
   connect(menu_help_action_the_manual, SIGNAL(triggered()), this, SLOT(action_the_manual()));
   /* Qt says I should also do "addSeparator" if Motif style. Harmless. */
-  ui->menuBar->addSeparator();
   /* exitAction->setPriority(QAction::LowPriority); */
 #if (OCELOT_MYSQL_INCLUDE == 1)
-  menu_help_action_libmysqlclient= menu_help->addAction(menu_strings[menu_off + MENU_HELP_LIBMYSQLCLIENT]);
+  menu_help_action_libmysqlclient->setText(menu_strings[menu_off + MENU_HELP_LIBMYSQLCLIENT]);
   connect(menu_help_action_libmysqlclient, SIGNAL(triggered()), this, SLOT(action_libmysqlclient()));
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
-  menu_help_action_settings= menu_help->addAction(menu_strings[menu_off + MENU_HELP_SETTINGS]);
+  menu_help_action_settings->setText(menu_strings[menu_off + MENU_HELP_SETTINGS]);
   connect(menu_help_action_settings, SIGNAL(triggered()), this, SLOT(action_settings()));
 }
 
@@ -2714,8 +2792,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_connect_keysequence= QKeySequence::Open;
       else
         ocelot_shortcut_connect_keysequence= QKeySequence(ocelot_shortcut_connect);
-      if (menu_file != NULL)
-        menu_file_action_connect->setShortcut(ocelot_shortcut_connect_keysequence);
+      menu_file_action_connect->setShortcut(ocelot_shortcut_connect_keysequence);
     }
     return 1;
   }
@@ -2729,8 +2806,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_exit_keysequence= QKeySequence("Ctrl+Q");
       else
         ocelot_shortcut_exit_keysequence= QKeySequence(ocelot_shortcut_exit);
-      if (menu_file != NULL)
-        menu_file_action_exit->setShortcut(ocelot_shortcut_exit_keysequence);
+      menu_file_action_exit->setShortcut(ocelot_shortcut_exit_keysequence);
     }
     return 1;
   }
@@ -2743,8 +2819,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_undo_keysequence= QKeySequence::Undo;
       else
         ocelot_shortcut_undo_keysequence= QKeySequence(ocelot_shortcut_undo);
-      if (menu_file != NULL)
-        menu_edit_action_undo->setShortcut(ocelot_shortcut_undo_keysequence);
+      menu_edit_action_undo->setShortcut(ocelot_shortcut_undo_keysequence);
     }
     return 1;
   }
@@ -2757,8 +2832,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_redo_keysequence= QKeySequence::Redo;
       else
         ocelot_shortcut_redo_keysequence= QKeySequence(ocelot_shortcut_redo);
-      if (menu_file != NULL)
-        menu_edit_action_redo->setShortcut(ocelot_shortcut_redo_keysequence);
+      menu_edit_action_redo->setShortcut(ocelot_shortcut_redo_keysequence);
     }
     return 1;
   }
@@ -2771,8 +2845,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_cut_keysequence= QKeySequence::Cut;
       else
         ocelot_shortcut_cut_keysequence= QKeySequence(ocelot_shortcut_cut);
-      if (menu_file != NULL)
-        menu_edit_action_cut->setShortcut(ocelot_shortcut_cut_keysequence);
+      menu_edit_action_cut->setShortcut(ocelot_shortcut_cut_keysequence);
     }
     return 1;
   }
@@ -2785,8 +2858,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_copy_keysequence= QKeySequence::Copy;
       else
         ocelot_shortcut_copy_keysequence= QKeySequence(ocelot_shortcut_copy);
-      if (menu_file != NULL)
-        menu_edit_action_copy->setShortcut(ocelot_shortcut_copy_keysequence);
+      menu_edit_action_copy->setShortcut(ocelot_shortcut_copy_keysequence);
     }
     return 1;
   }
@@ -2799,8 +2871,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_paste_keysequence= QKeySequence::Paste;
       else
         ocelot_shortcut_paste_keysequence= QKeySequence(ocelot_shortcut_paste);
-      if (menu_file != NULL)
-        menu_edit_action_paste->setShortcut(ocelot_shortcut_paste_keysequence);
+      menu_edit_action_paste->setShortcut(ocelot_shortcut_paste_keysequence);
     }
     return 1;
   }
@@ -2813,8 +2884,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_select_all_keysequence= QKeySequence::SelectAll;
       else
         ocelot_shortcut_select_all_keysequence= QKeySequence(ocelot_shortcut_select_all);
-      if (menu_file != NULL)
-        menu_edit_action_select_all->setShortcut(ocelot_shortcut_select_all_keysequence);
+      menu_edit_action_select_all->setShortcut(ocelot_shortcut_select_all_keysequence);
     }
     return 1;
   }
@@ -2827,8 +2897,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_history_markup_previous_keysequence= QKeySequence("Ctrl+P");
       else
         ocelot_shortcut_history_markup_previous_keysequence= QKeySequence(ocelot_shortcut_history_markup_previous);
-      if (menu_file != NULL)
-        menu_edit_action_history_markup_previous->setShortcut(ocelot_shortcut_history_markup_previous_keysequence);
+      menu_edit_action_history_markup_previous->setShortcut(ocelot_shortcut_history_markup_previous_keysequence);
     }
     return 1;
   }
@@ -2841,8 +2910,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_history_markup_next_keysequence= QKeySequence("Ctrl+N");
       else
         ocelot_shortcut_history_markup_next_keysequence= QKeySequence(ocelot_shortcut_history_markup_next);
-      if (menu_file != NULL)
-        menu_edit_action_history_markup_next->setShortcut(ocelot_shortcut_history_markup_next_keysequence);
+      menu_edit_action_history_markup_next->setShortcut(ocelot_shortcut_history_markup_next_keysequence);
     }
     return 1;
   }
@@ -2855,8 +2923,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_format_keysequence= QKeySequence("Alt+Shift+F");
       else
         ocelot_shortcut_format_keysequence= QKeySequence(ocelot_shortcut_format);
-      if (menu_file != NULL)
-        menu_edit_action_formatter->setShortcut(ocelot_shortcut_format_keysequence);
+      menu_edit_action_formatter->setShortcut(ocelot_shortcut_format_keysequence);
     }
     return 1;
   }
@@ -2869,8 +2936,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_zoomin_keysequence= QKeySequence("Ctrl+=");
       else
         ocelot_shortcut_zoomin_keysequence= QKeySequence(ocelot_shortcut_zoomin);
-      if (menu_file != NULL)
-        menu_edit_action_zoomin->setShortcut(ocelot_shortcut_zoomin_keysequence);
+      menu_edit_action_zoomin->setShortcut(ocelot_shortcut_zoomin_keysequence);
     }
     return 1;
   }
@@ -2883,8 +2949,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_zoomout_keysequence= QKeySequence::ZoomOut;
       else
         ocelot_shortcut_zoomout_keysequence= QKeySequence(ocelot_shortcut_zoomout);
-      if (menu_file != NULL)
-        menu_edit_action_zoomout->setShortcut(ocelot_shortcut_zoomout_keysequence);
+      menu_edit_action_zoomout->setShortcut(ocelot_shortcut_zoomout_keysequence);
     }
     return 1;
   }
@@ -2898,8 +2963,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_autocomplete_keysequence= QKeySequence("Tab");
       else
         ocelot_shortcut_autocomplete_keysequence= QKeySequence(ocelot_shortcut_autocomplete);
-      if (menu_file != NULL)
-        menu_edit_action_autocomplete->setShortcut(ocelot_shortcut_autocomplete_keysequence);
+      menu_edit_action_autocomplete->setShortcut(ocelot_shortcut_autocomplete_keysequence);
     }
     return 1;
   }
@@ -2912,8 +2976,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_execute_keysequence= QKeySequence("Ctrl+E");
       else
         ocelot_shortcut_execute_keysequence= QKeySequence(ocelot_shortcut_execute);
-      if (menu_file != NULL)
-        menu_run_action_execute->setShortcut(ocelot_shortcut_execute_keysequence);
+      menu_run_action_execute->setShortcut(ocelot_shortcut_execute_keysequence);
     }
     return 1;
   }
@@ -2926,8 +2989,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_kill_keysequence= QKeySequence("Ctrl+C");
       else
         ocelot_shortcut_kill_keysequence= QKeySequence(ocelot_shortcut_kill);
-      if (menu_file != NULL)
-        menu_run_action_kill->setShortcut(ocelot_shortcut_kill_keysequence);
+      menu_run_action_kill->setShortcut(ocelot_shortcut_kill_keysequence);
     }
     return 1;
   }
@@ -2940,8 +3002,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_next_window_keysequence= QKeySequence::NextChild;
       else
         ocelot_shortcut_next_window_keysequence= QKeySequence(ocelot_shortcut_next_window);
-      if (menu_file != NULL)
-        menu_options_action_next_window->setShortcut(ocelot_shortcut_next_window_keysequence);
+      menu_options_action_next_window->setShortcut(ocelot_shortcut_next_window_keysequence);
     }
     return 1;
   }
@@ -2954,8 +3015,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_previous_window_keysequence= QKeySequence::PreviousChild;
       else
         ocelot_shortcut_previous_window_keysequence= QKeySequence(ocelot_shortcut_previous_window);
-      if (menu_file != NULL)
-        menu_options_action_previous_window->setShortcut(ocelot_shortcut_previous_window_keysequence);
+      menu_options_action_previous_window->setShortcut(ocelot_shortcut_previous_window_keysequence);
     }
     return 1;
   }
@@ -2969,8 +3029,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_batch_keysequence= QKeySequence("Alt+Shift+1");
       else
         ocelot_shortcut_batch_keysequence= QKeySequence(ocelot_shortcut_batch);
-      if (menu_file != NULL)
-        menu_options_action_batch->setShortcut(ocelot_shortcut_batch_keysequence);
+      menu_options_action_batch->setShortcut(ocelot_shortcut_batch_keysequence);
     }
     return 1;
   }
@@ -2984,8 +3043,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_horizontal_keysequence= QKeySequence("Alt+Shift+2");
       else
         ocelot_shortcut_horizontal_keysequence= QKeySequence(ocelot_shortcut_horizontal);
-      if (menu_file != NULL)
-        menu_options_action_horizontal->setShortcut(ocelot_shortcut_horizontal_keysequence);
+      menu_options_action_horizontal->setShortcut(ocelot_shortcut_horizontal_keysequence);
     }
     return 1;
   }
@@ -2999,8 +3057,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_html_keysequence= QKeySequence("Alt+Shift+3");
       else
         ocelot_shortcut_html_keysequence= QKeySequence(ocelot_shortcut_html);
-      if (menu_file != NULL)
-        menu_options_action_html->setShortcut(ocelot_shortcut_html_keysequence);
+      menu_options_action_html->setShortcut(ocelot_shortcut_html_keysequence);
     }
     return 1;
   }
@@ -3014,8 +3071,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_htmlraw_keysequence= QKeySequence("Alt+Shift+4");
       else
         ocelot_shortcut_htmlraw_keysequence= QKeySequence(ocelot_shortcut_htmlraw);
-      if (menu_file != NULL)
-        menu_options_action_htmlraw->setShortcut(ocelot_shortcut_htmlraw_keysequence);
+      menu_options_action_htmlraw->setShortcut(ocelot_shortcut_htmlraw_keysequence);
     }
     return 1;
   }
@@ -3029,8 +3085,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_raw_keysequence= QKeySequence("Alt+Shift+5");
       else
         ocelot_shortcut_raw_keysequence= QKeySequence(ocelot_shortcut_raw);
-      if (menu_file != NULL)
-        menu_options_action_raw->setShortcut(ocelot_shortcut_raw_keysequence);
+      menu_options_action_raw->setShortcut(ocelot_shortcut_raw_keysequence);
     }
     return 1;
   }
@@ -3044,8 +3099,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_vertical_keysequence= QKeySequence("Alt+Shift+6");
       else
         ocelot_shortcut_vertical_keysequence= QKeySequence(ocelot_shortcut_vertical);
-      if (menu_file != NULL)
-        menu_options_action_vertical->setShortcut(ocelot_shortcut_vertical_keysequence);
+      menu_options_action_vertical->setShortcut(ocelot_shortcut_vertical_keysequence);
     }
     return 1;
   }
@@ -3059,8 +3113,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_xml_keysequence= QKeySequence("Alt+Shift+7");
       else
         ocelot_shortcut_xml_keysequence= QKeySequence(ocelot_shortcut_xml);
-      if (menu_file != NULL)
-        menu_options_action_xml->setShortcut(ocelot_shortcut_xml_keysequence);
+      menu_options_action_xml->setShortcut(ocelot_shortcut_xml_keysequence);
     }
     return 1;
   }
@@ -3075,8 +3128,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_breakpoint_keysequence= QKeySequence("Alt+1");
       else
         ocelot_shortcut_breakpoint_keysequence= QKeySequence(ocelot_shortcut_breakpoint);
-      if (menu_file != NULL)
-        menu_debug_action_breakpoint->setShortcut(ocelot_shortcut_breakpoint_keysequence);
+      menu_debug_action_breakpoint->setShortcut(ocelot_shortcut_breakpoint_keysequence);
     }
     return 1;
   }
@@ -3089,8 +3141,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_continue_keysequence= QKeySequence("Alt+2");
       else
         ocelot_shortcut_continue_keysequence= QKeySequence(ocelot_shortcut_continue);
-      if (menu_file != NULL)
-        menu_debug_action_continue->setShortcut(ocelot_shortcut_continue_keysequence);
+      menu_debug_action_continue->setShortcut(ocelot_shortcut_continue_keysequence);
     }
     return 1;
   }
@@ -3103,8 +3154,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_next_keysequence= QKeySequence("Alt+3");
       else
         ocelot_shortcut_next_keysequence= QKeySequence(ocelot_shortcut_next);
-      if (menu_file != NULL)
-        menu_debug_action_next->setShortcut(ocelot_shortcut_next_keysequence);
+      menu_debug_action_next->setShortcut(ocelot_shortcut_next_keysequence);
     }
     return 1;
   }
@@ -3117,8 +3167,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_step_keysequence= QKeySequence("Alt+5");
       else
         ocelot_shortcut_step_keysequence= QKeySequence(ocelot_shortcut_step);
-      if (menu_file != NULL)
-        menu_debug_action_step->setShortcut(ocelot_shortcut_step_keysequence);
+      menu_debug_action_step->setShortcut(ocelot_shortcut_step_keysequence);
     }
     return 1;
   }
@@ -3131,8 +3180,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_clear_keysequence= QKeySequence("Alt+6");
       else
         ocelot_shortcut_clear_keysequence= QKeySequence(ocelot_shortcut_clear);
-      if (menu_file != NULL)
-        menu_debug_action_clear->setShortcut(ocelot_shortcut_clear_keysequence);
+      menu_debug_action_clear->setShortcut(ocelot_shortcut_clear_keysequence);
     }
     return 1;
   }
@@ -3145,8 +3193,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_debug_exit_keysequence= QKeySequence("Alt+7");
       else
         ocelot_shortcut_debug_exit_keysequence= QKeySequence(ocelot_shortcut_debug_exit);
-      if (menu_file != NULL)
-        menu_debug_action_exit->setShortcut(ocelot_shortcut_debug_exit_keysequence);
+      menu_debug_action_exit->setShortcut(ocelot_shortcut_debug_exit_keysequence);
     }
     return 1;
   }
@@ -3159,8 +3206,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_information_keysequence= QKeySequence("Alt+8");
       else
         ocelot_shortcut_information_keysequence= QKeySequence(ocelot_shortcut_information);
-      if (menu_file != NULL)
-        menu_debug_action_information->setShortcut(ocelot_shortcut_information_keysequence);
+      menu_debug_action_information->setShortcut(ocelot_shortcut_information_keysequence);
     }
     return 1;
   }
@@ -3173,8 +3219,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_refresh_server_variables_keysequence= QKeySequence("Alt+9");
       else
         ocelot_shortcut_refresh_server_variables_keysequence= QKeySequence(ocelot_shortcut_refresh_server_variables);
-      if (menu_file != NULL)
-        menu_debug_action_refresh_server_variables->setShortcut(ocelot_shortcut_refresh_server_variables_keysequence);
+      menu_debug_action_refresh_server_variables->setShortcut(ocelot_shortcut_refresh_server_variables_keysequence);
     }
     return 1;
   }
@@ -3187,8 +3232,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_refresh_user_variables_keysequence= QKeySequence("Alt+0");
       else
         ocelot_shortcut_refresh_user_variables_keysequence= QKeySequence(ocelot_shortcut_refresh_user_variables);
-      if (menu_file != NULL)
-        menu_debug_action_refresh_user_variables->setShortcut(ocelot_shortcut_refresh_user_variables_keysequence);
+      menu_debug_action_refresh_user_variables->setShortcut(ocelot_shortcut_refresh_user_variables_keysequence);
     }
     return 1;
   }
@@ -3201,8 +3245,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_refresh_variables_keysequence= QKeySequence("Alt+A");
       else
         ocelot_shortcut_refresh_variables_keysequence= QKeySequence(ocelot_shortcut_refresh_variables);
-      if (menu_file != NULL)
-        menu_debug_action_refresh_variables->setShortcut(ocelot_shortcut_refresh_variables_keysequence);
+      menu_debug_action_refresh_variables->setShortcut(ocelot_shortcut_refresh_variables_keysequence);
     }
     return 1;
   }
@@ -3215,8 +3258,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
         ocelot_shortcut_refresh_call_stack_keysequence= QKeySequence("Alt+B");
       else
         ocelot_shortcut_refresh_call_stack_keysequence= QKeySequence(ocelot_shortcut_refresh_call_stack);
-      if (menu_file != NULL)
-        menu_debug_action_refresh_call_stack->setShortcut(ocelot_shortcut_refresh_call_stack_keysequence);
+      menu_debug_action_refresh_call_stack->setShortcut(ocelot_shortcut_refresh_call_stack_keysequence);
     }
     /* todo: check why there is no "return 1;" here. */
   }
@@ -4199,8 +4241,7 @@ void MainWindow::detach_history_widget(bool checked)
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
       shrink= 0;
     }
-    if (menu_file != NULL)
-      menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
+    menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
     history_edit_widget->setWindowFlags(Qt::Widget);
     history_edit_widget->detach_stop();
   }
@@ -4245,8 +4286,7 @@ void MainWindow::detach_result_grid_widget(bool checked)
   QRect main_rect= rect();
   if (checked)
   {
-    if (menu_file != NULL)
-      menu_options_action_option_detach_result_grid_widget->setText("attach result grid widget");
+    menu_options_action_option_detach_result_grid_widget->setText("attach result grid widget");
     result_grid_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     result_grid_tab_widget->setWindowTitle("result grid widget");
     if (ocelot_grid_top == "default")
@@ -4269,8 +4309,7 @@ void MainWindow::detach_result_grid_widget(bool checked)
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
       shrink= 0;
     }
-    if (menu_file != NULL)
-      menu_options_action_option_detach_result_grid_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
+    menu_options_action_option_detach_result_grid_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
     result_grid_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) result_grid_tab_widget->show();
@@ -4317,8 +4356,7 @@ void MainWindow::detach_debug_widget(bool checked)
   QRect main_rect= rect();
   if (checked)
   {
-    if (menu_file != NULL)
-      menu_options_action_option_detach_debug_widget->setText("attach debug widget");
+    menu_options_action_option_detach_debug_widget->setText("attach debug widget");
     debug_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     debug_tab_widget->setWindowTitle("debug widget");
     if (ocelot_debug_top == "default")
@@ -4341,8 +4379,7 @@ void MainWindow::detach_debug_widget(bool checked)
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
       shrink= 0;
     }
-    if (menu_file != NULL)
-      menu_options_action_option_detach_debug_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
+    menu_options_action_option_detach_debug_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
     debug_tab_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) debug_tab_widget->show();
@@ -4388,8 +4425,7 @@ void MainWindow::detach_statement_widget(bool checked)
   QRect main_rect= rect();
   if (checked)
   {
-    if (menu_file != NULL)
-      menu_options_action_option_detach_statement_widget->setText("attach statement widget");
+    menu_options_action_option_detach_statement_widget->setText("attach statement widget");
     statement_edit_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     statement_edit_widget->setWindowTitle("statement widget");
     if (ocelot_statement_top == "default")
@@ -4412,8 +4448,7 @@ void MainWindow::detach_statement_widget(bool checked)
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
       shrink= 0;
     }
-    if (menu_file != NULL)
-      menu_options_action_option_detach_statement_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
+    menu_options_action_option_detach_statement_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
     statement_edit_widget->setWindowFlags(Qt::Widget);
   }
   if (is_visible) statement_edit_widget->show();
@@ -24117,7 +24152,6 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED))
   {
-    if (main_window->menu_file != NULL)
     {
       if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
       {
