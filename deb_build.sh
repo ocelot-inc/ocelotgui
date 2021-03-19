@@ -1,11 +1,11 @@
-# deb_build.sh -- produce ocelotgui-1.3.0 .deb from ~/ocelotgui
+# deb_build.sh -- produce ocelotgui-1.4.0 .deb from ~/ocelotgui
 
-# Ocelot uses this script to produce a .deb file from a source directory ~/ocelotgui on Ubuntu xenial.
+# The ocelotgui developer uses this script to produce a .deb file from a source directory ~/ocelotgui on Ubuntu xenial.
 # Only advanced users will want this, ordinary users will download the official-release .deb file or make with cmake.
 
 # An easy way to get ~/ocelotgui is "cd ~" + "git clone https://github.com/ocelot-inc/ocelotgui ocelotgui".
 # This script uses /tmp and cheerily deletes existing files in /tmp.
-# The result will be /tmp/debian3/ocelotgui_1.3.0-1_amd64.deb or /tmp/debian3/ocelotgui_1.3.0-1_i386.deb.
+# The result will be /tmp/debian3/ocelotgui_1.4.0-1_amd64.deb or /tmp/debian3/ocelotgui_1.4.0-1_i386.deb.
 # See also the comments in README.Debian.
 
 sudo apt-get install debhelper dpkg-dev devscripts
@@ -15,7 +15,7 @@ sudo apt-get install qtbase5-dev
 sudo apt-get install default-libmysqlclient-dev
 sudo apt-get install piuparts
 
-export VERSION=1.3.0
+export VERSION=1.4.0
 export SOURCE=$HOME/ocelotgui
 
 cd /tmp
@@ -118,7 +118,7 @@ debuild
 
 #Optional tests
 # The result of debuild should be ocelotgui_$VERSION-1_amd64.deb or ocelotgui_$VERSION-1_i386.deb if 32-bit
-# Assuming platform is Ubuntu, $CODENAME will be trusty/senial/bionic/etc. Remember, Ocelot builds on xenial.
+# Assuming platform is Ubuntu, $CODENAME will be trusty/senial/bionic/etc. Remember, Peter Gulutzan builds on xenial.
 # Final lines of output should show: piuparts says "PASS: All tests." and lintian -I says nothing.
 export CODENAME=`lsb_release --codename --short`
 cd /tmp/debian3

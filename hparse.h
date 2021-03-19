@@ -1,4 +1,4 @@
-/* Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
+/* Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -24,7 +24,7 @@
   The intent is to make highlight and hover look good.
   If any comparison fails, the error message will say:
   what we expected, token number + offset + value for the token where comparison failed.
-  Allowed syntaxes are: MySQL_5.7, MariaDB 10.2, Tarantool (like SQLite), or an Ocelot client statement.
+  Allowed syntaxes are: MySQL_5.7, MariaDB 10.2, Tarantool (like SQLite), or an ocelotgui client statement.
 */
 
 /*

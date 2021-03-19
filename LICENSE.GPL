@@ -2,7 +2,7 @@ Where to find license information about ocelotgui
 
 This is not intended as a legal document.
 
-Ocelotgui (Ocelot Graphical User Interface) is
+Ocelotgui (Graphical User Interface) is
 distributed according to GPL version 2.
 The text of the license is in file COPYING.
 
@@ -24,9 +24,9 @@ The text of the license is in file COPYING.thirdparty.
 
 On Windows, ocelotgui.exe was statically linked with
 MariaDB Connector C, which is distributed according
-to LGPL 2. Ocelot has an option to convey as LGPL 2
+to LGPL 2. Peter Gulutzan has an option to convey as LGPL 2
 as GPL 2, but did not since GPL v2 is compatible.
-Ocelot was forced to change one (1) line of the source.
+Peter Gulutzan was forced to change one (1) line of the source.
 The text of the license is in file COPYING.thirdparty.
 
 On Windows, ocelotgui includes the source code file

@@ -1,12 +1,12 @@
 Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: ocelotgui
 Source: http://ocelot.ca and http://github.com/ocelot-inc/ocelotgui
-Comment: See the LICENSE.GPL file for explanation why Ocelot chose GPL-2.
+Comment: See the LICENSE.GPL file for explanation why Peter Gulutzan chose GPL-2.
 
 Files: ocelotgui.cpp ocelotgui.h hparse.h ostrings.h readmylogin.c
        *.png *.jpg *.pro *.txt *.ui *.htm *.md *.sh ocelotgui* *changelog* debian/* *.cnf
        COPYING* LICENSE* copyright
-Copyright: Copyright 2014-2021 Ocelot Computer Services Inc. <ocelot.ca>
+Copyright: Copyright 2021 by Peter Gulutzan. <ocelot.ca>
 License: GPL-2
  This program is free software; you can redistribute it
  and/or modify it under the terms of the GNU General Public
@@ -37,7 +37,7 @@ Comment:
   and therefore MDBug's maker's copyright and GPL version 2 license provisions
   are reproduced below. These provisions apply only for the
   part of the debug_mdbug_install routine which is marked within the program.
-  The program as a whole is copyrighted by Ocelot and
+  The program as a whole is copyrighted by Peter Gulutzan and
   licensed under GPL version 2 as stated above.
   .
   This file is part of MDBug.
@@ -75,7 +75,7 @@ Comment:
    and therefore CodeEditor's maker's copyright and BSD license provisions
    are reproduced below. These provisions apply only for the
    part of the CodeEditor class which is included by #include "codeeditor.h".
-   The program as a whole is copyrighted by Ocelot and
+   The program as a whole is copyrighted by Peter Gulutzan and
    licensed under GPL version 2 as stated above.
 
 Files: third_party.h
@@ -87,7 +87,7 @@ Comment:
    and therefore Tarantool-C's maker's copyright and BSD-2 license provisions
    are reproduced below. These provisions apply only for the
    part of the third_party.h file which is taken from that source.
-   The program as a whole is copyrighted by Ocelot and
+   The program as a whole is copyrighted by Peter Gulutzan and
    licensed under GPL version 2 as stated above.
 
 License: BSD-2-clause

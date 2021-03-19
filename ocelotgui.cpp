@@ -1,11 +1,11 @@
 /*
-  ocelotgui -- Ocelot GUI Front End for MySQL or MariaDB
+  ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 1.3.0
-   Last modified: March 12 2021
+   Version: 1.4.0
+   Last modified: March 19 2021
 */
 /*
-  Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
+  Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@
    and therefore CodeEditor's maker's copyright and BSD license provisions
    are reproduced below. These provisions apply only for the
    part of the CodeEditor class which is included by #include "codeeditor.h".
-   The program as a whole is copyrighted by Ocelot and
+   The program as a whole is copyrighted by Peter Gulutzan and
    licensed under GPL version 2 as stated above.
  **
  ** Copyright (C) 2014 Digia Plc and/or its subsidiary(-ies).
@@ -71,7 +71,7 @@
   and therefore MDBug's maker's copyright and GPL version 2 license provisions
   are reproduced below. These provisions apply only for the
   part of the debug_mdbug_install routine which is marked within the program.
-  The program as a whole is copyrighted by Ocelot and
+  The program as a whole is copyrighted by Peter Gulutzan and
   licensed under GPL version 2 as stated above.
 
   This file is part of MDBug.
@@ -143,7 +143,7 @@
   but lines may be long, and sometimes spaces occur at ends of lines,
   and "if (x) y" may be preferred to "if (x) <newline> y".
 
-  The code was written by Ocelot Computer Services Inc. employees, except
+  The code was written by Peter Gulutzan, except
   for about 50 lines in the codeeditor.h CodeEditor section (Digia copyright / BSD license),
   and except for most of the lines in install_sql.cpp (HP copyright / GPL license).
   Other contributors will be acknowledged here and/or in a "Help" display.
@@ -410,7 +410,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.3.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.4.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -724,11 +724,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
       this, SLOT(menu_context(const QPoint &)));
 
   /* If any widget is detached, there might be some blinking. Probably not worth worrying about. */
-  if (ocelot_history_detached.toInt() == 1) detach_history_widget(true);
-  if (ocelot_grid_detached.toInt() == 1) detach_result_grid_widget(true);
-  if (ocelot_statement_detached.toInt() == 1) detach_statement_widget(true);
+  if (ocelot_history_detached == "yes") detach_history_widget(true);
+  if (ocelot_grid_detached == "yes") detach_result_grid_widget(true);
+  if (ocelot_statement_detached == "yes") detach_statement_widget(true);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
-  if (ocelot_debug_detached.toInt() == 1) detach_debug_widget(true);
+  if (ocelot_debug_detached == "yes") detach_debug_widget(true);
 #endif
   /*
     If the command-line option was -p but not a password, then password input is necessary
@@ -1389,7 +1389,7 @@ QString MainWindow::statement_format_rule_apply(QString main_token, int main_tok
   Todo: Consider: Perhaps this should not be in MainWindow:: but in CodeEditor::.
   Todo: Consider: Perhaps this should be a menu item, not a filter event.
                   (There's already a menu item, but it's not for Enter|Return.)
-  There are a few "Ocelot keyword" items that do not require ";" or delimiter
+  There are a few "ocelotgui keyword" items that do not require ";" or delimiter
   provided they're the first word, for example "QUIT".
 */
 bool MainWindow::eventFilter(QObject *obj, QEvent *event)
@@ -1644,7 +1644,7 @@ bool MainWindow::is_statement_complete(QString text)
     if (i > 0) second_last_token= text.mid(main_token_offsets[i - 1], main_token_lengths[i - 1]);
     break;
   }
-  /* No delimiter needed if first word in first statement of the input is an Ocelot keyword e.g. QUIT */
+  /* No delimiter needed if first word in first statement of the input is an ocelotgui keyword e.g. QUIT */
   /* Todo: this means that a client statement cannot be spread over two lines but for SET client-statement we wait for ; */
   if (is_client_statement(first_token_type, first_token_i, text) == true)
   {
@@ -4631,7 +4631,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Ocelot Graphical User Interface</b><br>Copyright (c) 2014-2021 by Ocelot Computer Services Inc.<br>\
+<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2021 by Peter Gulutzan.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -4715,10 +4715,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.3.0, February 9 2021  \
+  <BR>Version 1.4.0, March 19 2021  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.  \
+  <BR>Copyright (c) 2021 by Peter Gulutzan. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -5300,7 +5300,7 @@ QString MainWindow::q_color_list_name(QString rgb_name)
 }
 
 /*
-  It's possible to say SET [ocelot color name] = rgb_name e.g. "#FFFFFF"
+  It's possible to say SET [ocelotgui color name] = rgb_name e.g. "#FFFFFF"
   or have rgb_name in an options file or get an RGB name with set_current_colors_and_fonts().
   We'd prefer to show as W3C names where possible, X11 names as second choice, if English.
   But where the color is not in the W3C or X11 lists, we'll add.
@@ -6901,7 +6901,7 @@ void debug_mdbug_install()
   So the old unused code in install_sql.cpp still exists, and if we say
   #define NEW_SETUP 0 then it will still be invoked for test purposes,
   but now $setup code is entirely in ocelotgui.cpp (and incidentally
-  is entirely written by Ocelot Computer Services, only the old
+  is entirely written by Peter Gulutzan, only the old
   code in install_sql.cpp was written for HP).
 */
 #define NEW_SETUP 1
@@ -20070,7 +20070,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2014-2021 by Ocelot Computer Services Inc. and others\n");
+  printf("Copyright (c) 2021 by Peter Gulutzan and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");
@@ -23808,7 +23808,7 @@ void MainWindow::clf_make_sql_execute_function(QString *clf_output)
     "\n" + indent_string + "local function sql_execute(statement, parameters)" +
     "\n" + indent_string + "--[[" +
     "\n" + indent_string + "    THIS IS A STUB." +
-    "\n" + indent_string + "    For MySQL/MariaDB, Ocelot has not written the sql_execute() code." +
+    "\n" + indent_string + "    For MySQL/MariaDB, Peter Gulutzan has not written the sql_execute() code." +
     "\n" + indent_string + "    But it should be easy, fewer than 50 lines." +
     "\n" + indent_string + "    Using the C API, remembering to enclose within pcall():" +
     "\n" + indent_string + "    * Pass each parameter." +

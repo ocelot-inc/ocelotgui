@@ -15,7 +15,7 @@
    and therefore CodeEditor's maker's copyright and BSD license provisions
    are reproduced below. These provisions apply only for the
    part of the CodeEditor class which is included by #include "codeeditor.h".
-   The program as a whole is copyrighted by Ocelot and
+   The program as a whole is copyrighted by Peter Gulutzan and
    licensed under GPL version 2 as stated above
    and in COPYING file.
  **
@@ -60,7 +60,7 @@
   and therefore MDBug's maker's copyright and GPL version 2 license provisions
   are reproduced below. These provisions apply only for the
   part of the debug_mdbug_install routine which is marked within the program.
-  The program as a whole is copyrighted by Ocelot and
+  The program as a whole is copyrighted by Peter Gulutzan and
   licensed under GPL version 2 as stated above.
 
   This file is part of MDBug.

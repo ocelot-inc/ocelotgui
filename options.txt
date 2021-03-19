@@ -5,7 +5,7 @@ so it is obsolete. It will be removed in a later release.
 Some details about ocelotgui options.
 
 An option is a named value which affects connecting and behavior.
-Most Ocelot options are very similar to options of the mysql client.
+Most [ocelot] options are very similar to options of the mysql client.
 
 The places that an option might be specified are:
 within the program for example the default port value is 3306,

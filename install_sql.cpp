@@ -3746,7 +3746,7 @@ strcpy(x,
 "  IF v_condition_value   LIKE '%e%' THEN"
 "    SET i_double=v_condition_value;" 
 "    SET i_double_2=v_table_variable_value;" 
-"    SET return_value = (i_double_1 = i_double_2);" 
+"    SET return_value = (i_double = i_double_2);"
 "    LEAVE compare;" 
 "    END IF;" 
 "  IF v_condition_value   LIKE '%.%' THEN"

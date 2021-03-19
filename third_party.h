@@ -18,7 +18,7 @@
   are removals of #includes since now there is only one file).
   Then the file contents.
   
-  Ocelot Computer Services Inc. is not the primary author of the
+  Peter Gulutzan is not the primary author of the
   code in this file, and only claims rights to the changes it wrote.
   It was copied to make builds of ocelotgui on non-Linux platforms
   easier. Anyone who wishes to use the code for any other purpose

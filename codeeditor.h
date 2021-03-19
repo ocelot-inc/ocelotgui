@@ -4,7 +4,7 @@
    and therefore CodeEditor's maker's copyright and BSD license provisions
    are reproduced below. These provisions apply only for the
    part of the CodeEditor class which is included by #include "codeeditor.h".
-   The program as a whole is copyrighted by Ocelot and
+   The program as a whole is copyrighted by Peter Gulutzan and
    licensed under GPL version 2 as stated at the beginning of ocelotgui.cpp
    and in the COPYING file.
  **

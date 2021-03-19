@@ -1,4 +1,4 @@
-# Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
+# Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -133,9 +133,9 @@
 # By default this is 1. If it is 0, most code related to MySQL/MariaDB is not included.
 
 # FILENAME_EXTRA
-# Default is blank. Ocelot passes -DFILENAME_EXTRA="qt4" when building with qt4,
-# so the final package name will look like ocelotgui_1.3.0qt4-1_amd64.deb or
-# ocelotgui-1.3.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
+# Default is blank. ocelotgui passes -DFILENAME_EXTRA="qt4" when building with qt4,
+# so the final package name will look like ocelotgui_1.4.0qt4-1_amd64.deb or
+# ocelotgui-1.4.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
 
 # FILENAME_RELEASE
 # Default is "1". Ordinarily it doesn't need to be changed.
@@ -147,18 +147,18 @@
 
 # e.g. to generate .deb file and install with dpkg:
 # deb_build.sh, which copies files and invokes debian/rules, which uses CMakeLists.txt
-# sudo dpkg -i ocelotgui_1.3.0-1_amd64.deb
+# sudo dpkg -i ocelotgui_1.4.0-1_amd64.deb
 # but see also comments in deb_build.sh and debian/README.Debian
 
 # e.g. to generate .rpm file and install with rpm:
 # rpm_build.sh, which copies files and invokes ocelotgui.spec, which uses CMakeLists.txt
-# rpmlint ocelotgui-1.3.0-1.x86_64.rpm
-# rpm -i ocelotgui-1.3.0-1.x86_64.rpm
+# rpmlint ocelotgui-1.4.0-1.x86_64.rpm
+# rpm -i ocelotgui-1.4.0-1.x86_64.rpm
 # but see also comments in rpm_build.sh
 
 # Todo: We only check if CMAKE_SYSTEM_PROCESSOR = x86_64. On FreeBSD 12, uname -p says amd64.
 
-message("-- CmakeLists.txt for ocelotgui 1.3.0")
+message("-- CmakeLists.txt for ocelotgui 1.4.0")
 message("-- see comments in CMakeLists.txt for special instructions")
 message("-- see README.md for general instructions for building")
 
@@ -223,7 +223,7 @@ endif (NOT MYSQL_INCLUDE_DIR_RESULT)
 if (MYSQL_INCLUDE_DIR_RESULT)
   message("-- mysql.h found in ${MYSQL_INCLUDE_DIR_RESULT}")
 else (MYSQL_INCLUDE_DIR_RESULT)
-  message(FATAL ERROR "-- mysql.h not found in CMake default path or Ocelot hard-coded path")
+  message(FATAL ERROR "-- mysql.h not found in CMake default path or ocelotgui hard-coded path")
 endif (MYSQL_INCLUDE_DIR_RESULT)
 endif (TMP_OCELOT_MYSQL_INCLUDE)
 
@@ -303,7 +303,7 @@ if (Qt5Widgets_FOUND)
   message("-- found Qt5")
   # -fPIE, but nobody has checked whether other flags are better
   # (some other flags depend on CMAKE_BUILD_TYPE)
-  # (Ocelot developers use ocelotgui.pro which has -Wall -O2)
+  # (The ocelotgui developer uses ocelotgui.pro which has -Wall -O2)
   set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
   #Produce ui_ocelotgui.h from ocelotgui.ui
   qt5_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
@@ -466,14 +466,14 @@ if (PACKAGE_TYPE MATCHES "RPM")
   install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (PACKAGE_TYPE MATCHES "RPM")
 
-# version = 1.3.0
+# version = 1.4.0
 set(CPACK_PACKAGE_VERSION_MAJOR "1")
-set(CPACK_PACKAGE_VERSION_MINOR "3")
+set(CPACK_PACKAGE_VERSION_MINOR "4")
 set(CPACK_PACKAGE_VERSION_PATCH "0")
 
-# I assume nobody wants package names like ocelotgui_1.3.0-Linux.deb
+# I assume nobody wants package names like ocelotgui_1.4.0-Linux.deb
 # but that's what I get if CMAKE_SYSTEM_NAME = "Linux".
-# I'd prefer ocelotgui_1.3.0-1_amd64.deb or ocelotgui-1.3.0.x86_64.rpm
+# I'd prefer ocelotgui_1.4.0-1_amd64.deb or ocelotgui-1.4.0.x86_64.rpm
 # If it's neither "DEB" nor "RPM", = default.
 set(FILENAME_PLATFORM_FOR_DEB "Linux")
 set(FILENAME_PLATFORM_FOR_RPM "Linux")

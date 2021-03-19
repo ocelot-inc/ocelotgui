@@ -1,4 +1,4 @@
-#  Copyright (c) 2014-2021 by Ocelot Computer Services Inc. All rights reserved.
+#  Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -88,7 +88,7 @@ contains(QMAKE_HOST.arch, x86_64) {
   }
 
 # Installing by rebuilding source, with Qt Creator
-# Ocelot makes all packages with cmake as described in the README,
+# Peter Gulutzan makes all packages with cmake as described in the README,
 # and recommends that others do so.
 # However, here are additional notes for users who are
 # particularly interested in using Qt Creator instead.
