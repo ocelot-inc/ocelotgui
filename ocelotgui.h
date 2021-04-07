@@ -2580,6 +2580,32 @@ static const keywords strvalues[]=
       {"_UTF8MB4", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD__UTF8MB4}
     };
 
+/* For talk about fontweightsvalues see "Font comments" */
+
+struct fontweights {
+   char  chars[12];
+   char  alternate_chars[12];
+   unsigned int qt_number;
+   unsigned int css_number;
+};
+static const fontweights fontweightsvalues[]=
+  {
+    {"thin", "", 0, 100}, /* QFont::Thin */
+    {"extralight", "", 12, 200}, /* QFont::ExtraLight */ /* though an Internet site says extralight is 250 */
+    /* Ubuntu Light is 18 but an Internet site says the css value is 200 */
+    {"light", "", 25, 300}, /* QFont::Light */
+    /* "semilight" would be between light and book says an Internet site */
+    /* URW Gothic Book is 45 and an Internet site says book=350 */
+    {"normal", "regular", 50, 400}, /* QFont::Normal */
+    {"medium", "dark", 57, 500}, /* QFont::Medium */
+    {"demibold", "demi", 63, 600}, /* QFont::DemiBold */ /* todo: should we allow for aka semibold? */
+    {"bold", "", 75, 700}, /* QFont::Bold */
+    {"extrabold", "ultrabold", 81, 800}, /* QFont::ExtraBold */
+    {"black", "heavy", 87, 900},   /* QFont::Black */ /* alternate_chars == "heavy" might be wrong */
+    {"extrablack", "ultrablack", 93, 950}, /* no enum but documented for Qt 6.x so I guessed 93 */
+  };
+#define FONTWEIGHTSVALUES_SIZE 10 /* # of entries in fontweightsvalues */
+
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -2595,7 +2621,6 @@ static const keywords strvalues[]=
 #include <QDialog>
 #include <QDir>
 #include <QElapsedTimer>        /* only needed for log(), and even for that it's not needed much */
-#include <QFontDialog>
 #include <QFrame>
 #include <QHBoxLayout>
 #include <QLabel>
@@ -2870,7 +2895,7 @@ extern int MENU_SETTINGS_FOR_GRID;
 extern int MENU_SETTINGS_FOR_STATEMENT;
 extern int MENU_SETTINGS_FOR_DEBUG;
 extern int MENU_SETTINGS_FOR_EXTRA_RULE_1;
-extern int MENU_PICK_NEW_FONT;
+extern int MENU_PICK_NEW_FONT; /* obsolete -- since version 1.5 we don't call QFontDialog*/
 
 extern unsigned int menu_off;
 
@@ -2895,6 +2920,7 @@ QT_BEGIN_NAMESPACE
 class CodeEditor;
 class ResultGrid;
 class Settings;
+class QComboBoxInSettings;
 class TextEditFrame;
 class TextEditWidget;
 class QScrollAreaWithSize;
@@ -3089,6 +3115,9 @@ public:
   QString canonical_color_name(QString);
   void assign_names_for_colors();
   QString canonical_font_weight(QString);
+  int fontweights_index_via_chars(QString);
+  int fontweights_index_via_qt_number(int);
+  int fontweights_index_via_css_number(int);
   QString canonical_font_family(QString,QString*);
   QString canonical_font_style(QString,QString);
   QString connect_stripper(QString value_to_strip, bool strip_doublets_flag);
@@ -3585,6 +3614,8 @@ private:
   QFont get_fixed_font();
 public:
   void make_style_strings();
+  void make_one_style_string(QString *style_string, QString text_color, QString background_color, QString border_size, QString border_color, QString font_family, QString font_size, QString font_style, QString font_weight, bool is_menu);
+
 private:
   //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
@@ -9955,6 +9986,23 @@ virtual QSize sizeHint() const
 #endif // QSCROLLAREAWITHSIZE_H
 
 /*********************************************************************************************************/
+/* THE QCOMBOBOXINSETTINGS WIDGET */
+/* QComboBox::hidePopup() needs to be overridden in Settings calls so we can reset example. */
+#ifndef QCOMBOBOXINSETTINGS_H
+#define QCOMBOBOXINSETTINGS_H
+class QComboBoxInSettings : public QComboBox
+{
+public:
+//  void hidePopup() override;
+  void hidePopup()
+  {
+    QComboBox::hidePopup();
+    emit highlighted(-1);
+  }
+};
+#endif // QCOMBOBOXINSETTINGS_H
+
+/*********************************************************************************************************/
 /* THE SETTINGS WIDGET */
 
 #ifndef SETTINGS_H
@@ -9978,16 +10026,26 @@ private slots:
   void handle_combo_box_for_color_pick_8();
   void handle_combo_box_for_color_pick_9();
   void handle_combo_box_for_color_pick_10();
+  void handle_combo_box_for_font_name_change(); etc.
 */
 
-public:
+private:
+  QString actual_font_family;
+  QString actual_font_size;
+  QString actual_font_style;
+  QString actual_font_weight;
+
 
   QVBoxLayout *main_layout;
   QWidget *widget_3, *widget_for_font_dialog;
   QHBoxLayout *hbox_layout_3, *hbox_layout_for_font_dialog;
-  QPushButton *button_for_cancel, *button_for_ok, *button_for_font_dialog;
+  QPushButton *button_for_cancel, *button_for_ok;
   QLabel *widget_font_label;
-
+  /* New Font Dialog */
+  QComboBoxInSettings *combo_box_for_font_name;
+  QComboBoxInSettings *combo_box_for_font_size;
+  QLabel *text_for_font_example;
+  /* New Font Dialog end */
   QWidget *widget_for_color[11];
   QHBoxLayout *hbox_layout_for_color[11];
   QLabel *label_for_color[11];
@@ -10034,12 +10092,52 @@ public:
 #define FONT_SIZE_MIN 6
 #define FONT_SIZE_ZOOM_INCREMENT 1
 
-private:
+/*
+  Font Comments (all observations about how-to-do-font-settings should go here)
+  Re weights:
+    QFontDatabase and QFontDialog() sometimes disagree.
+    We stopped using QFontDialog() in ocelotgui 1.5.
+    In Qt version 6.x the QFont enums change: https://doc.qt.io/qt-6/gui-changes-qt6.html#qfont
+    Our fontweightsvalues list has common names, alternate names, qt numbers, css numbers.
+    Common names might not be the same as names that QFontDatabase returns in styles().
+    Sometimes family contains weight (erroneously?) e.g. "Ubuntu Light", they probably mean "Ubuntu Condensed".
+    Our style is always [nothing] | italic | oblique, derived from QFontDatabase.styles()
+    Our weight is always fontweightsvalues that is closest to QFontDatabase::weights().
+    (We also allow users to enter css numbers via SET.)
+    Therefore what we show in the combo box often differs from what QFontDatabase or QFontDialog() show.
+    But they are more consistent with each other and with css.
+    See also the comments for canonical_font_family()
+    Warning: "normal" can refer to QFont::StyleNormal (style) or to QFont::Normal (weight)
+    Example: if QFontDatabase says family = "x", style = "light Italic" we show "x - light italic"
+    Todo: we're using setFont and setItemData. Since elsewhere we use style sheets this is inconsistent.
+    Todo: To make the initial display quicker, populate at first with only one item.
+          Then, if mousePressEvent or something equivalent happens, populate fully.
+    Todo: Get size of current font (i.e. "this"?) for the Settings dialog box
+          For QFont(const QString &family, int pointSize = -1, int weight = -1, bool italic = false)
+          We want pointSize of the dialog box font, weight + italic of the actual font.
+    Todo: indicate if fixed pitch font
+    Todo: SET statements match Settings
+  Re sizes:
+    In our experience QFontDatabase returns the same list regardless of famile or style, around 18 options.
+    So we make the list once for all suggested sizes. If somehow (e.g. via SET) an unsuggested size comes up,
+    we pick the nearest.
+
+  Re desired behaviour:
+    * There is an label with an example of text in current basic colors and fonts.
+      If user navigates and changes highlighting, change the example. But revert to currentIndex() setting
+      if user closes the QComboBox (that's why we had to subclass the name and size comboboxes)
+    * Weight can be either a name or a qt number or a css number. We might try to distinguish qt number
+      from css number by value, which means we won't recognize qt number = 100, we think that's css.
+      If there's somehow a change to an unknown weight value, consider it "normal"
+      Re Qt Version 5.6+ https://doc.qt.io/qt-5/qfont.html#Weight-enum:
+      We want to compile on earlier versions so we don't use the enums but we use the values.
+*/
+
 /*
   Called from: Settings
   Pass: &combo_box_for_top|left|width|height or &combo_box_for_default
   Pass: current value
-  Fill the box with "default", 0 - 1000 by 50s, and current value if not in the box
+  Fill the box with defaults.
   Point to current value
 */
 void combo_box_filler(QComboBox **addr_of_combo_box, QString current_value, bool is_for_default)
@@ -10058,11 +10156,247 @@ void combo_box_filler(QComboBox **addr_of_combo_box, QString current_value, bool
   }
   i_of_current_value= (*addr_of_combo_box)->findText(c);
   if (i_of_current_value == -1)
-  {
-    (*addr_of_combo_box)->addItem(c);
+  {    (*addr_of_combo_box)->addItem(c);
     i_of_current_value= (*addr_of_combo_box)->findText(c);
   }
   (*addr_of_combo_box)->setCurrentIndex(i_of_current_value);
+}
+
+/*
+  Todo: I think "normal" won't be a weight, "normal" should match only if there is no weight
+        i.e. bold|medium|light|demi|etc. is missing. Maybe call QFontDatabase weight function?
+  Todo: surely combo_box_for_font_name_parse can help here
+*/
+int combo_box_for_font_name_matcher(QString name, QString family, QString style, QString weight)
+{
+  int r= 0;
+  if (name.contains(family + " ", Qt::CaseInsensitive))
+  {
+    r|= 1;
+    if (name.contains(" " + style, Qt::CaseInsensitive))
+    {
+      r|= 2;
+    }
+    if ((style == "normal") && (name.contains(" Regular", Qt::CaseInsensitive)))
+    {
+      r|= 2;
+    }
+    if (name.contains(" " + weight, Qt::CaseInsensitive))
+    {
+      r|= 4;
+    }
+    if ((weight == "normal") && (name.contains(" Regular", Qt::CaseInsensitive)))
+    {
+      r|= 4;
+    }
+  }
+  return r;
+}
+
+/*
+  Pass: a combo_box_for_font_name item, which looks like family - weight [style]
+  Return: family, weight, style
+  Todo: There's another way: you could use QFontDatabase to get the weight given family and style,
+        then whatever's left over must be the style. Apparently it's omitted if it's default though.
+  Todo: There are some odd styles like "roman" and "book" in QFontDatabase, I don't know how to handle them.
+*/
+void combo_box_for_font_name_parse(QString name, QString *family, QString *weight, QString *style)
+{
+  QString family_candidate, weight_and_style_candidate, style_candidate, weight_candidate;
+  name= name.toLower();
+  int i_of_hyphen= name.indexOf(" - ");
+  family_candidate= name.left(i_of_hyphen);
+
+  weight_and_style_candidate= name.right(name.size() - (i_of_hyphen + 3));
+  int i_of_space= weight_and_style_candidate.indexOf(" ");
+  if (i_of_space == -1)
+  {
+    if ((weight_and_style_candidate == "italic") || (weight_and_style_candidate == "oblique"))
+    {
+      /* Todo: maybe regular? */
+      weight_candidate= "normal"; /* huh? I guess it would be default weight, whatever that would be */
+      style_candidate= weight_and_style_candidate;
+    }
+    else
+    {
+      weight_candidate= weight_and_style_candidate;
+      style_candidate= "normal"; /* huh?  I guess it should be default style, whatever that would be */
+    }
+  }
+  else
+  {
+    weight_candidate= weight_and_style_candidate.left(i_of_space);
+    style_candidate= weight_and_style_candidate.right(weight_and_style_candidate.size() - (i_of_space + 1));
+  }
+
+  *family= family_candidate;
+  *weight= weight_candidate;
+  *style= style_candidate;
+
+}
+
+/*
+  Pass: QFontDatabase-style family and style
+  Return: our-style family and weight and style (family doesn't need to change). or ""
+*/
+int qt_style_to_our_style(QString qt_family, QString qt_style, QString *our_weight, QString *our_style)
+{
+  QFontDatabase font_database;
+  int qt_weight= font_database.weight(qt_family, qt_style);
+  if (qt_weight == -1) return -1;
+  *our_weight= copy_of_parent->canonical_font_weight(QString::number(qt_weight));
+  if (qt_style.contains("italic", Qt::CaseInsensitive)) *our_style= "italic";
+  else if (qt_style.contains("oblique", Qt::CaseInsensitive)) *our_style= "oblique";
+  else *our_style= "normal";
+  return 0;
+}
+
+/*
+  Populate Settings combo box for font name.
+  See: Font comments
+*/
+int combo_box_for_font_name_filler(QString actual_font_family, QString actual_font_style, QString actual_font_weight)
+{
+  QFontDatabase font_database;
+  combo_box_for_font_name->clear();
+
+  //int this_font_point_size= this->font().pointSize();
+  //QFont font(actual_font_family, this_font_point_size);
+  //combo_box_for_font_name->setFont(font);
+
+  QStringList font_families= font_database.families();
+
+  int font_family_index= 0;
+  int font_family_index_of_first_match= 0;
+  int maximum_width= 0;
+  for (int i= 0; i < font_families.size(); ++i)
+  {
+    bool is_match_found= false;
+    QStringList font_styles= font_database.styles(font_families.at(i));
+    QString our_weight, our_style;
+
+    if (font_families.at(i) == actual_font_family) font_family_index_of_first_match= font_family_index;
+
+    for (int j= 0; j < font_styles.size(); ++j)
+    {
+      qt_style_to_our_style(font_families.at(i), font_styles.at(j), &our_weight, &our_style);
+      QString name= font_families.at(i) + " - " + our_weight + " " + our_style;
+
+      combo_box_for_font_name->addItem(name);
+      if (name.size() > maximum_width) maximum_width= name.size();
+
+      //QString family, weight, style;
+      //combo_box_for_font_name_parse(name, &family, &weight, &style);
+      /* Next few lines would display item in item's font but I think they are too slow. */
+      //bool is_italic= false;
+      //if ((our_style == "italic") || (our_style == "oblique")) is_italic= true;
+      //int fwi= copy_of_parent->fontweights_index_via_chars(weight);
+      //QFont qf(family, this_font_point_size, fontweightsvalues[fwi].qt_number, is_italic);
+      //combo_box_for_font_name->setItemData(font_family_index, qf, Qt::FontRole);
+      if (font_families.at(i) == actual_font_family)
+      {
+        QString our_weight, our_style;
+        qt_style_to_our_style(font_families.at(i), font_styles.at(j), &our_weight, &our_style);
+        if ((our_weight == actual_font_weight) && (our_style == actual_font_style))
+        {
+          combo_box_for_font_name->setCurrentIndex(font_family_index);
+          is_match_found= true;
+        }
+      }
+      ++font_family_index;
+    }
+    if ((font_families.at(i) == actual_font_family) && (is_match_found == false))
+    {
+      /* family matches but weight|style. add a new entry if qfontinfo says it's possible. else use at(0) */
+      bool italic= false;
+      if (actual_font_style != "normal") italic= true;
+      int fwi_a= copy_of_parent->fontweights_index_via_chars(actual_font_weight);
+      int font_weight_as_int= fontweightsvalues[fwi_a].qt_number; /* e.g. if weight "300" we get 25 */
+      QFont qf= QFont(font_families.at(i), -1, font_weight_as_int, italic);
+      QFontInfo qfi= QFontInfo(qf);
+      int fwi_o= copy_of_parent->fontweights_index_via_qt_number(qfi.weight());
+      if (fwi_a == fwi_o)
+      {
+        QString name= font_families.at(i) + " - " + actual_font_weight + " " + actual_font_style;
+        combo_box_for_font_name->addItem(name);
+        combo_box_for_font_name->setCurrentIndex(font_family_index);
+        ++font_family_index;
+      }
+      else combo_box_for_font_name->setCurrentIndex(font_family_index_of_first_match);
+    }
+
+
+  }
+  return maximum_width;
+}
+
+/*
+  Settings example on the right side of the font hbox
+  Called initially or from the handlers for change of the first two colors, or change of the font.
+  todo: border-color would be possible too
+  todo: take size into account but with a scroll bar
+  todo: remove margin
+  todo: since we have an example, the time-consuming name combo box might be always the same font now
+  todo: read-only so tab skips over it? or allow edit? or allow cut-and-paste?
+  todo: check: is it safe to call this due to connect with color combo box before we know all values?
+  Todo: let user change "Example" to an identifier and then show identifier highlight colour
+  Todo: Or, show all highlight possibilities (and then we really need a scroll bar)
+*/
+void text_for_font_example_filler(QString text_color, QString background_color, QString font_family, QString font_style, QString font_weight, QString font_size)
+{
+  if (font_size.right(2) == "pt") font_size= font_size.left(font_size.size() - 2);
+  text_for_font_example->setText("Example");
+  QString style_sheet;
+  copy_of_parent->make_one_style_string(&style_sheet,
+                        text_color,
+                        background_color,
+                        "1",
+                        "red",
+                        font_family,
+                        font_size,
+                        font_style,
+                        font_weight,
+                        false);
+  text_for_font_example->setStyleSheet(style_sheet);
+}
+
+void combo_box_for_font_size_filler(QString actual_font_size)
+{
+  QFontDatabase font_database;
+
+  QStringList font_families= font_database.families();
+  QList<int> big_list;
+
+  big_list.clear();
+  for (int i= 0; i < font_families.size(); ++i)
+  {
+    QStringList font_styles= font_database.styles(font_families.at(i));
+    for (int j= 0; j < font_styles.size(); ++j)
+    {
+      QList<int> point_sizes= font_database.pointSizes(font_families.at(i), font_styles.at(j));
+      for (int k= 0; k < point_sizes.count(); ++k)
+      {
+        int k_item= point_sizes.at(k);
+        int l= 0;
+        for (; l < big_list.count(); ++l)
+        {
+          if (k_item == big_list.at(l)) break;
+          if (k_item < big_list.at(l)) { big_list.insert(l, k_item); break; }
+        }
+        if (l >= big_list.count()) big_list.append(k_item);
+      }
+    }
+  }
+  for (int i= 0; i < big_list.size(); ++i)
+  {
+    int j= big_list.at(i);
+    if ((j < FONT_SIZE_MIN) || (j > FONT_SIZE_MAX)) break;
+    QString s= QString::number(j) + "pt";
+    combo_box_for_font_size->addItem(s);
+  }
+  int actual_font_size_as_int= actual_font_size.toInt();
+  font_size_index_set(actual_font_size_as_int);
+
 }
 
 /* TODO: probably some memory is leaking. I don't say "(this)" every time I say "new". */
@@ -10179,27 +10513,33 @@ if (current_widget != DEBUG_WIDGET)
 {
   /* Hboxes for foreground, background, and highlights */
 
+  /* Icons for all the colors. Todo: dynamic size. I expect about 150. */
+  QPixmap pixmaps[512];
+  QIcon icons[512];
+  int i_of_icons;
+  for (i_of_icons= 0; i_of_icons < copy_of_parent->q_color_list.size() / 2; ++i_of_icons)
+  {
+    pixmaps[i_of_icons]= QPixmap(100, 100);
+    pixmaps[i_of_icons].fill(QColor(copy_of_parent->q_color_list[(i_of_icons * 2) + 1]));
+    icons[i_of_icons]= pixmaps[i_of_icons];
+  }
+
   for (int ci= 0; ci < 11; ++ci)
   {
     widget_for_color[ci]= new QWidget(this);
     label_for_color[ci]= new QLabel();
     label_for_color_rgb[ci]= new QLabel();
     combo_box_for_color_pick[ci]= new QComboBox(this);
-
     {
       /*
         When theme = CleanLooks or GTK+, the non-editable combobox's list view has no scroll bar.
         Finding the problem and putting in this one-line solution took 20 man-hours.
       */
       combo_box_for_color_pick[ci]->view()->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-      QPixmap pixmap= QPixmap(100, 100);
-      QIcon icon;
       int i_44;
       for (i_44= 0; i_44 < copy_of_parent->q_color_list.size() / 2; ++i_44)
       {
-        pixmap.fill(QColor(copy_of_parent->q_color_list[(i_44 * 2) + 1]));
-        icon= pixmap;
-        combo_box_for_color_pick[ci]->addItem(icon, copy_of_parent->q_color_list[(i_44 * 2)]);
+        combo_box_for_color_pick[ci]->addItem(icons[i_44], copy_of_parent->q_color_list[(i_44 * 2)]);
       }
     }
 
@@ -10238,12 +10578,72 @@ if (current_widget != DEBUG_WIDGET)
   label_for_font_dialog= new QLabel(this);
   label_for_font_dialog_set_text();
 
-  button_for_font_dialog= new QPushButton(menu_strings[menu_off + MENU_PICK_NEW_FONT], this);
   hbox_layout_for_font_dialog= new QHBoxLayout();
   hbox_layout_for_font_dialog->addWidget(label_for_font_dialog);
-  hbox_layout_for_font_dialog->addWidget(button_for_font_dialog);
+  /* New font dialog start */
+  {
+    {
+
+      if (current_widget == STATEMENT_WIDGET)
+      {
+        actual_font_family= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_statement_font_family, false);
+        actual_font_size= copy_of_parent->new_ocelot_statement_font_size;
+        actual_font_style= copy_of_parent->new_ocelot_statement_font_style;
+        actual_font_weight= copy_of_parent->new_ocelot_statement_font_weight;
+      }
+      if (current_widget == GRID_WIDGET)
+      {
+        actual_font_family= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_grid_font_family, false);
+        actual_font_size= copy_of_parent->new_ocelot_grid_font_size;
+        actual_font_style= copy_of_parent->new_ocelot_grid_font_style;
+        actual_font_weight= copy_of_parent->new_ocelot_grid_font_weight;
+      }
+      if (current_widget == HISTORY_WIDGET)
+      {
+        actual_font_family= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_history_font_family, false);
+        actual_font_size= copy_of_parent->new_ocelot_history_font_size;
+        actual_font_style= copy_of_parent->new_ocelot_history_font_style;
+        actual_font_weight= copy_of_parent->new_ocelot_history_font_weight;
+      }
+      if (current_widget == MAIN_WIDGET)
+      {
+        actual_font_family= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_menu_font_family, false);
+        actual_font_size= copy_of_parent->new_ocelot_menu_font_size;
+        actual_font_style= copy_of_parent->new_ocelot_menu_font_style;
+        actual_font_weight= copy_of_parent->new_ocelot_menu_font_weight;
+      }
+      /* todo: what if it's extra widget? */
+
+      combo_box_for_font_name= new QComboBoxInSettings(); /* Should I say "this"? */
+      combo_box_for_font_name->view()->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+
+      int maximum_width= combo_box_for_font_name_filler(actual_font_family, actual_font_style, actual_font_weight);
+      QString maximum_value= QString("X").repeated(maximum_width);
+      /* Todo: what you really need is width(maximum # of characters) + scroll bar width */
+      //combo_box_for_font_name->setFixedWidth(this->fontMetrics().boundingRect(maximum_value).width());
+
+      combo_box_for_font_size= new QComboBoxInSettings();
+      combo_box_for_font_size_filler(actual_font_size);
+      maximum_value= "999999pt"; /* Todo: what you really need is width(99pt) + scroll bar width */
+      combo_box_for_font_size->setFixedWidth(this->fontMetrics().boundingRect(maximum_value).width());
+
+      text_for_font_example= new QLabel();
+      handle_combo_box_for_any_highlighted(-1, -1); /* to fill in the example widget initially */
+
+      hbox_layout_for_font_dialog->addWidget(combo_box_for_font_name);
+      hbox_layout_for_font_dialog->addWidget(combo_box_for_font_size);
+      hbox_layout_for_font_dialog->addWidget(text_for_font_example);
+    }
+
+    //hbox_layout_for_font_dialog->addWidget(combo_box_for_font_size);
+    connect(combo_box_for_font_name, SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_font_name_change(int)));
+    connect(combo_box_for_font_name, SIGNAL(highlighted(int)), this, SLOT(handle_combo_box_for_font_name_highlighted(int)));
+    connect(combo_box_for_font_size, SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_font_size_change(int)));
+    connect(combo_box_for_font_size, SIGNAL(highlighted(int)), this, SLOT(handle_combo_box_for_font_size_highlighted(int)));
+
+  }
+  /* New font dialog end */
   widget_for_font_dialog->setLayout(hbox_layout_for_font_dialog);
-  connect(button_for_font_dialog, SIGNAL(clicked()), this, SLOT(handle_button_for_font_dialog()));
 
   if (current_widget == STATEMENT_WIDGET)
   {
@@ -10743,7 +11143,9 @@ void handle_combo_box_1(int i)
     }
     widget_font_label->hide();
     label_for_font_dialog->hide();
-    button_for_font_dialog->hide();
+    combo_box_for_font_name->hide();
+    combo_box_for_font_size->hide();
+    text_for_font_example->hide();
   }
   if ((i == HISTORY_WIDGET) || (i == MAIN_WIDGET))
   {
@@ -10924,6 +11326,14 @@ void handle_combo_box_for_color_pick_0(int item_number)
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
   }
+
+  text_for_font_example_filler(label_for_color_rgb[0]->text(),
+                               label_for_color_rgb[1]->text(),
+                               actual_font_family,
+                               actual_font_style,
+                               actual_font_weight,
+                               actual_font_size);
+
 }
 
 
@@ -10979,6 +11389,14 @@ void handle_combo_box_for_color_pick_1(int item_number)
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[1]->setStyleSheet(s);
   }
+
+  text_for_font_example_filler(label_for_color_rgb[0]->text(),
+                               label_for_color_rgb[1]->text(),
+                               actual_font_family,
+                               actual_font_style,
+                               actual_font_weight,
+                               actual_font_size);
+
 }
 
 void handle_combo_box_for_color_pick_2(int item_number)
@@ -11177,13 +11595,161 @@ void handle_combo_box_for_color_pick_10(int item_number)
   }
 }
 
+void handle_combo_box_for_font_any_change()
+{
+  QString *family= NULL;
+  QString *size= NULL;
+  QString *style= NULL;
+  QString *weight= NULL;
+  if (current_widget == STATEMENT_WIDGET)
+  {
+    family= &(copy_of_parent->new_ocelot_statement_font_family);
+    size= &(copy_of_parent->new_ocelot_statement_font_size);
+    style= &(copy_of_parent->new_ocelot_statement_font_style);
+    weight= &(copy_of_parent->new_ocelot_statement_font_weight);
+  }
+  if (current_widget == GRID_WIDGET)
+  {
+    family= &(copy_of_parent->new_ocelot_grid_font_family);
+    size= &(copy_of_parent->new_ocelot_grid_font_size);
+    style= &(copy_of_parent->new_ocelot_grid_font_style);
+    weight= &(copy_of_parent->new_ocelot_grid_font_weight);
+  }
+  if (current_widget == HISTORY_WIDGET)
+  {
+    family= &(copy_of_parent->new_ocelot_history_font_family);
+    size= &(copy_of_parent->new_ocelot_history_font_size);
+    style= &(copy_of_parent->new_ocelot_history_font_style);
+    weight= &(copy_of_parent->new_ocelot_history_font_weight);
+  }
+  if (current_widget == MAIN_WIDGET)
+  {
+    family= &(copy_of_parent->new_ocelot_menu_font_family);
+    size= &(copy_of_parent->new_ocelot_menu_font_size);
+    style= &(copy_of_parent->new_ocelot_menu_font_style);
+    weight= &(copy_of_parent->new_ocelot_menu_font_weight);
+  }
+  /* todo: just pass family, weight, style. no need for candidates */
+  QString family_candidate, weight_candidate, style_candidate;
+  combo_box_for_font_name_parse(combo_box_for_font_name->currentText(),
+                                &family_candidate,
+                                &weight_candidate,
+                                &style_candidate);
+  *family= family_candidate;
+  *style= style_candidate;
+
+  *weight= weight_candidate;
+
+  QString ctu= combo_box_for_font_size->currentText();
+  *size= ctu.left(ctu.size() - 2);
+
+  text_for_font_example_filler(label_for_color_rgb[0]->text(),
+                               label_for_color_rgb[1]->text(),
+                               family_candidate,
+                               style_candidate,
+                               weight_candidate,
+                               combo_box_for_font_size->currentText());
+}
+
+/*
+  User changed one of the font dialog settings: name - weight style.
+  Warning: something can return -1 if size was specified in pixels (whatever that means).
+  We might set up so weight is either "bold" or "normal" but I don't want to contradict e.g. "Ubuntu Bold".
+*/
+void handle_combo_box_for_font_name_change(int i)
+{
+  (void)i;
+  /* Hmm, won't this cause us to call handle_combo_box_for_any_change()? */
+  QString family_candidate, weight_candidate, style_candidate;
+  combo_box_for_font_name_parse(combo_box_for_font_name->currentText(),
+                                &family_candidate,
+                                &weight_candidate,
+                                &style_candidate);
+  handle_combo_box_for_font_any_change();
+}
+
+/* set combo_box_for_fontsize currentIndex = what's closest to actual size (might not be exact) */
+void font_size_index_set(int actual_font_size_as_int)
+{
+  int index_of_closest_match= 0;
+  {
+    QString s;
+    for (int j= 0; j < combo_box_for_font_size->count(); ++j)
+    {
+      int curr_as_int;
+      s= combo_box_for_font_size->itemText(j);
+      curr_as_int= s.left(s.size() - 2).toInt();
+      int prev_as_int;
+      if (j == 0) prev_as_int= -99999;
+      else
+      {
+        s= combo_box_for_font_size->itemText(j - 1);
+        prev_as_int= s.left(s.size() - 2).toInt();
+      }
+      bool is_between= false;
+      if ((actual_font_size_as_int > prev_as_int) && (actual_font_size_as_int <= curr_as_int)) is_between= true;
+      if (j == combo_box_for_font_size->count() - 1) is_between= true;
+      if (is_between == true)
+      {
+        int diff_from_prev= actual_font_size_as_int - prev_as_int;
+        int diff_from_curr= curr_as_int - actual_font_size_as_int;
+        if (diff_from_prev < diff_from_curr)
+        {
+          index_of_closest_match= j - 1;
+          break;
+        }
+        else
+        {
+          index_of_closest_match= j;
+          break;
+        }
+      }
+    }
+  }
+  combo_box_for_font_size->setCurrentIndex(index_of_closest_match);
+}
+
+/* User change one of the font dialog settings: size. */
+void handle_combo_box_for_font_size_change(int i)
+{
+  if (i == -1) return; /* -1 can happen if box is cleared */
+  handle_combo_box_for_font_any_change();
+}
+
+void handle_combo_box_for_any_highlighted(int i_of_font_name, int i_of_font_size)
+{
+  if (i_of_font_name == -1) i_of_font_name= combo_box_for_font_name->currentIndex();
+  if (i_of_font_size == -1) i_of_font_size= combo_box_for_font_size->currentIndex();
+  QString family_candidate, weight_candidate, style_candidate;
+  QString text_of_font_name= combo_box_for_font_name->itemText(i_of_font_name);
+  combo_box_for_font_name_parse(text_of_font_name,
+                                &family_candidate,
+                                &weight_candidate,
+                                &style_candidate);
+  QString text_of_font_size= combo_box_for_font_size->itemText(i_of_font_size);
+  text_for_font_example_filler(label_for_color_rgb[0]->text(),
+                               label_for_color_rgb[1]->text(),
+                               family_candidate,
+                               style_candidate,
+                               weight_candidate,
+                               text_of_font_size);
+}
+
+void handle_combo_box_for_font_name_highlighted(int i)
+{
+  handle_combo_box_for_any_highlighted(i, -1);
+}
+
+void handle_combo_box_for_font_size_highlighted(int i)
+{
+  handle_combo_box_for_any_highlighted(-1, i);
+}
 
 void handle_combo_box_for_syntax_check(int i)
 {
   if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_syntax_checker= QString::number(i);
 }
-
 
 void handle_spin_box_for_max_row_count(int i)
 {
@@ -11280,125 +11846,11 @@ void handle_combo_box_for_size_2(int i)
 }
 
 
-/* Some of the code in handle_button_for_font_dialog() is a near-duplicate of code in set_colors_and_fonts(). */
-/* This doesn't look for font_weight=light|demibold|black since QFontDialog ignores them anyway. */
-/* This passes italic==true but QFontDialog ignores that if it's expecting an oblique font. */
-/* Possible bug: with Qt4, even when font style="normal", dialog box appears showing italic. */
-void handle_button_for_font_dialog()
+/* See comment that begins with the words "Font comments" */
+int get_font_weight_as_qfont_weight(QString font_weight_string)
 {
-  bool ok;
-  QString font_name;
-  QFont font;
-
-  if (current_widget == STATEMENT_WIDGET)
-  {
-    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_statement_font_family, false);
-    font= QFont(copy_of_parent->new_ocelot_statement_font_family, copy_of_parent->new_ocelot_statement_font_size.toInt());
-    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_statement_font_weight));
-    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_statement_font_style));
-    font= call_qfontdialog(&ok, font);
-  }
-  if (current_widget == GRID_WIDGET)
-  {
-    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_grid_font_family, false);
-    font= QFont(copy_of_parent->new_ocelot_grid_font_family, copy_of_parent->new_ocelot_grid_font_size.toInt());
-    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_grid_font_weight));
-    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_grid_font_style));
-    font= call_qfontdialog(&ok, font);
-  }
-  if (current_widget == HISTORY_WIDGET)
-  {
-    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_history_font_family, false);
-    font= QFont(copy_of_parent->new_ocelot_history_font_family, copy_of_parent->new_ocelot_history_font_size.toInt());
-    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_history_font_weight));
-    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_history_font_style));
-    font= call_qfontdialog(&ok, font);
-  }
-  if (current_widget == MAIN_WIDGET)
-  {
-    font_name= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_menu_font_family, false);
-    font= QFont(copy_of_parent->new_ocelot_menu_font_family, copy_of_parent->new_ocelot_menu_font_size.toInt());
-    font.setWeight(get_font_weight_as_qfont_weight(copy_of_parent->new_ocelot_menu_font_weight));
-    font.setStyle(get_font_style_as_qfont_style(copy_of_parent->new_ocelot_menu_font_style));
-    font= call_qfontdialog(&ok, font);
-  }
-
-  if (ok)
-  {
-    /* User clicked OK on QFontDialog */
-    if (current_widget == STATEMENT_WIDGET)
-    {
-      copy_of_parent->new_ocelot_statement_font_family= font.family();
-      copy_of_parent->new_ocelot_statement_font_style= copy_of_parent->get_font_style_as_string(font);
-      copy_of_parent->new_ocelot_statement_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-      if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_statement_font_weight= "bold";
-      else copy_of_parent->new_ocelot_statement_font_weight= "normal";
-    }
-   if (current_widget == GRID_WIDGET)
-   {
-     copy_of_parent->new_ocelot_grid_font_family= font.family();
-     copy_of_parent->new_ocelot_grid_font_style= copy_of_parent->get_font_style_as_string(font);
-     copy_of_parent->new_ocelot_grid_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-     if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_grid_font_weight= "bold";
-     else copy_of_parent->new_ocelot_grid_font_weight= "normal";
-   }
-   if (current_widget == HISTORY_WIDGET)
-   {
-     copy_of_parent->new_ocelot_history_font_family= font.family();
-     copy_of_parent->new_ocelot_history_font_style= copy_of_parent->get_font_style_as_string(font);
-     copy_of_parent->new_ocelot_history_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-     if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_history_font_weight= "bold";
-     else copy_of_parent->new_ocelot_history_font_weight= "normal";
-   }
-   if (current_widget == MAIN_WIDGET)
-   {
-     copy_of_parent->new_ocelot_menu_font_family= font.family();
-     copy_of_parent->new_ocelot_menu_font_style= copy_of_parent->get_font_style_as_string(font);
-     copy_of_parent->new_ocelot_menu_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
-     if (font.weight() >= QFont::Bold) copy_of_parent->new_ocelot_menu_font_weight= "bold";
-     else copy_of_parent->new_ocelot_menu_font_weight= "normal";
-    }
-    label_for_font_dialog_set_text();
-  }
-}
-
-/*
-  There are a few fonts that QFontDialog() won't highlight. This might even be a Qt bug.
-  For example on Ubuntu: Century Schoolbook L, FreeMono Oblique, Kinnari Regular.
-  But if I set to bold weight and normal style, they appear, and I guess that's better than nothing.
-  Other things that cause non-highlighting -- italic/oblique difference, alias -- are handled elsewhere.
-  Todo: This might be a better way to solve the italic/oblique difference, try it sometime.
-  Todo: Often only weight needs changing, though I don't know if an examination is worth the effort.
-  Todo: This causes display of "GtkDialog mapped without a transient parent. This is discouraged."
-        I try to suppress the display with qInstallMessageHandler but that only seems to work with Windows.
-        I try DontUseNativeDialog but, as the Qt manual says, that's for Macs. It did nothing on Ubuntu.
-        The old QFontDialog from Qt 4.8 did not cause this and looked better too.
-*/
-QFont call_qfontdialog(bool *ok, QFont font)
-{
-  QFontDialog *font_dialog= new QFontDialog(this);
-  font_dialog->setCurrentFont(font);
-  QFont font2= font_dialog->currentFont();
-  if (font != font2)
-  {
-    font2= font;
-    font2.setWeight(QFont::Bold);
-    font2.setStyle(QFont::StyleNormal);
-  }
-  QFont font3= QFontDialog::getFont(ok, font2, this);
-  delete font_dialog;
-  return font3;
-}
-
-/* See also comments in canonical_font_weight() */
-QFont::Weight get_font_weight_as_qfont_weight(QString font_weight_string)
-{
-  QString new_font_weight_string= font_weight_string.toLower();
-  if (new_font_weight_string == "light") return QFont::Light;
-  if (new_font_weight_string == "normal") return QFont::Normal;
-  if (new_font_weight_string == "demibold") return QFont::DemiBold;
-  if (new_font_weight_string == "bold") return QFont::Bold;
-  if (new_font_weight_string == "black") return QFont::Black;
+  int i= copy_of_parent->fontweights_index_via_chars(font_weight_string);
+  if (i != -1) return fontweightsvalues[i].qt_number;
   return QFont::Normal; /* This should never happen */
 }
 
@@ -11433,7 +11885,6 @@ int q_color_list_index(QString color_name_string)
 
 };
 #endif // SETTINGS_H
-
 
 /* QThread::msleep is protected in qt 4.8. so you have to say QThread48::msleep */
 #ifndef QTHREAD48_H

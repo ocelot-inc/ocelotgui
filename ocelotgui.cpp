@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: March 19 2021
+   Last modified: April 7 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -492,13 +492,14 @@ volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
    https://github.com/MartinBriza/QGnomePlatform/issues/23 (Fedora)
    Originally we only suppressed if Windows but then it started to apper for Linux too.
-   There's not much I can do except maybe replace all native dialogs (I use QFontDialog)
+   There's not much I can do except maybe replace all native dialogs (such as QFontDialog)
    with substitutes in this program. Qutie a lot of work just to suppress a useless message, eh?
    Todo: Failed to load module "canberra-gtk-module" which has something to do with sound
          https://cromwell-intl.com/open-source/missing-gtk-modules.html
          We don't need special sounds so suppressing would be okay.
          But I didn't bother because I only saw it with Linux + Qt4.
    Todo: consider also suppressing "OpenType support missing for script"
+   Todo: Since version 1.5 I no longer use QFontDialog, maybe that means some of this is unnecessary.
 */
 #if (QT_VERSION >= 0x50000)
 void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QString &msg)
@@ -5668,35 +5669,68 @@ QString MainWindow::qt_color(QString color_name)
 
 
 /*
-  Pass: a string which is supposed to have a font weight. Return: a canonical font weight.
-  If it's not an expected value, return "" which means invalid.
-  The string can be light|normal|demibold|bold|black, or a number which we'll try to interpret.
-  Todo: check whether setStyleSheet accepts numbers too.
-  I think the font dialog box returns lower case, so that's what we regard as canonical.
-  There's a slight error -- maximum should be 99 not 100 -- but okay, it's "black" anyway.
-  Don't allow anything that we're not testing for in get_font_from_style_sheet().
+  Pass: a string which is supposed to have a font weight. Return: a canonical font weight, a css number.
+  See comment in ocelotgui.h that begins with the words "Font comments"
 */
 QString MainWindow::canonical_font_weight(QString font_weight_string)
 {
-  if (QString::compare(font_weight_string, "Light", Qt::CaseInsensitive) == 0) return "light";
-  if (QString::compare(font_weight_string, "Normal", Qt::CaseInsensitive) == 0) return "normal";
-  if (QString::compare(font_weight_string, "DemiBold", Qt::CaseInsensitive) == 0) return "demibold";
-  if (QString::compare(font_weight_string, "Bold", Qt::CaseInsensitive) == 0) return "bold";
-  if (QString::compare(font_weight_string, "Black", Qt::CaseInsensitive) == 0) return "black";
-  /* Todo: Allow these new values if Qt version = 5.6 */
-  //if (QString::compare(font_weight_string, "Thin", Qt::CaseInsensitive) == 0) return "thin";
-  //if (QString::compare(font_weight_string, "ExtraLight", Qt::CaseInsensitive) == 0) return "extralight";
-  //if (QString::compare(font_weight_string, "Medium", Qt::CaseInsensitive) == 0) return "medium";
-  //if (QString::compare(font_weight_string, "ExtraBold", Qt::CaseInsensitive) == 0) return "extrabold";
-  bool ok;
-  int font_weight_as_int= font_weight_string.toInt(&ok);
-  if ((ok == false) || (font_weight_as_int < 0) || (font_weight_as_int > 100)) return "";
-  if (font_weight_as_int <= QFont::Light) return "light";
-  if (font_weight_as_int <= QFont::Normal) return "normal";
-  if (font_weight_as_int <= QFont::DemiBold) return "demibold";
-  if (font_weight_as_int <= QFont::Bold) return "bold";
-  return "black";
+  int fwi= fontweights_index_via_chars(font_weight_string);
+  int font_weight_as_int= fontweightsvalues[fwi].css_number; /* e.g. if font is "Light" we get 300 */
+  char tmp_font_weight_string[64];
+  strcpy(tmp_font_weight_string, font_weight_string.toUtf8());
+  return QString::number(font_weight_as_int);
 }
+
+/* Pass: weight string. */
+/* Return: offset within fontweightsvalues so e.g. you can get fontweightsvalues[i].qt_number. Or: -1. */
+/* If it is a number less than 100 we assume that it's a QFont value, else we assume that it's a css value. */
+/* todo: maybe if it's not a known name we should return the index for "normal"? */
+int MainWindow::fontweights_index_via_chars(QString weight_string)
+{
+  QString weight_lower= weight_string.toLower();
+  for (int i= 0; i <= FONTWEIGHTSVALUES_SIZE; ++i)
+  {
+    if ((weight_lower == fontweightsvalues[i].chars)
+     || (weight_lower == fontweightsvalues[i].alternate_chars))
+      return i;
+  }
+  bool ok;
+  int weight_as_int= weight_lower.toInt(&ok);
+  if (ok == false) return -1;
+  if (weight_as_int < 100) return fontweights_index_via_qt_number(weight_as_int);
+  return fontweights_index_via_css_number(weight_as_int);
+}
+
+/*
+  Pass: int for QFont to recognize, e.g. QFont::Light | Qt::Bold
+  Return: index of e.g. Qt::Bold within fontweightvalues so we can get chars or css_number
+  If the value is < Qt::Bold but >= Qt::DemiBold return index of Qt::DemiBold
+*/
+int MainWindow::fontweights_index_via_qt_number(int qt_number)
+{
+  int i;
+  for (i= 1; i <= FONTWEIGHTSVALUES_SIZE; ++i)
+  {
+    if (qt_number < (int)fontweightsvalues[i].qt_number) break;
+  }
+  return i - 1;
+}
+
+/*
+  Pass: int for css to recognize, e.g. 100 | 200 | 300 | 400 | 500 | 600 | 700 | 800 | 900
+  Return: index of e.g. 700 ("bold") within fontweightvalues so we can get chars or qt_number
+  If the value is < 700 but >= 600 return index of 600
+*/
+int MainWindow::fontweights_index_via_css_number(int css_number)
+{
+  int i;
+  for (i= 1; i <= FONTWEIGHTSVALUES_SIZE; ++i)
+  {
+    if (css_number < (int)fontweightsvalues[i].css_number) break;
+  }
+  return i - 1;
+}
+
 
 /*
   Pass font_family. Return font_family lower case stripped, or if it is invalid return "".
@@ -5706,7 +5740,7 @@ QString MainWindow::canonical_font_weight(QString font_weight_string)
     There is no function that checks whether a family exists. We tried looking up the family
     via QFontDatabase but then QFontDialog can fail, for example "sans serif" is in QFontDatabase but not in QFontDialog,
     "sans regular" is in QFontDialog but not in QFontDatabase.
-    Todo: make your own QFontDialog that depends on QFontDatabase.
+    Todo: make your own QFontDialog that depends on QFontDatabase. (This was done in version 1.5.)
   Switching to QFontinfo family solves the problem that QDialogBox has alias 'Sans', it's really 'DejaVu Sans'.
   Unfortunately QFontInfo also changes 'Ubuntu Light' to 'Ubuntu' but I will insist on using QFontInfo()'s decisions.
   Unfortunately 'padmaa italic' is in QFontDialog but QFontDatabase has only 'Regular' and 'Normal'.
@@ -5728,14 +5762,13 @@ QString MainWindow::canonical_font_family(QString font_family_string, QString* f
 
 /*
   Pass: a string which is supposed to have a font style. Return: a canonical font style.
-  If it's not an expected value, return "" which means invalid.
+  If it's not an expected value, return "normal" even though it might be invalid.
   We might change "italic" to "oblique" or vice versa depending on family --
   although you could set italic for a font that allows only oblique,
   later QDialogBox wouldn't find it.
   If the return is "" then I think it's safest to ignore and leave unchanged.
   Some QFontDatabase entries are "Regular" "Bold Oblique" "Light" etc. We only care about "Italic" and/or "Oblique".
   I don't use QStringList::contains() because it is new in Qt 5.12.
-  Todo: Maybe return "Normal" rather than "" so errors will be ignored.
   Todo: This doesn't allow for families that have both italic and oblique. Prefer what is passed.
 */
 QString MainWindow::canonical_font_style(QString font_family_string, QString font_style_string)
@@ -5765,7 +5798,6 @@ QString MainWindow::canonical_font_style(QString font_family_string, QString fon
     if (style_of_family == QFont::StyleItalic) return "italic";
   }
 
-
   return "";
 }
 
@@ -5783,68 +5815,99 @@ QString MainWindow::canonical_font_style(QString font_family_string, QString fon
 */
 void MainWindow::make_style_strings()
 {
-  ocelot_statement_style_string= "color:"; ocelot_statement_style_string.append(qt_color(ocelot_statement_text_color));
-  ocelot_statement_style_string.append(";background-color:"); ocelot_statement_style_string.append(qt_color(ocelot_statement_background_color));
-  ocelot_statement_style_string.append(";border:1px solid "); ocelot_statement_style_string.append(qt_color(ocelot_statement_border_color));
-  ocelot_statement_style_string.append(";font-family:"); ocelot_statement_style_string.append(ocelot_statement_font_family);
-  ocelot_statement_style_string.append(";font-size:"); ocelot_statement_style_string.append(ocelot_statement_font_size);
-  ocelot_statement_style_string.append("pt;font-style:"); ocelot_statement_style_string.append(ocelot_statement_font_style);
-  ocelot_statement_style_string.append(";font-weight:"); ocelot_statement_style_string.append(ocelot_statement_font_weight);
+  make_one_style_string(&ocelot_statement_style_string,
+                        qt_color(ocelot_statement_text_color),
+                        qt_color(ocelot_statement_background_color),
+                        "1",
+                        qt_color(ocelot_statement_border_color),
+                        ocelot_statement_font_family,
+                        ocelot_statement_font_size,
+                        ocelot_statement_font_style,
+                        ocelot_statement_font_weight,
+                           false);
+  make_one_style_string(&ocelot_grid_style_string,
+                        qt_color(ocelot_grid_text_color),
+                        qt_color(ocelot_grid_background_color),
+                        ocelot_grid_cell_border_size,
+                        qt_color(ocelot_grid_border_color),
+                        ocelot_grid_font_family,
+                        ocelot_grid_font_size,
+                        ocelot_grid_font_style,
+                        ocelot_grid_font_weight,
+                        false);
+  make_one_style_string(&ocelot_history_style_string,
+                        qt_color(ocelot_history_text_color),
+                        qt_color(ocelot_history_background_color),
+                        "1",
+                        qt_color(ocelot_history_border_color),
+                        ocelot_history_font_family,
+                        ocelot_history_font_size,
+                        ocelot_history_font_style,
+                        ocelot_history_font_weight,
+                        false);
+  make_one_style_string(&ocelot_grid_header_style_string,
+                        qt_color(ocelot_grid_text_color),
+                        qt_color(ocelot_grid_header_background_color),
+                        ocelot_grid_cell_border_size,
+                        qt_color(ocelot_grid_border_color),
+                        ocelot_grid_font_family,
+                        ocelot_grid_font_size,
+                        ocelot_grid_font_style,
+                        ocelot_grid_font_weight,
+                        false);
+  make_one_style_string(&ocelot_menu_style_string,
+                        qt_color(ocelot_menu_text_color),
+                        qt_color(ocelot_menu_background_color),
+                        "1",
+                        qt_color(ocelot_menu_border_color),
+                        ocelot_menu_font_family,
+                        ocelot_menu_font_size,
+                        ocelot_menu_font_style,
+                        ocelot_menu_font_weight,
+                        true);
+  make_one_style_string(&ocelot_extra_rule_1_style_string,
+                        qt_color(ocelot_extra_rule_1_text_color),
+                        qt_color(ocelot_extra_rule_1_background_color),
+                        ocelot_grid_cell_border_size,
+                        qt_color(ocelot_grid_border_color),
+                        ocelot_grid_font_family,
+                        ocelot_grid_font_size,
+                        ocelot_grid_font_style,
+                        ocelot_grid_font_weight,
+                        false);
+}
 
-  ocelot_grid_style_string= "color:"; ocelot_grid_style_string.append(qt_color(ocelot_grid_text_color));
-  ocelot_grid_style_string.append(";background-color:"); ocelot_grid_style_string.append(qt_color(ocelot_grid_background_color));
-  ocelot_grid_style_string.append(";border:");
-  ocelot_grid_style_string.append(ocelot_grid_cell_border_size);
-  ocelot_grid_style_string.append("px solid ");
-  ocelot_grid_style_string.append(qt_color(ocelot_grid_border_color));
-  ocelot_grid_style_string.append(";font-family:"); ocelot_grid_style_string.append(ocelot_grid_font_family);
-  ocelot_grid_style_string.append(";font-size:"); ocelot_grid_style_string.append(ocelot_grid_font_size);
-  ocelot_grid_style_string.append("pt;font-style:"); ocelot_grid_style_string.append(ocelot_grid_font_style);
-  ocelot_grid_style_string.append(";font-weight:"); ocelot_grid_style_string.append(ocelot_grid_font_weight);
-
-  ocelot_grid_header_style_string= "color:"; ocelot_grid_header_style_string.append(qt_color(ocelot_grid_text_color));
-  ocelot_grid_header_style_string.append(";background-color:"); ocelot_grid_header_style_string.append(qt_color(ocelot_grid_header_background_color));
-  ocelot_grid_header_style_string.append(";border:");
-  ocelot_grid_header_style_string.append(ocelot_grid_cell_border_size);
-  ocelot_grid_header_style_string.append("px solid ");
-  ocelot_grid_header_style_string.append(qt_color(ocelot_grid_border_color));
-  ocelot_grid_header_style_string.append(";font-family:"); ocelot_grid_header_style_string.append(ocelot_grid_font_family);
-  ocelot_grid_header_style_string.append(";font-size:"); ocelot_grid_header_style_string.append(ocelot_grid_font_size);
-  ocelot_grid_header_style_string.append("pt;font-style:"); ocelot_grid_header_style_string.append(ocelot_grid_font_style);
-  ocelot_grid_header_style_string.append(";font-weight:"); ocelot_grid_header_style_string.append(ocelot_grid_font_weight);
-
-  ocelot_history_style_string= "color:"; ocelot_history_style_string.append(qt_color(ocelot_history_text_color));
-  ocelot_history_style_string.append(";background-color:"); ocelot_history_style_string.append(qt_color(ocelot_history_background_color));
-  ocelot_history_style_string.append(";border:1px solid "); ocelot_history_style_string.append(qt_color(ocelot_history_border_color));
-  ocelot_history_style_string.append(";font-family:"); ocelot_history_style_string.append(ocelot_history_font_family);
-  ocelot_history_style_string.append(";font-size:"); ocelot_history_style_string.append(ocelot_history_font_size);
-  ocelot_history_style_string.append("pt;font-style:"); ocelot_history_style_string.append(ocelot_history_font_style);
-  ocelot_history_style_string.append(";font-weight:"); ocelot_history_style_string.append(ocelot_history_font_weight);
-
-  ocelot_menu_style_string="* {";
-  ocelot_menu_style_string.append("color:");
-  ocelot_menu_style_string.append(qt_color(ocelot_menu_text_color));
-  ocelot_menu_style_string.append(";background-color:"); ocelot_menu_style_string.append(qt_color(ocelot_menu_background_color));
-  ocelot_menu_style_string.append(";border:1px solid "); ocelot_menu_style_string.append(qt_color(ocelot_menu_border_color));
-  ocelot_menu_style_string.append(";font-family:"); ocelot_menu_style_string.append(ocelot_menu_font_family);
-  ocelot_menu_style_string.append(";font-size:"); ocelot_menu_style_string.append(ocelot_menu_font_size);
-  ocelot_menu_style_string.append("pt;font-style:"); ocelot_menu_style_string.append(ocelot_menu_font_style);
-  ocelot_menu_style_string.append(";font-weight:"); ocelot_menu_style_string.append(ocelot_menu_font_weight);
-  ocelot_menu_style_string.append("} ");
-  ocelot_menu_style_string.append("QMenu::item:disabled {");
-  ocelot_menu_style_string.append("background-color:gray");
-  ocelot_menu_style_string.append("}");
-
-  ocelot_extra_rule_1_style_string= "color:"; ocelot_extra_rule_1_style_string.append(qt_color(ocelot_extra_rule_1_text_color));
-  ocelot_extra_rule_1_style_string.append(";background-color:"); ocelot_extra_rule_1_style_string.append(qt_color(ocelot_extra_rule_1_background_color));
-  ocelot_extra_rule_1_style_string.append(";border:");
-  ocelot_extra_rule_1_style_string.append(ocelot_grid_cell_border_size);
-  ocelot_extra_rule_1_style_string.append("px solid ");
-  ocelot_extra_rule_1_style_string.append(qt_color(ocelot_grid_border_color));
-  ocelot_extra_rule_1_style_string.append(";font-family:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_family);
-  ocelot_extra_rule_1_style_string.append(";font-size:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_size);
-  ocelot_extra_rule_1_style_string.append("pt;font-style:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_style);
-  ocelot_extra_rule_1_style_string.append(";font-weight:"); ocelot_extra_rule_1_style_string.append(ocelot_grid_font_weight);
+/* called from make_style_strings (above) and Settings function text_for_font_example_filler in ocelotgui.h */
+/* For font-family we should enclose in ''s but didn't because it would affected untested things  */
+void MainWindow::make_one_style_string(QString *style_string,
+                                       QString text_color,
+                                       QString background_color,
+                                       QString border_size,
+                                       QString border_color,
+                                       QString font_family,
+                                       QString font_size,
+                                       QString font_style, QString font_weight, bool is_menu)
+{
+  *style_string= "";
+  if (is_menu)   (*style_string).append("* {");
+  (*style_string).append("color:"); (*style_string).append(text_color);
+  (*style_string).append(";background-color:"); (*style_string).append(background_color);
+  (*style_string).append(";border:");
+  (*style_string).append(border_size);
+  (*style_string).append("px solid ");
+  (*style_string).append(border_color);
+  (*style_string).append(";font-family:"); (*style_string).append(font_family);
+  (*style_string).append(";font-size:"); (*style_string).append(font_size);
+  (*style_string).append("pt;font-style:"); (*style_string).append(font_style);
+  font_weight= font_weight.trimmed();
+  (*style_string).append(";font-weight:"); (*style_string).append(canonical_font_weight(font_weight));
+  if (is_menu)
+  {
+    (*style_string).append("} ");
+    (*style_string).append("QMenu::item:disabled {");
+    (*style_string).append("background-color:gray");
+    (*style_string).append("}");
+  }
 }
 
 
@@ -5934,15 +5997,8 @@ QFont MainWindow::get_font_from_style_sheet(QString style_string)
     if (font_weight_end < 0) font_weight_end= style_string.length();
     QString font_weight= style_string.mid(font_weight_start + 12, font_weight_end - (font_weight_start + 12));
     font_weight= font_weight.trimmed();
-    if (QString::compare(font_weight,"Light",Qt::CaseInsensitive) == 0) font_weight_as_int= QFont::Light;
-    if (QString::compare(font_weight,"Normal",Qt::CaseInsensitive) == 0) font_weight_as_int= QFont::Normal;
-    if (QString::compare(font_weight,"DemiBold",Qt::CaseInsensitive) == 0) font_weight_as_int= QFont::DemiBold;
-    if (QString::compare(font_weight,"Bold",Qt::CaseInsensitive) == 0) font_weight_as_int= QFont::Bold;
-    if (QString::compare(font_weight,"Black",Qt::CaseInsensitive) == 0) font_weight_as_int= QFont::Black;
-    //if (QString::compare(font_weight,"Thin",Qt::CaseInsensitive) == 0) font_weight_as_int= 0;
-    //if (QString::compare(font_weight,"ExtraLight",Qt::CaseInsensitive) == 0) font_weight_as_int= 12;
-    //if (QString::compare(font_weight,"Medium",Qt::CaseInsensitive) == 0) font_weight_as_int= 57;
-    //if (QString::compare(font_weight,"ExtraBold",Qt::CaseInsensitive) == 0) font_weight_as_int= 81;
+    int fwi= fontweights_index_via_chars(font_weight);
+    font_weight_as_int= fontweightsvalues[fwi].qt_number; /* e.g. if font is "Light" we get QFont::Light */
     assert(font_weight_as_int >= 0);
   }
   QFont font(font_family, font_size_as_int, font_weight_as_int, font_style_as_bool);

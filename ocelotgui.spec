@@ -53,9 +53,11 @@
 
 #Re Group:
 #  Usually this is Group: Applications/Databases
-#  On Mageia we change it to Group: Databases -- lintian doesn't seem to realize that this is
+#  On Mageia: we change it to Group: Databases -- rpmlint doesn't seem to realize that this is
 #  inside if/endif and complains anyway, but I can't think of anything to do about that except
-#  have a separate .spec file for Mageia.
+#  have a separate .spec file for Mageia. See https://wiki.mageia.org/en/RPM_groups_policy
+#  On Fedora: we could omit it nowadays. See https://fedoraproject.org/wiki/RPMGroups
+#  On SUSE: Productivity/Databases/Clients|Tools. See https://en.opensuse.org/openSUSE:Package_group_guidelines
 #Re Release:
 #   Although 1[[percent-sign]{?{dist}, instead of 1, is the right thing for packaging
 #   for a specific distro, it adds to the .rpm name, and we don't want that for a
@@ -130,7 +132,7 @@
 # * Test on a completely new machine, because BuildRequires: might not have a complete list.
 # * Keep track of howtobuild.txt
 # * (Mageia warnings) no-signature (this can be ignored), manpage-not-compressed
-# * (Fedora-26 warnings) non-standard-group Databases
+# * (Fedora-26 warnings) non-standard-group Databases. See description of Group, above.
 # * Instead of if/endif for 3 distros, make 3 directories = rpm_fedora | rpm_suse | rpm_mageia,
 #   and each directory contains an ocelotgui.spec file that's only got the spec for that distro.
 # It would be great to have ifdef equivalents for sourcedir etc.
@@ -298,7 +300,7 @@ cd %{_builddir}/%{name}-%{version}/build
 %{_datadir}/pixmaps/ocelotgui-logo.png
 
 %changelog
-* Fri Mar 19 2021 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.4.0.1
+* Fri Mar 19 2021 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.4.0-1
   Better handling of history files.
 * Tue Feb 09 2021 Peter Gulutzan <pgulutzan at ocelot.ca> - 1.3.0-1
   Conditional settings.

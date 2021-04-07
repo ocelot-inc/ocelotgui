@@ -913,7 +913,7 @@ static int MENU_SETTINGS_FOR_GRID= 103;
 static int MENU_SETTINGS_FOR_STATEMENT= 104;
 static int MENU_SETTINGS_FOR_DEBUG= 105;
 static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 106;
-static int MENU_PICK_NEW_FONT= 107;
+//static int MENU_PICK_NEW_FONT= 107; no longer used
 #define MENU_CONNECTION_DIALOG_BOX 108
 #define MENU_FILE_CONNECT_HEADING 109
 #define MENU_END 110
@@ -1028,7 +1028,7 @@ static const char *menu_strings[]=
     "Settings -- -- for Statement",
     "Settings -- -- for Debug",
     "Settings -- -- for Extra Rule 1",
-    "Pick new font",
+    "Pick new font", /* Obsolete. Since version 1.5 we don't call QFontDialog */
     "Connection Dialog Box",
     "File|Connect. Usually only the first 8 fields are important.",
     /* FRENCH */
