@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: April 7 2021
+   Last modified: April 9 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -5878,7 +5878,7 @@ void MainWindow::make_style_strings()
 }
 
 /* called from make_style_strings (above) and Settings function text_for_font_example_filler in ocelotgui.h */
-/* For font-family we should enclose in ''s but didn't because it would affected untested things  */
+/* We enclose font-family in ''s because some names country [foundry] */
 void MainWindow::make_one_style_string(QString *style_string,
                                        QString text_color,
                                        QString background_color,
@@ -5896,6 +5896,9 @@ void MainWindow::make_one_style_string(QString *style_string,
   (*style_string).append(border_size);
   (*style_string).append("px solid ");
   (*style_string).append(border_color);
+  font_family= font_family.trimmed();
+  font_family= connect_stripper(font_family, false);
+  font_family= "'" + font_family + "'";
   (*style_string).append(";font-family:"); (*style_string).append(font_family);
   (*style_string).append(";font-size:"); (*style_string).append(font_size);
   (*style_string).append("pt;font-style:"); (*style_string).append(font_style);

@@ -9628,6 +9628,7 @@ bool comparer(
   Todo: Allow setup of conditional statements in Settings menu
   Todo: SET ocelot_grid_background_color='blue', ocelot_grid_color='red' WHERE row = 5 AND column_name REGEX 'x';
   Todo: More comparands e.g. COLUMN_TYPE = 'binary'.
+  Todo: font-family might have [foundry] in brackets, it should be in ''s, though I didn't notice a problem
 */
 #define MAX_CONDITIONAL_STATEMENT_TOKENS 100 /* todo: this is a duplicate of what's defined in MainWindow */
 bool conditional_setting_evaluate(int cs_number,
@@ -10160,37 +10161,6 @@ void combo_box_filler(QComboBox **addr_of_combo_box, QString current_value, bool
     i_of_current_value= (*addr_of_combo_box)->findText(c);
   }
   (*addr_of_combo_box)->setCurrentIndex(i_of_current_value);
-}
-
-/*
-  Todo: I think "normal" won't be a weight, "normal" should match only if there is no weight
-        i.e. bold|medium|light|demi|etc. is missing. Maybe call QFontDatabase weight function?
-  Todo: surely combo_box_for_font_name_parse can help here
-*/
-int combo_box_for_font_name_matcher(QString name, QString family, QString style, QString weight)
-{
-  int r= 0;
-  if (name.contains(family + " ", Qt::CaseInsensitive))
-  {
-    r|= 1;
-    if (name.contains(" " + style, Qt::CaseInsensitive))
-    {
-      r|= 2;
-    }
-    if ((style == "normal") && (name.contains(" Regular", Qt::CaseInsensitive)))
-    {
-      r|= 2;
-    }
-    if (name.contains(" " + weight, Qt::CaseInsensitive))
-    {
-      r|= 4;
-    }
-    if ((weight == "normal") && (name.contains(" Regular", Qt::CaseInsensitive)))
-    {
-      r|= 4;
-    }
-  }
-  return r;
 }
 
 /*
