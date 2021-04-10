@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: April 9 2021
+   Last modified: April 10 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -24353,10 +24353,42 @@ bool XSettings::ocelot_variable_is_color(int keyword_index)
 {
   int offset= ocelot_variable_offset(keyword_index);
   if (offset < 0) return false;
-  char flags_style= ocelot_variables[offset].flags_style;
+  unsigned char flags_style= ocelot_variables[offset].flags_style;
   if (flags_style == OCELOT_VARIABLE_FLAG_SET_COLOR) return true;
   return false;
 }
+
+/* Return true iff keyword_index is for an ocelot_ variable for a font_weight setting */
+bool XSettings::ocelot_variable_is_font_weight(int keyword_index)
+{
+  int offset= ocelot_variable_offset(keyword_index);
+  if (offset < 0) return false;
+  unsigned char flags_style= ocelot_variables[offset].flags_style;
+  if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT) return true;
+  return false;
+}
+
+/* Return true iff keyword_index is for an ocelot_ variable for a font_style setting */
+bool XSettings::ocelot_variable_is_font_style(int keyword_index)
+{
+  int offset= ocelot_variable_offset(keyword_index);
+  if (offset < 0) return false;
+  unsigned char flags_style= ocelot_variables[offset].flags_style;
+  if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_STYLE) return true;
+  return false;
+}
+
+/* Return true iff keyword_index is for an ocelot_ variable for a font_family setting */
+bool XSettings::ocelot_variable_is_font_family(int keyword_index)
+{
+  int offset= ocelot_variable_offset(keyword_index);
+  if (offset < 0) return false;
+  unsigned char flags_style= ocelot_variables[offset].flags_style;
+  if (flags_style == OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY) return true;
+  return false;
+}
+
+
 
 int XSettings::ocelot_variables_size()
 {

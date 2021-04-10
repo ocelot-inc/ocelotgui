@@ -13120,7 +13120,7 @@ int MainWindow::hparse_f_client_set_rule()
   Todo: strvalues items are in order so you could bsearch().
   Todo: TOKEN_REFTYPE_ANY is vague, you'd do well with a reftype for ocelot_ items
   Todo: it's really TOKEN_TYPE_IDENTIFIER so see what hovering does
-  Todo: we could have hints for some values e.g. use QFontDatabase to show possible font families
+  Todo: we have autocomplete for color and font_style|weight|family but we culd have more
   Todo: why is it an error if starts with ocelot_ but isn't specifically one of the reserved ocelot_ items?
 */
 int MainWindow::hparse_f_client_set()
@@ -13204,24 +13204,27 @@ int MainWindow::hparse_f_client_set()
   if (hparse_errno > 0) return 0;
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
-
+  QStringList q;
+  q.clear();
   if (xsettings_widget->ocelot_variable_is_color(i_of_keyword) == true)
+    for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; q_i+= 2) q.append(s_color_list[q_i]);
+  if (xsettings_widget->ocelot_variable_is_font_weight(i_of_keyword) == true)
   {
-    int q_i= 0;
-    bool is_color_found= false;
-    for (; strcmp(s_color_list[q_i]," ") > 0; q_i+= 2)
-    {
-      char tmp[64];
-      strcpy(tmp, "'");
-      strcat(tmp, s_color_list[q_i]);
-      strcat(tmp, "'");
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, tmp) == 1)
-      {
-        is_color_found= true;
-        break;
-      }
-    }
-    if (is_color_found == false)
+    for (int q_i= 0; q_i < FONTWEIGHTSVALUES_SIZE; ++q_i) q.append(fontweightsvalues[q_i].chars);
+    for (int q_i= 0; q_i < FONTWEIGHTSVALUES_SIZE; ++q_i) q.append(QString::number(fontweightsvalues[q_i].css_number));
+  }
+  if (xsettings_widget->ocelot_variable_is_font_style(i_of_keyword) == true)
+  {
+    q.append("normal"); q.append("italic"); q.append("oblique");
+  }
+  if (xsettings_widget->ocelot_variable_is_font_family(i_of_keyword) == true)
+  {
+    QFontDatabase font_database;
+    q= font_database.families();
+  }
+  if (q.count() > 0)
+  {
+    if (hparse_pick_from_list(q) == false)
     {
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     }
@@ -13230,6 +13233,22 @@ int MainWindow::hparse_f_client_set()
   if (hparse_errno > 0) return 0;
   if (is_conditional_settings_possible == true) return 3;
   return 1;
+}
+
+/*
+  For picking a string literal when there are fixed choices.
+  Used for colors + fonts. Todo: use for more.
+  Todo: use for more. Pass a flag if it's to be enclosed in ''s. Pass a flag if it's to be sorted.
+*/
+bool MainWindow::hparse_pick_from_list(QStringList q)
+{
+  for (int q_i= 0; q_i < q.size(); ++q_i)
+  {
+    QString s= "'" + q.at(q_i) + "'";
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, s) == 1)
+      return true;
+  }
+  return false;
 }
 
 /*

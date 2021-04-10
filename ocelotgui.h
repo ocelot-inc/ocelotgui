@@ -3354,6 +3354,7 @@ public:
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
   int hparse_f_client_set_rule();
+  bool hparse_pick_from_list(QStringList);
   int hparse_f_client_set();
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
@@ -12054,6 +12055,9 @@ XSettings(MainWindow *parent)
 
 int ocelot_variable_set(int keyword_index, QString new_value);
 bool ocelot_variable_is_color(int keyword);
+bool ocelot_variable_is_font_weight(int keyword);
+bool ocelot_variable_is_font_style(int keyword);
+bool ocelot_variable_is_font_family(int keyword);
 int ocelot_variables_size();
 ~XSettings();
 
