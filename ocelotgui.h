@@ -5985,6 +5985,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   Todo: There can be a bit of flicker during drag though I doubt that anyone will care.
   Todo: BUG: If the QTextEdit gets a vertical scroll bar, then the horizontal cursor appears over the scroll bar,
         and dragging won't work. The problem is alleviated if border_size > 1. (Check: maybe this is fixed.)
+  Todo: Initializing copy_of_ocelot_html etc. works around a problem but isn't adequate if user changes
+        ocelot_html etc. to non-default values and then changes the font.
   Todo: Find out why cut-and-paste often fails. Maybe it's that selecting doesn't change colour or paintevent returns wrong.
   Re cursor shapes, see http://qt-project.org/doc/qt-4.8/qcursor.html#details
 */
@@ -6190,6 +6192,7 @@ ResultGrid(
     return;
   }
 
+
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
   /* We might say "new ResultGrid(0)" merely so we'd have ResultGrid in the middle spot in the layout-> */
@@ -6285,6 +6288,7 @@ ResultGrid(
 
   batch_text_edit= new QTextEdit(this);
   batch_text_edit->hide();
+  copy_of_ocelot_batch= copy_of_ocelot_html= copy_of_ocelot_raw= copy_of_ocelot_xml= 0;
 }
 
 
@@ -6712,7 +6716,6 @@ void display(int due_to,
     ocelot_vertical_copy= ocelot_vertical;
     ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
   }
-
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_html != 0)
    || (copy_of_ocelot_xml != 0))
@@ -6763,7 +6766,6 @@ void display(int due_to,
   QFont *pointer_to_font;
   pointer_to_font= &text_edit_widget_font;
   QFontMetrics mm= QFontMetrics(*pointer_to_font);
-
   /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
   ocelot_grid_max_desired_width_in_pixels= (parent->width() - (mm.boundingRect('W').width() * MIN_WIDTH_IN_CHARS));
   {
@@ -9076,7 +9078,7 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
       batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
     return;
   }
-  QFont tmp_font= this->font();
+//  QFont tmp_font= this->font();
   QFontMetrics mm= QFontMetrics(this->font());
   unsigned int height_of_line= mm.lineSpacing();
   unsigned int max_height_in_lines= height_of_grid_widget / height_of_line;
