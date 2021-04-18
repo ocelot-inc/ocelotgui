@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: April 15 2021
+   Last modified: April 18 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -220,7 +220,7 @@
 #define STRING_LENGTH_512 512
 
 /* MAX_HPARSE_ERRMSG_LENGTH should be enough for all keywords that begin with "OCELOT_" */
-#define MAX_HPARSE_ERRMSG_LENGTH 3690
+#define MAX_HPARSE_ERRMSG_LENGTH 3720
 
 /* Connect arguments and options */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
@@ -348,6 +348,7 @@
   static char ocelot_shortcut_zoomin[80]= "default";
   static char ocelot_shortcut_zoomout[80]= "default";
   static char ocelot_shortcut_autocomplete[80]= "default";
+  static char ocelot_shortcut_find[80]= "default";
   static char ocelot_shortcut_execute[80]= "default";
   static char ocelot_shortcut_kill[80]= "default";
   static char ocelot_shortcut_next_window[80]= "default";
@@ -711,6 +712,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   main_layout->addWidget(statement_edit_widget);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   main_layout->addWidget(debug_top_widget);
+#endif
+#if (OCELOT_FIND_WIDGET == 1)
+  find_widget_initialize();
 #endif
   main_window->setLayout(main_layout);
 
@@ -1561,6 +1565,9 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   {
     return menu_edit_autocomplete();  /* even if menu_edit_action_autocomplete->isEnabled() == false */
   }
+#if (OCELOT_FIND_WIDGET == 1)
+  if (qk == ocelot_shortcut_find_keysequence){menu_edit_find(); return true; }
+#endif
   if (menu_run_action_kill->isEnabled() == true)
   {
     if (qk == ocelot_shortcut_kill_keysequence) { action_kill(); return true; }
@@ -2448,6 +2455,7 @@ void MainWindow::create_menu()
   menu_edit_action_zoomin= menu_edit->addAction("");
   menu_edit_action_zoomout= menu_edit->addAction("");
   menu_edit_action_autocomplete= menu_edit->addAction("");
+  menu_edit_action_find= menu_edit->addAction("");
   menu_run= ui->menuBar->addMenu("");
   menu_run_action_execute= menu_run->addAction("");
   menu_run_action_kill= menu_run->addAction("");
@@ -2558,6 +2566,11 @@ void MainWindow::fill_menu()
   menu_edit_action_autocomplete->setText(menu_strings[menu_off + MENU_EDIT_AUTOCOMPLETE]);
   connect(menu_edit_action_autocomplete, SIGNAL(triggered()), this, SLOT(menu_edit_autocomplete_via_menu()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE, "", false, true);
+#if (OCELOT_FIND_WIDGET == 1)
+  menu_edit_action_find->setText(menu_strings[menu_off + MENU_EDIT_FIND]);
+  connect(menu_edit_action_find, SIGNAL(triggered()), this, SLOT(menu_edit_find()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_FIND, "", false, true);
+#endif
   menu_run->setTitle(menu_strings[menu_off + MENU_RUN]);
   menu_run_action_execute->setText(menu_strings[menu_off + MENU_RUN_EXECUTE]);
   connect(menu_run_action_execute, SIGNAL(triggered()), this, SLOT(action_execute_force()));
@@ -2965,6 +2978,19 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
       else
         ocelot_shortcut_autocomplete_keysequence= QKeySequence(ocelot_shortcut_autocomplete);
       menu_edit_action_autocomplete->setShortcut(ocelot_shortcut_autocomplete_keysequence);
+    }
+    return 1;
+  }
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_FIND)
+  {
+    if (is_set) strcpy(ocelot_shortcut_find, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_find, "default") == 0)
+        ocelot_shortcut_find_keysequence= QKeySequence("Ctrl+F");
+      else
+        ocelot_shortcut_find_keysequence= QKeySequence(ocelot_shortcut_find);
+      menu_edit_action_find->setShortcut(ocelot_shortcut_find_keysequence);
     }
     return 1;
   }
@@ -3524,6 +3550,12 @@ bool MainWindow::menu_edit_autocomplete()
   return false;
 }
 
+#if (OCELOT_FIND_WIDGET == 1)
+void MainWindow::menu_edit_find()
+{
+  find_widget_activate();
+}
+#endif
 
 /*
   The required size of main_token_offsets|lengths|types|flags is
@@ -4974,6 +5006,7 @@ void MainWindow::action_redo()
         if font_size already >= FONT_SIZE_MAX, disable zoomout.
         (Get the widget's ->styleSheet() as you do elsewhere.)
   Todo: check if ExpectedWidget can be affected here
+  Todo: we could have is_can_find for menu_edit_action_find but at the moment it's always enabled
 */
 void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
 {
@@ -12122,9 +12155,9 @@ void MainWindow::initial_asserts()
 
   #ifdef OCELOT_OS_LINUX
   #if defined(NDEBUG)
-    if (MENU_FONT != 89) {printf("assert(MENU_FONT == 89);"); exit(1); }
+    if (MENU_FONT != 93) {printf("assert(MENU_FONT == 93);"); exit(1); }
   #else
-    assert(MENU_FONT == 89); /* See kludge alert in ocelotgui.h Settings() */
+    assert(MENU_FONT == 93); /* See kludge alert in ocelotgui.h Settings() */
   #endif
   #else
     assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
@@ -12143,11 +12176,11 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "123" to the new size */
+  /* That is okay but you must change this occurrence of "124" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 125);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 126);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -17493,6 +17526,110 @@ void Completer_widget::timer_expired()
 }
 
 /******************** completer_widget end   ************************************/
+
+/******************** find_widget start   ************************************/
+#if (OCELOT_FIND_WIDGET == 1)
+/*
+  Comments: We wrap, i.e. if at end and forward-search go to start, if at start and backward-search go to end.
+  I think the objective should be:
+    highlight using the same ideas as used for debug i.e. muted yellow, and straight underline
+    highlight all? or highlight first from cursor? should the cursor move?
+    case insensitive, and accent insensitive too if possible
+  Also consider:
+  hbox_layout->setContentsMargins(0, 0, 0, 0);
+  hbox_layout->setSpacing(0);
+  ? Attach to current widget, or to main window?
+  ? Change focus
+  ? close -- esc might do it, but a Qt key-def for close would be fine too
+  ? create when edit|find, delete when close
+  ? new class
+  Todo: QTextEdit has a find() function but I couldn't figure out how it works.
+  Todo: I'd like to set color and maybe underline as in debug_highlight_line() instead of selecting.
+  Todo: signal(pressed) and signal(clicked) both seem to work, which should I prefer?
+  Todo: in ababaabaab I see 3 occurrences of aba but kwrite sees 2
+*/
+
+/* Called just before main_window->setLayout() */
+void MainWindow::find_widget_initialize()
+{
+  find_widget= new QWidget(this);
+  find_widget_layout= new QHBoxLayout(this);
+  find_widget_label= new QLabel(this);
+  find_widget_line= new QLineEdit(this);
+  find_widget_down_arrow= new QToolButton(this);
+  find_widget_up_arrow= new QToolButton(this);
+  find_widget_layout->addWidget(find_widget_label);
+  find_widget_layout->addWidget(find_widget_line);
+  find_widget_layout->addWidget(find_widget_down_arrow);
+  find_widget_layout->addWidget(find_widget_up_arrow);
+  find_widget->setLayout(find_widget_layout);
+  main_layout->addWidget(find_widget);
+  find_widget->hide();
+}
+
+/* Called from menu_edit_find() */
+void MainWindow::find_widget_activate()
+{
+  find_widget_label->setText("Find:");
+  find_widget_up_arrow->setArrowType(Qt::UpArrow);
+  find_widget_up_arrow->setToolTip("Find previous match");
+  find_widget_down_arrow->setArrowType(Qt::DownArrow);
+  find_widget_down_arrow->setToolTip("Find next match");
+  find_widget_line->setToolTip("Text to find");
+  connect(find_widget_line, SIGNAL(textEdited(QString)), this, SLOT(action_find_widget_line_text_changed(QString)));
+  connect(find_widget_down_arrow, SIGNAL(clicked()), this, SLOT(action_find_widget_down_arrow_clicked()));
+  connect(find_widget_up_arrow, SIGNAL(pressed()), this, SLOT(action_find_widget_up_arrow_clicked()));
+  find_widget->show();
+}
+
+/* slot for signal connected with find_widget_activate */
+void MainWindow::action_find_widget_line_text_changed(QString find_text)
+{
+  (void)find_text;
+  action_find_widget_move(true, true);
+}
+
+void MainWindow::action_find_widget_down_arrow_clicked()
+{
+  action_find_widget_move(false, true);
+}
+
+void MainWindow::action_find_widget_up_arrow_clicked()
+{
+  action_find_widget_move(false, false);
+}
+
+/* called from action_find_widget_line_text_change|down_arrow_clicked|up_arrow_clicked */
+void MainWindow::action_find_widget_move(bool is_from_start, bool is_forward)
+{
+  int position_from, position_to;
+  QTextCursor c= statement_edit_widget->textCursor();
+  if (is_from_start == true) position_from= 0;
+  else position_from= c.position();
+  QString s= statement_edit_widget->toPlainText();
+  QString find_text= find_widget_line->text();
+  if (is_forward == true)
+  {
+    position_to= s.indexOf(find_text, position_from  - (find_text.size() - 1));
+    if (position_to == -1) position_to= s.indexOf(find_text, 0);
+  }
+  else
+  {
+    position_to= s.lastIndexOf(find_text, position_from - (find_text.size() + 1));
+    if (position_to == -1) position_to= s.lastIndexOf(find_text, 0);
+  }
+  if (position_to != -1)
+  {
+    c.setPosition(position_to, QTextCursor::MoveAnchor);
+    c.setPosition(position_to + find_text.size(), QTextCursor::KeepAnchor);
+    statement_edit_widget->setTextCursor(c);
+  }
+}
+
+
+#endif
+/******************** find_widget end   ************************************/
+
 
 /*
   TextEditFrame
@@ -24007,7 +24144,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 123 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 124 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
 */
 int XSettings::ocelot_variables_create()
 {
@@ -24085,6 +24222,7 @@ int XSettings::ocelot_variables_create()
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT},
+    {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_FIND},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS},
@@ -24137,7 +24275,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 123;
+  int i= 124;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;

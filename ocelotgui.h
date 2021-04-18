@@ -27,6 +27,11 @@
 #define OCELOT_MYSQL_DEBUGGER OCELOT_MYSQL_INCLUDE
 #endif
 
+/* To remove most of the code related to Edit|Find feature if you don't need it, set OCELOT_FIND_WIDGET 0 */
+#ifndef OCELOT_FIND_WIDGET
+#define OCELOT_FIND_WIDGET 1
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -820,6 +825,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_FIND,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS,
@@ -1395,7 +1401,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1170
+#define KEYWORD_LIST_SIZE 1171
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2057,6 +2063,7 @@ static const keywords strvalues[]=
     {"OCELOT_SHORTCUT_DEBUG_EXIT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_DEBUG_EXIT},
     {"OCELOT_SHORTCUT_EXECUTE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE},
     {"OCELOT_SHORTCUT_EXIT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT},
+    {"OCELOT_SHORTCUT_FIND", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_FIND},
     {"OCELOT_SHORTCUT_FORMAT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_FORMAT},
     {"OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_NEXT},
     {"OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HISTORY_MARKUP_PREVIOUS},
@@ -2649,6 +2656,9 @@ static const fontweights fontweightsvalues[]=
 #include <QRegularExpression>
 #else
 #include <QDesktopWidget>
+#endif
+#if (OCELOT_FIND_WIDGET == 1)
+#include <QToolButton>
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -3413,7 +3423,6 @@ public:
 
   Completer_widget *completer_widget= NULL;
 
-
 public slots:
   void action_connect();
   void action_connect_once(QString);
@@ -3514,10 +3523,19 @@ public slots:
   void menu_edit_zoomout();
   void menu_edit_autocomplete_via_menu();
   bool menu_edit_autocomplete();
+#if (OCELOT_FIND_WIDGET == 1)
+  void menu_edit_find();
+#endif
   bool eventfilter_function(QObject *obj, QEvent *event);
   void menu_context(const QPoint &);
 //  int typer_to_ocelot_data_type(char *s); /* exists in ocelotgui.cpp but is commented out */
-  char *typer_to_keyword(unsigned int);
+  char *typer_to_keyword(unsigned int); /* todo: check: why are some things in "public slots" not "public"? */
+#if (OCELOT_FIND_WIDGET == 1)
+  void action_find_widget_line_text_changed(QString);
+  void action_find_widget_down_arrow_clicked();
+  void action_find_widget_up_arrow_clicked();
+  void action_find_widget_move(bool,bool);
+#endif
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
@@ -3613,6 +3631,10 @@ private:
   void connect_init(int connection_number);
   void set_current_colors_and_font(QFont);
   QFont get_fixed_font();
+#if (OCELOT_FIND_WIDGET == 1)
+  void find_widget_initialize();
+  void find_widget_activate();
+#endif
 public:
   void make_style_strings();
   void make_one_style_string(QString *style_string, QString text_color, QString background_color, QString border_size, QString border_color, QString font_family, QString font_size, QString font_style, QString font_weight, bool is_menu);
@@ -3718,6 +3740,14 @@ private:
   QTabWidget *debug_tab_widget;
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
+#if (OCELOT_FIND_WIDGET == 1)
+  QWidget *find_widget;
+  QHBoxLayout *find_widget_layout;
+  QLabel *find_widget_label;
+  QLineEdit *find_widget_line;
+  QToolButton *find_widget_down_arrow;
+  QToolButton *find_widget_up_arrow;
+#endif
   XSettings *xsettings_widget;
   QMenu *menu_file;
     QAction *menu_file_action_connect;
@@ -3734,6 +3764,7 @@ private:
     QAction *menu_edit_action_formatter;
     QAction *menu_edit_action_zoomin;
     QAction *menu_edit_action_zoomout;
+    QAction *menu_edit_action_find;
 public:
     QAction *menu_edit_action_autocomplete;
 private:
@@ -3842,6 +3873,7 @@ private:
   QKeySequence ocelot_shortcut_zoomin_keysequence;
   QKeySequence ocelot_shortcut_zoomout_keysequence;
   QKeySequence ocelot_shortcut_autocomplete_keysequence;
+  QKeySequence ocelot_shortcut_find_keysequence;
   QKeySequence ocelot_shortcut_execute_keysequence;
   QKeySequence ocelot_shortcut_kill_keysequence;
   QKeySequence ocelot_shortcut_next_window_keysequence;
@@ -10382,7 +10414,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
     Change the assert in ocelotgui.cpp if MENU_FONT changes in ostrings.h.
   */
-  menu_strings_menu_font_copy= menu_strings[menu_off + 89];
+  menu_strings_menu_font_copy= menu_strings[menu_off + 93];
 
   int settings_width, settings_height;
 
@@ -12015,7 +12047,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 123
+#define OCELOT_VARIABLES_SIZE 124
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
