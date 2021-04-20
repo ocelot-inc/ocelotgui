@@ -2940,6 +2940,9 @@ class TextEditHistory;
 class TextEditWidget2;
 class XSettings;
 class Completer_widget;
+#if (OCELOT_FIND_WIDGET == 1)
+class Find_widget;
+#endif
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -3530,12 +3533,6 @@ public slots:
   void menu_context(const QPoint &);
 //  int typer_to_ocelot_data_type(char *s); /* exists in ocelotgui.cpp but is commented out */
   char *typer_to_keyword(unsigned int); /* todo: check: why are some things in "public slots" not "public"? */
-#if (OCELOT_FIND_WIDGET == 1)
-  void action_find_widget_line_text_changed(QString);
-  void action_find_widget_down_arrow_clicked();
-  void action_find_widget_up_arrow_clicked();
-  void action_find_widget_move(bool,bool);
-#endif
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
@@ -3631,10 +3628,7 @@ private:
   void connect_init(int connection_number);
   void set_current_colors_and_font(QFont);
   QFont get_fixed_font();
-#if (OCELOT_FIND_WIDGET == 1)
-  void find_widget_initialize();
-  void find_widget_activate();
-#endif
+
 public:
   void make_style_strings();
   void make_one_style_string(QString *style_string, QString text_color, QString background_color, QString border_size, QString border_color, QString font_family, QString font_size, QString font_style, QString font_weight, bool is_menu);
@@ -3741,12 +3735,7 @@ private:
   CodeEditor *debug_widget[DEBUG_TAB_WIDGET_MAX]; /* todo: this should be variable-size */
 #endif
 #if (OCELOT_FIND_WIDGET == 1)
-  QWidget *find_widget;
-  QHBoxLayout *find_widget_layout;
-  QLabel *find_widget_label;
-  QLineEdit *find_widget_line;
-  QToolButton *find_widget_down_arrow;
-  QToolButton *find_widget_up_arrow;
+  Find_widget *find_widget;
 #endif
   XSettings *xsettings_widget;
   QMenu *menu_file;
@@ -4765,6 +4754,55 @@ Completer_widget(MainWindow *m)
 };
 
 #endif // COMPLETER_WIDGET_H
+
+#if (OCELOT_FIND_WIDGET == 1)
+#ifndef FIND_WIDGET_H
+#define FIND_WIDGET_H
+
+/* See comments just before Find_widget::construct() */
+
+class Find_widget: public QWidget
+{
+  Q_OBJECT
+
+private:
+  MainWindow *main_window;
+  QHBoxLayout *layout;
+  QToolButton *close_button;
+  QLabel *find_label;
+  QComboBox *combo_box;
+  QToolButton *down_button;
+  QToolButton *up_button;
+  QToolButton *case_button;
+  void construct();
+  void action_find_widget_move(bool,bool);
+  void enable_or_disable();
+protected:
+  void keyPressEvent(QKeyEvent *event);
+private slots:
+  void action_combo_box_text_changed(QString);
+  void action_down_button_clicked();
+  void action_up_button_clicked();
+  void action_close_button_clicked();
+  void action_case_button_clicked();
+public:
+  void find_widget_activate();
+
+Find_widget(MainWindow *m)
+{
+  main_window= m;
+  construct();
+}
+
+~Find_widget()
+{
+  ;
+}
+
+};
+
+#endif
+#endif
 
 /***********************************************************/
 /* The Low-Level DBMS calls */

@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: April 18 2021
+   Last modified: April 19 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -714,7 +714,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   main_layout->addWidget(debug_top_widget);
 #endif
 #if (OCELOT_FIND_WIDGET == 1)
-  find_widget_initialize();
+  find_widget= new Find_widget(this);
+  main_layout->addWidget(find_widget);
 #endif
   main_window->setLayout(main_layout);
 
@@ -3553,7 +3554,7 @@ bool MainWindow::menu_edit_autocomplete()
 #if (OCELOT_FIND_WIDGET == 1)
 void MainWindow::menu_edit_find()
 {
-  find_widget_activate();
+  find_widget->find_widget_activate();
 }
 #endif
 
@@ -17530,102 +17531,198 @@ void Completer_widget::timer_expired()
 /******************** find_widget start   ************************************/
 #if (OCELOT_FIND_WIDGET == 1)
 /*
-  Comments: We wrap, i.e. if at end and forward-search go to start, if at start and backward-search go to end.
-  I think the objective should be:
-    highlight using the same ideas as used for debug i.e. muted yellow, and straight underline
+  Re keyPressEvent:
+    Maybe looking for Esc is a mistake, it should be a shortcut with default == QKeySequence::Cancel.
+    See also keypress_shortcut_handler().
+  Re close_button:
+    If user clicks this, we hide (but we don't delete, and maybe we should. or delete components)
+    This is like what an editor does.
+  Re find_label:
+    This and other text should be in ostrings.h so it can be French
+  Re combo_box:
+    QComboBox, editable.
+    After each Ctrl+F, users see a blank that they can edit, or they can scroll down and pick a previous.
+    This is like what an editor does but an editor's history is stored, ours is since-startup and limited to 5.
+  Re up_button and down_button:
+    These are for going to "next" or "previous"
+    This is like what an editor does.
+    We could have said down_button->setArrowType(Qt::DownArrow);
+  Re case_button:
+    Text is 'i' for Qt::CaseInsensitive or 's' for Qt::CaseSensitive. Default is 'i'.
+    Click to toggle between 'i' and 's'. Search won't be repeated automatically but setting is in effect.
+    I'm not sure this is a good way to do it.
+    I've seen an icon used here, I think text might be clearer.
+  Re searching:
+    By default CaseInsensitive, but clicking case_button toggles to sensitive.
+    We wrap, i.e. if at end when forward we go to start, if at start when backward we go from end
+    This is like what an editor does but an editor goes from statement current pos, we go from start|end.
+    Todo: options e.g. "matching )"
+  Re highlighting what's found:
+    Todo: I'd like to set color and maybe underline as in debug_highlight_line() instead of selecting.
+          e.g. muted yellow, and straight underline
     highlight all? or highlight first from cursor? should the cursor move?
-    case insensitive, and accent insensitive too if possible
-  Also consider:
-  hbox_layout->setContentsMargins(0, 0, 0, 0);
-  hbox_layout->setSpacing(0);
-  ? Attach to current widget, or to main window?
-  ? Change focus
-  ? close -- esc might do it, but a Qt key-def for close would be fine too
-  ? create when edit|find, delete when close
-  ? new class
-  Todo: QTextEdit has a find() function but I couldn't figure out how it works.
-  Todo: I'd like to set color and maybe underline as in debug_highlight_line() instead of selecting.
+    Todo: put a box around the clause
+  Re relevant widget:
+    Todo: We assume statement, we should instead use current (last in focus) widget
+    Todo: Show immediately after relevant widget, or in main menu
+    If the relevant widget is grid, then it's harder -- too many widgets, eh?
   Todo: signal(pressed) and signal(clicked) both seem to work, which should I prefer?
-  Todo: in ababaabaab I see 3 occurrences of aba but kwrite sees 2
+  Todo: in ababaabaab I see 3 occurrences of aba but an editor sees 2
+  Todo: Save current focus, see https://forum.qt.io/topic/80019/find-which-widget-had-focus-when-menu-item-is-clicked/8
+  Todo: Maybe say "explicit" before Find_widget(...) in ocelotgui.h
+  Todo: Do I need to change so next|prev widget won't come to find_widget when it's activated?
+  Todo: Maybe say action_close_button_clicked() instead of hide()
+  Todo: Change keyboard_shortcut_handler(), you need to handle ^Q but not most other things
+  Todo: bug: search for "bl" and see bl is highlighted in statement
+             then backspace so the search is only for "b" and see bl is still highlighted in statement
+  Todo: There is too much space between the statement widget and the find widget
+  Todo: Maybe save space by only loading components when activate, and deleting them when close
 */
 
-/* Called just before main_window->setLayout() */
-void MainWindow::find_widget_initialize()
+/* called from new Find_widget() which is called just before main_window->setLayout(main_layout) */
+void Find_widget::construct()
 {
-  find_widget= new QWidget(this);
-  find_widget_layout= new QHBoxLayout(this);
-  find_widget_label= new QLabel(this);
-  find_widget_line= new QLineEdit(this);
-  find_widget_down_arrow= new QToolButton(this);
-  find_widget_up_arrow= new QToolButton(this);
-  find_widget_layout->addWidget(find_widget_label);
-  find_widget_layout->addWidget(find_widget_line);
-  find_widget_layout->addWidget(find_widget_down_arrow);
-  find_widget_layout->addWidget(find_widget_up_arrow);
-  find_widget->setLayout(find_widget_layout);
-  main_layout->addWidget(find_widget);
-  find_widget->hide();
+  QStyle *style = qApp->style();
+  layout= new QHBoxLayout(this);
+  close_button= new QToolButton(this);
+  close_button->setIcon(style->standardIcon(QStyle::SP_DialogCancelButton));
+  close_button->setToolTip("Close");
+  find_label= new QLabel(this);
+  QFont f= this->font();
+  QFontMetrics fm(f);
+  QString s= "Find:";
+  s= s.left(s.size() - 1); /* otherwise there's a blank at the end? */
+  QRect r= fm.boundingRect(0, 0, 4000, 4000, Qt::TextDontClip, s);
+  find_label->setFixedWidth(r.width());
+  find_label->setText(s);
+  combo_box= new QComboBox(this);
+  combo_box->setEditable(true);
+  combo_box->setMaxCount(5);
+  combo_box->setToolTip("Text to find");
+  down_button= new QToolButton(this);
+  down_button->setIcon(style->standardIcon(QStyle::SP_ArrowDown));
+  down_button->setToolTip("Find next match");
+  up_button= new QToolButton(this);
+  up_button->setIcon(style->standardIcon(QStyle::SP_ArrowUp));
+  up_button->setToolTip("Find previous match");
+  case_button= new QToolButton(this);
+  case_button->setText("i");
+  case_button->setToolTip("Case sensitive search");
+  layout->addWidget(close_button);
+  layout->addWidget(find_label);
+  layout->addWidget(combo_box);
+  layout->addWidget(down_button);
+  layout->addWidget(up_button);
+  layout->addWidget(case_button);
+  setLayout(layout);
+  connect(combo_box, SIGNAL(currentTextChanged(QString)), this, SLOT(action_combo_box_text_changed(QString)));
+  connect(down_button, SIGNAL(clicked()), this, SLOT(action_down_button_clicked()));
+  connect(up_button, SIGNAL(pressed()), this, SLOT(action_up_button_clicked()));
+  connect(close_button, SIGNAL(pressed()), this, SLOT(action_close_button_clicked()));
+  connect(case_button, SIGNAL(pressed()), this, SLOT(action_case_button_clicked()));
+  hide();
 }
 
-/* Called from menu_edit_find() */
-void MainWindow::find_widget_activate()
+void Find_widget::find_widget_activate()
 {
-  find_widget_label->setText("Find:");
-  find_widget_up_arrow->setArrowType(Qt::UpArrow);
-  find_widget_up_arrow->setToolTip("Find previous match");
-  find_widget_down_arrow->setArrowType(Qt::DownArrow);
-  find_widget_down_arrow->setToolTip("Find next match");
-  find_widget_line->setToolTip("Text to find");
-  connect(find_widget_line, SIGNAL(textEdited(QString)), this, SLOT(action_find_widget_line_text_changed(QString)));
-  connect(find_widget_down_arrow, SIGNAL(clicked()), this, SLOT(action_find_widget_down_arrow_clicked()));
-  connect(find_widget_up_arrow, SIGNAL(pressed()), this, SLOT(action_find_widget_up_arrow_clicked()));
-  find_widget->show();
+  if (combo_box->currentIndex() > 0) combo_box->setCurrentIndex(0);
+  QString s= combo_box->currentText();
+  if (s != "")
+  {
+    combo_box->insertItem(0, s);
+    combo_box->setCurrentIndex(0);
+    combo_box->setCurrentText("");
+  }
+  enable_or_disable();
+  combo_box->setFocus();
+  show();
+}
+
+void Find_widget::action_close_button_clicked()
+{
+  hide();
 }
 
 /* slot for signal connected with find_widget_activate */
-void MainWindow::action_find_widget_line_text_changed(QString find_text)
+void Find_widget::action_combo_box_text_changed(QString find_text)
 {
   (void)find_text;
+  enable_or_disable();
   action_find_widget_move(true, true);
 }
 
-void MainWindow::action_find_widget_down_arrow_clicked()
+void Find_widget::action_down_button_clicked()
 {
   action_find_widget_move(false, true);
 }
 
-void MainWindow::action_find_widget_up_arrow_clicked()
+void Find_widget::action_up_button_clicked()
 {
   action_find_widget_move(false, false);
 }
 
-/* called from action_find_widget_line_text_change|down_arrow_clicked|up_arrow_clicked */
-void MainWindow::action_find_widget_move(bool is_from_start, bool is_forward)
+void Find_widget::action_case_button_clicked()
 {
+  if (case_button->text() == "i") case_button->setText("s");
+  else case_button->setText("i");
+}
+
+/* called from action_combo_box_text_change|down_arrow_clicked|up_arrow_clicked */
+void Find_widget::action_find_widget_move(bool is_from_start, bool is_forward)
+{
+  Qt::CaseSensitivity case_sensitive;
+  if (case_button->text() == "i") case_sensitive= Qt::CaseInsensitive;
+  else case_sensitive= Qt::CaseSensitive;
   int position_from, position_to;
-  QTextCursor c= statement_edit_widget->textCursor();
+  QTextCursor c= main_window->statement_edit_widget->textCursor();
   if (is_from_start == true) position_from= 0;
   else position_from= c.position();
-  QString s= statement_edit_widget->toPlainText();
-  QString find_text= find_widget_line->text();
+  QString s= main_window->statement_edit_widget->toPlainText();
+  QString find_text= combo_box->currentText();
   if (is_forward == true)
   {
-    position_to= s.indexOf(find_text, position_from  - (find_text.size() - 1));
-    if (position_to == -1) position_to= s.indexOf(find_text, 0);
+    position_to= s.indexOf(find_text, position_from  - (find_text.size() - 1), case_sensitive);
+    if (position_to == -1) position_to= s.indexOf(find_text, 0, case_sensitive);
   }
   else
   {
-    position_to= s.lastIndexOf(find_text, position_from - (find_text.size() + 1));
-    if (position_to == -1) position_to= s.lastIndexOf(find_text, 0);
+    position_to= s.lastIndexOf(find_text, position_from - (find_text.size() + 1), case_sensitive);
+    if (position_to == -1) position_to= s.lastIndexOf(find_text, s.size() - 1, case_sensitive);
   }
   if (position_to != -1)
   {
     c.setPosition(position_to, QTextCursor::MoveAnchor);
     c.setPosition(position_to + find_text.size(), QTextCursor::KeepAnchor);
-    statement_edit_widget->setTextCursor(c);
+    main_window->statement_edit_widget->setTextCursor(c);
   }
 }
 
+void Find_widget::keyPressEvent(QKeyEvent *event)
+{
+  if (event->key() == Qt::Key_Escape)
+  {
+    hide();
+    return;
+  }
+  if (main_window->keypress_shortcut_handler(event, false) == true)
+  {
+    return;
+  }
+}
+
+void Find_widget::enable_or_disable()
+{
+  if (combo_box->currentText() != "")
+  {
+    up_button->setEnabled(true);
+    down_button->setEnabled(true);
+  }
+  else
+  {
+    up_button->setEnabled(false);
+    down_button->setEnabled(false);
+  }
+}
 
 #endif
 /******************** find_widget end   ************************************/
