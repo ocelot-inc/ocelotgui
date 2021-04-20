@@ -3889,6 +3889,9 @@ private:
 #endif
 
 public:
+#if (OCELOT_FIND_WIDGET == 1)
+  QObject *last_focus_widget;
+#endif
   bool keypress_shortcut_handler(QKeyEvent *, bool);
   int tarantool_execute_sql(const char *, unsigned int, int);
   int tarantool_execute_lua(const char *, unsigned int, int);
@@ -6358,6 +6361,7 @@ ResultGrid(
 
   batch_text_edit= new QTextEdit(this);
   batch_text_edit->hide();
+
   copy_of_ocelot_batch= copy_of_ocelot_html= copy_of_ocelot_raw= copy_of_ocelot_xml= 0;
 }
 

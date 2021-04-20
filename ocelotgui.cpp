@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: April 19 2021
+   Last modified: April 20 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -5016,6 +5016,12 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
   bool is_can_format= false, is_can_zoomin= false, is_can_zoomout= false;
   bool is_can_autocomplete= false;
   const char *class_name= focus_widget->metaObject()->className();
+#if (OCELOT_FIND_WIDGET == 1)
+  if (qe == QEvent::FocusOut)
+  {
+    last_focus_widget= focus_widget;
+  }
+#endif
   if (qe == QEvent::FocusIn)
   {
     if (strcmp(class_name, "TextEditWidget") != 0) return;
@@ -17531,9 +17537,6 @@ void Completer_widget::timer_expired()
 /******************** find_widget start   ************************************/
 #if (OCELOT_FIND_WIDGET == 1)
 /*
-  Re keyPressEvent:
-    Maybe looking for Esc is a mistake, it should be a shortcut with default == QKeySequence::Cancel.
-    See also keypress_shortcut_handler().
   Re close_button:
     If user clicks this, we hide (but we don't delete, and maybe we should. or delete components)
     This is like what an editor does.
@@ -17562,10 +17565,17 @@ void Completer_widget::timer_expired()
           e.g. muted yellow, and straight underline
     highlight all? or highlight first from cursor? should the cursor move?
     Todo: put a box around the clause
+  Re keyPressEvent:
+    Maybe looking for Esc is a mistake, it should be a shortcut with default == QKeySequence::Cancel.
+    See also keypress_shortcut_handler().
   Re relevant widget:
-    Todo: We assume statement, we should instead use current (last in focus) widget
+    We try to use last_focus_widget, i.e. what we saved in menu_activate() when one of the main widgets
+    lost focus, regarding that as "current". Make sure cast is legitimate by checking the class name.
+    codeEditor is subclass of QPlainTextEit, TextEditHistory and TextEditWidget and TextEditWidge2 are
+    subclasses of QTextEdit, if it's anything else then assume statement_edit_widget not last_focus_widget.
     Todo: Show immediately after relevant widget, or in main menu
-    If the relevant widget is grid, then it's harder -- too many widgets, eh?
+    If the relevant widget is grid, then we search only in a cell.
+    I hoped we'd see more if --ocelot_html=1 but batch_text_edit doesn't get seen by filter (?).
   Todo: signal(pressed) and signal(clicked) both seem to work, which should I prefer?
   Todo: in ababaabaab I see 3 occurrences of aba but an editor sees 2
   Todo: Save current focus, see https://forum.qt.io/topic/80019/find-which-widget-had-focus-when-menu-item-is-clicked/8
@@ -17670,14 +17680,36 @@ void Find_widget::action_case_button_clicked()
 /* called from action_combo_box_text_change|down_arrow_clicked|up_arrow_clicked */
 void Find_widget::action_find_widget_move(bool is_from_start, bool is_forward)
 {
+  QTextCursor c;
+  QString s;
+  QPlainTextEdit *p_plaintextedit= NULL;
+  QTextEdit *p_textedit= NULL;
+  const char *class_name= main_window->last_focus_widget->metaObject()->className();
+  if (strcmp(class_name, "CodeEditor") == 0)
+  {
+    p_plaintextedit= (QPlainTextEdit *) main_window->last_focus_widget;
+    c= p_plaintextedit->textCursor();
+    s= p_plaintextedit->toPlainText();
+  }
+  else if ((strcmp(class_name, "TextEditHistory") == 0)
+   || (strcmp(class_name, "TextEditWidget") == 0)
+   || (strcmp(class_name, "TextEditWidget2") == 0))
+  {
+    p_textedit= (QTextEdit *) main_window->last_focus_widget;
+    c= p_textedit->textCursor();
+    s= p_textedit->toPlainText();
+  }
+  else
+  {
+    c= main_window->statement_edit_widget->textCursor();
+    s= main_window->statement_edit_widget->toPlainText();
+  }
   Qt::CaseSensitivity case_sensitive;
   if (case_button->text() == "i") case_sensitive= Qt::CaseInsensitive;
   else case_sensitive= Qt::CaseSensitive;
   int position_from, position_to;
-  QTextCursor c= main_window->statement_edit_widget->textCursor();
   if (is_from_start == true) position_from= 0;
   else position_from= c.position();
-  QString s= main_window->statement_edit_widget->toPlainText();
   QString find_text= combo_box->currentText();
   if (is_forward == true)
   {
@@ -17693,20 +17725,9 @@ void Find_widget::action_find_widget_move(bool is_from_start, bool is_forward)
   {
     c.setPosition(position_to, QTextCursor::MoveAnchor);
     c.setPosition(position_to + find_text.size(), QTextCursor::KeepAnchor);
-    main_window->statement_edit_widget->setTextCursor(c);
-  }
-}
-
-void Find_widget::keyPressEvent(QKeyEvent *event)
-{
-  if (event->key() == Qt::Key_Escape)
-  {
-    hide();
-    return;
-  }
-  if (main_window->keypress_shortcut_handler(event, false) == true)
-  {
-    return;
+    if (p_plaintextedit != NULL) p_plaintextedit->setTextCursor(c);
+    else if (p_textedit != NULL) p_textedit->setTextCursor(c);
+    else main_window->statement_edit_widget->setTextCursor(c);
   }
 }
 
@@ -17721,6 +17742,19 @@ void Find_widget::enable_or_disable()
   {
     up_button->setEnabled(false);
     down_button->setEnabled(false);
+  }
+}
+
+void Find_widget::keyPressEvent(QKeyEvent *event)
+{
+  if (event->key() == Qt::Key_Escape)
+  {
+    hide();
+    return;
+  }
+  if (main_window->keypress_shortcut_handler(event, false) == true)
+  {
+    return;
   }
 }
 
