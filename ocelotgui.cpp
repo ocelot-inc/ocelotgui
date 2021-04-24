@@ -717,6 +717,10 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   find_widget= new Find_widget(this);
   main_layout->addWidget(find_widget);
 #endif
+#if (OCELOT_RESULT_WIDGET == 1)
+  result_widget= new Result_widget(this);
+  main_layout->addWidget(result_widget);
+#endif
   main_window->setLayout(main_layout);
 
   setCentralWidget(main_window);
@@ -9593,7 +9597,14 @@ int MainWindow::action_execute_one_statement(QString text)
             rg->show();
             result_grid_tab_widget->show(); /* Maybe this only has to happen once */
           }
-
+#if (OCELOT_RESULT_WIDGET == 1)
+          QString fillup_result_2= result_widget->fillup(mysql_res,
+                    connections_dbms[0],
+                    lmysql, ocelot_client_side_functions,
+                    MYSQL_MAIN_CONNECTION,
+                    true);
+          result_widget->display(ocelot_vertical, ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml);
+#endif
           /*
             Following is no-op by default because ocelot_history_max_row_count=0
           */
@@ -17761,6 +17772,1221 @@ void Find_widget::keyPressEvent(QKeyEvent *event)
 #endif
 /******************** find_widget end   ************************************/
 
+#if (OCELOT_RESULT_WIDGET == 1)
+/******************** result_widget start   ************************************/
+
+void Result_widget::construct()
+{
+  printf("**** Result_widget::construct\n");
+  result_qtextedit= new Result_qtextedit(this);
+  result_qscrollbar= new Result_qscrollbar(this);
+
+  result_layout= new QHBoxLayout(this);
+
+  result_layout= new QHBoxLayout(this);
+  result_layout->addWidget(result_qtextedit);
+  result_layout->addWidget(result_qscrollbar);
+
+  setLayout(result_layout);
+
+  result_max_column_widths= NULL;
+  result_field_types= NULL;
+  result_field_charsetnrs= NULL;
+  result_field_flags= NULL;
+  gridx_field_types= NULL;
+  result_columns= NULL;
+
+  settings_change_calc(); /* setting_max_width_of_a_char, setting_min_width_of_a_column */
+
+}
+
+/*
+  settings_change_calc()
+  called from set_all_style_sheets()
+  Calculate setting_max_width_of_a_char and setting_min_width_of_a_column.
+  We should call this during initialization or settings change (of font or drag line or border).
+  Assume settings apply for all grid columns so don't need to call for every column.
+  width() is deprecated in Qt 5.13.
+  Assume we know text_edit_widget_font, setting_ocelot_grid_cell_border_size_as_int,
+    setting_ocelot_grid_cell_drag_line_size_as_int, scroll_bar_width.
+  The maximum width is based on boundingRect() since width() is deprecated in Qt 5.13.
+  Choosing "W" is good enough for western alphabets, some Asian characters may be wider
+  but in that case we will end up with a higher column see set_height().
+  Assume there might be a vertical scroll bar, although perhaps it isn't possible if
+  there is no drag line and no column could overflow the maximum number of lines.
+  Do not increase if text_edit_widget_fonts.italic()=true, that should be taken care of now.
+  Return true if the results mean that repaint should occur.
+  TODO: what to do with scroll_bar_width?
+*/
+bool Result_widget::settings_change_calc()
+{
+  printf("**** settings_change_calc\n");
+  unsigned int old_max_width_of_a_char= setting_max_width_of_a_char;
+  unsigned int old_min_width_of_a_column= setting_min_width_of_a_column;
+
+  text_edit_widget_font= main_window->get_font_from_style_sheet(main_window->ocelot_grid_style_string);
+
+  setting_ocelot_grid_cell_drag_line_size_as_int= main_window->ocelot_grid_cell_drag_line_size.toInt();
+//  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
+  setting_ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
+
+  QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
+  QRect r2= text_edit_widget_font_metrics.boundingRect(
+                                   0, /* int x = x coordinate within original rect */
+                                   0, /* int y = y coordinate within original rect */
+                                   2000, /* int width = r.width(), which we don't change */
+                                   2000, /* int height = height, which is arbitrary big maximum */
+                                   0, /* int flags = (see comments before start of this routine) */
+                                   "W"); /* QString & text= cell contents */
+  setting_max_width_of_a_char= r2.width();
+
+  setting_min_width_of_a_column= setting_max_width_of_a_char
+//                         + scroll_bar_width + 1
+                         + setting_ocelot_grid_cell_border_size_as_int * 2
+                         + setting_ocelot_grid_cell_drag_line_size_as_int;
+
+  if ((setting_max_width_of_a_char != old_max_width_of_a_char)
+   || (setting_min_width_of_a_column != old_min_width_of_a_column))
+    return true;
+  else
+    return false;
+
+  /* The following calculations used to exist in grid_column_size_calc(). Are they obsolete? */
+  //pointer_to_font= &text_edit_widget_font;
+
+  /* Calculate with rounding up because of inter-character spacing. */
+  //QFontMetrics mm= QFontMetrics(*pointer_to_font);
+  //setting_max_width_of_a_char= mm.width("WWWW") / 4;
+  //if ((max_width_of_a_char * 4) < (unsigned int) mm.width("WWWW")) ++setting_max_width_of_a_char;
+
+  /*
+     For italic|oblique I sometimes need zero extra pixels, but I
+     sometimes need an incredible number of extra pixels.
+     abs(qfm.rightBearing('W')) + abs(qfm.leftBearing('W')) is not enough
+     Todo: try again to reduce, meanwhile document: don't use italics.
+  */
+  //if (pointer_to_font->italic() == true)
+  //{
+  //  setting_max_width_of_a_char*= 2;
+  //}
+
+  /* (pointer_to_font->fixedPitch() always == false, I don't know why */
+  //if (mm.width("WWWWWWWWWW") != mm.width("I- 1a!~:wX"))
+  //{
+  //  ++setting_max_width_of_a_char;
+  //}
+  printf("**** setting_max_width_of_a_char=%d\n", setting_max_width_of_a_char);
+}
+
+/*
+  Return true if what's at pointer has an image signature.
+  We only do this for Tarantool, we set data type = OCELOT_DATA_TYPE_BLOB
+  if the length is > 100 (arbitrary) and if the signature for .jpg or
+  .png or .gif is at the start (not a reliable check but a false hit won't do a
+  lot of harm). See wikipedia article = List of file signatures.
+  We don't actually care except for extra_rule_1.
+  We could do this check for MySQL/MariaDB too, but for them we simply
+  look at the data type.
+  Todo: check for other signatures, e.g. bmp.
+*/
+bool is_image_format(int length, char* pointer)
+{
+  unsigned char *p= (unsigned char*) pointer;
+  if (length <= 100) return false;
+  if ((*p == 0x89) && (*(p+1) == 0x50) && (*(p+2) == 0x4e))
+    return true;
+  if ((*p == 0xff) && (*(p+1) == 0xd8) && (*(p+2) == 0xff))
+    return true;
+  if ((memcmp(p,"GIF87a",6) == 0) || (memcmp(p,"GIF89a",6) == 0))
+    return true;
+  return false;
+}
+
+/*
+  How many UTF-8 characters are there, maximum?
+  This is more important for a width calculation than length in bytes.
+  The following doesn't do a great job -- I wanted to get it right for
+  Latin special characters and Greek or Cyrillic or other alphabets --
+  so it misses combining characters and it mishandles Chinese|Japanese
+  characters which sometimes are wide. Essentially the algorithm is:
+  count all the ASCII and continuation bytes, don't count leading bytes.
+  Don't bother if the length can't be greater than the current maximum.
+  Todo: skip this if it's an image.
+  Todo: we're not doing this if vertical!
+  Todo: The "++i;" in this code exists so that 3-byte UTF-8 will
+        result in double-wide, which seems okay for Japanese kanji.
+        But it's ridiculous! Surely many 3-byte UTF-8 characters
+        (U+0800 and beyond) are not double-wide, surely some
+        2-byte UTF-8 characters are double-wide. For details see
+        http://unicode.org/reports/tr11/, http://www.unicode.org/Public/5.2.0/ucd/EastAsianWidth.txt,
+        http://stackoverflow.com/questions/3634627/how-to-know-the-preferred-display-width-in-columns-of-unicode-characters
+*/
+void Result_widget::set_max_column_width(unsigned int v_length,
+                         const char *result_set_copy_pointer,
+                         unsigned int *p_result_max_column_width)
+{
+  printf("**** result_widget::set_max_column_width\n");
+  if (v_length <= *p_result_max_column_width) return;
+  unsigned int j= v_length;
+  for (unsigned int i= 0; i < v_length; ++i)
+  {
+    if (( *(result_set_copy_pointer + i)   & 0xc0) == 0x80)
+    {
+      --j;
+      ++i;
+    }
+  }
+  if (j > *p_result_max_column_width) *p_result_max_column_width= j;
+}
+
+/*
+  Given result set, fill in each field_number, max_column_width, v_length, field_names_pointer
+  Todo: This is preliminary. When we support grid columns that are not from result set, there will be more.
+  Todo: v_length is # of bytes not # of characters
+*/
+void Result_widget::column_sizes_1()
+{
+  printf("**** column_sizes_1\n");
+  char *result_field_names_pointer= &result_field_names[0];
+  unsigned int v_length;
+  for (int i= 0; i < result_column_count; ++i)
+  {
+    result_columns[i].field_number= i;
+    result_columns[i].max_column_width= result_max_column_widths[i];
+    memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+    result_columns[i].v_length= v_length;
+    result_columns[i].field_names_pointer= result_field_names_pointer + sizeof(unsigned int);
+    result_field_names_pointer+= v_length + sizeof(unsigned int);
+  }
+}
+
+/*
+  Todo: Take into account: ocelot_vertical
+  Todo: Take into account: ocelot_result_grid_column_names_copy
+  Todo: Take into account: setting saying the column has a fixed width or height (which is in pixels)
+  Todo: Take into account: image
+  Todo: It would be more accurate to calculate using boundingRect() for the field name
+  Todo: You're forgetting drag line size + border size!
+  Use boundingRect()
+  settings_change_calc() gave us setting_max_width_of_a_char, setting_min_width_of_a_column
+*/
+void Result_widget::column_sizes_2()
+{
+  printf("**** column_sizes_2\n");
+  for (int i= 0; i < result_column_count; ++i)
+  {
+    result_columns[i].min_width_in_pixels= setting_min_width_of_a_column;
+    if ((ocelot_result_grid_column_names_copy != 0)
+     && (result_columns[i].v_length * setting_max_width_of_a_char > setting_min_width_of_a_column))
+    {
+      result_columns[i].min_width_in_pixels= result_columns[i].v_length * setting_max_width_of_a_char;
+    }
+  }
+}
+
+/*
+  Calculate column widths
+  Todo: squeeze as in grid_column_size_calc()
+*/
+void Result_widget::column_sizes_3()
+{
+  printf("**** column_sizes_3\n");
+  /* Initial */
+  for (int i= 0; i < result_column_count; ++i)
+  {
+    result_columns[i].width_in_pixels= result_columns[i].max_column_width * setting_max_width_of_a_char;
+  }
+}
+
+#if (OCELOT_MYSQL_INCLUDE == 1)
+/*
+  Make a copy of mysql_res.
+    It's insane that I have to make a copy of what was in mysql_res, = result_set_copy.
+    But things get complicated if there are multiple result sets i.e. if mysql_more_results is true.
+    Also, after the copy, we're less (or not at all?) dependent on calls to MySQL functions.
+  For each column, we have: (unsigned int) length, (char) unused or null flag, (char[n]) contents.
+  We want max actual length too.
+*/
+void Result_widget::scan_rows(unsigned int p_result_column_count,
+               unsigned int p_result_row_count,
+               MYSQL_RES *p_mysql_res,
+               char **p_result_set_copy,
+               char ***p_result_set_copy_rows,
+               unsigned int **p_result_max_column_widths)
+{
+  printf("**** result_widget::scan_rows\n");
+  unsigned long int v_r;
+  unsigned int i;
+  MYSQL_ROW v_row;
+  unsigned long *v_lengths;
+//  unsigned int ki;
+
+  for (i= 0; i < p_result_column_count; ++i) (*p_result_max_column_widths)[i]= 0;
+
+  /*
+    First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
+  */
+  unsigned int total_size= 0;
+  char *result_set_copy_pointer;
+  lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
+  for (v_r= 0; v_r < p_result_row_count; ++v_r)                                /* first loop */
+  {
+    v_row= lmysql->ldbms_mysql_fetch_row(p_mysql_res);
+    v_lengths= lmysql->ldbms_mysql_fetch_lengths(p_mysql_res);
+    for (i= 0; i < p_result_column_count; ++i)
+    {
+//      ki= (v_r + 1) * result_column_count + i;
+      if ((v_row == 0) || (v_row[i] == 0))
+      {
+        total_size+= sizeof(unsigned int) + sizeof(char);
+        //total_size+= sizeof(NULL_STRING) - 1;
+      }
+      else
+      {
+        if ((ocelot_client_side_functions_copy == 1)
+         && (v_lengths[i] == sizeof("row_number() over ()") - 1)
+         && (strncasecmp(v_row[i], "row_number() over ()", v_lengths[i]) == 0))
+        {
+          total_size+= sizeof(unsigned int) + sizeof(char);
+          char tmp[16];
+          sprintf(tmp, "%ld", v_r + 1);
+          total_size+= strlen(tmp);
+        }
+        else
+        {
+          total_size+= sizeof(unsigned int) + sizeof(char);
+          total_size+= v_lengths[i];
+        }
+      }
+    }
+  }
+  *p_result_set_copy= new char[total_size];                                              /* allocate */
+  *p_result_set_copy_rows= new char*[p_result_row_count];
+  result_set_copy_pointer= *p_result_set_copy;
+  lmysql->ldbms_mysql_data_seek(p_mysql_res, 0);
+
+  for (v_r= 0; v_r < p_result_row_count; ++v_r)                                 /* second loop */
+  {
+    (*p_result_set_copy_rows)[v_r]= result_set_copy_pointer;
+    v_row= lmysql->ldbms_mysql_fetch_row(p_mysql_res);
+    v_lengths= lmysql->ldbms_mysql_fetch_lengths(p_mysql_res);
+    for (i= 0; i < p_result_column_count; ++i)
+    {
+      if ((v_row == 0) || (v_row[i] == 0))
+      {
+        if (sizeof(NULL_STRING) - 1 > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= sizeof(NULL_STRING) - 1;
+        memset(result_set_copy_pointer, 0, sizeof(unsigned int));
+        *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NULL;
+        result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
+      }
+      else
+      {
+
+        if ((ocelot_client_side_functions_copy == 1)
+         && (v_lengths[i] == sizeof("row_number() over ()") - 1)
+         && (strncasecmp(v_row[i], "row_number() over ()", v_lengths[i]) == 0))
+        {
+          char tmp[16];
+          sprintf(tmp, "%ld", v_r + 1);
+          unsigned int v_length= strlen(tmp);
+          //if (v_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_length;
+          set_max_column_width(v_length, tmp, (&(*p_result_max_column_widths)[i]));
+          memcpy(result_set_copy_pointer, &v_length, sizeof(unsigned int));
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_ZERO;
+          result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
+          memcpy(result_set_copy_pointer, tmp, v_length);
+          result_set_copy_pointer+= v_length;
+        }
+        else
+        {
+          //if (v_lengths[i] > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_lengths[i];
+          set_max_column_width(v_lengths[i], v_row[i], (&(*p_result_max_column_widths)[i]));
+          memcpy(result_set_copy_pointer, &v_lengths[i], sizeof(unsigned int));
+          *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_ZERO;
+          result_set_copy_pointer+= sizeof(unsigned int) + sizeof(char);
+          memcpy(result_set_copy_pointer, v_row[i], v_lengths[i]);
+          result_set_copy_pointer+= v_lengths[i];
+        }
+      }
+    }
+  }
+}
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+
+#if (OCELOT_MYSQL_INCLUDE == 1)
+/*
+  Using the same technique as in scan_rows, make a copy of field names.
+
+  Todo: This (length,data,length,data,length,data...) is a bad way to
+  store because we have to scan X entries in order to find field X name.
+  This would be better: (pointer,pointer,pointer,...data,data,data...).
+
+  MYSQL_FIELD has: name, org_name, org_table, db. We only need name for result set
+  display, but we need the others if user edits the result set (see TextEditWidget::keyPressEvent).
+  Todo: we could try going through the token list to find this out, but it's tough
+  to watch for AS clauses + UNIONs + expressions + which-field-is-which-table, and
+  I'm not sure what would occur when the SELECT is inside a stored procedure.
+*/
+void Result_widget::scan_field_names(
+               const char *which_field,
+               unsigned int p_result_column_count,
+               char **p_result_field_names)
+{
+  printf("**** result_widgt::scan_field_names\n");
+  unsigned int i;
+  unsigned int v_lengths;
+
+  /*
+    First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
+  */
+  unsigned int total_size= 0;
+  char *result_field_names_pointer;
+
+  for (i= 0; i < p_result_column_count; ++i)                                /* first loop */
+  {
+      total_size+= sizeof(unsigned int);
+      if (strcmp(which_field, "name") == 0) total_size+= mysql_fields[i].name_length;
+      else if (strcmp(which_field, "org_name") == 0) total_size+= mysql_fields[i].org_name_length;
+      else if (strcmp(which_field, "org_table") == 0) total_size+= mysql_fields[i].org_table_length;
+      else /* if (strcmp(which_field, "db") == 0) */ total_size+= mysql_fields[i].db_length;
+  }
+  *p_result_field_names= new char[total_size];                               /* allocate */
+
+  result_field_names_pointer= *p_result_field_names;
+  for (i= 0; i < p_result_column_count; ++i)                                 /* second loop */
+  {
+    if (strcmp(which_field, "name") == 0) v_lengths= mysql_fields[i].name_length;
+    else if (strcmp(which_field, "org_name") == 0) v_lengths= mysql_fields[i].org_name_length;
+    else if (strcmp(which_field, "org_table") == 0) v_lengths= mysql_fields[i].org_table_length;
+    else /* if (strcmp(which_field, "db") == 0) */ v_lengths= mysql_fields[i].db_length;
+    memcpy(result_field_names_pointer, &v_lengths, sizeof(unsigned int));
+    result_field_names_pointer+= sizeof(unsigned int);
+    if (strcmp(which_field, "name") == 0) memcpy(result_field_names_pointer, mysql_fields[i].name, v_lengths);
+    else if (strcmp(which_field, "org_name") == 0) memcpy(result_field_names_pointer, mysql_fields[i].org_name, v_lengths);
+    else if (strcmp(which_field, "org_table") == 0) memcpy(result_field_names_pointer, mysql_fields[i].org_table, v_lengths);
+    else /* if (strcmp(which_field, "db") == 0) */ memcpy(result_field_names_pointer, mysql_fields[i].db, v_lengths);
+    result_field_names_pointer+= v_lengths;
+  }
+}
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+
+
+
+/* Todo: not everything that calls fillup() calls fillup_garbage_collect() later, i.e. leak */
+/* We call fillup() whenever there is a new result set to put up on the result grid widget. */
+QString Result_widget::fillup(MYSQL_RES *mysql_res,
+            int connections_dbms,
+            ldbms *passed_lmysql,
+            int ocelot_client_side_functions,
+            unsigned int connection_number,
+            bool is_for_display)
+{
+  printf("**** result_widget::fillup\n");
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  MYSQL_RES *grid_mysql_res;
+  MYSQL_FIELD *mysql_fields;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+
+  /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
+  lmysql= passed_lmysql;
+  ocelot_client_side_functions_copy= ocelot_client_side_functions;
+
+  grid_mysql_res= mysql_res;
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    result_row_count= copy_of_parent->tarantool_num_rows(connection_number);
+    if (result_row_count == 0)
+    {
+      /* Tarantool has no columns if there are no rows. */
+      /* Todo: this is no longer true, if type = 5 */
+      result_column_count= 0; /* solves the crash? */
+      return "OK";
+    }
+    result_column_count= copy_of_parent->tarantool_num_fields();
+  }
+  else
+#endif
+  {
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    result_column_count= lmysql->ldbms_mysql_num_fields(grid_mysql_res);
+    result_row_count= lmysql->ldbms_mysql_num_rows(grid_mysql_res);                /* this will be the height of the grid */
+    mysql_fields= lmysql->ldbms_mysql_fetch_fields(grid_mysql_res);
+#else
+    ;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+  }
+  result_max_column_widths= new unsigned int[result_column_count];
+  result_field_types= new unsigned short int[result_column_count];
+  result_field_charsetnrs= new unsigned int[result_column_count];
+  result_field_flags= new unsigned int[result_column_count];
+  gridx_field_types= new unsigned short int[result_column_count];
+
+  /* Adding "*100" here doesn't help. */
+  result_columns= new result_column[result_column_count];
+
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    QString result= copy_of_parent->tarantool_scan_rows(result_column_count, result_row_count,
+              grid_mysql_res,
+              &result_set_copy, &result_set_copy_rows,
+              &result_max_column_widths);
+    if (result != "OK")
+    {
+      fillup_garbage_collect();
+      return result;
+    }
+  }
+  else
+#endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    scan_rows(result_column_count, result_row_count,
+              grid_mysql_res,
+              &result_set_copy, &result_set_copy_rows,
+              &result_max_column_widths);
+#else
+    {;}
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    QString r;
+    r= copy_of_parent->tarantool_scan_field_names("name", result_column_count, &result_field_names, is_for_display);
+    if (r != "OK") return r;
+    /* Next three scan_field_names calls are only needed if user will edit the result set */
+    copy_of_parent->tarantool_scan_field_names("org_name", result_column_count, &result_original_field_names, is_for_display);
+    copy_of_parent->tarantool_scan_field_names("org_table", result_column_count, &result_original_table_names, is_for_display);
+    copy_of_parent->tarantool_scan_field_names("db", result_column_count, &result_original_database_names, is_for_display);
+  }
+  else
+#endif
+  {
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    scan_field_names("name", result_column_count, &result_field_names);
+    /* Next three scan_field_names calls are only needed if user will edit the result set */
+    scan_field_names("org_name", result_column_count, &result_original_field_names);
+    scan_field_names("org_table", result_column_count, &result_original_table_names);
+    scan_field_names("db", result_column_count, &result_original_database_names);
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+  }
+#ifdef DBMS_TARANTOOL
+  /* Scan entire result set to determine if NUM_FLAG should go on. */
+  /* TODO: maybe this is unnecessary now that we are checking numericness for each cell? */
+  if (connections_dbms == DBMS_TARANTOOL)
+  {
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      //result_field_types[i]= OCELOT_DATA_TYPE_VAR_STRING; replaced on 2021-01-03
+      result_field_types[i]= copy_of_parent->field_type_list_all_rows[i];
+      result_field_charsetnrs[i]= 83; /* utf8, utf8_bin */
+      result_field_flags[i]= 0; /* todo: decide if it's numeric */
+    }
+    long unsigned int tmp_xrow;
+    char *pointer= result_set_copy_rows[0];
+    unsigned int v_length;
+    for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+    {
+      for (unsigned int i= 0; i < result_column_count; ++i)
+      {
+        memcpy(&v_length, pointer, sizeof(unsigned int));
+        char tmp_flag= *(pointer + sizeof(unsigned int));
+        result_field_flags[i]|= tmp_flag;
+        if (tmp_flag == FIELD_VALUE_FLAG_IS_STRING)
+        {
+          if (is_image_format(v_length, pointer + sizeof(unsigned int) + sizeof(char)))
+          {
+            result_field_flags[i]|= FIELD_VALUE_FLAG_IS_IMAGE;
+          }
+        }
+        pointer+= v_length + sizeof(unsigned int) + sizeof(char);
+      }
+    }
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if ((result_field_flags[i] & (FIELD_VALUE_FLAG_IS_NUMBER | FIELD_VALUE_FLAG_IS_STRING)) == FIELD_VALUE_FLAG_IS_NUMBER)
+        result_field_flags[i]= NUM_FLAG;
+      else
+      {
+        if ((result_field_flags[i] & FIELD_VALUE_FLAG_IS_IMAGE) != 0)
+        {
+          result_field_types[i]= OCELOT_DATA_TYPE_BLOB;
+          result_field_charsetnrs[i]= 63;
+        }
+        result_field_flags[i]= 0;
+      }
+    }
+  }
+  else
+#endif
+
+  {
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      result_field_types[i]= mysql_fields[i].type;
+      result_field_charsetnrs[i]= mysql_fields[i].charsetnr;
+      result_field_flags[i]= mysql_fields[i].flags;
+    }
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+  }
+
+  if (copy_of_parent->conditional_settings.count() > 0)
+  {
+    /* Todo: filter conditional_settings so for some frames we won't need to check every time */
+  }
+
+  /* new, temporary */
+  for (int i= 0; i < result_column_count; ++i) gridx_field_types[i]= result_field_types[i];
+
+  /*
+    At this point, we have:
+      result_column_count, result_row_count
+      result_set_copy, result_set_copy_rows,
+      result_field_names,
+      result_original_field_names, result_original_table_names, result_original_database_names,
+      result_max_column_widths
+      mysql_fields (which we should not use, but we do)
+    From now on there should be no need to call mysql_ functions again for this result set.
+    if is_for_display was true, we're ready to call display() now
+  */
+  copy_of_connections_dbms= connections_dbms; /* Todo: check: will I ever need this? */
+  return "OK";
+}
+
+/*
+  We'll do our own garbage collecting for non-Qt items.
+  fillup_garbage_collect for anything made with "new " in fillup() or fillup() subsidiaries.
+  display_garbage_collect for anything made with "new " in display() or display() subsidiaries.
+  Todo: make sure Qt items have parents where possible so that "delete result_grid_table_widget"
+        takes care of them.
+  Why we clear() text_edit_widgets:
+    If the text is big blobs, and you start with default i.e. ocelot_display_blob_as_image = false,
+    then you switch to ocelot_display_blob_as_image = true,
+    it is much slower then if you start with ocelot_display_blob_as_image = true.
+    Clearing alleviates the problem.
+    It would be faster to use max_table_edit_widgets_count not cell_pool_size but that crashes.
+    Perhaps it would be better to clear only if current size > (some minimum)?
+  Warning: we check if (result_set_copy == 0) to ensure there's a result.
+*/
+void Result_widget::fillup_garbage_collect()
+{
+  printf("**** result_widget::fillup_garbage_collect\n");
+  if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; } /* new */
+  if (result_field_types != 0) { delete [] result_field_types; result_field_types= 0; }
+  if (result_field_charsetnrs != 0) { delete [] result_field_charsetnrs; result_field_charsetnrs= 0; }
+  if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
+  if (result_set_copy != 0) { delete [] result_set_copy; result_set_copy= 0; }
+  if (result_set_copy_rows != 0) { delete [] result_set_copy_rows; result_set_copy_rows= 0; }
+  if (result_field_names != 0) { delete [] result_field_names; result_field_names= 0; }
+  if (result_original_field_names != 0) { delete [] result_original_field_names; result_original_field_names= 0; }
+  if (result_original_table_names != 0) { delete [] result_original_table_names; result_original_table_names= 0; }
+  if (result_original_database_names != 0) { delete [] result_original_database_names; result_original_database_names= 0; }
+  if (result_max_column_widths != 0) { delete [] result_max_column_widths; result_max_column_widths= 0; }
+  if (result_columns != 0) delete [] result_columns; result_columns= 0;
+}
+
+
+/*
+  Return true if extra_rule_1 is applicable for this column
+*/
+bool Result_widget::is_extra_rule_1(int col)
+{
+  printf("**** result_widget::is_extra_rule_1\n");
+  QString condition= copy_of_parent->ocelot_extra_rule_1_condition;
+  if (condition == "data_type LIKE '%BLOB'")
+  {
+    if (gridx_field_types[col] == OCELOT_DATA_TYPE_BLOB)
+    {
+      return true;
+    }
+  }
+  if (condition == "data_type LIKE '%BINARY'")
+  {
+    if ((gridx_field_types[col] == OCELOT_DATA_TYPE_BINARY) || (gridx_field_types[col] == OCELOT_DATA_TYPE_VARBINARY))
+    {
+      return true;
+    }
+  }
+  return false;
+}
+
+
+/*
+  Return true if this column should be displayed as an image,
+  that is, the image flag should be turned on.
+*/
+bool Result_widget::is_image(int col)
+{
+  printf("**** result_widget::is_image\n");
+  QString display_as;
+  display_as= copy_of_parent->ocelot_extra_rule_1_display_as;
+  if (display_as == "image")
+  {
+    if (is_extra_rule_1(col) == true) return true;
+  }
+  return false;
+}
+
+
+void Result_widget::display(unsigned short int ocelot_vertical,
+                            unsigned short int ocelot_batch,
+                            unsigned short int ocelot_html,
+                            unsigned short int ocelot_raw,
+                            unsigned short int ocelot_xml)
+{
+  printf("**** result_widget::display\n");
+  result_qtextedit->setText("hi!");
+  result_qtextedit->setFocus();
+  result_qtextedit->show();
+  show();
+  copy_of_ocelot_batch= ocelot_batch;
+  copy_of_ocelot_html= ocelot_html;
+  copy_of_ocelot_raw= ocelot_raw;
+  copy_of_ocelot_xml= ocelot_xml;
+  /* TEMPORARY -- assume ocelot_html == 1 for our tests */
+  copy_of_ocelot_html= 1;
+
+  /* TEMPORARY -- calling from here might be okay but might be redundant */
+  column_sizes_1();
+  column_sizes_2();
+  column_sizes_3();
+
+  display_batch();
+}
+
+/*
+  For --batch, avoid normal grid display. Result won't go to history.
+  For --html, avoid normal grid display.
+              Result will go to history.
+              For --html --raw, result is dumped so user sees the markup.
+              --html overrides --batch, i.e. we look at html first
+              images are done as data URIs if png|jpg|gif
+  We say setReadOnly() so edit won't generate update statement.
+  We pay attention to --column-names and (sometimes) --raw, as well.
+  Todo: BUG: If you reconnect with file|connect, and use a different
+        setting for batch or html or raw, display is garbage.
+  Todo: SET ocelot_batch = x; should be possible.
+        It would not change the current result grid.
+  Todo: going directly to a file should be possible too
+  Todo: check what happens if row data contains "\n"
+  Todo: pay attention to --vertical
+  Todo: Do what you do for other displays, e.g. check for null
+  Todo: look for --raw, currently we're just assuming it's true
+        + we don't need to multiply size by 2 if --raw is off (?)
+        Escape ' " \ nul tab newline =  \' \" \\ \0 \t \n
+  Todo: we can also support --xml, I don't know whether
+        it overrides --batch or whether it complements it somehow.
+        also csv and msgpack and json
+        also "--like-mysql-client"
+        or SET ocelot_grid_format = {'fancy'|'html'|'xml'|'csv'|etc.}
+  Todo: Setting should be possible with the syntax that's used for
+        INTO OUTFILE
+  Todo: I was getting
+        QTextOdfWriter: unsupported paragraph alignment;  QFlags(0x20)
+        if ^A (select all), ^C (Copy) on a large output.
+        Specifying "...Qt::AlignLeft" solved it.
+        But it might be nice to write a bug report for the Qt folks.
+  Todo: it would take less memory and possibly display quicker if
+        I only output when necessary, i.e. when user scrolls
+  Todo: check: does it do any good to hide() first?
+  Todo: callback to a local Lua function prior to display, for each row
+  Todo: allow row update. and, if there's a change in one mode, show
+        the changed row when modes are switched
+  Todo: xml statement="" and field name="" contents lack escaping.
+  Todo: "<" wrecks the cell, we need character entities
+  Todo: If you remove "batch_text_edit->setWordWrapMode(QTextOption::NoWrap);"
+        the effect is interesting, it might be a desirable option.
+*/
+/*
+  Eventually ...
+                                                    csv     --html    --batch  --xml
+    ocelot_grid_table_start                                 </TABLE>           $statement
+    ocelot_grid_header_row_start                            <TR>
+    ocelot_grid_header_row_end                      \n      </TR>      \n
+    ocelot_grid_header_numeric_column_start                 <TH>
+    ocelot_grid_header_numeric_column_end           ,       </TH>      tab
+    ocelot_grid_header_char_column_start            "       <TH>
+    ocelot_grid_header_char_column_end              ",      </TH>      tab
+    ocelot_grid_detail_row_start                                               <row>
+    ocelot_grid_detail_row_end                                                 </row>
+    ocelot_grid_detail_numeric_column_start                 <TD>
+    ocelot_grid_detail_numeric_column_end           ,       </TD>
+    ocelot_grid_detail_char_column_start            "       <TD>               <field name="$field">
+    ocelot_grid_detail_char_column_end              ",      </TD>              </field>
+    ocelot_grid_table_end                                   </TABLE>
+    ... up to 9 characters + \0
+*/
+/*
+  Todo: the html style sheet
+  For html, instead of batch_text_edit->setStyleSheet(), we want to
+  put css specifications in the html header. Example:
+  <HTML><head><style type=text/css>table, th, td {border-color: black; border-style: solid; color: red; background-color: blue}</style></head><BODY><TABLE BORDER=5>.
+  Although copy_of_parent->ocelot_grid_style_string) has all the
+  necessary information, it's the wrong format. Use:
+  color = copy_of_parent->ocelot_grid_text_color;
+  background-color = copy_of_parent->ocelot_grid_background_color;
+  copy_of_parent->ocelot_grid_border_color; (no)
+  copy_of_parent->ocelot_grid_header_background_color;
+
+  font-family = copy_of_parent->ocelot_grid_font_family;
+  font-size = copy_of_parent->ocelot_grid_font_size;
+  font-style = copy_of_parent->ocelot_grid_font_style;
+  font-weight = copy_of_parent->ocelot_grid_font_weight;
+
+  border-color = copy_of_parent->ocelot_grid_cell_border_color;
+  copy_of_parent->ocelot_grid_cell_drag_line_color; (no)
+  copy_of_parent->ocelot_grid_border_size; (no)
+  copy_of_parent->ocelot_grid_cell_border_size;
+  copy_of_parent->ocelot_grid_cell_drag_line_size;
+  Todo: I think hide() is unnecessary because the caller has already done it.
+*/
+void Result_widget::display_batch()
+{
+  printf("**** result_widget::display_batch. result_row_count=%ld, result_column_count=%d\n", result_row_count, result_column_count);
+  char ocelot_grid_table_start[896];
+  char ocelot_grid_header_row_start[32];
+  char ocelot_grid_header_row_end[32];
+  char ocelot_grid_header_numeric_column_start[32];
+  char ocelot_grid_header_numeric_column_end[32];
+  char ocelot_grid_header_char_column_start[32];
+  char ocelot_grid_header_char_column_end[32];
+  char ocelot_grid_detail_row_start[32];
+  char ocelot_grid_detail_row_end[32];
+  char ocelot_grid_detail_numeric_column_start[32];
+  char ocelot_grid_detail_numeric_column_end[32];
+  char ocelot_grid_detail_char_column_start[320];
+  char ocelot_grid_detail_char_column_end[32];
+  char ocelot_grid_table_end[320];
+
+  /* Todo: this should be done permanently, on persistent variables. */
+  if (copy_of_ocelot_html != 0)
+  {
+    char html_border_color[32];
+    char html_color[32];
+    char html_background_color[32];
+    char html_header_background_color[32];
+    char html_font_family[32];
+    char html_font_size[32];
+    char html_font_style[32];
+    char html_font_weight[32];
+    int html_border_size;
+    strcpy(html_border_color, copy_of_parent->ocelot_grid_cell_border_color.toUtf8());
+    strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
+    strcpy(html_background_color, copy_of_parent->ocelot_grid_background_color.toUtf8());
+    strcpy(html_header_background_color, copy_of_parent->ocelot_grid_header_background_color.toUtf8());
+    strcpy(html_font_family, copy_of_parent->ocelot_grid_font_family.toUtf8());
+    strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
+    strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
+    strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
+    html_border_size= copy_of_parent->ocelot_grid_cell_border_size.toInt();
+    sprintf(ocelot_grid_table_start, "<head><style type=text/css>"
+            " th {"
+            "border-color: %s; "
+            "border-style: solid; "
+            "padding-left: 1px; "
+            "padding-right: 1px; "
+            "color: %s; "
+            "background-color: %s; "
+            "font-family: %s; "
+            "font-size: %spx; "
+            "font-style: %s; "
+            "font-weight: %s}"
+            " td {"
+            "border-color: %s; "
+            "border-style: solid; "
+            "padding-left: 1px; "
+            "padding-right: 1px; "
+            "color: %s; "
+            "background-color: %s; "
+            "font-family: %s; "
+            "font-size: %spx; "
+            "font-style: %s; "
+            "font-weight: %s}"
+            "</style></head><BODY><TABLE BORDER=%d>",
+            html_border_color,
+            html_color,
+            html_header_background_color,
+            html_font_family,
+            html_font_size,
+            html_font_style,
+            html_font_weight,
+            html_border_color,
+            html_color,
+            html_background_color,
+            html_font_family,
+            html_font_size,
+            html_font_style,
+            html_font_weight,
+            html_border_size);
+    strcpy(ocelot_grid_header_row_start, "<TR>");
+    strcpy(ocelot_grid_header_row_end, "</TR>");
+    strcpy(ocelot_grid_header_numeric_column_start, "<TH>");
+    strcpy(ocelot_grid_header_numeric_column_end, "</TH>");
+    strcpy(ocelot_grid_header_char_column_start, "<TH>");
+    strcpy(ocelot_grid_header_char_column_end, "</TH>");
+    strcpy(ocelot_grid_detail_row_start, "<TR>");
+    strcpy(ocelot_grid_detail_row_end, "</TR>");
+    strcpy(ocelot_grid_detail_numeric_column_start, "<TD align=\"right\">");
+    strcpy(ocelot_grid_detail_numeric_column_end,"</TD>");
+    strcpy(ocelot_grid_detail_char_column_start, "<TD>");
+    strcpy(ocelot_grid_detail_char_column_end , "</TD>");
+    strcpy(ocelot_grid_table_end, "</TABLE></BODY></HTML>");
+  }
+  else if (copy_of_ocelot_batch != 0)
+  {
+    strcpy(ocelot_grid_table_start, "");
+    strcpy(ocelot_grid_header_row_start, "");
+    strcpy(ocelot_grid_header_row_end, "\n");
+    strcpy(ocelot_grid_header_numeric_column_start, "");
+    strcpy(ocelot_grid_header_numeric_column_end, "\t");
+    strcpy(ocelot_grid_header_char_column_start, "");
+    strcpy(ocelot_grid_header_char_column_end, "\t");
+    strcpy(ocelot_grid_detail_row_start, "");
+    strcpy(ocelot_grid_detail_row_end, "\n");
+    strcpy(ocelot_grid_detail_numeric_column_start, "");
+    strcpy(ocelot_grid_detail_numeric_column_end, "\t");
+    strcpy(ocelot_grid_detail_char_column_start, "");
+    strcpy(ocelot_grid_detail_char_column_end , "\t");
+    strcpy(ocelot_grid_table_end, "");
+  }
+  else /* copy_of_ocelot_xml != 0 */
+  {
+    strcpy(ocelot_grid_table_start, "<?xml version=\"1.0\"?>"
+                                    "<resultset statement=\"");
+    strcat(ocelot_grid_table_start, copy_of_parent->query_utf16_copy.toUtf8());
+    strcat(ocelot_grid_table_start, "\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+    strcpy(ocelot_grid_header_row_start, "<row>");
+    strcpy(ocelot_grid_header_row_end, "</row>");
+    strcpy(ocelot_grid_header_numeric_column_start, "<field name=\"");
+    strcpy(ocelot_grid_header_numeric_column_end, "</field>");
+    strcpy(ocelot_grid_header_char_column_start, "<field name=\"");
+    strcpy(ocelot_grid_header_char_column_end, "</field>");
+    strcpy(ocelot_grid_detail_row_start, "<row>");
+    strcpy(ocelot_grid_detail_row_end, "</row>");
+    strcpy(ocelot_grid_detail_numeric_column_start, "<field name=\"");
+    strcpy(ocelot_grid_detail_numeric_column_end, "</field>");
+    strcpy(ocelot_grid_detail_char_column_start, "<field name=\"");
+    strcpy(ocelot_grid_detail_char_column_end , "</field>");
+    strcpy(ocelot_grid_table_end, "</resultset>");
+  }
+  hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
+  //batch_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
+
+  /*
+    Kludge #1: if I don't delete batch_text_edit and create it again, then after
+    ocelot_html=1; big select; ocelot_html=0; big select; ocelot_html=1;big select;
+    the horizontal scroll bar won't work.
+    KLudge #2: without the show() and hide()s here, if I said
+    SET ocelot_html=0; SELECT * FROM "_space"; SET ocelot_html=1; SELECT * FROM "_space";
+    the vertical scroll bar was absent. I wish I knew why doing this can fix it.
+    Kludge #3: with something other than SetMaximumSize later, this wil cause too-small window:
+    SET ocelot_html=0; SELECT 5; SET ocelot_html=1; SELECT * FROM "_space";
+    Kludge #4: If we don't break off early when row count or column count = 0, we will crash.
+    But by doing so, we fail to add html or xml markup and we don't allow for message translation.
+    I don't bother to say batch_text_edit_hide() so this->show() makes it visible, momentarily.
+    I think batch_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
+  */
+//??  delete result_qtextedit;
+//??  result_qtextedit= new Result_qtextedit(this);
+//??  this->show();
+//  client->show();
+//  client->hide();
+//??  this->hide();
+
+//??  result_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
+//??  result_qscrollbar->setVisible(false);
+//??  result_layout->addWidget(result_qtextedit);
+
+  if ((result_row_count == 0) || (result_column_count == 0))
+  {
+    result_qtextedit->insertPlainText("row_count == 0 or column_count == 0");
+    this->show();
+    //client->show();
+    return;
+  }
+
+  if (copy_of_ocelot_html == 0)
+    result_qtextedit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
+  /* Todo: next four lines could be done during the initial setup (well, not any more, because of the kludges) */
+  result_qtextedit->setReadOnly(true);
+  result_qtextedit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  result_qtextedit->setWordWrapMode(QTextOption::NoWrap);
+  result_qtextedit->setFrameStyle(QFrame::NoFrame);
+  long unsigned int tmp_xrow;
+  char *pointer= result_set_copy_rows[0];
+  unsigned int v_length, f_length;
+  char *result_field_names_pointer;
+
+  /*
+    Todo: Adjust calculation for numeric columns, for escapes, for hex.
+          It ought to be possible to do a single non-looping calculation.
+ */
+  unsigned int tmp_size= sizeof(char);
+
+  printf("**** ocelot_result_grid_column_names_copy %d\n", ocelot_result_grid_column_names_copy);
+
+  if ((ocelot_result_grid_column_names_copy == 1)
+   && (copy_of_ocelot_xml == 0))
+  {
+    tmp_size+= strlen(ocelot_grid_header_row_start);
+    result_field_names_pointer= &result_field_names[0];
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      tmp_size+= strlen(ocelot_grid_header_char_column_start);
+      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      tmp_size+= v_length;
+      result_field_names_pointer+= v_length + sizeof(unsigned int);
+      tmp_size+= strlen(ocelot_grid_header_char_column_end);
+    }
+    tmp_size+= strlen(ocelot_grid_header_row_end);
+  }
+
+  tmp_size+= strlen(ocelot_grid_table_start);
+  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    result_field_names_pointer= &result_field_names[0];
+    tmp_size+= strlen(ocelot_grid_detail_row_start);
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if ((result_field_flags[i] & NUM_FLAG) != 0)
+        tmp_size+= strlen(ocelot_grid_detail_numeric_column_start);
+      else
+        tmp_size+= strlen(ocelot_grid_detail_char_column_start);
+      if (copy_of_ocelot_xml != 0)
+      {
+        memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
+        tmp_size+= f_length + 2;
+        result_field_names_pointer+= f_length + sizeof(unsigned int);
+      }
+      memcpy(&v_length, pointer, sizeof(unsigned int));
+      pointer+= sizeof(unsigned int) + sizeof(char);
+      /* Todo: we only need v_length*1 unless it's img or hex or escaped */
+      tmp_size+= v_length * 2;
+      tmp_size+= strlen(ocelot_grid_detail_char_column_end);
+      pointer+= v_length;
+    }
+    tmp_size+= strlen(ocelot_grid_detail_row_end);
+  }
+  tmp_size+= strlen(ocelot_grid_table_end);
+  char *tmp;
+
+  /* POSSIBLE OVERFLOW? We've gotta do tmp allocation better than this! Anyway, * 2 for the moment */
+  tmp= new char[tmp_size * 2];
+  char *tmp_pointer= &tmp[0];
+
+  strcpy(tmp_pointer, ocelot_grid_table_start);
+  tmp_pointer+= strlen(ocelot_grid_table_start);
+
+  if ((ocelot_result_grid_column_names_copy == 1)
+   && (copy_of_ocelot_xml == 0))
+  {
+    printf("**** ready to dump the header?\n");
+    //char *result_field_names_pointer;
+    //result_field_names_pointer= &result_field_names[0];
+    strcpy(tmp_pointer, ocelot_grid_header_row_start);
+    tmp_pointer+= strlen(ocelot_grid_header_row_start);
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      strcpy(tmp_pointer, ocelot_grid_header_char_column_start);
+      tmp_pointer+= strlen(ocelot_grid_header_char_column_start);
+      memcpy(tmp_pointer, result_columns[i].field_names_pointer, result_columns[i].v_length);
+
+      //memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      //result_field_names_pointer+= sizeof(unsigned int);
+      //memcpy(tmp_pointer, result_field_names_pointer, v_length);
+      tmp_pointer+= result_columns[i].v_length;
+      strcpy(tmp_pointer, ocelot_grid_header_char_column_end);
+      tmp_pointer+= strlen(ocelot_grid_header_char_column_end);
+      result_field_names_pointer+= v_length;
+    }
+    strcpy(tmp_pointer, ocelot_grid_header_row_end);
+    tmp_pointer+= strlen(ocelot_grid_header_row_end);
+  }
+
+  printf("**** tmp, so far=%s.\n", tmp);
+
+  pointer= result_set_copy_rows[0];
+  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    result_field_names_pointer= &result_field_names[0];
+    strcpy(tmp_pointer, ocelot_grid_detail_row_start);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_start);
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if ((result_field_flags[i] & NUM_FLAG) != 0)
+      {
+        strcpy(tmp_pointer, ocelot_grid_detail_numeric_column_start);
+        tmp_pointer+= strlen(ocelot_grid_detail_numeric_column_start);
+      }
+      else
+      {
+        strcpy(tmp_pointer, ocelot_grid_detail_char_column_start);
+        tmp_pointer+= strlen(ocelot_grid_detail_char_column_start);
+
+        if (copy_of_ocelot_html != 0)
+        {
+          --tmp_pointer;
+          char tmp_cwidth[64];
+          sprintf(tmp_cwidth, " width=%d>", result_columns[i].width_in_pixels);
+          printf("**** ! Ready to set width. %d %s.!\n", result_columns[i].width_in_pixels, tmp_cwidth);
+          strcpy(tmp_pointer, tmp_cwidth);
+          tmp_pointer+= strlen(tmp_cwidth);
+        }
+      }
+      if (copy_of_ocelot_xml != 0)
+      {
+        memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
+        result_field_names_pointer+= sizeof(unsigned int);
+        memcpy(tmp_pointer, result_field_names_pointer, f_length);
+        tmp_pointer+= f_length;
+        result_field_names_pointer+= f_length;
+        strcpy(tmp_pointer, "\">");
+        tmp_pointer+= 2;
+      }
+      memcpy(&v_length, pointer, sizeof(unsigned int));
+      pointer+= sizeof(unsigned int) + sizeof(char);
+      bool is_image_written= false;
+      if ((copy_of_ocelot_html != 0) && (is_image(i) == true))
+      {
+        char img_type[4]= "";
+        if (v_length > 4)
+        {
+          if (strncmp(pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
+          else if (strncmp(pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
+          else if (strncmp(pointer,"GIF",3) == 0) strcpy(img_type, "gif");
+          /* to: try BMP? check with loadFromData()? */
+        }
+        if (strcmp(img_type,"") != 0)
+        {
+          char *base64_tmp;
+          base64_tmp= new char[(v_length * 4) / 3 + 16];
+          QByteArray data= QByteArray::fromRawData(pointer, v_length);
+          strcpy(base64_tmp, data.toBase64());
+          memcpy(tmp_pointer, "<img src=\"data:image/", 21);
+          tmp_pointer+= 21;
+          memcpy(tmp_pointer, img_type, 3);
+          tmp_pointer+= 3;
+          memcpy(tmp_pointer, ";base64,", 8);
+          tmp_pointer+= 8;
+          memcpy(tmp_pointer, base64_tmp, strlen(base64_tmp));
+          tmp_pointer+= strlen(base64_tmp);
+          memcpy(tmp_pointer, "\"/>", 3);
+          tmp_pointer+= 3;
+          delete base64_tmp;
+          is_image_written= true;
+        }
+      }
+      if (is_image_written == false)
+      {
+        memcpy(tmp_pointer, pointer, v_length);
+        tmp_pointer+= v_length;
+      }
+      strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
+      tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
+      pointer+= v_length;
+    }
+    strcpy(tmp_pointer, ocelot_grid_detail_row_end);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_end);
+  }
+  strcpy(tmp_pointer, ocelot_grid_table_end);
+  tmp_pointer+= strlen(ocelot_grid_table_end);
+  *tmp_pointer= '\0';
+
+  if ((copy_of_ocelot_html != 0) && (copy_of_ocelot_raw == 0))
+  {
+    printf("**** tmp=%s.\n", tmp);
+    result_qtextedit->setHtml(tmp);
+  }
+  else
+  {
+    result_qtextedit->insertPlainText(tmp);
+  }
+  result_qtextedit->moveCursor(QTextCursor::Start);
+  result_qtextedit->ensureCursorVisible();
+  result_qtextedit->show();
+  show();
+  //client->show();
+  delete [] tmp;
+  return;
+}
+
+void Result_qscrollbar::construct()
+{
+  ;
+}
+
+void Result_qtextedit::construct()
+{
+  ;
+}
+
+void Result_qtextedit::focusInEvent(QFocusEvent *event)
+{
+  printf("**** Result_qtextedit::focusInEvent\n");
+  QTextEdit::focusInEvent(event);
+}
+
+/* Todo: see what we do with main widgets when they lose focus */
+void Result_qtextedit::focusOutEvent(QFocusEvent *event)
+{
+  printf("**** Result_qtextedit::focusInEvent\n");
+  QTextEdit::focusOutEvent(event);
+}
+
+/* Todo: see how we handled void TextEditWidget::keyPressEvent(QKeyEvent *event) */
+void Result_qtextedit::keyPressEvent(QKeyEvent *event)
+{
+  printf("**** Result_qtextedit::keyPressEvent\n");
+  QTextEdit::keyPressEvent(event);
+}
+
+void Result_qtextedit::mouseDoubleClickEvent(QMouseEvent *event)
+{
+  printf("**** Result_qtextedit::mouseDoubleClickEvent\n");
+  QTextEdit::mouseDoubleClickEvent(event);
+}
+
+/* Todo: We've calculated c.position(), we should be able to say what column we're in (or bar between columns). */
+/*       (requires blocknumber() and assume we do not wrap, or else see https://stackoverflow.com/questions/15814776/how-do-i-get-the-actual-visible-cursors-line-number*/
+/* Todo: button() has flags, it's possible that more than one button is being pressed. */
+/* would eventClicked() be better? */
+/* See also https://www.qtcentre.org/threads/45645-QTextEdit-cursorForPosition()-and-character-at-mouse-pointer */
+void Result_qtextedit::mousePressEvent(QMouseEvent *event)
+{
+  printf("**** Result_qtextedit::mousePressEvent\n");
+  if (event->button() == Qt::LeftButton) printf("****    Qt::LeftButton\n");
+  if (event->button() == Qt::RightButton) printf("****    Qt::RightButton\n");
+  QTextCursor c= cursorForPosition(event->pos());
+  int position= c.position();
+  printf("****     x=%d, y=%d, position=%d\n", event->x(), event->y(), position);
+
+  for (int i= 0; i < result_column_count; ++i)
+  {
+    ; /* Here we try to find out what column number matches the cursor position */
+  }
+
+
+  QTextEdit::mousePressEvent(event);
+}
+
+void Result_qtextedit::paintEvent(QPaintEvent *event)
+{
+  printf("**** Result_qtextedit::paintEvent\n");
+  QTextEdit::paintEvent(event);
+}
+
+void Result_qtextedit::resizeEvent(QResizeEvent *event)
+{
+  printf("**** Result_qtextedit::resizeEvent\n");
+  QTextEdit::resizeEvent(event);
+}
+
+
+
+
+/******************** result_widget end   ************************************/
+#endif
 
 /*
   TextEditFrame

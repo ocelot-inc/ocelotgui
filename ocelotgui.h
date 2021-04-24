@@ -2943,6 +2943,13 @@ class Completer_widget;
 #if (OCELOT_FIND_WIDGET == 1)
 class Find_widget;
 #endif
+#define OCELOT_RESULT_WIDGET 0
+#if (OCELOT_RESULT_WIDGET == 1)
+class Result_widget;
+class Result_qscrollbar;
+class Result_qtextedit;
+#endif
+
 QT_END_NAMESPACE
 
 class MainWindow : public QMainWindow
@@ -3736,6 +3743,9 @@ private:
 #endif
 #if (OCELOT_FIND_WIDGET == 1)
   Find_widget *find_widget;
+#endif
+#if (OCELOT_RESULT_WIDGET == 1)
+  Result_widget *result_widget;
 #endif
   XSettings *xsettings_widget;
   QMenu *menu_file;
@@ -4780,6 +4790,7 @@ private:
   void construct();
   void action_find_widget_move(bool,bool);
   void enable_or_disable();
+
 protected:
   void keyPressEvent(QKeyEvent *event);
 private slots:
@@ -5995,6 +6006,282 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 #define STATEMENT_WIDGET 3
 #define DEBUG_WIDGET 4
 #define EXTRA_RULE_1 5
+
+
+#if (OCELOT_RESULT_WIDGET == 1)
+/*********************************************************************************************************/
+/* THE RESULT WIDGET */
+/*********************************************************************************************************/
+
+/* Eventually this will replace THE GRID WIDGET (ResultGrid). */
+/* See comments just before Result_widget::construct() */
+
+
+#ifndef RESULT_WIDGET_H
+#define RESULT_WIDGET_H
+
+/* See comments just before Result_widget::construct() */
+
+/* COPIED */
+/*
+  Often an OCELOT_DATA_TYPE value is the same as a MYSQL_TYPE value, for example
+  MYSQL_TYPE_LONG_BLOB=251 in mysql_com.h and #define OCELOT_DATA_TYPE_LONG_BLOG 251 here.
+  But we have additional TEXT and BINARY types because we distinguish when charsetnr=63.
+  DECIMAL and NEWDECIMAL are both DECIMAL. LONG is INT. INT24 is MEDIUMINT. LONGLONG is BIGINT.
+  STRING is CHAR (only). VAR_STRING is VARCHAR (only). BLOB is BLOB (only).
+  See also struct typer.
+*/
+#define OCELOT_DATA_TYPE_DECIMAL     0
+#define OCELOT_DATA_TYPE_TINY        1
+#define OCELOT_DATA_TYPE_SHORT       2
+#define OCELOT_DATA_TYPE_LONG        3
+#define OCELOT_DATA_TYPE_FLOAT       4
+#define OCELOT_DATA_TYPE_DOUBLE      5
+#define OCELOT_DATA_TYPE_NULL        6
+#define OCELOT_DATA_TYPE_TIMESTAMP   7
+#define OCELOT_DATA_TYPE_LONGLONG    8
+#define OCELOT_DATA_TYPE_INT24       9
+#define OCELOT_DATA_TYPE_DATE        10
+#define OCELOT_DATA_TYPE_TIME        11
+#define OCELOT_DATA_TYPE_DATETIME    12
+#define OCELOT_DATA_TYPE_YEAR        13
+//#define OCELOT_DATA_TYPE_NEWDATE     14
+//#define OCELOT_DATA_TYPE_VARCHAR     15
+#define OCELOT_DATA_TYPE_BIT         16
+#define OCELOT_DATA_TYPE_JSON        245       /* new in MySQL 5.7. todo: don't ignore it */
+#define OCELOT_DATA_TYPE_NEWDECIMAL  246
+#define OCELOT_DATA_TYPE_ENUM        247
+#define OCELOT_DATA_TYPE_SET         248
+//#define OCELOT_DATA_TYPE_TINY_BLOB   249
+//#define OCELOT_DATA_TYPE_MEDIUM_BLOB 250
+//#define OCELOT_DATA_TYPE_LONG_BLOB   251
+#define OCELOT_DATA_TYPE_BLOB        252
+#define OCELOT_DATA_TYPE_VAR_STRING  253       /* i.e. VARCHAR or VARBINARY */
+#define OCELOT_DATA_TYPE_STRING      254       /* i.e. CHAR or BINARY */
+#define OCELOT_DATA_TYPE_GEOMETRY    255
+#define OCELOT_DATA_TYPE_BINARY      10001
+#define OCELOT_DATA_TYPE_VARBINARY   10002
+#define OCELOT_DATA_TYPE_TEXT        10003
+#define OCELOT_DATA_TYPE_SCALAR      12001     /* numbers > 12000 are Tarantool-specific */
+#define OCELOT_DATA_TYPE_BOOLEAN     12002
+#define OCELOT_DATA_TYPE_MAP         12003
+#define OCELOT_DATA_TYPE_ARRAY       12004
+#define OCELOT_DATA_TYPE_INTEGER     12005
+#define OCELOT_DATA_TYPE_UNSIGNED    12006
+#define OCELOT_DATA_TYPE_NUMBER      12007
+
+struct result_column {
+   unsigned int max_column_width;               /* calculate based on max if no squeeze */
+   unsigned int height_in_chars;
+   unsigned int width_in_pixels;                /* calculate from width_in_chars at start or if font change */
+   unsigned int field_number;                   /* field number in result set if it's in the result set */
+   char *field_names_pointer;
+   unsigned int v_length;                       /* length of field name */
+   unsigned char flags;
+   unsigned int min_width_in_pixels;
+};
+
+class Result_widget: public QWidget
+{
+  Q_OBJECT
+
+private:
+  MainWindow *main_window;
+  MainWindow *copy_of_parent; /* Todo: this is same as main_window, so use main_window instead */
+  Result_qtextedit *result_qtextedit;
+  Result_qscrollbar *result_qscrollbar;
+  int copy_of_connections_dbms;
+  char *result_set_copy;                                     /* gets a copy of mysql_res contents, if necessary */
+  char **result_set_copy_rows;                               /* dynamic-sized list of result_set_copy row offsets, if necessary */
+  char *result_field_names;                                  /* gets a copy of mysql_fields[].name */
+  char *result_original_field_names;                         /* gets a copy of mysql_fields[].org_name */
+  char *result_original_table_names;                         /* gets a copy of mysql_fields[].org_table */
+  char *result_original_database_names;                      /* gets a copy of mysql_fields[].db */
+
+  result_column *result_columns;                             /* dynamic-sized list of grid columns */
+
+
+  unsigned short int *gridx_field_types;                     /* gets a copy of result_field_types */
+  unsigned short ocelot_result_grid_column_names_copy;
+
+  unsigned int setting_max_width_of_a_char;                  /* changeable with settings_change_calc() */
+  unsigned int setting_min_width_of_a_column;                /* changeable with settings_change_calc() */
+  unsigned int setting_ocelot_grid_cell_drag_line_size_as_int; /* changeable with settings_change_calc() */
+  unsigned int setting_ocelot_grid_cell_border_size_as_int;    /* changeable with settings_change_calc() */
+
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  MYSQL_FIELD *mysql_fields;
+#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+  void construct();
+
+  bool settings_change_calc();
+
+  void set_max_column_width(unsigned int v_length,
+                           const char *result_set_copy_pointer,
+                           unsigned int *p_result_max_column_width);
+  /*
+    We'll do our own garbage collecting for non-Qt items.
+    fillup_garbage_collect for anything made with "new " in fillup() or fillup() subsidiaries.
+    display_garbage_collect for anything made with "new " in display() or display() subsidiaries.
+    Todo: make sure Qt items have parents where possible so that "delete result_grid_table_widget"
+          takes care of them.
+    Why we clear() text_edit_widgets:
+      If the text is big blobs, and you start with default i.e. ocelot_display_blob_as_image = false,
+      then you switch to ocelot_display_blob_as_image = true,
+      it is much slower then if you start with ocelot_display_blob_as_image = true.
+      Clearing alleviates the problem.
+      It would be faster to use max_table_edit_widgets_count not cell_pool_size but that crashes.
+      Perhaps it would be better to clear only if current size > (some minimum)?
+    Warning: we check if (result_set_copy == 0) to ensure there's a result.
+  */
+  void fillup_garbage_collect();
+  void display_batch();
+  bool is_extra_rule_1(int col);
+  bool is_image(int col);
+
+  unsigned long result_row_count;
+  unsigned int result_column_count;
+  /* TODO: THESE ARE MADE WITH NEW -- WHO DELETES? */
+  unsigned int *result_max_column_widths; /* chars not bytes */ /* dynamic-sized list of actual maximum widths in detail columns */
+  unsigned short int *result_field_types;          /* dynamic-sized list of types */
+  unsigned int *result_field_charsetnrs;           /* dynamic-sized list of character set numbers */
+  unsigned int *result_field_flags;                /* dynamic-sized list of flags */
+  unsigned short ocelot_client_side_functions_copy;
+  unsigned short int copy_of_ocelot_batch;
+  unsigned short int copy_of_ocelot_html;
+  unsigned short int copy_of_ocelot_raw;
+  unsigned short int copy_of_ocelot_xml;
+
+  QHBoxLayout *result_layout;
+  QFont text_edit_widget_font; /* changeable with settings_change_calc() */
+
+
+private slots:
+// e.g. void timer_expired();
+
+protected:
+// e.g. void mousePressEvent(QMouseEvent *event);
+
+public:
+  void display(unsigned short ocelot_vertical,
+               unsigned short int ocelot_batch,
+               unsigned short int ocelot_html,
+               unsigned short int ocelot_raw,
+               unsigned short int ocelot_xml);
+  void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
+                             int setting_ocelot_grid_cell_drag_line_size_as_int,
+                             unsigned short int is_using_column_names,
+                             int connections_dbms);
+  void scan_rows(unsigned int p_result_column_count,
+                 unsigned int p_result_row_count,
+                 MYSQL_RES *p_mysql_res,
+                 char **p_result_set_copy,
+                 char ***p_result_set_copy_rows,
+                 unsigned int **p_result_max_column_widths);
+  void scan_field_names(
+                 const char *which_field,
+                 unsigned int p_result_column_count,
+                 char **p_result_field_names);
+  QString fillup(MYSQL_RES *mysql_res,
+              //struct tnt_reply *tarantool_tnt_reply,
+              int connections_dbms,
+              //MainWindow *parent,
+              ldbms *passed_lmysql,
+              int ocelot_client_side_functions,
+              unsigned int connection_number,
+              bool is_for_display);
+  void column_sizes_1(), column_sizes_2(), column_sizes_3();
+
+Result_widget(MainWindow *m)
+{
+  main_window= m;
+  copy_of_parent= m;
+  construct();
+}
+
+~Result_widget()
+{
+  printf("**** ~Result_widget()\n");
+  fillup_garbage_collect();
+}
+
+};
+#endif
+
+#ifndef RESULT_QTEXTEDIT_H
+#define RESULT_QTEXTEDIT_H
+
+class Result_qtextedit: public QTextEdit
+{
+  Q_OBJECT
+
+private:
+  Result_widget *result_widget;
+  Result_qscrollbar *result_qscrollbar;
+  void construct();
+
+private slots:
+// e.g. void timer_expired();
+
+protected:
+void focusInEvent(QFocusEvent *e);
+void focusOutEvent(QFocusEvent *e);
+void keyPressEvent(QKeyEvent *e);
+void mouseDoubleClickEvent(QMouseEvent *e);
+void mousePressEvent(QMouseEvent *e);
+void paintEvent(QPaintEvent *e);
+void resizeEvent(QResizeEvent *e);
+
+public:
+
+Result_qtextedit(Result_widget *m)
+{
+  result_widget= m;
+  construct();
+}
+
+~Result_qtextedit()
+{
+  printf("**** ~Result_qtextedit\n");
+}
+
+};
+#endif
+
+#ifndef RESULT_QSCROLLBAR_H
+#define RESULT_QSCROLLBAR_H
+
+class Result_qscrollbar: public QScrollBar
+{
+  Q_OBJECT
+
+private:
+  Result_widget *result_widget;
+  void construct();
+
+private slots:
+// e.g. void timer_expired();
+
+protected:
+// e.g. void mousePressEvent(QMouseEvent *event);
+
+public:
+
+Result_qscrollbar(Result_widget *m)
+{
+  result_widget= m;
+  construct();
+}
+
+~Result_qscrollbar()
+{
+  printf("**** ~Result_qscrollbar\n");
+}
+
+};
+#endif
+
+#endif
 
 /*********************************************************************************************************/
 
