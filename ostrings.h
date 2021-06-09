@@ -110,9 +110,9 @@ static const char *string_languages[]=
 #define ER_FORMAT_STATEMENT               33
 #define ER_FORMAT_CLAUSE                  34
 #define ER_FORMAT_RULE                    35
-#define ER_UNKNOWN_BORDER_SIZE            36
+#define ER_UNKNOWN_CELL_HEIGHT            36
 #define ER_UNKNOWN_CELL_BORDER_SIZE       37
-#define ER_UNKNOWN_CELL_DRAG_LINE_SIZE    38
+#define ER_UNKNOWN_CELL_WIDTH             38
 #define ER_ILLEGAL_VALUE                  39
 #define ER_FAILED_TO_CONNECT              40
 #define ER_POPEN_FAILED                   41
@@ -201,9 +201,9 @@ static const char *er_strings[]=
   "Format statement indent value must be between 0 and 8", /* ER_FORMAT_STATEMENT */
   "Format clause indent value must be between 0 and 8", /* ER_FORMAT_CLAUSE */
   "Syntax checker value must be 1 or 3 (Menu item Settings | Statement widget)'", /* ER_FORMAT_RULE */
-  "Unknown border size", /* ER_UNKNOWN_BORDER_SIZE */
+  "Unknown cell height", /* ER_UNKNOWN_CELL_HEIGHT */
   "Unknown cell border size", /* ER_UNKNOWN_CELL_BORDER_SIZE */
-  "Unknown cell drag line size", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */
+  "Unknown cell width", /* ER_UNKNOWN_CELL_WIDTH */
   "Illegal value", /* ER_ILLEGAL_VALUE */
   " Failed to connect. Use menu item File|Connect to try again", /* ER_FAILED_TO_CONNECT */
   " popen() failed", /* ER_POPEN_FAILED */
@@ -287,9 +287,9 @@ static const char *er_strings[]=
     "Format déclaration  valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_STATEMENT */
     "Format clause valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_CLAUSE */
     "Syntaxe valeur (pour vérificateur de syntaxe) doit être 1 ou 3", /* FORMAT_RULE */
-    "Taille de la bordure inconnu", /* ER_UNKNOWN_BORDER_SIZE */
+    "Taille de hauteur cellulaire inconnu", /* ER_UNKNOWN_CELL_HEIGHT */
     "Taille de la bordure de la cellule inconnu ", /* ER_UNKNOWN_CELL_BORDER_SIZE */
-    "Taille de dragline cellulaire inconnu", /* ER_UNKNOWN_CELL_DRAG_LINE_SIZE */
+    "Taille de largeur cellulaire inconnu", /* ER_UNKNOWN_CELL_WIDTH */
     "Valeur illégale", /* ER_ILLEGAL_VALUE */
     " Échec de connexion. Utilisez le menu Fichier|Connexion pour essayer de nouveau", /* ER_FAILED_TO_CONNECT */
     " popen() échoué", /* ER_POPEN_FAILED */
@@ -889,10 +889,10 @@ static int MENU_GRID_BACKGROUND_COLOR= 79;
 static int MENU_GRID_CELL_BORDER_COLOR= 80;
 static int MENU_GRID_CELL_DRAG_LINE_COLOR= 81;
 static int MENU_GRID_HEADER_BACKGROUND_COLOR= 82;
-static int MENU_GRID_BORDER_COLOR= 83;
-static int MENU_GRID_BORDER_SIZE= 84;
+static int MENU_GRID_FOCUS_CELL_BACKGROUND_COLOR= 83;
+static int MENU_GRID_CELL_HEIGHT= 84;
 static int MENU_GRID_CELL_BORDER_SIZE= 85;
-static int MENU_GRID_CELL_DRAG_LINE_SIZE= 86;
+static int MENU_GRID_CELL_WIDTH= 86;
 static int MENU_HISTORY_TEXT_COLOR= 87;
 static int MENU_HISTORY_BACKGROUND_COLOR= 88;
 static int MENU_HISTORY_BORDER_COLOR= 89;
@@ -1006,12 +1006,12 @@ static const char *menu_strings[]=
     "Grid Text Color",
     "Grid Background Color",
     "Grid Cell Border Color",
-    "Grid Cell Drag Line Color",
+    "Grid Outer Color",
     "Grid Header Background Color",
-    "Grid Border Color",
-    "Grid Border Size",
+    "Grid Focus Cell Background Color",
+    "Grid Cell Height",
     "Grid Cell Border Size",
-    "Grid Cell Drag Line Size",
+    "Grid Cell Width",
     "History Text Color",
     "History Background Color",
     "History Border Color",
@@ -1121,12 +1121,12 @@ static const char *menu_strings[]=
         "Grille Texte Couleur",
         "Grille Couleur de fond",
         "Grille Cellule Couleur de fond",
-        "Grille Cellule Drag Line Couleur",
+        "Grille Cellule Couleur dehors",
         "Grille Rubrique Couleur de fond",
-        "Grille Bordure Couleur",
-        "Grille Bordure Taille",
+        "Grille Cellule Focale Couleur de fond",
+        "Grille Cellule Hauteur",
         "Grille Cellule Bordure Taille",
-        "Grille Cellule Drag Line Taille",
+        "Grille Cellule Largeur",
         "Histoire Texte Couleur",
         "Histoire Texte Couleur de fond",
         "Histoire Bordure Couleur",

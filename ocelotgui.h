@@ -764,15 +764,14 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR,
-    TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR,
-    TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE,
+    TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE, /* no longer used */
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE,
-    TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR,
-    TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE,
+    TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE, /* no longer used */
     TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH,
     TOKEN_KEYWORD_OCELOT_GRID_DETACHED,
+    TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY,
     TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE,
     TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE,
@@ -780,6 +779,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_HEIGHT,
     TOKEN_KEYWORD_OCELOT_GRID_LEFT,
+    TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_TABS,
     TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP,
@@ -2002,15 +2002,14 @@ static const keywords strvalues[]=
     {"OCELOT_EXTRA_RULE_1_DISPLAY_AS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS},
     {"OCELOT_EXTRA_RULE_1_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR},
     {"OCELOT_GRID_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR},
-    {"OCELOT_GRID_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR},
-    {"OCELOT_GRID_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE},
+    {"OCELOT_GRID_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE}, /* no longer used */
     {"OCELOT_GRID_CELL_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR},
     {"OCELOT_GRID_CELL_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
-    {"OCELOT_GRID_CELL_DRAG_LINE_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_COLOR},
     {"OCELOT_GRID_CELL_DRAG_LINE_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE},
     {"OCELOT_GRID_CELL_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
     {"OCELOT_GRID_CELL_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH},
     {"OCELOT_GRID_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_DETACHED},
+    {"OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR},
     {"OCELOT_GRID_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY},
     {"OCELOT_GRID_FONT_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE},
     {"OCELOT_GRID_FONT_STYLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE},
@@ -2018,6 +2017,7 @@ static const keywords strvalues[]=
     {"OCELOT_GRID_HEADER_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR},
     {"OCELOT_GRID_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT},
     {"OCELOT_GRID_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT},
+    {"OCELOT_GRID_OUTER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR},
     {"OCELOT_GRID_TABS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TABS},
     {"OCELOT_GRID_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR},
     {"OCELOT_GRID_TOOLTIP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP},
@@ -2659,6 +2659,7 @@ static const fontweights fontweightsvalues[]=
 #endif
 #if (OCELOT_FIND_WIDGET == 1)
 #include <QToolButton>
+#include <QRegExp>
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -2875,10 +2876,10 @@ extern int MENU_GRID_BACKGROUND_COLOR;
 extern int MENU_GRID_CELL_BORDER_COLOR;
 extern int MENU_GRID_CELL_DRAG_LINE_COLOR;
 extern int MENU_GRID_HEADER_BACKGROUND_COLOR;
-extern int MENU_GRID_BORDER_COLOR;
-extern int MENU_GRID_BORDER_SIZE;
+extern int MENU_GRID_FOCUS_CELL_BACKGROUND_COLOR;
+extern int MENU_GRID_CELL_HEIGHT;
 extern int MENU_GRID_CELL_BORDER_SIZE;
-extern int MENU_GRID_CELL_DRAG_LINE_SIZE;
+extern int MENU_GRID_CELL_WIDTH;
 extern int MENU_GRID_TEXT_COLOR;
 extern int MENU_GRID_BACKGROUND_COLOR;
 extern int MENU_HISTORY_TEXT_COLOR;
@@ -2931,8 +2932,10 @@ class CodeEditor;
 class ResultGrid;
 class Settings;
 class QComboBoxInSettings;
+#ifdef OLD_STUFF
 class TextEditFrame;
 class TextEditWidget;
+#endif
 class QScrollAreaWithSize;
 class QThread48;
 class QTabWidget48;
@@ -2943,12 +2946,8 @@ class Completer_widget;
 #if (OCELOT_FIND_WIDGET == 1)
 class Find_widget;
 #endif
-#define OCELOT_RESULT_WIDGET 0
-#if (OCELOT_RESULT_WIDGET == 1)
-class Result_widget;
-class Result_qscrollbar;
 class Result_qtextedit;
-#endif
+class Result_changes;
 
 QT_END_NAMESPACE
 
@@ -2966,8 +2965,8 @@ public:
     Client variables have the prefix 'ocelot_'.
     Every client variable has an item on the Settings menu,
     and most may be changed with the SET statement. For example,
-    ocelot_grid_cell_drag_line_color is on menu item Settings | Grid Widget,
-    SET ocelot_grid_cell_drag_line_color = value; will change.
+    ocelot_grid_outer_color is on menu item Settings | Grid Widget,
+    SET ocelot_grid_outer_color = value; will change.
     The important thing is: if it's changed on the Settings menu, then
     a SET statement is generated, so that can be saved and replayed.
     Naming convention: ocelot_ + settings-menu-item + object + color|size|font.
@@ -3032,7 +3031,7 @@ public:
   QString ocelot_debug_detached, new_ocelot_debug_detached;
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
-  QString ocelot_grid_border_color, new_ocelot_grid_border_color;
+  QString ocelot_grid_focus_cell_background_color, new_ocelot_grid_focus_cell_background_color;
   QString ocelot_grid_header_background_color, new_ocelot_grid_header_background_color;
   QString ocelot_grid_font_family, new_ocelot_grid_font_family;
   QString ocelot_grid_font_size, new_ocelot_grid_font_size;
@@ -3040,9 +3039,11 @@ public:
   QString ocelot_grid_font_weight, new_ocelot_grid_font_weight;
   QString ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color;
   QString ocelot_grid_cell_drag_line_color, new_ocelot_grid_cell_drag_line_color;
-  QString ocelot_grid_border_size, new_ocelot_grid_border_size;
+  QString ocelot_grid_border_size, new_ocelot_grid_border_size; /* no longer used */
   QString ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size;
-  QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size;
+  QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size; /* no longer used */
+  QString ocelot_grid_cell_height, new_ocelot_grid_cell_height;
+  QString ocelot_grid_cell_width, new_ocelot_grid_cell_width;
   QString ocelot_grid_style_string;
   QString ocelot_grid_header_style_string;
   QString ocelot_grid_height, new_ocelot_grid_height;
@@ -3744,9 +3745,6 @@ private:
 #if (OCELOT_FIND_WIDGET == 1)
   Find_widget *find_widget;
 #endif
-#if (OCELOT_RESULT_WIDGET == 1)
-  Result_widget *result_widget;
-#endif
   XSettings *xsettings_widget;
   QMenu *menu_file;
     QAction *menu_file_action_connect;
@@ -4168,6 +4166,12 @@ enum {
 
 #endif
 
+#define TEXTEDITFRAME_CELL_TYPE_DETAIL 0
+#define TEXTEDITFRAME_CELL_TYPE_HEADER 1
+#define TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1 2
+
+
+#ifdef OLD_STUFF
 /*****************************************************************************************************************************/
 /* THE TEXTEDITFRAME WIDGET */
 /* See comments containing the word TextEditFrame, in ResultGrid code. */
@@ -4175,9 +4179,6 @@ enum {
 #ifndef TEXTEDITFRAME_H
 #define TEXTEDITFRAME_H
 
-#define TEXTEDITFRAME_CELL_TYPE_DETAIL 0
-#define TEXTEDITFRAME_CELL_TYPE_HEADER 1
-#define TEXTEDITFRAME_CELL_TYPE_DETAIL_EXTRA_RULE_1 2
 
 class TextEditFrame : public QFrame
 {
@@ -4218,7 +4219,9 @@ private:
   void style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit);
 };
 #endif // TEXTEDITFRAME_H
+#endif
 
+#ifdef OLD_STUFF
 /*********************************************************************************************************/
 /* THE TEXTEDITWIDGET WIDGET */
 /* subclassed QTextEdit so paintEvent can be caught, for use in result_grid */
@@ -4238,7 +4241,7 @@ public:
 
   void copy();
   void paste();
-  void menu_context_t_2(const QPoint & pos);
+
   void generate_update();
 protected:
   void paintEvent(QPaintEvent *event);
@@ -4248,15 +4251,11 @@ protected:
 
   QString unstripper(QString value_to_unstrip);
 
-public slots:
-void menu_context_t(const QPoint & pos)
-{
-  menu_context_t_2(pos);
-}
 
 };
 
 #endif // TEXTEDITWIDGET_H
+#endif
 
 /*********************************************************************************************************/
 /* THE ROW_FORM_BOX WIDGET */
@@ -4608,6 +4607,7 @@ QSize sizeHint() const
 
 };
 #endif // TEXTEDITWIDGET2_H
+
 
 /***********************************************************/
 /* THE MESSAGE_BOX WIDGET */
@@ -6008,201 +6008,67 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 #define EXTRA_RULE_1 5
 
 
-#if (OCELOT_RESULT_WIDGET == 1)
-/*********************************************************************************************************/
-/* THE RESULT WIDGET */
-/*********************************************************************************************************/
+#ifndef RESULT_CHANGES_H
+#define RESULT_CHANGES_H
 
-/* Eventually this will replace THE GRID WIDGET (ResultGrid). */
-/* See comments just before Result_widget::construct() */
-
-
-#ifndef RESULT_WIDGET_H
-#define RESULT_WIDGET_H
-
-/* See comments just before Result_widget::construct() */
-
-/* COPIED */
 /*
-  Often an OCELOT_DATA_TYPE value is the same as a MYSQL_TYPE value, for example
-  MYSQL_TYPE_LONG_BLOB=251 in mysql_com.h and #define OCELOT_DATA_TYPE_LONG_BLOG 251 here.
-  But we have additional TEXT and BINARY types because we distinguish when charsetnr=63.
-  DECIMAL and NEWDECIMAL are both DECIMAL. LONG is INT. INT24 is MEDIUMINT. LONGLONG is BIGINT.
-  STRING is CHAR (only). VAR_STRING is VARCHAR (only). BLOB is BLOB (only).
-  See also struct typer.
+  If a user edits a cell, the value in the result set becomes temporarily obsolete.
+  So for display refreshing we will look in Result_changes to see if we want the newer value.
+  Assumption = there will be very few changes (if there are many then find() will be slow).
+  Todo: This must be set up when we make a result set (in fillup?) and wiped when we garbage collect.
+  But should the parent be Result_qtextedit, or ResultGrid?
 */
-#define OCELOT_DATA_TYPE_DECIMAL     0
-#define OCELOT_DATA_TYPE_TINY        1
-#define OCELOT_DATA_TYPE_SHORT       2
-#define OCELOT_DATA_TYPE_LONG        3
-#define OCELOT_DATA_TYPE_FLOAT       4
-#define OCELOT_DATA_TYPE_DOUBLE      5
-#define OCELOT_DATA_TYPE_NULL        6
-#define OCELOT_DATA_TYPE_TIMESTAMP   7
-#define OCELOT_DATA_TYPE_LONGLONG    8
-#define OCELOT_DATA_TYPE_INT24       9
-#define OCELOT_DATA_TYPE_DATE        10
-#define OCELOT_DATA_TYPE_TIME        11
-#define OCELOT_DATA_TYPE_DATETIME    12
-#define OCELOT_DATA_TYPE_YEAR        13
-//#define OCELOT_DATA_TYPE_NEWDATE     14
-//#define OCELOT_DATA_TYPE_VARCHAR     15
-#define OCELOT_DATA_TYPE_BIT         16
-#define OCELOT_DATA_TYPE_JSON        245       /* new in MySQL 5.7. todo: don't ignore it */
-#define OCELOT_DATA_TYPE_NEWDECIMAL  246
-#define OCELOT_DATA_TYPE_ENUM        247
-#define OCELOT_DATA_TYPE_SET         248
-//#define OCELOT_DATA_TYPE_TINY_BLOB   249
-//#define OCELOT_DATA_TYPE_MEDIUM_BLOB 250
-//#define OCELOT_DATA_TYPE_LONG_BLOB   251
-#define OCELOT_DATA_TYPE_BLOB        252
-#define OCELOT_DATA_TYPE_VAR_STRING  253       /* i.e. VARCHAR or VARBINARY */
-#define OCELOT_DATA_TYPE_STRING      254       /* i.e. CHAR or BINARY */
-#define OCELOT_DATA_TYPE_GEOMETRY    255
-#define OCELOT_DATA_TYPE_BINARY      10001
-#define OCELOT_DATA_TYPE_VARBINARY   10002
-#define OCELOT_DATA_TYPE_TEXT        10003
-#define OCELOT_DATA_TYPE_SCALAR      12001     /* numbers > 12000 are Tarantool-specific */
-#define OCELOT_DATA_TYPE_BOOLEAN     12002
-#define OCELOT_DATA_TYPE_MAP         12003
-#define OCELOT_DATA_TYPE_ARRAY       12004
-#define OCELOT_DATA_TYPE_INTEGER     12005
-#define OCELOT_DATA_TYPE_UNSIGNED    12006
-#define OCELOT_DATA_TYPE_NUMBER      12007
 
-struct result_column {
-   unsigned int max_column_width;               /* calculate based on max if no squeeze */
-   unsigned int height_in_chars;
-   unsigned int width_in_pixels;                /* calculate from width_in_chars at start or if font change */
-   unsigned int field_number;                   /* field number in result set if it's in the result set */
-   char *field_names_pointer;
-   unsigned int v_length;                       /* length of field name */
-   unsigned char flags;
-   unsigned int min_width_in_pixels;
-};
-
-class Result_widget: public QWidget
+class Result_changes: public QWidget
 {
   Q_OBJECT
 
 private:
-  MainWindow *main_window;
-  MainWindow *copy_of_parent; /* Todo: this is same as main_window, so use main_window instead */
-  Result_qtextedit *result_qtextedit;
-  Result_qscrollbar *result_qscrollbar;
-  int copy_of_connections_dbms;
-  char *result_set_copy;                                     /* gets a copy of mysql_res contents, if necessary */
-  char **result_set_copy_rows;                               /* dynamic-sized list of result_set_copy row offsets, if necessary */
-  char *result_field_names;                                  /* gets a copy of mysql_fields[].name */
-  char *result_original_field_names;                         /* gets a copy of mysql_fields[].org_name */
-  char *result_original_table_names;                         /* gets a copy of mysql_fields[].org_table */
-  char *result_original_database_names;                      /* gets a copy of mysql_fields[].db */
 
-  result_column *result_columns;                             /* dynamic-sized list of grid columns */
+struct Rows_and_columns{
+    unsigned int row_number;
+    unsigned int column_number;
+    QByteArray qba;
+};
 
-
-  unsigned short int *gridx_field_types;                     /* gets a copy of result_field_types */
-  unsigned short ocelot_result_grid_column_names_copy;
-
-  unsigned int setting_max_width_of_a_char;                  /* changeable with settings_change_calc() */
-  unsigned int setting_min_width_of_a_column;                /* changeable with settings_change_calc() */
-  unsigned int setting_ocelot_grid_cell_drag_line_size_as_int; /* changeable with settings_change_calc() */
-  unsigned int setting_ocelot_grid_cell_border_size_as_int;    /* changeable with settings_change_calc() */
-
-#if (OCELOT_MYSQL_INCLUDE == 1)
-  MYSQL_FIELD *mysql_fields;
-#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
-  void construct();
-
-  bool settings_change_calc();
-
-  void set_max_column_width(unsigned int v_length,
-                           const char *result_set_copy_pointer,
-                           unsigned int *p_result_max_column_width);
-  /*
-    We'll do our own garbage collecting for non-Qt items.
-    fillup_garbage_collect for anything made with "new " in fillup() or fillup() subsidiaries.
-    display_garbage_collect for anything made with "new " in display() or display() subsidiaries.
-    Todo: make sure Qt items have parents where possible so that "delete result_grid_table_widget"
-          takes care of them.
-    Why we clear() text_edit_widgets:
-      If the text is big blobs, and you start with default i.e. ocelot_display_blob_as_image = false,
-      then you switch to ocelot_display_blob_as_image = true,
-      it is much slower then if you start with ocelot_display_blob_as_image = true.
-      Clearing alleviates the problem.
-      It would be faster to use max_table_edit_widgets_count not cell_pool_size but that crashes.
-      Perhaps it would be better to clear only if current size > (some minimum)?
-    Warning: we check if (result_set_copy == 0) to ensure there's a result.
-  */
-  void fillup_garbage_collect();
-  void display_batch();
-  bool is_extra_rule_1(int col);
-  bool is_image(int col);
-
-  unsigned long result_row_count;
-  unsigned int result_column_count;
-  /* TODO: THESE ARE MADE WITH NEW -- WHO DELETES? */
-  unsigned int *result_max_column_widths; /* chars not bytes */ /* dynamic-sized list of actual maximum widths in detail columns */
-  unsigned short int *result_field_types;          /* dynamic-sized list of types */
-  unsigned int *result_field_charsetnrs;           /* dynamic-sized list of character set numbers */
-  unsigned int *result_field_flags;                /* dynamic-sized list of flags */
-  unsigned short ocelot_client_side_functions_copy;
-  unsigned short int copy_of_ocelot_batch;
-  unsigned short int copy_of_ocelot_html;
-  unsigned short int copy_of_ocelot_raw;
-  unsigned short int copy_of_ocelot_xml;
-
-  QHBoxLayout *result_layout;
-  QFont text_edit_widget_font; /* changeable with settings_change_calc() */
-
-
-private slots:
-// e.g. void timer_expired();
-
-protected:
-// e.g. void mousePressEvent(QMouseEvent *event);
+Result_qtextedit *result_qtextedit;
+QList<Rows_and_columns> *rows_and_columns_list;
 
 public:
-  void display(unsigned short ocelot_vertical,
-               unsigned short int ocelot_batch,
-               unsigned short int ocelot_html,
-               unsigned short int ocelot_raw,
-               unsigned short int ocelot_xml);
-  void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
-                             int setting_ocelot_grid_cell_drag_line_size_as_int,
-                             unsigned short int is_using_column_names,
-                             int connections_dbms);
-  void scan_rows(unsigned int p_result_column_count,
-                 unsigned int p_result_row_count,
-                 MYSQL_RES *p_mysql_res,
-                 char **p_result_set_copy,
-                 char ***p_result_set_copy_rows,
-                 unsigned int **p_result_max_column_widths);
-  void scan_field_names(
-                 const char *which_field,
-                 unsigned int p_result_column_count,
-                 char **p_result_field_names);
-  QString fillup(MYSQL_RES *mysql_res,
-              //struct tnt_reply *tarantool_tnt_reply,
-              int connections_dbms,
-              //MainWindow *parent,
-              ldbms *passed_lmysql,
-              int ocelot_client_side_functions,
-              unsigned int connection_number,
-              bool is_for_display);
-  void column_sizes_1(), column_sizes_2(), column_sizes_3();
 
-Result_widget(MainWindow *m)
+Result_changes(Result_qtextedit *m)
 {
-  main_window= m;
-  copy_of_parent= m;
-  construct();
+  result_qtextedit= m;
+  rows_and_columns_list= new QList<Rows_and_columns>;
 }
 
-~Result_widget()
+void append(unsigned int row_number, unsigned int column_number, QByteArray *value)
 {
-  printf("**** ~Result_widget()\n");
-  fillup_garbage_collect();
+  Rows_and_columns r;
+  r.row_number= row_number;
+  r.column_number= column_number;
+  r.qba= *value;
+  rows_and_columns_list->append(r);
+}
+
+QByteArray find(unsigned int row_number, unsigned int column_number)
+{
+  for (int i= rows_and_columns_list->size() - 1; i >= 0; --i)
+  {
+    Rows_and_columns r= rows_and_columns_list->at(i);
+    if ((r.row_number == row_number)
+      && (r.column_number == column_number))
+    {
+      return rows_and_columns_list->at(i).qba;
+    }
+  }
+  return QByteArray(1, 0); /* Todo: I really would prefer to return with size 0 */
+}
+
+/* Todo: ? */
+~Result_changes()
+{
+  delete rows_and_columns_list;
 }
 
 };
@@ -6211,76 +6077,115 @@ Result_widget(MainWindow *m)
 #ifndef RESULT_QTEXTEDIT_H
 #define RESULT_QTEXTEDIT_H
 
+/*
+  Do not change class name "Result_qtextedit" without checking its uses e.g. in menu_edit_paste().
+*/
+
 class Result_qtextedit: public QTextEdit
 {
   Q_OBJECT
 
 private:
-  Result_widget *result_widget;
-  Result_qscrollbar *result_qscrollbar;
+
+    /* unused */
+    struct result_column {
+       unsigned int max_column_width;               /* calculate based on max if no squeeze */
+       unsigned int height_in_chars;
+       unsigned int width_in_pixels;                /* calculate from width_in_chars at start or if font change */
+       unsigned int field_number;                   /* field number in result set if it's in the result set */
+       char *field_names_pointer;
+       unsigned int v_length;                       /* length of field name */
+       unsigned char flags;
+       unsigned int min_width_in_pixels;
+    };
+
+  ResultGrid *result_grid;
+  int qtextedit_drag_start_x; /* See comment = Dragging theory. */
+  int qtextedit_drag_start_y;
+  int qtextedit_drag_start_time;
+  bool qtextedit_is_in_drag_for_column, qtextedit_is_in_drag_for_row;
+  int qtextedit_column_number_at_drag_start_time;
+  int qtextedit_row_number_at_drag_start_time;
+
+  /* Things that get set by cell_analyze(). Mostly pixels or points. */
+  int qtextedit_block_count;       /* from document()->blockCount() */
+  int qtextedit_columns_per_row;   /* # of defined columns + 1 for the thin-image column */
+  int qtextedit_x;                 /* from event->x() */
+  int qtextedit_y;                 /* from event->y() */
+  int qtextedit_block_number;      /* what we calculate other things from */
+  int qtextedit_row_number;        /* row number, starts at 1, includes header row, within display */
+  int qtextedit_column_number;     /* column number, starts at 1, includes thin image column */
+  bool qtextedit_is_before_column; /* x is on a pixel that precedes qtextedit_column */
+  bool qtextedit_is_before_row;    /* y is on a pixel that precedes qtextedit_row */
+  int qtextedit_x_start;         /* start of the column that x is on */
+  int qtextedit_x_end;           /* end of the column that x is on, border included (actual width = end - start) */
+  int qtextedit_y_start;         /* start of the row that y is on */
+  int qtextedit_y_end;           /* end of the row that y is on, border included (actual height = end - start) */
+  QString qtextedit_cell_content;  /* cell contents. but if it's an image we get U+fffc or something like that */
+                                   /* Actually this probably should be in locals */
+  bool qtextedit_at_end;           /* If document doesn't fill result widget, this can become true */
+
+  Result_changes *qtextedit_result_changes;
+
+  void cell_analyze(int x, int y);
   void construct();
+  int get_result_set_row_number(int row_number);
+  QString unstripper(QString value_to_unstrip);
+  void generate_update();
+  QString to_plain_text();
 
 private slots:
 // e.g. void timer_expired();
+
+public slots:
+void menu_context_t(const QPoint & pos)
+{
+  menu_context_t_2(pos);
+}
 
 protected:
 void focusInEvent(QFocusEvent *e);
 void focusOutEvent(QFocusEvent *e);
 void keyPressEvent(QKeyEvent *e);
 void mouseDoubleClickEvent(QMouseEvent *e);
+void mouseMoveEvent(QMouseEvent *e);
 void mousePressEvent(QMouseEvent *e);
+void mouseReleaseEvent(QMouseEvent *e);
 void paintEvent(QPaintEvent *e);
 void resizeEvent(QResizeEvent *e);
 
 public:
 
-Result_qtextedit(Result_widget *m)
+void copy();  /* via menu_edit_copy() */
+void cut();
+void paste();
+void undo();
+void redo();
+void selectAll();
+void zoomIn();
+void zoomOut();
+void menu_context_t_2(const QPoint & pos);
+int copy_html_cell(char *ocelot_grid_detail_numeric_column_start, char *ocelot_grid_detail_char_column_start,
+                   char *tmp_pointer, char *pointer, int v_length, int cell_type,
+                   int width, QFont result_grid_font, int setting_max_width_of_a_char,
+                   int passed_i, long unsigned int tmp_xrow, char *ocelot_grid_detail_char_column_end,
+                   int *new_cell_height);
+
+
+Result_qtextedit(ResultGrid *m)
 {
-  result_widget= m;
+  result_grid= m;
   construct();
 }
 
+/* Todo: don't forget to delete [] grid_columns somewhere */
+/* It might not be necessary to delete anything made in Result_qtextedit::construct(), but try anyway. */
 ~Result_qtextedit()
 {
-  printf("**** ~Result_qtextedit\n");
+  delete qtextedit_result_changes;
 }
 
 };
-#endif
-
-#ifndef RESULT_QSCROLLBAR_H
-#define RESULT_QSCROLLBAR_H
-
-class Result_qscrollbar: public QScrollBar
-{
-  Q_OBJECT
-
-private:
-  Result_widget *result_widget;
-  void construct();
-
-private slots:
-// e.g. void timer_expired();
-
-protected:
-// e.g. void mousePressEvent(QMouseEvent *event);
-
-public:
-
-Result_qscrollbar(Result_widget *m)
-{
-  result_widget= m;
-  construct();
-}
-
-~Result_qscrollbar()
-{
-  printf("**** ~Result_qscrollbar\n");
-}
-
-};
-#endif
-
 #endif
 
 /*********************************************************************************************************/
@@ -6388,7 +6293,7 @@ public:
 
   unsigned int result_column_count;
   long unsigned int result_row_count, grid_result_row_count;
-  long unsigned int *lengths;
+//  long unsigned int *lengths;
   unsigned int *grid_column_widths;                         /* dynamic-sized list of widths */
   unsigned int *result_max_column_widths; /* chars not bytes */ /* dynamic-sized list of actual maximum widths in detail columns */
   unsigned int *grid_column_heights;                         /* dynamic-sized list of heights */
@@ -6396,12 +6301,15 @@ public:
   unsigned short int *result_field_types;          /* dynamic-sized list of types */
   unsigned int *result_field_charsetnrs;           /* dynamic-sized list of character set numbers */
   unsigned int *result_field_flags;                /* dynamic-sized list of flags */
-  unsigned long result_row_number;                    /* row number in result set */
+//  unsigned long result_row_number;                    /* row number in result set */
 #if (OCELOT_MYSQL_INCLUDE == 1)
   MYSQL_ROW row;
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   int is_paintable;
+#ifdef OLD_STUFF
   unsigned int max_text_edit_frames_count;                       /* used for a strange error check during paint events */
+#endif
+  unsigned int grid_row_heights[1000];
 
   unsigned int result_grid_widget_max_height_in_lines;
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -6410,10 +6318,13 @@ public:
   QScrollArea *grid_scroll_area;
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
+#ifdef OLD_STUFF
   TextEditWidget **text_edit_widgets; /* Todo: consider using plaintext */ /* dynamic-sized list of pointers to QPlainTextEdit widgets */
   QHBoxLayout **text_edit_layouts;
+#endif
+#ifdef OLD_STUFF
   TextEditFrame **text_edit_frames;
-
+#endif
   MYSQL_RES *grid_mysql_res;
   unsigned short ocelot_vertical_copy;
   unsigned short ocelot_result_grid_column_names_copy;
@@ -6440,7 +6351,7 @@ public:
   unsigned int setting_max_width_of_a_char;                  /* changeable with settings_change_calc() */
   unsigned int setting_min_width_of_a_column;                /* changeable with settings_change_calc() */
 
-  QHBoxLayout *hbox_layout;
+ QHBoxLayout *hbox_layout;
 
   QHBoxLayout **grid_row_layouts;                               /* dynamic-sized list of pointers to rows' QHBoxLayout layouts */
   QWidget **grid_row_widgets;                                   /* dynamic-sized list of pointers to rows' QWidget widgets */
@@ -6456,6 +6367,7 @@ public:
   unsigned short int copy_of_ocelot_raw;
   unsigned short int copy_of_ocelot_xml;
 
+  Result_qtextedit *html_text_edit;
   QTextEdit *batch_text_edit;
 
   int border_size;                                             /* used when calculating cell height + width */
@@ -6463,17 +6375,27 @@ public:
   unsigned int ocelot_grid_max_column_height_in_lines;         /* used when calculating cell height + width */
   unsigned int grid_max_column_height_in_pixels;
 
-  unsigned int setting_ocelot_grid_cell_drag_line_size_as_int; /* changeable with settings_change_calc() */
+  unsigned int setting_ocelot_grid_cell_drag_line_size_as_int; /* no longer used */
   unsigned int setting_ocelot_grid_cell_border_size_as_int;    /* changeable with settings_change_calc() */
+  unsigned int setting_ocelot_grid_cell_width_as_int;
   QString ocelot_grid_text_color;
   QString ocelot_grid_background_color;
   QString ocelot_grid_cell_drag_line_color;
-  unsigned int row_pool_size;
-  unsigned int cell_pool_size;
+
+#ifdef OLD_STUFF
   QString frame_color_setting;                                 /* based on drag line color */
-  QFont text_edit_widget_font;
+#endif
+  QFont result_grid_font;
   ldbms *lmysql;
   unsigned int scroll_bar_width;
+  unsigned int scroll_bar_height;
+  unsigned int result_grid_height_after_last_resize;
+  unsigned int result_grid_width_after_last_resize;
+
+  int result_grid_vertical_width_of_header;
+  int result_grid_vertical_width_of_value;
+
+  int focus_row_number, focus_column_number;
 
 /* How many rows can fit on the screen? Take a guess for initialization. */
 #define RESULT_GRID_WIDGET_INITIAL_HEIGHT 10
@@ -6506,10 +6428,11 @@ ResultGrid(
   lmysql= passed_lmysql;
 
   copy_of_parent= parent;
-
+#ifdef OLD_STUFF
   text_edit_widgets= 0;                                     /* all dynamic-sized items should be initially zero */
   text_edit_layouts= 0;
   text_edit_frames= 0;
+#endif
   grid_column_widths= 0;                                    /* initializing for display_garbage_collect */
   result_max_column_widths= 0;
   grid_column_heights= 0;
@@ -6542,16 +6465,15 @@ ResultGrid(
   //result_row_count= 0;
   //result_column_count= 0;
   grid_result_row_count= 0;
+#ifdef OLD_STUFF
   max_text_edit_frames_count= 0;
-
+#endif
   if (is_displayable == false)
   {
-    row_pool_size= cell_pool_size= 0;
     grid_main_layout= 0;
-    batch_text_edit= NULL;
+    html_text_edit= NULL;
     return;
   }
-
 
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
@@ -6569,7 +6491,7 @@ ResultGrid(
   grid_scroll_area->setWidget(client);
   grid_scroll_area->setWidgetResizable(true);              /* Without this, the QTextEdit widget heights won't change */
 
-  grid_vertical_scroll_bar= new QScrollBar(this);
+  vertical_scroll_bar_construct(); /* grid_vertical_scroll_bar= new QScrollBar(this); etc. */
 
   /* setContentsMargins overrides style settings, I suppose. */
   /* Will setSpacing(0) keep scroll bar beside scroll area? Apparently not. Useless. */
@@ -6596,8 +6518,15 @@ ResultGrid(
   */
   hbox_layout->setContentsMargins(0, 0, 0, 0);
   hbox_layout->setSpacing(0);
+  /* TEST!!!! */
+  html_text_edit= new Result_qtextedit(this);
+
   hbox_layout->addWidget(grid_scroll_area);
+//  hbox_layout->addWidget(html_text_edit);
+//  html_text_edit->show();
+
   hbox_layout->addWidget(grid_vertical_scroll_bar);
+  grid_vertical_scroll_bar->show();
   /* hbox_layout->setSizeConstraint(QLayout::SetFixedSize); */
   /*
     Strange but true: when we said "new QHBoxLayout(this)" that meant this already has a layout,
@@ -6609,17 +6538,19 @@ ResultGrid(
   /* grid_vertical_scroll_bar_value= 0; */
   /* grid_vertical_scroll_bar= grid_scroll_area->verticalScrollBar(); */
 
-  /* Assume there will never be more than 50 columns per row, but this might be resized during fillup */
-  pools_resize(0, result_grid_widget_max_height_in_lines, 0, result_grid_widget_max_height_in_lines * 50);
-  row_pool_size= result_grid_widget_max_height_in_lines;
-  cell_pool_size= result_grid_widget_max_height_in_lines * 50;
-
   /* Typically scroll_bar_width = 13.
      If there was an option to change it, we'd have to use
      a different way to find its width.
      Todo: move this, it doesn't need recalculation
+     Todo: some people on a forum said height is 3 pixels too small.
   */
-  scroll_bar_width= text_edit_widgets[0]->style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+  scroll_bar_width= html_text_edit->style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+  scroll_bar_height= html_text_edit->style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+
+  /* This won't be correct until after resizeEvent() and after a real display of the resultgrid widget */
+  result_grid_height_after_last_resize= -1;
+  result_grid_width_after_last_resize= -1;
+
 
   /*
     Just a note for the archives ...
@@ -6634,123 +6565,28 @@ ResultGrid(
 
   grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
 
+  grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
+
   client->setLayout(grid_main_layout);
 
   /* 2018-10-08 Maybe this will finally fix the bug where initial cell height was too small? */
-  // text_edit_widget_font= this->font();
-  text_edit_widget_font= parent->get_font_from_style_sheet(parent->ocelot_grid_style_string);
+  // result_grid_font= this->font();
+  result_grid_font= parent->get_font_from_style_sheet(parent->ocelot_grid_style_string);
 
   settings_change_calc();
 
   set_grid_max_column_height_in_pixels((parent->height() / 3) - 11);
-
+#ifdef OLD_STUFF
   set_frame_color_setting();
+#endif
+//  html_text_edit= new Result_qtextedit(this);
+//  html_text_edit->hide();
 
-  batch_text_edit= new QTextEdit(this);
-  batch_text_edit->hide();
+  html_text_edit->insertPlainText("[Results will appear in this box]");
+  html_text_edit->show();
+  client->show();
 
   copy_of_ocelot_batch= copy_of_ocelot_html= copy_of_ocelot_raw= copy_of_ocelot_xml= 0;
-}
-
-
-/*
-  It takes a long time to make a widget. Therefore we have pools of reusable widgets.
-  When the pool is too small, we increase it.
-  This can increase the sizes of the new widget pools. It cannot decrease.
-*/
-void pools_resize(unsigned int old_row_pool_size, unsigned int new_row_pool_size,
-                  unsigned int old_cell_pool_size, unsigned int new_cell_pool_size)
-{
-  QHBoxLayout **tmp_grid_row_layouts;
-  QWidget **tmp_grid_row_widgets;
-  TextEditWidget **tmp_text_edit_widgets;
-  QHBoxLayout **tmp_text_edit_layouts;
-  TextEditFrame **tmp_text_edit_frames;
-  unsigned int i_rp, i_cp;
-
-  if (old_row_pool_size < new_row_pool_size)
-  {
-    if (old_row_pool_size != 0)
-    {
-      tmp_grid_row_layouts= new QHBoxLayout*[old_row_pool_size];
-      for (i_rp= 0; i_rp < old_row_pool_size; ++i_rp) tmp_grid_row_layouts[i_rp]= grid_row_layouts[i_rp];
-      delete [] grid_row_layouts;
-      grid_row_layouts= new QHBoxLayout*[new_row_pool_size];
-      for (i_rp= 0; i_rp < old_row_pool_size; ++i_rp) grid_row_layouts[i_rp]= tmp_grid_row_layouts[i_rp];
-      delete [] tmp_grid_row_layouts;
-      tmp_grid_row_widgets= new QWidget*[old_row_pool_size];
-      for (i_rp= 0; i_rp < old_row_pool_size; ++i_rp) tmp_grid_row_widgets[i_rp]= grid_row_widgets[i_rp];
-      delete [] grid_row_widgets;
-      grid_row_widgets= new QWidget*[new_row_pool_size];
-      for (i_rp= 0; i_rp < old_row_pool_size; ++i_rp) grid_row_widgets[i_rp]= tmp_grid_row_widgets[i_rp];
-      delete [] tmp_grid_row_widgets;
-    }
-    else
-    {
-      grid_row_layouts= new QHBoxLayout*[new_row_pool_size];
-      grid_row_widgets= new QWidget*[new_row_pool_size];
-    }
-  }
-
-  if (old_row_pool_size < new_row_pool_size)
-  {
-    for (i_rp= old_row_pool_size; i_rp < new_row_pool_size; ++i_rp)
-    {
-      grid_row_layouts[i_rp]= new QHBoxLayout();  /* I had "(client)" here. That caused warnings. */
-      grid_row_layouts[i_rp]->setSpacing(0);
-      grid_row_layouts[i_rp]->setContentsMargins(QMargins(0, 0, 0, 0));
-      grid_row_widgets[i_rp]= new QWidget(this);
-      grid_row_widgets[i_rp]->setLayout(grid_row_layouts[i_rp]);
-    }
-  }
-
-  if (old_cell_pool_size < new_cell_pool_size)
-  {
-    if (old_cell_pool_size != 0)
-    {
-      tmp_text_edit_widgets= new TextEditWidget*[old_cell_pool_size];
-      for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) tmp_text_edit_widgets[i_cp]= text_edit_widgets[i_cp];
-      delete [] text_edit_widgets;
-      text_edit_widgets= new TextEditWidget*[new_cell_pool_size];
-      for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) text_edit_widgets[i_cp]= tmp_text_edit_widgets[i_cp];
-      delete [] tmp_text_edit_widgets;
-      tmp_text_edit_layouts= new QHBoxLayout*[old_cell_pool_size];
-      for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) tmp_text_edit_layouts[i_cp]= text_edit_layouts[i_cp];
-      delete [] text_edit_layouts;
-      text_edit_layouts= new QHBoxLayout*[new_cell_pool_size];
-      for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) text_edit_layouts[i_cp]= tmp_text_edit_layouts[i_cp];
-      delete [] tmp_text_edit_layouts;
-      tmp_text_edit_frames= new TextEditFrame*[old_cell_pool_size];
-      for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) tmp_text_edit_frames[i_cp]= text_edit_frames[i_cp];
-      delete [] text_edit_frames;
-      text_edit_frames= new TextEditFrame*[new_cell_pool_size];
-      for (i_cp= 0; i_cp < old_cell_pool_size; ++i_cp) text_edit_frames[i_cp]= tmp_text_edit_frames[i_cp];
-      delete [] tmp_text_edit_frames;
-    }
-    else
-    {
-      text_edit_widgets= new TextEditWidget*[new_cell_pool_size];
-      text_edit_layouts= new QHBoxLayout*[new_cell_pool_size];
-      text_edit_frames= new TextEditFrame*[new_cell_pool_size];
-    }
-  }
-
-  if (old_cell_pool_size < new_cell_pool_size)
-  {
-    for (i_cp= old_cell_pool_size; i_cp < new_cell_pool_size; ++i_cp)
-    {
-      text_edit_widgets[i_cp]= new TextEditWidget(this);
-      text_edit_widgets[i_cp]->setCursor(Qt::ArrowCursor); /* See Note#1 above */
-      /* todo: this should be a constant e.g. MARGIN_AMOUNT_IN_PIXELS */
-      text_edit_widgets[i_cp]->document()->setDocumentMargin(0); /* default = 4 */
-      text_edit_widgets[i_cp]->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-      text_edit_layouts[i_cp]= new QHBoxLayout();
-      text_edit_layouts[i_cp]->addWidget(text_edit_widgets[i_cp]);
-      text_edit_frames[i_cp]= new TextEditFrame(this, this, i_cp);
-      text_edit_frames[i_cp]->setLayout(text_edit_layouts[i_cp]);
-      text_edit_widgets[i_cp]->text_edit_frame_of_cell= text_edit_frames[i_cp];
-    }
-  }
 }
 
 /*
@@ -6996,6 +6832,361 @@ QString fillup(MYSQL_RES *mysql_res,
 }
 
 /*
+  For display with xml or batch or raw, i.e. not the usual (html). Just dump.
+  Todo: Check: ocelot_html!=0 and ocelot_raw != 0 and ocelot_vertical != 0.
+*/
+void display_batch()
+{
+  char ocelot_grid_table_start[896];
+  char ocelot_grid_header_row_start[32];
+  char ocelot_grid_header_row_end[32];
+  char ocelot_grid_header_numeric_column_start[32];
+  char ocelot_grid_header_numeric_column_end[32];
+  char ocelot_grid_header_char_column_start[32];
+  char ocelot_grid_header_char_column_end[32];
+  char ocelot_grid_detail_row_start[32];
+  char ocelot_grid_detail_row_end[32];
+  char ocelot_grid_detail_numeric_column_start[32];
+  char ocelot_grid_detail_numeric_column_end[32];
+  char ocelot_grid_detail_char_column_start[320];
+  char ocelot_grid_detail_char_column_end[32];
+  char ocelot_grid_table_end[320];
+
+  /* Todo: this should be done permanently, on persistent variables. */
+  if (copy_of_ocelot_html != 0)
+  {
+    char html_border_color[32];
+    char html_color[32];
+    char html_background_color[32];
+    char html_header_background_color[32];
+    char html_font_family[32];
+    char html_font_size[32];
+    char html_font_style[32];
+    char html_font_weight[32];
+    int html_border_size;
+    strcpy(html_border_color, copy_of_parent->ocelot_grid_cell_border_color.toUtf8());
+    strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
+    strcpy(html_background_color, copy_of_parent->ocelot_grid_background_color.toUtf8());
+    strcpy(html_header_background_color, copy_of_parent->ocelot_grid_header_background_color.toUtf8());
+    strcpy(html_font_family, copy_of_parent->ocelot_grid_font_family.toUtf8());
+    strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
+    strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
+    strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
+    html_border_size= copy_of_parent->ocelot_grid_cell_border_size.toInt();
+    sprintf(ocelot_grid_table_start, "<head><style type=text/css>"
+            " th {"
+            "border-color: %s; "
+            "border-style: solid; "
+            "padding-left: 1px; "
+            "padding-right: 1px; "
+            "color: %s; "
+            "background-color: %s; "
+            "font-family: %s; "
+            "font-size: %spx; "
+            "font-style: %s; "
+            "font-weight: %s}"
+            " td {"
+            "border-color: %s; "
+            "border-style: solid; "
+            "padding-left: 1px; "
+            "padding-right: 1px; "
+            "color: %s; "
+            "background-color: %s; "
+            "font-family: %s; "
+            "font-size: %spx; "
+            "font-style: %s; "
+            "font-weight: %s}"
+            "</style></head><BODY><TABLE BORDER=%d>",
+            html_border_color,
+            html_color,
+            html_header_background_color,
+            html_font_family,
+            html_font_size,
+            html_font_style,
+            html_font_weight,
+            html_border_color,
+            html_color,
+            html_background_color,
+            html_font_family,
+            html_font_size,
+            html_font_style,
+            html_font_weight,
+            html_border_size);
+    strcpy(ocelot_grid_header_row_start, "<TR>");
+    strcpy(ocelot_grid_header_row_end, "</TR>");
+    strcpy(ocelot_grid_header_numeric_column_start, "<TH>");
+    strcpy(ocelot_grid_header_numeric_column_end, "</TH>");
+    strcpy(ocelot_grid_header_char_column_start, "<TH>");
+    strcpy(ocelot_grid_header_char_column_end, "</TH>");
+    strcpy(ocelot_grid_detail_row_start, "<TR>");
+    strcpy(ocelot_grid_detail_row_end, "</TR>");
+    strcpy(ocelot_grid_detail_numeric_column_start, "<TD align=\"right\">");
+    strcpy(ocelot_grid_detail_numeric_column_end,"</TD>");
+    strcpy(ocelot_grid_detail_char_column_start, "<TD>");
+    strcpy(ocelot_grid_detail_char_column_end , "</TD>");
+    strcpy(ocelot_grid_table_end, "</TABLE></BODY></HTML>");
+  }
+  else if (copy_of_ocelot_batch != 0)
+  {
+    strcpy(ocelot_grid_table_start, "");
+    strcpy(ocelot_grid_header_row_start, "");
+    strcpy(ocelot_grid_header_row_end, "\n");
+    strcpy(ocelot_grid_header_numeric_column_start, "");
+    strcpy(ocelot_grid_header_numeric_column_end, "\t");
+    strcpy(ocelot_grid_header_char_column_start, "");
+    strcpy(ocelot_grid_header_char_column_end, "\t");
+    strcpy(ocelot_grid_detail_row_start, "");
+    strcpy(ocelot_grid_detail_row_end, "\n");
+    strcpy(ocelot_grid_detail_numeric_column_start, "");
+    strcpy(ocelot_grid_detail_numeric_column_end, "\t");
+    strcpy(ocelot_grid_detail_char_column_start, "");
+    strcpy(ocelot_grid_detail_char_column_end , "\t");
+    strcpy(ocelot_grid_table_end, "");
+  }
+  else /* copy_of_ocelot_xml != 0 */
+  {
+    strcpy(ocelot_grid_table_start, "<?xml version=\"1.0\"?>"
+                                    "<resultset statement=\"");
+    strcat(ocelot_grid_table_start, copy_of_parent->query_utf16_copy.toUtf8());
+    strcat(ocelot_grid_table_start, "\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
+    strcpy(ocelot_grid_header_row_start, "<row>");
+    strcpy(ocelot_grid_header_row_end, "</row>");
+    strcpy(ocelot_grid_header_numeric_column_start, "<field name=\"");
+    strcpy(ocelot_grid_header_numeric_column_end, "</field>");
+    strcpy(ocelot_grid_header_char_column_start, "<field name=\"");
+    strcpy(ocelot_grid_header_char_column_end, "</field>");
+    strcpy(ocelot_grid_detail_row_start, "<row>");
+    strcpy(ocelot_grid_detail_row_end, "</row>");
+    strcpy(ocelot_grid_detail_numeric_column_start, "<field name=\"");
+    strcpy(ocelot_grid_detail_numeric_column_end, "</field>");
+    strcpy(ocelot_grid_detail_char_column_start, "<field name=\"");
+    strcpy(ocelot_grid_detail_char_column_end , "</field>");
+    strcpy(ocelot_grid_table_end, "</resultset>");
+  }
+  hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
+  //batch_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
+
+  /*
+    Kludge #1: if I don't delete batch_text_edit and create it again, then after
+    ocelot_html=1; big select; ocelot_html=0; big select; ocelot_html=1;big select;
+    the horizontal scroll bar won't work.
+    KLudge #2: without the show() and hide()s here, if I said
+    SET ocelot_html=0; SELECT * FROM "_space"; SET ocelot_html=1; SELECT * FROM "_space";
+    the vertical scroll bar was absent. I wish I knew why doing this can fix it.
+    Kludge #3: with something other than SetMaximumSize later, this wil cause too-small window:
+    SET ocelot_html=0; SELECT 5; SET ocelot_html=1; SELECT * FROM "_space";
+    Kludge #4: If we don't break off early when row count or column count = 0, we will crash.
+    But by doing so, we fail to add html or xml markup and we don't allow for message translation.
+    I don't bother to say batch_text_edit_hide() so this->show() makes it visible, momentarily.
+    I think batch_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
+  */
+  delete batch_text_edit;
+  batch_text_edit= new QTextEdit(this);
+  this->show();
+  client->show();
+  client->hide();
+  this->hide();
+
+  grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
+  grid_vertical_scroll_bar->setVisible(false);
+  grid_main_layout->addWidget(batch_text_edit);
+
+  if ((result_row_count == 0) || (result_column_count == 0))
+  {
+    batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
+    this->show();
+    client->show();
+    return;
+  }
+
+  if (copy_of_ocelot_html == 0)
+    batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
+  /* Todo: next four lines could be done during the initial setup (well, not any more, because of the kludges) */
+  batch_text_edit->setReadOnly(true);
+  batch_text_edit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
+  batch_text_edit->setWordWrapMode(QTextOption::NoWrap);
+  batch_text_edit->setFrameStyle(QFrame::NoFrame);
+  long unsigned int tmp_xrow;
+  char *pointer= result_set_copy_rows[0];
+  unsigned int v_length, f_length;
+  char *result_field_names_pointer;
+
+  /*
+    Todo: Adjust calculation for numeric columns, for escapes, for hex.
+          It ought to be possible to do a single non-looping calculation.
+ */
+  unsigned int tmp_size= sizeof(char);
+
+  if ((ocelot_result_grid_column_names_copy == 1)
+   && (copy_of_ocelot_xml == 0))
+  {
+    tmp_size+= strlen(ocelot_grid_header_row_start);
+    result_field_names_pointer= &result_field_names[0];
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      tmp_size+= strlen(ocelot_grid_header_char_column_start);
+      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      tmp_size+= v_length;
+      result_field_names_pointer+= v_length + sizeof(unsigned int);
+      tmp_size+= strlen(ocelot_grid_header_char_column_end);
+    }
+    tmp_size+= strlen(ocelot_grid_header_row_end);
+  }
+
+  tmp_size+= strlen(ocelot_grid_table_start);
+  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    result_field_names_pointer= &result_field_names[0];
+    tmp_size+= strlen(ocelot_grid_detail_row_start);
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if ((result_field_flags[i] & NUM_FLAG) != 0)
+        tmp_size+= strlen(ocelot_grid_detail_numeric_column_start);
+      else
+        tmp_size+= strlen(ocelot_grid_detail_char_column_start);
+      if (copy_of_ocelot_xml != 0)
+      {
+        memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
+        tmp_size+= f_length + 2;
+        result_field_names_pointer+= f_length + sizeof(unsigned int);
+      }
+      memcpy(&v_length, pointer, sizeof(unsigned int));
+      pointer+= sizeof(unsigned int) + sizeof(char);
+      /* Todo: we only need v_length*1 unless it's img or hex or escaped */
+      tmp_size+= v_length * 2;
+      tmp_size+= strlen(ocelot_grid_detail_char_column_end);
+      pointer+= v_length;
+    }
+    tmp_size+= strlen(ocelot_grid_detail_row_end);
+  }
+  tmp_size+= strlen(ocelot_grid_table_end);
+  char *tmp;
+
+  tmp= new char[tmp_size];
+  char *tmp_pointer= &tmp[0];
+
+  strcpy(tmp_pointer, ocelot_grid_table_start);
+  tmp_pointer+= strlen(ocelot_grid_table_start);
+
+  if ((ocelot_result_grid_column_names_copy == 1)
+   && (copy_of_ocelot_xml == 0))
+  {
+    char *result_field_names_pointer;
+    result_field_names_pointer= &result_field_names[0];
+    strcpy(tmp_pointer, ocelot_grid_header_row_start);
+    tmp_pointer+= strlen(ocelot_grid_header_row_start);
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      strcpy(tmp_pointer, ocelot_grid_header_char_column_start);
+      tmp_pointer+= strlen(ocelot_grid_header_char_column_start);
+      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      result_field_names_pointer+= sizeof(unsigned int);
+      memcpy(tmp_pointer, result_field_names_pointer, v_length);
+      tmp_pointer+= v_length;
+      strcpy(tmp_pointer, ocelot_grid_header_char_column_end);
+      tmp_pointer+= strlen(ocelot_grid_header_char_column_end);
+      result_field_names_pointer+= v_length;
+    }
+    strcpy(tmp_pointer, ocelot_grid_header_row_end);
+    tmp_pointer+= strlen(ocelot_grid_header_row_end);
+  }
+
+  pointer= result_set_copy_rows[0];
+  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    result_field_names_pointer= &result_field_names[0];
+    strcpy(tmp_pointer, ocelot_grid_detail_row_start);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_start);
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if ((result_field_flags[i] & NUM_FLAG) != 0)
+      {
+        strcpy(tmp_pointer, ocelot_grid_detail_numeric_column_start);
+        tmp_pointer+= strlen(ocelot_grid_detail_numeric_column_start);
+      }
+      else
+      {
+        strcpy(tmp_pointer, ocelot_grid_detail_char_column_start);
+        tmp_pointer+= strlen(ocelot_grid_detail_char_column_start);
+      }
+      if (copy_of_ocelot_xml != 0)
+      {
+        memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
+        result_field_names_pointer+= sizeof(unsigned int);
+        memcpy(tmp_pointer, result_field_names_pointer, f_length);
+        tmp_pointer+= f_length;
+        result_field_names_pointer+= f_length;
+        strcpy(tmp_pointer, "\">");
+        tmp_pointer+= 2;
+      }
+      memcpy(&v_length, pointer, sizeof(unsigned int));
+      pointer+= sizeof(unsigned int) + sizeof(char);
+      bool is_image_written= false;
+      if ((copy_of_ocelot_html != 0) && (is_image(i) == true))
+      {
+        char img_type[4]= "";
+        if (v_length > 4)
+        {
+          if (strncmp(pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
+          else if (strncmp(pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
+          else if (strncmp(pointer,"GIF",3) == 0) strcpy(img_type, "gif");
+          /* to: try BMP? check with loadFromData()? */
+        }
+        if (strcmp(img_type,"") != 0)
+        {
+          char *base64_tmp;
+          base64_tmp= new char[(v_length * 4) / 3 + 16];
+          QByteArray data= QByteArray::fromRawData(pointer, v_length);
+          strcpy(base64_tmp, data.toBase64());
+          memcpy(tmp_pointer, "<img src=\"data:image/", 21);
+          tmp_pointer+= 21;
+          memcpy(tmp_pointer, img_type, 3);
+          tmp_pointer+= 3;
+          memcpy(tmp_pointer, ";base64,", 8);
+          tmp_pointer+= 8;
+          memcpy(tmp_pointer, base64_tmp, strlen(base64_tmp));
+          tmp_pointer+= strlen(base64_tmp);
+          memcpy(tmp_pointer, "\"/>", 3);
+          tmp_pointer+= 3;
+          delete base64_tmp;
+          is_image_written= true;
+        }
+      }
+      if (is_image_written == false)
+      {
+        memcpy(tmp_pointer, pointer, v_length);
+        tmp_pointer+= v_length;
+      }
+      strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
+      tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
+      pointer+= v_length;
+    }
+    strcpy(tmp_pointer, ocelot_grid_detail_row_end);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_end);
+  }
+  strcpy(tmp_pointer, ocelot_grid_table_end);
+  tmp_pointer+= strlen(ocelot_grid_table_end);
+  *tmp_pointer= '\0';
+
+  if ((copy_of_ocelot_html != 0) && (copy_of_ocelot_raw == 0))
+  {
+    batch_text_edit->setHtml(tmp);
+  }
+  else
+  {
+    batch_text_edit->insertPlainText(tmp);
+  }
+  batch_text_edit->moveCursor(QTextCursor::Start);
+  batch_text_edit->ensureCursorVisible();
+  batch_text_edit->show();
+  show();
+  client->show();
+  delete [] tmp;
+  return;
+}
+
+
+/*
   display(due_to)
   ---------------
   After fillup() we can do layout and fill cells or just print out, depending on user options.
@@ -7019,7 +7210,7 @@ QString fillup(MYSQL_RES *mysql_res,
         SET ocelot_html = 0;
         select * from information_schema.tables limit 10;
         the display is obscured, that is why in display() I say
-        batch_text_edit->hide();
+        html_text_edit->hide();
         but why do I need it, if I've removed it from layout?
   Todo: Allow switch from one output to another. This does require
         having fillup() completely separate from display(), that part is now done.
@@ -7031,10 +7222,10 @@ QString fillup(MYSQL_RES *mysql_res,
     rather than something that might have been set later.
     Todo: ocelot_vertical_copy is a pointless duplication of copy_of_ocelot_vertical?
     Todo: ocelot_result_grid_column_names_copy is a pointless duplication of copy_of_ocelot_result_grid_column_names?
-  Re display_batch
-    We should set the copy_of items even if we will call display_batch etc., because we might change
-    how result_display_batch() works. But there are other items that we set at the start that,
-    I think, we don't need to set since display_batch() won't use them.
+  Re display_html
+    We should set the copy_of items even if we will call display_html etc., because we might change
+    how result_display_html() works. But there are other items that we set at the start that,
+    I think, we don't need to set since display_html() won't use them.
 */
 void display(int due_to,
              unsigned short ocelot_vertical,
@@ -7044,10 +7235,13 @@ void display(int due_to,
              unsigned short int ocelot_xml,
              unsigned short ocelot_result_grid_column_names)
 {
+  (void)due_to;
   /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
+#ifdef OLD_STUFF
   hide();
+#endif
 
-  if ((due_to == 0) || (due_to == 1))
+//  if ((due_to == 0) || (due_to == 1))
   {
     display_garbage_collect();
     copy_result_to_gridx();
@@ -7077,15 +7271,30 @@ void display(int due_to,
     ocelot_vertical_copy= ocelot_vertical;
     ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
   }
+
+  vertical_scroll_bar_initialize();
+
   if ((copy_of_ocelot_batch != 0)
-   || (copy_of_ocelot_html != 0)
-   || (copy_of_ocelot_xml != 0))
+   || (copy_of_ocelot_xml != 0)
+   || (copy_of_ocelot_raw != 0))
   {
     display_batch();
-    return;
   }
+
+  /* Since it's not ocelot_batch or ocelot_xml it must be ocelot_html */
+  {
+    grid_vertical_scroll_bar_value= -1; /* todo: check: is this alread in vertical_scroll_bar_initialize? */
+    focus_row_number= focus_column_number= -1; /* i.e. no cell is in focus */
+    prepare_for_display_html();
+    display_html(0);
+  }
+
+  return;
+
+#ifdef OLD_STUFF
+
   grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
-  batch_text_edit->hide();
+//  html_text_edit->hide();
 
   long unsigned int xrow;
   unsigned int xcol;
@@ -7125,7 +7334,7 @@ void display(int due_to,
   /* Todo: since grid_column_size_calc() recalculates max_height_of_a_char, don't bother with this. */
 
   QFont *pointer_to_font;
-  pointer_to_font= &text_edit_widget_font;
+  pointer_to_font= &result_grid_font;
   QFontMetrics mm= QFontMetrics(*pointer_to_font);
   /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
   ocelot_grid_max_desired_width_in_pixels= (parent->width() - (mm.boundingRect('W').width() * MIN_WIDTH_IN_CHARS));
@@ -7155,7 +7364,7 @@ void display(int due_to,
     todo: why the whole pool rather than just result-row_count + 1?
   */
   QFont *pointer_to_font_2;
-  pointer_to_font_2= &text_edit_widget_font;
+  pointer_to_font_2= &result_grid_font;
   QFontMetrics fm= QFontMetrics(*pointer_to_font_2);
   /* Todo: see whether this loop could be shifted somewhere so it's not repeated for every fillup */
   for (xrow= 0; (xrow < gridx_row_count) && (xrow < result_grid_widget_max_height_in_lines); ++xrow)
@@ -7403,9 +7612,10 @@ void display(int due_to,
 //  grid_scroll_area->setWidgetResizable(true);              /* Without this, the QTextEdit widget heights won't change */
 
   /* area->horizontalScrollBar()->setSingleStep(client->width() / 24); */ /* single-stepping seems pointless */
-
+#endif
 }
 
+#ifdef OLD_STUFF
 /*
   frame_resize() == Setting text_edit_frames[n] size.
   Called from: display() if vertical == 0 (initial),
@@ -7442,7 +7652,9 @@ void frame_resize(int ki, int grid_col, int width, int height)
   //text_edit_frames[ki]->setMaximumHeight(height);
   //text_edit_frames[ki]->setMinimumHeight(height);
 }
+#endif
 
+#ifdef OLD_STUFF
 /*
   Called from: TextEditFrame::mouseMoveEvent() if right drag line moved, so probable width change
   The call to get_column_height_in_pixels() is just so that vertical scroll bar might go on|off.
@@ -7468,6 +7680,50 @@ void frame_resize_for_drag_bottom(long int xrow, int ki, int grid_col, int width
   get_column_height_in_pixels(ki, width, height);
   if (copy_of_ocelot_vertical == 0) grid_row_widgets[xrow]->setFixedHeight(height);
   text_edit_frames[ki]->setFixedHeight(height);
+}
+#endif
+
+/*
+  The border color must differ from all background colors because mouseMoveEvent() finds column boundaries
+  by looking for color changes.
+  Todo: Make the difference smaller by adding or subtracting 1 at a time from final hex digit.
+*/
+QString get_border_color()
+{
+  QString tmp_border_color= copy_of_parent->ocelot_grid_cell_border_color;
+  int i= 1;
+  while ((tmp_border_color == copy_of_parent->ocelot_grid_background_color)
+      || (tmp_border_color == copy_of_parent->ocelot_grid_header_background_color)
+      || (tmp_border_color == copy_of_parent->ocelot_grid_cell_drag_line_color))
+  {
+    tmp_border_color= tmp_border_color.left(tmp_border_color.size() - 1)
+                    + QString::number(i);
+    ++i;
+  }
+  return tmp_border_color;
+}
+
+/*
+  Let's see whether we can output a thin image at the start of every row.
+  Suppose that the header and every row has a 1x1 black-and-white 73-byte .png changed to base64.
+  Warning: make sure you don't end with \0.
+  This was working okay with "if (h < 0 h= 1;" and "width=0" but sometimes the result was blank or too high.
+  Todo: We account for this when allocating tmp size but should record exact calculated size.
+  Todo: If it works, we can use it to force height iff it's greater.
+  Todo: instead of h= 5 we should say h= minimum height, whatever that is.
+*/
+int thin_image(char *tmp_pointer, const char *th_or_td, int height)
+{
+  char output_string[256];
+  int h= height;
+  if (h < 0) h= 5;
+  sprintf(output_string, "<%s width=0><img width=0 height=%d src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABAQAAAAA3bvkkAAAAEElEQVR4nGJgAQAAAP//AwAABgAFV7+r1AAAAABJRU5ErkJggg==\"/></%s>",
+          th_or_td, h, th_or_td);
+  if (h < 10) strcat(output_string, " "); /* We can overwrite so must be sure that size is always the same */
+  if (h < 100) strcat(output_string, " ");
+  if (h < 1000) strcat(output_string, " ");
+  memcpy(tmp_pointer, output_string, strlen(output_string));
+  return strlen(output_string);
 }
 
 /*
@@ -7510,7 +7766,7 @@ void frame_resize_for_drag_bottom(long int xrow, int ki, int grid_col, int width
         the changed row when modes are switched
   Todo: xml statement="" and field name="" contents lack escaping.
   Todo: "<" wrecks the cell, we need character entities
-  Todo: If you remove "batch_text_edit->setWordWrapMode(QTextOption::NoWrap);"
+  Todo: If you remove "html_text_edit->setWordWrapMode(QTextOption::NoWrap);"
         the effect is interesting, it might be a desirable option.
 */
 /*
@@ -7525,8 +7781,8 @@ void frame_resize_for_drag_bottom(long int xrow, int ki, int grid_col, int width
     ocelot_grid_header_char_column_end              ",      </TH>      tab
     ocelot_grid_detail_row_start                                               <row>
     ocelot_grid_detail_row_end                                                 </row>
-    ocelot_grid_detail_numeric_column_start                 <TD>
-    ocelot_grid_detail_numeric_column_end           ,       </TD>
+    ocelot_grid_detail_numeric_column_start                 <TD>[<div ...>]
+    ocelot_grid_detail_numeric_column_end           ,       </TD>[</div>]
     ocelot_grid_detail_char_column_start            "       <TD>               <field name="$field">
     ocelot_grid_detail_char_column_end              ",      </TD>              </field>
     ocelot_grid_table_end                                   </TABLE>
@@ -7534,14 +7790,14 @@ void frame_resize_for_drag_bottom(long int xrow, int ki, int grid_col, int width
 */
 /*
   Todo: the html style sheet
-  For html, instead of batch_text_edit->setStyleSheet(), we want to
+  For html, instead of html_text_edit->setStyleSheet(), we want to
   put css specifications in the html header. Example:
-  <HTML><head><style type=text/css>table, th, td {border-color: black; border-style: solid; color: red; background-color: blue}</style></head><BODY><TABLE BORDER=5>.
+  <HTML><head><style type=text/css>table, th, td {border-color: black; border-style: solid; color: red; background-color: blue}</style></HEAD><BODY><TABLE BORDER=5>.
   Although copy_of_parent->ocelot_grid_style_string) has all the
   necessary information, it's the wrong format. Use:
   color = copy_of_parent->ocelot_grid_text_color;
   background-color = copy_of_parent->ocelot_grid_background_color;
-  copy_of_parent->ocelot_grid_border_color; (no)
+  copy_of_parent->ocelot_grid_focus_cell_background_color; (no) (this is unimplemented anyway)
   copy_of_parent->ocelot_grid_header_background_color;
 
   font-family = copy_of_parent->ocelot_grid_font_family;
@@ -7555,188 +7811,298 @@ void frame_resize_for_drag_bottom(long int xrow, int ki, int grid_col, int width
   copy_of_parent->ocelot_grid_cell_border_size;
   copy_of_parent->ocelot_grid_cell_drag_line_size;
   Todo: I think hide() is unnecessary because the caller has already done it.
+  Re  new_grid_vertical_scroll_bar_value: compare fill_detail_widgets() usage.
+  We cannot let html_border_color be the same as any background color.
+  We must say border-style: solid; otherwise we get two-tone when border_size > 1
+     (someday look up: is default = groove? ridge? inset? outset?)
 */
-void display_batch()
+
+/* shared */
+char ocelot_grid_table_start[1896]; /* TODO: this can be too small if many conditionals */
+char ocelot_grid_header_row_start[32];
+char ocelot_grid_header_row_end[32];
+char ocelot_grid_header_numeric_column_start[32];
+char ocelot_grid_header_numeric_column_end[32];
+char ocelot_grid_header_char_column_start[32];
+char ocelot_grid_header_char_column_end[32];
+char ocelot_grid_detail_row_start[32];
+char ocelot_grid_detail_row_end[32];
+char ocelot_grid_detail_numeric_column_start[320];
+char ocelot_grid_detail_numeric_column_end[32];
+char ocelot_grid_detail_char_column_start[320];
+char ocelot_grid_detail_char_column_end[32];
+char ocelot_grid_table_end[320];
+
+void prepare_for_display_html()
 {
-  char ocelot_grid_table_start[896];
-  char ocelot_grid_header_row_start[32];
-  char ocelot_grid_header_row_end[32];
-  char ocelot_grid_header_numeric_column_start[32];
-  char ocelot_grid_header_numeric_column_end[32];
-  char ocelot_grid_header_char_column_start[32];
-  char ocelot_grid_header_char_column_end[32];
-  char ocelot_grid_detail_row_start[32];
-  char ocelot_grid_detail_row_end[32];
-  char ocelot_grid_detail_numeric_column_start[32];
-  char ocelot_grid_detail_numeric_column_end[32];
-  char ocelot_grid_detail_char_column_start[320];
-  char ocelot_grid_detail_char_column_end[32];
-  char ocelot_grid_table_end[320];
+    /* I'm not sure where this should go. It's really only good for size-change */
+    /* Maybe this doesn't work anyway */
+    grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
+    /* Todo: since grid_column_size_calc() recalculates max_height_of_a_char, don't bother with this. */
 
-  /* Todo: this should be done permanently, on persistent variables. */
-  if (copy_of_ocelot_html != 0)
-  {
-    char html_border_color[32];
-    char html_color[32];
-    char html_background_color[32];
-    char html_header_background_color[32];
-    char html_font_family[32];
-    char html_font_size[32];
-    char html_font_style[32];
-    char html_font_weight[32];
-    int html_border_size;
-    strcpy(html_border_color, copy_of_parent->ocelot_grid_cell_border_color.toUtf8());
-    strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
-    strcpy(html_background_color, copy_of_parent->ocelot_grid_background_color.toUtf8());
-    strcpy(html_header_background_color, copy_of_parent->ocelot_grid_header_background_color.toUtf8());
-    strcpy(html_font_family, copy_of_parent->ocelot_grid_font_family.toUtf8());
-    strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
-    strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
-    strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
-    html_border_size= copy_of_parent->ocelot_grid_cell_border_size.toInt();
-    sprintf(ocelot_grid_table_start, "<head><style type=text/css>"
-            " th {"
-            "border-color: %s; "
-            "border-style: solid; "
-            "padding-left: 1px; "
-            "padding-right: 1px; "
-            "color: %s; "
-            "background-color: %s; "
-            "font-family: %s; "
-            "font-size: %spx; "
-            "font-style: %s; "
-            "font-weight: %s}"
-            " td {"
-            "border-color: %s; "
-            "border-style: solid; "
-            "padding-left: 1px; "
-            "padding-right: 1px; "
-            "color: %s; "
-            "background-color: %s; "
-            "font-family: %s; "
-            "font-size: %spx; "
-            "font-style: %s; "
-            "font-weight: %s}"
-            "</style></head><BODY><TABLE BORDER=%d>",
-            html_border_color,
-            html_color,
-            html_header_background_color,
-            html_font_family,
-            html_font_size,
-            html_font_style,
-            html_font_weight,
-            html_border_color,
-            html_color,
-            html_background_color,
-            html_font_family,
-            html_font_size,
-            html_font_style,
-            html_font_weight,
-            html_border_size);
-    strcpy(ocelot_grid_header_row_start, "<TR>");
-    strcpy(ocelot_grid_header_row_end, "</TR>");
-    strcpy(ocelot_grid_header_numeric_column_start, "<TH>");
-    strcpy(ocelot_grid_header_numeric_column_end, "</TH>");
-    strcpy(ocelot_grid_header_char_column_start, "<TH>");
-    strcpy(ocelot_grid_header_char_column_end, "</TH>");
-    strcpy(ocelot_grid_detail_row_start, "<TR>");
-    strcpy(ocelot_grid_detail_row_end, "</TR>");
-    strcpy(ocelot_grid_detail_numeric_column_start, "<TD align=\"right\">");
-    strcpy(ocelot_grid_detail_numeric_column_end,"</TD>");
-    strcpy(ocelot_grid_detail_char_column_start, "<TD>");
-    strcpy(ocelot_grid_detail_char_column_end , "</TD>");
-    strcpy(ocelot_grid_table_end, "</TABLE></BODY></HTML>");
-  }
-  else if (copy_of_ocelot_batch != 0)
-  {
-    strcpy(ocelot_grid_table_start, "");
-    strcpy(ocelot_grid_header_row_start, "");
-    strcpy(ocelot_grid_header_row_end, "\n");
-    strcpy(ocelot_grid_header_numeric_column_start, "");
-    strcpy(ocelot_grid_header_numeric_column_end, "\t");
-    strcpy(ocelot_grid_header_char_column_start, "");
-    strcpy(ocelot_grid_header_char_column_end, "\t");
-    strcpy(ocelot_grid_detail_row_start, "");
-    strcpy(ocelot_grid_detail_row_end, "\n");
-    strcpy(ocelot_grid_detail_numeric_column_start, "");
-    strcpy(ocelot_grid_detail_numeric_column_end, "\t");
-    strcpy(ocelot_grid_detail_char_column_start, "");
-    strcpy(ocelot_grid_detail_char_column_end , "\t");
-    strcpy(ocelot_grid_table_end, "");
-  }
-  else /* copy_of_ocelot_xml != 0 */
-  {
-    strcpy(ocelot_grid_table_start, "<?xml version=\"1.0\"?>"
-                                    "<resultset statement=\"");
-    strcat(ocelot_grid_table_start, copy_of_parent->query_utf16_copy.toUtf8());
-    strcat(ocelot_grid_table_start, "\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">");
-    strcpy(ocelot_grid_header_row_start, "<row>");
-    strcpy(ocelot_grid_header_row_end, "</row>");
-    strcpy(ocelot_grid_header_numeric_column_start, "<field name=\"");
-    strcpy(ocelot_grid_header_numeric_column_end, "</field>");
-    strcpy(ocelot_grid_header_char_column_start, "<field name=\"");
-    strcpy(ocelot_grid_header_char_column_end, "</field>");
-    strcpy(ocelot_grid_detail_row_start, "<row>");
-    strcpy(ocelot_grid_detail_row_end, "</row>");
-    strcpy(ocelot_grid_detail_numeric_column_start, "<field name=\"");
-    strcpy(ocelot_grid_detail_numeric_column_end, "</field>");
-    strcpy(ocelot_grid_detail_char_column_start, "<field name=\"");
-    strcpy(ocelot_grid_detail_char_column_end , "</field>");
-    strcpy(ocelot_grid_table_end, "</resultset>");
-  }
-  hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
-  //batch_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
+    MainWindow *parent= copy_of_parent;
+    QFont *pointer_to_font;
+    pointer_to_font= &result_grid_font;
+    QFontMetrics mm= QFontMetrics(*pointer_to_font);
+    /* Todo: figure out why this says parent->width() rather than this->width() -- maybe "this" has no width yet? */
+    ocelot_grid_max_desired_width_in_pixels= (parent->width() - (mm.boundingRect('W').width() * MIN_WIDTH_IN_CHARS));
+    {
+      /*
+        Try to ensure we can fit at least header (if there is a header) plus one row.
+        So there's a maximum number of lines per row.
+        We assume (border height + horizontal scroll bar height) < 11 (todo: calculate them).
+        We assume result grid height = height of main window / 3 (todo: calculate it).
+      */
+      int result_grid_height= (parent->height() / 3) - 11;
+      int line_height= mm.lineSpacing();
+      if ((copy_of_ocelot_result_grid_column_names == 1) && (copy_of_ocelot_vertical == 0))
+          result_grid_height-= line_height;
+      ocelot_grid_max_column_height_in_lines= result_grid_height / line_height;
+      if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
+    }
 
-  /*
-    Kludge #1: if I don't delete batch_text_edit and create it again, then after
-    ocelot_html=1; big select; ocelot_html=0; big select; ocelot_html=1;big select;
-    the horizontal scroll bar won't work.
-    KLudge #2: without the show() and hide()s here, if I said
-    SET ocelot_html=0; SELECT * FROM "_space"; SET ocelot_html=1; SELECT * FROM "_space";
-    the vertical scroll bar was absent. I wish I knew why doing this can fix it.
-    Kludge #3: with something other than SetMaximumSize later, this wil cause too-small window:
-    SET ocelot_html=0; SELECT 5; SET ocelot_html=1; SELECT * FROM "_space";
-    Kludge #4: If we don't break off early when row count or column count = 0, we will crash.
-    But by doing so, we fail to add html or xml markup and we don't allow for message translation.
-    I don't bother to say batch_text_edit_hide() so this->show() makes it visible, momentarily.
-    I think batch_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
-  */
-  delete batch_text_edit;
-  batch_text_edit= new QTextEdit(this);
-  this->show();
-  client->show();
-  client->hide();
-  this->hide();
+    /* This is so we know desired column widths for deciding whether to wrap in HTML cells */
+    /* Todo: Check harder. Some things might not be initialized yet for this call. */
+    /* Todo: We're not ready yet for ocelot_vertical != 0 */
+    //if (copy_of_ocelot_html != 0)
+    {
+      //if (copy_of_ocelot_vertical == 0)
+      grid_column_size_calc(setting_ocelot_grid_cell_border_size_as_int,
+                            setting_ocelot_grid_cell_drag_line_size_as_int,
+                            ocelot_result_grid_column_names_copy,
+                            copy_of_connections_dbms); /* get grid_column_widths[] and grid_column_heights[] */
+    }
+    /* Todo: this should be done permanently, on persistent variables. */
+    //if (copy_of_ocelot_html != 0)
+    {
+      char html_border_color[32];
+      char html_color[32];
+      char html_background_color[32];
+      char html_header_background_color[32];
+      char html_font_family[32];
+      char html_font_size[32];
+      char html_font_style[32];
+      char html_font_weight[32];
+      char html_drag_line_color[32];
+      int html_border_size;
+
+      QString tmp_border_color= get_border_color();
+
+      strcpy(html_border_color, tmp_border_color.toUtf8());
+      strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
+      strcpy(html_background_color, copy_of_parent->ocelot_grid_background_color.toUtf8());
+      strcpy(html_header_background_color, copy_of_parent->ocelot_grid_header_background_color.toUtf8());
+      strcpy(html_font_family, copy_of_parent->ocelot_grid_font_family.toUtf8());
+      strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
+      strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
+      strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
+      strcpy(html_drag_line_color, copy_of_parent->ocelot_grid_cell_drag_line_color.toUtf8());
+      html_border_size= copy_of_parent->ocelot_grid_cell_border_size.toInt();
+
+      char tmp_div[512];
+      {
+        /* TEST!!! start: See whether we can change color, at least. HTML only! SHOULD BE IN A LOOP! */
+        QString new_tooltip= "";
+        QString new_style_sheet= copy_of_parent->ocelot_grid_style_string;
+        QString new_cell_height= "";
+        QString new_cell_width= "";
+        bool result= conditional_setting_evaluate(
+             0, /* cs_number */
+             0, /* doesn't matter */
+             0, /* doesn't matter */
+             0, /* doesn't matter */
+             0, /* doesn't matter */
+             TEXTEDITFRAME_CELL_TYPE_DETAIL, /* text_edit_frames[text_edit_frames_index]->cell_type, */
+             copy_of_parent->ocelot_grid_style_string,          /* old_style_sheet */
+             true,        /* is_always_true */
+             &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width);
+        if (result == true)
+        {
+          strcpy(tmp_div, " .E0 {");                        /* for <div> */
+          strcat(tmp_div, new_style_sheet.toUtf8());
+          strcat(tmp_div, "} ");
+        }
+        else tmp_div[0]= '\0';
+      }
+      sprintf(ocelot_grid_table_start,"<HTML><HEAD><style type=text/css>"
+              " %s "                                                /* tmp_div */
+              " table {border-style: solid; background-color: %s; border-color: %s} "    /* html_border_color */
+              " body {"
+              "background-color: purple; "
+              "color: %s; "                                         /* html_color */
+              "font-family: '%s'; "                                 /* html_font_family */
+              "font-size: %spt; "                                   /* html_font_size */
+              "font-style: %s; "                                    /* html_font_style */
+              "font-weight: %s}"                                    /* html_font_weight */
+              " th {"
+              "background-color: %s; "                              /* html_header_background_color */
+              "}"
+              " td {"
+              "background-color: %s; "                              /* html_background_color */
+              "}"
+              "</style></HEAD><BODY bgcolor=%s><TABLE BORDER=%d blue>", /* html_border_size */
+              tmp_div,
+              html_border_color, /* table{background-color:...} will look like cell border color */
+              html_border_color, /* table{border-color:...} will look like cell border color */
+              html_color,        /* body {color} will be color of text in th and td */
+              html_font_family,             /* body {font-family} */
+              html_font_size,               /* body {font-size} */
+              html_font_style,              /* body {font-style} */
+              html_font_weight,             /* body {font-weight} */
+              html_header_background_color, /* th {background-color} */
+              html_background_color,        /* td {background-color} */
+              html_drag_line_color,         /* body bgcolor */
+              html_border_size);            /* table border size */
+      strcpy(ocelot_grid_header_row_start, "<TR bgcolor=blue>");
+      strcpy(ocelot_grid_header_row_end, "</TR>");
+      strcpy(ocelot_grid_header_numeric_column_start, "<TH>");
+      strcpy(ocelot_grid_header_numeric_column_end, "</TH>");
+      strcpy(ocelot_grid_header_char_column_start, "<TH>");
+      strcpy(ocelot_grid_header_char_column_end, "</TH>");
+      strcpy(ocelot_grid_detail_row_start, "<TR>");
+      strcpy(ocelot_grid_detail_row_end, "</TR>");
+      strcpy(ocelot_grid_detail_numeric_column_start, "<TD align=\"right\">");
+      strcpy(ocelot_grid_detail_numeric_column_end,"</TD>");
+      /* TEST!!!! */
+      strcpy(ocelot_grid_detail_char_column_start, "<TD width=    >");
+      strcpy(ocelot_grid_detail_char_column_end , "</TD>");
+      strcpy(ocelot_grid_table_end, "</TABLE></BODY></HTML>");
+    }
+
+//TEST!!    hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
+    //html_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
+
+    /*
+      Kludge #1: if I don't delete html_text_edit and create it again, then after
+      ocelot_html=1; big select; ocelot_html=0; big select; ocelot_html=1;big select;
+      the horizontal scroll bar won't work.
+      KLudge #2: without the show() and hide()s here, if I said
+      SET ocelot_html=0; SELECT * FROM "_space"; SET ocelot_html=1; SELECT * FROM "_space";
+      the vertical scroll bar was absent. I wish I knew why doing this can fix it.
+      Kludge #3: with something other than SetMaximumSize later, this wil cause too-small window:
+      SET ocelot_html=0; SELECT 5; SET ocelot_html=1; SELECT * FROM "_space";
+      Kludge #4: If we don't break off early when row count or column count = 0, we will crash.
+      But by doing so, we fail to add html or xml markup and we don't allow for message translation.
+      I don't bother to say html_text_edit_hide() so this->show() makes it visible, momentarily.
+      I think html_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
+    */
+    /*** Removed due to tests */
+    //delete html_text_edit;
+    //html_text_edit= new Result_qtextedit(this);
+
+}
+
+/*
+  Called from display_html(). Return expected # of pixels in a column of a row.
+              For a string: height of a line for the column's font, * #-of-<br>s
+              For an image: default height
+              ... but there might be an override due to a height specifier, which might be conditional
+              ... see grid_row_heights[]
+            + border-size * 2
+            + 1 (mysteriously)
+  Todo: Look for conditional settings.
+  Todo: call this for header too, if it's decided that header can be multi-line.
+  Todo: Should also look for image height and grid heights[]
+  Todo: Possibly boundingRect() would be more accurate, especially if someday word wrap is allowed.
+*/
+int column_height(unsigned int grid_row, int column_no, int v_length, char *value)
+{
+  (void)grid_row;
+  (void)value;
+  int column_width_in_chars= (grid_column_widths[column_no] / setting_max_width_of_a_char);
+  int lines_in_cell= (v_length + (column_width_in_chars - 1)) / column_width_in_chars;
+  if (lines_in_cell == 0) lines_in_cell= 1;
+  int this_column_height= (lines_in_cell * max_height_of_a_char) + (setting_ocelot_grid_cell_border_size_as_int * 2) + 1;
+  if (this_column_height < (int) grid_row_heights[column_no]) this_column_height= grid_row_heights[column_no];
+  return this_column_height;
+}
+
+/*
+  Todo: ensure this isn't called for some irrelevant vertical scroll bar event.
+  Todo: We're calculating char[] size in advance and using strcpy() or memcpy().
+        It would be lots simpler and safer to use a QString, but might be slower.
+  Todo: Figure out how many rows you can fit. Straightforward but time-consuming. Mostly finished.
+        Calculate max_display_height =
+          viewport-height or widget height
+          - height of a potential horizontal scroll bar (but don't subtract this if width < widget width)
+            i.e. self.style().pixelMetric(qg.QStyle.PM_ScrollBarExtent)
+            and frame if you ever decide to have a frame
+            +3 say some folks in a forum
+          - n pixels for luck
+          -     width +=
+        Calculate table_height =
+          0
+          For each row:
+            + max_column_heights i.e. size of highest column as returned by column_height()
+          If total max_column_heights > max_display_height after X rows, you want X - 1 rows.
+          Exception: X cannot be 0, i.e. there is always at least 1 row. It can have its own scroll bar.
+        You might have a bit of trouble if there is a font-change within the column, otherwise you should be accurate.
+        Warning: if lineSpacing()==24 then max_height_of_a_char==26 and actual height seems to be 27
+*/
+void display_html(int new_grid_vertical_scroll_bar_value)
+{
+  if (copy_of_ocelot_vertical == 1) { display_html_html_vertical(new_grid_vertical_scroll_bar_value); return; }
+
+  /* Todo: result_grid_height_after_last_resize can change in ways that might not be anticipated. */
+  int max_display_height= result_grid_height_after_last_resize;
+  if (max_display_height < 300) max_display_height= 261; /* TEST!! because first display has it wrong. */
+
+  int w= scroll_bar_width * 2; /* todo: should add width of the leftmost (sizer) column, actually */
+  for (int i= 0; i < (int) gridx_column_count; ++i) w+= grid_column_widths[i]
+                                              + setting_ocelot_grid_cell_border_size_as_int * 2
+                                              + 1;
+  if (w >= (int) result_grid_width_after_last_resize)
+      max_display_height-= scroll_bar_height;
+  /* Todo: eventually row_height + max_display_rows won't need to be calculated at this stage. */
+  int row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1;
+  int max_display_rows= max_display_height / row_height;
+  if (ocelot_result_grid_column_names_copy == 1)
+  {
+    --max_display_rows;
+  }
+  if (max_display_rows <= 0) max_display_rows= 1;
+
+  is_paintable= 0;
+
+  /* TODO: IS THIS NECESSARY? IS IT IN THE RIGHT PLACE? */
+//  printf("**** html_text_edit->show();\n");
+//  html_text_edit->show();
+
+  /* I SUSPECT THAT IF I HIDE CLIENT THEN SCROLLBAR WON'T WORK CORRECTLY WITH SLIDER */
+  /* TODO: WHY WERE THESE THINGS HERE? */
+//  this->show();
+//  client->show();
+//  client->hide();
+//  this->hide();
 
   grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
-  grid_vertical_scroll_bar->setVisible(false);
-  grid_main_layout->addWidget(batch_text_edit);
+//  grid_vertical_scroll_bar->setVisible(false); /* let it stay visible for tests */
+//  grid_main_layout->addWidget(html_text_edit);
 
   if ((result_row_count == 0) || (result_column_count == 0))
   {
-    batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
-    this->show();
-    client->show();
+    html_text_edit->insertPlainText("row_count == 0 or column_count == 0");
+//    this->show();
+//    client->show();
     return;
   }
 
-  if (copy_of_ocelot_html == 0)
-    batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
-  /* Todo: next four lines could be done during the initial setup (well, not any more, because of the kludges) */
-  batch_text_edit->setReadOnly(true);
-  batch_text_edit->setAlignment(Qt::AlignTop | Qt::AlignLeft);
-  batch_text_edit->setWordWrapMode(QTextOption::NoWrap);
-  batch_text_edit->setFrameStyle(QFrame::NoFrame);
   long unsigned int tmp_xrow;
-  char *pointer= result_set_copy_rows[0];
-  unsigned int v_length, f_length;
+  char *result_set_pointer= result_set_copy_rows[0];
+  unsigned int v_length /*, f_length */;
   char *result_field_names_pointer;
 
   /*
-    Todo: Adjust calculation for numeric columns, for escapes, for hex.
-          It ought to be possible to do a single non-looping calculation.
+    For every column value we add size of possible overhead in <th> or <td> or <div>.
+    Todo: It ought to be possible to do a single non-looping calculation.
  */
   unsigned int tmp_size= sizeof(char);
+
+  unsigned int max_column_heights_total= 0;
+
+  /* <TD></TD> might be replaced by <TD><div class="xx"></div></TD> which is 22 bytes */
+  unsigned int extra_for_div= 0;
+  if (copy_of_parent->conditional_settings.count() > 0) extra_for_div= 22;
 
   if ((ocelot_result_grid_column_names_copy == 1)
    && (copy_of_ocelot_xml == 0))
@@ -7745,7 +8111,213 @@ void display_batch()
     result_field_names_pointer= &result_field_names[0];
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
-      tmp_size+= strlen(ocelot_grid_header_char_column_start);
+      tmp_size+= strlen(ocelot_grid_header_char_column_start) + extra_for_div;
+      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      tmp_size+= v_length;
+      result_field_names_pointer+= v_length + sizeof(unsigned int);
+      tmp_size+= strlen(ocelot_grid_header_char_column_end);
+    }
+    tmp_size+= strlen(ocelot_grid_header_row_end);
+    max_column_heights_total= row_height;
+  }
+
+  tmp_size+= strlen(ocelot_grid_table_start);
+
+  //for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  unsigned int grid_row;
+  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (tmp_xrow < result_row_count) && (grid_row < (unsigned int) max_display_rows);
+       ++tmp_xrow, ++grid_row)
+  {
+    result_field_names_pointer= &result_field_names[0];
+    tmp_size+= strlen(ocelot_grid_detail_row_start);
+    int max_column_height= 0;
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      if ((result_field_flags[i] & NUM_FLAG) != 0)
+        tmp_size+= strlen(ocelot_grid_detail_numeric_column_start) + extra_for_div;
+      else
+        tmp_size+= strlen(ocelot_grid_detail_char_column_start) + extra_for_div;
+      tmp_size+= 12; /* for "width=xxxxx;" */
+      memcpy(&v_length, result_set_pointer, sizeof(unsigned int));
+      result_set_pointer+= sizeof(unsigned int) + sizeof(char);
+      int this_column_height= column_height(grid_row, i, v_length, result_set_pointer);
+      if (this_column_height > max_column_height) max_column_height= this_column_height;
+      tmp_size+= v_length;
+      tmp_size+= strlen(ocelot_grid_detail_char_column_end);
+      result_set_pointer+= v_length;
+    }
+    tmp_size+= strlen(ocelot_grid_detail_row_end);
+    max_column_heights_total+= max_column_height;
+
+    if ((max_column_heights_total + 10) > (unsigned int) max_display_height)
+    {
+      /* Too many rows. There's no good justification for "+ 10" but it's harmless to display too few. */
+      max_display_rows= grid_row;
+      if (max_display_rows <= 0) max_display_rows= 1;
+      break;
+    }
+  }
+  tmp_size+= strlen(ocelot_grid_table_end);
+  char *tmp;
+
+  /* *5 in case (a) we change & to &amp; (b) we add <br> (c) we use hex digits (d) we forgot something. */
+  tmp_size= tmp_size * 5;
+
+  /* +200 because thin_image */
+
+  tmp_size+= 1000000; /* image paste experiment */
+
+  tmp= new char[tmp_size];
+  char *tmp_pointer= &tmp[0];
+
+  char *tmp_pointer_before_thin_image_call; /* For the first column. Includes height which may need changing. */
+  int new_cell_height; /* If this becomes positive, we have to rewrite at tmp_pointer_before_thin_image_call */
+
+  strcpy(tmp_pointer, ocelot_grid_table_start);
+  tmp_pointer+= strlen(ocelot_grid_table_start);
+
+  if (ocelot_result_grid_column_names_copy == 1)
+  {
+    char *result_field_names_pointer;
+    result_field_names_pointer= &result_field_names[0];
+    strcpy(tmp_pointer, ocelot_grid_header_row_start);
+    tmp_pointer+= strlen(ocelot_grid_header_row_start);
+    tmp_pointer_before_thin_image_call= tmp_pointer;
+    tmp_pointer+= thin_image(tmp_pointer, (const char*) "TH", 1);
+
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      result_field_names_pointer+= sizeof(unsigned int);
+
+      //memcpy(tmp_pointer, result_field_names_pointer, v_length);
+      //tmp_pointer+= v_length;
+
+      tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_header_char_column_start,
+                                                    ocelot_grid_header_char_column_start,
+                                                    tmp_pointer,
+                                                    result_field_names_pointer,
+                                                    v_length,
+                                                    TEXTEDITFRAME_CELL_TYPE_HEADER,
+                                                    grid_column_widths[i],
+                                                    result_grid_font,
+                                                    setting_max_width_of_a_char,
+                                                    i,
+                                                    0, /* tmp_xrow */
+                                                    ocelot_grid_header_char_column_end,
+                                                    &new_cell_height);
+      result_field_names_pointer+= v_length;
+    }
+    strcpy(tmp_pointer, ocelot_grid_header_row_end);
+    tmp_pointer+= strlen(ocelot_grid_header_row_end);
+  }
+
+  result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
+  //unsigned int grid_row;
+  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (tmp_xrow < result_row_count) && (grid_row < (unsigned int) max_display_rows);
+       ++tmp_xrow, ++grid_row)
+//  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  {
+    result_field_names_pointer= &result_field_names[0];
+    strcpy(tmp_pointer, ocelot_grid_detail_row_start);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_start);
+    tmp_pointer_before_thin_image_call= tmp_pointer;
+    tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row]);
+
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      memcpy(&v_length, result_set_pointer, sizeof(unsigned int));
+      result_set_pointer+= sizeof(unsigned int) + sizeof(char);
+      /* more "HTML only" stuff */
+      tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
+                                                    ocelot_grid_detail_char_column_start,
+                                                    tmp_pointer,
+                                                    result_set_pointer,
+                                                    v_length,
+                                                    TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                                                    grid_column_widths[i],
+                                                    result_grid_font,
+                                                    setting_max_width_of_a_char,
+                                                    i,
+                                                    tmp_xrow,
+                                                    ocelot_grid_detail_char_column_end,
+                                                    &new_cell_height);
+      result_set_pointer+= v_length;
+
+      if (new_cell_height > 0)
+      {
+        thin_image(tmp_pointer_before_thin_image_call, (const char*) "TD", new_cell_height); /* overwrite */
+      }
+    }
+    strcpy(tmp_pointer, ocelot_grid_detail_row_end);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_end);
+  }
+  strcpy(tmp_pointer, ocelot_grid_table_end);
+  tmp_pointer+= strlen(ocelot_grid_table_end);
+  *tmp_pointer= '\0';
+
+  html_text_edit->setHtml(tmp);
+  html_text_edit->moveCursor(QTextCursor::Start);
+  html_text_edit->ensureCursorVisible();
+  /* Beware, saying show() causes resize_or_font_change which calls display_html */
+  {
+//TEST!!    html_text_edit->show();
+//TEST!!    show();
+//TEST!!    client->show();
+  }
+  delete [] tmp;
+  is_paintable= 1;
+  return;
+}
+
+/*
+  When is_vertical == 1 we have one line per column: [optional column heading] column value.
+  Todo: This is only when copy_of_ocelot_html != 0. But size calculation for xml is similar.
+*/
+void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
+{
+  int new_cell_height; /* TODO: WE HAVE TO DO SOMETHING WITH THIS! */
+
+  is_paintable= 0;
+
+  /* TODO: IS THIS NECESSARY? IS IT IN THE RIGHT PLACE? */
+//  printf("**** html_text_edit->show();\n");
+  html_text_edit->show();
+
+  grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
+
+  if ((result_row_count == 0) || (result_column_count == 0))
+  {
+    html_text_edit->insertPlainText("row_count == 0 or column_count == 0");
+    this->show();
+    client->show();
+    return;
+  }
+
+  long unsigned int tmp_xrow;
+  char *pointer= result_set_copy_rows[0];
+  unsigned int v_length, f_length;
+  char *result_field_names_pointer;
+
+  /*
+    For every column value we add size of possible overhead in <th> or <td> or <div>.
+    Todo: It ought to be possible to do a single non-looping calculation.
+ */
+  unsigned int tmp_size= sizeof(char);
+
+  /* <TD></TD> might be replaced by <TD><div class="xx"></div></TD> which is 22 bytes */
+  unsigned int extra_for_div= 0;
+  if ((copy_of_ocelot_html == 1) && (copy_of_parent->conditional_settings.count() > 0)) extra_for_div= 22;
+
+  if (ocelot_result_grid_column_names_copy == 1)
+  {
+    tmp_size+= strlen(ocelot_grid_header_row_start);
+    result_field_names_pointer= &result_field_names[0];
+    for (unsigned int i= 0; i < result_column_count; ++i)
+    {
+      tmp_size+= strlen(ocelot_grid_header_char_column_start) + extra_for_div;
       memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
       tmp_size+= v_length;
       result_field_names_pointer+= v_length + sizeof(unsigned int);
@@ -7755,26 +8327,32 @@ void display_batch()
   }
 
   tmp_size+= strlen(ocelot_grid_table_start);
-  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+
+  //for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  unsigned int grid_row;
+  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (tmp_xrow < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
+       ++tmp_xrow, ++grid_row)
   {
     result_field_names_pointer= &result_field_names[0];
     tmp_size+= strlen(ocelot_grid_detail_row_start);
     for (unsigned int i= 0; i < result_column_count; ++i)
-    {  
+    {
       if ((result_field_flags[i] & NUM_FLAG) != 0)
-        tmp_size+= strlen(ocelot_grid_detail_numeric_column_start);
+        tmp_size+= strlen(ocelot_grid_detail_numeric_column_start) + extra_for_div;
       else
-        tmp_size+= strlen(ocelot_grid_detail_char_column_start);
-      if (copy_of_ocelot_xml != 0)
+        tmp_size+= strlen(ocelot_grid_detail_char_column_start) + extra_for_div;
+      tmp_size+= 12; /* for "width=xxxxx;" */
+//      if (copy_of_ocelot_xml != 0)
       {
         memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
         tmp_size+= f_length + 2;
         result_field_names_pointer+= f_length + sizeof(unsigned int);
       }
       memcpy(&v_length, pointer, sizeof(unsigned int));
+
       pointer+= sizeof(unsigned int) + sizeof(char);
-      /* Todo: we only need v_length*1 unless it's img or hex or escaped */
-      tmp_size+= v_length * 2;
+      tmp_size+= v_length;
       tmp_size+= strlen(ocelot_grid_detail_char_column_end);
       pointer+= v_length;
     }
@@ -7783,107 +8361,76 @@ void display_batch()
   tmp_size+= strlen(ocelot_grid_table_end);
   char *tmp;
 
+  /* TEST!!!! * temporarily 50 */
+  /* *5 in case (a) we change & to &amp; (b) we add <br> (c) we use hex digits (d) we forgot something. */
+  tmp_size= tmp_size * 50;
+
   tmp= new char[tmp_size];
   char *tmp_pointer= &tmp[0];
 
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
 
-  if ((ocelot_result_grid_column_names_copy == 1)
-   && (copy_of_ocelot_xml == 0))
+  pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
+  //unsigned int grid_row;
+  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (tmp_xrow < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
+       ++tmp_xrow, ++grid_row)
+//  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
   {
-    char *result_field_names_pointer;
     result_field_names_pointer= &result_field_names[0];
-    strcpy(tmp_pointer, ocelot_grid_header_row_start);
-    tmp_pointer+= strlen(ocelot_grid_header_row_start);
-    for (unsigned int i= 0; i < result_column_count; ++i)
-    {
-      strcpy(tmp_pointer, ocelot_grid_header_char_column_start);
-      tmp_pointer+= strlen(ocelot_grid_header_char_column_start);
-      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
-      result_field_names_pointer+= sizeof(unsigned int);
-      memcpy(tmp_pointer, result_field_names_pointer, v_length);
-      tmp_pointer+= v_length;
-      strcpy(tmp_pointer, ocelot_grid_header_char_column_end);
-      tmp_pointer+= strlen(ocelot_grid_header_char_column_end);
-      result_field_names_pointer+= v_length;
-    }
-    strcpy(tmp_pointer, ocelot_grid_header_row_end);
-    tmp_pointer+= strlen(ocelot_grid_header_row_end);
-  }
 
-  pointer= result_set_copy_rows[0];
-  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
-  {
-    result_field_names_pointer= &result_field_names[0];
-    strcpy(tmp_pointer, ocelot_grid_detail_row_start);
-    tmp_pointer+= strlen(ocelot_grid_detail_row_start);
     for (unsigned int i= 0; i < result_column_count; ++i)
     {
-      if ((result_field_flags[i] & NUM_FLAG) != 0)
-      {
-        strcpy(tmp_pointer, ocelot_grid_detail_numeric_column_start);
-        tmp_pointer+= strlen(ocelot_grid_detail_numeric_column_start);
-      }
-      else
-      {
-        strcpy(tmp_pointer, ocelot_grid_detail_char_column_start);
-        tmp_pointer+= strlen(ocelot_grid_detail_char_column_start);
-      }
-      if (copy_of_ocelot_xml != 0)
+//      if (copy_of_ocelot_xml != 0)
+      strcpy(tmp_pointer, ocelot_grid_detail_row_start);
+      tmp_pointer+= strlen(ocelot_grid_detail_row_start);
+
+      /* EL KLUDGEO -- until we have a better calculation of grid_column_widths[] when vertical */
+//      if (grid_column_widths[i] < 20) grid_column_widths[i]= 200;
+
+      if (ocelot_result_grid_column_names_copy == 1)
       {
         memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
         result_field_names_pointer+= sizeof(unsigned int);
-        memcpy(tmp_pointer, result_field_names_pointer, f_length);
-        tmp_pointer+= f_length;
+        tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_header_char_column_start,
+                                                      ocelot_grid_header_char_column_start,
+                                                      tmp_pointer,
+                                                      result_field_names_pointer,
+                                                      f_length,
+                                                      TEXTEDITFRAME_CELL_TYPE_HEADER,
+                                                      result_grid_vertical_width_of_header,
+                                                      result_grid_font,
+                                                      setting_max_width_of_a_char,
+                                                      i,
+                                                      tmp_xrow,
+                                                      ocelot_grid_header_char_column_end,
+                                                      &new_cell_height);
+
         result_field_names_pointer+= f_length;
-        strcpy(tmp_pointer, "\">");
-        tmp_pointer+= 2;
       }
       memcpy(&v_length, pointer, sizeof(unsigned int));
       pointer+= sizeof(unsigned int) + sizeof(char);
-      bool is_image_written= false;
-      if ((copy_of_ocelot_html != 0) && (is_image(i) == true))
-      {
-        char img_type[4]= "";
-        if (v_length > 4)
-        {
-          if (strncmp(pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
-          else if (strncmp(pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
-          else if (strncmp(pointer,"GIF",3) == 0) strcpy(img_type, "gif");
-          /* to: try BMP? check with loadFromData()? */
-        }
-        if (strcmp(img_type,"") != 0)
-        {
-          char *base64_tmp;
-          base64_tmp= new char[(v_length * 4) / 3 + 16];
-          QByteArray data= QByteArray::fromRawData(pointer, v_length);
-          strcpy(base64_tmp, data.toBase64());
-          memcpy(tmp_pointer, "<img src=\"data:image/", 21);
-          tmp_pointer+= 21;
-          memcpy(tmp_pointer, img_type, 3);
-          tmp_pointer+= 3;
-          memcpy(tmp_pointer, ";base64,", 8);
-          tmp_pointer+= 8;
-          memcpy(tmp_pointer, base64_tmp, strlen(base64_tmp));
-          tmp_pointer+= strlen(base64_tmp);
-          memcpy(tmp_pointer, "\"/>", 3);
-          tmp_pointer+= 3;
-          delete base64_tmp;
-          is_image_written= true;
-        }
-      }
-      if (is_image_written == false)
-      {
-        memcpy(tmp_pointer, pointer, v_length);
-        tmp_pointer+= v_length;
-      }
-      strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
-      tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
+      /* more "HTML only" stuff */
+
+      tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
+                                                    ocelot_grid_detail_char_column_start,
+                                                    tmp_pointer,
+                                                    pointer,
+                                                    v_length,
+                                                    TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                                                    result_grid_vertical_width_of_value,
+                                                    result_grid_font,
+                                                    setting_max_width_of_a_char,
+                                                    i,
+                                                    tmp_xrow,
+                                                    ocelot_grid_detail_char_column_end,
+                                                    &new_cell_height);
       pointer+= v_length;
+      strcpy(tmp_pointer, ocelot_grid_detail_row_end);
+      tmp_pointer+= strlen(ocelot_grid_detail_row_end);
     }
-    strcpy(tmp_pointer, ocelot_grid_detail_row_end);
-    tmp_pointer+= strlen(ocelot_grid_detail_row_end);
+
   }
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
@@ -7891,18 +8438,19 @@ void display_batch()
 
   if ((copy_of_ocelot_html != 0) && (copy_of_ocelot_raw == 0))
   {
-    batch_text_edit->setHtml(tmp);
+    html_text_edit->setHtml(tmp);
   }
   else
   {
-    batch_text_edit->insertPlainText(tmp);
+    html_text_edit->insertPlainText(tmp);
   }
-  batch_text_edit->moveCursor(QTextCursor::Start);
-  batch_text_edit->ensureCursorVisible();
-  batch_text_edit->show();
+  html_text_edit->moveCursor(QTextCursor::Start);
+  html_text_edit->ensureCursorVisible();
+  html_text_edit->show();
   show();
   client->show();
   delete [] tmp;
+  is_paintable= 1;
   return;
 }
 
@@ -8087,6 +8635,7 @@ int inserts(QString temporary_table_name)
    gridx_field_types
    gridx_result_indexes                use as index for result_ lists
    gridx_column_count, gridx_row_count
+   Todo: We rely on a bunch of gridx_* items. They should be in a single struct.
 */
 void copy_result_to_gridx()
 {
@@ -8189,7 +8738,10 @@ bool is_image(int col)
   display_as= copy_of_parent->ocelot_extra_rule_1_display_as;
   if (display_as == "image")
   {
-    if (is_extra_rule_1(col) == true) return true;
+    if (is_extra_rule_1(col) == true)
+    {
+      return true;
+    }
   }
   return false;
 }
@@ -8475,6 +9027,23 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   return s;
 }
 
+/* Called from ocelot_column_size_calc() or copy_html_cell() */
+/* Todo: if it's "default" I'm not sure what to do. */
+int get_cell_width_or_height_as_int(QString cell_width_or_height_as_qstring, int min)
+{
+  int cell_width_or_height_as_int;
+  char tmp[64];
+  strcpy(tmp, cell_width_or_height_as_qstring.toUtf8());
+  cell_width_or_height_as_int= cell_width_or_height_as_qstring.toInt();
+  //if (cell_width_or_height_as_int > 0)
+  {
+    if (cell_width_or_height_as_int > 1000) cell_width_or_height_as_int= 1000; /* arbitrary maximum */
+    if (cell_width_or_height_as_int < min) cell_width_or_height_as_int= min; /* arbitrary minimum */
+  }
+  return cell_width_or_height_as_int;
+}
+
+
 /*
   Thoughts about ocelot_vertical
   ------------------------------
@@ -8511,6 +9080,17 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   Todo: sometimes you don't want width(), you want frameGeometry().width()
 */
 
+/*
+  Re grid_row_heights
+  The height can be "default",
+  or changed by SET ocelot_grid_cell_height=n;
+  or changed by SET ocelot_grid_cell_height=n WHERE condition;
+  or changed by dragging.
+  We've said grid_rows_heights[1000] but in fact it should just be the max number of rows in the display.
+  Todo: reset whenever there is scrolling so any changes due to dragging are negated.
+        (to preserve changes due to dragging we'd have to have an item for every row in the result set).
+  Flaw: we have no way to change the height after we output the columns, do we?
+*/
 
 /*
   grid_column_size_calc()
@@ -8576,6 +9156,12 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   Todo: Japanese kanji, size 40, Ubuntu mono, needed another pixel,
         has no top margin i.e. it hugs the top border.
   Todo: if you ever do Windows or Mac OS, you'll have to revisit this.
+  Re ocelot_grid_cell_width:
+    This is undocumented but one can say SET ocelot_grid_cell_width='number' (otherwise it's 'default').
+    If it's in a sensible range, all cells should have that width except ones with longer column names.
+    If it's 'max' we don't squeeze.
+    Similar for ocelot_grid_cell_height.
+  Todo: Maybe instead of max_desired_width_in_pixels we should be looking at result_grid_width_after_last_resize
 */
 void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
                            int setting_ocelot_grid_cell_drag_line_size_as_int,
@@ -8590,8 +9176,8 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
   unsigned int amount_being_reduced;
   unsigned int max_reduction;
   QFont *pointer_to_font;
-
-  pointer_to_font= &text_edit_widget_font;
+  int cell_width_as_int;
+  pointer_to_font= &result_grid_font;
 
   /* 2020-07-01 Some calculations here were replaced by settings_change_calc() */
 
@@ -8600,81 +9186,95 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
   /* max_height_of_a_char= mm.lineSpacing(); didn't work */
   max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
 
-  sum_tmp_column_lengths= 0;
 
-  /*
-    The first approximation
-    Take it that grid_column_widths[i] = max actual column width.
-    If this is good enough, then grid_row_heights[i] = 1 char
-    and column width = grid_column_widths[i] chars.
-  */
-  for (i= 0; i < gridx_column_count; ++i)
+  cell_width_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_width, MIN_WIDTH_IN_CHARS * setting_max_width_of_a_char);
+  if ((cell_width_as_int > 0)
+   && (QString::compare("default", copy_of_parent->ocelot_grid_cell_width, Qt::CaseInsensitive) != 0))
   {
-    if (is_using_column_names != 0)
-    {
-      /* probably this->mysql_fields[i].name_length */
-      grid_column_widths[i]= 0;
-      char tmp[1024];
-      unsigned int l= dbms_get_field_name_length(i, connections_dbms);
-      strncpy(tmp, dbms_get_field_name(i, connections_dbms).toUtf8(), l);
-      set_max_column_width(l, tmp, &grid_column_widths[i]);
-      //grid_column_widths[i]= dbms_get_field_name_length(i, connections_dbms);
-    }
-    else grid_column_widths[i]= 1;
-    /*
-      For some reason -- I never figured it out -- if column width < MIN_WITH_IN_CHARS
-      and there is a drag line, the drag line disappears.
-      If vertical != 0 I compensate for too-short contents a different way.
-    */
-
-    if ((grid_column_widths[i] < MIN_WIDTH_IN_CHARS) && (setting_ocelot_grid_cell_drag_line_size_as_int > 0))
-      grid_column_widths[i]= MIN_WIDTH_IN_CHARS;
-    if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
-    grid_column_widths[i]= grid_column_widths[i] * setting_max_width_of_a_char
-                           + setting_ocelot_grid_cell_border_size_as_int * 2
-                           + setting_ocelot_grid_cell_drag_line_size_as_int;
-    sum_tmp_column_lengths+= grid_column_widths[i];
+    for (i= 0; i < gridx_column_count; ++i) grid_column_widths[i]= cell_width_as_int;
+    /* Todo: This does nothing about about vertical */
   }
-
-  /*
-    The Squeeze
-    This cuts the widths of the really long columns, it might loop several times.
-    This is a strong attempt to reduce to the user-settable maximum, but if we have to override it, we do.
-    Cannot squeeze to less than header length
-  */
-
-  sum_amount_reduced= 1;
-
-  while ((sum_tmp_column_lengths > ocelot_grid_max_desired_width_in_pixels) && (sum_amount_reduced > 0))
+  else
   {
-    necessary_reduction= sum_tmp_column_lengths - ocelot_grid_max_desired_width_in_pixels;
-    necessary_reduction-= necessary_reduction % setting_max_width_of_a_char;
-    sum_amount_reduced= 0;
+
+    sum_tmp_column_lengths= 0;
+
+    /*
+      The first approximation
+      Take it that grid_column_widths[i] = max actual column width.
+      If this is good enough, then grid_row_heights[i] = 1 char
+      and column width = grid_column_widths[i] chars.
+    */
     for (i= 0; i < gridx_column_count; ++i)
     {
-      unsigned int min_width;
-      QString s_header= dbms_get_field_name(i, connections_dbms);
-      min_width= get_column_width_in_pixels(s_header, true, false);
-      if (grid_column_widths[i] <= min_width) continue;
-      max_reduction= grid_column_widths[i] - min_width;
-      max_reduction-= max_reduction % setting_max_width_of_a_char;
-      if (grid_column_widths[i] >= (sum_tmp_column_lengths / gridx_column_count))
+      if (is_using_column_names != 0)
       {
-        amount_being_reduced= grid_column_widths[i] / 2;
-        amount_being_reduced-= amount_being_reduced % setting_max_width_of_a_char;
-        if (amount_being_reduced > necessary_reduction) amount_being_reduced= necessary_reduction;
-        if (amount_being_reduced > max_reduction) amount_being_reduced= max_reduction;
-        grid_column_widths[i]= grid_column_widths[i] - amount_being_reduced;
-        sum_amount_reduced+= amount_being_reduced;
-        necessary_reduction-= amount_being_reduced;
-        sum_tmp_column_lengths-= amount_being_reduced;
+        /* probably this->mysql_fields[i].name_length */
+        grid_column_widths[i]= 0;
+        char tmp[1024];
+        unsigned int l= dbms_get_field_name_length(i, connections_dbms);
+        strncpy(tmp, dbms_get_field_name(i, connections_dbms).toUtf8(), l);
+        set_max_column_width(l, tmp, &grid_column_widths[i]);
+        //grid_column_widths[i]= dbms_get_field_name_length(i, connections_dbms);
       }
-      if (necessary_reduction <= setting_max_width_of_a_char) break; /* todo: consider making this "< 10" */
+      else grid_column_widths[i]= 1;
+      /*
+        For some reason -- I never figured it out -- if column width < MIN_WIDTH_IN_CHARS
+        and there is a drag line, the drag line disappears.
+        If vertical != 0 I compensate for too-short contents a different way.
+      */
+
+      if ((grid_column_widths[i] < MIN_WIDTH_IN_CHARS) && (setting_ocelot_grid_cell_drag_line_size_as_int > 0))
+        grid_column_widths[i]= MIN_WIDTH_IN_CHARS;
+      if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
+      grid_column_widths[i]= grid_column_widths[i] * setting_max_width_of_a_char
+                             + setting_ocelot_grid_cell_border_size_as_int * 2
+                           + setting_ocelot_grid_cell_drag_line_size_as_int;
+      sum_tmp_column_lengths+= grid_column_widths[i];
+    }
+
+    /*
+      The Squeeze
+      This cuts the widths of the really long columns, it might loop several times.
+      This is a strong attempt to reduce to the user-settable maximum, but if we have to override it, we do.
+      Cannot squeeze to less than header length
+    */
+
+    sum_amount_reduced= 1;
+
+    if (copy_of_parent->ocelot_grid_cell_width != "max")
+    {
+      while ((sum_tmp_column_lengths > ocelot_grid_max_desired_width_in_pixels) && (sum_amount_reduced > 0))
+      {
+        necessary_reduction= sum_tmp_column_lengths - ocelot_grid_max_desired_width_in_pixels;
+        necessary_reduction-= necessary_reduction % setting_max_width_of_a_char;
+        sum_amount_reduced= 0;
+        for (i= 0; i < gridx_column_count; ++i)
+        {
+          unsigned int min_width;
+          QString s_header= dbms_get_field_name(i, connections_dbms);
+          min_width= get_column_width_in_pixels(s_header, true, false);
+          if (grid_column_widths[i] <= min_width) continue;
+          max_reduction= grid_column_widths[i] - min_width;
+          max_reduction-= max_reduction % setting_max_width_of_a_char;
+          if (grid_column_widths[i] >= (sum_tmp_column_lengths / gridx_column_count))
+          {
+            amount_being_reduced= grid_column_widths[i] / 2;
+            amount_being_reduced-= amount_being_reduced % setting_max_width_of_a_char;
+            if (amount_being_reduced > necessary_reduction) amount_being_reduced= necessary_reduction;
+            if (amount_being_reduced > max_reduction) amount_being_reduced= max_reduction;
+            grid_column_widths[i]= grid_column_widths[i] - amount_being_reduced;
+            sum_amount_reduced+= amount_being_reduced;
+            necessary_reduction-= amount_being_reduced;
+            sum_tmp_column_lengths-= amount_being_reduced;
+          }
+          if (necessary_reduction <= setting_max_width_of_a_char) break; /* todo: consider making this "< 10" */
+        }
+      }
     }
   }
-
   grid_actual_row_height_in_lines= 1;
-
+#ifdef OLD_STUFF
   /*
     Each column's height = (gridx_max_column_widths[i] i.e. actual max) / grid_column_widths[i] rounded up.
     If that's greater than the user-defined maximum, reduce to user-defined maximum
@@ -8700,8 +9300,63 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
                             + setting_ocelot_grid_cell_border_size_as_int * 2
                             + setting_ocelot_grid_cell_drag_line_size_as_int;
   }
+#endif
+  /* TODO: This is supposed to be only for # of rows in the grid */
+  int cell_height_as_int;
+  cell_height_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_height, max_height_of_a_char);
+  if (cell_height_as_int > 0)
+  {
+    for (i= 0; i < 1000; ++i) grid_row_heights[i]= cell_height_as_int;
+    /* Todo: This does nothing about vertical */
+  }
+
+  grid_column_size_calc_vertical(is_using_column_names, connections_dbms);
 }
 
+/*
+  The variant of grid_column_size_calc() that we use if ocelot_vertical == 1.
+  We should have called grid_column_size_calc() earlier and we won't change what that produced.
+  But we now need, for HTML at least, only two widths:
+  header_width = based on width of longest field name, can be 0 if is_using_column_names == 0
+  value_width = based on width of longest column value
+  Squeezing will be simpler, I hope.
+  I no longer care about border_size or drag_line_size.
+  Set result_grid_vertical_width_of_header, result_grid_vertical_width_of_value.
+*/
+void grid_column_size_calc_vertical(
+                           unsigned short int is_using_column_names,
+                           int connections_dbms)
+{
+  unsigned int i;
+  unsigned int sum_tmp_column_lengths;
+  sum_tmp_column_lengths= 0;
+  result_grid_vertical_width_of_header= 0;
+  result_grid_vertical_width_of_value= 0;
+  for (i= 0; i < gridx_column_count; ++i)
+  {
+    if (is_using_column_names != 0)
+    {
+      /* probably this->mysql_fields[i].name_length */
+      unsigned int width_of_field_name_i= 0;
+      char tmp[1024];
+      unsigned int l= dbms_get_field_name_length(i, connections_dbms);
+      strncpy(tmp, dbms_get_field_name(i, connections_dbms).toUtf8(), l);
+      set_max_column_width(l, tmp, &width_of_field_name_i);
+      if (width_of_field_name_i > (unsigned int) result_grid_vertical_width_of_header) result_grid_vertical_width_of_header= width_of_field_name_i;
+    }
+    int width_of_field_value_i= 0;
+    if (grid_column_widths[i] < MIN_WIDTH_IN_CHARS) width_of_field_value_i= MIN_WIDTH_IN_CHARS;
+    if (width_of_field_value_i > result_grid_vertical_width_of_value) result_grid_vertical_width_of_value= width_of_field_value_i;
+  }
+  result_grid_vertical_width_of_header= result_grid_vertical_width_of_header * setting_max_width_of_a_char;
+  result_grid_vertical_width_of_value= result_grid_vertical_width_of_value * setting_max_width_of_a_char;
+  sum_tmp_column_lengths= result_grid_vertical_width_of_header + result_grid_vertical_width_of_value;
+  if (sum_tmp_column_lengths > ocelot_grid_max_desired_width_in_pixels)
+  {
+    result_grid_vertical_width_of_header= (result_grid_vertical_width_of_header / sum_tmp_column_lengths) * ocelot_grid_max_desired_width_in_pixels;
+    result_grid_vertical_width_of_value= (result_grid_vertical_width_of_value / sum_tmp_column_lengths) * ocelot_grid_max_desired_width_in_pixels;
+  }
+}
 
 #if (OCELOT_MYSQL_INCLUDE == 1)
 /*
@@ -8909,6 +9564,7 @@ void scan_field_names(
 }
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
+#ifdef OLD_STUFF
 /*
    Set alignment and height of a cell.
    Todo: There's a terrible amount of duplication:
@@ -8943,13 +9599,14 @@ int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, 
   QString new_style_sheet= copy_of_parent->ocelot_grid_style_string;
   QString new_cell_height= "";
   QString new_cell_width= "";
-  bool result= conditional_setting_evaluate(1,
+  int returned_cs_number= 0;
+  bool result= conditional_setting_evaluate_till_true(
        text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number,
        text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number,
        text_edit_frames[text_edit_frames_index]->content_pointer,
        text_edit_frames[text_edit_frames_index]->content_length,
        text_edit_frames[text_edit_frames_index]->cell_type,
-       &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width);
+       &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number);
   if (result == true)
   {
     if (new_cell_width.toInt() > 0)
@@ -8999,7 +9656,9 @@ int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, 
 
   return width;
 }
+#endif
 
+#ifdef OLD_STUFF
 /*
   Set height of a cell.
   Before we display we proportionally allocate column widths, they stay the same.
@@ -9042,7 +9701,7 @@ int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, 
         (Border and drag line are taken into account correctly for the next time we select)
   TODO: SELECT '<font color="red" size="+10">Big Red Text</font>' AS x;
         won't see the size change (probably same problem with <big> etc.).
-        because Qt font metrics are based on text_edit_widget_font only.
+        because Qt font metrics are based on result_grid_font only.
         "Red" is okay. Turning off HTML can be done with <pre> but maybe there's a better way.
   Todo: Beware images i.e. is_image_flag == true.
   Todo: This is good for headers too because
@@ -9057,7 +9716,7 @@ int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, 
 int get_column_height_in_pixels(unsigned int text_edit_frames_index, int width, int copy_of_grid_max_column_height_in_pixels)
 {
   unsigned int height;
-  QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
+  QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
   if (text_edit_frames[text_edit_frames_index]->is_image_flag)
   {
     height= 2000; /* arbitrary big maximum */
@@ -9078,15 +9737,15 @@ int get_column_height_in_pixels(unsigned int text_edit_frames_index, int width, 
     /* Saying i < 1 instead of i < 2 disables the kludge for italic. Maybe we won't need it. */
     for (int i= 0; i < 2; ++i)
     {
-      r2= text_edit_widget_font_metrics.boundingRect(
+      r2= result_grid_font_metrics.boundingRect(
           0, /* int x = x coordinate within original rect */
           0, /* int y = y coordinate within original rect */
           text_edit_widget_width, /* int width = r.width(), which we don't change */
           2000, /* int height = height, which is arbitrary big maximum */
           Qt::TextWrapAnywhere + Qt::TextIncludeTrailingSpaces, /* int flags = (see comments before start of this routine) */
           s); /* QString & text= cell contents */
-      if (text_edit_widget_font.style() == QFont::StyleNormal) break;
-      int n= r2.height() / text_edit_widget_font_metrics.lineSpacing();
+      if (result_grid_font.style() == QFont::StyleNormal) break;
+      int n= r2.height() / result_grid_font_metrics.lineSpacing();
       s= s + QString("W").repeated(n);
     }
 
@@ -9096,7 +9755,7 @@ int get_column_height_in_pixels(unsigned int text_edit_frames_index, int width, 
   if ((text_edit_frames[text_edit_frames_index]->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
    && (ocelot_vertical_copy == 0))
   {
-    max_column_height_in_pixels= text_edit_widget_font_metrics.lineSpacing();
+    max_column_height_in_pixels= result_grid_font_metrics.lineSpacing();
   }
   else
   {
@@ -9111,7 +9770,9 @@ int get_column_height_in_pixels(unsigned int text_edit_frames_index, int width, 
     text_edit_widgets[text_edit_frames_index]->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
   return height;
 }
+#endif
 
+#ifdef OLD_STUFF
 /*
   Todo: possible better names: set_column_height_in_pixels, set_cell_height_in_points
 */
@@ -9128,13 +9789,14 @@ int set_height(unsigned int text_edit_frames_index, int width)
   //text_edit_widgets[text_edit_frames_index]->setFixedHeight(nn - 20);
   return height;
 }
+#endif
 
 /*
   Get column width in pixels.
   Use boundingRect() as you did for set_height() but this time column width isn't fixed.
   I plan to use this for header width calculation.
   The question is: how many pixels do we need to fit this string in a cell,
-  given current text_edit_widget_font and border and drag line?
+  given current result_grid_font and border and drag line?
   We do not check maximum size here.
   Re images: They have no characters so there's no point getting a font and checking width that way.
              I could make a QPixMap and call loadFromData() then ask width() but fear that's slow.
@@ -9152,8 +9814,8 @@ int set_height(unsigned int text_edit_frames_index, int width)
 int get_column_width_in_pixels(QString s, bool is_header, bool is_image_flag)
 {
   if (is_image_flag) return 2000; /* arbitrary big maximum */
-  QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
-  QRect r2= text_edit_widget_font_metrics.boundingRect(
+  QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
+  QRect r2= result_grid_font_metrics.boundingRect(
                                    0, /* int x = x coordinate within original rect */
                                    0, /* int y = y coordinate within original rect */
                                    2000, /* int width = width, which we can change */
@@ -9178,6 +9840,8 @@ int get_column_width_in_pixels(QString s, bool is_header, bool is_image_flag)
   return min_width;
 }
 
+
+#ifdef OLD_STUFF
 /*
   Put lengths and pointers in text_edit_frames.
   Set a flag to say "not retrieved yet", that happens at paint time.
@@ -9409,6 +10073,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
     }
   }
 }
+#endif
 
 /*
   We don't know exactly the maximum number of lines that will fit
@@ -9427,6 +10092,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
   We're making the over-cautious assumption that it will be necessary to assign
   1 texteditframe for 1 line. In fact a texteditframe is always bigger than a line.
   We try to avoid recalculating just because user shifts by a few pixels.
+  We can't call display_html() if is_resize because there's a show() in that, which cause a call to here
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
@@ -9436,7 +10102,16 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
    || (copy_of_ocelot_xml != 0))
   {
     if (copy_of_ocelot_html == 0)
-      batch_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
+      html_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
+    else
+    {
+//      if (is_resize == false)
+      {
+        /* Todo: this shouldn't be 0, it should be current scrollbar value */
+        prepare_for_display_html();
+        display_html(0);
+      }
+    }
     return;
   }
 //  QFont tmp_font= this->font();
@@ -9458,12 +10133,21 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 }
 
 /*
+  We want to redo the display but are confident that font and size are not changing.
+  So far the only times we call are for: mousePressEvent (which changes focus background color).
+*/
+void color_change()
+{
+  display_html(grid_vertical_scroll_bar->value());
+}
+
+/*
   Set grid_max_column_height which is a permanently-available calculated maximum in pixels.
   We call this from from resize_or_font_change(), which should mean
   (a) we know that result grid size is current,
-  (b) we know that text_edit_widget_font may not be current but will be used in later paint jobs.
+  (b) we know that result_grid_font may not be current but will be used in later paint jobs.
   We also call this when creating, but in that case result grid size is not really known
-  and text_edit_widget_font is still the parent's font.
+  and result_grid_font is still the parent's font.
   The rule should simply be that no single row + header row (which is one line)
   can exceed the size of the result grid, until we have a user-specified maximum.
   We use this in set_height(), where the idea is that you can't make a column higher
@@ -9475,11 +10159,11 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
   Todo: ocelot_grid_max_column_height_in_lines could be user-settable but overridable.
   Todo: It should be impossible to resize result grid to < 11 or < line size * 2, eh?
   Todo: Initially we call with result_grid_height == 0 but that is temporary.
-  Todo: Make sure we call this whenever we change text_edit_widget_font. Put the change in this function?
+  Todo: Make sure we call this whenever we change result_grid_font. Put the change in this function?
 */
 void set_grid_max_column_height_in_pixels(int result_grid_height)
 {
-  QFontMetrics mm= QFontMetrics(text_edit_widget_font);
+  QFontMetrics mm= QFontMetrics(result_grid_font);
   int height_of_line= mm.lineSpacing();
   int new_height= result_grid_height - (height_of_line * 2);
   if (new_height < height_of_line) new_height= height_of_line;
@@ -9490,13 +10174,15 @@ void set_grid_max_column_height_in_pixels(int result_grid_height)
 /*
   Resize of grid widget. This could be called from eventfilter instead.
   Warning: changes in statement widget can cause this to be invoked.
+  Warning: result_grid_height is not stable or useful until after there's been a display.
 */
 void resizeEvent(QResizeEvent *event)
 {
-  unsigned int height_of_grid_widget= event->size().height();
-  if (height_of_grid_widget != (unsigned int) event->oldSize().height())
+  result_grid_height_after_last_resize= event->size().height();
+  result_grid_width_after_last_resize= event->size().width();
+  if (result_grid_height_after_last_resize != (unsigned int) event->oldSize().height())
   {
-    resize_or_font_change(height_of_grid_widget, true);
+    resize_or_font_change(result_grid_height_after_last_resize, true);
   }
 }
 
@@ -9534,39 +10220,104 @@ bool show_event()
   There is also an automatic show-as-needed scroll bar, which will come on if scrolling is inevitable for a smaller result set.
   But vertical_scroll_bar_event() is only for the non-automatic vertical scroll bar.
   Initially grid_vertical_scroll_bar_value == -1, it's checked so that we don't paint the initial display twice.
+  Todo: Nothing happens if I click and hold, I have to click and release and hold.
+  Some possible event types: 17 Show, 78 UpdateLater, 12 Paint, 5 MouseMove, 129 HoverMove, 110 ToolTip,
+                             3 MouseButtonRelease, 18 Hide, 11 Leave, 25 WindowDeactivate, 128 HoverLeave
+                             But if we call display_html() we miss 1 Timer, 2 MouseButtonPress
 */
-bool vertical_scroll_bar_event(int connections_dbms)
+
+bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
 {
+  (void)connections_dbms;
   int new_value;
   /* It's impossible to get here if the scroll bar is hidden, but it happens. Well, maybe only for "turning it off" events. */
   if (grid_vertical_scroll_bar->isVisible() == false)
   {
-      return false;
+    return false;
   }
-  /* It's ridiculous to do these settings every time. But when is the best time to do them? Which event matters? */
-  if (ocelot_vertical_copy == 0) grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
-  else grid_vertical_scroll_bar->setMaximum(grid_result_row_count - 1);
-  grid_vertical_scroll_bar->setSingleStep(1);
-  grid_vertical_scroll_bar->setPageStep(1);
-  grid_vertical_scroll_bar->setMinimum(0);
+  if (event->type() == QEvent::Show)
+  {
+    return false;
+  }
 
   new_value= grid_vertical_scroll_bar->value();
 
   if (new_value != grid_vertical_scroll_bar_value)
   {
-    if ((is_paintable == 1) && (grid_vertical_scroll_bar_value != -1))
+    /* Todo: See whether is_paintable is important for batch etc. */
+    /* Eventually display_html() will replace everything */
+//    if (grid_vertical_scroll_bar_value == -1) return false;
+    if ((is_paintable != 1) || (grid_vertical_scroll_bar_value == -1))
     {
+      grid_vertical_scroll_bar_value= new_value;
+      return false;
+    }
+    if (copy_of_ocelot_html == 1)
+    {
+      display_html(new_value);
+      this->update();      /* not sure if we need to update both this and client, but it should be harmless*/
+      client->update();
+      grid_vertical_scroll_bar->update();
+    }
+    else
+    {
+#ifdef OLD_STUFF
       fill_detail_widgets(new_value, connections_dbms);
+#endif
       this->update();      /* not sure if we need to update both this and client, but it should be harmless*/
       client->update();
     }
     grid_vertical_scroll_bar_value= new_value;
+    /* TEST!!!! */
     return false;
   }
   return false;
 }
 
+/*
+  Call when making the vertical bar scroll bar, which always happens when we make a ResultGrid.
+  We'll call r->grid_vertical_scroll_bar->installEventFilter(this); from MainWindow.
+  Todo: Anything special for destruct?
+*/
+void vertical_scroll_bar_construct()
+{
+  grid_vertical_scroll_bar= new QScrollBar(this);
+  grid_vertical_scroll_bar->setSingleStep(1);
+  grid_vertical_scroll_bar->setPageStep(1);
+  grid_vertical_scroll_bar->setMinimum(0);
+  grid_vertical_scroll_bar->setMouseTracking(true);
+}
 
+/*
+  Call when there is a new result set to display.
+  We don't want setValue(0) to cause display_html() yet so we set grid_vertical_scroll_bar_value= -1;
+*/
+void vertical_scroll_bar_initialize()
+{
+  if ((copy_of_ocelot_batch != 0)
+   || (copy_of_ocelot_xml != 0)
+   || (copy_of_ocelot_raw != 0))
+  {
+    grid_vertical_scroll_bar->hide();
+    return;
+  }
+  grid_vertical_scroll_bar_value= -1;
+  if (ocelot_vertical_copy == 0)
+  {
+    grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+    if (result_row_count <= 1) grid_vertical_scroll_bar->hide();
+    else grid_vertical_scroll_bar->show();
+  }
+  else
+  {
+    grid_vertical_scroll_bar->setMaximum(grid_result_row_count - 1);
+    if (grid_result_row_count <= 1) grid_vertical_scroll_bar->hide();
+    else grid_vertical_scroll_bar->show();
+  }
+  grid_vertical_scroll_bar->setValue(0);
+}
+
+#ifdef OLD_STUFF
 /*
   If a result grid text_edit_widget is a number + not header, call with alignment_flag == Qt::AlighRight.
   Otherwise call with alignment_flag == Qt::AlignLeft.
@@ -9600,7 +10351,7 @@ void text_align(TextEditWidget *cell_text_edit_widget, enum Qt::AlignmentFlag al
   cell_text_edit_widget->document()->setDefaultTextOption(to);
   cell_text_edit_widget->setAlignment(a);
 }
-
+#endif
 
 /*
   To clean up from a previous result set:
@@ -9611,28 +10362,14 @@ void text_align(TextEditWidget *cell_text_edit_widget, enum Qt::AlignmentFlag al
 */
 void remove_layouts()
 {
-  long unsigned int xrow; 
-  QLayoutItem *text_edit_frame_item;
-  QWidget *text_edit_frame_widget;
+  //long unsigned int xrow;
+  //QLayoutItem *text_edit_frame_item;
+  //QWidget *text_edit_frame_widget;
 
-  client->hide(); /* client->show() will happen again soon */
+//TEST!!  client->hide(); /* client->show() will happen again soon */
   if (grid_main_layout != 0)
   {
-    for (xrow= 0; xrow < row_pool_size; ++xrow)
-    {
-      if (grid_row_layouts[xrow]->count() == 0) break;
-      for (;;)
-      {
-        text_edit_frame_item= grid_row_layouts[xrow]->itemAt(0);
-        if (text_edit_frame_item == NULL) break;
-        text_edit_frame_widget= text_edit_frame_item->widget();
-        if (text_edit_frame_widget == NULL) break;       /* I think this is impossible */
-        grid_row_layouts[xrow]->removeWidget(text_edit_frame_widget);
-        text_edit_frame_widget->hide(); /* i.e. text_edit_frames[..]->hide() */
-      }
-      grid_main_layout->removeWidget(grid_row_widgets[xrow]);
-    }
-    grid_main_layout->removeWidget(batch_text_edit);
+//    grid_main_layout->removeWidget(html_text_edit);
   }
 }
 
@@ -9677,10 +10414,15 @@ void display_garbage_collect()
   if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
   if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
   if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
-  for (unsigned int i= 0; i < cell_pool_size; ++i) text_edit_widgets[i]->clear(); /* unnecessary? */
-  if (batch_text_edit != NULL) batch_text_edit->clear(); /* unnecessary? */
+  if (html_text_edit != NULL)
+  {
+    delete html_text_edit;
+    html_text_edit= new Result_qtextedit(this);
+    grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
+  }
 }
 
+#ifdef OLD_STUFF
 void set_frame_color_setting()
 {
   setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
@@ -9690,7 +10432,7 @@ void set_frame_color_setting()
   //frame_color_setting.append(";border: 0px");              /* TEST !! */
   frame_color_setting.append("}");
 }
-
+#endif
 
 /*
   Setting the parent should affect the children.
@@ -9707,20 +10449,22 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
 {
   (void)(new_ocelot_grid_cell_drag_line_size);
   if ((copy_of_ocelot_batch != 0)
+#ifdef OLD_STUFF
    || (copy_of_ocelot_html != 0)
+#endif
    || (copy_of_ocelot_xml != 0))
   {
     resize_or_font_change(this->height(), false);
     return;
   }
-  text_edit_widget_font= copy_of_parent->get_font_from_style_sheet(new_ocelot_grid_style_string);
+  result_grid_font= copy_of_parent->get_font_from_style_sheet(new_ocelot_grid_style_string);
 
-  unsigned int i_h;
+  //unsigned int i_h;
 
   //setting_ocelot_grid_cell_drag_line_size_as_int= new_ocelot_grid_cell_drag_line_size.toInt();
-
+  setting_ocelot_grid_cell_drag_line_size_as_int= 0;
+#ifdef OLD_STUFF
   settings_change_calc();
-
   set_frame_color_setting();
   for (i_h= 0; i_h < cell_pool_size; ++i_h)
   {
@@ -9730,6 +10474,7 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
     /* todo: skip following line if setting_ocelot_grid_cell_drag_line_size_as_int did not change */
     text_edit_layouts[i_h]->setContentsMargins(QMargins(0, 0, setting_ocelot_grid_cell_drag_line_size_as_int, setting_ocelot_grid_cell_drag_line_size_as_int));
   }
+#endif
   /* todo: is "caller" redundant? if it's 0, then font change is false? */
   /* todo: this shouldn't be just is_result_grid_font_changed, it should be any changed. */
   if ((caller == 1) && (is_result_grid_font_changed))
@@ -9745,14 +10490,14 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
   We should call this during initialization or settings change (of font or drag line or border).
   Assume settings apply for all grid columns so don't need to call for every column.
   width() is deprecated in Qt 5.13.
-  Assume we know text_edit_widget_font, setting_ocelot_grid_cell_border_size_as_int,
+  Assume we know result_grid_font, setting_ocelot_grid_cell_border_size_as_int,
     setting_ocelot_grid_cell_drag_line_size_as_int, scroll_bar_width.
   The maximum width is based on boundingRect() since width() is deprecated in Qt 5.13.
   Choosing "W" is good enough for western alphabets, some Asian characters may be wider
   but in that case we will end up with a higher column see set_height().
   Assume there might be a vertical scroll bar, although perhaps it isn't possible if
   there is no drag line and no column could overflow the maximum number of lines.
-  Do not increase if text_edit_widget_fonts.italic()=true, that should be taken care of now.
+  Do not increase if result_grid_fonts.italic()=true, that should be taken care of now.
   Return true if the results mean that repaint should occur.
 */
 bool settings_change_calc()
@@ -9761,11 +10506,12 @@ bool settings_change_calc()
   unsigned int old_min_width_of_a_column= setting_min_width_of_a_column;
 
   setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+  setting_ocelot_grid_cell_width_as_int= copy_of_parent->ocelot_grid_cell_width.toInt();
 //  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
   setting_ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
 
-  QFontMetrics text_edit_widget_font_metrics= QFontMetrics(text_edit_widget_font);
-  QRect r2= text_edit_widget_font_metrics.boundingRect(
+  QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
+  QRect r2= result_grid_font_metrics.boundingRect(
                                    0, /* int x = x coordinate within original rect */
                                    0, /* int y = y coordinate within original rect */
                                    2000, /* int width = r.width(), which we don't change */
@@ -9786,7 +10532,7 @@ bool settings_change_calc()
     return false;
 
   /* The following calculations used to exist in grid_column_size_calc(). Are they obsolete? */
-  //pointer_to_font= &text_edit_widget_font;
+  //pointer_to_font= &result_grid_font;
 
   /* Calculate with rounding up because of inter-character spacing. */
   //QFontMetrics mm= QFontMetrics(*pointer_to_font);
@@ -9907,19 +10653,6 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
 {
   //remove_layouts(); /* I think this is unnecessary */
   fillup_garbage_collect();
-  if (row_pool_size != 0)
-  {
-    delete [] grid_row_layouts;
-    delete [] grid_row_widgets;
-    row_pool_size= 0;
-  }
-  if (cell_pool_size != 0)
-  {
-    delete [] text_edit_widgets;
-    delete [] text_edit_layouts;
-    delete [] text_edit_frames;
-    cell_pool_size= 0;
-  }
 }
 
 
@@ -9986,7 +10719,7 @@ bool comparer(
   Todo: We clear conditional_settings before inserting, so temporarily there can't be more than one.
   Todo: Call SELECT * FROM "_vindex"; then call it again. Second time, there are calls to setStyleSheet(). Why?
   Todo: You are splitting into separate statements if there are carriage returns, as is typical with SET.
-        It's somewhere in get_next_statement_in_string().
+         It's somewhere in get_next_statement_in_string().
   Todo: Allow viewing conditional statements
   Todo: Allow clearing all conditional statements
   Todo: Allow setup of conditional statements in Settings menu
@@ -10001,21 +10734,21 @@ bool conditional_setting_evaluate(int cs_number,
                                   char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
                                   unsigned int cs_content_length, /* e.g. text_frame->content_length */
                                   unsigned short int cs_cell_type,  /* e.g. text_frame->cell_type */
+                                  QString old_style_sheet,
+                                  bool is_always_true,
                                   QString *cs_new_tooltip,        /* return */
                                   QString *cs_new_style_sheet,    /* return */
                                   QString *cs_new_cell_height,    /* return */
                                   QString *cs_new_cell_width)     /* return */
 {
-  (void) (cs_number);
-  if (cs_cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL) return false; /* Temporary till we handle heders */
-
+  if (cs_cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL) return false; /* Temporary till we handle headers */
   ResultGrid *rg= this;
   MainWindow *mw= rg->copy_of_parent;
-  if (mw->conditional_settings.count() > 0)
+  if (mw->conditional_settings.count() <= cs_number) return false; /* unnecessary */
   {
     int token_offsets[MAX_CONDITIONAL_STATEMENT_TOKENS];
     int token_lengths[MAX_CONDITIONAL_STATEMENT_TOKENS];
-    for (int i= 0; i < mw->conditional_settings.count(); ++i)
+    int i= cs_number;
     {
       QString text= mw->conditional_settings.at(i);
       mw->tokenize(text.data(),
@@ -10024,71 +10757,81 @@ bool conditional_setting_evaluate(int cs_number,
               (QChar*)"33333", 2, "", 1);
       int token_index= 4; /* We're sure that WHERE comes after SET ocelot_grid_background|text_color='...' */
       while ((token_lengths[token_index] != 5) || (text.mid(token_offsets[token_index], 5) != "WHERE")) ++token_index;
-      bool result= false;
-      QString next_clause_start= "WHERE";
-      bool is_skippable= false;
-      for (;;)
+      bool result;
+      if (is_always_true == true)
       {
-        if ((next_clause_start == "AND") && (result == false)) is_skippable= true;
-        else if ((next_clause_start == "OR") && (result == true)) is_skippable= true;
-        else is_skippable= false;
-        QString target= text.mid(token_offsets[token_index + 1], token_lengths[token_index + 1]);
-        QString opr= text.mid(token_offsets[token_index + 2], token_lengths[token_index + 2]);
-        QString value= text.mid(token_offsets[token_index + 3], token_lengths[token_index + 3]);
-        next_clause_start= text.mid(token_offsets[token_index + 4], token_lengths[token_index + 4]);
-        if (is_skippable == false)
-        {
-          if (target == "COLUMN_NAME")
-          {
-            char *result_field_names_pointer= &rg->result_field_names[0];
-            unsigned int v_length;
-            for (unsigned int i= 0; i < rg->result_column_count; ++i)
-            {
-              memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
-              result_field_names_pointer+= sizeof(unsigned int);
-              if (i == (unsigned int) cs_column_number)
-              {
-                QString s= QString(QByteArray(result_field_names_pointer, v_length));
-                result= comparer(s, value, opr, 0);
-                break;
-              }
-              result_field_names_pointer+= v_length;
-            }
-          }
-          if (target == "COLUMN_NUMBER")
-            result= comparer(QString::number(cs_column_number + 1), value, opr, 0);
-          if (target == "COLUMN_TYPE")
-          {
-            int a= cs_column_number;
-            char *b= mw->typer_to_keyword(rg->result_field_types[a]);
-            result= comparer(b, value, opr, 0);
-          }
-          if (target == "ROW_NUMBER")
-          {
-            int crn= cs_row_number;
-            if (ocelot_result_grid_column_names_copy == 1) ++crn;
-            result= comparer(QString::number(crn), value, opr, 0);
-          }
-          if (target == "VALUE")
-          {
-            if (cs_content_pointer == 0)
-            {
-              result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
-            }
-            else
-            {
-              QString s= QString(QByteArray(cs_content_pointer, cs_content_length));
-              /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
-              /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
-              result= comparer(s, value, opr, 0);
-            }
-          }
-        }
-        if (next_clause_start == ";") break;
-        token_index= token_index + 4; /* it's AND | OR, continue, but next condition might be skippable */
-        continue;
+        result= true;
       }
-      QString new_style_sheet= mw->ocelot_grid_style_string;
+      else
+      {
+        result= false;
+        QString next_clause_start= "WHERE";
+        bool is_skippable= false;
+        for (;;)
+        {
+          if ((next_clause_start == "AND") && (result == false)) is_skippable= true;
+          else if ((next_clause_start == "OR") && (result == true)) is_skippable= true;
+          else is_skippable= false;
+          QString target= text.mid(token_offsets[token_index + 1], token_lengths[token_index + 1]);
+          QString opr= text.mid(token_offsets[token_index + 2], token_lengths[token_index + 2]);
+          QString value= text.mid(token_offsets[token_index + 3], token_lengths[token_index + 3]);
+          next_clause_start= text.mid(token_offsets[token_index + 4], token_lengths[token_index + 4]);
+          if (is_skippable == false)
+          {
+            if (target == "COLUMN_NAME")
+            {
+              char *result_field_names_pointer= &rg->result_field_names[0];
+              unsigned int v_length;
+              for (unsigned int i= 0; i < rg->result_column_count; ++i)
+              {
+                memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+                result_field_names_pointer+= sizeof(unsigned int);
+                if (i == (unsigned int) cs_column_number)
+                {
+                  QString s= QString(QByteArray(result_field_names_pointer, v_length));
+                  result= comparer(s, value, opr, 0);
+                  break;
+                }
+                result_field_names_pointer+= v_length;
+              }
+            }
+            if (target == "COLUMN_NUMBER")
+            {
+              result= comparer(QString::number(cs_column_number + 1), value, opr, 0);
+            }
+            if (target == "COLUMN_TYPE")
+            {
+              int a= cs_column_number;
+              char *b= mw->typer_to_keyword(rg->result_field_types[a]);
+              result= comparer(b, value, opr, 0);
+            }
+            if (target == "ROW_NUMBER")
+            {
+              int crn= cs_row_number;
+              if (ocelot_result_grid_column_names_copy == 1) ++crn;
+              result= comparer(QString::number(crn), value, opr, 0);
+            }
+            if (target == "VALUE")
+            {
+              if (cs_content_pointer == 0)
+              {
+                result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
+              }
+              else
+              {
+                QString s= QString(QByteArray(cs_content_pointer, cs_content_length));
+                /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
+                /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
+                result= comparer(s, value, opr, 0);
+              }
+            }
+          }
+          if (next_clause_start == ";") break;
+          token_index= token_index + 4; /* it's AND | OR, continue, but next condition might be skippable */
+          continue;
+        }
+      }
+      QString new_style_sheet= old_style_sheet;
       if (result == true)
       {
         for (int target_index= 1;; target_index+= 4)
@@ -10104,20 +10847,20 @@ bool conditional_setting_evaluate(int cs_number,
             k= new_style_sheet.indexOf("font-size:") + 10;
             setting_value= setting_value + "pt";
           }
-          else if (setting == "OCELOT_GRID_BORDER_COLOR")
-          {
-            k= new_style_sheet.indexOf("border:") + 7;
-            k= new_style_sheet.indexOf(" ", k) + 1;
-            k= new_style_sheet.indexOf(" ", k) + 1;
-          }
+//          else if (setting == "OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR") /* Todo: Don't do this */
+//          {
+//            k= new_style_sheet.indexOf("border:") + 7;
+//            k= new_style_sheet.indexOf(" ", k) + 1;
+//            k= new_style_sheet.indexOf(" ", k) + 1;
+//          }
           else if (setting == "OCELOT_GRID_FONT_STYLE") k= new_style_sheet.indexOf("font-style:") + 11;
           else if (setting == "OCELOT_GRID_FONT_WEIGHT") k= new_style_sheet.indexOf("font-weight:") + 12;
           else if (setting == "OCELOT_GRID_FONT_FAMILY") k= new_style_sheet.indexOf("font-family:") + 12;
-          else if (setting == "OCELOT_GRID_BORDER_SIZE")
-          {
-            k= new_style_sheet.indexOf("border:") + 7;
-            setting_value= setting_value + "px";
-          }
+//          else if (setting == "OCELOT_GRID_BORDER_SIZE") /* now we only use ocelot_grid_cell_border_size */
+//          {
+//            k= new_style_sheet.indexOf("border:") + 7;
+//            setting_value= setting_value + "px";
+//          }
           else if (setting == "OCELOT_GRID_TOOLTIP")
           {
             *cs_new_tooltip= setting_value; /* caller can say setTooltip */
@@ -10135,20 +10878,63 @@ bool conditional_setting_evaluate(int cs_number,
           }
           else break;
           int l;
-          if (setting == "OCELOT_GRID_BORDER_SIZE") l= new_style_sheet.indexOf(" ", k + 1);
-          else l= new_style_sheet.indexOf(";", k + 1);
+//          if (setting == "OCELOT_GRID_BORDER_SIZE") l= new_style_sheet.indexOf(" ", k + 1);
+//          else
+            l= new_style_sheet.indexOf(";", k + 1);
           if (l == -1) l= new_style_sheet.size();
           new_style_sheet.replace(k, l - k, setting_value);
         }
+        *cs_new_style_sheet= new_style_sheet; /* caller can say setstylesheet */
+        return true; /* We only have evaluated one condition! But caller might call again. */
       }
       else
       {
         ;
       }
-      *cs_new_style_sheet= new_style_sheet; /* caller can say setstylesheet */
-      return true; /* !! Too early! We only have evaluated one condition! */
     }
   }
+  return false;
+}
+
+/* Evaluate conditional settings until one is true (return true), or none are true (return false) */
+/* If not HTML we could continue after true and pass result style string to the next iteration. But, no. */
+bool conditional_setting_evaluate_till_true(
+                                  int cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
+                                  int cs_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
+                                  char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
+                                  unsigned int cs_content_length, /* e.g. text_frame->content_length */
+                                  unsigned short int cs_cell_type,  /* e.g. text_frame->cell_type */
+                                  QString *cs_new_tooltip,        /* return */
+                                  QString *cs_new_style_sheet,    /* return */
+                                  QString *cs_new_cell_height,    /* return */
+                                  QString *cs_new_cell_width,     /* return */
+                                  int *returned_cs_number)        /* return */
+{
+  ResultGrid *rg= this;
+  MainWindow *mw= rg->copy_of_parent;
+  QString old_style_sheet= mw->ocelot_grid_style_string;
+  bool result;
+  for (int i= 0; i < mw->conditional_settings.count(); ++i)
+  {
+    result= conditional_setting_evaluate(i,
+    cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
+    cs_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
+    cs_content_pointer,       /* e.g. text_frame->content_pointer */
+    cs_content_length, /* e.g. text_frame->content_length */
+    cs_cell_type,  /* e.g. text_frame->cell_type */
+    old_style_sheet,
+    false,
+    cs_new_tooltip,        /* return */
+    cs_new_style_sheet,    /* return */
+    cs_new_cell_height,    /* return */
+    cs_new_cell_width);     /* return */
+    if (result == true)
+    {
+      *returned_cs_number= i;
+      return true;
+    }
+  }
+  *returned_cs_number= -1;
   return false;
 }
 
@@ -10777,7 +11563,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 
   copy_of_parent->new_ocelot_grid_text_color= copy_of_parent->ocelot_grid_text_color;
   copy_of_parent->new_ocelot_grid_background_color= copy_of_parent->ocelot_grid_background_color;
-  copy_of_parent->new_ocelot_grid_border_color= copy_of_parent->ocelot_grid_border_color;
+  copy_of_parent->new_ocelot_grid_focus_cell_background_color= copy_of_parent->ocelot_grid_focus_cell_background_color;
   copy_of_parent->new_ocelot_grid_header_background_color= copy_of_parent->ocelot_grid_header_background_color;
   copy_of_parent->new_ocelot_grid_font_family= copy_of_parent->ocelot_grid_font_family;
   copy_of_parent->new_ocelot_grid_font_size= copy_of_parent->ocelot_grid_font_size;
@@ -10785,8 +11571,10 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_grid_font_weight= copy_of_parent->ocelot_grid_font_weight;
   copy_of_parent->new_ocelot_grid_cell_border_color= copy_of_parent->ocelot_grid_cell_border_color;
   copy_of_parent->new_ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
-  copy_of_parent->new_ocelot_grid_border_size= copy_of_parent->ocelot_grid_border_size;
+//  copy_of_parent->new_ocelot_grid_border_size= copy_of_parent->ocelot_grid_border_size;
   copy_of_parent->new_ocelot_grid_cell_border_size= copy_of_parent->ocelot_grid_cell_border_size;
+  copy_of_parent->new_ocelot_grid_cell_width= copy_of_parent->ocelot_grid_cell_width;
+  copy_of_parent->new_ocelot_grid_cell_height= copy_of_parent->ocelot_grid_cell_height;
   copy_of_parent->new_ocelot_grid_cell_drag_line_size= copy_of_parent->ocelot_grid_cell_drag_line_size;
   copy_of_parent->new_ocelot_grid_height= copy_of_parent->ocelot_grid_height;
   copy_of_parent->new_ocelot_grid_left= copy_of_parent->ocelot_grid_left;
@@ -11017,16 +11805,34 @@ if (current_widget != DEBUG_WIDGET)
     for (int ci= 0; ci < 3; ++ci)
     {
       widget_for_size[ci]= new QWidget(this);
-      if (ci == 0) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_BORDER_SIZE]);
+      if (ci == 0) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_CELL_HEIGHT]);
       if (ci == 1) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_CELL_BORDER_SIZE]);
-      if (ci == 2) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_SIZE]);
+      if (ci == 2) label_for_size[ci]= new QLabel(menu_strings[menu_off + MENU_GRID_CELL_WIDTH]);
       combo_box_for_size[ci]= new QComboBox();
-      combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 3);
-      for (int cj= 0; cj < 11; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
-      label_for_size[ci]->setFixedWidth(label_for_color_width * MAX_COLOR_NAME_WIDTH);
-      if (ci == 0) combo_box_for_size[0]->setCurrentIndex(copy_of_parent->new_ocelot_grid_border_size.toInt());
+      if (ci == 0)
+      {
+        combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 10);
+        QString current_value= copy_of_parent->ocelot_grid_cell_height;
+        combo_box_filler(&combo_box_for_size[0], current_value, false);
+        label_for_size[ci]->setFixedWidth(label_for_color_width * MAX_COLOR_NAME_WIDTH);
+      }
+      if (ci == 1)
+      {
+        combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 3);
+        for (int cj= 1; cj < 11; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
+        label_for_size[ci]->setFixedWidth(label_for_color_width * MAX_COLOR_NAME_WIDTH);
+      }
+      if (ci == 2)
+      {
+        combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 10);
+        QString current_value= copy_of_parent->ocelot_grid_cell_width;
+        combo_box_filler(&combo_box_for_size[2], current_value, false);
+        label_for_size[ci]->setFixedWidth(label_for_color_width * MAX_COLOR_NAME_WIDTH);
+      }
+
+      // if (ci == 0) combo_box_filler should handle this
       if (ci == 1) combo_box_for_size[1]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_border_size.toInt());
-      if (ci == 2) combo_box_for_size[2]->setCurrentIndex(copy_of_parent->new_ocelot_grid_cell_drag_line_size.toInt());
+      // if (ci == 2) combo_box_filler() should handle this
       hbox_layout_for_size[ci]= new QHBoxLayout();
       hbox_layout_for_size[ci]->addWidget(label_for_size[ci]);
       hbox_layout_for_size[ci]->addWidget(combo_box_for_size[ci]);
@@ -11036,9 +11842,7 @@ if (current_widget != DEBUG_WIDGET)
     connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
     connect(combo_box_for_size[2], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_2(int)));
-    /* I could not get result grid border size to work so it is hidden until someday it is figured out -- maybe never */
-    label_for_size[0]->hide();
-    combo_box_for_size[0]->hide();
+
   }
 }
   if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET)
@@ -11335,7 +12139,7 @@ void set_widget_values(int ci)
               color_name= copy_of_parent->new_ocelot_grid_cell_border_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
-    case 3: { color_type= menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_COLOR];
+    case 3: { color_type= menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_COLOR]; /* actually OUTER color */
               color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
@@ -11343,8 +12147,8 @@ void set_widget_values(int ci)
               color_name= copy_of_parent->new_ocelot_grid_header_background_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
-    case 8: { color_type= menu_strings[menu_off + MENU_GRID_BORDER_COLOR];
-              color_name= copy_of_parent->new_ocelot_grid_border_color;
+    case 8: { color_type= menu_strings[menu_off + MENU_GRID_FOCUS_CELL_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_focus_cell_background_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
     }
@@ -11871,7 +12675,7 @@ void handle_combo_box_for_color_pick_8(int item_number)
   {
     QString new_color= combo_box_for_color_pick[8]->itemText(item_number);
     new_color= copy_of_parent->canonical_color_name(new_color);
-    copy_of_parent->new_ocelot_grid_border_color= new_color;
+    copy_of_parent->new_ocelot_grid_focus_cell_background_color= new_color;
     label_for_color_rgb[8]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
@@ -12159,7 +12963,7 @@ void handle_combo_box_for_height(int item_number)
 void handle_combo_box_for_size_0(int i)
 {
   if (current_widget == GRID_WIDGET)
-    copy_of_parent->new_ocelot_grid_border_size= QString::number(i);
+    copy_of_parent->new_ocelot_grid_cell_height= combo_box_for_size[0]->itemText(i);
   if (current_widget == EXTRA_RULE_1)
     copy_of_parent->new_ocelot_extra_rule_1_condition= combo_box_for_size[0]->itemText(i);
 }
@@ -12174,9 +12978,10 @@ void handle_combo_box_for_size_1(int i)
 }
 
 
-void handle_combo_box_for_size_2(int i)
+void handle_combo_box_for_size_2(int item_number)
 {
-  copy_of_parent->new_ocelot_grid_cell_drag_line_size= QString::number(i);
+  QString q= combo_box_for_size[2]->itemText(item_number);
+  copy_of_parent->new_ocelot_grid_cell_width= q;
 }
 
 
@@ -12359,7 +13164,7 @@ class XSettings : public QWidget
   Todo: Make sure ocelot_horizontal and ocelot_htmlraw, which have no variables, actually cause the changes.
   Todo: Check whether there has actually been a style change.
   Todo: For grid's set_all_style_sheets, we only redo existing display if there has been a font change.
-  Todo: ocelot_grid_border_size isn't on the settings menu
+  Todo: ocelot_grid_border_size isn't on the settings menu (well, we're not going to bother with it anyway)
   Todo: merge with Settings class?
 */
 

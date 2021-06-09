@@ -13128,7 +13128,7 @@ int MainWindow::hparse_f_client_set()
   bool is_conditional_settings_possible= false;
 
   /* 1=grid_background_color. 2=grid_text_color. 4=grid_font_size. 8=grid_border_color.
-     16=grid_font_style. 32=grid_font_weight. 64=grid_font_family. 128=grid_border_size,
+     16=grid_font_style. 32=grid_font_weight. 64=grid_font_family. 128=grid_border_size (no longer used),
      256=ocelot_grid_tooltip, 512=ocelot_grid_cell_height, 1024=ocelot_grid_cell_width */
   int flags= 0;
   for (int i= hparse_i_of_last_accepted;;)
@@ -13137,11 +13137,11 @@ int MainWindow::hparse_f_client_set()
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) flags|= 1;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR) flags|= 2;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE) flags|= 4;
-    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR) flags|= 8;
+    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR) flags|= 8;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE) flags|= 16;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT) flags|= 32;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY) flags|= 64;
-    if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) flags|= 128;
+    //if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) flags|= 128;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP) flags|= 256;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT) flags|= 512;
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH) flags|= 1024;
@@ -13161,11 +13161,11 @@ int MainWindow::hparse_f_client_set()
       if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE)
-       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR)
+       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY)
-       || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE)
+       //|| (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT)
        || (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH))
@@ -13173,11 +13173,11 @@ int MainWindow::hparse_f_client_set()
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR) && ((flags & 1) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR) && ((flags & 2) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE) && ((flags & 4) != 0)) continue;
-        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_COLOR) && ((flags & 8) != 0)) continue;
+        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR) && ((flags & 8) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE) && ((flags & 16) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT) && ((flags & 32) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY) && ((flags & 64) != 0)) continue;
-        if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) && ((flags & 128) != 0)) continue;
+        //if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE) && ((flags & 128) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP) && ((flags &256) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT) && ((flags &512) != 0)) continue;
         if ((i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH) && ((flags &1024) != 0)) continue;
