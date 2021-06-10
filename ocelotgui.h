@@ -2874,7 +2874,7 @@ extern int MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR;
 extern int MENU_GRID_TEXT_COLOR;
 extern int MENU_GRID_BACKGROUND_COLOR;
 extern int MENU_GRID_CELL_BORDER_COLOR;
-extern int MENU_GRID_CELL_DRAG_LINE_COLOR;
+extern int MENU_GRID_OUTER_COLOR;
 extern int MENU_GRID_HEADER_BACKGROUND_COLOR;
 extern int MENU_GRID_FOCUS_CELL_BACKGROUND_COLOR;
 extern int MENU_GRID_CELL_HEIGHT;
@@ -3038,7 +3038,7 @@ public:
   QString ocelot_grid_font_style, new_ocelot_grid_font_style;
   QString ocelot_grid_font_weight, new_ocelot_grid_font_weight;
   QString ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color;
-  QString ocelot_grid_cell_drag_line_color, new_ocelot_grid_cell_drag_line_color;
+  QString ocelot_grid_outer_color, new_ocelot_grid_outer_color;
   QString ocelot_grid_border_size, new_ocelot_grid_border_size; /* no longer used */
   QString ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size;
   QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size; /* no longer used */
@@ -6146,6 +6146,7 @@ void menu_context_t(const QPoint & pos)
 protected:
 void focusInEvent(QFocusEvent *e);
 void focusOutEvent(QFocusEvent *e);
+void hideEvent(QHideEvent *e);
 void keyPressEvent(QKeyEvent *e);
 void mouseDoubleClickEvent(QMouseEvent *e);
 void mouseMoveEvent(QMouseEvent *e);
@@ -6153,6 +6154,7 @@ void mousePressEvent(QMouseEvent *e);
 void mouseReleaseEvent(QMouseEvent *e);
 void paintEvent(QPaintEvent *e);
 void resizeEvent(QResizeEvent *e);
+void showEvent(QShowEvent *e);
 
 public:
 
@@ -6192,11 +6194,10 @@ Result_qtextedit(ResultGrid *m)
 
 /* THE GRID WIDGET */
 /*
-  Re the "cells" of the grid:
-  Todo: Originally these were QPlainTextEdit widgets, because QTextEdit
-        would insist on expanding long lines. That doesn't seem to be happening any more,
-        but we might have to switch back if there are problems.
-        Make sure the QTextEdit widgets are plain text, in case somebody enters HTML.
+  As of June 2021 major change:
+  The default display, which is also the odbc_html=1 vertical=0 display, is an HTML 4 table.
+  We allow dragging, width|height changing, changing cell background for "focus", images,
+  cut/copy/paste, scrolling.
   Todo: allow change of setTextDirection() based on language or on client variable.
   Todo: see this re trail spaces: http://qt-project.org/doc/qt-4.8/qtextoption.html#Flag-enum
   Todo: although min(column width) = heading width, don't have to make text editable area that wide
@@ -6205,13 +6206,9 @@ Result_qtextedit(ResultGrid *m)
   Todo: I used an eventfilter to detect scrolling because QScrollBar::valueChanged()
         failed, but someday I should find out why and retry. See vertical_scroll_bar_event().
   Todo: "new" operations should have nothrow checks.
-  Todo: different rows have different column heights
-  Because they're in a grid with (probably) a scroll bar, I want uniform width and height, and
-  perhaps have redundant expressions to tell Qt that's what I want -- I flailed around for hours
-  until something finally worked, and left it alone after that, although I might have to add even
-  more junk about dontshowonscreen or opacity if there is flickering.
-  The wrap policy is QTextOption::WrapAnywhere -- there could be a user-settable option for this
-  if the preference was to wrap on word boundaries when possible.
+  Todo: add even more junk about dontshowonscreen or opacity if there is flickering.
+  Todo: Our wrap policy is like QTextOption::WrapAnywhere -- there could be a user-settable option for this
+        if the preference was to wrap on word boundaries when possible. Could be difficult.
 */
 /*
   Todo:
@@ -6226,14 +6223,13 @@ Result_qtextedit(ResultGrid *m)
 */
 
 /*
-   Grid cells are made resizable by putting a frame around the cell, and detecting mouse-click + mouse-movement on the frame.
-   grid_main_layout                        QVBoxLayout occurs 1 time
-   grid_main_widget                        QWidget occurs 0 times -- currently we use a widget named "client" instead
-     grid_row_layouts                           QHBoxLayout occurs #-of-rows times
-     grid_row_widgets                           QWidget occurs #-of-rows times, with layout = row_layouts
-       text_edit_frames                             TextEditFrame occurs #-of-columns times within each grid_row_widgets
-         text_edit_layouts                              QHBoxLayout ""
-           text_edit_widgets                                QTextEdit ""
+  this
+    hbox_layout                QHBoxLayout
+      grid_scroll_area         QScrollArea *
+      grid_vertical_scroll_bar QScrollBar *
+  client                       QWidget *
+    grid_main_layout           QVBoxLayout
+      html_text_edit           Result_qtextedit *
 
   Making the grid-cell QTextWidgets resizable was difficult.
   I couldn't get satisfactory results with QSplitter, and don't believe that satisfactory results would be possible.
@@ -6257,9 +6253,6 @@ Result_qtextedit(ResultGrid *m)
 */
 
 /*
-  In fact we have a QTextBox inside a modified QFrame. But it appears as if it's a QTextBox with a border.
-  So the menu item Settings|Border Color, or dragger color, actually changes the QFrame's background color.
-  And the size of the QTextEdit right "border" is actually the amount that we set with setContentsMargins() on the QFrame.
   The changes made by dragging are persistent as long as the result set is up.
 */
 
@@ -6288,9 +6281,12 @@ Result_qtextedit(ResultGrid *m)
 class ResultGrid: public QWidget
 {
   Q_OBJECT
-public:
+private:
   QWidget *client;
-
+  QScrollArea *grid_scroll_area;
+  int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
+public:
+  QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   unsigned int result_column_count;
   long unsigned int result_row_count, grid_result_row_count;
 //  long unsigned int *lengths;
@@ -6315,14 +6311,9 @@ public:
 #if (OCELOT_MYSQL_INCLUDE == 1)
   MYSQL_FIELD *mysql_fields;
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
-  QScrollArea *grid_scroll_area;
-  QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
-  int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
 #ifdef OLD_STUFF
   TextEditWidget **text_edit_widgets; /* Todo: consider using plaintext */ /* dynamic-sized list of pointers to QPlainTextEdit widgets */
   QHBoxLayout **text_edit_layouts;
-#endif
-#ifdef OLD_STUFF
   TextEditFrame **text_edit_frames;
 #endif
   MYSQL_RES *grid_mysql_res;
@@ -6353,8 +6344,8 @@ public:
 
  QHBoxLayout *hbox_layout;
 
-  QHBoxLayout **grid_row_layouts;                               /* dynamic-sized list of pointers to rows' QHBoxLayout layouts */
-  QWidget **grid_row_widgets;                                   /* dynamic-sized list of pointers to rows' QWidget widgets */
+//  QHBoxLayout **grid_row_layouts;                               /* dynamic-sized list of pointers to rows' QHBoxLayout layouts */
+//  QWidget **grid_row_widgets;                                   /* dynamic-sized list of pointers to rows' QWidget widgets */
   QVBoxLayout *grid_main_layout;                                   /* replaces QGridLayout *grid_layout */
   /* QWidget *grid_main_widget;  */                                /* replaces QGridLayout *grid_layout -- but we say "client" */
 
@@ -6380,7 +6371,7 @@ public:
   unsigned int setting_ocelot_grid_cell_width_as_int;
   QString ocelot_grid_text_color;
   QString ocelot_grid_background_color;
-  QString ocelot_grid_cell_drag_line_color;
+//  QString ocelot_grid_cell_drag_line_color;
 
 #ifdef OLD_STUFF
   QString frame_color_setting;                                 /* based on drag line color */
@@ -6389,8 +6380,8 @@ public:
   ldbms *lmysql;
   unsigned int scroll_bar_width;
   unsigned int scroll_bar_height;
-  unsigned int result_grid_height_after_last_resize;
-  unsigned int result_grid_width_after_last_resize;
+  int result_grid_height_after_last_resize; /* not unsigned int because we might see it as -1 */
+  int result_grid_width_after_last_resize;
 
   int result_grid_vertical_width_of_header;
   int result_grid_vertical_width_of_value;
@@ -6456,8 +6447,8 @@ ResultGrid(
   grid_scroll_area= 0;
   /* grid_layout= 0; */
   hbox_layout= 0;
-  grid_row_layouts= 0;
-  grid_row_widgets= 0;
+  //grid_row_layouts= 0;
+  //grid_row_widgets= 0;
   grid_main_layout= 0;
   /* grid_main_widget= 0; */
   border_size= 1;                                          /* Todo: This actually has to depend on stylesheet */
@@ -6550,7 +6541,6 @@ ResultGrid(
   /* This won't be correct until after resizeEvent() and after a real display of the resultgrid widget */
   result_grid_height_after_last_resize= -1;
   result_grid_width_after_last_resize= -1;
-
 
   /*
     Just a note for the archives ...
@@ -6863,6 +6853,7 @@ void display_batch()
     char html_font_size[32];
     char html_font_style[32];
     char html_font_weight[32];
+    char html_outer_color[32];
     int html_border_size;
     strcpy(html_border_color, copy_of_parent->ocelot_grid_cell_border_color.toUtf8());
     strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
@@ -6872,6 +6863,7 @@ void display_batch()
     strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
     strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
     strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
+    strcpy(html_outer_color, copy_of_parent->ocelot_grid_outer_color.toUtf8());
     html_border_size= copy_of_parent->ocelot_grid_cell_border_size.toInt();
     sprintf(ocelot_grid_table_start, "<head><style type=text/css>"
             " th {"
@@ -7693,8 +7685,7 @@ QString get_border_color()
   QString tmp_border_color= copy_of_parent->ocelot_grid_cell_border_color;
   int i= 1;
   while ((tmp_border_color == copy_of_parent->ocelot_grid_background_color)
-      || (tmp_border_color == copy_of_parent->ocelot_grid_header_background_color)
-      || (tmp_border_color == copy_of_parent->ocelot_grid_cell_drag_line_color))
+      || (tmp_border_color == copy_of_parent->ocelot_grid_header_background_color))
   {
     tmp_border_color= tmp_border_color.left(tmp_border_color.size() - 1)
                     + QString::number(i);
@@ -7883,7 +7874,7 @@ void prepare_for_display_html()
       char html_font_size[32];
       char html_font_style[32];
       char html_font_weight[32];
-      char html_drag_line_color[32];
+      char html_outer_color[32];
       int html_border_size;
 
       QString tmp_border_color= get_border_color();
@@ -7896,7 +7887,8 @@ void prepare_for_display_html()
       strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
       strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
       strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
-      strcpy(html_drag_line_color, copy_of_parent->ocelot_grid_cell_drag_line_color.toUtf8());
+      strcpy(html_outer_color, copy_of_parent->ocelot_grid_outer_color.toUtf8());
+
       html_border_size= copy_of_parent->ocelot_grid_cell_border_size.toInt();
 
       char tmp_div[512];
@@ -7951,7 +7943,7 @@ void prepare_for_display_html()
               html_font_weight,             /* body {font-weight} */
               html_header_background_color, /* th {background-color} */
               html_background_color,        /* td {background-color} */
-              html_drag_line_color,         /* body bgcolor */
+              html_outer_color,         /* body bgcolor */
               html_border_size);            /* table border size */
       strcpy(ocelot_grid_header_row_start, "<TR bgcolor=blue>");
       strcpy(ocelot_grid_header_row_end, "</TR>");
@@ -8038,14 +8030,25 @@ int column_height(unsigned int grid_row, int column_no, int v_length, char *valu
           Exception: X cannot be 0, i.e. there is always at least 1 row. It can have its own scroll bar.
         You might have a bit of trouble if there is a font-change within the column, otherwise you should be accurate.
         Warning: if lineSpacing()==24 then max_height_of_a_char==26 and actual height seems to be 27
+  Re result_grid_height_after_last_resize:
+    It might be better to calculate height from Result_qtextedit::resizeEvent, it would probably be
+    two pixels smaller than what comes out of ResultGrid::resizeEvent, but we don't change because there
+    might be non-HTML stuff that depends on it. For some reason we might be calling display_html more than
+    once, but we won't waste too much time if it's -1.
 */
 void display_html(int new_grid_vertical_scroll_bar_value)
 {
   if (copy_of_ocelot_vertical == 1) { display_html_html_vertical(new_grid_vertical_scroll_bar_value); return; }
 
+  if (result_grid_height_after_last_resize < 0) return;
+
+  /* Todo: eventually row_height + max_display_rows won't need to be calculated at this stage. */
+  int row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1;
+
   /* Todo: result_grid_height_after_last_resize can change in ways that might not be anticipated. */
+  /* We know that it is wrong for the first display. Todo: check what happens if it's minimized. */
   int max_display_height= result_grid_height_after_last_resize;
-  if (max_display_height < 300) max_display_height= 261; /* TEST!! because first display has it wrong. */
+  if (max_display_height < row_height * 2) max_display_height= row_height * 2;
 
   int w= scroll_bar_width * 2; /* todo: should add width of the leftmost (sizer) column, actually */
   for (int i= 0; i < (int) gridx_column_count; ++i) w+= grid_column_widths[i]
@@ -8053,8 +8056,6 @@ void display_html(int new_grid_vertical_scroll_bar_value)
                                               + 1;
   if (w >= (int) result_grid_width_after_last_resize)
       max_display_height-= scroll_bar_height;
-  /* Todo: eventually row_height + max_display_rows won't need to be calculated at this stage. */
-  int row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1;
   int max_display_rows= max_display_height / row_height;
   if (ocelot_result_grid_column_names_copy == 1)
   {
@@ -10180,7 +10181,7 @@ void resizeEvent(QResizeEvent *event)
 {
   result_grid_height_after_last_resize= event->size().height();
   result_grid_width_after_last_resize= event->size().width();
-  if (result_grid_height_after_last_resize != (unsigned int) event->oldSize().height())
+  if (result_grid_height_after_last_resize != event->oldSize().height())
   {
     resize_or_font_change(result_grid_height_after_last_resize, true);
   }
@@ -11570,7 +11571,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_grid_font_style= copy_of_parent->ocelot_grid_font_style;
   copy_of_parent->new_ocelot_grid_font_weight= copy_of_parent->ocelot_grid_font_weight;
   copy_of_parent->new_ocelot_grid_cell_border_color= copy_of_parent->ocelot_grid_cell_border_color;
-  copy_of_parent->new_ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
+  copy_of_parent->new_ocelot_grid_outer_color= copy_of_parent->ocelot_grid_outer_color;
 //  copy_of_parent->new_ocelot_grid_border_size= copy_of_parent->ocelot_grid_border_size;
   copy_of_parent->new_ocelot_grid_cell_border_size= copy_of_parent->ocelot_grid_cell_border_size;
   copy_of_parent->new_ocelot_grid_cell_width= copy_of_parent->ocelot_grid_cell_width;
@@ -12139,8 +12140,8 @@ void set_widget_values(int ci)
               color_name= copy_of_parent->new_ocelot_grid_cell_border_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
-    case 3: { color_type= menu_strings[menu_off + MENU_GRID_CELL_DRAG_LINE_COLOR]; /* actually OUTER color */
-              color_name= copy_of_parent->new_ocelot_grid_cell_drag_line_color;
+    case 3: { color_type= menu_strings[menu_off + MENU_GRID_OUTER_COLOR];
+              color_name= copy_of_parent->new_ocelot_grid_outer_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
     case 7: { color_type= menu_strings[menu_off + MENU_GRID_HEADER_BACKGROUND_COLOR];
@@ -12580,7 +12581,7 @@ void handle_combo_box_for_color_pick_3(int item_number)
   {
     QString new_color= combo_box_for_color_pick[3]->itemText(item_number);
     new_color= copy_of_parent->canonical_color_name(new_color);
-    copy_of_parent->new_ocelot_grid_cell_drag_line_color= new_color;
+    copy_of_parent->new_ocelot_grid_outer_color= new_color;
     label_for_color_rgb[3]->setText(copy_of_parent->rgb_to_color(new_color));
     QString s= "border: 1px solid black; background-color: ";
     s.append(copy_of_parent->qt_color(new_color));
@@ -13181,7 +13182,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 124
+#define OCELOT_VARIABLES_SIZE 125
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */

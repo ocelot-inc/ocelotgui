@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 9 2021
+   Last modified: June 10 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -583,7 +583,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_prompt_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1]; /* set early because initialize_widget_statement() depends on this */
   ocelot_grid_focus_cell_background_color= s_color_list[COLOR_WHEAT*2 + 1];;
   ocelot_grid_header_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1];
-  ocelot_grid_cell_drag_line_color= s_color_list[COLOR_LIGHTBLUE*2 + 1];;
+  ocelot_grid_outer_color= s_color_list[COLOR_LIGHTBLUE*2 + 1];;
   ocelot_grid_cell_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_grid_cell_border_size= "1";
   ocelot_grid_cell_drag_line_size= "5";
@@ -3443,11 +3443,9 @@ void MainWindow::menu_edit_zoominorout(int increment)
     old_stylesheet= qobject_cast<QTextEdit*>(focus_widget)->styleSheet();
   else return; /* This would be unexpected. */
   int i= old_stylesheet.indexOf("font-size:");
-  printf("**** i=%d\n", i);
   if (i == -1) return;
   i+= sizeof("font-size:");
   int j= old_stylesheet.indexOf("pt", i);
-  printf("**** j=%d\n", j);
   if (j == -1) return;
   QString old_font_size= old_stylesheet.mid(i-1, j-(i-1));
   int font_size= old_font_size.toInt();
@@ -5207,7 +5205,7 @@ void MainWindow::action_grid()
     action_change_one_setting(ocelot_grid_font_style, new_ocelot_grid_font_style, TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE);
     action_change_one_setting(ocelot_grid_font_weight, new_ocelot_grid_font_weight, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT);
     action_change_one_setting(ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR);
-    action_change_one_setting(ocelot_grid_cell_drag_line_color, new_ocelot_grid_cell_drag_line_color, TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR);
+    action_change_one_setting(ocelot_grid_outer_color, new_ocelot_grid_outer_color, TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR);
     action_change_one_setting(ocelot_grid_cell_height, new_ocelot_grid_cell_height, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT);
     action_change_one_setting(ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE);
     action_change_one_setting(ocelot_grid_cell_width, new_ocelot_grid_cell_width, TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH);
@@ -5390,7 +5388,7 @@ void MainWindow::assign_names_for_colors()
   if (ocelot_grid_background_color.left(1) == "#") ocelot_grid_background_color= q_color_list_name(ocelot_grid_background_color);
   if (ocelot_grid_header_background_color.left(1) == "#") ocelot_grid_header_background_color= q_color_list_name(ocelot_grid_header_background_color);
   if (ocelot_grid_cell_border_color.left(1) == "#") ocelot_grid_cell_border_color= q_color_list_name(ocelot_grid_cell_border_color);
-  if (ocelot_grid_cell_drag_line_color.left(1) == "#") ocelot_grid_cell_drag_line_color= q_color_list_name(ocelot_grid_cell_drag_line_color);
+  if (ocelot_grid_outer_color.left(1) == "#") ocelot_grid_outer_color= q_color_list_name(ocelot_grid_outer_color);
   if (ocelot_history_text_color.left(1) == "#") ocelot_history_text_color= q_color_list_name(ocelot_history_text_color);
   if (ocelot_history_background_color.left(1) == "#") ocelot_history_background_color= q_color_list_name(ocelot_history_background_color);
   if (ocelot_history_border_color.left(1) == "#") ocelot_history_border_color= q_color_list_name(ocelot_history_border_color);
@@ -17812,7 +17810,6 @@ void Result_qtextedit::construct()
   setMouseTracking(true);
   document()->setDocumentMargin(0);
   /* test!! Hey it works. But should be an option. */
-  //setReadOnly(true);
   setAlignment(Qt::AlignTop | Qt::AlignLeft);
   setWordWrapMode(QTextOption::NoWrap);
   setFrameStyle(QFrame::NoFrame);
@@ -18938,10 +18935,22 @@ void Result_qtextedit::paste()
   QTextEdit::paste();
 }
 
+/* I don't know what cause Result_qtextedit::hideEvent(). Maybe ResultGrid::hideEvent()? */
+void Result_qtextedit::hideEvent(QHideEvent *event)
+{
+  QTextEdit::hideEvent(event);
+}
+
 void Result_qtextedit::resizeEvent(QResizeEvent *event)
 {
   QTextEdit::resizeEvent(event);
 }
+
+void Result_qtextedit::showEvent(QShowEvent *event)
+{
+  QTextEdit::showEvent(event);
+}
+
 
 /*
    Todo: We know what is at pos but do nothing about it.
@@ -24921,7 +24930,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 124 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 125 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
   Todo: ocelot_grid_border_size is no longer used but we'll probably add something else soon
 */
 int XSettings::ocelot_variables_create()
@@ -24956,6 +24965,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_grid_header_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR},
     {&main_window->ocelot_grid_height, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT},
     {&main_window->ocelot_grid_left, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT},
+    {&main_window->ocelot_grid_outer_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR},
     {NULL, &ocelot_grid_tabs,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TABS},
     {&main_window->ocelot_grid_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR},
     {&main_window->ocelot_grid_top, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TOP},
@@ -25053,7 +25063,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 124;
+  int i= 125;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;
