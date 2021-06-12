@@ -6105,7 +6105,7 @@ private:
   int qtextedit_drag_start_time;
   bool qtextedit_is_in_drag_for_column, qtextedit_is_in_drag_for_row;
   int qtextedit_column_number_at_drag_start_time;
-  int qtextedit_row_number_at_drag_start_time;
+  int qtextedit_grid_row_number_at_drag_start_time;
 
   /* Things that get set by cell_analyze(). Mostly pixels or points. */
   int qtextedit_block_count;       /* from document()->blockCount() */
@@ -6113,7 +6113,7 @@ private:
   int qtextedit_x;                 /* from event->x() */
   int qtextedit_y;                 /* from event->y() */
   int qtextedit_block_number;      /* what we calculate other things from */
-  int qtextedit_row_number;        /* row number, starts at 1, includes header row, within display */
+  int qtextedit_grid_row_number;        /* row number, starts at 1, includes header row, within display */
   int qtextedit_column_number;     /* column number, starts at 1, includes thin image column */
   bool qtextedit_is_before_column; /* x is on a pixel that precedes qtextedit_column */
   bool qtextedit_is_before_row;    /* y is on a pixel that precedes qtextedit_row */
@@ -6129,7 +6129,8 @@ private:
 
   void cell_analyze(int x, int y);
   void construct();
-  int get_result_set_row_number(int row_number);
+  int result_row_number_from_grid_row_number(int grid_row_number);
+  int grid_row_number_from_result_row_number(int result_row_number);
   QString unstripper(QString value_to_unstrip);
   void generate_update();
   QString to_plain_text();
@@ -6386,7 +6387,7 @@ public:
   int result_grid_vertical_width_of_header;
   int result_grid_vertical_width_of_value;
 
-  int focus_row_number, focus_column_number;
+  int focus_result_row_number, focus_column_number;
 
 /* How many rows can fit on the screen? Take a guess for initialization. */
 #define RESULT_GRID_WIDGET_INITIAL_HEIGHT 10
@@ -7276,7 +7277,7 @@ void display(int due_to,
   /* Since it's not ocelot_batch or ocelot_xml it must be ocelot_html */
   {
     grid_vertical_scroll_bar_value= -1; /* todo: check: is this alread in vertical_scroll_bar_initialize? */
-    focus_row_number= focus_column_number= -1; /* i.e. no cell is in focus */
+    focus_result_row_number= focus_column_number= -1; /* i.e. no cell is in focus */
     prepare_for_display_html();
     display_html(0);
   }
@@ -8088,8 +8089,8 @@ void display_html(int new_grid_vertical_scroll_bar_value)
     return;
   }
 
-  long unsigned int tmp_xrow;
-  char *result_set_pointer= result_set_copy_rows[0];
+  long unsigned int tmp_result_row_number;
+  char *result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   unsigned int v_length /*, f_length */;
   char *result_field_names_pointer;
 
@@ -8124,11 +8125,11 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 
   tmp_size+= strlen(ocelot_grid_table_start);
 
-  //for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  //for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   unsigned int grid_row;
-  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_xrow < result_row_count) && (grid_row < (unsigned int) max_display_rows);
-       ++tmp_xrow, ++grid_row)
+  for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_display_rows);
+       ++tmp_result_row_number, ++grid_row)
   {
     result_field_names_pointer= &result_field_names[0];
     tmp_size+= strlen(ocelot_grid_detail_row_start);
@@ -8205,7 +8206,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
                                                     i,
-                                                    0, /* tmp_xrow */
+                                                    0, /* tmp_result_row_number */
                                                     ocelot_grid_header_char_column_end,
                                                     &new_cell_height);
       result_field_names_pointer+= v_length;
@@ -8216,10 +8217,10 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 
   result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
-  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_xrow < result_row_count) && (grid_row < (unsigned int) max_display_rows);
-       ++tmp_xrow, ++grid_row)
-//  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_display_rows);
+       ++tmp_result_row_number, ++grid_row)
+//  for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   {
     result_field_names_pointer= &result_field_names[0];
     strcpy(tmp_pointer, ocelot_grid_detail_row_start);
@@ -8242,7 +8243,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
                                                     i,
-                                                    tmp_xrow,
+                                                    tmp_result_row_number,
                                                     ocelot_grid_detail_char_column_end,
                                                     &new_cell_height);
       result_set_pointer+= v_length;
@@ -8283,8 +8284,6 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 
   is_paintable= 0;
 
-  /* TODO: IS THIS NECESSARY? IS IT IN THE RIGHT PLACE? */
-//  printf("**** html_text_edit->show();\n");
   html_text_edit->show();
 
   grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
@@ -8292,13 +8291,12 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   if ((result_row_count == 0) || (result_column_count == 0))
   {
     html_text_edit->insertPlainText("row_count == 0 or column_count == 0");
-    this->show();
-    client->show();
+//    this->show();
+//    client->show();
     return;
   }
-
-  long unsigned int tmp_xrow;
-  char *pointer= result_set_copy_rows[0];
+  long unsigned int result_row_number;
+  char *result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   unsigned int v_length, f_length;
   char *result_field_names_pointer;
 
@@ -8311,7 +8309,6 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   /* <TD></TD> might be replaced by <TD><div class="xx"></div></TD> which is 22 bytes */
   unsigned int extra_for_div= 0;
   if ((copy_of_ocelot_html == 1) && (copy_of_parent->conditional_settings.count() > 0)) extra_for_div= 22;
-
   if (ocelot_result_grid_column_names_copy == 1)
   {
     tmp_size+= strlen(ocelot_grid_header_row_start);
@@ -8326,14 +8323,13 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
     }
     tmp_size+= strlen(ocelot_grid_header_row_end);
   }
-
   tmp_size+= strlen(ocelot_grid_table_start);
 
-  //for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  //for (result_row_number= 0; result_row_number < result_row_count; ++result_row_number)
   unsigned int grid_row;
-  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_xrow < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
-       ++tmp_xrow, ++grid_row)
+  for (result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
+       ++result_row_number, ++grid_row)
   {
     result_field_names_pointer= &result_field_names[0];
     tmp_size+= strlen(ocelot_grid_detail_row_start);
@@ -8350,12 +8346,12 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
         tmp_size+= f_length + 2;
         result_field_names_pointer+= f_length + sizeof(unsigned int);
       }
-      memcpy(&v_length, pointer, sizeof(unsigned int));
+      memcpy(&v_length, result_set_pointer, sizeof(unsigned int));
 
-      pointer+= sizeof(unsigned int) + sizeof(char);
+      result_set_pointer+= sizeof(unsigned int) + sizeof(char);
       tmp_size+= v_length;
       tmp_size+= strlen(ocelot_grid_detail_char_column_end);
-      pointer+= v_length;
+      result_set_pointer+= v_length;
     }
     tmp_size+= strlen(ocelot_grid_detail_row_end);
   }
@@ -8372,12 +8368,12 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
 
-  pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
+  result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
-  for (tmp_xrow= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_xrow < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
-       ++tmp_xrow, ++grid_row)
-//  for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
+  for (result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
+       (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
+       ++result_row_number, ++grid_row)
+//  for (result_row_number= 0; result_row_number < result_row_count; ++result_row_number)
   {
     result_field_names_pointer= &result_field_names[0];
 
@@ -8389,7 +8385,6 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 
       /* EL KLUDGEO -- until we have a better calculation of grid_column_widths[] when vertical */
 //      if (grid_column_widths[i] < 20) grid_column_widths[i]= 200;
-
       if (ocelot_result_grid_column_names_copy == 1)
       {
         memcpy(&f_length, result_field_names_pointer, sizeof(unsigned int));
@@ -8404,39 +8399,36 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                       result_grid_font,
                                                       setting_max_width_of_a_char,
                                                       i,
-                                                      tmp_xrow,
+                                                      result_row_number,
                                                       ocelot_grid_header_char_column_end,
                                                       &new_cell_height);
 
         result_field_names_pointer+= f_length;
       }
-      memcpy(&v_length, pointer, sizeof(unsigned int));
-      pointer+= sizeof(unsigned int) + sizeof(char);
+      memcpy(&v_length, result_set_pointer, sizeof(unsigned int));
+      result_set_pointer+= sizeof(unsigned int) + sizeof(char);
       /* more "HTML only" stuff */
-
       tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
                                                     ocelot_grid_detail_char_column_start,
                                                     tmp_pointer,
-                                                    pointer,
+                                                    result_set_pointer,
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
                                                     result_grid_vertical_width_of_value,
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
                                                     i,
-                                                    tmp_xrow,
+                                                    result_row_number,
                                                     ocelot_grid_detail_char_column_end,
                                                     &new_cell_height);
-      pointer+= v_length;
+      result_set_pointer+= v_length;
       strcpy(tmp_pointer, ocelot_grid_detail_row_end);
       tmp_pointer+= strlen(ocelot_grid_detail_row_end);
     }
-
   }
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
-
   if ((copy_of_ocelot_html != 0) && (copy_of_ocelot_raw == 0))
   {
     html_text_edit->setHtml(tmp);
@@ -8447,9 +8439,9 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   }
   html_text_edit->moveCursor(QTextCursor::Start);
   html_text_edit->ensureCursorVisible();
-  html_text_edit->show();
-  show();
-  client->show();
+//  html_text_edit->show();
+//  show();
+//  client->show();
   delete [] tmp;
   is_paintable= 1;
   return;
@@ -9346,7 +9338,8 @@ void grid_column_size_calc_vertical(
       if (width_of_field_name_i > (unsigned int) result_grid_vertical_width_of_header) result_grid_vertical_width_of_header= width_of_field_name_i;
     }
     int width_of_field_value_i= 0;
-    if (grid_column_widths[i] < MIN_WIDTH_IN_CHARS) width_of_field_value_i= MIN_WIDTH_IN_CHARS;
+    if (gridx_max_column_widths[i] < MIN_WIDTH_IN_CHARS) width_of_field_value_i= MIN_WIDTH_IN_CHARS;
+    else width_of_field_value_i= gridx_max_column_widths[i];
     if (width_of_field_value_i > result_grid_vertical_width_of_value) result_grid_vertical_width_of_value= width_of_field_value_i;
   }
   result_grid_vertical_width_of_header= result_grid_vertical_width_of_header * setting_max_width_of_a_char;
@@ -10093,7 +10086,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
   We're making the over-cautious assumption that it will be necessary to assign
   1 texteditframe for 1 line. In fact a texteditframe is always bigger than a line.
   We try to avoid recalculating just because user shifts by a few pixels.
-  We can't call display_html() if is_resize because there's a show() in that, which cause a call to here
+  display_html() should not show() because that would cause a call to here, we'd loop
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
@@ -10731,7 +10724,7 @@ bool comparer(
 #define MAX_CONDITIONAL_STATEMENT_TOKENS 100 /* todo: this is a duplicate of what's defined in MainWindow */
 bool conditional_setting_evaluate(int cs_number,
                                   int cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
-                                  int cs_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
+                                  int cs_result_row_number,       /* e.g. text_frame->ancestor_grid_result_row_number */
                                   char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
                                   unsigned int cs_content_length, /* e.g. text_frame->content_length */
                                   unsigned short int cs_cell_type,  /* e.g. text_frame->cell_type */
@@ -10808,7 +10801,7 @@ bool conditional_setting_evaluate(int cs_number,
             }
             if (target == "ROW_NUMBER")
             {
-              int crn= cs_row_number;
+              int crn= cs_result_row_number;
               if (ocelot_result_grid_column_names_copy == 1) ++crn;
               result= comparer(QString::number(crn), value, opr, 0);
             }
@@ -10901,7 +10894,7 @@ bool conditional_setting_evaluate(int cs_number,
 /* If not HTML we could continue after true and pass result style string to the next iteration. But, no. */
 bool conditional_setting_evaluate_till_true(
                                   int cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
-                                  int cs_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
+                                  int cs_result_row_number,       /* e.g. text_frame->ancestor_grid_result_row_number */
                                   char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
                                   unsigned int cs_content_length, /* e.g. text_frame->content_length */
                                   unsigned short int cs_cell_type,  /* e.g. text_frame->cell_type */
@@ -10919,7 +10912,7 @@ bool conditional_setting_evaluate_till_true(
   {
     result= conditional_setting_evaluate(i,
     cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
-    cs_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
+    cs_result_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
     cs_content_pointer,       /* e.g. text_frame->content_pointer */
     cs_content_length, /* e.g. text_frame->content_length */
     cs_cell_type,  /* e.g. text_frame->cell_type */

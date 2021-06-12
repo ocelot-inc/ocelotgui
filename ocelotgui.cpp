@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 10 2021
+   Last modified: June 11 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -5035,9 +5035,6 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
   }
 #endif
   if (qe == QEvent::FocusIn)
-  {
-    if (strcmp(class_name, "TextEditWidget") != 0) return; /* Todo: This class no longer exists. */
-  }
   if (strcmp(class_name, "CodeEditor") == 0)
   {
     CodeEditor *t= qobject_cast<CodeEditor*>(focus_widget);
@@ -5049,31 +5046,6 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     is_can_format= is_can_zoomin= is_can_zoomout= !doc->isEmpty();
     is_can_autocomplete= !completer_widget->isHidden();
   }
-#ifdef OLD_STUFF
-  else if (strcmp(class_name, "TextEditWidget") == 0) /* Todo: This class no longer exists. */
-  {
-    TextEditWidget *t= qobject_cast<TextEditWidget*>(focus_widget);
-    QTextDocument *doc= t->document();
-    if (doc->availableUndoSteps() <= 0) is_can_undo= false;
-    if (t->text_edit_frame_of_cell->is_image_flag)
-    {
-
-      /* !! TEST !! */
-      is_can_copy= true;
-
-      /* zoomin + zoomout are already false */
-      is_can_cut= false;
-      is_can_paste= false;
-    }
-    else
-    {
-      is_can_copy= is_can_cut= t->textCursor().hasSelection();
-      is_can_paste= t->canPaste();
-      is_can_zoomin= is_can_zoomout= !doc->isEmpty();
-    }
-    is_can_format= false;
-  }
-#endif
   else if (strcmp(class_name, "TextEditHistory") == 0)
   {
     TextEditHistory *t= qobject_cast<TextEditHistory*>(focus_widget);
@@ -5089,6 +5061,7 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     Result_qtextedit *t= qobject_cast<Result_qtextedit*>(focus_widget);
     QTextDocument *doc= t->document();
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
+    if (doc->availableRedoSteps() <= 0) is_can_redo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
     is_can_format= false;
@@ -17897,7 +17870,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
                                      QFont font,
                                      int max_width_of_a_char,
                                      int passed_i,
-                                     long unsigned int tmp_xrow,
+                                     long unsigned int tmp_result_row_number,
                                      char *ocelot_grid_detail_char_column_end,
                                      int *new_cell_height_as_int)
 {
@@ -17909,7 +17882,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   bool is_image= false;
   if (result_grid->is_image(passed_i) == true) is_image= true;
 
-  QByteArray f= qtextedit_result_changes->find(tmp_xrow, passed_i);
+  QByteArray f= qtextedit_result_changes->find(tmp_result_row_number, passed_i);
 
   if (f.size() > 1)
   {
@@ -17917,7 +17890,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     pointer= (char*) f.constData();  /* image paste experiment */
     v_length= f.size();  /* image paste experiment */
   }
-
   /* How can this be right if v_length and pointer get adjusted afterward? Well, VALUE='...' doesn't work. */
   /* Todo: This is supposed to be applicable to header too, no? */
   /* TEST!!! start: See whether we can change color, at least. HTML only! */
@@ -17928,14 +17900,13 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   int returned_cs_number= 0;
   bool result= result_grid->conditional_setting_evaluate_till_true(
        passed_i, /* text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number, */
-       tmp_xrow, /* text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number, */
+       tmp_result_row_number, /* text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number, */
        pointer, /* text_edit_frames[text_edit_frames_index]->content_pointer, */
        v_length, /* text_edit_frames[text_edit_frames_index]->content_length, */
        TEXTEDITFRAME_CELL_TYPE_DETAIL, /* text_edit_frames[text_edit_frames_index]->cell_type, */
        &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number);
 //  char tmp_new_style_sheet[640];
 //  strcpy(tmp_new_style_sheet, new_style_sheet.toUtf8());
-
   if ((result == true) && (new_cell_height != ""))
   {
     int nchi= result_grid->get_cell_width_or_height_as_int(new_cell_height, result_grid->max_height_of_a_char);
@@ -17943,7 +17914,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
      && (QString::compare("default", new_cell_height, Qt::CaseInsensitive) != 0))
       *new_cell_height_as_int= nchi;
   }
-
   /*
     Although we pass ocelot_grid_detail_numeric_column_start and ocelot_grid_detail_char_column_start,
     we ignore them because we must add <width=...> in either case so what we really will want is
@@ -17961,7 +17931,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     w-= result_grid->setting_ocelot_grid_cell_border_size_as_int * 2;
     w-= result_grid->setting_ocelot_grid_cell_drag_line_size_as_int;
     char bgcolor[64];
-    if (((int) tmp_xrow == result_grid->focus_row_number - 1) && ((int) passed_i == result_grid->focus_column_number - 1))
+    if (((int) tmp_result_row_number == result_grid->focus_result_row_number) && ((int) passed_i == result_grid->focus_column_number - 1))
     {
       char color_name[32];
       strcpy(color_name, result_grid->copy_of_parent->ocelot_grid_focus_cell_background_color.toUtf8());
@@ -17990,7 +17960,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     tmp_pointer+= strlen(tmp_div);
   }
   /* TEST!!! end */
-
   if ((cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL) && (is_image == true))
   {
     char img_type[4]= "";
@@ -18026,7 +17995,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     }
     return tmp_pointer - original_tmp_pointer;
   }
-
   char c;
   QString s;
   int column_width_in_chars= (width / max_width_of_a_char); /* TEST!!!! */
@@ -18047,7 +18015,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     //else
     {*tmp_pointer= c; ++tmp_pointer;}
   }
-
   /* TODO: This looks like dead code since we have copied already and we won't increment tmp_pointer here */
   memcpy(tmp_pointer, pointer, v_length);
 
@@ -18059,7 +18026,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
 
   strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
   tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
-
   return tmp_pointer - original_tmp_pointer;
 }
 
@@ -18156,17 +18122,33 @@ QString Result_qtextedit::unstripper(QString value_to_unstrip)
 }
 
 /*
-  Pass: row_number from display, probably qtextedit_row_number
+  Pass: row_number from display, probably qtextedit_grid_row_number
   Return: row_number from result set, usually a simple calculation
   Todo: if it's vertical, this is wrong.
 */
-int Result_qtextedit::get_result_set_row_number(int row_number)
+int Result_qtextedit::result_row_number_from_grid_row_number(int grid_row_number)
 {
-  int r= row_number + result_grid->grid_vertical_scroll_bar->value();
-  if (result_grid->ocelot_result_grid_column_names_copy == 1) --r;
-  return r;
+  int result_row_number= grid_row_number + result_grid->grid_vertical_scroll_bar->value();
+  if (result_grid->ocelot_result_grid_column_names_copy == 1) --result_row_number;
+  return result_row_number;
 }
 
+/*
+  Pass: row_number from result set
+  Return: row_number on grid, or -1 if it's not on grid
+          If it's before the first grid row, it's negative, that's okay.
+          If it's after the last grid row i.e. max_display_rows in display_html(), that's okay.
+  Todo: if it's vertical, this is wrong.
+*/
+int Result_qtextedit::grid_row_number_from_result_row_number(int result_row_number)
+{
+  int grid_row_number= result_row_number - result_grid->grid_vertical_scroll_bar->value();
+  if (grid_row_number >= 0)
+  {
+    if (result_grid->ocelot_result_grid_column_names_copy == 1) ++grid_row_number;
+  }
+  return grid_row_number;
+}
 
 /* Taken from TextEditWidget::generate_update() */
 /*
@@ -18206,7 +18188,7 @@ void Result_qtextedit::generate_update()
 
   /* Todo: This is row# within display. So it is offset. Translate to row# within result set. */
   int xrow;
-  xrow= qtextedit_row_number;
+  xrow= qtextedit_grid_row_number;
   ++xrow; /* possible bug: should this be done if there's no header row? */
   /* Go up the line to find first text_edit_frame for the row */
   /* Content has changed since the last keyPressEvent. */
@@ -18227,7 +18209,7 @@ void Result_qtextedit::generate_update()
   unsigned int tefi= 0; /* was: text_edit_frame_index_of_first_cell; */
 
   /* Row# in result set = Row# in display but offset by vertical scroll bar */
-  int result_set_row_number= get_result_set_row_number(qtextedit_row_number);
+  int result_set_row_number= result_row_number_from_grid_row_number(qtextedit_grid_row_number);
 
   /* Given Row# point to result set row. We'll go through its columns in the loop. */
   char *result_set_copy_pointer;
@@ -18267,7 +18249,6 @@ void Result_qtextedit::generate_update()
     dbs_pointer+= sizeof(unsigned int);
     db_pointer= dbs_pointer;
     dbs_pointer+= db_length;
-printf("A\n");
     /* if in UNION or column-expression, or literal, skip it */
     if ((name_length == 0) || (table_length == 0) || (db_length == 0))
     {
@@ -18330,7 +18311,7 @@ printf("A\n");
           qt= document();
           QTextBlock qtb;
           /* Todo: Mystery! Why "+ 2"? I calculate it should be "+ 1". */
-          int qtb_number= (qtextedit_row_number * (result_grid->result_column_count + 1)) + 2 + column_number;
+          int qtb_number= (qtextedit_grid_row_number * (result_grid->result_column_count + 1)) + 2 + column_number;
           qtb= qt->findBlockByNumber(qtb_number);
         content_in_text_edit_widget= qtb.text();
 
@@ -18452,7 +18433,7 @@ void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
   tip= tip + " x=" + QString::number(qtextedit_x);
   tip= tip + " y=" + QString::number(qtextedit_y);
   tip= tip + " Block=" + QString::number(qtextedit_block_number);
-  tip= tip + " Row=" + QString::number(qtextedit_row_number);
+  tip= tip + " Grid_Row=" + QString::number(qtextedit_grid_row_number);
   tip= tip + " Column  " + QString::number(qtextedit_column_number);
   if (qtextedit_is_before_column) tip= tip + " (is_before_column)";
   if (qtextedit_is_before_row) tip= tip + " (is_before_row)";
@@ -18486,7 +18467,7 @@ void Result_qtextedit::cell_analyze(int x, int y)
 {
   qtextedit_block_count= document()->blockCount();
 
-  qtextedit_block_number= qtextedit_row_number=qtextedit_column_number= 0;
+  qtextedit_block_number= qtextedit_grid_row_number= qtextedit_column_number= 0;
   qtextedit_is_before_column= qtextedit_is_before_row= false;
 
   qtextedit_columns_per_row= result_grid->gridx_column_count + 1; /* +1 because of thin image on the left */
@@ -18521,7 +18502,7 @@ void Result_qtextedit::cell_analyze(int x, int y)
 
   QTextCursor text_cursor= cursorForPosition(QPoint(x, y));
   qtextedit_block_number= text_cursor.blockNumber() - 1;
-  qtextedit_row_number= qtextedit_block_number / qtextedit_columns_per_row;
+  qtextedit_grid_row_number= qtextedit_block_number / qtextedit_columns_per_row;
   qtextedit_column_number= qtextedit_block_number % qtextedit_columns_per_row;
   int border_size= result_grid->copy_of_parent->ocelot_grid_cell_border_size.toInt();
   qtextedit_is_before_column= false;
@@ -18606,7 +18587,7 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
  would eventClicked() be better?
  See also https://www.qtcentre.org/threads/45645-QTextEdit-cursorForPosition()-and-character-at-mouse-pointer
  Todo: I think dragging is only for left button. so add   if (!(event->buttons() & Qt::LeftButton))
- Re focus_row_number and focus_column_number:
+ Re focus_result_row_number and focus_column_number:
    We recognize mousePressEvent as a focus change. To show it, we change the background color with bgcolor.
    This gets overridden if there is a conditional setting too. We do not change it if the result set loses
    focus. We don't change color if mousePressEvent is on the header or outside the table. Default color is
@@ -18614,7 +18595,7 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
 */
 void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 {
-  result_grid->focus_row_number= qtextedit_row_number; /* so that background = Grid Focus Cell Background Color */
+  result_grid->focus_result_row_number= result_row_number_from_grid_row_number(qtextedit_grid_row_number); /* so that background = Grid Focus Cell Background Color */
   result_grid->focus_column_number= qtextedit_column_number;
 
   qtextedit_is_in_drag_for_column= qtextedit_is_in_drag_for_row= false;
@@ -18628,7 +18609,7 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
   {
     qtextedit_is_in_drag_for_row= true;
     qtextedit_drag_start_y= event->y();
-    qtextedit_row_number_at_drag_start_time= qtextedit_row_number;
+    qtextedit_grid_row_number_at_drag_start_time= qtextedit_grid_row_number;
   }
   if ((qtextedit_is_in_drag_for_column == true) || (qtextedit_is_in_drag_for_row == true))
   {
@@ -18710,7 +18691,7 @@ void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
         int moved_y= event->y() - qtextedit_drag_start_y;
         if (abs(moved_y) >= QApplication::startDragDistance())
         { /* Drag relevant row up or down */
-          result_grid->grid_row_heights[qtextedit_row_number_at_drag_start_time]+= moved_y;
+          result_grid->grid_row_heights[qtextedit_grid_row_number_at_drag_start_time]+= moved_y;
           is_dragged= true;
         }
       }
@@ -18928,7 +18909,7 @@ void Result_qtextedit::paste()
     if (p.save(&buffer, "PNG"))
     {
       /* image paste experiment */
-      qtextedit_result_changes->append(qtextedit_row_number, qtextedit_column_number, &image_as_byte_array);
+      qtextedit_result_changes->append(qtextedit_grid_row_number, qtextedit_column_number, &image_as_byte_array);
       return;
     }
   }
