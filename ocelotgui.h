@@ -3041,7 +3041,7 @@ public:
   QString ocelot_grid_outer_color, new_ocelot_grid_outer_color;
   QString ocelot_grid_border_size, new_ocelot_grid_border_size; /* no longer used */
   QString ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size;
-  QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size; /* no longer used */
+//  QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size; /* no longer used */
   QString ocelot_grid_cell_height, new_ocelot_grid_cell_height;
   QString ocelot_grid_cell_width, new_ocelot_grid_cell_width;
   QString ocelot_grid_style_string;
@@ -6114,6 +6114,7 @@ private:
   int qtextedit_y;                 /* from event->y() */
   int qtextedit_block_number;      /* what we calculate other things from */
   int qtextedit_grid_row_number;        /* row number, starts at 1, includes header row, within display */
+  int qtextedit_result_row_number;      /* row number from result set, derived from qtextedit_grid_row_number */
   int qtextedit_column_number;     /* column number, starts at 1, includes thin image column */
   bool qtextedit_is_before_column; /* x is on a pixel that precedes qtextedit_column */
   bool qtextedit_is_before_row;    /* y is on a pixel that precedes qtextedit_row */
@@ -7264,7 +7265,6 @@ void display(int due_to,
     ocelot_vertical_copy= ocelot_vertical;
     ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names;
   }
-
   vertical_scroll_bar_initialize();
 
   if ((copy_of_ocelot_batch != 0)
@@ -7281,7 +7281,6 @@ void display(int due_to,
     prepare_for_display_html();
     display_html(0);
   }
-
   return;
 
 #ifdef OLD_STUFF
@@ -7961,7 +7960,6 @@ void prepare_for_display_html()
       strcpy(ocelot_grid_detail_char_column_end , "</TD>");
       strcpy(ocelot_grid_table_end, "</TABLE></BODY></HTML>");
     }
-
 //TEST!!    hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
     //html_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
 
@@ -8010,6 +8008,28 @@ int column_height(unsigned int grid_row, int column_no, int v_length, char *valu
   return this_column_height;
 }
 
+void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, int *max_display_height, int *max_grid_rows)
+{
+  /* Todo: eventually row_height + max_display_rows won't need to be calculated at this stage. */
+  *row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1;
+  /* Todo: result_grid_height_after_last_resize can change in ways that might not be anticipated. */
+  /* We know that it is wrong for the first display. Todo: check what happens if it's minimized. */
+  *max_display_height= result_grid_height_after_last_resize;
+  if (*max_display_height < *row_height * 2) *max_display_height= *row_height * 2;
+  int wx= scroll_bar_width * 2; /* todo: should add width of the leftmost (sizer) column, actually */
+  for (int i= 0; i < (int) gridx_column_count; ++i) wx+= grid_column_widths[i]
+                                              + setting_ocelot_grid_cell_border_size_as_int * 2
+                                            + 1;
+  if (wx >= (int) result_grid_width_after_last_resize)
+      *max_display_height-= scroll_bar_height;
+  *max_grid_rows= *max_display_height / *row_height;
+  if ((ocelot_vertical_copy == 1) && (ocelot_result_grid_column_names_copy == 1))
+  {
+    --(*max_grid_rows);
+  }
+  if (*max_grid_rows <= 0) *max_grid_rows= 1;
+}
+
 /*
   Todo: ensure this isn't called for some irrelevant vertical scroll bar event.
   Todo: We're calculating char[] size in advance and using strcpy() or memcpy().
@@ -8043,26 +8063,8 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 
   if (result_grid_height_after_last_resize < 0) return;
 
-  /* Todo: eventually row_height + max_display_rows won't need to be calculated at this stage. */
-  int row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1;
-
-  /* Todo: result_grid_height_after_last_resize can change in ways that might not be anticipated. */
-  /* We know that it is wrong for the first display. Todo: check what happens if it's minimized. */
-  int max_display_height= result_grid_height_after_last_resize;
-  if (max_display_height < row_height * 2) max_display_height= row_height * 2;
-
-  int w= scroll_bar_width * 2; /* todo: should add width of the leftmost (sizer) column, actually */
-  for (int i= 0; i < (int) gridx_column_count; ++i) w+= grid_column_widths[i]
-                                              + setting_ocelot_grid_cell_border_size_as_int * 2
-                                              + 1;
-  if (w >= (int) result_grid_width_after_last_resize)
-      max_display_height-= scroll_bar_height;
-  int max_display_rows= max_display_height / row_height;
-  if (ocelot_result_grid_column_names_copy == 1)
-  {
-    --max_display_rows;
-  }
-  if (max_display_rows <= 0) max_display_rows= 1;
+  int row_height, max_display_height, max_grid_rows;
+  get_row_height_and_max_display_height_and_max_grid_rows(&row_height, &max_display_height, &max_grid_rows);
 
   is_paintable= 0;
 
@@ -8128,7 +8130,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   //for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   unsigned int grid_row;
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_display_rows);
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
   {
     result_field_names_pointer= &result_field_names[0];
@@ -8155,8 +8157,8 @@ void display_html(int new_grid_vertical_scroll_bar_value)
     if ((max_column_heights_total + 10) > (unsigned int) max_display_height)
     {
       /* Too many rows. There's no good justification for "+ 10" but it's harmless to display too few. */
-      max_display_rows= grid_row;
-      if (max_display_rows <= 0) max_display_rows= 1;
+      max_grid_rows= grid_row;
+      if (max_grid_rows <= 0) max_grid_rows= 1;
       break;
     }
   }
@@ -8218,7 +8220,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_display_rows);
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
 //  for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   {
@@ -8280,11 +8282,16 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 */
 void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 {
+  if (result_grid_height_after_last_resize < 0) return;
+
+  int row_height, max_display_height, max_grid_rows;
+  get_row_height_and_max_display_height_and_max_grid_rows(&row_height, &max_display_height, &max_grid_rows);
+
   int new_cell_height; /* TODO: WE HAVE TO DO SOMETHING WITH THIS! */
 
   is_paintable= 0;
 
-  html_text_edit->show();
+//  html_text_edit->show();
 
   grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
 
@@ -8328,7 +8335,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   //for (result_row_number= 0; result_row_number < result_row_count; ++result_row_number)
   unsigned int grid_row;
   for (result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
+       (result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
        ++result_row_number, ++grid_row)
   {
     result_field_names_pointer= &result_field_names[0];
@@ -8362,8 +8369,15 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   /* *5 in case (a) we change & to &amp; (b) we add <br> (c) we use hex digits (d) we forgot something. */
   tmp_size= tmp_size * 50;
 
+  /* +200 because thin_image */
+
+  tmp_size+= 1000000; /* image paste experiment */
+
+
   tmp= new char[tmp_size];
   char *tmp_pointer= &tmp[0];
+  char *tmp_pointer_before_thin_image_call; /* For the first column. Includes height which may need changing. */
+
 
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
@@ -8371,7 +8385,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
   for (result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (result_row_number < result_row_count) && (grid_row < result_grid_widget_max_height_in_lines);
+       (result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
        ++result_row_number, ++grid_row)
 //  for (result_row_number= 0; result_row_number < result_row_count; ++result_row_number)
   {
@@ -8382,6 +8396,9 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 //      if (copy_of_ocelot_xml != 0)
       strcpy(tmp_pointer, ocelot_grid_detail_row_start);
       tmp_pointer+= strlen(ocelot_grid_detail_row_start);
+
+      tmp_pointer_before_thin_image_call= tmp_pointer;
+      tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row]);
 
       /* EL KLUDGEO -- until we have a better calculation of grid_column_widths[] when vertical */
 //      if (grid_column_widths[i] < 20) grid_column_widths[i]= 200;
@@ -8398,7 +8415,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                       result_grid_vertical_width_of_header,
                                                       result_grid_font,
                                                       setting_max_width_of_a_char,
-                                                      i,
+                                                      0,
                                                       result_row_number,
                                                       ocelot_grid_header_char_column_end,
                                                       &new_cell_height);
@@ -8417,11 +8434,15 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                     result_grid_vertical_width_of_value,
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
-                                                    i,
+                                                    0 + ocelot_result_grid_column_names_copy,
                                                     result_row_number,
                                                     ocelot_grid_detail_char_column_end,
                                                     &new_cell_height);
       result_set_pointer+= v_length;
+      if (new_cell_height > 0)
+      {
+        thin_image(tmp_pointer_before_thin_image_call, (const char*) "TD", new_cell_height); /* overwrite */
+      }
       strcpy(tmp_pointer, ocelot_grid_detail_row_end);
       tmp_pointer+= strlen(ocelot_grid_detail_row_end);
     }
@@ -9324,21 +9345,26 @@ void grid_column_size_calc_vertical(
   unsigned int sum_tmp_column_lengths;
   sum_tmp_column_lengths= 0;
   result_grid_vertical_width_of_header= 0;
-  result_grid_vertical_width_of_value= 0;
-  for (i= 0; i < gridx_column_count; ++i)
+
+  if (is_using_column_names != 0)
   {
-    if (is_using_column_names != 0)
+    for (i= 0; i < result_column_count; ++i)
     {
       /* probably this->mysql_fields[i].name_length */
       unsigned int width_of_field_name_i= 0;
-      char tmp[1024];
+      char tmp[1024]; /* todo: should be max_field_name_size but I'm not positive that's been checked yet */
       unsigned int l= dbms_get_field_name_length(i, connections_dbms);
       strncpy(tmp, dbms_get_field_name(i, connections_dbms).toUtf8(), l);
       set_max_column_width(l, tmp, &width_of_field_name_i);
+
       if (width_of_field_name_i > (unsigned int) result_grid_vertical_width_of_header) result_grid_vertical_width_of_header= width_of_field_name_i;
     }
+  }
+  result_grid_vertical_width_of_value= 0;
+  for (i= 0; i < result_column_count; ++i)
+  {
     int width_of_field_value_i= 0;
-    if (gridx_max_column_widths[i] < MIN_WIDTH_IN_CHARS) width_of_field_value_i= MIN_WIDTH_IN_CHARS;
+    if (result_max_column_widths[i] < MIN_WIDTH_IN_CHARS) width_of_field_value_i= MIN_WIDTH_IN_CHARS;
     else width_of_field_value_i= gridx_max_column_widths[i];
     if (width_of_field_value_i > result_grid_vertical_width_of_value) result_grid_vertical_width_of_value= width_of_field_value_i;
   }
@@ -10499,7 +10525,8 @@ bool settings_change_calc()
   unsigned int old_max_width_of_a_char= setting_max_width_of_a_char;
   unsigned int old_min_width_of_a_column= setting_min_width_of_a_column;
 
-  setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+//  setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
+  setting_ocelot_grid_cell_drag_line_size_as_int= 0;
   setting_ocelot_grid_cell_width_as_int= copy_of_parent->ocelot_grid_cell_width.toInt();
 //  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
   setting_ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
@@ -11569,7 +11596,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_grid_cell_border_size= copy_of_parent->ocelot_grid_cell_border_size;
   copy_of_parent->new_ocelot_grid_cell_width= copy_of_parent->ocelot_grid_cell_width;
   copy_of_parent->new_ocelot_grid_cell_height= copy_of_parent->ocelot_grid_cell_height;
-  copy_of_parent->new_ocelot_grid_cell_drag_line_size= copy_of_parent->ocelot_grid_cell_drag_line_size;
+//  copy_of_parent->new_ocelot_grid_cell_drag_line_size= copy_of_parent->ocelot_grid_cell_drag_line_size;
   copy_of_parent->new_ocelot_grid_height= copy_of_parent->ocelot_grid_height;
   copy_of_parent->new_ocelot_grid_left= copy_of_parent->ocelot_grid_left;
   copy_of_parent->new_ocelot_grid_top= copy_of_parent->ocelot_grid_top;

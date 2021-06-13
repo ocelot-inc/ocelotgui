@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 11 2021
+   Last modified: June 13 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -586,7 +586,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_grid_outer_color= s_color_list[COLOR_LIGHTBLUE*2 + 1];;
   ocelot_grid_cell_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_grid_cell_border_size= "1";
-  ocelot_grid_cell_drag_line_size= "5";
+//  ocelot_grid_cell_drag_line_size= "5";
 //  ocelot_grid_cell_width= "default";
   ocelot_grid_height= ocelot_grid_left= ocelot_grid_top= ocelot_grid_width= "default";
   ocelot_grid_detached= "no";
@@ -819,7 +819,7 @@ int MainWindow::result_grid_add_tab()
   }
   {
     r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
-    r->set_all_style_sheets(ocelot_grid_style_string, ocelot_grid_cell_drag_line_size, 0, false);
+    r->set_all_style_sheets(ocelot_grid_style_string, 0, 0, false);
   }
   ++ocelot_grid_actual_tabs;
   return 0;
@@ -5034,7 +5034,7 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     last_focus_widget= focus_widget;
   }
 #endif
-  if (qe == QEvent::FocusIn)
+  // Todo: This is odd. if (qe == QEvent::FocusIn) isn't checked
   if (strcmp(class_name, "CodeEditor") == 0)
   {
     CodeEditor *t= qobject_cast<CodeEditor*>(focus_widget);
@@ -17866,7 +17866,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
                                      char *pointer,
                                      int v_length,
                                      int cell_type,
-                                     int width,
+                                     int width_n,
                                      QFont font,
                                      int max_width_of_a_char,
                                      int passed_i,
@@ -17921,15 +17921,15 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   */
   {
     /* TODO: SET THE RIGHT WIDTH IN THE FIRST PLACE! */
-    unsigned int w= result_grid->grid_column_widths[passed_i];
+    unsigned int width_i= width_n; /* instead of result_grid->grid_column_widths[passed_i]; */
     /* If conditional setting is true and has a width setting clause, use that instead of normal value. */
     if ((result == true) && (new_cell_width != ""))
     {
       int new_cell_width_as_int= result_grid->get_cell_width_or_height_as_int(new_cell_width, MIN_WIDTH_IN_CHARS * result_grid->setting_max_width_of_a_char);
-      if (new_cell_width_as_int > 0) w= new_cell_width_as_int;
+      if (new_cell_width_as_int > 0) width_i= new_cell_width_as_int;
     }
-    w-= result_grid->setting_ocelot_grid_cell_border_size_as_int * 2;
-    w-= result_grid->setting_ocelot_grid_cell_drag_line_size_as_int;
+    width_i-= result_grid->setting_ocelot_grid_cell_border_size_as_int * 2;
+//    width_i-= result_grid->setting_ocelot_grid_cell_drag_line_size_as_int;
     char bgcolor[64];
     if (((int) tmp_result_row_number == result_grid->focus_result_row_number) && ((int) passed_i == result_grid->focus_column_number - 1))
     {
@@ -17941,13 +17941,13 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     char tmp_td[128];
 
     if (memcmp(ocelot_grid_detail_char_column_start, "<TH", 3) == 0)
-      sprintf(tmp_td, "<TH align='left'; width=%d>", w);
+      sprintf(tmp_td, "<TH align='left'; width=%d>", width_i);
     else
     {
       if ((result_grid->result_field_flags[passed_i] & NUM_FLAG) != 0)
-        sprintf(tmp_td, "<TD %salign='right'; width=%d>", bgcolor, w);
+        sprintf(tmp_td, "<TD %salign='right'; width=%d>", bgcolor, width_i);
       else
-        sprintf(tmp_td, "<TD %swidth=%d>", bgcolor, w);
+        sprintf(tmp_td, "<TD %swidth=%d>", bgcolor, width_i);
     }
     strcpy(tmp_pointer, tmp_td);
     tmp_pointer+= strlen(tmp_td);
@@ -17997,7 +17997,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   }
   char c;
   QString s;
-  int column_width_in_chars= (width / max_width_of_a_char); /* TEST!!!! */
+  int column_width_in_chars= (width_n / max_width_of_a_char); /* TEST!!!! */
   for (int i= 0; i < v_length; ++i)
   {
     c= *pointer;
@@ -18129,7 +18129,14 @@ QString Result_qtextedit::unstripper(QString value_to_unstrip)
 int Result_qtextedit::result_row_number_from_grid_row_number(int grid_row_number)
 {
   int result_row_number= grid_row_number + result_grid->grid_vertical_scroll_bar->value();
-  if (result_grid->ocelot_result_grid_column_names_copy == 1) --result_row_number;
+  if (result_grid->copy_of_ocelot_vertical == 1)
+  {
+    result_row_number= result_row_number / result_grid->result_column_count;
+  }
+  else
+  {
+    if (result_grid->ocelot_result_grid_column_names_copy == 1) --result_row_number;
+  }
   return result_row_number;
 }
 
@@ -18142,10 +18149,18 @@ int Result_qtextedit::result_row_number_from_grid_row_number(int grid_row_number
 */
 int Result_qtextedit::grid_row_number_from_result_row_number(int result_row_number)
 {
-  int grid_row_number= result_row_number - result_grid->grid_vertical_scroll_bar->value();
-  if (grid_row_number >= 0)
+  int grid_row_number;
+  if (result_grid->copy_of_ocelot_vertical == 1)
   {
-    if (result_grid->ocelot_result_grid_column_names_copy == 1) ++grid_row_number;
+    grid_row_number= (result_row_number * result_grid->result_column_count) - result_grid->grid_vertical_scroll_bar->value();
+  }
+  else
+  {
+    grid_row_number= result_row_number - result_grid->result_column_count;
+    if (grid_row_number >= 0)
+    {
+      if (result_grid->ocelot_result_grid_column_names_copy == 1) ++grid_row_number;
+    }
   }
   return grid_row_number;
 }
@@ -18428,12 +18443,12 @@ void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
   cell_analyze(event->x(), event->y());
   QString tip= "";
   tip= tip + "block_count=" + QString::number(qtextedit_block_count);
-
   tip= tip + " columns_per_row=" + QString::number(qtextedit_columns_per_row);
   tip= tip + " x=" + QString::number(qtextedit_x);
   tip= tip + " y=" + QString::number(qtextedit_y);
   tip= tip + " Block=" + QString::number(qtextedit_block_number);
   tip= tip + " Grid_Row=" + QString::number(qtextedit_grid_row_number);
+  tip= tip + " Result_row=" + QString::number(qtextedit_result_row_number);
   tip= tip + " Column  " + QString::number(qtextedit_column_number);
   if (qtextedit_is_before_column) tip= tip + " (is_before_column)";
   if (qtextedit_is_before_row) tip= tip + " (is_before_row)";
@@ -18503,6 +18518,7 @@ void Result_qtextedit::cell_analyze(int x, int y)
   QTextCursor text_cursor= cursorForPosition(QPoint(x, y));
   qtextedit_block_number= text_cursor.blockNumber() - 1;
   qtextedit_grid_row_number= qtextedit_block_number / qtextedit_columns_per_row;
+  qtextedit_result_row_number= result_row_number_from_grid_row_number(qtextedit_grid_row_number);
   qtextedit_column_number= qtextedit_block_number % qtextedit_columns_per_row;
   int border_size= result_grid->copy_of_parent->ocelot_grid_cell_border_size.toInt();
   qtextedit_is_before_column= false;
