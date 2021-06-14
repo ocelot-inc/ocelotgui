@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 13 2021
+   Last modified: June 14 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -17869,10 +17869,11 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
                                      int width_n,
                                      QFont font,
                                      int max_width_of_a_char,
-                                     int passed_i,
+                                     int grid_column_no,
                                      long unsigned int tmp_result_row_number,
                                      char *ocelot_grid_detail_char_column_end,
-                                     int *new_cell_height_as_int)
+                                     int *new_cell_height_as_int,
+                                     unsigned int result_column_no)
 {
   (void)ocelot_grid_detail_numeric_column_start;
   (void)font;
@@ -17880,9 +17881,12 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   char *original_tmp_pointer= tmp_pointer;
 
   bool is_image= false;
-  if (result_grid->is_image(passed_i) == true) is_image= true;
+  if (result_grid->is_image(grid_column_no) == true)
+  {
+    is_image= true;
+  }
 
-  QByteArray f= qtextedit_result_changes->find(tmp_result_row_number, passed_i);
+  QByteArray f= qtextedit_result_changes->find(tmp_result_row_number, result_column_no);
 
   if (f.size() > 1)
   {
@@ -17898,8 +17902,9 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   QString new_cell_height= "";
   QString new_cell_width= "";
   int returned_cs_number= 0;
+
   bool result= result_grid->conditional_setting_evaluate_till_true(
-       passed_i, /* text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number, */
+       result_column_no, /* i.e. result set column number */
        tmp_result_row_number, /* text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number, */
        pointer, /* text_edit_frames[text_edit_frames_index]->content_pointer, */
        v_length, /* text_edit_frames[text_edit_frames_index]->content_length, */
@@ -17921,7 +17926,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   */
   {
     /* TODO: SET THE RIGHT WIDTH IN THE FIRST PLACE! */
-    unsigned int width_i= width_n; /* instead of result_grid->grid_column_widths[passed_i]; */
+    unsigned int width_i= width_n; /* instead of result_grid->grid_column_widths[grid_column_no]; */
     /* If conditional setting is true and has a width setting clause, use that instead of normal value. */
     if ((result == true) && (new_cell_width != ""))
     {
@@ -17931,7 +17936,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     width_i-= result_grid->setting_ocelot_grid_cell_border_size_as_int * 2;
 //    width_i-= result_grid->setting_ocelot_grid_cell_drag_line_size_as_int;
     char bgcolor[64];
-    if (((int) tmp_result_row_number == result_grid->focus_result_row_number) && ((int) passed_i == result_grid->focus_column_number - 1))
+    if (((int) tmp_result_row_number == result_grid->focus_result_row_number) && ((int) grid_column_no == result_grid->focus_column_number - 1))
     {
       char color_name[32];
       strcpy(color_name, result_grid->copy_of_parent->ocelot_grid_focus_cell_background_color.toUtf8());
@@ -17944,7 +17949,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       sprintf(tmp_td, "<TH align='left'; width=%d>", width_i);
     else
     {
-      if ((result_grid->result_field_flags[passed_i] & NUM_FLAG) != 0)
+      if ((result_grid->result_field_flags[result_column_no] & NUM_FLAG) != 0)
         sprintf(tmp_td, "<TD %salign='right'; width=%d>", bgcolor, width_i);
       else
         sprintf(tmp_td, "<TD %swidth=%d>", bgcolor, width_i);
@@ -18124,7 +18129,6 @@ QString Result_qtextedit::unstripper(QString value_to_unstrip)
 /*
   Pass: row_number from display, probably qtextedit_grid_row_number
   Return: row_number from result set, usually a simple calculation
-  Todo: if it's vertical, this is wrong.
 */
 int Result_qtextedit::result_row_number_from_grid_row_number(int grid_row_number)
 {
@@ -18145,7 +18149,6 @@ int Result_qtextedit::result_row_number_from_grid_row_number(int grid_row_number
   Return: row_number on grid, or -1 if it's not on grid
           If it's before the first grid row, it's negative, that's okay.
           If it's after the last grid row i.e. max_display_rows in display_html(), that's okay.
-  Todo: if it's vertical, this is wrong.
 */
 int Result_qtextedit::grid_row_number_from_result_row_number(int result_row_number)
 {
@@ -18164,6 +18167,28 @@ int Result_qtextedit::grid_row_number_from_result_row_number(int result_row_numb
   }
   return grid_row_number;
 }
+
+///*
+//  Pass: column_number from display, probably qtextedit_grid_column_number
+//  Return: column_number from result set, usually a simple calculation
+//  Todo: I forget why grid_row_number starts at 1, find out. Apparently minimum column number is 0.
+//  In the end we decided not to use this.
+//*/
+//int Result_qtextedit::result_column_number_from_grid_column_number(int grid_row_number, int grid_column_number)
+//{
+//  int result_column_number;
+//  if (result_grid->copy_of_ocelot_vertical == 1)
+//  {
+//    --grid_row_number;
+//    result_column_number= grid_row_number % result_grid->result_column_count;
+//  }
+//  else
+//  {
+//    result_column_number= grid_column_number;
+//  }
+//  return result_column_number;
+//}
+
 
 /* Taken from TextEditWidget::generate_update() */
 /*
@@ -18456,7 +18481,7 @@ void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
   tip= tip + " x_end= " + QString::number(qtextedit_x_end);
   tip= tip + " y_start= " + QString::number(qtextedit_y_start);
   tip= tip + " y_end= " + QString::number(qtextedit_y_end);
-  tip= tip + " content=" + qtextedit_cell_content;
+  //tip= tip + " content=" + qtextedit_cell_content; removed because big contents cause slowdown
 
   if (qtextedit_at_end == true) tip= tip + " (At End)"; /* If this is so, nothing else matters */
 
@@ -18626,6 +18651,7 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
     qtextedit_is_in_drag_for_row= true;
     qtextedit_drag_start_y= event->y();
     qtextedit_grid_row_number_at_drag_start_time= qtextedit_grid_row_number;
+    qtextedit_result_row_number_at_drag_start_time= qtextedit_result_row_number;
   }
   if ((qtextedit_is_in_drag_for_column == true) || (qtextedit_is_in_drag_for_row == true))
   {
@@ -18698,7 +18724,18 @@ void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
         int moved_x= event->x() - qtextedit_drag_start_x;
         if (abs(moved_x) >= QApplication::startDragDistance())
         { /* Drag relevant column right or left */
-          result_grid->grid_column_widths[qtextedit_column_number_at_drag_start_time - 1]+= moved_x;
+          if (result_grid->copy_of_ocelot_vertical == 0)
+          {
+            result_grid->grid_column_widths[qtextedit_column_number_at_drag_start_time - 1]+= moved_x;
+          }
+          else
+          {
+            if ((result_grid->copy_of_ocelot_result_grid_column_names == 1)
+             && (qtextedit_column_number_at_drag_start_time == 1))
+              result_grid->result_grid_vertical_width_of_header+= moved_x;
+            else
+              result_grid->result_grid_vertical_width_of_value+= moved_x;
+          }
           is_dragged= true;
         }
       }
@@ -18707,6 +18744,7 @@ void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
         int moved_y= event->y() - qtextedit_drag_start_y;
         if (abs(moved_y) >= QApplication::startDragDistance())
         { /* Drag relevant row up or down */
+          /* Todo: maybe it should be qtextedit_result_row_number_at_drag_start_time? No, dangerous. */
           result_grid->grid_row_heights[qtextedit_grid_row_number_at_drag_start_time]+= moved_y;
           is_dragged= true;
         }

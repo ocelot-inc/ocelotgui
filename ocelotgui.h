@@ -6106,6 +6106,7 @@ private:
   bool qtextedit_is_in_drag_for_column, qtextedit_is_in_drag_for_row;
   int qtextedit_column_number_at_drag_start_time;
   int qtextedit_grid_row_number_at_drag_start_time;
+  int qtextedit_result_row_number_at_drag_start_time;
 
   /* Things that get set by cell_analyze(). Mostly pixels or points. */
   int qtextedit_block_count;       /* from document()->blockCount() */
@@ -6132,6 +6133,7 @@ private:
   void construct();
   int result_row_number_from_grid_row_number(int grid_row_number);
   int grid_row_number_from_result_row_number(int result_row_number);
+//  int result_column_number_from_grid_column_number(int grid_row_number, int grid_column_number);
   QString unstripper(QString value_to_unstrip);
   void generate_update();
   QString to_plain_text();
@@ -6173,8 +6175,7 @@ int copy_html_cell(char *ocelot_grid_detail_numeric_column_start, char *ocelot_g
                    char *tmp_pointer, char *pointer, int v_length, int cell_type,
                    int width, QFont result_grid_font, int setting_max_width_of_a_char,
                    int passed_i, long unsigned int tmp_xrow, char *ocelot_grid_detail_char_column_end,
-                   int *new_cell_height);
-
+                   int *new_cell_height, unsigned int result_column_no);
 
 Result_qtextedit(ResultGrid *m)
 {
@@ -8159,6 +8160,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
       /* Too many rows. There's no good justification for "+ 10" but it's harmless to display too few. */
       max_grid_rows= grid_row;
       if (max_grid_rows <= 0) max_grid_rows= 1;
+      if ((max_grid_rows == 1) && (copy_of_ocelot_result_grid_column_names == 1)) max_grid_rows= 2;
       break;
     }
   }
@@ -8190,27 +8192,27 @@ void display_html(int new_grid_vertical_scroll_bar_value)
     tmp_pointer_before_thin_image_call= tmp_pointer;
     tmp_pointer+= thin_image(tmp_pointer, (const char*) "TH", 1);
 
-    for (unsigned int i= 0; i < result_column_count; ++i)
+    for (unsigned int result_column_no= 0; result_column_no < result_column_count; ++result_column_no)
     {
       memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
       result_field_names_pointer+= sizeof(unsigned int);
 
       //memcpy(tmp_pointer, result_field_names_pointer, v_length);
       //tmp_pointer+= v_length;
-
       tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_header_char_column_start,
                                                     ocelot_grid_header_char_column_start,
                                                     tmp_pointer,
                                                     result_field_names_pointer,
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_HEADER,
-                                                    grid_column_widths[i],
+                                                    grid_column_widths[result_column_no],
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
-                                                    i,
+                                                    result_column_no,
                                                     0, /* tmp_result_row_number */
                                                     ocelot_grid_header_char_column_end,
-                                                    &new_cell_height);
+                                                    &new_cell_height,
+                                                    result_column_no);
       result_field_names_pointer+= v_length;
     }
     strcpy(tmp_pointer, ocelot_grid_header_row_end);
@@ -8229,8 +8231,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
     tmp_pointer+= strlen(ocelot_grid_detail_row_start);
     tmp_pointer_before_thin_image_call= tmp_pointer;
     tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row]);
-
-    for (unsigned int i= 0; i < result_column_count; ++i)
+    for (unsigned int result_column_no= 0; result_column_no < result_column_count; ++result_column_no)
     {
       memcpy(&v_length, result_set_pointer, sizeof(unsigned int));
       result_set_pointer+= sizeof(unsigned int) + sizeof(char);
@@ -8241,13 +8242,14 @@ void display_html(int new_grid_vertical_scroll_bar_value)
                                                     result_set_pointer,
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
-                                                    grid_column_widths[i],
+                                                    grid_column_widths[result_column_no],
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
-                                                    i,
+                                                    result_column_no,
                                                     tmp_result_row_number,
                                                     ocelot_grid_detail_char_column_end,
-                                                    &new_cell_height);
+                                                    &new_cell_height,
+                                                    result_column_no);
       result_set_pointer+= v_length;
 
       if (new_cell_height > 0)
@@ -8279,6 +8281,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 /*
   When is_vertical == 1 we have one line per column: [optional column heading] column value.
   Todo: This is only when copy_of_ocelot_html != 0. But size calculation for xml is similar.
+  Todo: I think we're missing recent improvements in display_html(), e.g. re column_height().
 */
 void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 {
@@ -8340,9 +8343,9 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   {
     result_field_names_pointer= &result_field_names[0];
     tmp_size+= strlen(ocelot_grid_detail_row_start);
-    for (unsigned int i= 0; i < result_column_count; ++i)
+    for (unsigned int result_column_no= 0; result_column_no < result_column_count; ++result_column_no)
     {
-      if ((result_field_flags[i] & NUM_FLAG) != 0)
+      if ((result_field_flags[result_column_no] & NUM_FLAG) != 0)
         tmp_size+= strlen(ocelot_grid_detail_numeric_column_start) + extra_for_div;
       else
         tmp_size+= strlen(ocelot_grid_detail_char_column_start) + extra_for_div;
@@ -8384,21 +8387,20 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 
   result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
-  for (result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
+  for (result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 0;
        (result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
-       ++result_row_number, ++grid_row)
+       ++result_row_number, grid_row+= result_column_count)
 //  for (result_row_number= 0; result_row_number < result_row_count; ++result_row_number)
   {
     result_field_names_pointer= &result_field_names[0];
 
-    for (unsigned int i= 0; i < result_column_count; ++i)
+    for (unsigned int result_column_no= 0; result_column_no < result_column_count; ++result_column_no)
     {
 //      if (copy_of_ocelot_xml != 0)
       strcpy(tmp_pointer, ocelot_grid_detail_row_start);
       tmp_pointer+= strlen(ocelot_grid_detail_row_start);
-
       tmp_pointer_before_thin_image_call= tmp_pointer;
-      tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row]);
+      tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row + result_column_no]);
 
       /* EL KLUDGEO -- until we have a better calculation of grid_column_widths[] when vertical */
 //      if (grid_column_widths[i] < 20) grid_column_widths[i]= 200;
@@ -8415,10 +8417,11 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                       result_grid_vertical_width_of_header,
                                                       result_grid_font,
                                                       setting_max_width_of_a_char,
-                                                      0,
+                                                      0, /* grid_column_no */
                                                       result_row_number,
                                                       ocelot_grid_header_char_column_end,
-                                                      &new_cell_height);
+                                                      &new_cell_height,
+                                                      result_column_no);
 
         result_field_names_pointer+= f_length;
       }
@@ -8434,10 +8437,11 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                     result_grid_vertical_width_of_value,
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
-                                                    0 + ocelot_result_grid_column_names_copy,
+                                                    0 + ocelot_result_grid_column_names_copy, /* grid_column_no */
                                                     result_row_number,
                                                     ocelot_grid_detail_char_column_end,
-                                                    &new_cell_height);
+                                                    &new_cell_height,
+                                                    result_column_no);
       result_set_pointer+= v_length;
       if (new_cell_height > 0)
       {
@@ -10737,6 +10741,8 @@ bool comparer(
         This seems to avoid earlier bugs but it's checking conditions more often than necessary.
         Maybe speed up by doing something clever with is_retrieved_flag.
         Maybe speed up by making canonical version with fixed lengths so there's no need to call tokenize.
+  Row number should mean result row number, same as grid row number unless scroll bar value > 0.
+  Column number should mean result column number, same as grid column number unless vertical=1.
   Todo: We clear conditional_settings before inserting, so temporarily there can't be more than one.
   Todo: Call SELECT * FROM "_vindex"; then call it again. Second time, there are calls to setStyleSheet(). Why?
   Todo: You are splitting into separate statements if there are carriage returns, as is typical with SET.
@@ -10920,7 +10926,7 @@ bool conditional_setting_evaluate(int cs_number,
 /* Evaluate conditional settings until one is true (return true), or none are true (return false) */
 /* If not HTML we could continue after true and pass result style string to the next iteration. But, no. */
 bool conditional_setting_evaluate_till_true(
-                                  int cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
+                                  int cs_column_number,           /* i.e. result set column number */
                                   int cs_result_row_number,       /* e.g. text_frame->ancestor_grid_result_row_number */
                                   char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
                                   unsigned int cs_content_length, /* e.g. text_frame->content_length */
