@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 14 2021
+   Last modified: June 15 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -1416,6 +1416,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
     Todo: find out what the problem event is. Am I returning "true" wrongly?
     Warn: Now only shortcuts will work, the Ubuntu workaround won't be seen.
   */
+
   if (dbms_long_query_state == LONG_QUERY_STATE_STARTED) return false;
 
 //  if (obj == result_grid_table_widget[0]->grid_vertical_scroll_bar)
@@ -17859,14 +17860,16 @@ void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget
   Todo: BUG: in order to get wrapping right, I have to first do a select with ocelot_html = 0.
   Todo: I think it's always TEXTEDITFRAME_CELL_TYPE_DETAIL now so you don't need to pass it and check it.
   Todo: BUG: width isn't being set for numeric columns, which is why column drag fails for numeric columns.
+  Todo: For an image, we assume height < max_height_of_a_char*2 is default and ignore it. We should check.
 */
 int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_start,
                                      char *ocelot_grid_detail_char_column_start,
                                      char *tmp_pointer,
-                                     char *pointer,
+                                     char *result_pointer, /* result_field_names_pointer or result_set_pointer */
                                      int v_length,
                                      int cell_type,
                                      int width_n,
+                                     int height_n,
                                      QFont font,
                                      int max_width_of_a_char,
                                      int grid_column_no,
@@ -17881,20 +17884,30 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   char *original_tmp_pointer= tmp_pointer;
 
   bool is_image= false;
-  if (result_grid->is_image(grid_column_no) == true)
+  /* Todo: Actually, maybe is_image(result_column_no) would be correct regardless of vertical value. */
+  if (result_grid->copy_of_ocelot_vertical == 0)
   {
-    is_image= true;
+    if (result_grid->is_image(grid_column_no) == true)
+    {
+      is_image= true;
+    }
   }
-
+  else
+  {
+    if (result_grid->is_image(result_column_no) == true)
+    {
+      is_image= true;
+    }
+  }
   QByteArray f= qtextedit_result_changes->find(tmp_result_row_number, result_column_no);
 
   if (f.size() > 1)
   {
     is_image= true; /* image paste experiment */
-    pointer= (char*) f.constData();  /* image paste experiment */
+    result_pointer= (char*) f.constData();  /* image paste experiment */
     v_length= f.size();  /* image paste experiment */
   }
-  /* How can this be right if v_length and pointer get adjusted afterward? Well, VALUE='...' doesn't work. */
+  /* How can this be right if v_length and result_pointer get adjusted afterward? Well, VALUE='...' doesn't work. */
   /* Todo: This is supposed to be applicable to header too, no? */
   /* TEST!!! start: See whether we can change color, at least. HTML only! */
   QString new_tooltip= "";
@@ -17902,11 +17915,10 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   QString new_cell_height= "";
   QString new_cell_width= "";
   int returned_cs_number= 0;
-
   bool result= result_grid->conditional_setting_evaluate_till_true(
        result_column_no, /* i.e. result set column number */
        tmp_result_row_number, /* text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number, */
-       pointer, /* text_edit_frames[text_edit_frames_index]->content_pointer, */
+       result_pointer, /* result_field_names_pointer or result_set_pointer or image paste experiment */
        v_length, /* text_edit_frames[text_edit_frames_index]->content_length, */
        TEXTEDITFRAME_CELL_TYPE_DETAIL, /* text_edit_frames[text_edit_frames_index]->cell_type, */
        &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number);
@@ -17924,15 +17936,15 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     we ignore them because we must add <width=...> in either case so what we really will want is
     <TD width=...> or <TD width=...; align="right">
   */
+  /* TODO: SET THE RIGHT WIDTH IN THE FIRST PLACE! */
+  unsigned int width_i= width_n; /* instead of result_grid->grid_column_widths[grid_column_no]; */
+  /* If conditional setting is true and has a width setting clause, use that instead of normal value. */
+  if ((result == true) && (new_cell_width != ""))
   {
-    /* TODO: SET THE RIGHT WIDTH IN THE FIRST PLACE! */
-    unsigned int width_i= width_n; /* instead of result_grid->grid_column_widths[grid_column_no]; */
-    /* If conditional setting is true and has a width setting clause, use that instead of normal value. */
-    if ((result == true) && (new_cell_width != ""))
-    {
-      int new_cell_width_as_int= result_grid->get_cell_width_or_height_as_int(new_cell_width, MIN_WIDTH_IN_CHARS * result_grid->setting_max_width_of_a_char);
-      if (new_cell_width_as_int > 0) width_i= new_cell_width_as_int;
-    }
+    int new_cell_width_as_int= result_grid->get_cell_width_or_height_as_int(new_cell_width, MIN_WIDTH_IN_CHARS * result_grid->setting_max_width_of_a_char);
+    if (new_cell_width_as_int > 0) width_i= new_cell_width_as_int;
+  }
+  {
     width_i-= result_grid->setting_ocelot_grid_cell_border_size_as_int * 2;
 //    width_i-= result_grid->setting_ocelot_grid_cell_drag_line_size_as_int;
     char bgcolor[64];
@@ -17970,20 +17982,26 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     char img_type[4]= "";
     if (v_length > 4)
     {
-      if (strncmp(pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
-      else if (strncmp(pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
-      else if (strncmp(pointer,"GIF",3) == 0) strcpy(img_type, "gif");
+      if (strncmp(result_pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
+      else if (strncmp(result_pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
+      else if (strncmp(result_pointer,"GIF",3) == 0) strcpy(img_type, "gif");
       /* to: try BMP? check with loadFromData()? */
     }
     if (strcmp(img_type,"") != 0)
     {
       char *base64_tmp;
-      base64_tmp= new char[(v_length * 4) / 3 + 16];
-      QByteArray data= QByteArray::fromRawData(pointer, v_length);
+      base64_tmp= new char[(v_length * 4) / 3 + 64];
+      QByteArray data= QByteArray::fromRawData(result_pointer, v_length);
       strcpy(base64_tmp, data.toBase64());
-      /* Todo: We should have width and height here, or at least height */
-      memcpy(tmp_pointer, "<img src=\"data:image/", 21);
-      tmp_pointer+= 21;
+      char img_start[64];
+      unsigned int height_candidate= height_n;
+      if (*new_cell_height_as_int != -1) height_candidate= *new_cell_height_as_int;
+      if (height_candidate > result_grid->max_height_of_a_char * 2)
+        sprintf(img_start, "<img width=%d height=%d src=\"data:image/", width_i, height_candidate);
+      else
+        sprintf(img_start, "<img width=%d src=\"data:image/", width_i);
+      strcpy(tmp_pointer, img_start);
+      tmp_pointer+= strlen(img_start);
       memcpy(tmp_pointer, img_type, 3);
       tmp_pointer+= 3;
       memcpy(tmp_pointer, ";base64,", 8);
@@ -18005,8 +18023,8 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   int column_width_in_chars= (width_n / max_width_of_a_char); /* TEST!!!! */
   for (int i= 0; i < v_length; ++i)
   {
-    c= *pointer;
-    ++pointer;
+    c= *result_pointer;
+    ++result_pointer;
     /* todo: check here if flag & 2 */
     if ((i != 0) && ((i % column_width_in_chars) == 0))
     {
@@ -18021,7 +18039,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     {*tmp_pointer= c; ++tmp_pointer;}
   }
   /* TODO: This looks like dead code since we have copied already and we won't increment tmp_pointer here */
-  memcpy(tmp_pointer, pointer, v_length);
+  memcpy(tmp_pointer, result_pointer, v_length);
 
   if (result == true)
   {
@@ -18090,6 +18108,11 @@ void Result_qtextedit::copy()
     }
     else QTextEdit::copy();
 #endif
+}
+
+void Result_qtextedit::closeEvent(QCloseEvent *event)
+{
+  QTextEdit::closeEvent(event);
 }
 
 void Result_qtextedit::focusInEvent(QFocusEvent *event)
@@ -18633,6 +18656,8 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
    This gets overridden if there is a conditional setting too. We do not change it if the result set loses
    focus. We don't change color if mousePressEvent is on the header or outside the table. Default color is
    "Wheat" as can be seen in the Settings menu.
+ Todo: After I've said mousePressEvent, there's an endless calling of paintEvent although nothing happened.
+       It doesn't hog CPU and disappears after the next select, but presumably something went wrong.
 */
 void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 {
@@ -18985,7 +19010,6 @@ void Result_qtextedit::showEvent(QShowEvent *event)
 {
   QTextEdit::showEvent(event);
 }
-
 
 /*
    Todo: We know what is at pos but do nothing about it.

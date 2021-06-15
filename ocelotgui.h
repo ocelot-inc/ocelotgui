@@ -6148,6 +6148,7 @@ void menu_context_t(const QPoint & pos)
 }
 
 protected:
+void closeEvent(QCloseEvent *e);
 void focusInEvent(QFocusEvent *e);
 void focusOutEvent(QFocusEvent *e);
 void hideEvent(QHideEvent *e);
@@ -6172,8 +6173,8 @@ void zoomIn();
 void zoomOut();
 void menu_context_t_2(const QPoint & pos);
 int copy_html_cell(char *ocelot_grid_detail_numeric_column_start, char *ocelot_grid_detail_char_column_start,
-                   char *tmp_pointer, char *pointer, int v_length, int cell_type,
-                   int width, QFont result_grid_font, int setting_max_width_of_a_char,
+                   char *tmp_pointer, char *result_pointer, int v_length, int cell_type,
+                   int width, int height, QFont result_grid_font, int setting_max_width_of_a_char,
                    int passed_i, long unsigned int tmp_xrow, char *ocelot_grid_detail_char_column_end,
                    int *new_cell_height, unsigned int result_column_no);
 
@@ -8206,6 +8207,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_HEADER,
                                                     grid_column_widths[result_column_no],
+                                                    max_height_of_a_char, /* todo: see if this is set */
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
                                                     result_column_no,
@@ -8243,6 +8245,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
                                                     grid_column_widths[result_column_no],
+                                                    grid_row_heights[grid_row],
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
                                                     result_column_no,
@@ -8263,7 +8266,6 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
-
   html_text_edit->setHtml(tmp);
   html_text_edit->moveCursor(QTextCursor::Start);
   html_text_edit->ensureCursorVisible();
@@ -8415,6 +8417,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                       f_length,
                                                       TEXTEDITFRAME_CELL_TYPE_HEADER,
                                                       result_grid_vertical_width_of_header,
+                                                      max_height_of_a_char, /* todo: see if this is set */
                                                       result_grid_font,
                                                       setting_max_width_of_a_char,
                                                       0, /* grid_column_no */
@@ -8435,6 +8438,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
                                                     result_grid_vertical_width_of_value,
+                                                    grid_row_heights[grid_row + result_column_no],
                                                     result_grid_font,
                                                     setting_max_width_of_a_char,
                                                     0 + ocelot_result_grid_column_names_copy, /* grid_column_no */
@@ -9349,7 +9353,6 @@ void grid_column_size_calc_vertical(
   unsigned int sum_tmp_column_lengths;
   sum_tmp_column_lengths= 0;
   result_grid_vertical_width_of_header= 0;
-
   if (is_using_column_names != 0)
   {
     for (i= 0; i < result_column_count; ++i)
@@ -9360,7 +9363,6 @@ void grid_column_size_calc_vertical(
       unsigned int l= dbms_get_field_name_length(i, connections_dbms);
       strncpy(tmp, dbms_get_field_name(i, connections_dbms).toUtf8(), l);
       set_max_column_width(l, tmp, &width_of_field_name_i);
-
       if (width_of_field_name_i > (unsigned int) result_grid_vertical_width_of_header) result_grid_vertical_width_of_header= width_of_field_name_i;
     }
   }
@@ -9377,9 +9379,14 @@ void grid_column_size_calc_vertical(
   sum_tmp_column_lengths= result_grid_vertical_width_of_header + result_grid_vertical_width_of_value;
   if (sum_tmp_column_lengths > ocelot_grid_max_desired_width_in_pixels)
   {
-    result_grid_vertical_width_of_header= (result_grid_vertical_width_of_header / sum_tmp_column_lengths) * ocelot_grid_max_desired_width_in_pixels;
-    result_grid_vertical_width_of_value= (result_grid_vertical_width_of_value / sum_tmp_column_lengths) * ocelot_grid_max_desired_width_in_pixels;
+    result_grid_vertical_width_of_header= (result_grid_vertical_width_of_header * ocelot_grid_max_desired_width_in_pixels) / sum_tmp_column_lengths;
+    result_grid_vertical_width_of_value= (result_grid_vertical_width_of_value * ocelot_grid_max_desired_width_in_pixels) / sum_tmp_column_lengths ;
   }
+  if (result_grid_vertical_width_of_header < MIN_WIDTH_IN_CHARS * (int) setting_max_width_of_a_char)
+    result_grid_vertical_width_of_header= MIN_WIDTH_IN_CHARS * setting_max_width_of_a_char;
+  if (result_grid_vertical_width_of_value < MIN_WIDTH_IN_CHARS * (int) setting_max_width_of_a_char)
+    result_grid_vertical_width_of_value= MIN_WIDTH_IN_CHARS * setting_max_width_of_a_char;
+
 }
 
 #if (OCELOT_MYSQL_INCLUDE == 1)
