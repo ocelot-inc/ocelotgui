@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 15 2021
+   Last modified: June 16 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -9757,6 +9757,7 @@ void MainWindow::extra_result_set(int result_grid_table_widget_index, unsigned s
 */
 int MainWindow::execute_real_query(QString query, int connection_number, const QString *alltext)
 {
+  log("execute_real_query start", 80);
 #if (OCELOT_MYSQL_INCLUDE == 1)
   /*
     If the last error was CR_SERVER_LOST 2013 or CR_SERVER_GONE_ERROR 2006,
@@ -9815,6 +9816,7 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
   delete []dbms_query;
+  log("execute_real_query return", 80);
   return dbms_long_query_result;
 }
 

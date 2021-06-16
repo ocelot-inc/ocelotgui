@@ -7191,8 +7191,8 @@ void display_batch()
   If due_to = 2, this is for resize_or_font_change
   Todo: We get here twice because right after fillup() we call display(), but then
         resize_or_font_change() calls display() again.
-        This is invisible because resize_or_font_change() calls
-        remove_layouts() first, but it's a silly waste of time.
+        This is invisible because resize_or_font_change calls
+        something first (?), but it's a silly waste of time.
         However, maybe it only happens for the first time I select.
   Todo: grid_main_layout->setSizeConstraint() is only necessary if
         we've recently turned off ocelot_batch + ocelot_html; it
@@ -7832,7 +7832,6 @@ void prepare_for_display_html()
     /* Maybe this doesn't work anyway */
     grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
     /* Todo: since grid_column_size_calc() recalculates max_height_of_a_char, don't bother with this. */
-
     MainWindow *parent= copy_of_parent;
     QFont *pointer_to_font;
     pointer_to_font= &result_grid_font;
@@ -7982,7 +7981,6 @@ void prepare_for_display_html()
     /*** Removed due to tests */
     //delete html_text_edit;
     //html_text_edit= new Result_qtextedit(this);
-
 }
 
 /*
@@ -8071,7 +8069,6 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   is_paintable= 0;
 
   /* TODO: IS THIS NECESSARY? IS IT IN THE RIGHT PLACE? */
-//  printf("**** html_text_edit->show();\n");
 //  html_text_edit->show();
 
   /* I SUSPECT THAT IF I HIDE CLIENT THEN SCROLLBAR WON'T WORK CORRECTLY WITH SLIDER */
@@ -9229,7 +9226,7 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
     */
     for (i= 0; i < gridx_column_count; ++i)
     {
-      if (is_using_column_names != 0)
+      if ((is_using_column_names != 0) && (i < result_column_count))
       {
         /* probably this->mysql_fields[i].name_length */
         grid_column_widths[i]= 0;
@@ -9245,7 +9242,6 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
         and there is a drag line, the drag line disappears.
         If vertical != 0 I compensate for too-short contents a different way.
       */
-
       if ((grid_column_widths[i] < MIN_WIDTH_IN_CHARS) && (setting_ocelot_grid_cell_drag_line_size_as_int > 0))
         grid_column_widths[i]= MIN_WIDTH_IN_CHARS;
       if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
@@ -9261,7 +9257,6 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
       This is a strong attempt to reduce to the user-settable maximum, but if we have to override it, we do.
       Cannot squeeze to less than header length
     */
-
     sum_amount_reduced= 1;
 
     if (copy_of_parent->ocelot_grid_cell_width != "max")
@@ -10156,7 +10151,6 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
     result_grid_widget_max_height_in_lines= max_height_in_lines;
     if (result_set_copy != 0)  /* see fillup_garbage_collect() comment */
     {
-      remove_layouts();
       display(2, 0, 0, 0, 0, 0, 0);
       this->show();
     }
@@ -10225,7 +10219,6 @@ void resizeEvent(QResizeEvent *event)
 */
 int fontchange_event()
 {
-//  remove_layouts();
 //  QFont tmp_font=this->font();
 //  put_widgets_in_layouts(&tmp_font);
   return 1;
@@ -10385,27 +10378,6 @@ void text_align(TextEditWidget *cell_text_edit_widget, enum Qt::AlignmentFlag al
 #endif
 
 /*
-  To clean up from a previous result set:
-    For each row:
-      For each column: remove frame widget from row layout
-      Remove row widget from main layout
-  Assumption: a blank row i.e. a row with no cells marks the end.
-*/
-void remove_layouts()
-{
-  //long unsigned int xrow;
-  //QLayoutItem *text_edit_frame_item;
-  //QWidget *text_edit_frame_widget;
-
-//TEST!!  client->hide(); /* client->show() will happen again soon */
-  if (grid_main_layout != 0)
-  {
-//    grid_main_layout->removeWidget(html_text_edit);
-  }
-}
-
-
-/*
   We'll do our own garbage collecting for non-Qt items.
   fillup_garbage_collect for anything made with "new " in fillup() or fillup() subsidiaries.
   display_garbage_collect for anything made with "new " in display() or display() subsidiaries.
@@ -10436,7 +10408,6 @@ void fillup_garbage_collect()
 
 void display_garbage_collect()
 {
-  remove_layouts();
   if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
   if (grid_column_dbms_sources != 0) { delete [] grid_column_dbms_sources; grid_column_dbms_sources= 0; }
@@ -10494,8 +10465,8 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
 
   //setting_ocelot_grid_cell_drag_line_size_as_int= new_ocelot_grid_cell_drag_line_size.toInt();
   setting_ocelot_grid_cell_drag_line_size_as_int= 0;
-#ifdef OLD_STUFF
   settings_change_calc();
+#ifdef OLD_STUFF
   set_frame_color_setting();
   for (i_h= 0; i_h < cell_pool_size; ++i_h)
   {
@@ -10680,10 +10651,11 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
   Deleting ResultGrid
   This probably will never be called explicitly, but if MainWindow parent is deleted when
   the program ends, we'll get here.
+  Todo: check if above comment is still true now if we remove tabs
+  Todo: why not display_garbage_collect()?
 */
 ~ResultGrid()
 {
-  //remove_layouts(); /* I think this is unnecessary */
   fillup_garbage_collect();
 }
 
