@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 16 2021
+   Last modified: June 17 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -18263,7 +18263,6 @@ void Result_qtextedit::generate_update()
   /* *content = text_edit_frame_of_cell->content_pointer, which should be 0 for null */
   update_statement= "";
   where_clause= "";
-
   char *name_pointer, *table_pointer, *db_pointer;
   unsigned int name_length, table_length, db_length;
   char *field_names_pointer, *org_tables_pointer, *dbs_pointer;
@@ -18279,7 +18278,6 @@ void Result_qtextedit::generate_update()
   /* Given Row# point to result set row. We'll go through its columns in the loop. */
   char *result_set_copy_pointer;
   result_set_copy_pointer= result_grid->result_set_copy_rows[result_set_row_number];
-
   for (column_number= 0; column_number < result_grid->result_column_count; )
   {
     /* NB: Don't continue i.e. skip until you move result_set_copy_pointer forward. */
@@ -18291,7 +18289,6 @@ void Result_qtextedit::generate_update()
     field_value_flags= *(result_set_copy_pointer + sizeof(unsigned int));
     column_value= result_set_copy_pointer + sizeof(unsigned int) + 1;
     result_set_copy_pointer+= sizeof(unsigned int) + 1 + column_v_length;
-
     /* Todo: You must skip if it's a header */
     //text_edit_frame= result_grid->text_edit_frames[tefi];
     //if (text_edit_frame->cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
@@ -18299,17 +18296,14 @@ void Result_qtextedit::generate_update()
     //  ++tefi;
     //  continue;
     //}
-
     memcpy(&name_length, field_names_pointer, sizeof(unsigned int)); /* Checked */
     field_names_pointer+= sizeof(unsigned int);
     name_pointer= field_names_pointer;
     field_names_pointer+= name_length;
-
     memcpy(&table_length, org_tables_pointer, sizeof(unsigned int)); /* Checked */
     org_tables_pointer+= sizeof(unsigned int);
     table_pointer= org_tables_pointer;
     org_tables_pointer+= table_length;
-
     memcpy(&db_length, dbs_pointer, sizeof(unsigned int));            /* Not checked. Meaningless if Tarantool */
     dbs_pointer+= sizeof(unsigned int);
     db_pointer= dbs_pointer;
@@ -18330,7 +18324,6 @@ void Result_qtextedit::generate_update()
       content_in_result_set= QString::fromUtf8(column_value, l);
     }
     name_in_result_set= QString::fromUtf8(name_pointer, name_length);
-
     if (l <= MAX_WHERE_CLAUSE_LITERAL_SIZE)
     {
       if (where_clause == "") where_clause= " WHERE ";
@@ -18348,7 +18341,6 @@ void Result_qtextedit::generate_update()
         where_clause.append(s);
       }
     }
-
     if (true) /* was: if (text_edit_frame->is_retrieved_flag == true) */
     {
       bool contents_changed_flag= true;
@@ -18425,7 +18417,11 @@ void Result_qtextedit::generate_update()
   }
 }
 
-/* Todo: see what we do with main widgets when they lose focus */
+/*
+  Todo: see what we do with main widgets when they lose focus
+  Todo: I'm not even sure that we get here, maybe event filter catches focusOutEvent
+  Todo: If we did a mousepress then the cursor is blinking. Figure out how to turn it off
+*/
 #ifdef OLDSTUFF
 TextEditFrame *t= text_edit_frame_of_cell;
 ResultGrid *r=  t->ancestor_result_grid_widget;
@@ -18445,6 +18441,7 @@ void Result_qtextedit::focusOutEvent(QFocusEvent *event)
   It doesn't supply event-x() or event-y() so we depend on what we saved during mouseMoveEvent.
   Perhaps we could have used QCursor position instead and translated global to local.
   Mostly copied from void TextEditWidget::keyPressEvent(QKeyEvent *event)
+  todo: call event->ignore() if cursor at end | between cells, or if event->key() == Qt::Key_Enter, etc.
 */
 
 void Result_qtextedit::keyPressEvent(QKeyEvent *event)
@@ -18549,7 +18546,7 @@ void Result_qtextedit::cell_analyze(int x, int y)
   QTextCursor text_cursor_0= cursorForPosition(QPoint(x, y));
   if (text_cursor_0.atEnd() == true)
   {
-    /* TODO: THIS CAN HAPPEN */
+    /* TODO: THIS CAN HAPPEN -- SO ELSEWHERE DO NOT DEPEND ON QTEXTEDIT_GRID_ROW_NUMBER ETC.  */
     qtextedit_at_end= true;
     return;
   }
@@ -18658,6 +18655,9 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
    This gets overridden if there is a conditional setting too. We do not change it if the result set loses
    focus. We don't change color if mousePressEvent is on the header or outside the table. Default color is
    "Wheat" as can be seen in the Settings menu.
+   It's a mystery to me that color_change() caused cursor disappearance because QTextCursor confuses me.
+   I see that color_change() calls display_html() so maybe this won't the be only cursor-loser situation.
+   There's a workaround at the end of this routine.
  Todo: After I've said mousePressEvent, there's an endless calling of paintEvent although nothing happened.
        It doesn't hog CPU and disappears after the next select, but presumably something went wrong.
 */
@@ -18687,6 +18687,10 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 
   QTextEdit::mousePressEvent(event);
   result_grid->color_change();
+  QTextCursor text_cursor_0= cursorForPosition(QPoint(qtextedit_x, qtextedit_y));
+  text_cursor_0.movePosition(QTextCursor::NoMove);
+  setTextCursor(text_cursor_0);
+
   return;
   //if (event->button() == Qt::LeftButton) printf("****    Qt::LeftButton\n");
   //if (event->button() == Qt::RightButton) printf("****    Qt::RightButton\n");
