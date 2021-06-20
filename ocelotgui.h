@@ -6148,6 +6148,7 @@ void menu_context_t(const QPoint & pos)
 }
 
 protected:
+void changeEvent(QEvent *e);
 void closeEvent(QCloseEvent *e);
 void focusInEvent(QFocusEvent *e);
 void focusOutEvent(QFocusEvent *e);

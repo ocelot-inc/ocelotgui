@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 17 2021
+   Last modified: June 20 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -18112,6 +18112,12 @@ void Result_qtextedit::copy()
 #endif
 }
 
+void Result_qtextedit::changeEvent(QEvent *event)
+{
+  event->ignore();
+}
+
+
 void Result_qtextedit::closeEvent(QCloseEvent *event)
 {
   QTextEdit::closeEvent(event);
@@ -18442,6 +18448,7 @@ void Result_qtextedit::focusOutEvent(QFocusEvent *event)
   Perhaps we could have used QCursor position instead and translated global to local.
   Mostly copied from void TextEditWidget::keyPressEvent(QKeyEvent *event)
   todo: call event->ignore() if cursor at end | between cells, or if event->key() == Qt::Key_Enter, etc.
+  Todo: maybe there is a smarter way to detect if cell is for header? texteditframe_cell_type_header?
 */
 
 void Result_qtextedit::keyPressEvent(QKeyEvent *event)
@@ -18455,18 +18462,71 @@ void Result_qtextedit::keyPressEvent(QKeyEvent *event)
   //  copy();
   //  return;
   //}
+
   if (m->keypress_shortcut_handler(event, false) == true)
   {
+    /* Todo: shortcut but not ignore. Am I supposed to accept? */
     return;
   }
   QString content_in_cell_before_keypress= qtextedit_cell_content;
+
+  bool is_printable= true;
+  if (qtextedit_at_end == true) {is_printable= false; }
+  if (qtextedit_is_before_column == true) {is_printable= false; }
+  if (qtextedit_is_before_row == true) {is_printable= false; }
+  if (qtextedit_column_number == 0) {is_printable= false; }
+  if (qtextedit_y < (int) (result_grid->setting_ocelot_grid_cell_border_size_as_int)) {is_printable= false; }
+  if (result_grid->is_image(qtextedit_column_number) == true) {is_printable= false; }
+  if (result_grid->copy_of_ocelot_result_grid_column_names == 1)
+  {
+    if (result_grid->copy_of_ocelot_vertical == 1)
+    {
+      if (((qtextedit_column_number - 1) % 2) == 0)
+      {
+        is_printable= false;
+      }
+    }
+    else
+    {
+      if (qtextedit_grid_row_number == 0)
+      {
+        is_printable= false;
+      }
+    }
+  }
+
+  if (result_grid->copy_of_ocelot_result_grid_column_names == 1)
+  {
+    if (result_grid->copy_of_ocelot_vertical == 1)
+    {
+      if (((qtextedit_column_number - 1) % 2) == 0)
+      {
+        is_printable= false;
+      }
+    }
+    else
+    {
+      if (qtextedit_grid_row_number == 0)
+      {
+        is_printable= false;
+      }
+    }
+  }
+
+  Qt::KeyboardModifiers modifiers= event->modifiers();
+  if ((modifiers & Qt::ControlModifier) != 0) {is_printable= false; }
+  if ((modifiers & Qt::ShiftModifier) != 0)  {; }
+  if ((modifiers & Qt::AltModifier) != 0)  {is_printable= false; }
+  if ((modifiers & Qt::MetaModifier) != 0)  {is_printable= false; }
+
+  if (is_printable == false) return;
+
   QTextEdit::keyPressEvent(event);
+
   cell_analyze(qtextedit_x, qtextedit_y); /* keypress might cause cursor movement but still within column (?) */
   QString content_in_cell_after_keypress= qtextedit_cell_content;
   if (content_in_cell_before_keypress != content_in_cell_after_keypress)
   {
-    /* Todo: skip if image */
-    /* Todo: skip if header. We used to check if TEXTEDITFRAME_CELL_TYPE_HEADER. Now use row number? */
     generate_update();
   }
 }
@@ -18657,9 +18717,10 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
    "Wheat" as can be seen in the Settings menu.
    It's a mystery to me that color_change() caused cursor disappearance because QTextCursor confuses me.
    I see that color_change() calls display_html() so maybe this won't the be only cursor-loser situation.
-   There's a workaround at the end of this routine.
+   There's a workaround at the end of this routin
  Todo: After I've said mousePressEvent, there's an endless calling of paintEvent although nothing happened.
-       It doesn't hog CPU and disappears after the next select, but presumably something went wrong.
+       It doesn't hog CPU and disappears after the next statement, but presumably something went wrong.
+       Todo: Here's a theory to check: it's merely because the cursor is blinking.
 */
 void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 {
