@@ -6346,6 +6346,7 @@ public:
   unsigned int max_height_of_a_char;
   unsigned int setting_max_width_of_a_char;                  /* changeable with settings_change_calc() */
   unsigned int setting_min_width_of_a_column;                /* changeable with settings_change_calc() */
+  unsigned int setting_bearing;                              /* changeable with settings_change_calc() */
 
  QHBoxLayout *hbox_layout;
 
@@ -6458,8 +6459,9 @@ ResultGrid(
   /* grid_main_widget= 0; */
   border_size= 1;                                          /* Todo: This actually has to depend on stylesheet */
 
-  //result_row_count= 0;
-  //result_column_count= 0;
+  /* For some reason the next two lines were commented out. */
+  result_row_count= 0;
+  result_column_count= 0;
   grid_result_row_count= 0;
 #ifdef OLD_STUFF
   max_text_edit_frames_count= 0;
@@ -6662,6 +6664,7 @@ bool is_image_format(int length, char* pointer)
 bool is_fancy()
 {
   if ((result_row_count == 0) || (result_column_count == 0)) return false;
+  if (html_text_edit == NULL) return false;
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_xml != 0)
    || (copy_of_ocelot_raw != 0))
@@ -8334,7 +8337,8 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 
   /* <TD></TD> might be replaced by <TD><div class="xx"></div></TD> which is 22 bytes */
   unsigned int extra_for_div= 0;
-  if ((copy_of_ocelot_html == 1) && (copy_of_parent->conditional_settings.count() > 0)) extra_for_div= 22;
+  /* We removed a check if copy_of_ocelot_html == 1 here */
+  if (copy_of_parent->conditional_settings.count() > 0) extra_for_div= 22;
   if (ocelot_result_grid_column_names_copy == 1)
   {
     tmp_size+= strlen(ocelot_grid_header_row_start);
@@ -8472,7 +8476,8 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
-  if ((copy_of_ocelot_html != 0) && (copy_of_ocelot_raw == 0))
+  /* removed "copy_of_ocelot_html != 0" here */
+  if (copy_of_ocelot_raw == 0)
   {
     html_text_edit->setHtml(tmp);
   }
@@ -9223,7 +9228,7 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
   max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
 
 
-  cell_width_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_width, MIN_WIDTH_IN_CHARS * setting_max_width_of_a_char);
+  cell_width_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_width, character_count_to_pixel_count(MIN_WIDTH_IN_CHARS));
   if ((cell_width_as_int > 0)
    && (QString::compare("default", copy_of_parent->ocelot_grid_cell_width, Qt::CaseInsensitive) != 0))
   {
@@ -9263,8 +9268,8 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
         grid_column_widths[i]= MIN_WIDTH_IN_CHARS;
       if (grid_column_widths[i] < gridx_max_column_widths[i]) grid_column_widths[i]= gridx_max_column_widths[i]; /* fields[i].length */
       grid_column_widths[i]= grid_column_widths[i] * setting_max_width_of_a_char
-                             + setting_ocelot_grid_cell_border_size_as_int * 2
-                           + setting_ocelot_grid_cell_drag_line_size_as_int;
+                             + setting_bearing
+                             + setting_ocelot_grid_cell_border_size_as_int * 2;
       sum_tmp_column_lengths+= grid_column_widths[i];
     }
 
@@ -9386,19 +9391,18 @@ void grid_column_size_calc_vertical(
     else width_of_field_value_i= gridx_max_column_widths[i];
     if (width_of_field_value_i > result_grid_vertical_width_of_value) result_grid_vertical_width_of_value= width_of_field_value_i;
   }
-  result_grid_vertical_width_of_header= result_grid_vertical_width_of_header * setting_max_width_of_a_char;
-  result_grid_vertical_width_of_value= result_grid_vertical_width_of_value * setting_max_width_of_a_char;
+  result_grid_vertical_width_of_header= character_count_to_pixel_count(result_grid_vertical_width_of_header);
+  result_grid_vertical_width_of_value= character_count_to_pixel_count(result_grid_vertical_width_of_value);
   sum_tmp_column_lengths= result_grid_vertical_width_of_header + result_grid_vertical_width_of_value;
   if (sum_tmp_column_lengths > ocelot_grid_max_desired_width_in_pixels)
   {
     result_grid_vertical_width_of_header= (result_grid_vertical_width_of_header * ocelot_grid_max_desired_width_in_pixels) / sum_tmp_column_lengths;
     result_grid_vertical_width_of_value= (result_grid_vertical_width_of_value * ocelot_grid_max_desired_width_in_pixels) / sum_tmp_column_lengths ;
   }
-  if (result_grid_vertical_width_of_header < MIN_WIDTH_IN_CHARS * (int) setting_max_width_of_a_char)
-    result_grid_vertical_width_of_header= MIN_WIDTH_IN_CHARS * setting_max_width_of_a_char;
-  if (result_grid_vertical_width_of_value < MIN_WIDTH_IN_CHARS * (int) setting_max_width_of_a_char)
-    result_grid_vertical_width_of_value= MIN_WIDTH_IN_CHARS * setting_max_width_of_a_char;
-
+  if (result_grid_vertical_width_of_header < character_count_to_pixel_count(MIN_WIDTH_IN_CHARS))
+    result_grid_vertical_width_of_header= character_count_to_pixel_count(MIN_WIDTH_IN_CHARS);
+  if (result_grid_vertical_width_of_value < character_count_to_pixel_count(MIN_WIDTH_IN_CHARS))
+    result_grid_vertical_width_of_value= character_count_to_pixel_count(MIN_WIDTH_IN_CHARS);
 }
 
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -9869,9 +9873,9 @@ int get_column_width_in_pixels(QString s, bool is_header, bool is_image_flag)
 
   /* Kludge alert. It's a mystery, but above min-width calculation sometimes isn't enough.
      However, increasing it should be okay if this is a detail cell and vertical != 0. */
-  int really_minimal= setting_max_width_of_a_char;
-  if ((ocelot_vertical_copy != 0) && (is_header == false) && (min_width < setting_max_width_of_a_char * MIN_WIDTH_IN_CHARS))
-    really_minimal= setting_max_width_of_a_char * MIN_WIDTH_IN_CHARS;
+  int really_minimal= character_count_to_pixel_count(1);
+  if ((ocelot_vertical_copy != 0) && (is_header == false) && (min_width < character_count_to_pixel_count(MIN_WIDTH_IN_CHARS)))
+    really_minimal= character_count_to_pixel_count(MIN_WIDTH_IN_CHARS);
 
   if (min_width < really_minimal + scroll_bar_width + 1)
   {
@@ -10140,6 +10144,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
+  if (html_text_edit == NULL) return;
   set_grid_max_column_height_in_pixels(this->height());
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_html != 0)
@@ -10151,10 +10156,11 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
     else
     {
 //      if (is_resize == false)
+      if (is_fancy() == true)
       {
         /* Todo: this shouldn't be 0, it should be current scrollbar value */
         prepare_for_display_html();
-        display_html(0);
+        display_html(grid_vertical_scroll_bar->value());
       }
     }
     return;
@@ -10267,6 +10273,7 @@ bool show_event()
   Some possible event types: 17 Show, 78 UpdateLater, 12 Paint, 5 MouseMove, 129 HoverMove, 110 ToolTip,
                              3 MouseButtonRelease, 18 Hide, 11 Leave, 25 WindowDeactivate, 128 HoverLeave
                              But if we call display_html() we miss 1 Timer, 2 MouseButtonPress
+  Todo: I don't see why is_fancy is needed since I guess is only around for html.
 */
 
 bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
@@ -10295,7 +10302,7 @@ bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
       grid_vertical_scroll_bar_value= new_value;
       return false;
     }
-    if (copy_of_ocelot_html == 1)
+    if (is_fancy() == true) /* was: if (copy_of_ocelot_html == 1) */
     {
       display_html(new_value);
       this->update();      /* not sure if we need to update both this and client, but it should be harmless*/
@@ -10519,39 +10526,44 @@ void set_all_style_sheets(QString new_ocelot_grid_style_string,
   Assume there might be a vertical scroll bar, although perhaps it isn't possible if
   there is no drag line and no column could overflow the maximum number of lines.
   Do not increase if result_grid_fonts.italic()=true, that should be taken care of now.
-  Return true if the results mean that repaint should occur.
+  Return true if the results mean that repaint should occur (but I guess we ignore that now).
+  Re bearing:
+    width of 1 char * 3) - (width of 3 chars) = amount we'll add to column width
+    abs(result_grid_font_metrics.leftBearing('W')) + abs(result_grid_font_metrics.rightBearing('W'))
+    gives a similar result but for some reason it can be off, I trust boundingRect more.
+    We no longer use horizontalAdvance.
+    I'm no sure whether letterSpacing ever matters.
 */
-bool settings_change_calc()
+void settings_change_calc()
 {
-  unsigned int old_max_width_of_a_char= setting_max_width_of_a_char;
-  unsigned int old_min_width_of_a_column= setting_min_width_of_a_column;
-
-//  setting_ocelot_grid_cell_drag_line_size_as_int= copy_of_parent->ocelot_grid_cell_drag_line_size.toInt();
-  setting_ocelot_grid_cell_drag_line_size_as_int= 0;
+  setting_ocelot_grid_cell_drag_line_size_as_int= 0; /* This should always be 0, we'll soon get rid of it */
   setting_ocelot_grid_cell_width_as_int= copy_of_parent->ocelot_grid_cell_width.toInt();
-//  ocelot_grid_cell_drag_line_color= copy_of_parent->ocelot_grid_cell_drag_line_color;
   setting_ocelot_grid_cell_border_size_as_int= copy_of_parent->ocelot_grid_cell_border_size.toInt();
 
   QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
-  QRect r2= result_grid_font_metrics.boundingRect(
+  QRect r2_1= result_grid_font_metrics.boundingRect(
                                    0, /* int x = x coordinate within original rect */
                                    0, /* int y = y coordinate within original rect */
                                    2000, /* int width = r.width(), which we don't change */
                                    2000, /* int height = height, which is arbitrary big maximum */
                                    0, /* int flags = (see comments before start of this routine) */
                                    "W"); /* QString & text= cell contents */
-  setting_max_width_of_a_char= r2.width();
-
-  setting_min_width_of_a_column= setting_max_width_of_a_char
+  int setting_max_width_of_1_char_times_3= r2_1.width() * 3;
+  QRect r2_3= result_grid_font_metrics.boundingRect(
+                                   0, /* int x = x coordinate within original rect */
+                                   0, /* int y = y coordinate within original rect */
+                                   2000, /* int width = r.width(), which we don't change */
+                                   2000, /* int height = height, which is arbitrary big maximum */
+                                   0, /* int flags = (see comments before start of this routine) */
+                                   "WWW"); /* QString & text= cell contents */
+  int setting_max_width_of_3_chars= r2_3.width();
+  setting_bearing= ((setting_max_width_of_1_char_times_3) - setting_max_width_of_3_chars) / 3;
+  setting_max_width_of_a_char= (setting_max_width_of_3_chars - setting_bearing) / 3;
+  if (setting_bearing > 0) ++setting_bearing;
+  setting_min_width_of_a_column= character_count_to_pixel_count(1)
                          + scroll_bar_width + 1
-                         + setting_ocelot_grid_cell_border_size_as_int * 2
-                         + setting_ocelot_grid_cell_drag_line_size_as_int;
-
-  if ((setting_max_width_of_a_char != old_max_width_of_a_char)
-   || (setting_min_width_of_a_column != old_min_width_of_a_column))
-    return true;
-  else
-    return false;
+                         + setting_ocelot_grid_cell_border_size_as_int * 2;
+  return;
 
   /* The following calculations used to exist in grid_column_size_calc(). Are they obsolete? */
   //pointer_to_font= &result_grid_font;
@@ -10579,6 +10591,13 @@ bool settings_change_calc()
   //}
 }
 
+/*
+  Call this whenever you want to calculate the width of a column.
+*/
+int character_count_to_pixel_count(int character_count)
+{
+  return (character_count * setting_max_width_of_a_char) + setting_bearing;
+}
 
 ///*
 //  If (row height * result_row_count) > ResultGrid widget height) we need a vertical scroll bar.

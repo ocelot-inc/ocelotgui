@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 23 2021
+   Last modified: June 24 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -17943,7 +17943,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   /* If conditional setting is true and has a width setting clause, use that instead of normal value. */
   if ((result == true) && (new_cell_width != ""))
   {
-    int new_cell_width_as_int= result_grid->get_cell_width_or_height_as_int(new_cell_width, MIN_WIDTH_IN_CHARS * result_grid->setting_max_width_of_a_char);
+    int new_cell_width_as_int= result_grid->get_cell_width_or_height_as_int(new_cell_width, result_grid->character_count_to_pixel_count(MIN_WIDTH_IN_CHARS));
     if (new_cell_width_as_int > 0) width_i= new_cell_width_as_int;
   }
   {
