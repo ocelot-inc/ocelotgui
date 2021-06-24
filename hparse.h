@@ -4366,6 +4366,13 @@ int MainWindow::hparse_f_data_type(int context)
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_BOOLEAN;
   }
+
+  if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UUID") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+    return TOKEN_KEYWORD_UUID;
+  }
+
   if (context == TOKEN_KEYWORD_DECLARE)
   {
     bool is_row_seen= false;

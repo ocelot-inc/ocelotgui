@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 20 2021
+   Last modified: June 23 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -18125,6 +18125,7 @@ void Result_qtextedit::closeEvent(QCloseEvent *event)
 
 void Result_qtextedit::focusInEvent(QFocusEvent *event)
 {
+  if (result_grid->is_fancy() == false){ QTextEdit::focusInEvent(event); return; }
   result_grid->copy_of_parent->menu_activations(this, QEvent::FocusIn);
   QTextEdit::focusInEvent(event);
 #ifdef OLD_STUFF
@@ -18136,7 +18137,6 @@ void Result_qtextedit::focusInEvent(QFocusEvent *event)
   /* We probably don't need to say this. */
   QTextEdit::focusInEvent(event);
 #endif
-
 }
 
 /* Add ' at start and end of a string. Change ' to '' within string. Compare connect_stripper(). */
@@ -18438,7 +18438,7 @@ QTextEdit::focusOutEvent(event);
 #endif
 void Result_qtextedit::focusOutEvent(QFocusEvent *event)
 {
-  (void)event;
+  if (result_grid->is_fancy() == false) { QTextEdit::focusOutEvent(event); return; }
   result_grid->copy_of_parent->menu_activations(this, QEvent::FocusOut);
 }
 
@@ -18453,6 +18453,7 @@ void Result_qtextedit::focusOutEvent(QFocusEvent *event)
 
 void Result_qtextedit::keyPressEvent(QKeyEvent *event)
 {
+  if (result_grid->is_fancy() == false) { QTextEdit::keyPressEvent(event); return; }
   MainWindow *m= result_grid->copy_of_parent;
 
   /* TEXT!!!! TODO: I DO NOT KNOW WHAT THIS WAS FOR. MAYBE IT SHOULD BE RESTORED. */
@@ -18547,6 +18548,7 @@ void Result_qtextedit::mouseDoubleClickEvent(QMouseEvent *event)
 
 void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
 {
+  if (result_grid->is_fancy() == false) { QTextEdit::mouseMoveEvent(event); return; }
   cell_analyze(event->x(), event->y());
   QString tip= "";
   tip= tip + "block_count=" + QString::number(qtextedit_block_count);
@@ -18724,6 +18726,7 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
 */
 void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 {
+  if (result_grid->is_fancy() == false) { QTextEdit::mousePressEvent(event); return; }
   result_grid->focus_result_row_number= result_row_number_from_grid_row_number(qtextedit_grid_row_number); /* so that background = Grid Focus Cell Background Color */
   result_grid->focus_column_number= qtextedit_column_number;
 
@@ -18805,6 +18808,7 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 */
 void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
 {
+  if (result_grid->is_fancy() == false) { QTextEdit::mouseReleaseEvent(event); return; }
   if ((qtextedit_is_in_drag_for_column == true) || (qtextedit_is_in_drag_for_row == true))
   {
     bool is_dragged= false;
@@ -19043,6 +19047,7 @@ void Result_qtextedit::redo()
 */
 void Result_qtextedit::paste()
 {
+  if (result_grid->is_fancy() == false) { QTextEdit::paste(); return; }
   QPixmap p;
   QClipboard *p_clipboard= QApplication::clipboard();
   p= p_clipboard->pixmap(QClipboard::Clipboard);
@@ -20344,7 +20349,8 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     ocelot_set_charset_dir= token2;
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_COLUMN_NAMES) { ocelot_result_grid_column_names= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_COLUMN_NAMES) {
+    ocelot_result_grid_column_names= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_COLUMN_TYPE_INFO) { ocelot_column_type_info= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_COMMENTS)
   {

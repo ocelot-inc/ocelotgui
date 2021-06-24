@@ -6655,6 +6655,20 @@ bool is_image_format(int length, char* pointer)
   return false;
 }
 
+/*
+  Return false if the display doesn't have a table that we can do fancy things with.
+  Else Result_qtextedit overriding functions e.g. mouseMoveEvent() will get confused.
+*/
+bool is_fancy()
+{
+  if ((result_row_count == 0) || (result_column_count == 0)) return false;
+  if ((copy_of_ocelot_batch != 0)
+   || (copy_of_ocelot_xml != 0)
+   || (copy_of_ocelot_raw != 0))
+    return false;
+  return true;
+}
+
 /* Todo: not everything that calls fillup() calls fillup_garbage_collect() later, i.e. leak */
 /* We call fillup() whenever there is a new result set to put up on the result grid widget. */
 QString fillup(MYSQL_RES *mysql_res,
@@ -7284,6 +7298,7 @@ void display(int due_to,
     prepare_for_display_html();
     display_html(0);
   }
+
   return;
 
 #ifdef OLD_STUFF
@@ -8085,6 +8100,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 
   if ((result_row_count == 0) || (result_column_count == 0))
   {
+    html_text_edit->clear(); /* Todo: This is to avoid repeating the message. Possibly that's a bug. */
     html_text_edit->insertPlainText("row_count == 0 or column_count == 0");
 //    this->show();
 //    client->show();
@@ -10120,15 +10136,17 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
   1 texteditframe for 1 line. In fact a texteditframe is always bigger than a line.
   We try to avoid recalculating just because user shifts by a few pixels.
   display_html() should not show() because that would cause a call to here, we'd loop
+  Todo: what about copy_of_ocelot_raw?
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
   set_grid_max_column_height_in_pixels(this->height());
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_html != 0)
+   || (copy_of_ocelot_html == 0)
    || (copy_of_ocelot_xml != 0))
   {
-    if (copy_of_ocelot_html == 0)
+    if ((copy_of_ocelot_batch != 0) || (copy_of_ocelot_xml != 0))
       html_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
     else
     {

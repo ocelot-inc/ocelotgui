@@ -5,7 +5,6 @@
 
 ocelot_grid_text_color='Indigo'
 ocelot_grid_background_color='DodgerBlue'
-ocelot_grid_border_color='Firebrick'
 ocelot_grid_header_background_color='Ivory'
 ocelot_grid_font_family='Courier New'
 ocelot_grid_font_size=11
@@ -13,14 +12,14 @@ ocelot_grid_font_style='Normal'
 ocelot_grid_font_weight='Bold'
 ocelot_grid_cell_border_color='Honeydew'
 ocelot_grid_cell_drag_line_color='HotPink'
-ocelot_grid_border_size=5
 ocelot_grid_cell_border_size=4
-ocelot_grid_cell_drag_line_size=5
 ocelot_grid_detached='no'
 ocelot_grid_left='default'
 ocelot_grid_top='default'
 ocelot_grid_width='default'
 ocelot_grid_height='default'
+ocelot_grid_focus_cell_background_color='Wheat'
+ocelot_grid_outer_color='LightBlue'
 #ocelot_grid_cell_height is conditional
 #ocelot_grid_cell_width is conditional
 #ocelot_grid_tabs is conditional
