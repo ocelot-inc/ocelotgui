@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 24 2021
+   Last modified: June 27 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -9736,7 +9736,7 @@ void MainWindow::extra_result_set(int result_grid_table_widget_index, unsigned s
     /* next line redundant? display() ends with show() */
     /* what is r? */
     /* TODO: REMOVE IT!!!! */
-    r->show();
+//    r->show();
 
     //Put in something based on this if you want extra results to go to history:
     //... result_grid_table_widget[result_grid_table_widget_index]->copy_to_history(); etc.
@@ -17795,7 +17795,7 @@ void Result_qtextedit::construct()
   connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
       this, SLOT(menu_context_t(const QPoint &)));
   qtextedit_result_changes= new Result_changes(this);
-  show();
+//  show();
 }
 
 #ifdef OLD_STUFF
@@ -19068,6 +19068,7 @@ void Result_qtextedit::paste()
 }
 
 /* I don't know what cause Result_qtextedit::hideEvent(). Maybe ResultGrid::hideEvent()? */
+/* Although I do have html_text_edit->hide() in display_batch() */
 void Result_qtextedit::hideEvent(QHideEvent *event)
 {
   QTextEdit::hideEvent(event);
@@ -19078,6 +19079,10 @@ void Result_qtextedit::resizeEvent(QResizeEvent *event)
   QTextEdit::resizeEvent(event);
 }
 
+/*
+  Do not show html_text_edit if batch_text_edit is visible and is all that's supposed to be visible.
+  Todo: Someday find out what causes this event while html_text_edit is hidden. Maybe parent tab show?
+*/
 void Result_qtextedit::showEvent(QShowEvent *event)
 {
   QTextEdit::showEvent(event);

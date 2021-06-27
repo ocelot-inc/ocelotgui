@@ -6472,6 +6472,7 @@ ResultGrid(
     html_text_edit= NULL;
     return;
   }
+  batch_text_edit= NULL;
 
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
@@ -6562,7 +6563,7 @@ ResultGrid(
 
   grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
 
-  grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
+//  grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
 
   client->setLayout(grid_main_layout);
 
@@ -6576,12 +6577,6 @@ ResultGrid(
 #ifdef OLD_STUFF
   set_frame_color_setting();
 #endif
-//  html_text_edit= new Result_qtextedit(this);
-//  html_text_edit->hide();
-
-  html_text_edit->insertPlainText("[Results will appear in this box]");
-  html_text_edit->show();
-  client->show();
 
   copy_of_ocelot_batch= copy_of_ocelot_html= copy_of_ocelot_raw= copy_of_ocelot_xml= 0;
 }
@@ -6660,6 +6655,7 @@ bool is_image_format(int length, char* pointer)
 /*
   Return false if the display doesn't have a table that we can do fancy things with.
   Else Result_qtextedit overriding functions e.g. mouseMoveEvent() will get confused.
+  Todo: Maybe part of this is unnecessary, display_batch uses batch_text_edit not html_text_edit.
 */
 bool is_fancy()
 {
@@ -6977,7 +6973,7 @@ void display_batch()
     strcpy(ocelot_grid_detail_char_column_end , "</field>");
     strcpy(ocelot_grid_table_end, "</resultset>");
   }
-  hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
+//  hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
   //batch_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
 
   /*
@@ -6994,22 +6990,24 @@ void display_batch()
     I don't bother to say batch_text_edit_hide() so this->show() makes it visible, momentarily.
     I think batch_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
   */
-  delete batch_text_edit;
+  if (batch_text_edit != NULL) delete batch_text_edit;
   batch_text_edit= new QTextEdit(this);
-  this->show();
-  client->show();
-  client->hide();
-  this->hide();
+//  this->show();
+//  client->show();
+//  client->hide();
+//  this->hide();
 
   grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
   grid_vertical_scroll_bar->setVisible(false);
+  if (html_text_edit != NULL) grid_main_layout->removeWidget(html_text_edit);
   grid_main_layout->addWidget(batch_text_edit);
 
   if ((result_row_count == 0) || (result_column_count == 0))
   {
     batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
-    this->show();
-    client->show();
+    batch_text_edit->show();
+//    this->show();
+//    client->show();
     return;
   }
 
@@ -7104,7 +7102,6 @@ void display_batch()
     strcpy(tmp_pointer, ocelot_grid_header_row_end);
     tmp_pointer+= strlen(ocelot_grid_header_row_end);
   }
-
   pointer= result_set_copy_rows[0];
   for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
   {
@@ -7182,6 +7179,7 @@ void display_batch()
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
 
+  /* Todo: This must be wrong. Surely ocelot_html is off if we're doing display_batch. */
   if ((copy_of_ocelot_html != 0) && (copy_of_ocelot_raw == 0))
   {
     batch_text_edit->setHtml(tmp);
@@ -7193,8 +7191,8 @@ void display_batch()
   batch_text_edit->moveCursor(QTextCursor::Start);
   batch_text_edit->ensureCursorVisible();
   batch_text_edit->show();
-  show();
-  client->show();
+//  show();
+//  client->show();
   delete [] tmp;
   return;
 }
@@ -7254,7 +7252,6 @@ void display(int due_to,
 #ifdef OLD_STUFF
   hide();
 #endif
-
 //  if ((due_to == 0) || (due_to == 1))
   {
     display_garbage_collect();
@@ -7293,7 +7290,7 @@ void display(int due_to,
   {
     display_batch();
   }
-
+  else
   /* Since it's not ocelot_batch or ocelot_xml it must be ocelot_html */
   {
     grid_vertical_scroll_bar_value= -1; /* todo: check: is this alread in vertical_scroll_bar_initialize? */
@@ -7301,7 +7298,6 @@ void display(int due_to,
     prepare_for_display_html();
     display_html(0);
   }
-
   return;
 
 #ifdef OLD_STUFF
@@ -8078,6 +8074,8 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
 */
 void display_html(int new_grid_vertical_scroll_bar_value)
 {
+  if ((batch_text_edit != NULL) && (batch_text_edit->isVisible())) batch_text_edit->hide();
+
   if (copy_of_ocelot_vertical == 1) { display_html_html_vertical(new_grid_vertical_scroll_bar_value); return; }
 
   if (result_grid_height_after_last_resize < 0) return;
@@ -8283,6 +8281,10 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
+
+  if (batch_text_edit != NULL) grid_main_layout->removeWidget(batch_text_edit);
+  grid_main_layout->addWidget(html_text_edit);
+
   html_text_edit->setHtml(tmp);
   html_text_edit->moveCursor(QTextCursor::Start);
   html_text_edit->ensureCursorVisible();
@@ -8476,6 +8478,10 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
+
+  if (batch_text_edit != NULL) grid_main_layout->removeWidget(batch_text_edit);
+  grid_main_layout->addWidget(html_text_edit);
+
   /* removed "copy_of_ocelot_html != 0" here */
   if (copy_of_ocelot_raw == 0)
   {
@@ -9874,7 +9880,7 @@ int get_column_width_in_pixels(QString s, bool is_header, bool is_image_flag)
   /* Kludge alert. It's a mystery, but above min-width calculation sometimes isn't enough.
      However, increasing it should be okay if this is a detail cell and vertical != 0. */
   int really_minimal= character_count_to_pixel_count(1);
-  if ((ocelot_vertical_copy != 0) && (is_header == false) && (min_width < character_count_to_pixel_count(MIN_WIDTH_IN_CHARS)))
+  if ((ocelot_vertical_copy != 0) && (is_header == false) && (min_width < (unsigned int) character_count_to_pixel_count(MIN_WIDTH_IN_CHARS)))
     really_minimal= character_count_to_pixel_count(MIN_WIDTH_IN_CHARS);
 
   if (min_width < really_minimal + scroll_bar_width + 1)
@@ -10446,7 +10452,13 @@ void display_garbage_collect()
   {
     delete html_text_edit;
     html_text_edit= new Result_qtextedit(this);
-    grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
+//    grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
+  }
+  if (batch_text_edit != NULL)
+  {
+    delete batch_text_edit;
+    batch_text_edit= new Result_qtextedit(this);
+//    grid_main_layout->addWidget(batch_text_edit); /* Huh? This can't be right. */
   }
 }
 
