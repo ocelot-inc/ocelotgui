@@ -28,8 +28,13 @@
 #endif
 
 /* To remove most of the code related to Edit|Find feature if you don't need it, set OCELOT_FIND_WIDGET 0 */
+/* Disabled in Qt 6 because QRegExp is gone. Todo: switch to using QRegularExpression. */
 #ifndef OCELOT_FIND_WIDGET
+#if (QT_VERSION >= 0x60000)
+#define OCELOT_FIND_WIDGET 0
+#else
 #define OCELOT_FIND_WIDGET 1
+#endif
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 0)
@@ -6111,8 +6116,8 @@ private:
   /* Things that get set by cell_analyze(). Mostly pixels or points. */
   int qtextedit_block_count;       /* from document()->blockCount() */
   int qtextedit_columns_per_row;   /* # of defined columns + 1 for the thin-image column */
-  int qtextedit_x;                 /* from event->x() */
-  int qtextedit_y;                 /* from event->y() */
+  int qtextedit_x;                 /* from event->x() (changed to event->pos().x() due to qt 6 change) */
+  int qtextedit_y;                 /* from event->y() (changed to event->pos().y() due to qt 6 change) */
   int qtextedit_block_number;      /* what we calculate other things from */
   int qtextedit_grid_row_number;        /* row number, starts at 1, includes header row, within display */
   int qtextedit_result_row_number;      /* row number from result set, derived from qtextedit_grid_row_number */

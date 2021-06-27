@@ -7965,7 +7965,7 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
     because maybe we had a USE statement.
     Todo: I'm a bit unclear what to do if this fails.
   */
-  if (select_1_row("select database()") != 0) debuggee_database[0]= '\0';
+  if (select_1_row("select database()") != "") debuggee_database[0]= '\0';
   else strcpy(debuggee_database, select_1_row_result_1.toUtf8());
 
   /*
@@ -18549,7 +18549,7 @@ void Result_qtextedit::mouseDoubleClickEvent(QMouseEvent *event)
 void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
 {
   if (result_grid->is_fancy() == false) { QTextEdit::mouseMoveEvent(event); return; }
-  cell_analyze(event->x(), event->y());
+  cell_analyze(event->pos().x(), event->pos().y());
   QString tip= "";
   tip= tip + "block_count=" + QString::number(qtextedit_block_count);
   tip= tip + " columns_per_row=" + QString::number(qtextedit_columns_per_row);
@@ -18734,13 +18734,13 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
   if ((qtextedit_column_number > 0) && (qtextedit_is_before_column))
   {
     qtextedit_is_in_drag_for_column= true;
-    qtextedit_drag_start_x= event->x();
+    qtextedit_drag_start_x= event->pos().x();
     qtextedit_column_number_at_drag_start_time= qtextedit_column_number;
   }
   if (qtextedit_is_before_row == true)
   {
     qtextedit_is_in_drag_for_row= true;
-    qtextedit_drag_start_y= event->y();
+    qtextedit_drag_start_y= event->pos().y();
     qtextedit_grid_row_number_at_drag_start_time= qtextedit_grid_row_number;
     qtextedit_result_row_number_at_drag_start_time= qtextedit_result_row_number;
   }
@@ -18776,7 +18776,7 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 
   for (unsigned int i= 0; i < 110; ++i)
   {
-    QPoint p= QPoint(i, event->y());
+    QPoint p= QPoint(i, event->pos().y());
     c= cursorForPosition(p);
     QString s= toPlainText();
     QString s2= s.mid(c.position(), 1);
@@ -18817,7 +18817,7 @@ void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
       if ((qtextedit_is_in_drag_for_column == true)
        && (qtextedit_column_number_at_drag_start_time >= 1))
       {
-        int moved_x= event->x() - qtextedit_drag_start_x;
+        int moved_x= event->pos().x() - qtextedit_drag_start_x;
         if (abs(moved_x) >= QApplication::startDragDistance())
         { /* Drag relevant column right or left */
           if (result_grid->copy_of_ocelot_vertical == 0)
@@ -18837,7 +18837,7 @@ void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
       }
       if (qtextedit_is_in_drag_for_row == true)
       {
-        int moved_y= event->y() - qtextedit_drag_start_y;
+        int moved_y= event->pos().y() - qtextedit_drag_start_y;
         if (abs(moved_y) >= QApplication::startDragDistance())
         { /* Drag relevant row up or down */
           /* Todo: maybe it should be qtextedit_result_row_number_at_drag_start_time? No, dangerous. */
