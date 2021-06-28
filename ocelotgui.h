@@ -28,13 +28,8 @@
 #endif
 
 /* To remove most of the code related to Edit|Find feature if you don't need it, set OCELOT_FIND_WIDGET 0 */
-/* Disabled in Qt 6 because QRegExp is gone. Todo: switch to using QRegularExpression. */
 #ifndef OCELOT_FIND_WIDGET
-#if (QT_VERSION >= 0x60000)
-#define OCELOT_FIND_WIDGET 0
-#else
 #define OCELOT_FIND_WIDGET 1
-#endif
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 0)
@@ -2664,6 +2659,10 @@ static const fontweights fontweightsvalues[]=
 #endif
 #if (OCELOT_FIND_WIDGET == 1)
 #include <QToolButton>
+#endif
+
+/* QRegExp is unavailable in Qt 6. Todo: We have never tested the replacemnt QRegularExpression code. */
+#if (QT_VERSION < 0x60000)
 #include <QRegExp>
 #endif
 

@@ -2098,6 +2098,7 @@ int MainWindow::history_markup_previous_or_next()
     mysql does not have our multi-line trick so won't show multi-line statements correctly
     mysql writes statements that fail, ocelotgui doesn't
     mysql will of course see our added comment line but user can ignore it, or set ocelot_histfileflags
+   QRegExp is unavailable in Qt 6. Todo: We have never tested the replacemnt QRegularExpression code.
 */
 void MainWindow::history_file_write(QString history_type, QString text_line)  /* see comment=tee+hist */
 {
@@ -2114,15 +2115,24 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
     QString qs;
     for (;;)
     {
+#if (QT_VERSION >= 0x60000)
+      QRegularExpression rx;
+#else
       QRegExp rx;
+#endif
       if (qfrom >= ocelot_histignore.length()) break;
       qindex= ocelot_histignore.indexOf(":", qfrom, Qt::CaseInsensitive);
       if (qindex == -1) qindex= ocelot_histignore.length();
       qs= ocelot_histignore.mid(qfrom, qindex - qfrom);
+#if (QT_VERSION >= 0x60000)
+      rx= QRegularExpression(qs, QRegularExpression::CaseInsensitiveOption);
+      if (rx.hasMatch(text_line) == true) return;
+#else
       rx= QRegExp(qs);
       rx.setPatternSyntax(QRegExp::Wildcard);
       rx.setCaseSensitivity(Qt::CaseInsensitive);
       if (rx.exactMatch(text_line) == true) return;
+#endif
       qfrom= qindex + 1;
     }
   }
@@ -13117,6 +13127,7 @@ struct reftypewords {
 /*
   Todo: disconnect old if already connected.
   TODO: LOTS OF ERROR CHECKS NEEDED IN THIS!
+   QRegExp is unavailable in Qt 6. Todo: We have never tested the replacemnt QRegularExpression code.
 */
 int MainWindow::connect_mysql(unsigned int connection_number)
 {
@@ -13292,14 +13303,22 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   statement_edit_widget->dbms_port= connect_row[2];
   s= connect_row[3];
   statement_edit_widget->dbms_current_user= s;
+#if (QT_VERSION >= 0x60000)
+  i= s.indexOf(QRegularExpression("@"), 0);
+#else
   i= s.indexOf(QRegExp("@"), 0);
+#endif
   if (i > 0) s= s.left(i);
   else s= "";
   statement_edit_widget->dbms_current_user_without_host= s;
   statement_edit_widget->dbms_connection_id= atoi(connect_row[4]);
   /* Todo: find out why this returns capitalized e.g. "Localhost" rather than "localhost" */
   s= lmysql->ldbms_mysql_get_host_info(&mysql[connection_number]);
+#if (QT_VERSION >= 0x60000)
+  i= s.indexOf(QRegularExpression(" "), 0);
+#else
   i= s.indexOf(QRegExp(" "), 0);
+#endif
   if (i > 0) s= s.left(i);
   statement_edit_widget->dbms_host= s;
   lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
@@ -18023,15 +18042,19 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   char c;
   QString s;
   int column_width_in_chars= (width_n / max_width_of_a_char); /* TEST!!!! */
-  for (int i= 0; i < v_length; ++i)
+  for (int i= 0, j= 0; i < v_length; ++i)
   {
     c= *result_pointer;
     ++result_pointer;
     /* todo: check here if flag & 2 */
-    if ((i != 0) && ((i % column_width_in_chars) == 0))
+    if ((c & 0xc0) != 0x80) /* 10xxxxxx is a continuation byte so don't count as another character */
     {
-      memcpy(tmp_pointer, "<br>", 4);
-      tmp_pointer+= 4;
+      if ((j != 0) && ((j % column_width_in_chars) == 0))
+      {
+        memcpy(tmp_pointer, "<br>", 4);
+        tmp_pointer+= 4;
+      }
+      ++j;
     }
     /* todo: check here if flag & 1 */ /* TEST!! left out */
     //if (c == '<') {memcpy(tmp_pointer, "&lt;", 4); tmp_pointer+= 4;}
