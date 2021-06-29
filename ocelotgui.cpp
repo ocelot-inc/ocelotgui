@@ -2126,7 +2126,8 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
       qs= ocelot_histignore.mid(qfrom, qindex - qfrom);
 #if (QT_VERSION >= 0x60000)
       rx= QRegularExpression(qs, QRegularExpression::CaseInsensitiveOption);
-      if (rx.hasMatch(text_line) == true) return;
+      QRegularExpressionMatch match = rx.match(text_line);
+      if (match.hasMatch() == true) return;
 #else
       rx= QRegExp(qs);
       rx.setPatternSyntax(QRegExp::Wildcard);

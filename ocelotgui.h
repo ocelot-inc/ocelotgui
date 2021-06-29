@@ -11806,8 +11806,10 @@ if (current_widget != DEBUG_WIDGET)
 
       combo_box_for_font_size= new QComboBoxInSettings();
       combo_box_for_font_size_filler(actual_font_size);
-      maximum_value= "999999pt"; /* Todo: what you really need is width(99pt) + scroll bar width */
-      combo_box_for_font_size->setFixedWidth(this->fontMetrics().boundingRect(maximum_value).width());
+      maximum_value= "9999pt"; /* Todo: this does use scroll bar width but can still be too small */
+      combo_box_for_font_size->setFixedWidth(this->fontMetrics().boundingRect(maximum_value).width()
+                                             + style()->pixelMetric(QStyle::PM_ScrollBarExtent)
+                                             + 4);
 
       text_for_font_example= new QLabel();
       handle_combo_box_for_any_highlighted(-1, -1); /* to fill in the example widget initially */
