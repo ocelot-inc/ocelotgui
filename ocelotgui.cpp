@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 27 2021
+   Last modified: June 30 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -17888,6 +17888,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
                                      char *ocelot_grid_detail_char_column_start,
                                      char *tmp_pointer,
                                      char *result_pointer, /* result_field_names_pointer or result_set_pointer */
+                                     char result_set_value_flags, /* e.g. FIELD_VALUE_FLAG_IS_NULL */
                                      int v_length,
                                      int cell_type,
                                      int width_n,
@@ -17941,6 +17942,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
        result_column_no, /* i.e. result set column number */
        tmp_result_row_number, /* text_edit_frames[text_edit_frames_index]->ancestor_grid_result_row_number, */
        result_pointer, /* result_field_names_pointer or result_set_pointer or image paste experiment */
+       result_set_value_flags,
        v_length, /* text_edit_frames[text_edit_frames_index]->content_length, */
        TEXTEDITFRAME_CELL_TYPE_DETAIL, /* text_edit_frames[text_edit_frames_index]->cell_type, */
        &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number);

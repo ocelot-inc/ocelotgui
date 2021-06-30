@@ -6178,7 +6178,7 @@ void zoomIn();
 void zoomOut();
 void menu_context_t_2(const QPoint & pos);
 int copy_html_cell(char *ocelot_grid_detail_numeric_column_start, char *ocelot_grid_detail_char_column_start,
-                   char *tmp_pointer, char *result_pointer, int v_length, int cell_type,
+                   char *tmp_pointer, char *result_pointer, char result_set_value_flags, int v_length, int cell_type,
                    int width, int height, QFont result_grid_font, int setting_max_width_of_a_char,
                    int passed_i, long unsigned int tmp_xrow, char *ocelot_grid_detail_char_column_end,
                    int *new_cell_height, unsigned int result_column_no);
@@ -7924,6 +7924,7 @@ void prepare_for_display_html()
              0, /* doesn't matter */
              0, /* doesn't matter */
              0, /* doesn't matter */
+             0, /* doesn't matter */
              TEXTEDITFRAME_CELL_TYPE_DETAIL, /* text_edit_frames[text_edit_frames_index]->cell_type, */
              copy_of_parent->ocelot_grid_style_string,          /* old_style_sheet */
              true,        /* is_always_true */
@@ -8027,20 +8028,28 @@ int column_height(unsigned int grid_row, int column_no, int v_length, char *valu
   return this_column_height;
 }
 
+/*
+  Re max_display_height: The results of cell_analyze() as for-the-moment are visible in tooltip
+  show minimum y = 3 and first row's height is 1 or 2 more than later rows'
+  height e.g. it's 23 if others are 21, which partly we can attribute to grid border size. So you see "- 4".
+  Todo: maybe that's not always so, so do the size calculation as in cell_analyze() if you can.
+  Re row_height: Again it's tooltip that shows I must have "+ 1 + 1" but I have no idea why.
+  Todo: eventually row_height + max_display_rows won't need to be calculated at this stage.
+  Todo: result_grid_height_after_last_resize can change in ways that might not be anticipated.
+  We know that it is wrong for the first display. Todo: check what happens if it's minimized.
+*/
 void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, int *max_display_height, int *max_grid_rows)
 {
-  /* Todo: eventually row_height + max_display_rows won't need to be calculated at this stage. */
-  *row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1;
-  /* Todo: result_grid_height_after_last_resize can change in ways that might not be anticipated. */
-  /* We know that it is wrong for the first display. Todo: check what happens if it's minimized. */
+  *row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1 + 1;
   *max_display_height= result_grid_height_after_last_resize;
-  if (*max_display_height < *row_height * 2) *max_display_height= *row_height * 2;
   int wx= scroll_bar_width * 2; /* todo: should add width of the leftmost (sizer) column, actually */
   for (int i= 0; i < (int) gridx_column_count; ++i) wx+= grid_column_widths[i]
                                               + setting_ocelot_grid_cell_border_size_as_int * 2
                                             + 1;
   if (wx >= (int) result_grid_width_after_last_resize)
       *max_display_height-= scroll_bar_height;
+  (*max_display_height)-= 4;
+  if (*max_display_height < *row_height * 2) *max_display_height= *row_height * 2;
   *max_grid_rows= *max_display_height / *row_height;
   if ((ocelot_vertical_copy == 1) && (ocelot_result_grid_column_names_copy == 1))
   {
@@ -8223,6 +8232,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
                                                     ocelot_grid_header_char_column_start,
                                                     tmp_pointer,
                                                     result_field_names_pointer,
+                                                    FIELD_VALUE_FLAG_IS_STRING,
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_HEADER,
                                                     grid_column_widths[result_column_no],
@@ -8255,12 +8265,14 @@ void display_html(int new_grid_vertical_scroll_bar_value)
     for (unsigned int result_column_no= 0; result_column_no < result_column_count; ++result_column_no)
     {
       memcpy(&v_length, result_set_pointer, sizeof(unsigned int));
+      char result_set_value_flags= *(result_set_pointer + sizeof(unsigned int));
       result_set_pointer+= sizeof(unsigned int) + sizeof(char);
       /* more "HTML only" stuff */
       tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
                                                     ocelot_grid_detail_char_column_start,
                                                     tmp_pointer,
                                                     result_set_pointer,
+                                                    result_set_value_flags,
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
                                                     grid_column_widths[result_column_no],
@@ -8438,6 +8450,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
                                                       ocelot_grid_header_char_column_start,
                                                       tmp_pointer,
                                                       result_field_names_pointer,
+                                                      FIELD_VALUE_FLAG_IS_STRING,
                                                       f_length,
                                                       TEXTEDITFRAME_CELL_TYPE_HEADER,
                                                       result_grid_vertical_width_of_header,
@@ -8453,12 +8466,14 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
         result_field_names_pointer+= f_length;
       }
       memcpy(&v_length, result_set_pointer, sizeof(unsigned int));
+      char result_set_value_flags= *(result_set_pointer + sizeof(unsigned int));
       result_set_pointer+= sizeof(unsigned int) + sizeof(char);
       /* more "HTML only" stuff */
       tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
                                                     ocelot_grid_detail_char_column_start,
                                                     tmp_pointer,
                                                     result_set_pointer,
+                                                    result_set_value_flags,
                                                     v_length,
                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
                                                     result_grid_vertical_width_of_value,
@@ -10792,6 +10807,7 @@ bool conditional_setting_evaluate(int cs_number,
                                   int cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
                                   int cs_result_row_number,       /* e.g. text_frame->ancestor_grid_result_row_number */
                                   char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
+                                  char cs_content_flags,
                                   unsigned int cs_content_length, /* e.g. text_frame->content_length */
                                   unsigned short int cs_cell_type,  /* e.g. text_frame->cell_type */
                                   QString old_style_sheet,
@@ -10873,16 +10889,11 @@ bool conditional_setting_evaluate(int cs_number,
             }
             if (target == "VALUE")
             {
-              if (cs_content_pointer == 0)
-              {
-                result= comparer("", value, opr, FIELD_VALUE_FLAG_IS_NULL);
-              }
-              else
               {
                 QString s= QString(QByteArray(cs_content_pointer, cs_content_length));
                 /* passing text_frame->content_field_value_flags didn't seem to be working consistently */
                 /* but *(text_frame->content_pointer + text_frame->content_length) causes crashing */
-                result= comparer(s, value, opr, 0);
+                result= comparer(s, value, opr, cs_content_flags);
               }
             }
           }
@@ -10962,6 +10973,7 @@ bool conditional_setting_evaluate_till_true(
                                   int cs_column_number,           /* i.e. result set column number */
                                   int cs_result_row_number,       /* e.g. text_frame->ancestor_grid_result_row_number */
                                   char *cs_content_pointer,       /* e.g. text_frame->content_pointer */
+                                  char cs_content_flags,          /* e.g. FIELD_VALUE_FLAG_IS_NULL */
                                   unsigned int cs_content_length, /* e.g. text_frame->content_length */
                                   unsigned short int cs_cell_type,  /* e.g. text_frame->cell_type */
                                   QString *cs_new_tooltip,        /* return */
@@ -10980,6 +10992,7 @@ bool conditional_setting_evaluate_till_true(
     cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
     cs_result_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
     cs_content_pointer,       /* e.g. text_frame->content_pointer */
+    cs_content_flags,
     cs_content_length, /* e.g. text_frame->content_length */
     cs_cell_type,  /* e.g. text_frame->cell_type */
     old_style_sheet,
@@ -11570,7 +11583,7 @@ void combo_box_for_font_size_filler(QString actual_font_size)
   for (int i= 0; i < big_list.size(); ++i)
   {
     int j= big_list.at(i);
-    if ((j < FONT_SIZE_MIN) || (j > FONT_SIZE_MAX)) break;
+    if ((j < FONT_SIZE_MIN) || (j > FONT_SIZE_MAX)) continue;
     QString s= QString::number(j) + "pt";
     combo_box_for_font_size->addItem(s);
   }
@@ -11881,7 +11894,7 @@ if (current_widget != DEBUG_WIDGET)
       if (ci == 1)
       {
         combo_box_for_size[ci]->setFixedWidth(label_for_color_width * 3);
-        for (int cj= 1; cj < 11; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
+        for (int cj= 0; cj < 10; ++cj) combo_box_for_size[ci]->addItem(QString::number(cj));
         label_for_size[ci]->setFixedWidth(label_for_color_width * MAX_COLOR_NAME_WIDTH);
       }
       if (ci == 2)
