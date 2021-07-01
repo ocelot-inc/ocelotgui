@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: June 30 2021
+   Last modified: July 1 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -18003,14 +18003,8 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   /* TEST!!! end */
   if ((cell_type == TEXTEDITFRAME_CELL_TYPE_DETAIL) && (is_image == true))
   {
-    char img_type[4]= "";
-    if (v_length > 4)
-    {
-      if (strncmp(result_pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
-      else if (strncmp(result_pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
-      else if (strncmp(result_pointer,"GIF",3) == 0) strcpy(img_type, "gif");
-      /* to: try BMP? check with loadFromData()? */
-    }
+    char img_type[4];
+    result_grid->set_img_type(result_pointer, v_length, img_type); /* so img_type = "" or "png" or "jpg" or "gif" */
     if (strcmp(img_type,"") != 0)
     {
       char *base64_tmp;
@@ -18024,6 +18018,16 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
         sprintf(img_start, "<img width=%d height=%d src=\"data:image/", width_i, height_candidate);
       else
         sprintf(img_start, "<img width=%d src=\"data:image/", width_i);
+
+      /* IMAGE TEST!!!! What happens if I don't say what the width is? */
+      if (grid_column_no > 0)
+      {
+          sprintf(img_start, "<img src=\"data:image/");
+      }
+      /* TEST!!!! end */
+
+
+
       strcpy(tmp_pointer, img_start);
       tmp_pointer+= strlen(img_start);
       memcpy(tmp_pointer, img_type, 3);

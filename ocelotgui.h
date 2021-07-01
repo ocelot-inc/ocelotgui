@@ -4565,7 +4565,6 @@ void garbage_collect ()
 
 #endif // ROW_FORM_BOX_H
 
-
 #ifndef TEXTEDITWIDGET2_H
 #define TEXTEDITWIDGET2_H
 
@@ -4611,7 +4610,6 @@ QSize sizeHint() const
 
 };
 #endif // TEXTEDITWIDGET2_H
-
 
 /***********************************************************/
 /* THE MESSAGE_BOX WIDGET */
@@ -7139,14 +7137,8 @@ void display_batch()
       bool is_image_written= false;
       if ((copy_of_ocelot_html != 0) && (is_image(i) == true))
       {
-        char img_type[4]= "";
-        if (v_length > 4)
-        {
-          if (strncmp(pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
-          else if (strncmp(pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
-          else if (strncmp(pointer,"GIF",3) == 0) strcpy(img_type, "gif");
-          /* to: try BMP? check with loadFromData()? */
-        }
+        char img_type[4];
+        set_img_type(pointer, v_length, img_type); /* so img_type = "" or "png" or "jpg" or "gif" */
         if (strcmp(img_type,"") != 0)
         {
           char *base64_tmp;
@@ -8006,20 +7998,35 @@ void prepare_for_display_html()
 /*
   Called from display_html(). Return expected # of pixels in a column of a row.
               For a string: height of a line for the column's font, * #-of-<br>s
-              For an image: default height
+              For an image: getting QPixMap is slow but we'll only call this while display
+                            (todo: someday calculate height from header, see comments before
+                             set_max_column_width)
               ... but there might be an override due to a height specifier, which might be conditional
               ... see grid_row_heights[]
             + border-size * 2
             + 1 (mysteriously)
   Todo: Look for conditional settings.
   Todo: call this for header too, if it's decided that header can be multi-line.
-  Todo: Should also look for image height and grid heights[]
+  Todo: Should also look for grid heights[]
   Todo: Possibly boundingRect() would be more accurate, especially if someday word wrap is allowed.
 */
 int column_height(unsigned int grid_row, int column_no, int v_length, char *value)
 {
   (void)grid_row;
-  (void)value;
+  char img_type[4];
+  set_img_type(value, v_length, img_type); /* so img_type = "" or "png" or "jpg" or "gif" */
+  if (img_type[0] != '\0')
+  {
+    QPixmap p= QPixmap();
+    if (p.loadFromData((const uchar*) value,
+                       v_length,
+                       0,
+                       Qt::AutoColor) == true)
+    {
+      /* Readable as an image. Not text. Not null. */
+      return p.height();
+    }
+  }
   int column_width_in_chars= (grid_column_widths[column_no] / setting_max_width_of_a_char);
   int lines_in_cell= (v_length + (column_width_in_chars - 1)) / column_width_in_chars;
   if (lines_in_cell == 0) lines_in_cell= 1;
@@ -8042,7 +8049,7 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
 {
   *row_height= max_height_of_a_char + setting_ocelot_grid_cell_border_size_as_int * 2 + 1 + 1;
   *max_display_height= result_grid_height_after_last_resize;
-  int wx= scroll_bar_width * 2; /* todo: should add width of the leftmost (sizer) column, actually */
+  int wx= scroll_bar_width * 2; /* todo: should add width of the leftmost (sizer thin image) column, actually */
   for (int i= 0; i < (int) gridx_column_count; ++i) wx+= grid_column_widths[i]
                                               + setting_ocelot_grid_cell_border_size_as_int * 2
                                             + 1;
@@ -9545,6 +9552,22 @@ void scan_rows(unsigned int p_result_column_count,
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
 /*
+  Pass: pointer to + length of a field in the result set, plus char[4] img_type.
+  Do: put in img_type: "" or "png" or "jpg" or "gif".
+*/
+void set_img_type(const char *pointer, unsigned int v_length, char *img_type)
+{
+  img_type[0]= '\0';
+  if (v_length > 4)
+  {
+    if (strncmp(pointer,"\x89PNG",4) == 0) strcpy(img_type, "png");
+    else if (strncmp(pointer,"\xFF\xD8",2) == 0) strcpy(img_type, "jpg");
+    else if (strncmp(pointer,"GIF",3) == 0) strcpy(img_type, "gif");
+    /* to: try BMP? check with loadFromData()? */
+  }
+}
+
+/*
   How many UTF-8 characters are there, maximum?
   This is more important for a width calculation than length in bytes.
   The following doesn't do a great job -- I wanted to get it right for
@@ -9553,7 +9576,16 @@ void scan_rows(unsigned int p_result_column_count,
   characters which sometimes are wide. Essentially the algorithm is:
   count all the ASCII and continuation bytes, don't count leading bytes.
   Don't bother if the length can't be greater than the current maximum.
-  Todo: skip this if it's an image.
+  Re images:
+    We're assuming that anything starting with png|jpg|gif header is png_jpg_gif (which might be wrong).
+    We're assuming that any png_jpg_gif should be displayed as an image (which might be wrong).
+    We're assuming that a 50-character width is better than v_length (which is arbitrary).
+    We're assuming that it's not wide enough then Qt will widen it.
+    Todo: one better way would be to let the user specify a number other than 50.
+    Todo: one better way would be to figure out the width and height in pixels from the image's header.
+     https://stackoverflow.com/questions/16724849/how-do-i-extract-the-width-and-height-of-a-png-from-looking-at-the-header-in-obj
+     https://stackoverflow.com/questions/18264357/how-to-get-the-width-height-of-jpeg-file-without-using-library
+     https://stackoverflow.com/questions/41670780/how-to-get-the-gif-image-size-dimensions-from-byte-array-in-as3/41672182
   Todo: we're not doing this if vertical!
   Todo: The "++i;" in this code exists so that 3-byte UTF-8 will
         result in double-wide, which seems okay for Japanese kanji.
@@ -9569,12 +9601,18 @@ void set_max_column_width(unsigned int v_length,
 {
   if (v_length <= *p_result_max_column_width) return;
   unsigned int j= v_length;
-  for (unsigned int i= 0; i < v_length; ++i)
+  char img_type[4];
+  set_img_type(result_set_copy_pointer, v_length, img_type); /* so img_type = "" or "png" or "jpg" or "gif" */
+  if (img_type[0] != '\0') j= 50;
+  else
   {
-    if (( *(result_set_copy_pointer + i)   & 0xc0) == 0x80)
+    for (unsigned int i= 0; i < v_length; ++i)
     {
-      --j;
-      ++i;
+      if (( *(result_set_copy_pointer + i)   & 0xc0) == 0x80)
+      {
+        --j;
+        ++i;
+      }
     }
   }
   if (j > *p_result_max_column_width) *p_result_max_column_width= j;
