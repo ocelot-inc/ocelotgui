@@ -4131,6 +4131,11 @@ void MainWindow::action_connect_once(QString message)
   For menu item "exit" we said connect(...SLOT(action_exit())));
   By default this is on and associated with File|Exit menu item.
   Stop the program.
+  Re result_grid_tab_widget->close():
+    MainWindow close will close children anyway but this forces a certain ordering.
+    If result grid is not closed first, you can get a crash by selecting, then
+    detaching, then setting focus to the result grid, then ^Q to exit.
+    Todo: since this is a kludge not a fix, investigate more. Maybe valgrind would help.
 */
 void MainWindow::action_exit()
 {
@@ -4184,8 +4189,8 @@ void MainWindow::action_exit()
 #endif //if (OCELOT_MYSQL_INCLUDE == 1)
   delete_utf8_copies();
   log("action_exit mid", 90);
-  close();
-
+  result_grid_tab_widget->close(); /* See the comment before the start of this function */
+  close(); /* Assuming quitOnLastWindowClosed is applicable, the program should exit so log won't happen */
   log("action_exit end", 90);
 }
 
