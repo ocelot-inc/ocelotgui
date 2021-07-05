@@ -18546,7 +18546,7 @@ int tnt_object_reset(struct tnt_stream *s)
      &s->opt.tmout_send to static_cast<void*>(&s->opt.tmout_send)
      &s->opt.tmout_recv to static_cast<void*>(&s->opt.tmout_recv)
    Re writev: I wrote pseudo_writev, I hope it does the same thing.
-   Anything inside #ifdef WIN32 ... #endif is added by Ocelot.
+   Anything inside #ifdef WIN32 ... #endif is added by Peter Gulutzan.
    Todo: We call WSAStartup every time we connect, never WSACleanup.
 */
 #ifndef TNT_IO_C_INCLUDED

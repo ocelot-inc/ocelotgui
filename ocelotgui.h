@@ -6458,6 +6458,7 @@ ResultGrid(
   //grid_row_layouts= 0;
   //grid_row_widgets= 0;
   grid_main_layout= 0;
+
   /* grid_main_widget= 0; */
   border_size= 1;                                          /* Todo: This actually has to depend on stylesheet */
 
@@ -6472,9 +6473,10 @@ ResultGrid(
   {
     grid_main_layout= 0;
     html_text_edit= NULL;
+    batch_text_edit= NULL;
     return;
   }
-  batch_text_edit= NULL;
+
 
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
@@ -6519,8 +6521,9 @@ ResultGrid(
   */
   hbox_layout->setContentsMargins(0, 0, 0, 0);
   hbox_layout->setSpacing(0);
-  /* TEST!!!! */
+  /* html_text_edit + batch_text_edit exist always except during temporary delete in display_garbage_collect() */
   html_text_edit= new Result_qtextedit(this);
+  batch_text_edit= new QTextEdit(this);
 
   hbox_layout->addWidget(grid_scroll_area);
 //  hbox_layout->addWidget(html_text_edit);
@@ -6563,7 +6566,9 @@ ResultGrid(
 
   grid_main_layout->setSpacing(0);                          /* ?? premature? */
 
-  grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
+  /* We used to say this but override it in some display functions */
+  //grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
+  grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);
 
 //  grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
 
@@ -6841,12 +6846,29 @@ QString fillup(MYSQL_RES *mysql_res,
   return "OK";
 }
 
+void switch_to_batch_text_edit()
+{
+  if (html_text_edit->isVisible() == true) html_text_edit->hide();
+  if (batch_text_edit->isVisible() == false) batch_text_edit->show();
+  if (grid_main_layout->indexOf(html_text_edit) != -1) grid_main_layout->removeWidget(html_text_edit);
+  if (grid_main_layout->indexOf(batch_text_edit) == -1) grid_main_layout->addWidget(batch_text_edit);
+}
+
+void switch_to_html_text_edit()
+{
+  if (batch_text_edit->isVisible() == true) batch_text_edit->hide();
+  if (html_text_edit->isVisible() == false) html_text_edit->show();
+  if (grid_main_layout->indexOf(batch_text_edit) != -1) grid_main_layout->removeWidget(batch_text_edit);
+  if (grid_main_layout->indexOf(html_text_edit) == -1) grid_main_layout->addWidget(html_text_edit);
+}
+
 /*
   For display with xml or batch or raw, i.e. not the usual (html). Just dump.
   Todo: Check: ocelot_html!=0 and ocelot_raw != 0 and ocelot_vertical != 0.
 */
 void display_batch()
 {
+  switch_to_batch_text_edit(); /* so grid_main_layout has batch_text_edit and not html_text_edit */
   char ocelot_grid_table_start[896];
   char ocelot_grid_header_row_start[32];
   char ocelot_grid_header_row_end[32];
@@ -6992,22 +7014,17 @@ void display_batch()
     I don't bother to say batch_text_edit_hide() so this->show() makes it visible, momentarily.
     I think batch_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
   */
-  if (batch_text_edit != NULL) delete batch_text_edit;
-  batch_text_edit= new QTextEdit(this);
 //  this->show();
 //  client->show();
 //  client->hide();
 //  this->hide();
 
-  grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
   grid_vertical_scroll_bar->setVisible(false);
-  if (html_text_edit != NULL) grid_main_layout->removeWidget(html_text_edit);
-  grid_main_layout->addWidget(batch_text_edit);
 
   if ((result_row_count == 0) || (result_column_count == 0))
   {
+    batch_text_edit->clear();
     batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
-    batch_text_edit->show();
 //    this->show();
 //    client->show();
     return;
@@ -7186,7 +7203,7 @@ void display_batch()
   }
   batch_text_edit->moveCursor(QTextCursor::Start);
   batch_text_edit->ensureCursorVisible();
-  batch_text_edit->show();
+
 //  show();
 //  client->show();
   delete [] tmp;
@@ -7206,10 +7223,6 @@ void display_batch()
         This is invisible because resize_or_font_change calls
         something first (?), but it's a silly waste of time.
         However, maybe it only happens for the first time I select.
-  Todo: grid_main_layout->setSizeConstraint() is only necessary if
-        we've recently turned off ocelot_batch + ocelot_html; it
-        could be shifted so it's only reset when we reconnect
-        and|or change those variables.
   Todo: Bug:
         (start program with ocelot_batch == ocelot_html == 0)
         select * from information_schema.tables limit 10;
@@ -7841,7 +7854,6 @@ void prepare_for_display_html()
 {
     /* I'm not sure where this should go. It's really only good for size-change */
     /* Maybe this doesn't work anyway */
-    grid_main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* This ensures the grid columns have no spaces between them */
     /* Todo: since grid_column_size_calc() recalculates max_height_of_a_char, don't bother with this. */
     MainWindow *parent= copy_of_parent;
     QFont *pointer_to_font;
@@ -7863,11 +7875,11 @@ void prepare_for_display_html()
       ocelot_grid_max_column_height_in_lines= result_grid_height / line_height;
       if (ocelot_grid_max_column_height_in_lines < 1) ocelot_grid_max_column_height_in_lines= 1;
     }
-
     /* This is so we know desired column widths for deciding whether to wrap in HTML cells */
     /* Todo: Check harder. Some things might not be initialized yet for this call. */
     /* Todo: We're not ready yet for ocelot_vertical != 0 */
     //if (copy_of_ocelot_html != 0)
+    if ((result_row_count != 0) && (result_column_count != 0))
     {
       //if (copy_of_ocelot_vertical == 0)
       grid_column_size_calc(setting_ocelot_grid_cell_border_size_as_int,
@@ -7975,7 +7987,6 @@ void prepare_for_display_html()
     }
 //TEST!!    hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
     //html_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
-
     /*
       Kludge #1: if I don't delete html_text_edit and create it again, then after
       ocelot_html=1; big select; ocelot_html=0; big select; ocelot_html=1;big select;
@@ -8094,12 +8105,21 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
 */
 void display_html(int new_grid_vertical_scroll_bar_value)
 {
-  if ((batch_text_edit != NULL) && (batch_text_edit->isVisible())) batch_text_edit->hide();
-
-  if (copy_of_ocelot_vertical == 1) { display_html_html_vertical(new_grid_vertical_scroll_bar_value); return; }
+  if ((result_row_count == 0) || (result_column_count == 0))
+  {
+    switch_to_batch_text_edit();
+    batch_text_edit->clear(); /* Todo: This is to avoid repeating the message. Possibly that's a bug. */
+    batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
+//    this->show();
+//    client->show();
+    return;
+  }
 
   if (result_grid_height_after_last_resize < 0) return;
 
+  switch_to_html_text_edit(); /* so grid_main_layout has html_text_edit and not batch_text_edit */
+
+  if (copy_of_ocelot_vertical == 1) { display_html_html_vertical(new_grid_vertical_scroll_bar_value); return; }
   int row_height, max_display_height, max_grid_rows;
   get_row_height_and_max_display_height_and_max_grid_rows(&row_height, &max_display_height, &max_grid_rows);
 
@@ -8115,18 +8135,8 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 //  client->hide();
 //  this->hide();
 
-  grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
 //  grid_vertical_scroll_bar->setVisible(false); /* let it stay visible for tests */
 //  grid_main_layout->addWidget(html_text_edit);
-
-  if ((result_row_count == 0) || (result_column_count == 0))
-  {
-    html_text_edit->clear(); /* Todo: This is to avoid repeating the message. Possibly that's a bug. */
-    html_text_edit->insertPlainText("row_count == 0 or column_count == 0");
-//    this->show();
-//    client->show();
-    return;
-  }
 
   long unsigned int tmp_result_row_number;
   char *result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
@@ -8305,9 +8315,6 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
 
-  if (batch_text_edit != NULL) grid_main_layout->removeWidget(batch_text_edit);
-  grid_main_layout->addWidget(html_text_edit);
-
   html_text_edit->setHtml(tmp);
   html_text_edit->moveCursor(QTextCursor::Start);
   html_text_edit->ensureCursorVisible();
@@ -8329,8 +8336,6 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 */
 void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 {
-  if (result_grid_height_after_last_resize < 0) return;
-
   int row_height, max_display_height, max_grid_rows;
   get_row_height_and_max_display_height_and_max_grid_rows(&row_height, &max_display_height, &max_grid_rows);
 
@@ -8340,15 +8345,6 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 
 //  html_text_edit->show();
 
-  grid_main_layout->setSizeConstraint(QLayout::SetMaximumSize);  /* Todo: try other settings again. SetMinimumSize? */
-
-  if ((result_row_count == 0) || (result_column_count == 0))
-  {
-    html_text_edit->insertPlainText("row_count == 0 or column_count == 0");
-//    this->show();
-//    client->show();
-    return;
-  }
   long unsigned int result_row_number;
   char *result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   unsigned int v_length, f_length;
@@ -8504,9 +8500,6 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
-
-  if (batch_text_edit != NULL) grid_main_layout->removeWidget(batch_text_edit);
-  grid_main_layout->addWidget(html_text_edit);
 
   /* removed "copy_of_ocelot_html != 0" here */
   if (copy_of_ocelot_raw == 0)
@@ -10207,7 +10200,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
-  if (html_text_edit == NULL) return;
+  if (html_text_edit == NULL) return; /* ?? this should be impossible */
   set_grid_max_column_height_in_pixels(this->height());
   if ((copy_of_ocelot_batch != 0)
    || (copy_of_ocelot_html != 0)
@@ -10240,7 +10233,7 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
     if (result_set_copy != 0)  /* see fillup_garbage_collect() comment */
     {
       display(2, 0, 0, 0, 0, 0, 0);
-      this->show();
+      this->show(); /* Todo: I think this is not necessary */
     }
   }
 }
@@ -10505,18 +10498,10 @@ void display_garbage_collect()
   if (gridx_result_indexes != 0) { delete [] gridx_result_indexes; gridx_result_indexes= 0; }
   if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
   if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
-  if (html_text_edit != NULL)
-  {
-    delete html_text_edit;
-    html_text_edit= new Result_qtextedit(this);
-//    grid_main_layout->addWidget(html_text_edit); /* Huh? This can't be right. */
-  }
-  if (batch_text_edit != NULL)
-  {
-    delete batch_text_edit;
-    batch_text_edit= new Result_qtextedit(this);
-//    grid_main_layout->addWidget(batch_text_edit); /* Huh? This can't be right. */
-  }
+  if (html_text_edit != NULL) delete html_text_edit;
+  html_text_edit= new Result_qtextedit(this);
+  if (batch_text_edit != NULL) delete batch_text_edit;
+  batch_text_edit= new QTextEdit(this);
 }
 
 #ifdef OLD_STUFF

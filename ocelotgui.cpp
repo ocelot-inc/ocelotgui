@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: July 1 2021
+   Last modified: July 4 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -17799,7 +17799,6 @@ void Find_widget::keyPressEvent(QKeyEvent *event)
   Re setDocumentMargin: We want the table to start at left boundary, but it starts at 1 anyway.
   Re possible memory leaks:
     We allow ^Z i.e. we don't setUndoRedoEnabled(false) and that causes a leak danger.
-    We make things here in construct() that can grow and not be deleted e.g.  qtextedit_result_changes.
     We might create resources, especially for images, and that too can cause a leak danger
     (See https://stackoverflow.com/questions/34735595/qtextdocument-how-to-remove-a-resource-from-cache).
     and although we could delete (or at least clear) QTextDocument, something might still be forgotten.
@@ -17819,7 +17818,7 @@ void Result_qtextedit::construct()
   this->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(this, SIGNAL(customContextMenuRequested(const QPoint &)),
       this, SLOT(menu_context_t(const QPoint &)));
-  qtextedit_result_changes= new Result_changes(this);
+  qtextedit_result_changes= new Result_changes(this); /* ~Result_qtextedit() should delete this */
 //  show();
 }
 

@@ -36,17 +36,22 @@
 # make install                  # might require root privileges
 # (Steps are different when generating .deb or .rpm, see comments later.)
 
-# Qt4 or Qt5 dev packages must be installed first. See 
+# Qt4 or Qt5 or Qt6 dev packages must be installed first. See 
 # http://doc.qt.io/qt-5/linux.html
 # ... but that is not complete for Ubuntu, you also need qtbase5-dev.
 # If your OS comes with Qt5, you should download Qt5 dev packages.
 # If your OS comes with Qt4, you should download Qt4 dev packages.
+# If your OS comes with Qt6, you should download Qt6 dev packages.
 # If your os is unknown then try "pkg-config --modversion QtCore"
 # or look in /usr/lib/pkgconfig files.
 # For more instructions see "Qt for Linux/X11"
 # http://doc.qt.io/qt-5/linux.html.
+# For more instructions about Qt6 see "Get started with CMake"
+# https://doc.qt.io/qt-6/cmake-get-started.html.
 # If you have qt4, but findQt4() fails, a symbolic link might work, e.g.:
 # sudo ln -s  /usr/lib64/qt4/bin/qmake /usr/bin/qmake-qt4
+# If you have qt6, but find_package(qt6Widgets ...) fails, you might try:
+# qmake-qt6 followed by make.
 
 # CMAKE_PREFIX_PATH=<string>
 # This must be the path where the Qt development files were installed.
@@ -102,10 +107,11 @@
 # If it is not included, and ocelotgui is started with --ocelot_dbms=tarantool,
 # then libtarantool.so will be sought.
 
-# QT_VERSION=4 or QT_VERSION=5
+# QT_VERSION=4 or QT_VERSION=5 or QT_VERSION=6
 # If -DQT_VERSION=4: Search only for Qt4, do not search for Qt5 first.
 # If -DQT_VERSION=5: Search only for Qt5, do not search for Qt4 afterwards.
-# If not specified or (not 4 and not 5): Search for Qt5 then search for Qt4.
+# If -DQT_VERSION=6: Search only for Qt6, do not search for Qt5 or Qt4.
+# If not specified or (not 4 and not 5 and not 6): Search for Qt5 first, then search for Qt4, then search for Qt6.
 
 # PACKAGE_TYPE="DEB" or PACKAGE_TYPE="RPM"
 #   DEB:
@@ -278,26 +284,54 @@ if (DEFINED OCELOT_MYSQL_INCLUDE)
 add_definitions(-DOCELOT_MYSQL_INCLUDE=${OCELOT_MYSQL_INCLUDE})
 endif(DEFINED OCELOT_MYSQL_INCLUDE)
 
-if (NOT QT_VERSION EQUAL "4")
+if (DEFINED QT_VERSION)
+  message("QT_VERSION is defined")
   if (QT_VERSION EQUAL "5")
     find_package(Qt5Widgets REQUIRED)
-  else (QT_VERSION EQUAL "5")
-    # QUIET suppresses the following warning because we'll look for Qt4 instead:
-    # CMake Warning at CMakeLists.txt:n (find_package):
-    # By not providing "FindQt5Widget.cmake" in CMAKE_MODULE_PATH this project
-    #   has asked CMake to find a package configuration file provided by
-    #   "Qt5Widget", but CMake did not find one.
-    #   Could not find a package configuration file provided by "Qt5Widget" with
-    #   any of the following names:
-    #     Qt5WidgetConfig.cmake
-    #     qt5widget-config.cmake
-    #   Add the installation prefix of "Qt5Widget" to CMAKE_PREFIX_PATH or set
-    #   "Qt5Widget_DIR" to a directory containing one of the above files.  If
-    #   "Qt5Widget" provides a separate development package or SDK, be sure it has
-    #   been installed.
-    find_package(Qt5Widgets QUIET)
-  endif (QT_VERSION EQUAL "5")
-endif (NOT QT_VERSION EQUAL "4")
+  elseif(QT_VERSION EQUAL "4")
+    find_package(Qt4Widgets REQUIRED)
+  elseif(QT_VERSION EQUAL "6")
+    find_package(Qt6Widgets REQUIRED)
+  else()
+    message(FATAL_ERROR "QT_VERSION was specified but was not 5 or 4 or 6") 
+  endif(QT_VERSION EQUAL "5")
+else (DEFINED QT_VERSION)
+  # QT_VERSION is not specified so we'll look for 5 then 6 then 4
+  # QUIET suppresses the following warning because we'll look for another version instead:
+  # CMake Warning at CMakeLists.txt:n (find_package):
+  # By not providing "FindQt5Widget.cmake" in CMAKE_MODULE_PATH this project
+  #   has asked CMake to find a package configuration file provided by
+  #   "Qt5Widget", but CMake did not find one.
+  #   Could not find a package configuration file provided by "Qt5Widget" with
+  #   any of the following names:
+  #     Qt5WidgetConfig.cmake
+  #     qt5widget-config.cmake
+  #   Add the installation prefix of "Qt5Widget" to CMAKE_PREFIX_PATH or set
+  #   "Qt5Widget_DIR" to a directory containing one of the above files.  If
+  #   "Qt5Widget" provides a separate development package or SDK, be sure it has
+  #   been installed.
+  find_package(Qt5Widgets QUIET)
+  if (NOT Qt5Widgets_FOUND)
+    message("Qt5 not found")
+    find_package(Qt4idgets QUIET)
+    if (NOT Qt4Widgets_FOUND)
+     find_package(Qt6Widgets QUIET)
+     if (NOT Qt6Widgets_FOUND)
+       message(FATAL_ERROR "QT_VERSION not specified, Qt5 not found, Qt4 not found, Qt6 not found")
+     endif(NOT Qt6Widgets_FOUND)
+    endif(NOT Qt4Widgets_FOUND)
+  endif(NOT Qt5Widgets_FOUND)
+endif(DEFINED QT_VERSION)
+
+if (QT_VERSION EQUAL "4")
+  message("4")
+endif(QT_VERSION EQUAL "4")
+if (QT_VERSION EQUAL "5")
+  message("5")
+endif (QT_VERSION EQUAL "5")
+if (QT_VERSION EQUAL "6")
+  message("6")
+endif (QT_VERSION EQUAL "6")
 
 if (Qt5Widgets_FOUND)
   message("-- found Qt5")
@@ -307,15 +341,15 @@ if (Qt5Widgets_FOUND)
   set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
   #Produce ui_ocelotgui.h from ocelotgui.ui
   qt5_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
-else (Qt5Widgets_FOUND)
-  find_package(Qt4 QUIET)
-  if (Qt4_FOUND)
-    message("-- found Qt4")
-    qt4_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
-  else (Qt4_FOUND)
-    message(FATAL_ERROR "Qt5 not found, Qt4 not found")
-  endif (Qt4_FOUND)
-endif (Qt5Widgets_FOUND)
+endif(Qt5Widgets_FOUND)
+if (Qt4Widgets_FOUND)
+  message("-- found Qt4")
+  qt4_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
+endif(Qt4Widgets_FOUND)
+if (Qt6Widgets_FOUND)
+  message("-- found Qt4")
+  qt6_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
+endif(Qt6Widgets_FOUND)
 
 #MinGW ignores #pragmas in third_party.h
 if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
@@ -390,9 +424,13 @@ endif (TMP_OCELOT_MYSQL_INCLUDE)
 
 if (Qt5Widgets_FOUND)
   target_link_libraries(ocelotgui Qt5::Widgets)
-else (Qt5Widgets_FOUND)
+endif(Qt5Widgets_FOUND)
+if (Qt4Widgets_FOUND)
   target_link_libraries(ocelotgui Qt4::QtGui)
-endif (Qt5Widgets_FOUND)
+endif(Qt4Widgets_FOUND)
+if (Qt6Widgets_FOUND)
+  target_link_libraries(ocelotgui Qt6::Widgets)
+endif(Qt6Widgets_FOUND)
 
 FILE(GLOB jpg_files "${CMAKE_CURRENT_SOURCE_DIR}/*.jpg")
 FILE(GLOB htm_files "${CMAKE_CURRENT_SOURCE_DIR}/*.htm")
