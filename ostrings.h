@@ -917,7 +917,7 @@ static int MENU_SETTINGS_FOR_GRID= 107;
 static int MENU_SETTINGS_FOR_STATEMENT= 108;
 static int MENU_SETTINGS_FOR_DEBUG= 109;
 static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 110;
-//static int MENU_PICK_NEW_FONT= 111; no longer used
+static int MENU_GRID_HTML_EFFECTS= 111; /* was MENU_PICK_NEW_FONT= 111; until version 1.5 */
 #define MENU_CONNECTION_DIALOG_BOX 112
 #define MENU_FILE_CONNECT_HEADING 113
 #define MENU_END 114
@@ -1036,7 +1036,7 @@ static const char *menu_strings[]=
     "Settings -- -- for Statement",
     "Settings -- -- for Debug",
     "Settings -- -- for Extra Rule 1",
-    "Pick new font", /* Obsolete. Since version 1.5 we don't call QFontDialog */
+    "Grid Html effects", /* Used to be "Pick new font". Since version 1.5 we don't call QFontDialog */
     "Connection Dialog Box",
     "File|Connect. Usually only the first 8 fields are important.",
     /* FRENCH */
@@ -1151,7 +1151,7 @@ static const char *menu_strings[]=
         "Réglages -- -- pour Instruction",
         "Réglages -- -- pour Debug",
         "Réglages -- -- pour Règle supplémentaire 1",
-        "Choisir nouvelle police",
+        "Grille effets de html",
         "Connexion Boîte de dialogue",
         "Fichier|Connexion. Habituellement, seuls les 8 premiers champs sont importants."
 };

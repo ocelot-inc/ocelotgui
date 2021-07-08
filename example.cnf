@@ -20,6 +20,7 @@ ocelot_grid_width='default'
 ocelot_grid_height='default'
 ocelot_grid_focus_cell_background_color='Wheat'
 ocelot_grid_outer_color='LightBlue'
+ocelot_grid_html_settings='no'
 #ocelot_grid_cell_height is conditional
 #ocelot_grid_cell_width is conditional
 #ocelot_grid_tabs is conditional

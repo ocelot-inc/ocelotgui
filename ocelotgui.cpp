@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.4.0
-   Last modified: July 4 2021
+   Last modified: July 8 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -589,11 +589,12 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 //  ocelot_grid_cell_drag_line_size= "5";
 //  ocelot_grid_cell_width= "default";
   ocelot_grid_height= ocelot_grid_left= ocelot_grid_top= ocelot_grid_width= "default";
+  ocelot_grid_html_effects= "no";
   ocelot_grid_detached= "no";
   /* Probably result_grid_table_widget_saved_font only matters if the connection dialog box has to go up. */
   QFont tmp_font;
 //  QFont *saved_font;
-  tmp_font= this->font();
+//  tmp_font= this->font();
 //  saved_font=&tmp_font;
 //  result_grid_table_widget= new ResultGrid(0, saved_font, this);
 
@@ -5204,6 +5205,7 @@ void MainWindow::action_grid()
     action_change_one_setting(ocelot_grid_left, new_ocelot_grid_left, TOKEN_KEYWORD_OCELOT_GRID_LEFT);
     action_change_one_setting(ocelot_grid_top, new_ocelot_grid_top, TOKEN_KEYWORD_OCELOT_GRID_TOP);
     action_change_one_setting(ocelot_grid_width, new_ocelot_grid_width, TOKEN_KEYWORD_OCELOT_GRID_WIDTH);
+    action_change_one_setting(ocelot_grid_html_effects, new_ocelot_grid_html_effects, TOKEN_KEYWORD_OCELOT_GRID_HTML_EFFECTS);
     action_change_one_setting(ocelot_grid_detached, new_ocelot_grid_detached, TOKEN_KEYWORD_OCELOT_GRID_DETACHED);
   }
   delete(se);
@@ -17887,6 +17889,12 @@ void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget
   Todo: I think it's always TEXTEDITFRAME_CELL_TYPE_DETAIL now so you don't need to pass it and check it.
   Todo: BUG: width isn't being set for numeric columns, which is why column drag fails for numeric columns.
   Todo: For an image, we assume height < max_height_of_a_char*2 is default and ignore it. We should check.
+  Todo: re ocelot_grid_html_settings:
+        Specialize e.g. it could be 'italics' or '<i>' to recognize only italics.
+        bug: If we put a <br> in order to increase height, it wrecks something between <i> and </i>.
+        We should calculate width without the html markup, otherwise column can be too wide.
+        When documenting, give example = select '<p style="color:red">' || 'x' || '</p>'; which is HTML 4.
+        Or select '<p style="color:red">' || 'x' || '</p>' AS "<i>BIG HEADER IN ITALICS</i>";
 */
 int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_start,
                                      char *ocelot_grid_detail_char_column_start,
@@ -18067,12 +18075,17 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       }
       ++j;
     }
-    /* todo: check here if flag & 1 */ /* TEST!! left out */
-    //if (c == '<') {memcpy(tmp_pointer, "&lt;", 4); tmp_pointer+= 4;}
-    //else if (c == '>') {memcpy(tmp_pointer, "&gt;", 4); tmp_pointer+= 4;}
-    //else if (c == '&') {memcpy(tmp_pointer, "&amp;", 5); tmp_pointer+= 5;}
-    //else
-    {*tmp_pointer= c; ++tmp_pointer;}
+    {
+      bool is_special_char= false;
+      if (c == '\0') {memcpy(tmp_pointer, "&#0;", 4); tmp_pointer+= 4; is_special_char= true;}
+      if (result_grid->copy_of_parent->ocelot_grid_html_effects != "yes")
+      {
+        if (c == '<') {memcpy(tmp_pointer, "&lt;", 4); tmp_pointer+= 4; is_special_char= true;}
+        else if (c == '>') {memcpy(tmp_pointer, "&gt;", 4); tmp_pointer+= 4; is_special_char= true;}
+        else if (c == '&') {memcpy(tmp_pointer, "&amp;", 5); tmp_pointer+= 5; is_special_char= true;}
+      }
+      if (is_special_char == false) {*tmp_pointer= c; ++tmp_pointer;}
+    }
   }
   /* TODO: This looks like dead code since we have copied already and we won't increment tmp_pointer here */
   memcpy(tmp_pointer, result_pointer, v_length);
@@ -18585,11 +18598,11 @@ void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
   if (result_grid->is_fancy() == false) { QTextEdit::mouseMoveEvent(event); return; }
   cell_analyze(event->pos().x(), event->pos().y());
   QString tip= "";
-  tip= tip + "block_count=" + QString::number(qtextedit_block_count);
-  tip= tip + " columns_per_row=" + QString::number(qtextedit_columns_per_row);
+  //tip= tip + "block_count=" + QString::number(qtextedit_block_count);
+  //tip= tip + " columns_per_row=" + QString::number(qtextedit_columns_per_row);
   tip= tip + " x=" + QString::number(qtextedit_x);
   tip= tip + " y=" + QString::number(qtextedit_y);
-  tip= tip + " Block=" + QString::number(qtextedit_block_number);
+  //tip= tip + " Block=" + QString::number(qtextedit_block_number);
   tip= tip + " Grid_Row=" + QString::number(qtextedit_grid_row_number);
   tip= tip + " Result_row=" + QString::number(qtextedit_result_row_number);
   tip= tip + " Column  " + QString::number(qtextedit_column_number);
@@ -18616,6 +18629,7 @@ void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
    Todo: Find out why there is 1 additional white pixel in the border.
          There should be no pixels before the left border because we called document()->setDocumentMargin(0);
          I've set spacing to 0 and padding to 0, but it doesn't seem to have an effect.
+   Todo: Research whether detaching the grid widget might change something that you set here.
    grid_column_size_calc() adds + setting_ocelot_grid_cell_border_size_as_int * 2
    grid_column_size_calc() adds + setting_ocelot_grid_cell_drag_line_size_as_int
    Usually the desired column width is calculable based on what grid_column_size_calc() delivered.
@@ -18706,7 +18720,7 @@ void Result_qtextedit::cell_analyze(int x, int y)
   qtb= qt->findBlockByNumber(qtextedit_block_number + 1);
   qtextedit_cell_content= qtb.text();
 
-  /* TEST!!!! */
+#if (QT_VERSION >= 0x50000)
   /* See also https://stackoverflow.com/questions/18700945/qtextbrowser-how-to-identify-image-from-mouse-click-position */
   {
     QTextCursor qtc= cursorForPosition(QPoint(x, y));
@@ -18722,11 +18736,9 @@ void Result_qtextedit::cell_analyze(int x, int y)
       QImage qi= qv.value<QImage>();
       QClipboard *p_clipboard= QApplication::clipboard();
       p_clipboard->setImage(qi);
-      //QMessageBox msgbox;
-      //msgbox.setText("There is something in the clipboard");
-      //msgbox.exec();
     }
   }
+#endif
 }
 
 #ifdef OLD_STUFF
@@ -19149,93 +19161,6 @@ TextEditFrame::TextEditFrame(QWidget *parent, ResultGrid *result_grid_widget, un
   hide();
 }
 
-
-TextEditFrame::~TextEditFrame()
-{
-}
-
-
-void TextEditFrame::mousePressEvent(QMouseEvent *event)
-{
-  ;
-}
-
-void TextEditFrame::mouseMoveEvent(QMouseEvent *event)
-{
-  ;
-}
-
-void TextEditFrame::mouseReleaseEvent(QMouseEvent *event)
-{
-  if (!(event->buttons() != 0)) left_mouse_button_was_pressed= 0;
-}
-
-void TextEditFrame::style_sheet_setter(TextEditFrame *text_frame, TextEditWidget *text_edit)
-{
-  ;
-}
-
-
-void TextEditFrame::paintEvent(QPaintEvent *event)
-{
-  ;
-}
-
-/*
-  TextEditWidget
-  This is one of the components of result_grid
-*/
-TextEditWidget::TextEditWidget(QWidget *parent) :
-    QTextEdit(parent)
-{
-
-  ;
-
-}
-
-
-TextEditWidget::~TextEditWidget()
-{
-}
-
-void TextEditWidget::paintEvent(QPaintEvent *event)
-{
-
-}
-
-void TextEditWidget::generate_update()
-{
-  ;
-}
-
-void TextEditWidget::keyPressEvent(QKeyEvent *event)
-{
-  ;
-}
-
-void TextEditWidget::copy()
-{
-
-}
-
-void TextEditWidget::paste()
-{
-}
-
-QString TextEditWidget::unstripper(QString value_to_unstrip)
-{
-
-}
-
-void TextEditWidget::focusOutEvent(QFocusEvent *event)
-{
-
-}
-
-void TextEditWidget::focusInEvent(QFocusEvent *event)
-{
-  ;
-}
 #endif
 
 
@@ -25101,7 +25026,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 125 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 126 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
   Todo: ocelot_grid_border_size is no longer used but we'll probably add something else soon
 */
 int XSettings::ocelot_variables_create()
@@ -25135,6 +25060,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_grid_font_weight, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT},
     {&main_window->ocelot_grid_header_background_color, NULL, -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR},
     {&main_window->ocelot_grid_height, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT},
+    {&main_window->ocelot_grid_html_effects, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_HTML_EFFECTS},
     {&main_window->ocelot_grid_left, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT},
     {&main_window->ocelot_grid_outer_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR},
     {NULL, &ocelot_grid_tabs,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_TABS},
@@ -25234,7 +25160,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 125;
+  int i= 126;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;

@@ -767,7 +767,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE, /* no longer used */
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE,
-    TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE, /* no longer used */
     TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH,
     TOKEN_KEYWORD_OCELOT_GRID_DETACHED,
@@ -778,6 +777,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT,
     TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_HEIGHT,
+    TOKEN_KEYWORD_OCELOT_GRID_HTML_EFFECTS,
     TOKEN_KEYWORD_OCELOT_GRID_LEFT,
     TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_TABS,
@@ -2005,7 +2005,6 @@ static const keywords strvalues[]=
     {"OCELOT_GRID_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE}, /* no longer used */
     {"OCELOT_GRID_CELL_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR},
     {"OCELOT_GRID_CELL_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
-    {"OCELOT_GRID_CELL_DRAG_LINE_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_DRAG_LINE_SIZE},
     {"OCELOT_GRID_CELL_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
     {"OCELOT_GRID_CELL_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH},
     {"OCELOT_GRID_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_DETACHED},
@@ -2016,6 +2015,7 @@ static const keywords strvalues[]=
     {"OCELOT_GRID_FONT_WEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT},
     {"OCELOT_GRID_HEADER_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR},
     {"OCELOT_GRID_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT},
+    {"OCELOT_GRID_HTML_EFFECTS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HTML_EFFECTS},
     {"OCELOT_GRID_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT},
     {"OCELOT_GRID_OUTER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR},
     {"OCELOT_GRID_TABS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TABS},
@@ -2910,7 +2910,7 @@ extern int MENU_SETTINGS_FOR_GRID;
 extern int MENU_SETTINGS_FOR_STATEMENT;
 extern int MENU_SETTINGS_FOR_DEBUG;
 extern int MENU_SETTINGS_FOR_EXTRA_RULE_1;
-extern int MENU_PICK_NEW_FONT; /* obsolete -- since version 1.5 we don't call QFontDialog*/
+extern int MENU_GRID_HTML_EFFECTS; /* was for font dialog, but since version 1.5 we don't call QFontDialog*/
 
 extern unsigned int menu_off;
 
@@ -3054,6 +3054,7 @@ public:
   QString ocelot_grid_left, new_ocelot_grid_left;
   QString ocelot_grid_top, new_ocelot_grid_top;
   QString ocelot_grid_width, new_ocelot_grid_width;
+  QString ocelot_grid_html_effects, new_ocelot_grid_html_effects;
   QString ocelot_grid_detached, new_ocelot_grid_detached;
   QString ocelot_extra_rule_1_background_color, new_ocelot_extra_rule_1_background_color;
   QString ocelot_extra_rule_1_text_color, new_ocelot_extra_rule_1_text_color;
@@ -7000,25 +7001,6 @@ void display_batch()
 //  hide(); /* todo: I'm not sure whether this has a point while the kludges exist */
   //batch_text_edit->clear(); /* I'm sure this has a point while the kludges exist */
 
-  /*
-    Kludge #1: if I don't delete batch_text_edit and create it again, then after
-    ocelot_html=1; big select; ocelot_html=0; big select; ocelot_html=1;big select;
-    the horizontal scroll bar won't work.
-    KLudge #2: without the show() and hide()s here, if I said
-    SET ocelot_html=0; SELECT * FROM "_space"; SET ocelot_html=1; SELECT * FROM "_space";
-    the vertical scroll bar was absent. I wish I knew why doing this can fix it.
-    Kludge #3: with something other than SetMaximumSize later, this wil cause too-small window:
-    SET ocelot_html=0; SELECT 5; SET ocelot_html=1; SELECT * FROM "_space";
-    Kludge #4: If we don't break off early when row count or column count = 0, we will crash.
-    But by doing so, we fail to add html or xml markup and we don't allow for message translation.
-    I don't bother to say batch_text_edit_hide() so this->show() makes it visible, momentarily.
-    I think batch_text_edit won't have trouble with paint events because it is an ordinary QTextEdit.
-  */
-//  this->show();
-//  client->show();
-//  client->hide();
-//  this->hide();
-
   grid_vertical_scroll_bar->setVisible(false);
 
   if ((result_row_count == 0) || (result_column_count == 0))
@@ -7257,8 +7239,8 @@ void display(int due_to,
              unsigned short ocelot_result_grid_column_names)
 {
   (void)due_to;
-  /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
 #ifdef OLD_STUFF
+  /* Some child widgets e.g. text_edit_frames[n] must not be visible because they'd receive paint events too soon. */
   hide();
 #endif
 //  if ((due_to == 0) || (due_to == 1))
@@ -7727,7 +7709,7 @@ QString get_border_color()
   This was working okay with "if (h < 0 h= 1;" and "width=0" but sometimes the result was blank or too high.
   Todo: We account for this when allocating tmp size but should record exact calculated size.
   Todo: If it works, we can use it to force height iff it's greater.
-  Todo: instead of h= 5 we should say h= minimum height, whatever that is.
+  Todo: instead of h= 5 we should say h= minimum height, whatever that is. Maybe FONT_SIZE_MIN.
 */
 int thin_image(char *tmp_pointer, const char *th_or_td, int height)
 {
@@ -8077,7 +8059,8 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
 }
 
 /*
-  Todo: ensure this isn't called for some irrelevant vertical scroll bar event.
+  Todo: Ensure this isn't called for some irrelevant vertical scroll bar event.
+        It seems that we're calling display_html multiple times, not once per select, find out why.
   Todo: We're calculating char[] size in advance and using strcpy() or memcpy().
         It would be lots simpler and safer to use a QString, but might be slower.
   Todo: Figure out how many rows you can fit. Straightforward but time-consuming. Mostly finished.
@@ -11319,6 +11302,11 @@ private:
   QComboBox *combo_box_for_detached;
   QHBoxLayout *hbox_layout_for_detached;
 
+  QWidget *widget_for_html_effects;
+  QLabel *label_for_html_effects;
+  QComboBox *combo_box_for_html_effects;
+  QHBoxLayout *hbox_layout_for_html_effects;
+
   QWidget *widget_for_top, *widget_for_left, *widget_for_width, *widget_for_height;
   QLabel *label_for_top, *label_for_left, *label_for_width, *label_for_height;
   QComboBox *combo_box_for_top, *combo_box_for_left, *combo_box_for_width, *combo_box_for_height;
@@ -11676,6 +11664,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_grid_left= copy_of_parent->ocelot_grid_left;
   copy_of_parent->new_ocelot_grid_top= copy_of_parent->ocelot_grid_top;
   copy_of_parent->new_ocelot_grid_width= copy_of_parent->ocelot_grid_width;
+  copy_of_parent->new_ocelot_grid_html_effects= copy_of_parent->ocelot_grid_html_effects;
   copy_of_parent->new_ocelot_grid_detached= copy_of_parent->ocelot_grid_detached;
 
   copy_of_parent->new_ocelot_extra_rule_1_text_color= copy_of_parent->ocelot_extra_rule_1_text_color;
@@ -11943,6 +11932,21 @@ if (current_widget != DEBUG_WIDGET)
 
   }
 }
+if (current_widget == GRID_WIDGET)
+{
+  QString current_value;
+  widget_for_html_effects= new QWidget(this);
+  label_for_html_effects= new QLabel(menu_strings[menu_off + MENU_GRID_HTML_EFFECTS]);
+  combo_box_for_html_effects= new QComboBox();
+  current_value= copy_of_parent->ocelot_grid_html_effects;
+  combo_box_filler(&combo_box_for_html_effects, current_value, true);
+  hbox_layout_for_html_effects= new QHBoxLayout();
+  hbox_layout_for_html_effects->addWidget(label_for_html_effects);
+  hbox_layout_for_html_effects->addWidget(combo_box_for_html_effects);
+  widget_for_html_effects->setLayout(hbox_layout_for_html_effects);
+  connect(combo_box_for_html_effects, SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_html_effects(int)));
+}
+
   if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET)
    || (current_widget == STATEMENT_WIDGET) || (current_widget == DEBUG_WIDGET))
   {
@@ -12120,6 +12124,10 @@ if (current_widget != DEBUG_WIDGET)
     if (current_widget == GRID_WIDGET) for (int ci= 0; ci < 3; ++ci) main_layout->addWidget(widget_for_size[ci]);
     if (current_widget == HISTORY_WIDGET)
       main_layout->addWidget(widget_for_max_row_count);
+  }
+  if (current_widget == GRID_WIDGET)
+  {
+    main_layout->addWidget(widget_for_html_effects);
   }
   if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET)
    || (current_widget == STATEMENT_WIDGET) || (current_widget == DEBUG_WIDGET))
@@ -12332,50 +12340,42 @@ void handle_combo_box_1(int i)
   {
     color_type= menu_strings[menu_off + MENU_STATEMENT_PROMPT_BACKGROUND_COLOR]; /* necessary even though set_widget_values() does it */
     label_for_color[7]->setText(color_type);
-    for (ci= 2; ci < 11 ; ++ci)
-    {
-      label_for_color[ci]->show();
-      label_for_color_rgb[ci]->show();
-      label_for_color_show[ci]->show();
-      combo_box_for_color_pick[ci]->show();
-    }
+//    for (ci= 2; ci < 11 ; ++ci)
+//    {
+//      label_for_color[ci]->show();
+//      label_for_color_rgb[ci]->show();
+//      label_for_color_show[ci]->show();
+//      combo_box_for_color_pick[ci]->show();
+//    }
   }
 
+  /*
+    This is a change for version 1.5.
+    Instead of hiding/showing color components, we assume show() and remove widgets that have the components
+    i.e. label_for_color[] label_for_color_rgb[] label_for_color_show[] combo_box_for_color_pick[] aren't
+    addressed by the box they are in -- widget_for_color[] -- goes out if main_layout if it's not needed.
+  */
   if (i == GRID_WIDGET)
   {
     color_type= menu_strings[menu_off + MENU_GRID_HEADER_BACKGROUND_COLOR];  /* necessary even though set_widget_values() does it */
     label_for_color[7]->setText(color_type);
-    for (ci= 4; ci < 7; ++ci)
-    {
-      label_for_color[ci]->hide();
-      label_for_color_rgb[ci]->hide();
-      label_for_color_show[ci]->hide();
-      combo_box_for_color_pick[ci]->hide();
-    }
-    for (ci= 7; ci < 8; ++ci)
-    {
-      label_for_color[ci]->show();
-      label_for_color_rgb[ci]->show();
-      label_for_color_show[ci]->show();
-      combo_box_for_color_pick[ci]->show();
-    }
-    label_for_color[9]->hide();
-    label_for_color_rgb[9]->hide();
-    label_for_color_show[9]->hide();
-    combo_box_for_color_pick[9]->hide();
-    label_for_color[10]->hide();
-    label_for_color_rgb[10]->hide();
-    label_for_color_show[10]->hide();
-    combo_box_for_color_pick[10]->hide();
+    widget_for_color[4]->hide();
+    widget_for_color[5]->hide();
+    widget_for_color[6]->hide();
+    widget_for_color[9]->hide();
+    widget_for_color[10]->hide();
+    main_layout->removeWidget(widget_for_color[4]);
+    main_layout->removeWidget(widget_for_color[5]);
+    main_layout->removeWidget(widget_for_color[6]);
+    main_layout->removeWidget(widget_for_color[9]);
+    main_layout->removeWidget(widget_for_color[10]);
   }
   if (i == EXTRA_RULE_1)
   {
     for (ci= 2; ci < 11; ++ci)
     {
-      label_for_color[ci]->hide();
-      label_for_color_rgb[ci]->hide();
-      label_for_color_show[ci]->hide();
-      combo_box_for_color_pick[ci]->hide();
+      widget_for_color[ci]->hide();
+      main_layout->removeWidget(widget_for_color[ci]);
     }
     widget_font_label->hide();
     label_for_font_dialog->hide();
@@ -12385,24 +12385,24 @@ void handle_combo_box_1(int i)
   }
   if ((i == HISTORY_WIDGET) || (i == MAIN_WIDGET))
   {
-    for (ci= 2; ci < 8; ++ci)
-    {
-      label_for_color[ci]->hide();
-      label_for_color_rgb[ci]->hide();
-      label_for_color_show[ci]->hide();
-      combo_box_for_color_pick[ci]->hide();
-    }
-    label_for_color[9]->hide();
-    label_for_color_rgb[9]->hide();
-    label_for_color_show[9]->hide();
-    combo_box_for_color_pick[9]->hide();
-    label_for_color[10]->hide();
-    label_for_color_rgb[10]->hide();
-    label_for_color_show[10]->hide();
-    combo_box_for_color_pick[10]->hide();
+    widget_for_color[2]->hide();
+    widget_for_color[3]->hide();
+    widget_for_color[4]->hide();
+    widget_for_color[5]->hide();
+    widget_for_color[6]->hide();
+    widget_for_color[7]->hide();
+    widget_for_color[9]->hide();
+    widget_for_color[10]->hide();
+    main_layout->removeWidget(widget_for_color[2]);
+    main_layout->removeWidget(widget_for_color[3]);
+    main_layout->removeWidget(widget_for_color[4]);
+    main_layout->removeWidget(widget_for_color[5]);
+    main_layout->removeWidget(widget_for_color[6]);
+    main_layout->removeWidget(widget_for_color[7]);
+    main_layout->removeWidget(widget_for_color[9]);
+    main_layout->removeWidget(widget_for_color[10]);
   }
 }
-
 
 void label_for_font_dialog_set_text()
 {
@@ -13006,6 +13006,12 @@ void handle_combo_box_for_detached(int item_number)
     copy_of_parent->new_ocelot_debug_detached= q;
 }
 
+void handle_combo_box_for_html_effects(int item_number)
+{
+  QString q= combo_box_for_detached->itemText(item_number);
+  copy_of_parent->new_ocelot_grid_html_effects= q;
+}
+
 void handle_combo_box_for_top(int item_number)
 {
   QString q= combo_box_for_top->itemText(item_number);
@@ -13279,7 +13285,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 125
+#define OCELOT_VARIABLES_SIZE 126
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
