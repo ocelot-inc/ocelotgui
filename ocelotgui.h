@@ -7998,6 +7998,7 @@ void prepare_for_display_html()
               ... see grid_row_heights[]
             + border-size * 2
             + 1 (mysteriously)
+            + 1 (mysteriously, and the same + 1 that we used to calculate row_height elsewhere)
   Todo: Look for conditional settings.
   Todo: call this for header too, if it's decided that header can be multi-line.
   Todo: Should also look for grid heights[]
@@ -8023,7 +8024,7 @@ int column_height(unsigned int grid_row, int column_no, int v_length, char *valu
   int column_width_in_chars= (grid_column_widths[column_no] / setting_max_width_of_a_char);
   int lines_in_cell= (v_length + (column_width_in_chars - 1)) / column_width_in_chars;
   if (lines_in_cell == 0) lines_in_cell= 1;
-  int this_column_height= (lines_in_cell * max_height_of_a_char) + (setting_ocelot_grid_cell_border_size_as_int * 2) + 1;
+  int this_column_height= (lines_in_cell * max_height_of_a_char) + (setting_ocelot_grid_cell_border_size_as_int * 2) + 1 + 1;
   if (this_column_height < (int) grid_row_heights[column_no]) this_column_height= grid_row_heights[column_no];
   return this_column_height;
 }
@@ -8034,6 +8035,7 @@ int column_height(unsigned int grid_row, int column_no, int v_length, char *valu
   height e.g. it's 23 if others are 21, which partly we can attribute to grid border size. So you see "- 4".
   Todo: maybe that's not always so, so do the size calculation as in cell_analyze() if you can.
   Re row_height: Again it's tooltip that shows I must have "+ 1 + 1" but I have no idea why.
+                 I do the same in the column_height() function.
   Todo: eventually row_height + max_display_rows won't need to be calculated at this stage.
   Todo: result_grid_height_after_last_resize can change in ways that might not be anticipated.
   We know that it is wrong for the first display. Todo: check what happens if it's minimized.
@@ -8138,9 +8140,12 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   unsigned int extra_for_div= 0;
   if (copy_of_parent->conditional_settings.count() > 0) extra_for_div= 22;
 
+  unsigned int grid_row= 0;
+
   if ((ocelot_result_grid_column_names_copy == 1)
    && (copy_of_ocelot_xml == 0))
   {
+    /* todo: do a max_column_height calculation as you do for detail rows */
     tmp_size+= strlen(ocelot_grid_header_row_start);
     result_field_names_pointer= &result_field_names[0];
     for (unsigned int i= 0; i < result_column_count; ++i)
@@ -8153,13 +8158,13 @@ void display_html(int new_grid_vertical_scroll_bar_value)
     }
     tmp_size+= strlen(ocelot_grid_header_row_end);
     max_column_heights_total= row_height;
+    ++grid_row;
   }
 
   tmp_size+= strlen(ocelot_grid_table_start);
 
   //for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
-  unsigned int grid_row;
-  for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
+  for (tmp_result_row_number= new_grid_vertical_scroll_bar_value;
        (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
   {
@@ -8183,10 +8188,9 @@ void display_html(int new_grid_vertical_scroll_bar_value)
     }
     tmp_size+= strlen(ocelot_grid_detail_row_end);
     max_column_heights_total+= max_column_height;
-
-    if ((max_column_heights_total + 10) > (unsigned int) max_display_height)
+    if ((max_column_heights_total) >= (unsigned int) max_display_height)
     {
-      /* Too many rows. There's no good justification for "+ 10" but it's harmless to display too few. */
+      /* Too many rows. There's no good justification for "+ 1" but it's harmless to display too few. */
       max_grid_rows= grid_row;
       if (max_grid_rows <= 0) max_grid_rows= 1;
       if ((max_grid_rows == 1) && (copy_of_ocelot_result_grid_column_names == 1)) max_grid_rows= 2;
@@ -8315,7 +8319,7 @@ void display_html(int new_grid_vertical_scroll_bar_value)
 /*
   When is_vertical == 1 we have one line per column: [optional column heading] column value.
   Todo: This is only when copy_of_ocelot_html != 0. But size calculation for xml is similar.
-  Todo: I think we're missing recent improvements in display_html(), e.g. re column_height().
+  Todo: We're missing recent improvements in display_html(), e.g. re column_height().
 */
 void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 {

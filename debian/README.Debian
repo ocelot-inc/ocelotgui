@@ -2,9 +2,8 @@ ocelotgui for Debian and any Linux distro that uses .deb packages
 
 The ocelotgui documentation is in README.htm. This file only has comments about .deb packages.
 
-In the official ocelotgui-1.0.7 release we created the .deb file with cpack (see the comments in CMakeLists.txt).
-In the official ocelotgui-1.0.9 release we switched to using debian/rules.
-Although some problems remain, we currently can create the .deb file and later can install the main componetns with
+We use debian/rules.
+Although some problems remain, we currently can create the .deb file and later can install the main components with
 sudo apt install [.deb file].
 These are example instructions.
 
@@ -13,15 +12,15 @@ The ocelotgui source package includes a script deb_build.sh which builds a .deb 
 # Get the prerequisites for build: apt-get install git cmake g++ default-libmysqlclient-dev qtbase5-dev
 # Get the prerequisites for debuild:  apt-get install devscripts build-essential lintian
 
-# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.4.0.tar.gz.
+# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.5.0.tar.gz.
 # (Internally Peter Gulutzan has a script for "Making a package" but we do not supply it, you must make your own tar.gz.) 
-# (Since release 1.0.9, you're able to simply download ocelotgui-1.4.0.tar.gz from the github release files.)
+# (Since release 1.0.9, you're able to simply download ocelotgui-1.5.0.tar.gz from the github release files.)
 cd ~
 rm -r -f ~/debian2
 mkdir ~/debian2
 cd ~/debian2
-cp ~/ocelotgui-1.4.0.tar.gz ocelotgui_1.4.0.orig.tar.gz
-tar -xvf ocelotgui_1.4.0.orig.tar.gz
+cp ~/ocelotgui-1.5.0.tar.gz ocelotgui_1.5.0.orig.tar.gz
+tar -xvf ocelotgui_1.5.0.orig.tar.gz
 cd ./ocelotgui/debian
 debuild
 
@@ -30,27 +29,36 @@ dpkg-genchanges: info: including full source code in upload ... but source isn't
 .png files were subjected to normalizing by "dh_strip_nondeterminism"
 
 # Lintian results
-After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.4.0_amd64.deb":
-  There are no errors. There are no warnings. There are no informative messages. Hurrah.
-On some distros, after "debuild" and after "lintian -I ocelotgui_1.4.0-1_amd64.changes":
+After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.5.0_amd64.deb":
+  When we build: There are no errors. There are no warnings. There are no informative messages. Hurrah.
+But it depends on what the distro's version is. We deliberately build on an old version.
+This is how to get rid of warnings or informative messages that might appear on newer distros.
   I: ocelotgui source: ored-build-depends-on-obsolete-package build-depends: libmysqlclient-dev => default-libmysqlclient-dev
-  I: ocelotgui source: out-of-date-standards-version 3.9.7 (released 2016-02-01) (current is 4.1.4)
+  ... Edit debian/control line default-libmysqlclient-dev | libmariadbclient-dev | libmysqlclient-dev
+  ... Change to default-libmysqlclient-dev
+  I or W: ocelotgui source: out-of-date-standards-version 3.9.7 (or ancient standards-version 3.9.7)
+  ... Edit debian/control line Standards-Version: 3.9.7
+  ... Change to 4.0.1 or later
   I: ocelotgui source: testsuite-autopkgtest-missing
-  These are not warnings they are informative.
-  The first one means prefer default-libmysqlclient-dev, but we already do so.
-  The second one means change standards-version, but we deliberately build on Ubuntu 16, not the latest.
-  The third one means a test would be good, but we'd have to install a server to connect to.
-On some distros, there was one other note: that our documentation size is large.
-  This happens because our documentation contains pictures in .png and .jpg files.
-  We do not expect users to depend on man for documentation, we want them to see pictures for README.htm.
-  However, recently we used pngquant to compress .png files and jpegoptim to compress .jpg files.
-  So the warning will not happen any more.
-lintian will warn about permissions if you are not root, which we work around by being root.
+  ... There is no testsuite, we'd have to install a server to connect to.
+  I or W: package-uses-deprecated-debhelper-compat-version 9
+  ... Edit debian/compat
+  ... Change to 10 or later
+  I: spelling-error-in-binary usr/bin/ocelotgui ...
+  ... False positive. Checked with "strings ocelotgui | grep ...". The error-message string is not in ocelotgui.
+  [A note that our documentation size is large]
+  ...  This happens because our documentation contains pictures in .png and .jpg files.
+  ... We do not expect users to depend on man for documentation, we want them to see pictures for README.htm.
+  ... However, recently we used pngquant to compress .png files and jpegoptim to compress .jpg files.
+  ... So the warning should not happen any more.
+  [A warning that you are not root]
+  ... We work around this by being root.
 
 # Contents of debian/control
 "Source ... Build-Depends":
     Since Qt4 has passed end of life, we nowadays only build with Qt5.
     Users who prefer Qt4 should change qtbase5-dev to libqt4-dev and libqt4-dev-tools.
+    (Qt6 is not listed yet but will work, see comments in CMakeLists.txt.)
     Although we first look for default-libmysqlclient-dev, in debian/rules we look for
     libmariadbclient-dev | libmysqlclient-dev, the difference shouldn't have significant effect.
     Todo: I've seen "libmariadbclient18 (>= ${binary:Version})", try that out someday

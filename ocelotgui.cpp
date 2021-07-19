@@ -1,8 +1,8 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 1.4.0
-   Last modified: July 8 2021
+   Version: 1.5.0
+   Last modified: July 19 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -411,7 +411,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.4.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.5.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -4779,7 +4779,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.4.0, March 19 2021  \
+  <BR>Version 1.5.0, July 19 2021  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2021 by Peter Gulutzan. All rights reserved.  \
@@ -4883,7 +4883,7 @@ void MainWindow::action_settings()
   CHANGING COLORS<br>\
   For example, to change the statement background color to dark blue:<br>\
   * Click the menu item Settings<br>\
-    then click Statement Widget: Colors and Fonts<br>\
+    then click Statement Widget<br>\
     then click the box on the right of the Statement Background Color line<br>\
     then click on the word 'DarkBlue' in the list of choices<br>\
     then click OK to confirm<br>\
@@ -4902,12 +4902,11 @@ void MainWindow::action_settings()
   <br>\
   <br>\
   CHANGING FONTS<br>\
-  For example, to change the menu font to bold italic:<br>\
+  For example, to change the menu font to italic:<br>\
   * Click the menu item Settings<br>\
-    then click Menu: Colors and Fonts<br>\
-    then click the Pick New Font button<br>\
-    then under the label Style: scroll to Italic<br>\
-    then click OK<br>\
+    then click Menu<br>\
+    then click the Font box <br>\
+    then scroll to and click on an italic choice<br>\
     then click OK to confirm<br>\
   * Or, Start ocelotgui with a parameter:<br>\
     ocelotgui --ocelot_menu_font_style='italic'<br>\

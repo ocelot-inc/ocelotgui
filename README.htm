@@ -1,7 +1,7 @@
 
 ocelotgui
 
-<P>Version 1.4.0</P>
+<P>Version 1.5.0</P>
 
 <P>The ocelotgui GUI, a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -77,7 +77,7 @@ The Qt version number can be found with <i>find /usr/lib -name "libQt*Gui.so*"</
 If the response starts with libQtGui.so.4 then you have Qt4,
 if the response starts with libQt5Gui.so.5 then you have Qt5.
 Alternatively it sometimes can be found with qmake -v.
-Peter Gulutzan supplies executables only for Qt version 5, but if you have Qt version 4 you can build from source.
+Peter Gulutzan supplies executables only for Qt version 5, but if you have Qt version 4 or Qt version 6 you can build from source.
 </P>
 
 <P>The Qt library is necessary for ocelotgui installation.</P>
@@ -118,21 +118,21 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui_1.4.0-1_i386.deb
-sudo apt install ./ocelotgui_1.4.0-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui_1.5.0-1_i386.deb
+sudo apt install ./ocelotgui_1.5.0-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui_1.4.0-1_amd64.deb
-sudo apt install ./ocelotgui_1.4.0-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui_1.5.0-1_amd64.deb
+sudo apt install ./ocelotgui_1.5.0-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui-1.4.0-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.4.0-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui-1.5.0-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.5.0-1.x86_64.rpm</PRE>
 For 64-bit, any Linux, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui-1.4.0.tar.gz
-tar zxvf ocelotgui-1.4.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui-1.5.0.tar.gz
+tar zxvf ocelotgui-1.5.0.tar.gz
 ocelotgui/ocelotgui-qt5</PRE>
 For 64-bit, any Linux, Qt4 (deprecated)<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui-1.4.0.tar.gz
-tar zxvf ocelotgui-1.4.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui-1.5.0.tar.gz
+tar zxvf ocelotgui-1.5.0.tar.gz
 ocelotgui/ocelotgui-qt4</PRE>
 </P>
 
@@ -166,7 +166,7 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.4.0, March 19 2021</P>
+<P>Version 1.5.0, July 19 2021</P>
 
 <P>Copyright (c) 2021 by Peter Gulutzan. All rights reserved.</P>
   
@@ -363,7 +363,7 @@ The width of the column depends on the result set's definition,
 but extremely wide columns will be split onto multiple lines.
 That is, one result-set row may take up to five lines.  
 If the data still is too wide or too tall to fit in the cell,
-then the cell will get a vertical scroll bar. The user can
+then the row will get a vertical scroll bar. The user can
 change the width of a column by dragging the column's right
 border to the right to make the column wider, or to the left
 to make it narrower.  
@@ -431,8 +431,7 @@ items which affect the behavior of each
 individual widget. The color settings affect foregrounds,
 backgrounds, borders, and (for the statement widget only)
 the syntax highlights. The font settings affect font family,
-boldness, italics, and size. Font settings
-involve further dialog boxes which are standard with Qt.
+boldness, italics, and size.
 There may be additional choices affecting appearance,
 for example the width of the border used to drag columns
 in the result widget.
@@ -563,7 +562,7 @@ Hitting the Tab key will cause the first word in the list to be
 displayed and accepted.
 Users can use arrow keys to select other words,
 and can use "set ocelot_shortcut_autocomplete='...'; to choose a different key instead of the Tab key,
-and can use "set ocelot_completer_timeout=...'; to choose how many many seconds the list will be visible,
+and can use "set ocelot_completer_timeout=...'; to choose how many seconds the list will be visible,
 and can use "rehash;" to update the list.<br>
 <A href="completer_1.png"><img src="completer_1.png" alt="completer_1.png" height="128" width="256"></A><br>
 <A href="completer_2.png"><img src="completer_2.png" alt="completer_2.png" height="128" width="256"></A><br>
@@ -604,7 +603,8 @@ item is COLUMN_NAME | COLUMN_NUMBER | COLUMN_TYPE | ROW_NUMBER | VALUE,<br>
 and comparison-operator is = | > | >= | < | <= | <> | IS | REGEXP.<br>
 For example to say "I want the background color to be pink if
 it's in the fourth column of the result set and it's NULL", say<br>
-SET ocelot_grid_background_color='pink' WHERE column_number = 4 AND value IS NULL;".</P>
+SET ocelot_grid_background_color='pink' WHERE column_number = 4 AND value IS NULL;
+</P>
 
 
 <P>RE: DEBUGGING WITH MYSQL 5.7. Oracle has made a significant
@@ -918,9 +918,9 @@ containing the string "select" will not be written.
 
 <tr>
 <td valign="top">html</td>
-<td valign="top">If one starts ocelotgui with --html, the grid display
-will be based on HTML rather than on widgets, making results
-look quite different. If one starts ocelotgui with --html --raw,
+<td valign="top">Internally formats are HTML anyway even if one says
+html=0, unless one starts with one of the non-HTML options such as
+batch or xml. If one starts ocelotgui with --html --raw,
 the actual html markup code will appear.</td>
 </tr>
 
@@ -988,11 +988,21 @@ associated option name. The intuitively-named settings options are:
 ocelot_extra_rule_1_text_color ocelot_extra_rule_1_background_color
 ocelot_extra_rule_1_condition ocelot_extra_rule_1_display_as
 ocelot_grid_text_color ocelot_grid_background_color
-ocelot_grid_border_color ocelot_grid_header_background_color
-ocelot_grid_font_size ocelot_grid_font_style
+ocelot_grid_header_background_color
+ocelot_grid_font_family ocelot_grid_font_size ocelot_grid_font_style
 ocelot_grid_font_weight ocelot_grid_cell_border_color
-ocelot_grid_cell_drag_line_color ocelot_grid_border_size
-ocelot_grid_cell_border_size ocelot_grid_cell_drag_line_size ocelot_grid_detached
+ocelot_grid_cell_border_size ocelot_grid_detached
+ocelot_grid_html_settings
+ocelot_grid_left
+ocelot_grid_top
+ocelot_grid_width
+ocelot_grid_height
+ocelot_grid_focus_cell_background_color
+ocelot_grid_outer_color
+ocelot_grid_cell_height
+ocelot_grid_cell_width
+ocelot_grid_tabs
+ocelot_grid_tooltip
 ocelot_history_text_color ocelot_history_background_color
 ocelot_history_border_color ocelot_history_font_family
 ocelot_history_font_size ocelot_history_font_style
@@ -1745,7 +1755,7 @@ For a more current version, download from github.com/tarantool/tarantool<br>
 and build from source as instructed in the Tarantool manual.</P>
 
 <P>Usually you do not need to install the Tarantool client (libtarantool.so) library,
-but it is possible to use it if you build ocelotgui with "cmake -DOCELOT_THIRD_PARTY=0".
+but it is possible to use it if you build ocelotgui with "cmake ... -DOCELOT_THIRD_PARTY=0".
 If you did that, then this is how to get tarantool.so.
 The tarantool-dev package does not have it any more.
 Clone and follow the instructions at
@@ -1777,7 +1787,7 @@ On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.</P>
 
 <P>You need the latest ocelotgui client.
-The Release 1.4.0 version is okay at the time of release,
+The Release 1.5.0 version is okay at the time of release,
 but some things might not be up to date.
 It may be better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.</P>
@@ -1806,11 +1816,7 @@ UPDATE test1 set s2 = s2 || '!';
 SELECT * FROM test1;</pre>
 You'll see the usual hints appearing as you type.
 You'll see the usual grid display when you type
-Enter, or control-E.
-(By the way, if you prefer the HTML-based grid
-display, start ocelotgui with the additional
-option --html. It will look quite different.
-But you can't drag and resize with --html.)</P>
+Enter, or control-E.</P>
 
 <P>Now type any other SQL statements, as described
 in the Tarantool manual.
@@ -1818,13 +1824,13 @@ The <A href="https://www.tarantool.io/en/doc/2.4/tutorials/sql_tutorial/">tutori
 work.)</P>
 
 <P>Now type<br>
-LUA 'return box.space._index:select()';<br>
+LUA 'return box.space._vindex:select()';<br>
 or simply<br>
-return box.space._index:select();<br>
+return box.space._vindex:select();<br>
 This will evaluate the expression, without SQL.
 The expression must return a result set.
 The result will be tabular (rows and columns),
-even though box.space._index was created with NoSQL.</P>
+even though box.space._vindex was created with NoSQL.</P>
 
 <P>Bonus feature: A client statement,<br>
 CREATE SERVER id ... OPTIONS (PORT ..., HOST ..., USER ..., PASSWORD ...);<br>
@@ -1851,14 +1857,14 @@ the CREATE TABLE statement will fail.<br>
 Example:<pre>
   On #1 (server/lua):
   box.cfg{listen=3301}
-  box.schema.user.grant('guest','read,write,execute','universe')
-  box.sql.execute([[create table a (s1 int primary key, s2 varchar);]])
-  box.sql.execute([[insert into a values (1,'wombat');]])
+  box.schema.user.grant('guest','read,write,create,execute','universe')
+  box.execute([[create table a (s1 int primary key, s2 varchar(15));]])
+  box.execute([[insert into a values (1,'wombat');]])
   On #2 (server/lua)
   box.cfg{listen=3302}
-  box.schema.user.grant('guest','read,write,execute','universe')
-  box.sql.execute([[CREATE TABLE t2 (x1 INT PRIMARY key, x2 VARCHAR);]])
-  box.sql.execute([[INSERT INTO t2 VALUES (0, 'Hi!');]])
+  box.schema.user.grant('guest','read,write,create,execute','universe')
+  box.execute([[CREATE TABLE t2 (x1 INT PRIMARY key, x2 VARCHAR(15));]])
+  box.execute([[INSERT INTO t2 VALUES (0, 'Hi!');]])
   On ocelotgui connection:
   CREATE SERVER id FOREIGN DATA WRAPPER ocelot_tarantool OPTIONS (PORT 3302, HOST 'localhost', USER 'guest');
   CREATE TABLE y4 SERVER id LUA 'return box.space._space:select()';
@@ -1899,11 +1905,7 @@ SET ocelot_extra_rule_1_condition = 'data_type LIKE ''%BLOB''';
 SELECT * FROM "timages";
 
 Alternative: (details are left to the reader's imagination) We could instead use:
-function f() return 5 end;
-box.internal.sql_create_function("f",f,0);
-CREATE TABLE test (s1 INT PRIMARY KEY);
-INSERT INTO test VALUES (f());
-SELECT s1, s1 * f() FROM test;
+<a href="https://www.tarantool.io/en/doc/latest/reference/reference_sql/sql_plus_lua/#calling-lua-routines-from-sql">a Lua function</a>.
 </pre>
 
 <P>
@@ -1946,11 +1948,11 @@ How to get it:<br>
 * Download the ocelotgui zip file from github.
   Check https://github.com/ocelot-inc/ocelotgui/blob/master/README.md
   to see where the latest release is. For example it might be
-  https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui-1.4.0-1.ocelotgui.zip<br>
+  https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui-1.5.0-1.ocelotgui.zip<br>
 * Unzip. It was zipped with 7-zip from http://www.7-zip.org,
   but other utilities should work. For example, on Windows command prompt,
   if you have the PowerShell utility on your path:
-  PowerShell Expand-Archive ocelotgui-1.4.0-1.ocelotgui.zip c:\ocelotgui<br>
+  PowerShell Expand-Archive ocelotgui-1.5.0-1.ocelotgui.zip c:\ocelotgui<br>
 * Read the COPYING and LICENSE arrangements.
   On Windows ocelotgui is statically linked to Qt and MariaDB libraries,
   so the copyright and licensing is not the same as for Linux.<br>
@@ -2203,7 +2205,7 @@ copy release\ocelotgui.exe ocelotgui.exe
 del ocelotui.zip
 "C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf             ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png
 
-: What we actually put in the release looks like ocelotgui-1.4.0-1.ocelotgui.zip, so rename the .zip file at some point.
+: What we actually put in the release looks like ocelotgui-1.5.0-1.ocelotgui.zip, so rename the .zip file at some point.
 
 
 : (Dynamic linking)
@@ -2281,18 +2283,19 @@ A release file is highlighted in green
 by github and is named ocelotgui-[version].tar.gz.
 Since version 1.0.9, there is also a release file named ocelotgui_[version].orig.tar.gz
 which is preferable because it does not contain unnecessary executables.
-Thus release 1.4.0 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui_1.4.0.orig.tar.gz.
+Thus release 1.5.0 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui_1.5.0.orig.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.4.0/ocelotgui_1.4.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.5.0/ocelotgui_1.5.0.orig.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui_1.4.0.orig.tar.gz.</P>
+and click ocelotgui_1.5.0.orig.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
- sudo apt-get install gcc cmake make
+ sudo apt-get install build-essential gcc cmake make
+ #It is possible to say libmariadbclient-dev instead of libmysqlclient-dev
  sudo apt-get install libmysqlclient-dev
  #Do the following if and only if build is for use with Qt4
  sudo apt-get install qt4-dev-tools
@@ -2319,12 +2322,12 @@ sudo pacman -S cmake
 sudo pacman -S mariadb-clients</PRE</P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui_1.4.0.orig.tar.gz
- cd ocelotgui-1.4.0</PRE>
+ tar -zxvf ocelotgui_1.5.0.orig.tar.gz
+ cd ocelotgui-1.5.0</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
-MYSQL_INCLUDE_DIR, WITH_QT4, OCELOT_THIRD_PARTY.
+MYSQL_INCLUDE_DIR, WITH_QT4, OCELOT_THIRD_PARTY, QT_VERSION.
 For explanation of these flags, read the comments
 in the CMakeLists.txt file.
 If no customizing is necessary,
@@ -2344,12 +2347,12 @@ Peter Gulutzan provides scripts that will create .deb or .rpm packages.
 Please read the comments in the scripts before using them.
 For Debian-like platforms say<PRE>
  ./deb_build.sh
- sudo apt install /tmp/debian3/ocelotgui_1.4.0-1_amd64.deb
- #or sudo apt install /tmp/debian3/ocelotgui_1.4.0-1_i386.deb</PRE>
+ sudo apt install /tmp/debian3/ocelotgui_1.5.0-1_amd64.deb
+ #or sudo apt install /tmp/debian3/ocelotgui_1.5.0-1_i386.deb</PRE>
 For RPM-like platforms say<PRE>
  ./rpm_build.sh
- sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.4.0-1.x86_64.rpm
- #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.4.0-1.i686.rpm</PRE>
+ sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.5.0-1.x86_64.rpm
+ #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.5.0-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
 </P>

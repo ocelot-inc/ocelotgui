@@ -11,7 +11,6 @@ ocelot_grid_font_size=11
 ocelot_grid_font_style='Normal'
 ocelot_grid_font_weight='Bold'
 ocelot_grid_cell_border_color='Honeydew'
-ocelot_grid_cell_drag_line_color='HotPink'
 ocelot_grid_cell_border_size=4
 ocelot_grid_detached='no'
 ocelot_grid_left='default'

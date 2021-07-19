@@ -1,10 +1,16 @@
+ocelotgui (1.5.0-1) UNRELEASED; urgency=low
+
+  * Rewrite of result grid code
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Mon, 19 Jul 2021 12:00:00 -0600
+
 ocelotgui (1.4.0-1) UNRELEASED; urgency=low
 
   * Better handling of history files
 
  -- Peter Gulutzan <pgulutzan@ocelot.ca>  Fri, 19 Mar 2021 12:00:00 -0600
 
- ocelotgui (1.3.0-1) UNRELEASED; urgency=low
+ocelotgui (1.3.0-1) UNRELEASED; urgency=low
 
   * Conditional settings
 
