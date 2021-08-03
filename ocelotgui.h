@@ -32,6 +32,11 @@
 #define OCELOT_FIND_WIDGET 1
 #endif
 
+/* To remove most of the code related to SET ocelot_import|ocelot_export, set OCELOT_IMPORT_EXPORT 0 */
+#ifndef OCELOT_IMPORT_EXPORT
+#define OCELOT_IMPORT_EXPORT 1
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -759,6 +764,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_DEBUG_LEFT,
     TOKEN_KEYWORD_OCELOT_DEBUG_TOP,
     TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH,
+    TOKEN_KEYWORD_OCELOT_EXPORT, /* if OCELOT_IMPORT_EXPORT == 1 */
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS,
@@ -804,6 +810,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_HORIZONTAL,
     TOKEN_KEYWORD_OCELOT_HTML,
     TOKEN_KEYWORD_OCELOT_HTMLRAW,
+    TOKEN_KEYWORD_OCELOT_IMPORT, /* if OCELOT_IMPORT_EXPORT == 1 */
     TOKEN_KEYWORD_OCELOT_LANGUAGE,
     TOKEN_KEYWORD_OCELOT_LOG_LEVEL,
     TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR,
@@ -1401,7 +1408,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1171
+#define KEYWORD_LIST_SIZE 1173
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1997,6 +2004,7 @@ static const keywords strvalues[]=
     {"OCELOT_DEBUG_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT},
     {"OCELOT_DEBUG_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP},
     {"OCELOT_DEBUG_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH},
+    {"OCELOT_EXPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */
     {"OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR},
     {"OCELOT_EXTRA_RULE_1_CONDITION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION},
     {"OCELOT_EXTRA_RULE_1_DISPLAY_AS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS},
@@ -2042,6 +2050,7 @@ static const keywords strvalues[]=
     {"OCELOT_HORIZONTAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HORIZONTAL},
     {"OCELOT_HTML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTML},
     {"OCELOT_HTMLRAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW},
+    {"OCELOT_IMPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_IMPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */
     {"OCELOT_LANGUAGE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {"OCELOT_LOG_LEVEL", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
     {"OCELOT_MENU_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
@@ -3023,6 +3032,9 @@ public:
   QString ocelot_statement_format_statement_indent;
   QString ocelot_statement_format_clause_indent;
   QString ocelot_statement_format_rule;
+#if (OCELOT_IMPORT_EXPORT)
+  QString ocelot_import_export_rule;
+#endif
   QString ocelot_statement_height, new_ocelot_statement_height;
   QString ocelot_statement_left, new_ocelot_statement_left;
   QString ocelot_statement_top, new_ocelot_statement_top;
@@ -3379,6 +3391,9 @@ public:
   bool hparse_f_is_rehash_searchable();
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
+#if (OCELOT_IMPORT_EXPORT == 1)
+  int hparse_f_client_set_import_export();
+#endif
   int hparse_f_client_set_rule();
   bool hparse_pick_from_list(QStringList);
   int hparse_f_client_set();
@@ -3460,6 +3475,9 @@ public slots:
   void statement_edit_widget_formatter();
   int statement_format_rule_set(QString text);
   QString statement_format_rule_apply(QString, int, unsigned char, unsigned int, int*, int*, int*);
+#if (OCELOT_IMPORT_EXPORT == 1)
+  int import_export_rule_set(QString text);
+#endif
   void action_change_one_setting(QString old_setting, QString new_setting, int keyword_index);
   void action_menu();
   void action_history();

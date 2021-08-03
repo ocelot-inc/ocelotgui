@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: July 19 2021
+   Last modified: August 2 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -220,7 +220,7 @@
 #define STRING_LENGTH_512 512
 
 /* MAX_HPARSE_ERRMSG_LENGTH should be enough for all keywords that begin with "OCELOT_" */
-#define MAX_HPARSE_ERRMSG_LENGTH 3720
+#define MAX_HPARSE_ERRMSG_LENGTH 3750
 
 /* Connect arguments and options */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
@@ -645,6 +645,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_format_statement_indent= "2";
   ocelot_statement_format_clause_indent= "4";
   ocelot_statement_format_rule= "keyword becomes keyword-upper;";
+#if (OCELOT_IMPORT_EXPORT == 1)
+  ocelot_import_export_rule= "";
+#endif
   ocelot_statement_height= ocelot_statement_left= ocelot_statement_top= ocelot_statement_width= "default";
   ocelot_statement_detached= "no";
 
@@ -1243,6 +1246,39 @@ int MainWindow::statement_format_rule_set(QString text)
     if (main_token_types[i] == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
     {
       ocelot_statement_format_rule= text.mid(main_token_offsets[i + 1]);
+    }
+  }
+  return ER_OK;
+}
+
+/*
+1. Allow SET ocelot_export [NULL | same-as-local-infile]
+   + allow --ocelot_export? or can you do that as an initial statement?
+   Example: SET ocelot_export FIELDS TERMINATED BY ',' COLUMNS TERMINATED BY '\n';
+   Maybe SET ocelot_export = ? i.e. should we have an = sign?
+2. Make Setting|export which causes generation of SET ocelot_export
+3. For SELECT, as well as history and result set, dump to file if ocelot_export is not NULL
+   erase after every SELECT
+   temporary file is okay, add name in warning message
+   do not do it if SELECT has an INTO OUTFILE clause
+4. Not just CSV. Also yaml, lua, html-4, SQL INSERT statements (if they're single-table)
+5. Figure out how to export binary
+6. Maybe this optionally can replace the result set, instead of being a supplementary
+7. Maybe SET ocelot_export causes immediate dump of current result set, but that's all
+8. Maybe INTO OUTFILE ocelot_export instead of all the other clauses
+  Todo: Something more specific than ER_ERROR. We'll need a change in ostrings.h then.
+  Todo: "rows affected" message for export.
+*/
+int MainWindow::import_export_rule_set(QString text)
+{
+  //if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return ER_ERROR;
+  int i;
+  for (i= 0; main_token_lengths[i] != 0; ++i)
+  {
+    if ((main_token_types[i] == TOKEN_KEYWORD_OCELOT_IMPORT)
+     || (main_token_types[i] == TOKEN_KEYWORD_OCELOT_EXPORT))
+    {
+      ocelot_import_export_rule= text.mid(main_token_offsets[i + 1]);
     }
   }
   return ER_OK;
@@ -10487,6 +10523,15 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(er, 0, (char*)"");
         return 1;
       }
+#if (OCELOT_IMPORT_EXPORT == 1)
+      if ((sub_token_types[1] == TOKEN_KEYWORD_OCELOT_IMPORT)
+       || (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_EXPORT))
+      {
+        int er= import_export_rule_set(text);
+        make_and_put_message_in_result(er, 0, (char*)"");
+        return 1;
+      }
+#endif
       // todo: I think we won't get here if name doesn't start with ocelot_, but maybe make sure again
       if ((sub_token_types[4] == TOKEN_KEYWORD_WHERE) || (text.mid(sub_token_offsets[4], sub_token_lengths[4]) == ","))
       {
@@ -12204,7 +12249,7 @@ void MainWindow::initial_asserts()
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 126);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 128);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
