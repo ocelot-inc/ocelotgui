@@ -264,6 +264,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_BOOL,
     TOKEN_KEYWORD_BOOLEAN,
     TOKEN_KEYWORD_BOTH,
+    TOKEN_KEYWORD_BOXES,
     TOKEN_KEYWORD_BREAK,
     TOKEN_KEYWORD_BUFFER,
     TOKEN_KEYWORD_BUSY_TIMEOUT,
@@ -295,6 +296,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_COLLATION,
     TOKEN_KEYWORD_COLLATION_LIST,
     TOKEN_KEYWORD_COLUMN,
+    TOKEN_KEYWORD_COLUMNS,
     TOKEN_KEYWORD_COLUMN_ADD,
     TOKEN_KEYWORD_COLUMN_CHECK,
     TOKEN_KEYWORD_COLUMN_CREATE,
@@ -347,6 +349,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_CREATE_DIGEST,
     TOKEN_KEYWORD_CROSS,
     TOKEN_KEYWORD_CROSSES,
+    TOKEN_KEYWORD_CSV,
     TOKEN_KEYWORD_CUBE,
     TOKEN_KEYWORD_CUME_DIST,
     TOKEN_KEYWORD_CURDATE,
@@ -459,6 +462,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_FALSE,
     TOKEN_KEYWORD_FETCH,
     TOKEN_KEYWORD_FIELD,
+    TOKEN_KEYWORD_FIELDS,
     TOKEN_KEYWORD_FILE,
     TOKEN_KEYWORD_FIND_IN_SET,
     TOKEN_KEYWORD_FIREWALL_ADMIN,
@@ -1408,7 +1412,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1173
+#define KEYWORD_LIST_SIZE 1177
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1509,6 +1513,7 @@ static const keywords strvalues[]=
       {"BOOL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BOOL},
       {"BOOLEAN", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BOOLEAN},
       {"BOTH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BOTH},
+      {"BOXES", 0, 0, TOKEN_KEYWORD_BOXES},
       {"BREAK", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_BREAK},
       {"BUFFER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BUFFER}, /* deprecated in MySQL 5.7.6 */
       {"BUSY_TIMEOUT", 0, 0, TOKEN_KEYWORD_BUSY_TIMEOUT},
@@ -1537,6 +1542,7 @@ static const keywords strvalues[]=
       {"COLLATION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_COLLATION},
       {"COLLATION_LIST", 0, 0, TOKEN_KEYWORD_COLLATION_LIST},
       {"COLUMN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_COLUMN},
+      {"COLUMNS", 0, 0, TOKEN_KEYWORD_COLUMNS},
       {"COLUMN_ADD", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_ADD},
       {"COLUMN_CHECK", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_CHECK},
       {"COLUMN_CREATE", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_COLUMN_CREATE},
@@ -1587,6 +1593,7 @@ static const keywords strvalues[]=
       {"CREATE_DIGEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CREATE_DIGEST},
       {"CROSS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CROSS},
       {"CROSSES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CROSSES}, /* deprecated in MySQL 5.7.6 */
+      {"CSV", 0, 0, TOKEN_KEYWORD_CSV},
     {"CUBE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_CUBE},
       {"CUME_DIST", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_CUME_DIST},
       {"CURDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURDATE},
@@ -1699,6 +1706,7 @@ static const keywords strvalues[]=
       {"FALSE", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FALSE},
       {"FETCH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FETCH},
       {"FIELD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FIELD},
+      {"FIELDS", 0, 0, TOKEN_KEYWORD_FIELDS},
       {"FILE", 0, 0, TOKEN_KEYWORD_FILE},
       {"FIND_IN_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FIND_IN_SET},
           {"FIREWALL_ADMIN", 0, 0, TOKEN_KEYWORD_FIREWALL_ADMIN},
@@ -2925,6 +2933,13 @@ extern unsigned int menu_off;
 
 extern unsigned int dbms_version_mask;
 
+#if (OCELOT_IMPORT_EXPORT == 1)
+extern int export_type;
+extern char export_columns_terminated_by[];
+extern char export_lines_terminated_by[];
+extern long unsigned int export_max_rows;
+#endif
+
 namespace Ui
 {
 class MainWindow;
@@ -3032,9 +3047,6 @@ public:
   QString ocelot_statement_format_statement_indent;
   QString ocelot_statement_format_clause_indent;
   QString ocelot_statement_format_rule;
-#if (OCELOT_IMPORT_EXPORT)
-  QString ocelot_import_export_rule;
-#endif
   QString ocelot_statement_height, new_ocelot_statement_height;
   QString ocelot_statement_left, new_ocelot_statement_left;
   QString ocelot_statement_top, new_ocelot_statement_top;
@@ -3458,6 +3470,9 @@ public slots:
   void action_connect();
   void action_connect_once(QString);
   void action_exit();
+#if (OCELOT_IMPORT_EXPORT == 1)
+  void action_export_csv();
+#endif
   void action_execute_force();
   int action_execute(int);
   void action_kill();
@@ -3673,6 +3688,7 @@ private:
 
   void history_markup_make_strings();
   void history_markup_append(QString result_set_for_history, bool is_interactive);
+  void tee_export(QString);
   QString history_markup_copy_for_history(QString);
   int history_file_start(QString, QString);        /* see comment=tee+hist */
   void history_file_stop(QString);                 /* see comment=tee+hist */
@@ -3772,6 +3788,9 @@ private:
   QMenu *menu_file;
     QAction *menu_file_action_connect;
     QAction *menu_file_action_exit;
+#if (OCELOT_IMPORT_EXPORT == 1)
+    QAction *menu_file_action_export_csv;
+#endif
   QMenu *menu_edit;
     QAction *menu_edit_action_cut;
     QAction *menu_edit_action_copy;
@@ -8874,6 +8893,7 @@ QByteArray history_padder(char *str, int length,
   Warning: because history display is html we can show wrong for "<", so
            later history_markup_append() will change to character entities.
   Warning: making the copy bigger would slow down the way the Previous and Next keys work.
+  Re file_name: this is NULL if we're really going to history, it's a filename if we're going to export.
   Remaining challenges with copy_to_history:
   * Names and max widths should depend on result_row stuff not gridx_max stuff
   * We should try to keep track of statements so we don't spend too much time going backwards.
@@ -8886,7 +8906,8 @@ QByteArray history_padder(char *str, int length,
 #define HISTORY_MAX_VERTICAL_COLUMN_WIDTH 8192
 QString copy_to_history(long int ocelot_history_max_row_count,
                         unsigned short int is_vertical,
-                        int connections_dbms)
+                        int connections_dbms,
+                        char *file_name)
 {
   if (ocelot_history_max_row_count == 0) return "";
 
@@ -9090,6 +9111,10 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       row_pointer+= column_length;
     }
     *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+#if (OCELOT_IMPORT_EXPORT == 1)
+    if (file_name != NULL) printf("%s", history_line);
+    else
+#endif
     s.append(history_line);
   }
   s.append(divider_line);

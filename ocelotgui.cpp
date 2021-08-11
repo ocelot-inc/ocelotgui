@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: August 2 2021
+   Last modified: August 10 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -438,6 +438,14 @@
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   unsigned int mysql_errno_result= 0;
 
+#if (OCELOT_IMPORT_EXPORT == 1)
+  /* Accessed both in ocelotgui.h and ocelotgui.cpp */
+#define MAX_IMPORT_EXPORT_CHAR_LENGTH 7
+  int export_type= TOKEN_KEYWORD_DEFAULT;                /* e.g. TOKEN_KEYWORD_CSV | TOKEN_KEYWORD_BOXES | TOKEN_KEYWORD_DEFAULT etc. */
+  char  export_columns_terminated_by[MAX_IMPORT_EXPORT_CHAR_LENGTH + 1];
+  char  export_lines_terminated_by[MAX_IMPORT_EXPORT_CHAR_LENGTH + 1];
+  long unsigned int export_max_rows;
+#endif
 
   static QString hparse_text_copy;
   static QString hparse_token;
@@ -646,7 +654,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_format_clause_indent= "4";
   ocelot_statement_format_rule= "keyword becomes keyword-upper;";
 #if (OCELOT_IMPORT_EXPORT == 1)
-  ocelot_import_export_rule= "";
+  import_export_rule_set("");
 #endif
   ocelot_statement_height= ocelot_statement_left= ocelot_statement_top= ocelot_statement_width= "default";
   ocelot_statement_detached= "no";
@@ -1251,38 +1259,137 @@ int MainWindow::statement_format_rule_set(QString text)
   return ER_OK;
 }
 
+#if (OCELOT_IMPORT_EXPORT == 1)
 /*
-1. Allow SET ocelot_export [NULL | same-as-local-infile]
-   + allow --ocelot_export? or can you do that as an initial statement?
-   Example: SET ocelot_export FIELDS TERMINATED BY ',' COLUMNS TERMINATED BY '\n';
-   Maybe SET ocelot_export = ? i.e. should we have an = sign?
-2. Make Setting|export which causes generation of SET ocelot_export
-3. For SELECT, as well as history and result set, dump to file if ocelot_export is not NULL
-   erase after every SELECT
-   temporary file is okay, add name in warning message
-   do not do it if SELECT has an INTO OUTFILE clause
-4. Not just CSV. Also yaml, lua, html-4, SQL INSERT statements (if they're single-table)
-5. Figure out how to export binary
-6. Maybe this optionally can replace the result set, instead of being a supplementary
-7. Maybe SET ocelot_export causes immediate dump of current result set, but that's all
-8. Maybe INTO OUTFILE ocelot_export instead of all the other clauses
-  Todo: Something more specific than ER_ERROR. We'll need a change in ostrings.h then.
-  Todo: "rows affected" message for export.
+   SET ocelot_export ...; -- settings for dump of current result set, in one of several formats
+   Example: SET ocelot_export COLUMNS TERMINATED BY ',' LINES TERMINATED BY '\n';
+   Export filename is specified separately by TEE filename, and OK result should say that
+   General types: CSV BOXES HTML JSON YAML LUA HTML4 HTML5 SQL DEFAULT (? and BATCH or RAW or XML?)
+   CSV:
+     The same items that are in MySQL/MariaDB output file
+     FIELDS|COLUMNS TERMINATED BY string
+     FIELDS|COLUMNS ESCAPED BY string
+     FIELDS|COLUMNS ENCLOSED BY string
+     LINES STARTING BY string
+     LINES TERMINATED BY string
+   BOXES: (or just BOX?)
+     This is the +----+ style with Box drawing as in https://en.wikipedia.org/wiki/Box-drawing_character
+     (but really the +-----+ style is fixed-width, columns terminated by |, lines terminated by special-stuff)
+     SET ... COLUMN BOUNDARIES '|' LINE BOUNDARIES '-' INTERSECTIONS '+' HEADER LINE BOUNDARIES '='
+     Does not appply to history, which is boxes but has no options because we may depend on its format.
+     FIELDS|COLUMNS TERMINATED BY string
+     LINES TERMINATED BY '-' AND '+' (or '-+')
+     HEADER LINES TERMINATED BY '=' AND '+'
+     FILE STARTING BY '-' AND '+'
+     FILE TERMINATED BY '-' AND '+'
+   HTML4
+     This has to just dump what we got for result grid, but with different limit for number of rows
+   DEFAULT:
+     This is the default, as the name implies.
+     TEE result set output will be like BOXES with -s and |s and +s, same as history output.
+   Applicable for all types:
+     MAX ROWS = n or selected-rows, if it's 0 but INCLUDE QUERY then only query will go out
+     MAXIMUM_BYTES, MAXIMUM_LINE_WIDTH
+     MAXIMUM_COLUMN_WIDTH = n or as-in-definition, and WRAP | TRUNCATE, and PAD with spaces
+     NULL_DISPLAY = '...', default 'NULL'
+     BINARY_DISPLAY = ascii | hex | 'binary' | according to MySQL 8.0 setting for mysql client
+     MAXIMUM_BYTES = n
+     INCLUDE QUERY = true/false (default is true because exporting is like that, or false if DEFAULT)
+     INCLUDE RESULT COUNT = true/false although probably a better word for INCLUDE QUERY would do the job
+     CHARACTER SET
+     Some SQL*Plus names are: RECSEP UNDERLINE HEADSEP WRAPPED|WORD_WRAPPED|TRUNCATED, BREAK ON column
+   Struct, or individual variables
+     type = "CSV", "BOXES", etc.
+     maximum_rows = long unsigned int
+     column_boundary = ',' (the CSV default) or '|' (the BOXES default)
+     include_query = bool
+   Todo: Menu
+     File | Export csv etc.
+     Dialog box for each type, with different names but affecting the same variables
+     No shortcuts
+     ostrings.h, French: Exportation, boîtes
+   Todo: TEE
+     Show file name that is actually used, dev/null does cancelling, temporary file is okay, pipe is okay
+     Ignore trailing ;
+     Allow more options after file name
+     Diagnostic message if fopen failure, and warning if appending / overwriting old file
+     Warn if there is a non-default export setting (display it?)
+     The actual writing of the result set is currently happening in tee_export()
+   Todo: skip if SELECT has an INTO OUTFILE clause
+   Todo: rather than widget(0) use the rg of the current-displayed result grid, if it's tabbed.
+   Todo: better error if we didn't go through hparse which is why FLAG_FOR_HIGHLIGHTS could be off
+   MAX_IMPORT_EXPORT_CHAR_LENGTH 7 is arbitrary, ordinarily length will be 1
+   struct export_rule is defined at the start of ocelotgui.cpp, set up here, and read in ocelotgui.h
 */
 int MainWindow::import_export_rule_set(QString text)
 {
-  //if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return ER_ERROR;
+  printf("**** import_export_rule_set\n");
+  export_type= TOKEN_KEYWORD_DEFAULT;
+  strcpy(export_columns_terminated_by, "|");
+  strcpy(export_lines_terminated_by, "\n");
+
+  if (text == "") return ER_OK; /* for default initialization we pass "" */
+
+  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return ER_ERROR;
+  /* Following does nothing until we actually start evaluating what's in text */
   int i;
+  int lines_or_columns= 0;
   for (i= 0; main_token_lengths[i] != 0; ++i)
   {
-    if ((main_token_types[i] == TOKEN_KEYWORD_OCELOT_IMPORT)
-     || (main_token_types[i] == TOKEN_KEYWORD_OCELOT_EXPORT))
+    int token= main_token_types[i];
+    if (token == TOKEN_KEYWORD_BOXES)
     {
-      ocelot_import_export_rule= text.mid(main_token_offsets[i + 1]);
+      export_type= TOKEN_KEYWORD_BOXES;
+      /* rest is default initially */
+    }
+    if (token == TOKEN_KEYWORD_CSV)
+    {
+      export_type= TOKEN_KEYWORD_CSV;
+      strcpy(export_columns_terminated_by, ",");
+      strcpy(export_lines_terminated_by, "\n");
+    }
+    if (token == TOKEN_KEYWORD_DEFAULT)
+    {
+      break;
+    }
+    if ((token == TOKEN_KEYWORD_FIELDS) || (token == TOKEN_KEYWORD_COLUMNS))
+      lines_or_columns= TOKEN_KEYWORD_COLUMNS;
+    if (token == TOKEN_KEYWORD_LINES)
+      lines_or_columns= TOKEN_KEYWORD_LINES;
+    /* Todo: what if it's a number? or a constant like FALSE? */
+    if ((token == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) || (token == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
+    {
+      QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      connect_stripper(s, false);
+      if (s.length() > MAX_IMPORT_EXPORT_CHAR_LENGTH) continue; /* Actually too-long is an error but we just ignore */
+      char str[MAX_IMPORT_EXPORT_CHAR_LENGTH*4+1];
+      strcpy(str, s.toUtf8());
+      if (strlen(str) > MAX_IMPORT_EXPORT_CHAR_LENGTH) continue;
+      printf("**** string %s\n", str);
+      int i_prev_1= next_i(i, -1);         /* presumably BY */
+      if (main_token_types[i_prev_1] == TOKEN_KEYWORD_BY) printf("**** prev_1 = BY\n");
+      int i_prev_2= next_i(i_prev_1, -1);
+      int token_prev_2= main_token_types[i_prev_2];
+      if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) printf("**** prev_2 = TERMINATED\n");
+      if (lines_or_columns == TOKEN_KEYWORD_COLUMNS)
+      {
+        if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) printf("**** COLUMNS ENCLOSED BY\n");
+        else if (token_prev_2 == TOKEN_KEYWORD_ESCAPED) printf("**** COLUMNS ESCAPED BY\n");
+        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) strcpy(export_columns_terminated_by, str);
+        else printf("**** COLUMNS STARTING BY\n");
+      }
+      if (lines_or_columns == TOKEN_KEYWORD_LINES)
+      {
+        if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) printf("**** LINES ENCLOSED BY\n");
+        else if (token_prev_2 == TOKEN_KEYWORD_ESCAPED) printf("**** LINES ESCAPED BY\n");
+        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) strcpy(export_lines_terminated_by, str);
+        else printf("**** LINES STARTING BY\n");
+      }
     }
   }
   return ER_OK;
 }
+#endif
 
 QString MainWindow::statement_format_rule_apply(QString main_token, int main_token_type, unsigned char main_token_reftype, unsigned int main_token_flag, int *rule_token_offsets, int *rule_token_lengths, int *rule_token_types)
 {
@@ -1958,11 +2065,26 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
   if (is_interactive == false) return;
 
   /*  not related to markup, just a convenient place to call */
-  history_file_write("TEE", query_utf16);
   history_file_write("HIST", query_utf16);
+}
+
+void MainWindow::tee_export(QString result_set_for_history)
+{
+  history_file_write("TEE", query_utf16);
   history_file_write("TEE", statement_edit_widget->result);
   if (result_set_for_history > "")
+  {
     history_file_write("TEE", result_set_for_history);
+#if (OCELOT_IMPORT_EXPORT == 1)
+    ResultGrid *rg;
+    QString result_set_for_history;
+    bool is_vertical= false;
+    QString ocelot_history_max_row_count= "100000"; /* should be in the dialog box */
+    char file_name[128]= "file_name"; /* should be in the dialog box */
+    rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+    result_set_for_history= rg->copy_to_history(ocelot_history_max_row_count.toLong(), is_vertical, connections_dbms[0], file_name);
+  }
+#endif
 }
 
 
@@ -2494,6 +2616,10 @@ void MainWindow::create_menu()
   /* Todo: consider adding fileMenu = new QMenu(tr("&File"), this); -*/
   menu_file_action_connect= menu_file->addAction("");
   menu_file_action_exit= menu_file->addAction("");
+#if (OCELOT_IMPORT_EXPORT == 1)
+  menu_file->addSeparator();
+  menu_file_action_export_csv= menu_file->addAction("");
+#endif
   menu_edit= ui->menuBar->addMenu("");
   menu_edit_action_undo= menu_edit->addAction("");
   menu_edit_action_redo= menu_edit->addAction("");
@@ -2584,6 +2710,11 @@ void MainWindow::fill_menu()
   connect(menu_file_action_exit, SIGNAL(triggered()), this, SLOT(action_exit()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT, "", false, true);
   menu_edit->setTitle(menu_strings[menu_off + MENU_EDIT]);
+#if (OCELOT_IMPORT_EXPORT == 1)
+  /* Todo: Put in ostrings.h and allow MENU_FILE_EXPORT */
+  menu_file_action_export_csv->setText("Export CSV");
+  connect(menu_file_action_export_csv, SIGNAL(triggered()), this, SLOT(action_export_csv()));
+#endif
   menu_edit_action_undo->setText(menu_strings[menu_off + MENU_EDIT_UNDO]);
   connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_UNDO, "", false, true);
@@ -4231,6 +4362,18 @@ void MainWindow::action_exit()
   log("action_exit end", 90);
 }
 
+#if (OCELOT_IMPORT_EXPORT == 1)
+/*
+  For menu item "export csv" we said connect(...SLOT(action_export_csv())));
+  This is on (if there is a result set to export, and associated with File|Export menu item.
+*/
+void MainWindow::action_export_csv()
+{
+  log("action_export_csv start", 90);
+  action_change_one_setting("0", "1", TOKEN_KEYWORD_OCELOT_EXPORT);
+  log("action_export_csv end", 90);
+}
+#endif
 
 /*
   detach
@@ -5345,32 +5488,42 @@ void MainWindow::action_change_one_setting(QString old_setting,
   if (old_setting != new_setting)
   {
     QString text;
-    old_setting= new_setting;
-    main_token_number= 0;
-    text= "SET ";
-    text.append(strvalues[keyword_index].chars);
-    text.append(" = ");
-    text.append("'");
-    QString source= new_setting;
-    if (xsettings_widget->ocelot_variable_is_color(keyword_index) == true)
-      source= rgb_to_color(new_setting);
-    for (int i= 0; i < source.length(); ++i)
+#if (OCELOT_IMPORT_EXPORT == 1)
+    if (keyword_index == TOKEN_KEYWORD_OCELOT_EXPORT)
     {
-      QString c= source.mid(i, 1);
-      text.append(c);
-      if (c == "'") text.append(c);
+      text= "SET ocelot_export = CSV COLUMNS TERMINATED BY ',' LINES TERMINATED BY '\n';";
+      main_token_count_in_statement= 13;
     }
-    text.append("';");
-    main_token_count_in_statement= 5;
+    else
+#endif
+    {
+      old_setting= new_setting;
+      main_token_number= 0;
+      text= "SET ";
+      text.append(strvalues[keyword_index].chars);
+      text.append(" = ");
+      text.append("'");
+      QString source= new_setting;
+      if (xsettings_widget->ocelot_variable_is_color(keyword_index) == true)
+        source= rgb_to_color(new_setting);
+      for (int i= 0; i < source.length(); ++i)
+      {
+        QString c= source.mid(i, 1);
+        text.append(c);
+        if (c == "'") text.append(c);
+      }
+      text.append("';");
+      main_token_count_in_statement= 5;
+    }
     main_token_new(text.size());
     tokenize(text.data(),
              text.size(),
              main_token_lengths, main_token_offsets,
              main_token_max_count, (QChar*)"33333", 1,
              ocelot_delimiter_str, 1);
-   tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
-   action_execute_one_statement(text);
-   history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
+    tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
+    action_execute_one_statement(text);
+    history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
   }
 }
 
@@ -9653,7 +9806,7 @@ int MainWindow::action_execute_one_statement(QString text)
            && (result_set_for_history == ""))
           {
             rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
-            result_set_for_history= rg->copy_to_history(ocelot_history_max_row_count.toLong(), is_vertical, connections_dbms[0]);
+            result_set_for_history= rg->copy_to_history(ocelot_history_max_row_count.toLong(), is_vertical, connections_dbms[0], NULL);
           }
           log("copy_to_history (after)", 80);
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
@@ -9739,6 +9892,7 @@ statement_is_aborted:
   if (additional_result != TOKEN_KEYWORD_SOURCE)
   {
     history_markup_append(result_set_for_history, true); /* add prompt+statement+result to history, with markup */
+    tee_export(result_set_for_history);
   }
   return return_value;
 }
@@ -12254,7 +12408,6 @@ void MainWindow::initial_asserts()
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
   assert(TOKEN_KEYWORD_QUESTIONMARK == TOKEN_KEYWORDS_START);
-
 #ifdef ADDITIONAL_ASSERTS
   //* Test strvalues is ordered by bsearching for every item. */
   // This is commented out i.e. we don't define ADDITIONAL_ASSERTS unless there has been a change to the list */

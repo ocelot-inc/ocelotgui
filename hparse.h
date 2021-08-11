@@ -13221,14 +13221,24 @@ int MainWindow::hparse_f_client_set()
   {
     return hparse_f_client_set_rule();
   }
-#if (OCELOT_IMPORT_EXPORT == 1)
-  if ((main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_OCELOT_IMPORT)
-   || (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_OCELOT_EXPORT))
-    return hparse_f_client_set_import_export();
-#endif
-
+  int last_accepted= main_token_types[hparse_i_of_last_accepted];
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
   if (hparse_errno > 0) return 0;
+
+#if (OCELOT_IMPORT_EXPORT == 1)
+  if ((last_accepted == TOKEN_KEYWORD_OCELOT_IMPORT)
+   || (last_accepted == TOKEN_KEYWORD_OCELOT_EXPORT))
+  {
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CSV, "CSV") == 1)
+      return hparse_f_client_set_import_export();
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BOXES, "BOXES") == 1)
+      return 1;
+    else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT");
+    if (hparse_errno > 0) return 0;
+    return 1;
+  }
+#endif
+
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
   QStringList q;
