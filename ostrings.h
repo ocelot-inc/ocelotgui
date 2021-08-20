@@ -196,7 +196,7 @@ static const char *er_strings[]=
   "NOPAGER not implemented", /* ER_NOPAGER */
   "PAGER not implemented", /* ER_PAGER */
   "PRINT not implemented", /* ER_PRINT */
-  "Error, fopen failed", /* ER_FOPEN */
+  "Error, fopen failed %s", /* ER_FOPEN */ /* Todo: it's not really fopen we've switched to QFile */
   "Syntax checker value must be between 0 and 3", /* ER_SYNTAX */
   "Format statement indent value must be between 0 and 8", /* ER_FORMAT_STATEMENT */
   "Format clause indent value must be between 0 and 8", /* ER_FORMAT_CLAUSE */
@@ -282,7 +282,7 @@ static const char *er_strings[]=
     "NOPAGER pas mis en œuvre", /* ER_NOPAGER */
     "PAGER pas mis en oeuvre", /* ER_PAGER */
     "PRINT pas mis en oeuvre", /* ER_PRINT */
-    "Erreur, fopen échoué", /* ER_FOPEN */
+    "Erreur, fopen échoué %s", /* ER_FOPEN */
     "Syntaxe valeur (pour vérificateur de syntaxe) doit être comprise entre 0 et 3", /* ER_SYNTAX */
     "Format déclaration  valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_STATEMENT */
     "Format clause valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_CLAUSE */

@@ -2935,9 +2935,19 @@ extern unsigned int dbms_version_mask;
 
 #if (OCELOT_IMPORT_EXPORT == 1)
 extern int export_type;
-extern char export_columns_terminated_by[];
-extern char export_lines_terminated_by[];
-extern long unsigned int export_max_rows;
+extern QByteArray export_columns_enclosed_by;
+extern QByteArray export_columns_escaped_by;
+extern bool export_columns_optionally;
+extern QByteArray export_columns_terminated_by;
+extern QByteArray export_lines_starting_by;
+extern QByteArray export_lines_terminated_by;
+extern unsigned short export_column_names;
+extern bool export_queries;
+extern bool export_row_counts;
+extern long unsigned export_max_row_count;
+extern unsigned short export_margin;
+extern unsigned short export_padding;
+extern unsigned short export_last;
 #endif
 
 namespace Ui
@@ -3491,6 +3501,7 @@ public slots:
   int statement_format_rule_set(QString text);
   QString statement_format_rule_apply(QString, int, unsigned char, unsigned int, int*, int*, int*);
 #if (OCELOT_IMPORT_EXPORT == 1)
+  QByteArray to_byte_array(QString);
   int import_export_rule_set(QString text);
 #endif
   void action_change_one_setting(QString old_setting, QString new_setting, int keyword_index);
@@ -3690,9 +3701,11 @@ private:
   void history_markup_append(QString result_set_for_history, bool is_interactive);
   void tee_export(QString);
   QString history_markup_copy_for_history(QString);
-  int history_file_start(QString, QString);        /* see comment=tee+hist */
+  int history_file_start(QString, QString, QString *r);        /* see comment=tee+hist */
   void history_file_stop(QString);                 /* see comment=tee+hist */
+public:
   void history_file_write(QString, QString);       /* see comment=tee+hist */
+private:
   void history_file_to_history_widget();           /* see comment=tee+hist */
   int history_line(char *);
 public:
@@ -8899,6 +8912,9 @@ QByteArray history_padder(char *str, int length,
   * We should try to keep track of statements so we don't spend too much time going backwards.
   * The "8192" for vertical output is arbitrary. Max should be calculated.
   * Displaying an image as if it's a bunch of characters is a waste of time.
+  Re "if (OCELOT_IMPORT_EXPORT == 1)":
+    This is for CSV stuff. See comments before import_export_rule_set().
+    Todo: our size calculation is unsafe, we must add sizes of terminated_by enclosed_by etc.
 */
 #define HISTORY_COLUMN_MARGIN 1
 #define HISTORY_MAX_COLUMN_WIDTH 65535
@@ -8909,11 +8925,44 @@ QString copy_to_history(long int ocelot_history_max_row_count,
                         int connections_dbms,
                         char *file_name)
 {
-  if (ocelot_history_max_row_count == 0) return "";
+  long unsigned max_row_count= ocelot_history_max_row_count;
+
+  if (max_row_count == 0) return "";
 
   /* Tarantool won't have picked up column headers if there are no rows */
   if ((result_row_count == 0) && (connections_dbms == DBMS_TARANTOOL))
     return "";
+
+#if (OCELOT_IMPORT_EXPORT == 1)
+  QByteArray escapers("");
+  char escape_char= export_columns_escaped_by[0];
+  char null_string[3];
+  char *pointer_to_null_string;
+  int length_of_null_string;
+  int margin;
+  if (file_name != NULL)
+  {
+    max_row_count= export_max_row_count;
+    int e= 0;
+    for (int i= 0; i < export_columns_enclosed_by.size(); ++i) escapers[e++]= export_columns_enclosed_by[i];
+    for (int i= 0; i < export_columns_escaped_by.size(); ++i) escapers[e++]= export_columns_escaped_by[i];
+    for (int i= 0; i < export_columns_terminated_by.size(); ++i) escapers[e++]= export_columns_terminated_by[i];
+    for (int i= 0; i < export_lines_starting_by.size(); ++i) escapers[e++]= export_lines_starting_by[i];
+    for (int i= 0; i < export_lines_terminated_by.size(); ++i) escapers[e++]= export_lines_terminated_by[i];
+    null_string[0]= escape_char;
+    null_string[1]= 'N';
+    null_string[2]= '\0';
+    length_of_null_string= 2;
+    pointer_to_null_string= null_string;
+    margin= export_margin;
+  }
+  else
+  {
+    length_of_null_string= strlen(NULL_STRING);
+    pointer_to_null_string= (char *) NULL_STRING;
+    margin= HISTORY_COLUMN_MARGIN;
+  }
+#endif
 
   unsigned int col;
   long unsigned int r;
@@ -8940,13 +8989,19 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 
   history_max_column_widths= new unsigned int[history_result_column_count];
   history_line_width= 2; /* sizeof('|') | sizeof('\n') */
+
+  unsigned short column_names_copy= ocelot_result_grid_column_names_copy;
+#if (OCELOT_IMPORT_EXPORT == 1)
+  if (file_name != NULL) column_names_copy= export_column_names;
+#endif
+
   unsigned int column_width;
   {
     char *pointer_to_field_names= result_field_names;
     unsigned int column_length;
     for (col= 0; col < history_result_column_count; ++col)
     {
-      if (ocelot_result_grid_column_names_copy == 1)
+      if (column_names_copy == 1)
       {
         memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
         pointer_to_field_names+= sizeof(unsigned int);
@@ -8957,17 +9012,17 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       if (column_width < gridx_max_column_widths[col]) column_width= gridx_max_column_widths[col];
       if (column_width > HISTORY_MAX_COLUMN_WIDTH) column_width= HISTORY_MAX_COLUMN_WIDTH;
       history_max_column_widths[col]= column_width;
-      history_line_width+= column_width + 1 + HISTORY_COLUMN_MARGIN * 2;
+      history_line_width+= column_width + 1 + margin * 2;
     }
   }
-  if (result_row_count > (unsigned long) ocelot_history_max_row_count) history_result_row_count= ocelot_history_max_row_count;
+  if (result_row_count > (unsigned long) max_row_count) history_result_row_count= max_row_count;
   else history_result_row_count= result_row_count;
 
   if (is_vertical == 1)
   {
     unsigned int longest_column_name_length= 0;
     unsigned int column_length;
-    if (ocelot_result_grid_column_names_copy == 1)
+    if (column_names_copy == 1)
     {
       char *pointer_to_field_names= result_field_names;
       for (col= 0; col < history_result_column_count; ++col)
@@ -9010,8 +9065,8 @@ QString copy_to_history(long int ocelot_history_max_row_count,
         row_pointer+= sizeof(unsigned int) + sizeof(char);
         if ((flag & FIELD_VALUE_FLAG_IS_NULL) != 0)
         {
-          length= strlen(NULL_STRING);
-          pointer_to_source= (char *) NULL_STRING;
+          length= length_of_null_string;
+          pointer_to_source= pointer_to_null_string;
         }
         else
         {
@@ -9039,14 +9094,14 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     for (col= 0; col < history_result_column_count; ++col)
     {
       memset(pointer_to_divider_line, '-',
-             history_max_column_widths[col] + HISTORY_COLUMN_MARGIN * 2);
+             history_max_column_widths[col] + margin * 2);
       pointer_to_divider_line+=
-             history_max_column_widths[col] + HISTORY_COLUMN_MARGIN * 2;
+             history_max_column_widths[col] + margin * 2;
       *(pointer_to_divider_line++)= '+';
     }
     *(pointer_to_divider_line)= '\n'; *(pointer_to_divider_line + 1)= '\0';
   }
-  if (ocelot_result_grid_column_names_copy == 1)
+  if (column_names_copy == 1)
   {
     char *pointer_to_field_names= result_field_names;
     unsigned int column_length;
@@ -9056,8 +9111,8 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     QByteArray pcv; /* padded column value */
     for (col= 0; col < history_result_column_count; ++col)
     {
-      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
-      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
+      memset(pointer_to_history_line, ' ', margin);
+      pointer_to_history_line+= margin;
       memcpy(&column_length, pointer_to_field_names, sizeof(unsigned int));
       pointer_to_field_names+= sizeof(unsigned int);
       pcv= history_padder(pointer_to_field_names, column_length,
@@ -9065,8 +9120,8 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       memcpy(pointer_to_history_line, pcv, pcv.size());
       pointer_to_field_names+= column_length;
       pointer_to_history_line+= pcv.size();
-      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
-      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
+      memset(pointer_to_history_line, ' ', margin);
+      pointer_to_history_line+= margin;
       *(pointer_to_history_line++)= '|';
     }
     *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
@@ -9082,6 +9137,14 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     char *pointer_to_source;
     pointer_to_history_line= history_line;
     row_pointer= result_set_copy_rows[r];
+#if (OCELOT_IMPORT_EXPORT == 1)
+    if (file_name != NULL)
+    {
+      strcpy(pointer_to_history_line, export_lines_starting_by.constData());
+      pointer_to_history_line+= export_lines_starting_by.size();
+    }
+    else
+#endif
     *(pointer_to_history_line++)= '|';
     QByteArray pcv; /* padded column value */
     for (col= 0; col < history_result_column_count; ++col)
@@ -9089,30 +9152,88 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
       field_value_flags= *(row_pointer + sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
+#if (OCELOT_IMPORT_EXPORT == 1)
+      bool is_to_be_enclosed= true;
+      if ((export_columns_optionally == true) && ((field_value_flags & FIELD_VALUE_FLAG_IS_STRING) == 0))
+        is_to_be_enclosed= false;
+#endif
       if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0)
       {
-        length= strlen(NULL_STRING);
-        pointer_to_source= (char *) NULL_STRING;
+        length= length_of_null_string;
+        pointer_to_source= pointer_to_null_string;
       }
       else
       {
         length= column_length;
         pointer_to_source= row_pointer;
       }
-      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
-      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
-      pcv= history_padder(pointer_to_source, length,
+      memset(pointer_to_history_line, ' ', margin);
+      pointer_to_history_line+= margin;
+#if (OCELOT_IMPORT_EXPORT == 1)
+      if ((file_name != NULL) && (export_padding == 0))
+        pcv= QByteArray(pointer_to_source, length);
+      else
+        pcv= history_padder(pointer_to_source, length,
                      history_max_column_widths[col], field_value_flags);
-      memcpy(pointer_to_history_line, pcv, pcv.size());
-      pointer_to_history_line+= pcv.size();
-      memset(pointer_to_history_line, ' ', HISTORY_COLUMN_MARGIN);
-      pointer_to_history_line+= HISTORY_COLUMN_MARGIN;
+#endif
+#if (OCELOT_IMPORT_EXPORT == 1)
+      if ((file_name != NULL) && (is_to_be_enclosed == true))
+      {
+        strcpy(pointer_to_history_line, export_columns_enclosed_by.constData());
+        pointer_to_history_line+= export_columns_enclosed_by.size();
+      }
+#endif
+      if ((file_name != NULL) && ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) == 0))
+      {
+        for (int j= 0; j< pcv.size(); ++j)
+        {
+          char c= pcv[j];
+          /* Warning: if we allowed non-ASCII characters we'd have to allow for multi-byte here. */
+          if (c == 0x00) {*(pointer_to_history_line++)= escape_char; *(pointer_to_history_line++)= '0'; }
+          else if (escapers.contains(c))
+          {
+            *(pointer_to_history_line++)= escape_char; *(pointer_to_history_line++)= c;
+          }
+          else *(pointer_to_history_line++)= c;
+        }
+      }
+      else
+      {
+        memcpy(pointer_to_history_line, pcv, pcv.size());
+        pointer_to_history_line+= pcv.size();
+      }
+      memset(pointer_to_history_line, ' ', margin);
+      pointer_to_history_line+= margin;
+#if (OCELOT_IMPORT_EXPORT == 1)
+      if (file_name != NULL)
+      {
+        if (is_to_be_enclosed == true)
+        {
+          strcpy(pointer_to_history_line, export_columns_enclosed_by.constData());
+          pointer_to_history_line+= export_columns_enclosed_by.size();
+        }
+        if ((col < (history_result_column_count - 1)) || (export_last == 1))
+        {
+          strcpy(pointer_to_history_line, export_columns_terminated_by.constData());
+          pointer_to_history_line+= export_columns_terminated_by.size();
+        }
+      }
+      else
+#endif
       *(pointer_to_history_line++)= '|';
       row_pointer+= column_length;
     }
-    *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
 #if (OCELOT_IMPORT_EXPORT == 1)
-    if (file_name != NULL) printf("%s", history_line);
+    if (file_name != NULL)
+    {
+      strcpy(pointer_to_history_line, export_lines_terminated_by.constData());
+    }
+    else
+#endif
+    {
+      *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0'; }
+#if (OCELOT_IMPORT_EXPORT == 1)
+    if (file_name != NULL) copy_of_parent->history_file_write("TEE", history_line);
     else
 #endif
     s.append(history_line);

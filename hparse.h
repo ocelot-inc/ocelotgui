@@ -13067,9 +13067,11 @@ void MainWindow::hparse_f_other(int flags)
     //  break;
     //}
     bool line_break_seen= false;
+    /* Warning: main_token_offsets[hparse_i+1] can be a crazy number so check size or check if q=="" */
     for (int i_off= main_token_offsets[hparse_i] + main_token_lengths[hparse_i];; ++i_off)
     {
       if (i_off >= main_token_offsets[hparse_i + 1]) break;
+      if (i_off >= hparse_text_copy.size()) break;
       QString q= hparse_text_copy.mid(i_off, 1);
       if ((q == "\n") || (q == "\r"))
       {
