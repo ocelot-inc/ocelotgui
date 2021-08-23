@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: August 19 2021
+   Last modified: August 23 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -16355,6 +16355,8 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
       Error if: ext 16 and ext 32, which would not be possible for decimal, but might be allowed someday
       Error if: not equal to MP_DECIMAL = 1: MP_UNKNOWN_EXTENSION = 0, MP_UUID = 2, MP_ERROR = 3.
       We do not check for premature end of input (we rarely do), so really bad input could cause segmentation fault
+  Re decimal:
+      Beware negative scale which means add 0s at end.
   Re uuid:
       I assume that length = 16 and I do not check that the MP_EXT byte was d8.
       I produce a string that does not contain any "-"s.
@@ -16393,7 +16395,7 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
   ++tarantool_tnt_reply_data;
   if (ext_field_type == MP_DECIMAL)
   {
-    unsigned char scale= *tarantool_tnt_reply_data;
+    signed char scale= *tarantool_tnt_reply_data;
     ++tarantool_tnt_reply_data;
     unsigned char high_nibble, low_nibble;
     unsigned char decimal_output[64];
@@ -16442,11 +16444,22 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
     }
     else
     {
-      memcpy(o, decimal_output, decimal_output_length - scale);
-      o+= decimal_output_length - scale;
-      *o= '.'; ++o;
-      memcpy(o, decimal_output + (decimal_output_length - scale), scale);
-      o+= scale;
+      if (scale < 0)
+      {
+        int additional_zeros= 0 - scale;
+        memcpy(o, decimal_output, decimal_output_length);
+        o+= decimal_output_length;
+        memset(o, '0', additional_zeros);
+        o+= additional_zeros;
+      }
+      else
+      {
+        memcpy(o, decimal_output, decimal_output_length - scale);
+        o+= decimal_output_length - scale;
+        *o= '.'; ++o;
+        memcpy(o, decimal_output + (decimal_output_length - scale), scale);
+        o+= scale;
+      }
     }
     return o - value_as_string;
   }
