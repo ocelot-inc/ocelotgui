@@ -9224,7 +9224,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       row_pointer+= column_length;
     }
 #if (OCELOT_IMPORT_EXPORT == 1)
-    if (file_name != NULL)
+    if ((file_name != NULL) && (export_type != TOKEN_KEYWORD_DEFAULT))
     {
       strcpy(pointer_to_history_line, export_lines_terminated_by.constData());
     }
@@ -9233,10 +9233,15 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     {
       *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0'; }
 #if (OCELOT_IMPORT_EXPORT == 1)
-    if (file_name != NULL) copy_of_parent->history_file_write("TEE", history_line);
+    if ((file_name != NULL) && (export_type != TOKEN_KEYWORD_DEFAULT))
+    {
+      copy_of_parent->history_file_write("TEE", history_line);
+    }
     else
 #endif
-    s.append(history_line);
+    {
+      s.append(history_line);
+    }
   }
   s.append(divider_line);
   if (history_line != 0) delete [] history_line;

@@ -2148,7 +2148,9 @@ void MainWindow::tee_export(QString result_set_for_history)
   {
 #if (OCELOT_IMPORT_EXPORT == 1)
     if (export_type == TOKEN_KEYWORD_DEFAULT)
+    {
       history_file_write("TEE", result_set_for_history);
+    }
     else
     {
       /* assume CSV */
@@ -2383,8 +2385,11 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
   if (history_type == "TEE")
   {
     ocelot_history_tee_file.write(query, strlen(query));
-    /* 2021-08-12 removed this because there's already an \n, this causes an extra \n if we append */
-    //ocelot_history_tee_file.write("\n", strlen("\n"));
+    /* We need the \n but not an extra \n if we append. */
+    if (export_type == TOKEN_KEYWORD_DEFAULT)
+    {
+      ocelot_history_tee_file.write("\n", strlen("\n"));
+    }
     ocelot_history_tee_file.flush();
   }
   else
