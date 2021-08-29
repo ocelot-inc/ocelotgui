@@ -13099,11 +13099,17 @@ void MainWindow::hparse_f_other(int flags)
 #if (OCELOT_IMPORT_EXPORT == 1)
 /*
   Called from hparse_f_client_statement() for special handling of SET ocelot_import|export.
-  See comments in ocelotgui.cpp before statement_import_export_rule()
+  See comments in ocelotgui.cpp before import_export_rule_set()
   Return 1 = ocelot_ but no conditional possible, or 0 if error.
 */
 int MainWindow::hparse_f_client_set_import_export()
 {
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO") == 1)
+  {
+    if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) {;}
+    else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STDOUT, "STDOUT");
+    if (hparse_errno > 0) return 0;
+  }
   hparse_f_infile_or_outfile();
   if (hparse_errno > 0) return 0;
   return 1;
@@ -13231,10 +13237,10 @@ int MainWindow::hparse_f_client_set()
   if ((last_accepted == TOKEN_KEYWORD_OCELOT_IMPORT)
    || (last_accepted == TOKEN_KEYWORD_OCELOT_EXPORT))
   {
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CSV, "CSV") == 1)
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELIMITED, "DELIMITED") == 1)
+     ||(hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BOXES, "BOXES") == 1))
       return hparse_f_client_set_import_export();
-    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BOXES, "BOXES") == 1)
-      return 1;
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HTML, "HTML") == 1) {;}
     else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT");
     if (hparse_errno > 0) return 0;
     return 1;

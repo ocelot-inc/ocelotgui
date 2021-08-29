@@ -105,7 +105,7 @@ static const char *string_languages[]=
 #define ER_NOPAGER                        28
 #define ER_PAGER                          29
 #define ER_PRINT                          30
-#define ER_FOPEN_FAILED                   31
+#define ER_OK_PLUS                        31
 #define ER_SYNTAX                         32
 #define ER_FORMAT_STATEMENT               33
 #define ER_FORMAT_CLAUSE                  34
@@ -186,7 +186,7 @@ static const char *er_strings[]=
   "Error. USE statement has no argument.", /* ER_USE */
   "Database changed", /* ER_DATABASE_CHANGED */
   "Error, SOURCE statement has no argument", /* ER_SOURCE */
-  "Error, file open() failed", /* ER_FILE_OPEN */
+  "Error, file open(%s) failed", /* ER_FILE_OPEN */ /* Could be QFile, could be fopen */
   "Error, delimiter should not be blank", /* ER_DELIMITER */
   "For HELP, use the Help menu items. For example click: Help | The Manual.", /* ER_HELP */
   "CHARSET not implemented",
@@ -196,7 +196,7 @@ static const char *er_strings[]=
   "NOPAGER not implemented", /* ER_NOPAGER */
   "PAGER not implemented", /* ER_PAGER */
   "PRINT not implemented", /* ER_PRINT */
-  "Error, fopen failed %s", /* ER_FOPEN */ /* Todo: it's not really fopen we've switched to QFile */
+  "OK %s", /* ER_OK_PLUS */ /* For example with file-open show the full file name */
   "Syntax checker value must be between 0 and 3", /* ER_SYNTAX */
   "Format statement indent value must be between 0 and 8", /* ER_FORMAT_STATEMENT */
   "Format clause indent value must be between 0 and 8", /* ER_FORMAT_CLAUSE */
@@ -272,7 +272,7 @@ static const char *er_strings[]=
     "Erreur. instruction USE n'a pas d'argument.", /* ER_USE */
     "Base de données changée.", /* ER_DATABASE_CHANGED */
     "Erreur. instruction SOURCE n'a pas d'argument.", /* ER_SOURCE */
-    "Erreur: file_open() échoué", /* ER_FILE_OPEN */
+    "Erreur: file_open(%s) échoué", /* ER_FILE_OPEN */
     "Erreur, delimiter ne doit pas être vide", /* ER_DELIMITER */
     "Pour HELP, utiliser les éléments du menu Aide. Illustration: cliquez sur: Aide | Le manuel.", /* ER_HELP */
     "CHARSET pas mis en oeuvre",
@@ -282,7 +282,7 @@ static const char *er_strings[]=
     "NOPAGER pas mis en œuvre", /* ER_NOPAGER */
     "PAGER pas mis en oeuvre", /* ER_PAGER */
     "PRINT pas mis en oeuvre", /* ER_PRINT */
-    "Erreur, fopen échoué %s", /* ER_FOPEN */
+    "OK %s", /* ER_OK_PLUS */ /* For example this could show file name. Compare ER_OK_REHASH. */
     "Syntaxe valeur (pour vérificateur de syntaxe) doit être comprise entre 0 et 3", /* ER_SYNTAX */
     "Format déclaration  valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_STATEMENT */
     "Format clause valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_CLAUSE */

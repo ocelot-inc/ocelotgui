@@ -349,7 +349,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_CREATE_DIGEST,
     TOKEN_KEYWORD_CROSS,
     TOKEN_KEYWORD_CROSSES,
-    TOKEN_KEYWORD_CSV,
     TOKEN_KEYWORD_CUBE,
     TOKEN_KEYWORD_CUME_DIST,
     TOKEN_KEYWORD_CURDATE,
@@ -399,6 +398,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_DEGREES,
     TOKEN_KEYWORD_DELAYED,
     TOKEN_KEYWORD_DELETE,
+    TOKEN_KEYWORD_DELIMITED,
     TOKEN_KEYWORD_DELIMITER,
     TOKEN_KEYWORD_DENSE_RANK,
     TOKEN_KEYWORD_DESC,
@@ -1102,6 +1102,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_STDDEV,
     TOKEN_KEYWORD_STDDEV_POP,
     TOKEN_KEYWORD_STDDEV_SAMP,
+    TOKEN_KEYWORD_STDOUT,
     TOKEN_KEYWORD_STOP,
     TOKEN_KEYWORD_STORED,
     TOKEN_KEYWORD_STRAIGHT_JOIN,
@@ -1412,7 +1413,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1177
+#define KEYWORD_LIST_SIZE 1178
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1593,8 +1594,7 @@ static const keywords strvalues[]=
       {"CREATE_DIGEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CREATE_DIGEST},
       {"CROSS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CROSS},
       {"CROSSES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CROSSES}, /* deprecated in MySQL 5.7.6 */
-      {"CSV", 0, 0, TOKEN_KEYWORD_CSV},
-    {"CUBE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_CUBE},
+      {"CUBE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_CUBE},
       {"CUME_DIST", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_CUME_DIST},
       {"CURDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CURDATE},
       {"CURRENT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_CURRENT},
@@ -1643,6 +1643,7 @@ static const keywords strvalues[]=
       {"DEGREES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DEGREES},
       {"DELAYED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DELAYED},
       {"DELETE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DELETE},
+      {"DELIMITED", 0, 0, TOKEN_KEYWORD_DELIMITED},
       {"DELIMITER", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_DELIMITER}, /* ocelotgui keyword */
       {"DENSE_RANK", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_DENSE_RANK},
       {"DESC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DESC},
@@ -2347,6 +2348,7 @@ static const keywords strvalues[]=
       {"STDDEV", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV},
       {"STDDEV_POP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV_POP},
       {"STDDEV_SAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STDDEV_SAMP},
+      {"STDOUT", 0, 0, TOKEN_KEYWORD_STDOUT},
       {"STOP", 0, 0, TOKEN_KEYWORD_STOP},
       {"STORED", FLAG_VERSION_MYSQL_5_7, 0, TOKEN_KEYWORD_STORED},
       {"STRAIGHT_JOIN", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_STRAIGHT_JOIN},
@@ -2948,6 +2950,7 @@ extern long unsigned export_max_row_count;
 extern unsigned short export_margin;
 extern unsigned short export_padding;
 extern unsigned short export_last;
+extern unsigned short export_divider;
 #endif
 
 namespace Ui
@@ -3481,7 +3484,10 @@ public slots:
   void action_connect_once(QString);
   void action_exit();
 #if (OCELOT_IMPORT_EXPORT == 1)
-  void action_export_csv();
+  void action_export_delimited();
+  void action_export_boxes();
+  void action_export_html();
+  void action_export_default();
 #endif
   void action_execute_force();
   int action_execute(int);
@@ -3502,7 +3508,7 @@ public slots:
   QString statement_format_rule_apply(QString, int, unsigned char, unsigned int, int*, int*, int*);
 #if (OCELOT_IMPORT_EXPORT == 1)
   QByteArray to_byte_array(QString);
-  int import_export_rule_set(QString text);
+  void import_export_rule_set(QString text);
 #endif
   void action_change_one_setting(QString old_setting, QString new_setting, int keyword_index);
   void action_menu();
@@ -3631,6 +3637,7 @@ private:
   void put_diagnostics_in_result(unsigned int);
   void put_message_in_result(QString);
   void make_and_put_message_in_result(unsigned int, int, char*);
+  void make_and_put_open_message_in_result(unsigned int, int, QString);
   void make_and_append_message_in_result(unsigned int, int, char*);
   unsigned int get_ocelot_protocol_as_int(QString s);
 //  int options_and_connect(char *host, char *database, char *user, char *password, char *tmp_init_command,
@@ -3704,7 +3711,7 @@ private:
   int history_file_start(QString, QString, QString *r);        /* see comment=tee+hist */
   void history_file_stop(QString);                 /* see comment=tee+hist */
 public:
-  void history_file_write(QString, QString);       /* see comment=tee+hist */
+  void history_file_write(QString, QString, bool);       /* see comment=tee+hist */
 private:
   void history_file_to_history_widget();           /* see comment=tee+hist */
   int history_line(char *);
@@ -3802,7 +3809,10 @@ private:
     QAction *menu_file_action_connect;
     QAction *menu_file_action_exit;
 #if (OCELOT_IMPORT_EXPORT == 1)
-    QAction *menu_file_action_export_csv;
+    QAction *menu_file_action_export_delimited;
+    QAction *menu_file_action_export_boxes;
+    QAction *menu_file_action_export_html;
+    QAction *menu_file_action_export_default;
 #endif
   QMenu *menu_edit;
     QAction *menu_edit_action_cut;
@@ -7337,7 +7347,7 @@ void display(int due_to,
     grid_vertical_scroll_bar_value= -1; /* todo: check: is this alread in vertical_scroll_bar_initialize? */
     focus_result_row_number= focus_column_number= -1; /* i.e. no cell is in focus */
     prepare_for_display_html();
-    display_html(0);
+    display_html(0, 0);
   }
   return;
 
@@ -8138,7 +8148,7 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
     might be non-HTML stuff that depends on it. For some reason we might be calling display_html more than
     once, but we won't waste too much time if it's -1.
 */
-void display_html(int new_grid_vertical_scroll_bar_value)
+void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 {
   if ((result_row_count == 0) || (result_column_count == 0))
   {
@@ -8352,9 +8362,16 @@ void display_html(int new_grid_vertical_scroll_bar_value)
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
 
-  html_text_edit->setHtml(tmp);
-  html_text_edit->moveCursor(QTextCursor::Start);
-  html_text_edit->ensureCursorVisible();
+  if (situation == TOKEN_KEYWORD_OCELOT_EXPORT)
+  {
+    copy_of_parent->history_file_write("TEE", tmp, false);
+  }
+  else
+  {
+    html_text_edit->setHtml(tmp);
+    html_text_edit->moveCursor(QTextCursor::Start);
+    html_text_edit->ensureCursorVisible();
+  }
   /* Beware, saying show() causes resize_or_font_change which calls display_html */
   {
 //TEST!!    html_text_edit->show();
@@ -8913,7 +8930,7 @@ QByteArray history_padder(char *str, int length,
   * The "8192" for vertical output is arbitrary. Max should be calculated.
   * Displaying an image as if it's a bunch of characters is a waste of time.
   Re "if (OCELOT_IMPORT_EXPORT == 1)":
-    This is for CSV stuff. See comments before import_export_rule_set().
+    This is for DELIMITED stuff e.g. CSV. See comments before import_export_rule_set().
     Todo: our size calculation is unsafe, we must add sizes of terminated_by enclosed_by etc.
 */
 #define HISTORY_COLUMN_MARGIN 1
@@ -8970,8 +8987,8 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   unsigned int history_result_column_count;
   unsigned int *history_max_column_widths;
   unsigned long history_result_row_count;
-  char *history_line;
-  char *divider_line;
+  char *history_line= NULL;
+  char *divider_line= NULL;
   char *pointer_to_history_line;
   unsigned int history_line_width;
   QString s;
@@ -8994,7 +9011,6 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 #if (OCELOT_IMPORT_EXPORT == 1)
   if (file_name != NULL) column_names_copy= export_column_names;
 #endif
-
   unsigned int column_width;
   {
     char *pointer_to_field_names= result_field_names;
@@ -9099,13 +9115,23 @@ QString copy_to_history(long int ocelot_history_max_row_count,
              history_max_column_widths[col] + margin * 2;
       *(pointer_to_divider_line++)= '+';
     }
+    /* Todo: Consider: maybe if file_name != NULL divider_line should end with export_lines_terminated_by? */
     *(pointer_to_divider_line)= '\n'; *(pointer_to_divider_line + 1)= '\0';
   }
   if (column_names_copy == 1)
   {
     char *pointer_to_field_names= result_field_names;
     unsigned int column_length;
+#if (OCELOT_IMPORT_EXPORT == 1)
+  if (file_name != NULL)
+  {
+    if (export_divider == 1) copy_of_parent->history_file_write("TEE", divider_line, false);
+  }
+  else
     s.append(divider_line);
+#else
+  s.append(divider_line);
+#endif
     pointer_to_history_line= history_line;
     *(pointer_to_history_line++)= '|';
     QByteArray pcv; /* padded column value */
@@ -9125,10 +9151,24 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       *(pointer_to_history_line++)= '|';
     }
     *(pointer_to_history_line)= '\n'; *(pointer_to_history_line + 1)= '\0';
+#if (OCELOT_IMPORT_EXPORT == 1)
+    if (file_name != NULL)
+      copy_of_parent->history_file_write("TEE", history_line, false);
+    else
+#endif
     s.append(history_line);
   }
   pointer_to_history_line= history_line;
+#if (OCELOT_IMPORT_EXPORT == 1)
+  if (file_name != NULL)
+  {
+    if (export_divider == 1) copy_of_parent->history_file_write("TEE", divider_line, false);
+  }
+  else
+    s.append(divider_line);
+#else
   s.append(divider_line);
+#endif
   for (r= 0; r < history_result_row_count; ++r)
   {
     char *row_pointer;
@@ -9235,7 +9275,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 #if (OCELOT_IMPORT_EXPORT == 1)
     if ((file_name != NULL) && (export_type != TOKEN_KEYWORD_DEFAULT))
     {
-      copy_of_parent->history_file_write("TEE", history_line);
+      copy_of_parent->history_file_write("TEE", history_line, false);
     }
     else
 #endif
@@ -9243,8 +9283,18 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       s.append(history_line);
     }
   }
+#if (OCELOT_IMPORT_EXPORT == 1)
+  if (file_name != NULL)
+  {
+    if (export_divider == 1) copy_of_parent->history_file_write("TEE", divider_line, false);
+  }
+  else
+    s.append(divider_line);
+#else
   s.append(divider_line);
+#endif
   if (history_line != 0) delete [] history_line;
+  if (divider_line != 0) delete [] divider_line;
   if (history_max_column_widths != 0) delete [] history_max_column_widths;
   return s;
 }
@@ -10372,7 +10422,7 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
       {
         /* Todo: this shouldn't be 0, it should be current scrollbar value */
         prepare_for_display_html();
-        display_html(grid_vertical_scroll_bar->value());
+        display_html(grid_vertical_scroll_bar->value(), 0);
       }
     }
     return;
@@ -10400,7 +10450,7 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 */
 void color_change()
 {
-  display_html(grid_vertical_scroll_bar->value());
+  display_html(grid_vertical_scroll_bar->value(), 0);
 }
 
 /*
@@ -10516,7 +10566,7 @@ bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
     }
     if (is_fancy() == true) /* was: if (copy_of_ocelot_html == 1) */
     {
-      display_html(new_value);
+      display_html(new_value, 0);
       this->update();      /* not sure if we need to update both this and client, but it should be harmless*/
       client->update();
       grid_vertical_scroll_bar->update();

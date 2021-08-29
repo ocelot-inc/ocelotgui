@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: August 23 2021
+   Last modified: August 29 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -440,7 +440,7 @@
 
 #if (OCELOT_IMPORT_EXPORT == 1)
   /* Accessed both in ocelotgui.h and ocelotgui.cpp */
-  int export_type= TOKEN_KEYWORD_DEFAULT;                /* e.g. TOKEN_KEYWORD_CSV | TOKEN_KEYWORD_BOXES | TOKEN_KEYWORD_DEFAULT etc. */
+  int export_type= TOKEN_KEYWORD_DEFAULT;                /* e.g. TOKEN_KEYWORD_DELIMITED | TOKEN_KEYWORD_BOXES | TOKEN_KEYWORD_DEFAULT etc. */
   bool export_columns_optionally;
   QByteArray export_columns_enclosed_by;
   QByteArray export_columns_escaped_by;
@@ -454,6 +454,7 @@
   unsigned short export_margin;       /* not user-changeable yet */
   unsigned short export_padding;      /* not user-changeable yet */
   unsigned short export_last; /* not user-changeable yet */ /* does last column get a terminated-by? */
+  unsigned short export_divider; /* not user-changeable yet */ /* divider line e.g. +---+---+? */
 #endif
 
   static QString hparse_text_copy;
@@ -1291,20 +1292,36 @@ QByteArray MainWindow::to_byte_array(QString q)
 
 /*
    SET ocelot_export ...; -- settings for dump of current result set, in one of several formats
-   Example: set by menu File|Export CSV using the same default as the mysql client:
-   SET ocelot_export = CSV
+   Many of the comments are about wishes that might never come true
+   Example: set by menu File|Export DELIMITED using the same default as the mysql client:
+   SET ocelot_export = DELIMITED
+       INTO STDOUT
        FIELDS TERMINATED BY '\t' ENCLOSED BY '' ESCAPED BY '\\'
-       LINES TERMINATED BY '\n' STARTING BY '';
+       LINES STARTING BY '' TERMINATED BY '\n';
+   SET ocelot_export = BOXES
+       FIELDS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY ''
+       LINES STARTING BY '|' TERMINATED BY '\n';
    Export filename is specified separately by TEE filename, and OK result should say that
-   General types: CSV BOXES HTML JSON YAML LUA HTML4 HTML5 SQL DEFAULT (? and BATCH or RAW or XML?)
-   CSV:
+     ... or it isn't, and we have an optional FILE clause
+   General types: DELIMITED, BOXES, HTML, JSON, YAML, LUA, HTML4, HTML5, DEFAULT (? and BATCH or RAW or XML?)
+                  SQL | INSERT STATEMENTS, MSGPACK, LATEX, TROFF
+
+   As well as overriding TEE, this overrides --html-raw and --xml and --raw
+
+   INTO 'filename' | TEE | STDOUT | @variable | CLIPBOARD | TMPFILE | pipe/port | grid-widget | histfile
+     We considered saying OUTFILE = or INTO OUTFILE or FILE, hopefully '[literal]' is enough hint
+     We considered [INTO 'outfile'] and if it's absent then INTO STDOUT is default
+     IF EXISTS append | error | overwrite
+     ... Perhaps this overrides what TEE says, but a later TEE can override it
+     there is no default file extension like .csv
+
+   DELIMITED: (some call it DEP) (these defaults are for MySQL which is tab-separated but like CSV)
      The same items that are in MySQL/MariaDB output file
      FIELDS|COLUMNS TERMINATED BY string
      FIELDS|COLUMNS ESCAPED BY string
      FIELDS|COLUMNS [OPTIONALLY] ENCLOSED BY string
-     LINES STARTING BY string
-     LINES TERMINATED BY string
-   BOXES: (or just BOX?)
+     LINES STARTING BY string TERMINATED BY string
+   BOXES: (or just BOX?) (or FIXED?)
      This is the +----+ style with Box drawing as in https://en.wikipedia.org/wiki/Box-drawing_character
      (but really the +-----+ style is fixed-width, columns terminated by |, lines terminated by special-stuff)
      SET ... COLUMN BOUNDARIES '|' LINE BOUNDARIES '-' INTERSECTIONS '+' HEADER LINE BOUNDARIES '='
@@ -1319,9 +1336,11 @@ QByteArray MainWindow::to_byte_array(QString q)
    DEFAULT:
      This is the default, as the name implies.
      TEE result set output will be like BOXES with -s and |s and +s, same as history output.
+     So DEFAULT is what you are used to seeing with TEE.
    Applicable for all types:
-     IF FILE EXISTS ERROR|APPEND|TRUNCATE
-     WIDTH FIXED|MINIMAL i.e. should we fill in blanks with leading|trailing spaces, as if PAD ' '
+     IF FILE EXISTS ERROR|APPEND|TRUNCATE Default = APPEND though mysql client would say ERROR
+     WIDTH FIXED|MINIMAL|MAXIMAL i.e. should we fill in blanks with leading|trailing spaces, as if PAD ' '
+       and if fixed: truncate | newline
      MAX ROWS = n or selected-rows, if it's 0 but INCLUDE QUERY then only query will go out
      NULL AS 'NULL' etc. but MySQL|MariaDB always say \N (or "fill with ****s"?)
      BINARY AS ascii | hex | 'binary' | according to MySQL 8.0 setting for mysql client
@@ -1329,14 +1348,22 @@ QByteArray MainWindow::to_byte_array(QString q)
      MAXIMUM_BYTES, MAXIMUM_LINE_WIDTH
      INCLUDE QUERY = true/false (default is true because exporting is like that, or false if DEFAULT)
      INCLUDE RESULT COUNT = true/false although probably a better word for INCLUDE QUERY would do the job
-     CHARACTER SET
-     Whether it's okay to double a quote character inside quotes, SQL-style, e.g. 'The''Rain'
-     Some SQL*Plus names are: RECSEP UNDERLINE HEADSEP WRAPPED|WORD_WRAPPED|TRUNCATED, BREAK ON column
-     MAXIMUM_COLUMN_WIDTH = n or as-in-definition, and WRAP | TRUNCATE, and PAD with spaces
-     FLUSH AFTER EACH ROW | AT END
-     SKIP IF same-regexp-as-for-history
+     CHARACTER SET character-set-name                       default is UTF8
+     DOUBLE QUOTES     Whether it's okay to double a quote character inside quotes,
+                       SQL-style, e.g. 'The''Rain'.
+                       This makes no sense if ENCLOSED BY is not ", or if ESCAPED BY is operating. Override them?
+                       Default = no.
+     HEADER            include column names? Add Oracle-style Header separator?
+     MAXIMUM_COLUMN_WIDTH = n or as-in-definition, and WRAP | WORD-WRAP | TRUNCATE, and PAD with spaces
+     FLUSH AFTER EACH ROW | AT END         Default = after each row
+     SKIP IF same-regexp-as-for-history    Default = nothing
+                                           Or say EXCLUDE data-type
+     ONLY SELECTED ROWS                    Ordinarily we always output when we have a selection
+                                           So this would imply: do not output until user selects
+                                           Initially nothing is selected.
    Re FIELDS|COLUMNS TERMINATED BY:
      It comes at the end of every column -- except the last column! So default end-of-row is x0a not 0x090a.
+     So allow "Include after last column"
    Re ESCAPED BY:
      x00 becomes escape+'0',
      fields-terminated-by becomes escape+fields-terminated-by e.g. x09 becomes escape+x09 (default),
@@ -1348,18 +1375,19 @@ QByteArray MainWindow::to_byte_array(QString q)
      But this is a reason that more than one character for enclosing makes no sense, usually.
      Re escape+'0': I guess it's rational if we say ESCAPED BY '\' because then the output is \0
      Todo: what if TERMINATED BY '\r\n'? Are ALL characters in the string escaped?
+     Perhaps " should be escaped by "" i.e. double the character you delimit with, or ESCAPE BY DOUBLE QUOTES
    Re ambiguity:
      mysql client can say "| Warning | 1475 | First character of the FIELDS TERMINATED string is ambiguous;
      please use non-optional and non-empty FIELDS ENCLOSED BY |".
      ... Because it's stupid if escaped-by = terminated-by = enclosed-by i.e. the same character twice.
 +-
    Struct, or individual variables
-     type = "CSV", "BOXES", etc.
+     type = "DELIMITED", "BOXES", etc.
      maximum_rows = long unsigned int
-     column_boundary = ',' (the CSV default) or '|' (the BOXES default) -- no, CSV default is '' I guess
+     column_boundary = ',' (the CSV default) or '|' (the BOXES default) -- no, DELIMITED default is '' I guess
      include_query = bool
    Todo: Menu
-     File | Export csv etc.
+     File | Export delimited etc.
      Dialog box for each type, with different names but affecting the same variables
      No shortcuts
      ostrings.h, French: Exportation, boîtes
@@ -1380,7 +1408,7 @@ QByteArray MainWindow::to_byte_array(QString q)
          I'd like to do differently. But I'd have to know whether X'...' i.e. VARBINARY was used.
          Maybe I'd only have to insist that the escape character is ASCII. Or say it's bizarre.
 */
-int MainWindow::import_export_rule_set(QString text)
+void MainWindow::import_export_rule_set(QString text)
 {
   export_type= TOKEN_KEYWORD_DEFAULT;
   export_columns_enclosed_by= "";
@@ -1396,23 +1424,27 @@ int MainWindow::import_export_rule_set(QString text)
   export_margin= 1;
   export_padding= 1;
   export_last= 1;
-  if (text == "") return ER_OK; /* for default initialization we pass "" */
-
-  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return ER_ERROR;
-  /* Following does nothing until we actually start evaluating what's in text */
-  int i;
+  export_divider= 1;
+  QString file_name= "";
+  QString s, rr;
+  int i, j, i_prev_1, i_prev_2, token_prev_2;
   int lines_or_columns= 0;
+  int token;
+  if (text == "") goto ok_return; /* for default initialization we pass "" */
+
+  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) goto er_return;
+  /* Following does nothing until we actually start evaluating what's in text */
   for (i= 0; main_token_lengths[i] != 0; ++i)
   {
-    int token= main_token_types[i];
+    token= main_token_types[i];
     if (token == TOKEN_KEYWORD_BOXES)
     {
       export_type= TOKEN_KEYWORD_BOXES;
       /* rest is default initially */
     }
-    if (token == TOKEN_KEYWORD_CSV)
+    if (token == TOKEN_KEYWORD_DELIMITED)
     {
-      export_type= TOKEN_KEYWORD_CSV;
+      export_type= TOKEN_KEYWORD_DELIMITED;
       export_columns_enclosed_by= "";
       export_columns_escaped_by= "\\";
       export_column_names= 0;
@@ -1425,11 +1457,27 @@ int MainWindow::import_export_rule_set(QString text)
       export_margin= 0;
       export_padding= 0;
       export_last= 0;
+      export_divider= 0;
+    }
+    if (token == TOKEN_KEYWORD_HTML)
+    {
+      export_type= TOKEN_KEYWORD_HTML;
+      export_queries= false;
+      export_row_counts= false;
+      break;
     }
     if (token == TOKEN_KEYWORD_DEFAULT)
     {
       break;
     }
+
+    if (token == TOKEN_KEYWORD_INTO)
+    {
+      j= next_i(i, +1);
+      file_name= text.mid(main_token_offsets[j], main_token_lengths[j]);
+      file_name= connect_stripper(file_name, false); /* todo: consider: should we pass true rather than false here? */
+    }
+
     if ((token == TOKEN_KEYWORD_FIELDS) || (token == TOKEN_KEYWORD_COLUMNS))
       lines_or_columns= TOKEN_KEYWORD_COLUMNS;
     if (token == TOKEN_KEYWORD_LINES)
@@ -1439,27 +1487,46 @@ int MainWindow::import_export_rule_set(QString text)
     /* Todo: what if it's a number? or a constant like FALSE? */
     if ((token == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) || (token == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
     {
-      QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      s= text.mid(main_token_offsets[i], main_token_lengths[i]);
       s= connect_stripper(s, false);
-      int i_prev_1= next_i(i, -1);         /* presumably BY */
-      int i_prev_2= next_i(i_prev_1, -1);
-      int token_prev_2= main_token_types[i_prev_2];
+      i_prev_1= next_i(i, -1);         /* presumably BY */
+      i_prev_2= next_i(i_prev_1, -1);
+      token_prev_2= main_token_types[i_prev_2];
       if (lines_or_columns == TOKEN_KEYWORD_COLUMNS)
       {
         if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) export_columns_enclosed_by= to_byte_array(s);
         else if (token_prev_2 == TOKEN_KEYWORD_ESCAPED) export_columns_escaped_by= to_byte_array(s);
         else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) export_columns_terminated_by= to_byte_array(s);
-        else printf("**** COLUMNS BAD?\n");
+        else { printf("**** COLUMNS BAD?\n"); goto er_return; }
       }
       if (lines_or_columns == TOKEN_KEYWORD_LINES)
       {
         if (token_prev_2 == TOKEN_KEYWORD_STARTING) export_lines_starting_by= to_byte_array(s);
         else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) export_lines_terminated_by= to_byte_array(s);
-        else printf("**** LINES BAD?\n");
+        else { printf("**** LINES BAD?\n"); goto er_return; }
       }
     }
   }
-  return ER_OK;
+
+  if (file_name != "")
+  {
+    if (history_file_start("TEE", file_name, &rr) == 0)
+    {
+      make_and_put_open_message_in_result(ER_FILE_OPEN, 0, rr);
+      return;
+    }
+    else
+    {
+      make_and_put_open_message_in_result(ER_OK_PLUS, 0, rr);
+      return;
+    }
+  }
+ok_return:
+  make_and_put_message_in_result(ER_OK, 0, (char*)"");
+  return;
+er_return:
+  make_and_put_message_in_result(ER_SYNTAX, 0, (char*)"");
+  return;
 }
 #endif
 
@@ -2137,23 +2204,30 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
   if (is_interactive == false) return;
 
   /*  not related to markup, just a convenient place to call */
-  history_file_write("HIST", query_utf16);
+  history_file_write("HIST", query_utf16, false);
 }
 
 void MainWindow::tee_export(QString result_set_for_history)
 {
-  if (export_queries == true) history_file_write("TEE", query_utf16);
-  if (export_row_counts == true) history_file_write("TEE", statement_edit_widget->result);
+  if (export_queries == true) history_file_write("TEE", query_utf16, true);
+  if (export_row_counts == true) history_file_write("TEE", statement_edit_widget->result, true);
   if (result_set_for_history > "")
   {
 #if (OCELOT_IMPORT_EXPORT == 1)
-    if (export_type == TOKEN_KEYWORD_DEFAULT)
+    if (export_type == TOKEN_KEYWORD_HTML)
     {
-      history_file_write("TEE", result_set_for_history);
+      /* Todo: There's silly repetition here. You should pass rg to tee_export! */
+      ResultGrid *rg;
+      rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
+      rg->display_html(0, TOKEN_KEYWORD_OCELOT_EXPORT);
+    }
+    else if (export_type == TOKEN_KEYWORD_DEFAULT)
+    {
+      history_file_write("TEE", result_set_for_history, true);
     }
     else
     {
-      /* assume CSV */
+      /* assume DELIMITED or BOXES */
       ResultGrid *rg;
       QString result_set_for_history;
       bool is_vertical= false;
@@ -2163,7 +2237,7 @@ void MainWindow::tee_export(QString result_set_for_history)
     }
   }
 #else
-  history_file_write("TEE", result_set_for_history);
+  history_file_write("TEE", result_set_for_history, true);
 #endif
 }
 
@@ -2339,7 +2413,7 @@ int MainWindow::history_markup_previous_or_next()
     mysql will of course see our added comment line but user can ignore it, or set ocelot_histfileflags
    QRegExp is unavailable in Qt 6. Todo: We have never tested the replacemnt QRegularExpression code.
 */
-void MainWindow::history_file_write(QString history_type, QString text_line)  /* see comment=tee+hist */
+void MainWindow::history_file_write(QString history_type, QString text_line, bool nflag)  /* see comment=tee+hist */
 {
   if (history_type == "TEE")
   {
@@ -2386,7 +2460,7 @@ void MainWindow::history_file_write(QString history_type, QString text_line)  /*
   {
     ocelot_history_tee_file.write(query, strlen(query));
     /* We need the \n but not an extra \n if we append. */
-    if (export_type == TOKEN_KEYWORD_DEFAULT)
+    if ((export_type == TOKEN_KEYWORD_DEFAULT) || (nflag == true))
     {
       ocelot_history_tee_file.write("\n", strlen("\n"));
     }
@@ -2707,7 +2781,10 @@ void MainWindow::create_menu()
   menu_file_action_exit= menu_file->addAction("");
 #if (OCELOT_IMPORT_EXPORT == 1)
   menu_file->addSeparator();
-  menu_file_action_export_csv= menu_file->addAction("");
+  menu_file_action_export_delimited= menu_file->addAction("");
+  menu_file_action_export_boxes= menu_file->addAction("");
+  menu_file_action_export_html= menu_file->addAction("");
+  menu_file_action_export_default= menu_file->addAction("");
 #endif
   menu_edit= ui->menuBar->addMenu("");
   menu_edit_action_undo= menu_edit->addAction("");
@@ -2801,8 +2878,14 @@ void MainWindow::fill_menu()
   menu_edit->setTitle(menu_strings[menu_off + MENU_EDIT]);
 #if (OCELOT_IMPORT_EXPORT == 1)
   /* Todo: Put in ostrings.h and allow MENU_FILE_EXPORT */
-  menu_file_action_export_csv->setText("Export CSV");
-  connect(menu_file_action_export_csv, SIGNAL(triggered()), this, SLOT(action_export_csv()));
+  menu_file_action_export_delimited->setText("Export delimited");
+  connect(menu_file_action_export_delimited, SIGNAL(triggered()), this, SLOT(action_export_delimited()));
+  menu_file_action_export_boxes->setText("Export boxes");
+  connect(menu_file_action_export_boxes, SIGNAL(triggered()), this, SLOT(action_export_boxes()));
+  menu_file_action_export_html->setText("Export html");
+  connect(menu_file_action_export_html, SIGNAL(triggered()), this, SLOT(action_export_html()));
+  menu_file_action_export_default->setText("Export default");
+  connect(menu_file_action_export_default, SIGNAL(triggered()), this, SLOT(action_export_default()));
 #endif
   menu_edit_action_undo->setText(menu_strings[menu_off + MENU_EDIT_UNDO]);
   connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
@@ -4453,14 +4536,24 @@ void MainWindow::action_exit()
 
 #if (OCELOT_IMPORT_EXPORT == 1)
 /*
-  For menu item "export csv" we said connect(...SLOT(action_export_csv())));
+  For menu item "export delimited" we said connect(...SLOT(action_export_delimited())));
   This is on (if there is a result set to export, and associated with File|Export menu item.
 */
-void MainWindow::action_export_csv()
+void MainWindow::action_export_delimited()
 {
-  log("action_export_csv start", 90);
-  action_change_one_setting("0", "1", TOKEN_KEYWORD_OCELOT_EXPORT);
-  log("action_export_csv end", 90);
+  action_change_one_setting("0", "1", TOKEN_KEYWORD_DELIMITED);
+}
+void MainWindow::action_export_boxes()
+{
+  action_change_one_setting("0", "1", TOKEN_KEYWORD_BOXES);
+}
+void MainWindow::action_export_html()
+{
+  action_change_one_setting("0", "1", TOKEN_KEYWORD_HTML);
+}
+void MainWindow::action_export_default()
+{
+  action_change_one_setting("0", "1", TOKEN_KEYWORD_DEFAULT);
 }
 #endif
 
@@ -5578,12 +5671,35 @@ void MainWindow::action_change_one_setting(QString old_setting,
   {
     QString text;
 #if (OCELOT_IMPORT_EXPORT == 1)
-    if (keyword_index == TOKEN_KEYWORD_OCELOT_EXPORT)
+    if (keyword_index == TOKEN_KEYWORD_DELIMITED)
     {
-      text= "SET ocelot_export = CSV "\
+      text= "SET ocelot_export = DELIMITED "\
+            "INTO STDOUT "\
             "COLUMNS TERMINATED BY '\\t' ENCLOSED BY '' ESCAPED BY '\\\\' "\
-            "LINES TERMINATED BY '\\n' STARTING BY '';";
-      main_token_count_in_statement= 22;
+            "LINES STARTING BY '' TERMINATED BY '\\n';";
+      main_token_count_in_statement= 24;
+    }
+    else if (keyword_index == TOKEN_KEYWORD_BOXES)
+    {
+      text= "SET ocelot_export = BOXES "\
+            "INTO STDOUT "\
+            "COLUMNS TERMINATED BY '\\t' ENCLOSED BY '' ESCAPED BY '\\\\' "\
+            "LINES STARTING BY '' TERMINATED BY '\\n';";
+      main_token_count_in_statement= 24;
+    }
+    else if (keyword_index == TOKEN_KEYWORD_HTML)
+    {
+      text= "SET ocelot_export = HTML "\
+            "INTO STDOUT "\
+            ";";
+      main_token_count_in_statement= 7;
+    }
+    else if (keyword_index == TOKEN_KEYWORD_DEFAULT)
+    {
+      text= "SET ocelot_export = DEFAULT "\
+            "INTO STDOUT "\
+            ";";
+      main_token_count_in_statement= 7;
     }
     else
 #endif
@@ -10463,7 +10579,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     bool open_result= file.open(QIODevice::ReadOnly | QIODevice::Text);
     if (open_result == false)
     {
-      make_and_put_message_in_result(ER_FILE_OPEN, 0, (char*)"");
+      make_and_put_open_message_in_result(ER_FILE_OPEN, 0, file.errorString());
       return 1;
     }
     /* Todo: this gets rid of SOURCE statement, but maybe it should be a comment in history. */
@@ -10691,14 +10807,11 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     QString rr;
     if (history_file_start("TEE", s, &rr) == 0)
     {
-      char tmp_str[1024];
-      strcpy(tmp_str, rr.toUtf8());
-      make_and_put_message_in_result(ER_FOPEN_FAILED, 0, tmp_str);
+      make_and_put_open_message_in_result(ER_FILE_OPEN, 0, rr);
     }
     else
     {
-      statement_edit_widget->result= rr + " ";
-      make_and_append_message_in_result(ER_OK, 0, (char*)"");
+      make_and_put_open_message_in_result(ER_OK_PLUS, 0, rr);
     }
     return 1;
   }
@@ -10784,9 +10897,8 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if ((sub_token_types[1] == TOKEN_KEYWORD_OCELOT_IMPORT)
        || (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_EXPORT))
       {
-        int er= import_export_rule_set(text);
-        statement_edit_widget->result= "(This affects TEE file format) ";
-        make_and_append_message_in_result(er, 0, (char*)"");
+        import_export_rule_set(text);
+        /* make_and_put_message_in_reult is done within import_export_rule_set */
         return 1;
       }
 #endif
@@ -11857,6 +11969,21 @@ void MainWindow::make_and_put_message_in_result(
   put_message_in_result(buffer);
 }
 
+void MainWindow::make_and_put_open_message_in_result(
+        unsigned int er_number, /* either ER_FILE_OPEN or ER_OK_PLUS */
+        int er_numeric_parameter,
+        QString file_name)
+{
+  char er_string_parameter[1024]; /* todo: should depend on file_name.size() */
+  char buffer[ER_MAX_LENGTH];
+  strcpy(er_string_parameter, file_name.toUtf8());
+  if (strstr(er_strings[er_off + er_number], "%s") != NULL)
+    sprintf(buffer, er_strings[er_off + er_number], er_string_parameter);
+  else
+    sprintf(buffer, er_strings[er_off + er_number], er_numeric_parameter);
+  put_message_in_result(buffer);
+}
+
 void MainWindow::make_and_append_message_in_result(
         unsigned int er_number,
         int er_numeric_parameter,
@@ -12527,6 +12654,7 @@ void MainWindow::initial_asserts()
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
   assert(TOKEN_KEYWORD_QUESTIONMARK == TOKEN_KEYWORDS_START);
+
 #ifdef ADDITIONAL_ASSERTS
   //* Test strvalues is ordered by bsearching for every item. */
   // This is commented out i.e. we don't define ADDITIONAL_ASSERTS unless there has been a change to the list */
@@ -19222,7 +19350,7 @@ void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
       }
     }
     qtextedit_is_in_drag_for_column= qtextedit_is_in_drag_for_row= false;
-    if (is_dragged == true) result_grid->display_html(result_grid->grid_vertical_scroll_bar->value()); /* refresh */
+    if (is_dragged == true) result_grid->display_html(result_grid->grid_vertical_scroll_bar->value(), 0); /* refresh */
   }
   QTextEdit::mouseReleaseEvent(event);
 }
