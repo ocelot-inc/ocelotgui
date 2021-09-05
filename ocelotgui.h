@@ -2685,6 +2685,9 @@ static const fontweights fontweightsvalues[]=
 #include <QRegExp>
 #endif
 
+#if (OCELOT_IMPORT_EXPORT == 1)
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 1)
 /* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
 #include <mysql.h>
@@ -3484,10 +3487,8 @@ public slots:
   void action_connect_once(QString);
   void action_exit();
 #if (OCELOT_IMPORT_EXPORT == 1)
-  void action_export_delimited();
-  void action_export_boxes();
-  void action_export_html();
-  void action_export_default();
+  QStringList fake_statement(QString fake_statement_text);
+  void action_export();
 #endif
   void action_execute_force();
   int action_execute(int);
@@ -3809,10 +3810,7 @@ private:
     QAction *menu_file_action_connect;
     QAction *menu_file_action_exit;
 #if (OCELOT_IMPORT_EXPORT == 1)
-    QAction *menu_file_action_export_delimited;
-    QAction *menu_file_action_export_boxes;
-    QAction *menu_file_action_export_html;
-    QAction *menu_file_action_export_default;
+    QAction *menu_file_action_export;
 #endif
   QMenu *menu_edit;
     QAction *menu_edit_action_cut;
@@ -4326,7 +4324,7 @@ protected:
 /* THE ROW_FORM_BOX WIDGET */
 
 /*
-  Todo: Currently this is only used for connecting.
+  Todo: Currently this is only used for connecting. And export dialog coming soon.
         But it should be very easy to use with result-table rows,
         either for vertical display or in response to a keystroke on ResultGrid.
 */
@@ -4362,6 +4360,7 @@ private:
   QLabel **label;
   QLineEdit **line_edit;
   QTextEdit **text_edit;
+  QComboBox **combo_box_edit;
   QHBoxLayout **hbox_layout;
   QWidget **widget;
   QPushButton *button_for_cancel, *button_for_ok;
@@ -4400,6 +4399,7 @@ Row_form_box(int column_count, QString *row_form_label,
   label= 0;
   line_edit= 0;
   text_edit= 0;
+  combo_box_edit= 0;
   hbox_layout= 0;
   widget= 0;
   button_for_cancel= 0;
@@ -4414,6 +4414,7 @@ Row_form_box(int column_count, QString *row_form_label,
   label= new QLabel*[column_count];
   line_edit= new QLineEdit*[column_count];
   text_edit= new QTextEdit*[column_count];
+  combo_box_edit= new QComboBox*[column_count];
   hbox_layout= new QHBoxLayout*[column_count];
   widget= new QWidget*[column_count];
 
@@ -4422,6 +4423,7 @@ Row_form_box(int column_count, QString *row_form_label,
     label[i]= 0;
     line_edit[i]= 0;
     text_edit[i]= 0;
+    combo_box_edit[i]= 0;
     hbox_layout[i]= 0;
     widget[i]= 0;
   }
@@ -4463,7 +4465,7 @@ Row_form_box(int column_count, QString *row_form_label,
       line_edit[i]->setMinimumHeight(component_height);
       hbox_layout[i]->addWidget(line_edit[i]);
     }
-    else
+    else if (row_form_is_password[i] == 0)
     {
       text_edit[i]= new QTextEdit();
 
@@ -4484,6 +4486,19 @@ Row_form_box(int column_count, QString *row_form_label,
       /* The following line will work, but I'm undecided whether it's desirable. */
       //if ((row_form_type[i] & NUM_FLAG) != 0) text_edit[i]->setAlignment(Qt::AlignRight);
       hbox_layout[i]->addWidget(text_edit[i]);
+    }
+    else /* row_form_is_password[i] == 2 */
+    {
+      combo_box_edit[i]= new QComboBox();
+      combo_box_edit[i]->setMaximumHeight(component_height);
+      combo_box_edit[i]->setMinimumHeight(component_height);
+      //combo_box_edit[i]->setTabChangesFocus(true);
+
+      QStringList qs= parent->fake_statement(row_form_data[i]);
+      for (int j= 0; j < qs.size(); ++j) combo_box_edit[i]->addItem(qs.at(j));
+
+      combo_box_edit[i]->addItem("Wombat");
+      hbox_layout[i]->addWidget(combo_box_edit[i]);
     }
     widget[i]= new QWidget();
     widget[i]->setLayout(hbox_layout[i]);
@@ -4562,7 +4577,8 @@ void handle_button_for_ok()
   for (int i= 0; i < column_count_copy; ++i)
   {
     if (this_row_form_box->row_form_is_password_copy[i] == 1) this_row_form_box->row_form_data_copy[i]= line_edit[i]->text();
-    else this_row_form_box->row_form_data_copy[i]= text_edit[i]->toPlainText();
+    else if (this_row_form_box->row_form_is_password_copy[i] == 0) this_row_form_box->row_form_data_copy[i]= text_edit[i]->toPlainText();
+    else this_row_form_box->row_form_data_copy[i]= combo_box_edit[i]->currentText();
   }
   is_ok= 1;
   garbage_collect();
@@ -4599,6 +4615,11 @@ void garbage_collect ()
   {
     for (i= 0; i < column_count_copy; ++i) if (text_edit[i] != 0) delete text_edit[i];
     delete [] text_edit;
+  }
+  if (combo_box_edit != 0)
+  {
+    for (i= 0; i < column_count_copy; ++i) if (combo_box_edit[i] != 0) delete combo_box_edit[i];
+    delete [] combo_box_edit;
   }
   if (hbox_layout != 0)
   {

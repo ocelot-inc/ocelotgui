@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: August 29 2021
+   Last modified: September 5 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -2781,10 +2781,8 @@ void MainWindow::create_menu()
   menu_file_action_exit= menu_file->addAction("");
 #if (OCELOT_IMPORT_EXPORT == 1)
   menu_file->addSeparator();
-  menu_file_action_export_delimited= menu_file->addAction("");
-  menu_file_action_export_boxes= menu_file->addAction("");
-  menu_file_action_export_html= menu_file->addAction("");
-  menu_file_action_export_default= menu_file->addAction("");
+  menu_file_action_export= menu_file->addAction("");
+  menu_file_action_export->setCheckable(true);
 #endif
   menu_edit= ui->menuBar->addMenu("");
   menu_edit_action_undo= menu_edit->addAction("");
@@ -2878,14 +2876,8 @@ void MainWindow::fill_menu()
   menu_edit->setTitle(menu_strings[menu_off + MENU_EDIT]);
 #if (OCELOT_IMPORT_EXPORT == 1)
   /* Todo: Put in ostrings.h and allow MENU_FILE_EXPORT */
-  menu_file_action_export_delimited->setText("Export delimited");
-  connect(menu_file_action_export_delimited, SIGNAL(triggered()), this, SLOT(action_export_delimited()));
-  menu_file_action_export_boxes->setText("Export boxes");
-  connect(menu_file_action_export_boxes, SIGNAL(triggered()), this, SLOT(action_export_boxes()));
-  menu_file_action_export_html->setText("Export html");
-  connect(menu_file_action_export_html, SIGNAL(triggered()), this, SLOT(action_export_html()));
-  menu_file_action_export_default->setText("Export default");
-  connect(menu_file_action_export_default, SIGNAL(triggered()), this, SLOT(action_export_default()));
+  menu_file_action_export->setText("Export");
+  connect(menu_file_action_export, SIGNAL(triggered()), this, SLOT(action_export()));
 #endif
   menu_edit_action_undo->setText(menu_strings[menu_off + MENU_EDIT_UNDO]);
   connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
@@ -4535,26 +4527,122 @@ void MainWindow::action_exit()
 }
 
 #if (OCELOT_IMPORT_EXPORT == 1)
+
 /*
-  For menu item "export delimited" we said connect(...SLOT(action_export_delimited())));
-  This is on (if there is a result set to export, and associated with File|Export menu item.
+  Especially for dialog boxes, there will be times that we want a list box of possibilities.
+  I'd like to produce the list once and consistently.
+  And I know that hparse can figure out what's possible.
+  Example: I want to get a list of the export types.
+           Pass SET ocelot_export =
+           Result: DELIMITED or BOXES or HTML or DEFAULT will be in hparse_expected.
+           Split that  into a QStringList with " or " as separator with QString::split().
+           Warning: It's case sensitive so OR won't split, but " or " within a string or name will split.
+  Todo: Figure out how dangerous this is and when it is possible to call it safely.
+        In mitigation, notice that the plan is to call this when we're going to generate a new statement.
+  Todo: Doubtless there will be more than one fake statement, so figure out how to decrease overhead.
+  Todo: Watch for overflow, don't pass big fake statements, we're expecting main_token_ stuff is sufficient.
+  Todo: Save completer_widget, or use it rather than hparse_expected, or make sure you don't call it.
+  Todo: Once this is okay, row_form_box() should be able to take a combo box based on
+        a fake statement that produces the choices for a list box,
+        and the initial list box choice is the fake statement to produce the choices,
+        and is_password is no longer a flag, there's either password-type or normal-text or combo box.
 */
-void MainWindow::action_export_delimited()
+QStringList MainWindow::fake_statement(QString fake_statement_text)
 {
-  action_change_one_setting("0", "1", TOKEN_KEYWORD_DELIMITED);
+  main_token_push();
+  main_token_lengths[0]= 0;
+  tokenize(fake_statement_text.data(),
+           fake_statement_text.size(),
+           &main_token_lengths[0], &main_token_offsets[0], 10,
+          (QChar*)"33333", 1, ocelot_delimiter_str, 1);
+  tokens_to_keywords(fake_statement_text, 0, sql_mode_ansi_quotes);
+  main_token_number= 0;
+  hparse_f_multi_block(fake_statement_text);
+  QStringList string_list= hparse_expected.split(" or ");
+  main_token_pop();
+  return string_list;
 }
-void MainWindow::action_export_boxes()
+
+/*
+  For menu item "export" we said connect(...SLOT(action_export())));
+  This is on (if there is a result set to export, and associated with File|Export menu item.
+
+  Very similar to action_connect_once(QString message)
+  Todo: Use menu_strings[menu_off + n] as we do in action_connect_once().
+  When row_form_password[]==2, row_form_box() will call fake_statement to produce possibilities for a combo box.
+*/
+void MainWindow::action_export()
 {
-  action_change_one_setting("0", "1", TOKEN_KEYWORD_BOXES);
+  QString message= "export";
+  int column_count;
+  QString *row_form_label;
+  int *row_form_type;
+  int *row_form_is_password;
+  QString *row_form_data;
+  QString *row_form_width;
+  QString row_form_title;
+  QString row_form_message;
+  int i;
+  Row_form_box *co;
+  row_form_label= 0;
+  row_form_type= 0;
+  row_form_is_password= 0;
+  row_form_data= 0;
+  row_form_width= 0;
+  column_count= 1; /* If you add or remove items, you have to change this */
+  row_form_label= new QString[column_count];
+  row_form_type= new int[column_count];
+  row_form_is_password= new int[column_count];
+  row_form_data= new QString[column_count];
+  row_form_width= new QString[column_count];
+  row_form_label[i=0]= QString(strvalues[TOKEN_KEYWORD_TYPE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 2; row_form_data[i]= "SET OCELOT_EXPORT ="; row_form_width[i]= '\x50';
+  assert(i == column_count - 1);
+  /* if (message == "File|Connect") */
+  {
+    row_form_title= menu_strings[menu_off + MENU_CONNECTION_DIALOG_BOX];
+    row_form_message= message;
+
+    co= new Row_form_box(column_count, row_form_label,
+                                       row_form_type,
+                                       row_form_is_password, row_form_data,
+  //                                     row_form_width,
+                                       row_form_title,
+                                       menu_strings[menu_off + MENU_FILE_CONNECT_HEADING],
+                                       this);
+    co->exec();
+
+    if (co->is_ok == 1)
+    {
+      QString export_type= row_form_data[0].trimmed();
+      int export_type_as_int;
+      if (export_type == "DELIMITED") export_type_as_int= TOKEN_KEYWORD_DELIMITED;
+      if (export_type == "BOXES") export_type_as_int= TOKEN_KEYWORD_BOXES;
+      if (export_type == "HTML") export_type_as_int= TOKEN_KEYWORD_HTML;
+      if (export_type == "DEFAULT") export_type_as_int= TOKEN_KEYWORD_DEFAULT;
+      action_change_one_setting("0", "1", export_type_as_int);
+      menu_file_action_export->setChecked(true);
+
+//      assert(i == column_count);
+//      /* This should ensure that a record goes to the history widget */
+//      /* Todo: clear statement_edit_widget first */
+//      statement_edit_widget->insertPlainText("CONNECT");
+//      action_execute(1);
+//      if (ocelot_init_command > "")
+//      {
+//        statement_edit_widget->insertPlainText(ocelot_init_command);
+//        action_execute(1);
+//      }
+    }
+    delete(co);
+  }
+
+  if (row_form_width != 0) delete [] row_form_width;
+  if (row_form_data != 0) delete [] row_form_data;
+  if (row_form_is_password != 0)  delete [] row_form_is_password;
+  if (row_form_type != 0) delete [] row_form_type;
+  if (row_form_label != 0) delete [] row_form_label;
 }
-void MainWindow::action_export_html()
-{
-  action_change_one_setting("0", "1", TOKEN_KEYWORD_HTML);
-}
-void MainWindow::action_export_default()
-{
-  action_change_one_setting("0", "1", TOKEN_KEYWORD_DEFAULT);
-}
+
 #endif
 
 /*
