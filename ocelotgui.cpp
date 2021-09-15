@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: September 5 2021
+   Last modified: September 15 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -440,19 +440,19 @@
 
 #if (OCELOT_IMPORT_EXPORT == 1)
   /* Accessed both in ocelotgui.h and ocelotgui.cpp */
-  int export_type= TOKEN_KEYWORD_DEFAULT;                /* e.g. TOKEN_KEYWORD_DELIMITED | TOKEN_KEYWORD_BOXES | TOKEN_KEYWORD_DEFAULT etc. */
+  int export_type= TOKEN_KEYWORD_DEFAULT;                /* e.g. TOKEN_KEYWORD_TEXT | TOKEN_KEYWORD_PRETTY | TOKEN_KEYWORD_DEFAULT etc. */
   bool export_columns_optionally;
   QByteArray export_columns_enclosed_by;
   QByteArray export_columns_escaped_by;
   QByteArray export_columns_terminated_by;
-  QByteArray export_lines_starting_by= "";
+  QByteArray export_lines_starting_by;
   QByteArray export_lines_terminated_by;
   unsigned short export_column_names; /* not user-changeable yet */
-  bool export_queries;                /* not user-changeable yet */
-  bool export_row_counts;             /* not user-changeable yet */
+  unsigned short export_query;                /* not user-changeable yet */
+  unsigned short export_row_count;             /* not user-changeable yet */
   long unsigned export_max_row_count; /* not user-changeable yet */
   unsigned short export_margin;       /* not user-changeable yet */
-  unsigned short export_padding;      /* not user-changeable yet */
+  unsigned short export_pad;          /* not user-changeable yet */
   unsigned short export_last; /* not user-changeable yet */ /* does last column get a terminated-by? */
   unsigned short export_divider; /* not user-changeable yet */ /* divider line e.g. +---+---+? */
 #endif
@@ -1293,39 +1293,41 @@ QByteArray MainWindow::to_byte_array(QString q)
 /*
    SET ocelot_export ...; -- settings for dump of current result set, in one of several formats
    Many of the comments are about wishes that might never come true
-   Example: set by menu File|Export DELIMITED using the same default as the mysql client:
-   SET ocelot_export = DELIMITED
+   Example: set by menu File|Export TEXT using the same default as the mysql client:
+   SET ocelot_export = TEXT
        INTO STDOUT
        FIELDS TERMINATED BY '\t' ENCLOSED BY '' ESCAPED BY '\\'
        LINES STARTING BY '' TERMINATED BY '\n';
-   SET ocelot_export = BOXES
+   SET ocelot_export = PRETTY
        FIELDS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY ''
        LINES STARTING BY '|' TERMINATED BY '\n';
    Export filename is specified separately by TEE filename, and OK result should say that
      ... or it isn't, and we have an optional FILE clause
-   General types: DELIMITED, BOXES, HTML, JSON, YAML, LUA, HTML4, HTML5, DEFAULT (? and BATCH or RAW or XML?)
+   General types: TEXT, PRETTY, HTML, JSON, YAML, LUA, HTML4, HTML5, DEFAULT (? and BATCH or RAW or XML?)
                   SQL | INSERT STATEMENTS, MSGPACK, LATEX, TROFF
 
    As well as overriding TEE, this overrides --html-raw and --xml and --raw
 
    INTO 'filename' | TEE | STDOUT | @variable | CLIPBOARD | TMPFILE | pipe/port | grid-widget | histfile
+     Maybe if you said FILES instead of FILE it would help?
      We considered saying OUTFILE = or INTO OUTFILE or FILE, hopefully '[literal]' is enough hint
      We considered [INTO 'outfile'] and if it's absent then INTO STDOUT is default
-     IF EXISTS append | error | overwrite
+     IF EXISTS append | error | overwrite | add new + ordinal
      ... Perhaps this overrides what TEE says, but a later TEE can override it
-     there is no default file extension like .csv
-
-   DELIMITED: (some call it DEP) (these defaults are for MySQL which is tab-separated but like CSV)
+     there is no default file extension like .csv, but .txt might be okay for text
+     [ADD TIMESTAMP] you could have multiple files, add timestamp or ordinal or random-string to each file name
+     [IF FILE EXISTS ERROR|APPEND|TRUNCATE] Default = APPEND though mysql client would say ERROR
+   TEXT: (some call it DEP) (or DELIMITED?) (these defaults are for MySQL which is tab-separated but like CSV)
      The same items that are in MySQL/MariaDB output file
      FIELDS|COLUMNS TERMINATED BY string
      FIELDS|COLUMNS ESCAPED BY string
      FIELDS|COLUMNS [OPTIONALLY] ENCLOSED BY string
      LINES STARTING BY string TERMINATED BY string
-   BOXES: (or just BOX?) (or FIXED?)
+   PRETTY: (or FIXED?) (I suggested BOXES but I noticed that ClickHouse called it Pretty)
      This is the +----+ style with Box drawing as in https://en.wikipedia.org/wiki/Box-drawing_character
      (but really the +-----+ style is fixed-width, columns terminated by |, lines terminated by special-stuff)
      SET ... COLUMN BOUNDARIES '|' LINE BOUNDARIES '-' INTERSECTIONS '+' HEADER LINE BOUNDARIES '='
-     Does not appply to history, which is boxes but has no options because we may depend on its format.
+     Does not appply to history, which is pretty but has no options because we may depend on its format.
      FIELDS|COLUMNS TERMINATED BY string
      LINES TERMINATED BY '-' AND '+' (or '-+')
      HEADER LINES TERMINATED BY '=' AND '+'
@@ -1335,10 +1337,9 @@ QByteArray MainWindow::to_byte_array(QString q)
      This has to just dump what we got for result grid, but with different limit for number of rows
    DEFAULT:
      This is the default, as the name implies.
-     TEE result set output will be like BOXES with -s and |s and +s, same as history output.
+     TEE result set output will be like PRETTY with -s and |s and +s, same as history output.
      So DEFAULT is what you are used to seeing with TEE.
    Applicable for all types:
-     IF FILE EXISTS ERROR|APPEND|TRUNCATE Default = APPEND though mysql client would say ERROR
      WIDTH FIXED|MINIMAL|MAXIMAL i.e. should we fill in blanks with leading|trailing spaces, as if PAD ' '
        and if fixed: truncate | newline
      MAX ROWS = n or selected-rows, if it's 0 but INCLUDE QUERY then only query will go out
@@ -1346,7 +1347,7 @@ QByteArray MainWindow::to_byte_array(QString q)
      BINARY AS ascii | hex | 'binary' | according to MySQL 8.0 setting for mysql client
      Maybe someday ...
      MAXIMUM_BYTES, MAXIMUM_LINE_WIDTH
-     INCLUDE QUERY = true/false (default is true because exporting is like that, or false if DEFAULT)
+     QUERY = n i.e. include query = true/false (default is true because exporting is like that, or false if DEFAULT)
      INCLUDE RESULT COUNT = true/false although probably a better word for INCLUDE QUERY would do the job
      CHARACTER SET character-set-name                       default is UTF8
      DOUBLE QUOTES     Whether it's okay to double a quote character inside quotes,
@@ -1361,6 +1362,7 @@ QByteArray MainWindow::to_byte_array(QString q)
      ONLY SELECTED ROWS                    Ordinarily we always output when we have a selection
                                            So this would imply: do not output until user selects
                                            Initially nothing is selected.
+     ZIP or some other compression
    Re FIELDS|COLUMNS TERMINATED BY:
      It comes at the end of every column -- except the last column! So default end-of-row is x0a not 0x090a.
      So allow "Include after last column"
@@ -1382,12 +1384,11 @@ QByteArray MainWindow::to_byte_array(QString q)
      ... Because it's stupid if escaped-by = terminated-by = enclosed-by i.e. the same character twice.
 +-
    Struct, or individual variables
-     type = "DELIMITED", "BOXES", etc.
+     type = "TEXT", "PRETTY", etc.
      maximum_rows = long unsigned int
-     column_boundary = ',' (the CSV default) or '|' (the BOXES default) -- no, DELIMITED default is '' I guess
-     include_query = bool
+     column_boundary = ',' (the CSV default) or '|' (the PRETTY default) -- no, TEXT default is '' I guess
    Todo: Menu
-     File | Export delimited etc.
+     File | Export text etc.
      Dialog box for each type, with different names but affecting the same variables
      No shortcuts
      ostrings.h, French: Exportation, boîtes
@@ -1418,52 +1419,52 @@ void MainWindow::import_export_rule_set(QString text)
   export_lines_starting_by= "";
   export_lines_terminated_by= "";
   export_column_names= 1;
-  export_queries= true;
-  export_row_counts= true;
+  export_query= 1;
+  export_row_count= 1;
   export_max_row_count= 100000000;
   export_margin= 1;
-  export_padding= 1;
+  export_pad= 1;
   export_last= 1;
   export_divider= 1;
   QString file_name= "";
   QString s, rr;
-  int i, j, i_prev_1, i_prev_2, token_prev_2;
+  int i, i_prev_1, i_prev_2, token_prev_1, token_prev_2;
   int lines_or_columns= 0;
   int token;
   if (text == "") goto ok_return; /* for default initialization we pass "" */
-
   if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) goto er_return;
   /* Following does nothing until we actually start evaluating what's in text */
   for (i= 0; main_token_lengths[i] != 0; ++i)
   {
     token= main_token_types[i];
-    if (token == TOKEN_KEYWORD_BOXES)
+    if (token == TOKEN_KEYWORD_PRETTY)
     {
-      export_type= TOKEN_KEYWORD_BOXES;
+      export_type= TOKEN_KEYWORD_PRETTY;
       /* rest is default initially */
     }
-    if (token == TOKEN_KEYWORD_DELIMITED)
+    if (token == TOKEN_KEYWORD_TEXT)
     {
-      export_type= TOKEN_KEYWORD_DELIMITED;
+      export_type= TOKEN_KEYWORD_TEXT;
       export_columns_enclosed_by= "";
       export_columns_escaped_by= "\\";
       export_column_names= 0;
       export_columns_terminated_by= "\t";
       export_lines_starting_by= "";
       export_lines_terminated_by= "\n";
-      export_queries= false;
-      export_row_counts= false;
+      export_query= 0;
+      export_row_count= 0;
       export_max_row_count= 100000000;
       export_margin= 0;
-      export_padding= 0;
+      export_pad= 0;
       export_last= 0;
       export_divider= 0;
     }
+
     if (token == TOKEN_KEYWORD_HTML)
     {
       export_type= TOKEN_KEYWORD_HTML;
-      export_queries= false;
-      export_row_counts= false;
+      export_query= 0;
+      export_row_count= 0;
       break;
     }
     if (token == TOKEN_KEYWORD_DEFAULT)
@@ -1473,8 +1474,8 @@ void MainWindow::import_export_rule_set(QString text)
 
     if (token == TOKEN_KEYWORD_INTO)
     {
-      j= next_i(i, +1);
-      file_name= text.mid(main_token_offsets[j], main_token_lengths[j]);
+      i= next_i(i, +1);
+      file_name= text.mid(main_token_offsets[i], main_token_lengths[i]);
       file_name= connect_stripper(file_name, false); /* todo: consider: should we pass true rather than false here? */
     }
 
@@ -1484,6 +1485,24 @@ void MainWindow::import_export_rule_set(QString text)
       lines_or_columns= TOKEN_KEYWORD_LINES;
     if (token == TOKEN_KEYWORD_OPTIONALLY)
       export_columns_optionally= true;
+    if ((token == TOKEN_KEYWORD_QUERY) || (token == TOKEN_KEYWORD_ROW_COUNT)
+     || (token == TOKEN_KEYWORD_MAX_ROW_COUNT)
+     || (token == TOKEN_KEYWORD_MARGIN) || (token == TOKEN_KEYWORD_PAD) || (token == TOKEN_KEYWORD_LAST)
+     || (token == TOKEN_KEYWORD_DIVIDER))
+    {
+      lines_or_columns= 0;
+      i= next_i(i, +1);
+      s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      s= connect_stripper(s, false);
+      int s_as_int= s.toInt();
+      if (token == TOKEN_KEYWORD_QUERY) export_query= s_as_int;
+      if (token == TOKEN_KEYWORD_ROW_COUNT) export_row_count= s_as_int;
+      if (token == TOKEN_KEYWORD_MAX_ROW_COUNT) export_max_row_count= s_as_int;
+      if (token == TOKEN_KEYWORD_MARGIN) export_margin= s_as_int;
+      if (token == TOKEN_KEYWORD_PAD) export_pad= s_as_int;
+      if (token == TOKEN_KEYWORD_LAST) export_last= s_as_int;
+      if (token == TOKEN_KEYWORD_DIVIDER) export_divider= s_as_int;
+    }
     /* Todo: what if it's a number? or a constant like FALSE? */
     if ((token == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) || (token == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
     {
@@ -1491,7 +1510,9 @@ void MainWindow::import_export_rule_set(QString text)
       s= connect_stripper(s, false);
       i_prev_1= next_i(i, -1);         /* presumably BY */
       i_prev_2= next_i(i_prev_1, -1);
+
       token_prev_2= main_token_types[i_prev_2];
+
       if (lines_or_columns == TOKEN_KEYWORD_COLUMNS)
       {
         if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) export_columns_enclosed_by= to_byte_array(s);
@@ -2209,8 +2230,8 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
 
 void MainWindow::tee_export(QString result_set_for_history)
 {
-  if (export_queries == true) history_file_write("TEE", query_utf16, true);
-  if (export_row_counts == true) history_file_write("TEE", statement_edit_widget->result, true);
+  if (export_query == 1) history_file_write("TEE", query_utf16, true);
+  if (export_row_count == 1) history_file_write("TEE", statement_edit_widget->result, true);
   if (result_set_for_history > "")
   {
 #if (OCELOT_IMPORT_EXPORT == 1)
@@ -2227,7 +2248,7 @@ void MainWindow::tee_export(QString result_set_for_history)
     }
     else
     {
-      /* assume DELIMITED or BOXES */
+      /* assume TEXT or PRETTY */
       ResultGrid *rg;
       QString result_set_for_history;
       bool is_vertical= false;
@@ -2538,12 +2559,22 @@ int MainWindow::history_file_start(QString history_type, QString file_name, QStr
   bool open_result;
   if (history_type == "TEE")
   {
-    QFileInfo file_info(query);
-    QString absolute_file_path= file_info.absoluteFilePath();
-    ocelot_history_tee_file.setFileName(query);
-    open_result= ocelot_history_tee_file.open(QIODevice::Append | QIODevice::Text);
-    if (open_result == true) *rr= absolute_file_path;
-    else *rr= absolute_file_path + " " + ocelot_history_tee_file.errorString();
+    QString q_file_name= query;
+    if (q_file_name.compare("stdout", Qt::CaseInsensitive) == 0)
+    {
+      /* todo: check: should I be adding other QIODevice flags? */
+      open_result= ocelot_history_tee_file.open(stdout, QIODevice::WriteOnly);
+      *rr= q_file_name;
+    }
+    else
+    {
+      QFileInfo file_info(query);
+      QString absolute_file_path= file_info.absoluteFilePath();
+      ocelot_history_tee_file.setFileName(query);
+      open_result= ocelot_history_tee_file.open(QIODevice::Append | QIODevice::Text);
+      if (open_result == true) *rr= absolute_file_path;
+      else *rr= absolute_file_path + " " + ocelot_history_tee_file.errorString();
+    }
     delete []query;
     if (open_result == false) return 0;
     ocelot_history_tee_file_is_open= true;
@@ -4534,7 +4565,7 @@ void MainWindow::action_exit()
   And I know that hparse can figure out what's possible.
   Example: I want to get a list of the export types.
            Pass SET ocelot_export =
-           Result: DELIMITED or BOXES or HTML or DEFAULT will be in hparse_expected.
+           Result: TEXT or PRETTY or HTML or DEFAULT will be in hparse_expected.
            Split that  into a QStringList with " or " as separator with QString::split().
            Warning: It's case sensitive so OR won't split, but " or " within a string or name will split.
   Todo: Figure out how dangerous this is and when it is possible to call it safely.
@@ -4575,27 +4606,32 @@ void MainWindow::action_export()
 {
   QString message= "export";
   int column_count;
-  QString *row_form_label;
-  int *row_form_type;
-  int *row_form_is_password;
-  QString *row_form_data;
-  QString *row_form_width;
   QString row_form_title;
   QString row_form_message;
   int i;
   Row_form_box *co;
-  row_form_label= 0;
-  row_form_type= 0;
-  row_form_is_password= 0;
-  row_form_data= 0;
-  row_form_width= 0;
-  column_count= 1; /* If you add or remove items, you have to change this */
-  row_form_label= new QString[column_count];
-  row_form_type= new int[column_count];
-  row_form_is_password= new int[column_count];
-  row_form_data= new QString[column_count];
-  row_form_width= new QString[column_count];
+  column_count= 14; /* If you add or remove items, you have to change this */
+  QString *row_form_label= new QString[column_count];
+  int *row_form_type= new int[column_count];
+  int *row_form_is_password= new int[column_count];
+  QString *row_form_data= new QString[column_count];
+  QString *row_form_width= new QString[column_count];
   row_form_label[i=0]= QString(strvalues[TOKEN_KEYWORD_TYPE].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 2; row_form_data[i]= "SET OCELOT_EXPORT ="; row_form_width[i]= '\x50';
+  row_form_label[++i]= "columns terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_columns_terminated_by; row_form_width[i]= '\x04';
+  row_form_label[++i]= "columns enclosed by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_columns_enclosed_by; row_form_width[i]= '\x04';
+  row_form_label[++i]= "columns escaped by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_columns_escaped_by; row_form_width[i]= '\x04';
+  row_form_label[++i]= "lines starting by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_lines_starting_by; row_form_width[i]= '\x04';
+  row_form_label[++i]= "lines terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_lines_terminated_by; row_form_width[i]= '\x04';
+
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_NAMES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_column_names); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_QUERY].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_query); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_row_count); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_max_row_count); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MARGIN].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_margin); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PAD].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_pad); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LAST].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_last); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DIVIDER].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_divider); row_form_width[i]= '\x50';
+
   assert(i == column_count - 1);
   /* if (message == "File|Connect") */
   {
@@ -4613,12 +4649,8 @@ void MainWindow::action_export()
 
     if (co->is_ok == 1)
     {
-      QString export_type= row_form_data[0].trimmed();
-      int export_type_as_int;
-      if (export_type == "DELIMITED") export_type_as_int= TOKEN_KEYWORD_DELIMITED;
-      if (export_type == "BOXES") export_type_as_int= TOKEN_KEYWORD_BOXES;
-      if (export_type == "HTML") export_type_as_int= TOKEN_KEYWORD_HTML;
-      if (export_type == "DEFAULT") export_type_as_int= TOKEN_KEYWORD_DEFAULT;
+      /* export_type_as_int= TOKEN_KEYWORD_TEXT|PRETTY|HTML_DEFAULT */
+      int export_type_as_int= get_keyword_index_from_qstring(row_form_data[0].trimmed());
       action_change_one_setting("0", "1", export_type_as_int);
       menu_file_action_export->setChecked(true);
 
@@ -5759,17 +5791,17 @@ void MainWindow::action_change_one_setting(QString old_setting,
   {
     QString text;
 #if (OCELOT_IMPORT_EXPORT == 1)
-    if (keyword_index == TOKEN_KEYWORD_DELIMITED)
+    if (keyword_index == TOKEN_KEYWORD_TEXT)
     {
-      text= "SET ocelot_export = DELIMITED "\
+      text= "SET ocelot_export = TEXT "\
             "INTO STDOUT "\
             "COLUMNS TERMINATED BY '\\t' ENCLOSED BY '' ESCAPED BY '\\\\' "\
             "LINES STARTING BY '' TERMINATED BY '\\n';";
       main_token_count_in_statement= 24;
     }
-    else if (keyword_index == TOKEN_KEYWORD_BOXES)
+    else if (keyword_index == TOKEN_KEYWORD_PRETTY)
     {
-      text= "SET ocelot_export = BOXES "\
+      text= "SET ocelot_export = PRETTY "\
             "INTO STDOUT "\
             "COLUMNS TERMINATED BY '\\t' ENCLOSED BY '' ESCAPED BY '\\\\' "\
             "LINES STARTING BY '' TERMINATED BY '\\n';";
@@ -12968,6 +13000,18 @@ int MainWindow::get_keyword_index(const char *key, char *key2)
   p_item=  (char*) bsearch(key2, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
   if (p_item == NULL) return -1;
   return (int)((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
+}
+
+/*
+  Todo: There are a few places where we do something like this,
+        change them to calls to get_keyword_index_from_qstring().
+*/
+int MainWindow::get_keyword_index_from_qstring(QString key)
+{
+  char key1[MAX_KEYWORD_LENGTH + 1];
+  char key2[MAX_KEYWORD_LENGTH + 1];
+  strcpy(key1, key.toUtf8());
+  return get_keyword_index(key1, key2);
 }
 
 /*

@@ -264,7 +264,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_BOOL,
     TOKEN_KEYWORD_BOOLEAN,
     TOKEN_KEYWORD_BOTH,
-    TOKEN_KEYWORD_BOXES,
     TOKEN_KEYWORD_BREAK,
     TOKEN_KEYWORD_BUFFER,
     TOKEN_KEYWORD_BUSY_TIMEOUT,
@@ -398,7 +397,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_DEGREES,
     TOKEN_KEYWORD_DELAYED,
     TOKEN_KEYWORD_DELETE,
-    TOKEN_KEYWORD_DELIMITED,
     TOKEN_KEYWORD_DELIMITER,
     TOKEN_KEYWORD_DENSE_RANK,
     TOKEN_KEYWORD_DESC,
@@ -414,6 +412,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_DISTINCT,
     TOKEN_KEYWORD_DISTINCTROW,
     TOKEN_KEYWORD_DIV,
+    TOKEN_KEYWORD_DIVIDER,
     TOKEN_KEYWORD_DO,
     TOKEN_KEYWORD_DOUBLE,
     TOKEN_KEYWORD_DROP,
@@ -673,6 +672,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_MAKETIME,
     TOKEN_KEYWORD_MAKE_SET,
     TOKEN_KEYWORD_MAP,
+    TOKEN_KEYWORD_MARGIN, /* export */
     TOKEN_KEYWORD_MASTER_BIND,
     TOKEN_KEYWORD_MASTER_HEARTBEAT_PERIOD,
     TOKEN_KEYWORD_MASTER_POS_WAIT,
@@ -682,6 +682,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_MAXVALUE,
         TOKEN_KEYWORD_MAX_ALLOWED_PACKET,
         TOKEN_KEYWORD_MAX_JOIN_SIZE,
+    TOKEN_KEYWORD_MAX_ROW_COUNT, /* export */
     TOKEN_KEYWORD_MBRCONTAINS,
     TOKEN_KEYWORD_MBRCOVEREDBY,
     TOKEN_KEYWORD_MBRCOVERS,
@@ -912,6 +913,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OVER,
     TOKEN_KEYWORD_OVERLAPS,
     TOKEN_KEYWORD_PACKAGE,
+    TOKEN_KEYWORD_PAD, /* export */
     TOKEN_KEYWORD_PAGER,
     TOKEN_KEYWORD_PARSER_TRACE,
     TOKEN_KEYWORD_PARTIAL,
@@ -946,6 +948,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_PRECEDES,
     TOKEN_KEYWORD_PRECISION,
     TOKEN_KEYWORD_PREPARE,
+    TOKEN_KEYWORD_PRETTY,
     TOKEN_KEYWORD_PRIMARY,
     TOKEN_KEYWORD_PRINT,
     TOKEN_KEYWORD_PRINTF,
@@ -1413,7 +1416,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1178
+#define KEYWORD_LIST_SIZE 1181
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1514,7 +1517,6 @@ static const keywords strvalues[]=
       {"BOOL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BOOL},
       {"BOOLEAN", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_BOOLEAN},
       {"BOTH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BOTH},
-      {"BOXES", 0, 0, TOKEN_KEYWORD_BOXES},
       {"BREAK", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_BREAK},
       {"BUFFER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_BUFFER}, /* deprecated in MySQL 5.7.6 */
       {"BUSY_TIMEOUT", 0, 0, TOKEN_KEYWORD_BUSY_TIMEOUT},
@@ -1643,7 +1645,6 @@ static const keywords strvalues[]=
       {"DEGREES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_DEGREES},
       {"DELAYED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DELAYED},
       {"DELETE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DELETE},
-      {"DELIMITED", 0, 0, TOKEN_KEYWORD_DELIMITED},
       {"DELIMITER", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_DELIMITER}, /* ocelotgui keyword */
       {"DENSE_RANK", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_DENSE_RANK},
       {"DESC", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DESC},
@@ -1659,6 +1660,7 @@ static const keywords strvalues[]=
       {"DISTINCT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DISTINCT},
       {"DISTINCTROW", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DISTINCTROW},
       {"DIV", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_DIV},
+      {"DIVIDER", 0, 0, TOKEN_KEYWORD_DIVIDER},
       {"DO", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_DO},
       {"DOUBLE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DOUBLE},
       {"DROP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_DROP},
@@ -1917,6 +1919,7 @@ static const keywords strvalues[]=
       {"MAKETIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKETIME},
       {"MAKE_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKE_SET},
       {"MAP", 0, 0, TOKEN_KEYWORD_MAP},
+      {"MARGIN", 0, 0, TOKEN_KEYWORD_MARGIN}, /* export */
       {"MASTER_BIND", FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_MASTER_BIND},
       {"MASTER_HEARTBEAT_PERIOD", 0, 0, TOKEN_KEYWORD_MASTER_HEARTBEAT_PERIOD},
       {"MASTER_POS_WAIT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MASTER_POS_WAIT},
@@ -1926,6 +1929,7 @@ static const keywords strvalues[]=
       {"MAXVALUE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MAXVALUE},
     {"MAX_ALLOWED_PACKET", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_MAX_ALLOWED_PACKET},
     {"MAX_JOIN_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_MAX_JOIN_SIZE},
+      {"MAX_ROW_COUNT", 0, 0, TOKEN_KEYWORD_MAX_ROW_COUNT}, /* export */
       {"MBRCONTAINS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCONTAINS},
       {"MBRCOVEREDBY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCOVEREDBY},
       {"MBRCOVERS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MBRCOVERS},
@@ -2158,6 +2162,7 @@ static const keywords strvalues[]=
       {"OVER", FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_TARANTOOL | FLAG_VERSION_MARIADB_10_2_2, 0, TOKEN_KEYWORD_OVER},
       {"OVERLAPS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OVERLAPS}, /* deprecated in MySQL 5.7.6 */
       {"PACKAGE", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_PACKAGE},
+      {"PAD", 0, 0, TOKEN_KEYWORD_PAD}, /* export */
       {"PAGER", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_PAGER}, /* ocelotgui keyword */
       {"PARSER_TRACE", 0, 0, TOKEN_KEYWORD_PARSER_TRACE},
       {"PARTIAL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_PARTIAL},
@@ -2192,6 +2197,7 @@ static const keywords strvalues[]=
       {"PRECEDES", FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, 0, TOKEN_KEYWORD_PRECEDES},
       {"PRECISION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PRECISION},
       {"PREPARE", 0, 0, TOKEN_KEYWORD_PREPARE},
+      {"PRETTY", 0, 0, TOKEN_KEYWORD_PRETTY},
       {"PRIMARY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PRIMARY},
       {"PRINT", 0, 0, TOKEN_KEYWORD_PRINT}, /* ocelotgui keyword */
       {"PRINTF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_PRINTF},
@@ -2947,11 +2953,11 @@ extern QByteArray export_columns_terminated_by;
 extern QByteArray export_lines_starting_by;
 extern QByteArray export_lines_terminated_by;
 extern unsigned short export_column_names;
-extern bool export_queries;
-extern bool export_row_counts;
+extern unsigned short export_query;
+extern unsigned short export_row_counts;
 extern long unsigned export_max_row_count;
 extern unsigned short export_margin;
-extern unsigned short export_padding;
+extern unsigned short export_pad;
 extern unsigned short export_last;
 extern unsigned short export_divider;
 #endif
@@ -3227,6 +3233,7 @@ public:
   bool hparse_f_is_equal(QString,QString);
   bool hparse_f_is_special_verb(int);
   int hparse_f_accept(unsigned int,unsigned char,int,QString);
+  //int hparse_f_accept_key(int);
   int hparse_f_acceptn(int,QString,int);
   int hparse_f_acceptf(int pass_number, QString replacee);
   void hparse_f_expected_initialize();
@@ -3762,6 +3769,7 @@ private:
   void tokens_to_keywords_revert(int i_of_body, int i_of_function, int i_of_do, QString text, int start);
   int next_token(int i);
   int get_keyword_index(const char *, char *);
+  int get_keyword_index_from_qstring(QString key);
   bool is_client_statement(int, int, QString);
   int find_start_of_body(QString text, int start, int *i_of_function, int *i_of_do);
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -8951,7 +8959,7 @@ QByteArray history_padder(char *str, int length,
   * The "8192" for vertical output is arbitrary. Max should be calculated.
   * Displaying an image as if it's a bunch of characters is a waste of time.
   Re "if (OCELOT_IMPORT_EXPORT == 1)":
-    This is for DELIMITED stuff e.g. CSV. See comments before import_export_rule_set().
+    This is for TEXT stuff e.g. CSV. See comments before import_export_rule_set().
     Todo: our size calculation is unsafe, we must add sizes of terminated_by enclosed_by etc.
 */
 #define HISTORY_COLUMN_MARGIN 1
@@ -9231,7 +9239,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       memset(pointer_to_history_line, ' ', margin);
       pointer_to_history_line+= margin;
 #if (OCELOT_IMPORT_EXPORT == 1)
-      if ((file_name != NULL) && (export_padding == 0))
+      if ((file_name != NULL) && (export_pad == 0))
         pcv= QByteArray(pointer_to_source, length);
       else
         pcv= history_padder(pointer_to_source, length,

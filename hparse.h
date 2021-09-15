@@ -395,6 +395,17 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
   return 0;
 }
 
+///*
+//  I had a theory that using  hparse_f_accept_key(TOKEN_KEYWORD_PAD)
+//  rather than hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAD, "PAD")
+//  would save a bit of space. In a quick test, it didn't. But test again someday.
+//*/
+//int MainWindow::hparse_f_accept_key(int key)
+//{
+//  return hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,key, QString(strvalues[key].chars));
+//}
+
+
 /*
   We tracked "what is expected" with global QString hparse_expected and with a  private QListWidget in class completer_widget.
   * hparse_expect = the possible error message if syntax checker == 3,
@@ -2699,7 +2710,8 @@ void MainWindow::hparse_f_function_arguments(QString opd)
    || (hparse_f_is_equal(opd, "MAX")))
   {
     bool distinct_seen= false;
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)
+     || (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1))
       distinct_seen= true;
     if ((hparse_f_is_equal(opd, "AVG"))
      || (hparse_f_is_equal(opd, "SUM"))
@@ -2839,14 +2851,16 @@ void MainWindow::hparse_f_function_arguments(QString opd)
       } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
     }
   }
-  else if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0) && hparse_f_is_equal(opd, "GROUP_CONCAT"))
+  else if (hparse_f_is_equal(opd, "GROUP_CONCAT"))
   {
-    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT");
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 0)
+      hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL");
     do
     {
       hparse_f_opr_1(0, 0);
       if (hparse_errno > 0) return;
-    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+    } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+    if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0) return;
     hparse_f_order_by(0);
     if (hparse_errno > 0) return;
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SEPARATOR") == 1))
@@ -13112,6 +13126,22 @@ int MainWindow::hparse_f_client_set_import_export()
   }
   hparse_f_infile_or_outfile();
   if (hparse_errno > 0) return 0;
+
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLUMN_NAMES, "COLUMN_NAMES") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUERY, "QUERY") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW_COUNT, "ROW_COUNT") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAX_ROW_COUNT, "MAX_ROW_COUNT") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MARGIN, "MARGIN") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAD, "PAD") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LAST, "LAST") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DIVIDER, "DIVIDER") == 1))
+  {
+    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) != 1)
+    {
+      hparse_f_error();
+      break;
+     }
+  }
   return 1;
 }
 #endif
@@ -13237,8 +13267,8 @@ int MainWindow::hparse_f_client_set()
   if ((last_accepted == TOKEN_KEYWORD_OCELOT_IMPORT)
    || (last_accepted == TOKEN_KEYWORD_OCELOT_EXPORT))
   {
-    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELIMITED, "DELIMITED") == 1)
-     ||(hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BOXES, "BOXES") == 1))
+    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEXT, "TEXT") == 1)
+     ||(hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRETTY, "PRETTY") == 1))
       return hparse_f_client_set_import_export();
     else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HTML, "HTML") == 1) {;}
     else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT");
