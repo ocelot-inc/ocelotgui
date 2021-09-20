@@ -13112,12 +13112,18 @@ void MainWindow::hparse_f_other(int flags)
 
 #if (OCELOT_IMPORT_EXPORT == 1)
 /*
-  Called from hparse_f_client_statement() for special handling of SET ocelot_import|export.
+  Called from hparse_f_client_statement() for special handling of SET ocelot_export.
   See comments in ocelotgui.cpp before import_export_rule_set()
   Return 1 = ocelot_ but no conditional possible, or 0 if error.
 */
-int MainWindow::hparse_f_client_set_import_export()
+int MainWindow::hparse_f_client_set_export()
 {
+  int type;
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEXT, "TEXT") == 1) type= TOKEN_KEYWORD_TEXT;
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRETTY, "PRETTY") == 1) type= TOKEN_KEYWORD_PRETTY;
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HTML, "HTML") == 1) type= TOKEN_KEYWORD_HTML;
+  else {hparse_f_error(); return 0; }
+
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO") == 1)
   {
     if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 1) {;}
@@ -13126,7 +13132,7 @@ int MainWindow::hparse_f_client_set_import_export()
   }
   hparse_f_infile_or_outfile();
   if (hparse_errno > 0) return 0;
-
+  if (type == TOKEN_KEYWORD_HTML) return 1;
   while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLUMN_NAMES, "COLUMN_NAMES") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUERY, "QUERY") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW_COUNT, "ROW_COUNT") == 1)
@@ -13264,16 +13270,9 @@ int MainWindow::hparse_f_client_set()
   if (hparse_errno > 0) return 0;
 
 #if (OCELOT_IMPORT_EXPORT == 1)
-  if ((last_accepted == TOKEN_KEYWORD_OCELOT_IMPORT)
-   || (last_accepted == TOKEN_KEYWORD_OCELOT_EXPORT))
+  if (last_accepted == TOKEN_KEYWORD_OCELOT_EXPORT)
   {
-    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEXT, "TEXT") == 1)
-     ||(hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRETTY, "PRETTY") == 1))
-      return hparse_f_client_set_import_export();
-    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HTML, "HTML") == 1) {;}
-    else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT");
-    if (hparse_errno > 0) return 0;
-    return 1;
+    return hparse_f_client_set_export();
   }
 #endif
 

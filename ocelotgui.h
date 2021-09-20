@@ -2946,6 +2946,7 @@ extern unsigned int dbms_version_mask;
 
 #if (OCELOT_IMPORT_EXPORT == 1)
 extern int export_type;
+extern QString export_file_name;
 extern QByteArray export_columns_enclosed_by;
 extern QByteArray export_columns_escaped_by;
 extern bool export_columns_optionally;
@@ -3427,7 +3428,7 @@ public:
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
 #if (OCELOT_IMPORT_EXPORT == 1)
-  int hparse_f_client_set_import_export();
+  int hparse_f_client_set_export();
 #endif
   int hparse_f_client_set_rule();
   bool hparse_pick_from_list(QStringList);
@@ -3495,7 +3496,10 @@ public slots:
   void action_exit();
 #if (OCELOT_IMPORT_EXPORT == 1)
   QStringList fake_statement(QString fake_statement_text);
-  void action_export();
+  int action_export_function(int);
+  void action_export_text();
+  void action_export_pretty();
+  void action_export_html();
 #endif
   void action_execute_force();
   int action_execute(int);
@@ -3818,7 +3822,10 @@ private:
     QAction *menu_file_action_connect;
     QAction *menu_file_action_exit;
 #if (OCELOT_IMPORT_EXPORT == 1)
-    QAction *menu_file_action_export;
+    QMenu *menu_file_export;
+    QAction *menu_file_export_text_action;
+    QAction *menu_file_export_pretty_action;
+    QAction *menu_file_export_html_action;
 #endif
   QMenu *menu_edit;
     QAction *menu_edit_action_cut;
@@ -4505,7 +4512,6 @@ Row_form_box(int column_count, QString *row_form_label,
       QStringList qs= parent->fake_statement(row_form_data[i]);
       for (int j= 0; j < qs.size(); ++j) combo_box_edit[i]->addItem(qs.at(j));
 
-      combo_box_edit[i]->addItem("Wombat");
       hbox_layout[i]->addWidget(combo_box_edit[i]);
     }
     widget[i]= new QWidget();
