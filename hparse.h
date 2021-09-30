@@ -4054,7 +4054,7 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_FLOAT8;
   }
-  if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FLOAT") == 1)
+  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FLOAT") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FLOAT4") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
@@ -4068,8 +4068,11 @@ int MainWindow::hparse_f_data_type(int context)
    || (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECIMAL, "NUMBER") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    hparse_f_length(true, true, false);
-    if (hparse_errno > 0) return 0;
+    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+    {
+      hparse_f_length(true, true, false);
+      if (hparse_errno > 0) return 0;
+    }
     return TOKEN_KEYWORD_DECIMAL;
   }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NUMERIC") == 1)
@@ -13130,17 +13133,18 @@ int MainWindow::hparse_f_client_set_export()
     else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STDOUT, "STDOUT");
     if (hparse_errno > 0) return 0;
   }
-  hparse_f_infile_or_outfile();
+  int k= 0; /* When k == 0 we don't accept, e.g. when it's HTML we don't have a MARGIN option */
+  if ((type == TOKEN_KEYWORD_TEXT) || (type == TOKEN_KEYWORD_PRETTY)) k= 1;
+  if (k == 1) hparse_f_infile_or_outfile();
   if (hparse_errno > 0) return 0;
-  if (type == TOKEN_KEYWORD_HTML) return 1;
   while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLUMN_NAMES, "COLUMN_NAMES") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUERY, "QUERY") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW_COUNT, "ROW_COUNT") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAX_ROW_COUNT, "MAX_ROW_COUNT") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MARGIN, "MARGIN") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAD, "PAD") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LAST, "LAST") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DIVIDER, "DIVIDER") == 1))
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUERY, "QUERY") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW_COUNT, "ROW_COUNT") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MARGIN, "MARGIN") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAD, "PAD") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LAST, "LAST") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DIVIDER, "DIVIDER") == 1))
   {
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) != 1)
     {

@@ -1760,7 +1760,7 @@ static const keywords strvalues[]=
       {"GO", 0, 0, TOKEN_KEYWORD_GO}, /* ocelotgui keyword */
       {"GOTO", FLAG_VERSION_LUA|FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_GOTO},
       {"GRANT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GRANT},
-      {"GREATEST", FLAG_VERSION_TARANTOOL_2_3, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_3, TOKEN_KEYWORD_GREATEST},
+      {"GREATEST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_3, TOKEN_KEYWORD_GREATEST},
       {"GROUP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_GROUP},
     {"GROUPING", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0, TOKEN_KEYWORD_GROUPING},
     {"GROUPS", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_GROUPS},
@@ -1876,7 +1876,7 @@ static const keywords strvalues[]=
         {"LD_RUN_PATH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_LD_RUN_PATH},
       {"LEAD", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LEAD}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"LEADING", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LEADING},
-      {"LEAST", FLAG_VERSION_TARANTOOL_2_3, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_3, TOKEN_KEYWORD_LEAST},
+      {"LEAST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_TARANTOOL_2_3, TOKEN_KEYWORD_LEAST},
       {"LEAVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LEAVE},
       {"LEFT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LEFT},
       {"LENGTH", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LENGTH},
@@ -2695,7 +2695,11 @@ static const fontweights fontweightsvalues[]=
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 1)
-/* Several possible include paths for mysql.h are hard coded in ocelotgui.pro. */
+/*
+  Several possible include paths for mysql.h are hard coded in ocelotgui.pro.
+  CMakeLists.txt has a similar list but can be overridden with -DMYSQL_INCLUDE_DIR or -DOCELOT_MYSQL_INCLUDE.
+  If mysql_config --help says /usr/include/mysql one can say #include <mysql/mysql.h> but that's not general.
+*/
 #include <mysql.h>
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
@@ -8187,19 +8191,27 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 {
   if ((result_row_count == 0) || (result_column_count == 0))
   {
-    switch_to_batch_text_edit();
-    batch_text_edit->clear(); /* Todo: This is to avoid repeating the message. Possibly that's a bug. */
-    batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
-//    this->show();
-//    client->show();
+    if (situation != TOKEN_KEYWORD_OCELOT_EXPORT)
+    {
+      switch_to_batch_text_edit();
+      batch_text_edit->clear(); /* Todo: This is to avoid repeating the message. Possibly that's a bug. */
+      batch_text_edit->insertPlainText("row_count == 0 or column_count == 0");
+//      this->show();
+//      client->show();
+    }
     return;
   }
 
-  if (result_grid_height_after_last_resize < 0) return;
-
+  if (situation != TOKEN_KEYWORD_OCELOT_EXPORT)
+  {
+    if (result_grid_height_after_last_resize < 0) return;
+  }
   switch_to_html_text_edit(); /* so grid_main_layout has html_text_edit and not batch_text_edit */
 
-  if (copy_of_ocelot_vertical == 1) { display_html_html_vertical(new_grid_vertical_scroll_bar_value); return; }
+  if (situation != TOKEN_KEYWORD_OCELOT_EXPORT)
+  {
+    if (copy_of_ocelot_vertical == 1) { display_html_html_vertical(new_grid_vertical_scroll_bar_value); return; }
+  }
   int row_height, max_display_height, max_grid_rows;
   get_row_height_and_max_display_height_and_max_grid_rows(&row_height, &max_display_height, &max_grid_rows);
 
@@ -8236,9 +8248,28 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   if (copy_of_parent->conditional_settings.count() > 0) extra_for_div= 22;
 
   unsigned int grid_row= 0;
+  int local_ocelot_result_grid_column_names_copy;
+  unsigned long local_max_grid_rows;
+  unsigned short local_copy_of_ocelot_xml;
+  bool local_is_including_thin_image;
+  if (situation == TOKEN_KEYWORD_OCELOT_EXPORT)
+  {
+    local_ocelot_result_grid_column_names_copy= export_column_names;
+    local_max_grid_rows= export_max_row_count;
+    local_copy_of_ocelot_xml= 0;
+    local_is_including_thin_image= false;
+    printf("**** display_html export. max_row_count=%ld\n", local_max_grid_rows);
+  }
+  else
+  {
+    local_ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names_copy;
+    local_max_grid_rows= max_grid_rows;
+    local_copy_of_ocelot_xml= copy_of_ocelot_xml;
+    local_is_including_thin_image= true;
+  }
 
-  if ((ocelot_result_grid_column_names_copy == 1)
-   && (copy_of_ocelot_xml == 0))
+  if ((local_ocelot_result_grid_column_names_copy == 1)
+   && (local_copy_of_ocelot_xml == 0))
   {
     /* todo: do a max_column_height calculation as you do for detail rows */
     tmp_size+= strlen(ocelot_grid_header_row_start);
@@ -8260,7 +8291,7 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 
   //for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value;
-       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) local_max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
   {
     result_field_names_pointer= &result_field_names[0];
@@ -8283,13 +8314,17 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     }
     tmp_size+= strlen(ocelot_grid_detail_row_end);
     max_column_heights_total+= max_column_height;
-    if ((max_column_heights_total) >= (unsigned int) max_display_height)
+
+    if (situation == TOKEN_KEYWORD_OCELOT_EXPORT)
     {
-      /* Too many rows. There's no good justification for "+ 1" but it's harmless to display too few. */
-      max_grid_rows= grid_row;
-      if (max_grid_rows <= 0) max_grid_rows= 1;
-      if ((max_grid_rows == 1) && (copy_of_ocelot_result_grid_column_names == 1)) max_grid_rows= 2;
-      break;
+      if ((max_column_heights_total) >= (unsigned int) max_display_height)
+      {
+        /* Too many rows. There's no good justification for "+ 1" but it's harmless to display too few. */
+        max_grid_rows= grid_row;
+        if (max_grid_rows <= 0) max_grid_rows= 1;
+        if ((max_grid_rows == 1) && (copy_of_ocelot_result_grid_column_names == 1)) max_grid_rows= 2;
+        break;
+      }
     }
   }
   tmp_size+= strlen(ocelot_grid_table_end);
@@ -8311,15 +8346,14 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
 
-  if (ocelot_result_grid_column_names_copy == 1)
+  if (local_ocelot_result_grid_column_names_copy == 1)
   {
     char *result_field_names_pointer;
     result_field_names_pointer= &result_field_names[0];
     strcpy(tmp_pointer, ocelot_grid_header_row_start);
     tmp_pointer+= strlen(ocelot_grid_header_row_start);
     tmp_pointer_before_thin_image_call= tmp_pointer;
-    tmp_pointer+= thin_image(tmp_pointer, (const char*) "TH", 1);
-
+    if (local_is_including_thin_image) tmp_pointer+= thin_image(tmp_pointer, (const char*) "TH", 1);
     for (unsigned int result_column_no= 0; result_column_no < result_column_count; ++result_column_no)
     {
       memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
@@ -8352,7 +8386,7 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) max_grid_rows);
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) local_max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
 //  for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   {
@@ -8360,7 +8394,7 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     strcpy(tmp_pointer, ocelot_grid_detail_row_start);
     tmp_pointer+= strlen(ocelot_grid_detail_row_start);
     tmp_pointer_before_thin_image_call= tmp_pointer;
-    tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row]);
+    if (local_is_including_thin_image) tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row]);
     for (unsigned int result_column_no= 0; result_column_no < result_column_count; ++result_column_no)
     {
       memcpy(&v_length, result_set_pointer, sizeof(unsigned int));

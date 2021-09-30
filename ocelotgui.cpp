@@ -2815,6 +2815,7 @@ void MainWindow::create_menu()
 #if (OCELOT_IMPORT_EXPORT == 1)
   menu_file->addSeparator();
   menu_file_export= menu_file->addMenu("Export");
+  menu_file_export->setEnabled(false);
   menu_file_export_text_action= menu_file_export->addAction("text");
   menu_file_export_pretty_action= menu_file_export->addAction("pretty");
   menu_file_export_html_action= menu_file_export->addAction("html");
@@ -4624,7 +4625,7 @@ int MainWindow::action_export_function(int passed_type)
   if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
     column_count= 14; /* If you add or remove items, you have to change this */
   else
-    column_count= 1;
+    column_count= 3;
   QString *row_form_label= new QString[column_count];
   int *row_form_type= new int[column_count];
   int *row_form_is_password= new int[column_count];
@@ -4638,10 +4639,13 @@ int MainWindow::action_export_function(int passed_type)
     row_form_label[++i]= "columns escaped by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_columns_escaped_by; row_form_width[i]= '\x04';
     row_form_label[++i]= "lines starting by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_lines_starting_by; row_form_width[i]= '\x04';
     row_form_label[++i]= "lines terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_lines_terminated_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_NAMES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_column_names); row_form_width[i]= '\x50';
+  }
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_NAMES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_column_names); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_max_row_count); row_form_width[i]= '\x50';
+  if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
+  {
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_QUERY].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_query); row_form_width[i]= '\x50';
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_row_count); row_form_width[i]= '\x50';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_max_row_count); row_form_width[i]= '\x50';
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MARGIN].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_margin); row_form_width[i]= '\x50';
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PAD].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_pad); row_form_width[i]= '\x50';
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LAST].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_last); row_form_width[i]= '\x50';
@@ -4674,10 +4678,13 @@ int MainWindow::action_export_function(int passed_type)
         export_columns_escaped_by= row_form_data[i++].trimmed().toUtf8();
         export_lines_starting_by= row_form_data[i++].trimmed().toUtf8();
         export_lines_terminated_by= row_form_data[i++].trimmed().toUtf8();
-        export_column_names= to_long(row_form_data[i++].trimmed());
+      }
+      export_column_names= to_long(row_form_data[i++].trimmed());
+      export_max_row_count= to_long(row_form_data[i++].trimmed());
+      if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
+      {
         export_query= to_long(row_form_data[i++].trimmed());
         export_row_count= to_long(row_form_data[i++].trimmed());
-        export_max_row_count= to_long(row_form_data[i++].trimmed());
         export_margin= to_long(row_form_data[i++].trimmed());
         export_pad= to_long(row_form_data[i++].trimmed());
         export_last= to_long(row_form_data[i++].trimmed());
@@ -21725,16 +21732,19 @@ int MainWindow::the_connect(unsigned int connection_number)
   Todo: Check that we're not calling this twice. There are too many connect routines.
   Todo: I'm guessing that somewhere in the connection we specified a database option, or it isn't necessary.
         If I'm wrong then I guess rehash_scan() will fail which is no big deal.
+  Todo: Everything that we enable when connection_number == 0 should be disabled when we disconnect.
 */
 void MainWindow::connect_init(int connection_number)
 {
   connections_is_connected[connection_number]= 1;
-
-  if ((ocelot_auto_rehash != 0)
-   && (connection_number == 0))
+  if (connection_number == 0)
   {
-    char error_or_ok_message[ER_MAX_LENGTH];
-    rehash_scan(error_or_ok_message); /* Todo: should we display the error/ok message that rehash_scan() produces? */
+    menu_file_export->setEnabled(true);
+    if (ocelot_auto_rehash != 0)
+    {
+      char error_or_ok_message[ER_MAX_LENGTH];
+      rehash_scan(error_or_ok_message); /* Todo: should we display the error/ok message that rehash_scan() produces? */
+    }
   }
 }
 
