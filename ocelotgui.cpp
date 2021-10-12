@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: September 20 2021
+   Last modified: October 12 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -440,22 +440,7 @@
 
 #if (OCELOT_IMPORT_EXPORT == 1)
   /* Accessed both in ocelotgui.h and ocelotgui.cpp */
-  int export_type= TOKEN_KEYWORD_DEFAULT;                /* e.g. TOKEN_KEYWORD_TEXT | TOKEN_KEYWORD_PRETTY | TOKEN_KEYWORD_DEFAULT etc. */
-  QString export_file_name;
-  bool export_columns_optionally;
-  QByteArray export_columns_enclosed_by;
-  QByteArray export_columns_escaped_by;
-  QByteArray export_columns_terminated_by;
-  QByteArray export_lines_starting_by;
-  QByteArray export_lines_terminated_by;
-  unsigned short export_column_names; /* not user-changeable yet */
-  unsigned short export_query;                /* not user-changeable yet */
-  unsigned short export_row_count;             /* not user-changeable yet */
-  long unsigned export_max_row_count; /* not user-changeable yet */
-  unsigned short export_margin;       /* not user-changeable yet */
-  unsigned short export_pad;          /* not user-changeable yet */
-  unsigned short export_last; /* not user-changeable yet */ /* does last column get a terminated-by? */
-  unsigned short export_divider; /* not user-changeable yet */ /* divider line e.g. +---+---+? */
+  struct export_settings main_exports;
 #endif
 
   static QString hparse_text_copy;
@@ -1410,24 +1395,52 @@ QByteArray MainWindow::to_byte_array(QString q)
          I'd like to do differently. But I'd have to know whether X'...' i.e. VARBINARY was used.
          Maybe I'd only have to insist that the escape character is ASCII. Or say it's bizarre.
 */
+
+
+void MainWindow::export_defaults(int passed_type, struct export_settings *exports)
+{
+  (*exports).type= passed_type;
+  (*exports).file_name= "STDOUT";
+  (*exports).columns_optionally= false;
+  (*exports).columns_enclosed_by= "";
+  (*exports).columns_escaped_by= "";
+  (*exports).columns_terminated_by= "|";
+  (*exports).lines_starting_by= "";
+  (*exports).lines_terminated_by= "";
+  (*exports).column_names= 1;
+  (*exports).query= 1;
+  (*exports).row_count= 1;
+  (*exports).max_row_count= 100000000;
+  (*exports).margin= 1;
+  (*exports).pad= 1;
+  (*exports).last= 1;
+  (*exports).divider= 1;
+  if (passed_type == TOKEN_KEYWORD_TEXT)
+  {
+    (*exports).columns_enclosed_by= "";
+    (*exports).columns_escaped_by= "\\";
+    (*exports).column_names= 0;
+    (*exports).columns_terminated_by= "\t";
+    (*exports).lines_starting_by= "";
+    (*exports).lines_terminated_by= "\n";
+    (*exports).query= 0;
+    (*exports).row_count= 0;
+    (*exports).max_row_count= 100000000;
+    (*exports).margin= 0;
+    (*exports).pad= 0;
+    (*exports).last= 0;
+    (*exports).divider= 0;
+  }
+  if (passed_type == TOKEN_KEYWORD_HTML)
+  {
+    (*exports).query= 0;
+    (*exports).row_count= 0;
+  }
+}
+
 void MainWindow::import_export_rule_set(QString text)
 {
-  export_type= TOKEN_KEYWORD_TEXT;
-  export_file_name= "STDOUT";
-  export_columns_enclosed_by= "";
-  export_columns_escaped_by= "";
-  export_columns_optionally= false;
-  export_columns_terminated_by= "|";
-  export_lines_starting_by= "";
-  export_lines_terminated_by= "";
-  export_column_names= 1;
-  export_query= 1;
-  export_row_count= 1;
-  export_max_row_count= 100000000;
-  export_margin= 1;
-  export_pad= 1;
-  export_last= 1;
-  export_divider= 1;
+  export_defaults(0, &main_exports);
 
   QString s, rr;
   int i, i_prev_1, i_prev_2, token_prev_2;
@@ -1441,32 +1454,17 @@ void MainWindow::import_export_rule_set(QString text)
     token= main_token_types[i];
     if (token == TOKEN_KEYWORD_PRETTY)
     {
-      export_type= TOKEN_KEYWORD_PRETTY;
+      main_exports.type= TOKEN_KEYWORD_PRETTY;
       /* rest is default initially */
     }
     if (token == TOKEN_KEYWORD_TEXT)
     {
-      export_type= TOKEN_KEYWORD_TEXT;
-      export_columns_enclosed_by= "";
-      export_columns_escaped_by= "\\";
-      export_column_names= 0;
-      export_columns_terminated_by= "\t";
-      export_lines_starting_by= "";
-      export_lines_terminated_by= "\n";
-      export_query= 0;
-      export_row_count= 0;
-      export_max_row_count= 100000000;
-      export_margin= 0;
-      export_pad= 0;
-      export_last= 0;
-      export_divider= 0;
+      export_defaults(TOKEN_KEYWORD_TEXT, &main_exports);
     }
 
     if (token == TOKEN_KEYWORD_HTML)
     {
-      export_type= TOKEN_KEYWORD_HTML;
-      export_query= 0;
-      export_row_count= 0;
+      export_defaults(TOKEN_KEYWORD_TEXT, &main_exports);
       break;
     }
     if (token == TOKEN_KEYWORD_DEFAULT)
@@ -1477,8 +1475,8 @@ void MainWindow::import_export_rule_set(QString text)
     if (token == TOKEN_KEYWORD_INTO)
     {
       i= next_i(i, +1);
-      export_file_name= text.mid(main_token_offsets[i], main_token_lengths[i]);
-      export_file_name= connect_stripper(export_file_name, false); /* todo: consider: should we pass true rather than false here? */
+      main_exports.file_name= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      main_exports.file_name= connect_stripper(main_exports.file_name, false); /* todo: consider: should we pass true rather than false here? */
     }
 
     if ((token == TOKEN_KEYWORD_FIELDS) || (token == TOKEN_KEYWORD_COLUMNS))
@@ -1486,7 +1484,7 @@ void MainWindow::import_export_rule_set(QString text)
     if (token == TOKEN_KEYWORD_LINES)
       lines_or_columns= TOKEN_KEYWORD_LINES;
     if (token == TOKEN_KEYWORD_OPTIONALLY)
-      export_columns_optionally= true;
+      main_exports.columns_optionally= true;
     if ((token == TOKEN_KEYWORD_QUERY) || (token == TOKEN_KEYWORD_ROW_COUNT)
      || (token == TOKEN_KEYWORD_MAX_ROW_COUNT)
      || (token == TOKEN_KEYWORD_MARGIN) || (token == TOKEN_KEYWORD_PAD) || (token == TOKEN_KEYWORD_LAST)
@@ -1497,13 +1495,13 @@ void MainWindow::import_export_rule_set(QString text)
       s= text.mid(main_token_offsets[i], main_token_lengths[i]);
       s= connect_stripper(s, false);
       int s_as_int= s.toInt();
-      if (token == TOKEN_KEYWORD_QUERY) export_query= s_as_int;
-      if (token == TOKEN_KEYWORD_ROW_COUNT) export_row_count= s_as_int;
-      if (token == TOKEN_KEYWORD_MAX_ROW_COUNT) export_max_row_count= s_as_int;
-      if (token == TOKEN_KEYWORD_MARGIN) export_margin= s_as_int;
-      if (token == TOKEN_KEYWORD_PAD) export_pad= s_as_int;
-      if (token == TOKEN_KEYWORD_LAST) export_last= s_as_int;
-      if (token == TOKEN_KEYWORD_DIVIDER) export_divider= s_as_int;
+      if (token == TOKEN_KEYWORD_QUERY) main_exports.query= s_as_int;
+      if (token == TOKEN_KEYWORD_ROW_COUNT) main_exports.row_count= s_as_int;
+      if (token == TOKEN_KEYWORD_MAX_ROW_COUNT) main_exports.max_row_count= s_as_int;
+      if (token == TOKEN_KEYWORD_MARGIN) main_exports.margin= s_as_int;
+      if (token == TOKEN_KEYWORD_PAD) main_exports.pad= s_as_int;
+      if (token == TOKEN_KEYWORD_LAST) main_exports.last= s_as_int;
+      if (token == TOKEN_KEYWORD_DIVIDER) main_exports.divider= s_as_int;
     }
     /* Todo: what if it's a number? or a constant like FALSE? */
     if ((token == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) || (token == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
@@ -1517,23 +1515,23 @@ void MainWindow::import_export_rule_set(QString text)
 
       if (lines_or_columns == TOKEN_KEYWORD_COLUMNS)
       {
-        if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) export_columns_enclosed_by= to_byte_array(s);
-        else if (token_prev_2 == TOKEN_KEYWORD_ESCAPED) export_columns_escaped_by= to_byte_array(s);
-        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) export_columns_terminated_by= to_byte_array(s);
+        if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) main_exports.columns_enclosed_by= to_byte_array(s);
+        else if (token_prev_2 == TOKEN_KEYWORD_ESCAPED) main_exports.columns_escaped_by= to_byte_array(s);
+        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) main_exports.columns_terminated_by= to_byte_array(s);
         else { printf("**** COLUMNS BAD?\n"); goto er_return; }
       }
       if (lines_or_columns == TOKEN_KEYWORD_LINES)
       {
-        if (token_prev_2 == TOKEN_KEYWORD_STARTING) export_lines_starting_by= to_byte_array(s);
-        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) export_lines_terminated_by= to_byte_array(s);
+        if (token_prev_2 == TOKEN_KEYWORD_STARTING) main_exports.lines_starting_by= to_byte_array(s);
+        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) main_exports.lines_terminated_by= to_byte_array(s);
         else { printf("**** LINES BAD?\n"); goto er_return; }
       }
     }
   }
 
-  if (export_file_name != "")
+  if (main_exports.file_name != "")
   {
-    if (history_file_start("TEE", export_file_name, &rr) == 0)
+    if (history_file_start("TEE", main_exports.file_name, &rr) == 0)
     {
       make_and_put_open_message_in_result(ER_FILE_OPEN, 0, rr);
       return;
@@ -2232,19 +2230,19 @@ void MainWindow::history_markup_append(QString result_set_for_history, bool is_i
 
 void MainWindow::tee_export(QString result_set_for_history)
 {
-  if (export_query == 1) history_file_write("TEE", query_utf16, true);
-  if (export_row_count == 1) history_file_write("TEE", statement_edit_widget->result, true);
+  if (main_exports.query == 1) history_file_write("TEE", query_utf16, true);
+  if (main_exports.row_count == 1) history_file_write("TEE", statement_edit_widget->result, true);
   if (result_set_for_history > "")
   {
 #if (OCELOT_IMPORT_EXPORT == 1)
-    if (export_type == TOKEN_KEYWORD_HTML)
+    if (main_exports.type == TOKEN_KEYWORD_HTML)
     {
       /* Todo: There's silly repetition here. You should pass rg to tee_export! */
       ResultGrid *rg;
       rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
       rg->display_html(0, TOKEN_KEYWORD_OCELOT_EXPORT);
     }
-    else if (export_type == TOKEN_KEYWORD_DEFAULT)
+    else if (main_exports.type == TOKEN_KEYWORD_DEFAULT)
     {
       history_file_write("TEE", result_set_for_history, true);
     }
@@ -2483,7 +2481,7 @@ void MainWindow::history_file_write(QString history_type, QString text_line, boo
   {
     ocelot_history_tee_file.write(query, strlen(query));
     /* We need the \n but not an extra \n if we append. */
-    if ((export_type == TOKEN_KEYWORD_DEFAULT) || (nflag == true))
+    if ((main_exports.type == TOKEN_KEYWORD_DEFAULT) || (nflag == true))
     {
       ocelot_history_tee_file.write("\n", strlen("\n"));
     }
@@ -4615,6 +4613,9 @@ QStringList MainWindow::fake_statement(QString fake_statement_text)
 
 int MainWindow::action_export_function(int passed_type)
 {
+  struct export_settings local_exports;
+  export_defaults(passed_type, &local_exports);
+
   QString message= "export";
   int column_count;
   QString row_form_title;
@@ -4631,25 +4632,25 @@ int MainWindow::action_export_function(int passed_type)
   int *row_form_is_password= new int[column_count];
   QString *row_form_data= new QString[column_count];
   QString *row_form_width= new QString[column_count];
-  row_form_label[i=0]= "into"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_file_name; row_form_width[i]= '\x04';
+  row_form_label[i=0]= "into"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.file_name; row_form_width[i]= '\x04';
   if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
   {
-    row_form_label[++i]= "columns terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_columns_terminated_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "columns enclosed by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_columns_enclosed_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "columns escaped by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_columns_escaped_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "lines starting by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_lines_starting_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "lines terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= export_lines_terminated_by; row_form_width[i]= '\x04';
+    row_form_label[++i]= "columns terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.columns_terminated_by; row_form_width[i]= '\x04';
+    row_form_label[++i]= "columns enclosed by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.columns_enclosed_by; row_form_width[i]= '\x04';
+    row_form_label[++i]= "columns escaped by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.columns_escaped_by; row_form_width[i]= '\x04';
+    row_form_label[++i]= "lines starting by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.lines_starting_by; row_form_width[i]= '\x04';
+    row_form_label[++i]= "lines terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.lines_terminated_by; row_form_width[i]= '\x04';
   }
-  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_NAMES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_column_names); row_form_width[i]= '\x50';
-  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_max_row_count); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_NAMES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.column_names); row_form_width[i]= '\x50';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.max_row_count); row_form_width[i]= '\x50';
   if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
   {
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_QUERY].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_query); row_form_width[i]= '\x50';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_row_count); row_form_width[i]= '\x50';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MARGIN].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_margin); row_form_width[i]= '\x50';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PAD].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_pad); row_form_width[i]= '\x50';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LAST].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_last); row_form_width[i]= '\x50';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DIVIDER].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(export_divider); row_form_width[i]= '\x50';
+    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_QUERY].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.query); row_form_width[i]= '\x50';
+    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.row_count); row_form_width[i]= '\x50';
+    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MARGIN].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.margin); row_form_width[i]= '\x50';
+    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PAD].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.pad); row_form_width[i]= '\x50';
+    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LAST].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.last); row_form_width[i]= '\x50';
+    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DIVIDER].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.divider); row_form_width[i]= '\x50';
   }
   assert(i == column_count - 1);
   /* if (message == "File|Connect") */
@@ -4668,40 +4669,67 @@ int MainWindow::action_export_function(int passed_type)
     co_is_ok= co->is_ok;
     if (co->is_ok == 1)
     {
-      /* export_type= TOKEN_KEYWORD_TEXT|PRETTY|HTML_DEFAULT */
-      export_type= passed_type;
-      export_file_name= row_form_data[i=0].trimmed();
+      /* local_exports.type= TOKEN_KEYWORD_TEXT|PRETTY|HTML_DEFAULT */
+      local_exports.type= passed_type;
+      local_exports.file_name= row_form_data[i=0].trimmed();
+      ++i;
       if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
       {
-        export_columns_terminated_by= row_form_data[i++].trimmed().toUtf8();
-        export_columns_enclosed_by= row_form_data[i++].trimmed().toUtf8();
-        export_columns_escaped_by= row_form_data[i++].trimmed().toUtf8();
-        export_lines_starting_by= row_form_data[i++].trimmed().toUtf8();
-        export_lines_terminated_by= row_form_data[i++].trimmed().toUtf8();
+        local_exports.columns_terminated_by= row_form_data[i++].trimmed().toUtf8();
+        local_exports.columns_enclosed_by= row_form_data[i++].trimmed().toUtf8();
+        local_exports.columns_escaped_by= row_form_data[i++].trimmed().toUtf8();
+        local_exports.lines_starting_by= row_form_data[i++].trimmed().toUtf8();
+        local_exports.lines_terminated_by= row_form_data[i++].trimmed().toUtf8();
       }
-      export_column_names= to_long(row_form_data[i++].trimmed());
-      export_max_row_count= to_long(row_form_data[i++].trimmed());
+      local_exports.column_names= to_long(row_form_data[i++].trimmed());
+      local_exports.max_row_count= to_long(row_form_data[i++].trimmed());
       if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
       {
-        export_query= to_long(row_form_data[i++].trimmed());
-        export_row_count= to_long(row_form_data[i++].trimmed());
-        export_margin= to_long(row_form_data[i++].trimmed());
-        export_pad= to_long(row_form_data[i++].trimmed());
-        export_last= to_long(row_form_data[i++].trimmed());
-        export_divider= to_long(row_form_data[i++].trimmed());
+        local_exports.query= to_long(row_form_data[i++].trimmed());
+        local_exports.row_count= to_long(row_form_data[i++].trimmed());
+        local_exports.margin= to_long(row_form_data[i++].trimmed());
+        local_exports.pad= to_long(row_form_data[i++].trimmed());
+        local_exports.last= to_long(row_form_data[i++].trimmed());
+        local_exports.divider= to_long(row_form_data[i++].trimmed());
       }
-      action_change_one_setting("0", "1", export_type);
-
-//      assert(i == column_count);
-//      /* This should ensure that a record goes to the history widget */
-//      /* Todo: clear statement_edit_widget first */
-//      statement_edit_widget->insertPlainText("CONNECT");
-//      action_execute(1);
-//      if (ocelot_init_command > "")
-//      {
-//        statement_edit_widget->insertPlainText(ocelot_init_command);
-//        action_execute(1);
-//      }
+      /* todo: maybe I should be appending with row_form_data[] and letting the statement be not fake */
+      QString text;
+      QString token;
+      text= "SET ocelot_export = ";
+      main_token_count_in_statement= 3;
+      if (local_exports.type == TOKEN_KEYWORD_TEXT) token= "TEXT ";
+      else if (local_exports.type == TOKEN_KEYWORD_PRETTY) token= "PRETTY ";
+      else if (local_exports.type == TOKEN_KEYWORD_HTML) token= "HTML ";
+      text= text + token;
+      ++main_token_count_in_statement;
+      text= text + action_export_function_clause("INTO", local_exports.file_name);
+      main_token_count_in_statement+= 2;
+      if ((local_exports.type == TOKEN_KEYWORD_TEXT) || (local_exports.type == TOKEN_KEYWORD_PRETTY))
+      {
+        /* e.g. '\\t' for text or '|' for pretty */
+        text= text + action_export_function_clause("COLUMNS TERMINATED BY", local_exports.columns_terminated_by);
+        /* e.g. '' for text or '' for pretty */
+        text= text + action_export_function_clause("ENCLOSED BY", local_exports.columns_enclosed_by);
+        /* e.g. '\\\\' for text or '' for pretty */
+        text= text + action_export_function_clause("ESCAPED BY", local_exports.columns_escaped_by);
+        /* e.g. '' for text or '|' for pretty */
+        text= text + action_export_function_clause("LINES STARTING BY", local_exports.lines_starting_by);
+        /* e.g. '\\n' for text or '\\n' for pretty */
+        text= text + action_export_function_clause("TERMINATED BY", local_exports.lines_terminated_by);
+        main_token_count_in_statement+= 3 + 1 + 2 + 1 + 2 + 1 + 3 + 1 + 2 + 1;
+      }
+      text= text + action_export_function_clause_i("COLUMN_NAMES", local_exports.column_names);
+      text= text + action_export_function_clause_i("MAX_ROW_COUNT", local_exports.max_row_count);
+      text= text + action_export_function_clause_i("QUERY", local_exports.query);
+      text= text + action_export_function_clause_i("ROW_COUNT", local_exports.row_count);
+      text= text + action_export_function_clause_i("MARGIN", local_exports.margin);
+      text= text + action_export_function_clause_i("PAD", local_exports.pad);
+      text= text + action_export_function_clause_i("LAST", local_exports.last);
+      text= text + action_export_function_clause_i("DIVIDER", local_exports.divider);
+      main_token_count_in_statement+= 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1;
+      text= text + ";";
+      ++main_token_count_in_statement;
+      action_change_one_setting_execute(text);
     }
     delete(co);
   }
@@ -4713,6 +4741,24 @@ int MainWindow::action_export_function(int passed_type)
   if (row_form_label != 0) delete [] row_form_label;
   return co_is_ok;
 }
+
+QString MainWindow::action_export_function_clause(QString keywords, QString literal)
+{
+  QString escaped_literal= "";
+  for (int i= 0; i < literal.size(); ++i)
+  {
+    QString c= literal.mid(i, 1);
+    if (c == "\\") escaped_literal= escaped_literal + c;
+    escaped_literal= escaped_literal + c;
+  }
+  return " " + keywords + " '" + escaped_literal + "' ";
+}
+
+QString MainWindow::action_export_function_clause_i(QString keywords, int literal)
+{
+  return " " + keywords + " " + QString::number(literal) + " ";
+}
+
 
 void MainWindow::action_export_text()
 {
@@ -5844,39 +5890,6 @@ void MainWindow::action_change_one_setting(QString old_setting,
   if (old_setting != new_setting)
   {
     QString text;
-#if (OCELOT_IMPORT_EXPORT == 1)
-    if (keyword_index == TOKEN_KEYWORD_TEXT)
-    {
-      text= "SET ocelot_export = TEXT "\
-            "INTO STDOUT "\
-            "COLUMNS TERMINATED BY '\\t' ENCLOSED BY '' ESCAPED BY '\\\\' "\
-            "LINES STARTING BY '' TERMINATED BY '\\n';";
-      main_token_count_in_statement= 24;
-    }
-    else if (keyword_index == TOKEN_KEYWORD_PRETTY)
-    {
-      text= "SET ocelot_export = PRETTY "\
-            "INTO STDOUT "\
-            "COLUMNS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY '' "\
-            "LINES STARTING BY '|' TERMINATED BY '\\n';";
-      main_token_count_in_statement= 24;
-    }
-    else if (keyword_index == TOKEN_KEYWORD_HTML)
-    {
-      text= "SET ocelot_export = HTML "\
-            "INTO STDOUT "\
-            ";";
-      main_token_count_in_statement= 7;
-    }
-    else if (keyword_index == TOKEN_KEYWORD_DEFAULT)
-    {
-      text= "SET ocelot_export = DEFAULT "\
-            "INTO STDOUT "\
-            ";";
-      main_token_count_in_statement= 7;
-    }
-    else
-#endif
     {
       old_setting= new_setting;
       main_token_number= 0;
@@ -5896,18 +5909,26 @@ void MainWindow::action_change_one_setting(QString old_setting,
       text.append("';");
       main_token_count_in_statement= 5;
     }
-    main_token_new(text.size());
-    tokenize(text.data(),
-             text.size(),
-             main_token_lengths, main_token_offsets,
-             main_token_max_count, (QChar*)"33333", 1,
-             ocelot_delimiter_str, 1);
-    tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
-    action_execute_one_statement(text);
-    history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
+    action_change_one_setting_execute(text);
   }
 }
 
+/*
+  called from action_change_one_setting due to most menu items that require change
+  called from action_export_function due to menu item that requires change for export (in that case it's fake)
+*/
+void MainWindow::action_change_one_setting_execute(QString text)
+{
+  main_token_new(text.size());
+  tokenize(text.data(),
+           text.size(),
+           main_token_lengths, main_token_offsets,
+           main_token_max_count, (QChar*)"33333", 1,
+           ocelot_delimiter_str, 1);
+  tokens_to_keywords(text, 0, sql_mode_ansi_quotes);
+  action_execute_one_statement(text);
+  history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
+}
 
 /*
   Pass QString with rgb name '#RRGGBB'.
@@ -16716,6 +16737,11 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
   {
     signed char scale= *tarantool_tnt_reply_data;
     ++tarantool_tnt_reply_data;
+    if (scale == -48) /* i.e. 0xd0 = MessagePack for "int 8", only happens for big numbers e.g. 1e35 */
+    {
+      scale= *tarantool_tnt_reply_data;
+      ++tarantool_tnt_reply_data;
+    }
     unsigned char high_nibble, low_nibble;
     unsigned char decimal_output[64];
     unsigned char *decimal_output_pointer= &decimal_output[0];
