@@ -13125,6 +13125,7 @@ int MainWindow::hparse_f_client_set_export()
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEXT, "TEXT") == 1) type= TOKEN_KEYWORD_TEXT;
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRETTY, "PRETTY") == 1) type= TOKEN_KEYWORD_PRETTY;
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HTML, "HTML") == 1) type= TOKEN_KEYWORD_HTML;
+  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NONE, "NONE") == 1) return 1;
   else {hparse_f_error(); return 0; }
 
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO") == 1)

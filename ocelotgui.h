@@ -736,6 +736,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_NEXTVAL,
     TOKEN_KEYWORD_NIL,
     TOKEN_KEYWORD_NO,
+    TOKEN_KEYWORD_NONE,
     TOKEN_KEYWORD_NOPAGER,
     TOKEN_KEYWORD_NOT,
     TOKEN_KEYWORD_NOTEE,
@@ -1416,7 +1417,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1181
+#define KEYWORD_LIST_SIZE 1182
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1983,6 +1984,7 @@ static const keywords strvalues[]=
       {"NEXTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NEXTVAL},
       {"NIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NIL},
       {"NO", 0, 0, TOKEN_KEYWORD_NO},
+      {"NONE", 0, 0, TOKEN_KEYWORD_NONE},
       {"NOPAGER", 0, 0, TOKEN_KEYWORD_NOPAGER}, /* ocelotgui keyword */
       {"NOT", FLAG_VERSION_TARANTOOL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NOT},
       {"NOTEE", 0, 0, TOKEN_KEYWORD_NOTEE}, /* ocelotgui keyword */
@@ -2684,6 +2686,9 @@ static const fontweights fontweightsvalues[]=
 #endif
 #if (OCELOT_FIND_WIDGET == 1)
 #include <QToolButton>
+#endif
+#if (OCELOT_IMPORT_EXPORT == 1)
+#include <QActionGroup>
 #endif
 
 /* QRegExp is unavailable in Qt 6. Todo: We have never tested the replacemnt QRegularExpression code. */
@@ -3504,6 +3509,7 @@ public:
   QByteArray to_byte_array(QString);
   void export_defaults(int passed_type, struct export_settings *exports);
   void import_export_rule_set(QString text);
+  void export_set_checked();
 #endif
 
 public slots:
@@ -3513,11 +3519,13 @@ public slots:
 #if (OCELOT_IMPORT_EXPORT == 1)
   QStringList fake_statement(QString fake_statement_text);
   int action_export_function(int);
+  QString action_export_function_value(QString input);
   QString action_export_function_clause(QString,QString);
   QString action_export_function_clause_i(QString,int);
   void action_export_text();
   void action_export_pretty();
   void action_export_html();
+  void action_export_none();
 #endif
   void action_execute_force();
   int action_execute(int);
@@ -3841,6 +3849,8 @@ private:
     QAction *menu_file_export_text_action;
     QAction *menu_file_export_pretty_action;
     QAction *menu_file_export_html_action;
+    QAction *menu_file_export_none_action;
+    QActionGroup *menu_file_export_group;
 #endif
   QMenu *menu_edit;
     QAction *menu_edit_action_cut;
@@ -9012,6 +9022,7 @@ QByteArray history_padder(char *str, int length,
   Re "if (OCELOT_IMPORT_EXPORT == 1)":
     This is for TEXT stuff e.g. CSV. See comments before import_export_rule_set().
     Todo: our size calculation is unsafe, we must add sizes of terminated_by enclosed_by etc.
+  Todo: We have a problem if columns_escaped_by is blank, it will ruin null displays.
 */
 #define HISTORY_COLUMN_MARGIN 1
 #define HISTORY_MAX_COLUMN_WIDTH 65535

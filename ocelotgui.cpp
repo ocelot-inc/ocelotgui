@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: October 12 2021
+   Last modified: October 17 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -1262,6 +1262,7 @@ int MainWindow::statement_format_rule_set(QString text)
   Convert escapes, e.g. if QString contains \n, we want a byte value QChar::LineFeed
   According to https://dev.mysql.com/doc/refman/8.0/en/load-data.html the combinations that are escapes
   are \0 \b \n \r \t \z \N. But I haven't handled \N (NULL) yet.
+  Todo: Check: why are you saying \\Z not \\z?
   Todo: Check if there are other combinations that aren't documented.
 */
 QByteArray MainWindow::to_byte_array(QString q)
@@ -1431,6 +1432,12 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
     (*exports).last= 0;
     (*exports).divider= 0;
   }
+  if (passed_type == TOKEN_KEYWORD_PRETTY)
+  {
+    (*exports).columns_escaped_by= "\\";
+    (*exports).lines_starting_by= "|";
+    (*exports).lines_terminated_by= "\n";
+  }
   if (passed_type == TOKEN_KEYWORD_HTML)
   {
     (*exports).query= 0;
@@ -1438,15 +1445,22 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
   }
 }
 
+/* Todo: I hope that if a file is already open it will be closed somewhere; I haven't checked. */
 void MainWindow::import_export_rule_set(QString text)
 {
   export_defaults(0, &main_exports);
 
-  QString s, rr;
+  QString s;
+  QString rr= "";
   int i, i_prev_1, i_prev_2, token_prev_2;
   int lines_or_columns= 0;
   int token;
-  if (text == "") goto ok_return; /* for default initialization we pass "" */
+  if (text == "")
+  {
+    main_exports.type= TOKEN_KEYWORD_NONE;
+    export_set_checked();
+    return; /* for default initialization we pass "" */
+  }
   if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) goto er_return;
   /* Following does nothing until we actually start evaluating what's in text */
   for (i= 0; main_token_lengths[i] != 0; ++i)
@@ -1461,13 +1475,13 @@ void MainWindow::import_export_rule_set(QString text)
     {
       export_defaults(TOKEN_KEYWORD_TEXT, &main_exports);
     }
-
     if (token == TOKEN_KEYWORD_HTML)
     {
-      export_defaults(TOKEN_KEYWORD_TEXT, &main_exports);
+      export_defaults(TOKEN_KEYWORD_HTML, &main_exports);
+      /* todo: isn't "break;" here wrong? shouldn't we look at INTO as well? and column names? */
       break;
     }
-    if (token == TOKEN_KEYWORD_DEFAULT)
+    if (token == TOKEN_KEYWORD_NONE)
     {
       break;
     }
@@ -1538,16 +1552,33 @@ void MainWindow::import_export_rule_set(QString text)
     }
     else
     {
-      make_and_put_open_message_in_result(ER_OK_PLUS, 0, rr);
-      return;
+      goto ok_return;
     }
   }
 ok_return:
-  make_and_put_message_in_result(ER_OK, 0, (char*)"");
+  export_set_checked();
+  if (rr == "") make_and_put_message_in_result(ER_OK, 0, (char*)"");
+  else make_and_put_open_message_in_result(ER_OK_PLUS, 0, rr);
   return;
 er_return:
+  /* todo: go back to prior main_exports.type */
   make_and_put_message_in_result(ER_SYNTAX, 0, (char*)"");
   return;
+}
+
+/*
+  Called from import_export_rule_set() or when user choice = cancel for an export dialog box.
+  Menu items are in a QActionGroup so setting one choice will unset other choices.
+  Re menu: If we got to import_export_rule_set() because user clicked a choice, then that choice already
+           has a check mark beside it, it happens before we get here. Usually that's fine, it's no change.
+           But if we put up the dialog box and user chooses cancel, that's not fine, go back to prior choice.
+*/
+void MainWindow::export_set_checked()
+{
+  if (main_exports.type == TOKEN_KEYWORD_TEXT) menu_file_export_text_action->setChecked(true);
+  if (main_exports.type == TOKEN_KEYWORD_PRETTY) menu_file_export_pretty_action->setChecked(true);
+  if (main_exports.type == TOKEN_KEYWORD_HTML) menu_file_export_html_action->setChecked(true);
+  if (main_exports.type == TOKEN_KEYWORD_NONE) menu_file_export_none_action->setChecked(true);
 }
 #endif
 
@@ -2803,6 +2834,10 @@ int MainWindow::history_line(char *l)
     Maybe instead of "Execute ctrl+E" I should be using "Run ctrl+R"
     Sure, I tried using & for various menu items e.g. E&xit -- but then Alt+x did not work!
   create_menu() makes a skeleton, fill_menu() comes when we know options from command-line and my.cnf
+  Todo: The choices in the export-related exclusive QActionGroup should have radio buttons not check marks.
+        Maybe figure out what went wrong, since illustrations suggested this would be automatic.
+        Maybe try adding to ocelot_menu_style_string: QMenu::indicator:exclusive:checked{image: ...}.
+        Maybe make your own icons and set them when checked.
 */
 void MainWindow::create_menu()
 {
@@ -2814,12 +2849,27 @@ void MainWindow::create_menu()
   menu_file->addSeparator();
   menu_file_export= menu_file->addMenu("Export");
   menu_file_export->setEnabled(false);
-  menu_file_export_text_action= menu_file_export->addAction("text");
-  menu_file_export_pretty_action= menu_file_export->addAction("pretty");
-  menu_file_export_html_action= menu_file_export->addAction("html");
+
+  QActionGroup *menu_file_export_group= new QActionGroup(menu_file_export);
+  menu_file_export_group->setEnabled(true);
+  //menu_file_export_group->setExclusive(true); should be automatic
+  menu_file_export_text_action= new QAction("text");
+  menu_file_export->addAction(menu_file_export_text_action);
+  menu_file_export_text_action->setActionGroup(menu_file_export_group);
+  menu_file_export_pretty_action= new QAction("pretty");
+  menu_file_export->addAction(menu_file_export_pretty_action);
+  menu_file_export_html_action= new QAction("html");
+  menu_file_export->addAction(menu_file_export_html_action);
+  menu_file_export_none_action= new QAction("none");
+  menu_file_export->addAction(menu_file_export_none_action);
   menu_file_export_text_action->setCheckable(true);
   menu_file_export_pretty_action->setCheckable(true);
   menu_file_export_html_action->setCheckable(true);
+  menu_file_export_none_action->setCheckable(true);
+  menu_file_export_group->addAction(menu_file_export_text_action);
+  menu_file_export_group->addAction(menu_file_export_pretty_action);
+  menu_file_export_group->addAction(menu_file_export_html_action);
+  menu_file_export_group->addAction(menu_file_export_none_action);
 #endif
   menu_edit= ui->menuBar->addMenu("");
   menu_edit_action_undo= menu_edit->addAction("");
@@ -2916,6 +2966,7 @@ void MainWindow::fill_menu()
   connect(menu_file_export_text_action, SIGNAL(triggered()), this, SLOT(action_export_text()));
   connect(menu_file_export_pretty_action, SIGNAL(triggered()), this, SLOT(action_export_pretty()));
   connect(menu_file_export_html_action, SIGNAL(triggered()), this, SLOT(action_export_html()));
+  connect(menu_file_export_none_action, SIGNAL(triggered()), this, SLOT(action_export_none()));
 #endif
   menu_edit_action_undo->setText(menu_strings[menu_off + MENU_EDIT_UNDO]);
   connect(menu_edit_action_undo, SIGNAL(triggered()), this, SLOT(menu_edit_undo()));
@@ -4609,6 +4660,7 @@ QStringList MainWindow::fake_statement(QString fake_statement_text)
   Very similar to action_connect_once(QString message)
   Todo: Use menu_strings[menu_off + n] as we do in action_connect_once().
   When row_form_password[]==2, row_form_box() will call fake_statement to produce possibilities for a combo box.
+  Warning: clicking the menu item causes it to be checked, which isn't what I want if dialog box result = cancel.
 */
 
 int MainWindow::action_export_function(int passed_type)
@@ -4635,11 +4687,11 @@ int MainWindow::action_export_function(int passed_type)
   row_form_label[i=0]= "into"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.file_name; row_form_width[i]= '\x04';
   if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_PRETTY))
   {
-    row_form_label[++i]= "columns terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.columns_terminated_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "columns enclosed by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.columns_enclosed_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "columns escaped by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.columns_escaped_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "lines starting by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.lines_starting_by; row_form_width[i]= '\x04';
-    row_form_label[++i]= "lines terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= local_exports.lines_terminated_by; row_form_width[i]= '\x04';
+    row_form_label[++i]= "columns terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.columns_terminated_by); row_form_width[i]= '\x04';
+    row_form_label[++i]= "columns enclosed by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.columns_enclosed_by); row_form_width[i]= '\x04';
+    row_form_label[++i]= "columns escaped by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.columns_escaped_by); row_form_width[i]= '\x04';
+    row_form_label[++i]= "lines starting by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.lines_starting_by); row_form_width[i]= '\x04';
+    row_form_label[++i]= "lines terminated by"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.lines_terminated_by); row_form_width[i]= '\x04';
   }
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_COLUMN_NAMES].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.column_names); row_form_width[i]= '\x50';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ROW_COUNT].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(local_exports.max_row_count); row_form_width[i]= '\x50';
@@ -4655,7 +4707,7 @@ int MainWindow::action_export_function(int passed_type)
   assert(i == column_count - 1);
   /* if (message == "File|Connect") */
   {
-    row_form_title= menu_strings[menu_off + MENU_CONNECTION_DIALOG_BOX];
+    row_form_title= "Export Dialog Box"; /* todo: there should be something in ostrings.h for this */
     row_form_message= message;
 
     co= new Row_form_box(column_count, row_form_label,
@@ -4669,7 +4721,7 @@ int MainWindow::action_export_function(int passed_type)
     co_is_ok= co->is_ok;
     if (co->is_ok == 1)
     {
-      /* local_exports.type= TOKEN_KEYWORD_TEXT|PRETTY|HTML_DEFAULT */
+      /* local_exports.type= TOKEN_KEYWORD_TEXT|PRETTY|HTML|NONE */
       local_exports.type= passed_type;
       local_exports.file_name= row_form_data[i=0].trimmed();
       ++i;
@@ -4730,6 +4782,12 @@ int MainWindow::action_export_function(int passed_type)
       text= text + ";";
       ++main_token_count_in_statement;
       action_change_one_setting_execute(text);
+      /* menu_file_export_..._action->setChecked(...) has happened if the execution succeeded */
+    }
+    else
+    {
+      /* user chose cancel, so the check mark should go back to the original place */
+      export_set_checked();
     }
     delete(co);
   }
@@ -4742,13 +4800,36 @@ int MainWindow::action_export_function(int passed_type)
   return co_is_ok;
 }
 
+/*
+  Called from: action_export_function(), for assigning values that might contain characters that don't display.
+  Todo: there's a reverse of this somewhere, not what it is.
+*/
+QString MainWindow::action_export_function_value(QString input)
+{
+  QString token_for_value= "";
+  QString c2;
+  for (int i= 0; i < input.size(); ++i)
+  {
+    c2= input.mid(i, 1);
+    if (c2 == "\x08") { token_for_value= token_for_value + "\\b"; continue; }
+    if (c2 == "\x09") { token_for_value= token_for_value + "\\t"; continue; }
+    if (c2 == "\x0a") { token_for_value= token_for_value + "\\n"; continue; }
+    if (c2 == "\x0d") { token_for_value= token_for_value + "\\r"; continue; }
+    /* nothing needed for \, I think */
+    if (c2 == "\x20") { token_for_value= token_for_value + "\\s"; continue; }
+    token_for_value= token_for_value + c2;
+  }
+  return token_for_value;
+}
+
 QString MainWindow::action_export_function_clause(QString keywords, QString literal)
 {
   QString escaped_literal= "";
   for (int i= 0; i < literal.size(); ++i)
   {
     QString c= literal.mid(i, 1);
-    if (c == "\\") escaped_literal= escaped_literal + c;
+    //if (c == "\\") escaped_literal= escaped_literal + c;
+    if (c == "'") escaped_literal= escaped_literal + c;
     escaped_literal= escaped_literal + c;
   }
   return " " + keywords + " '" + escaped_literal + "' ";
@@ -4759,21 +4840,27 @@ QString MainWindow::action_export_function_clause_i(QString keywords, int litera
   return " " + keywords + " " + QString::number(literal) + " ";
 }
 
-
 void MainWindow::action_export_text()
 {
-  if (action_export_function(TOKEN_KEYWORD_TEXT) == 1) menu_file_export_text_action->setChecked(true);
+  action_export_function(TOKEN_KEYWORD_TEXT);
 }
 
 void MainWindow::action_export_pretty()
 {
-  if (action_export_function(TOKEN_KEYWORD_PRETTY) == 1) menu_file_export_pretty_action->setChecked(true);
+  action_export_function(TOKEN_KEYWORD_PRETTY);
 }
 
 void MainWindow::action_export_html()
 {
-  if (action_export_function(TOKEN_KEYWORD_HTML) == 1) menu_file_export_html_action->setChecked(true);
+  action_export_function(TOKEN_KEYWORD_HTML);
 }
+
+void MainWindow::action_export_none()
+{
+  main_token_count_in_statement= 5;
+  action_change_one_setting_execute("SET OCELOT_EXPORT = NONE;");
+}
+
 
 #endif
 
