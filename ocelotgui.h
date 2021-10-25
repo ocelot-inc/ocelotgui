@@ -540,7 +540,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_IGNORE,
         TOKEN_KEYWORD_IGNORE_SPACES,
     TOKEN_KEYWORD_IMMEDIATE,
-    TOKEN_KEYWORD_IMPORT,
+    TOKEN_KEYWORD_IMPORT, /* unused */
     TOKEN_KEYWORD_IN,
     TOKEN_KEYWORD_INDEX,
     TOKEN_KEYWORD_INDEXED,
@@ -816,7 +816,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_HORIZONTAL,
     TOKEN_KEYWORD_OCELOT_HTML,
     TOKEN_KEYWORD_OCELOT_HTMLRAW,
-    TOKEN_KEYWORD_OCELOT_IMPORT, /* if OCELOT_IMPORT_EXPORT == 1 */
+    TOKEN_KEYWORD_OCELOT_IMPORT, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     TOKEN_KEYWORD_OCELOT_LANGUAGE,
     TOKEN_KEYWORD_OCELOT_LOG_LEVEL,
     TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR,
@@ -949,7 +949,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_PRECEDES,
     TOKEN_KEYWORD_PRECISION,
     TOKEN_KEYWORD_PREPARE,
-    TOKEN_KEYWORD_PRETTY,
+    TOKEN_KEYWORD_PRETTY, /* unused */
     TOKEN_KEYWORD_PRIMARY,
     TOKEN_KEYWORD_PRINT,
     TOKEN_KEYWORD_PRINTF,
@@ -1788,7 +1788,7 @@ static const keywords strvalues[]=
       {"IGNORE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_IGNORE},
         {"IGNORE_SPACES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_IGNORE_SPACES},
       {"IMMEDIATE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_IMMEDIATE},
-      {"IMPORT", 0, 0, TOKEN_KEYWORD_IMPORT},
+      {"IMPORT", 0, 0, TOKEN_KEYWORD_IMPORT}, /* unused */
       {"IN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IN},
       {"INDEX", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INDEX},
       {"INDEXED", 0, 0, TOKEN_KEYWORD_INDEXED},
@@ -2065,7 +2065,7 @@ static const keywords strvalues[]=
     {"OCELOT_HORIZONTAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HORIZONTAL},
     {"OCELOT_HTML", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTML},
     {"OCELOT_HTMLRAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW},
-    {"OCELOT_IMPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_IMPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */
+    {"OCELOT_IMPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_IMPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     {"OCELOT_LANGUAGE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {"OCELOT_LOG_LEVEL", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
     {"OCELOT_MENU_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
@@ -2199,7 +2199,7 @@ static const keywords strvalues[]=
       {"PRECEDES", FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, 0, TOKEN_KEYWORD_PRECEDES},
       {"PRECISION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PRECISION},
       {"PREPARE", 0, 0, TOKEN_KEYWORD_PREPARE},
-      {"PRETTY", 0, 0, TOKEN_KEYWORD_PRETTY},
+      {"PRETTY", 0, 0, TOKEN_KEYWORD_PRETTY}, /* unused */
       {"PRIMARY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PRIMARY},
       {"PRINT", 0, 0, TOKEN_KEYWORD_PRINT}, /* ocelotgui keyword */
       {"PRINTF", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_PRINTF},
@@ -2746,22 +2746,23 @@ typedef char MY_BOOL;
 
 #if (OCELOT_IMPORT_EXPORT == 1)
 struct export_settings {
-  int type; /* e.g. 0 | TOKEN_KEYWORD_TEXT | TOKEN_KEYWORD_PRETTY | TOKEN_KEYWORD_HTML etc. */
+  int type; /* e.g. 0 | TOKEN_KEYWORD_TEXT | TOKEN_KEYWORD_TABLE | TOKEN_KEYWORD_HTML etc. */
   QString file_name;
-  bool columns_optionally;
-  QByteArray columns_enclosed_by;
-  QByteArray columns_escaped_by;
   QByteArray columns_terminated_by;
+  QByteArray columns_enclosed_by;
+  bool columns_optionally;
+  QByteArray columns_escaped_by;
   QByteArray lines_starting_by;
   QByteArray lines_terminated_by;
-  unsigned short column_names; /* not user-changeable yet */
-  unsigned short query; /* not user-changeable yet */
-  unsigned short row_count; /* not user-changeable yet */
-  long unsigned max_row_count; /* not user-changeable yet */
-  unsigned short margin; /* not user-changeable yet */
-  unsigned short pad; /* not user-changeable yet */
-  unsigned short last;  /* not user-changeable yet *//* does last column get a terminated-by? */
-  unsigned short divider;  /* not user-changeable yet *//* divider line e.g. +---+---+? */
+  long unsigned max_row_count;
+  bool column_names;
+  bool query;
+  bool row_count;
+  short int margin;
+  bool pad;
+  bool last;  /* not user-changeable yet *//* does last column get a terminated-by? */
+  bool divider;  /* not user-changeable yet *//* divider line e.g. +---+---+? */
+  QByteArray ifnull;
 };
 #endif
 
@@ -3446,7 +3447,7 @@ public:
   int hparse_f_client_set_export();
 #endif
   int hparse_f_client_set_rule();
-  bool hparse_pick_from_list(QStringList);
+  int hparse_pick_from_list(QStringList);
   int hparse_f_client_set();
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
@@ -3519,11 +3520,14 @@ public slots:
 #if (OCELOT_IMPORT_EXPORT == 1)
   QStringList fake_statement(QString fake_statement_text);
   int action_export_function(int);
+  const char *bool_to_string(bool input);
+  bool string_to_bool(QString input);
   QString action_export_function_value(QString input);
   QString action_export_function_clause(QString,QString);
   QString action_export_function_clause_i(QString,int);
+  QString action_export_function_clause_b(QString,bool);
   void action_export_text();
-  void action_export_pretty();
+  void action_export_table();
   void action_export_html();
   void action_export_none();
 #endif
@@ -3847,7 +3851,7 @@ private:
 #if (OCELOT_IMPORT_EXPORT == 1)
     QMenu *menu_file_export;
     QAction *menu_file_export_text_action;
-    QAction *menu_file_export_pretty_action;
+    QAction *menu_file_export_table_action;
     QAction *menu_file_export_html_action;
     QAction *menu_file_export_none_action;
     QActionGroup *menu_file_export_group;
@@ -4488,7 +4492,7 @@ Row_form_box(int column_count, QString *row_form_label,
     hbox_layout[i]= new QHBoxLayout();
     //hbox_layout[i]->setSpacing(0);
     hbox_layout[i]->setContentsMargins(QMargins(2, 2, 2, 2));
-    hbox_layout[i]->setSizeConstraint(QLayout::SetFixedSize);  /* necessary, but I don't know why */
+    hbox_layout[i]->setSizeConstraint(QLayout::SetFixedSize);  /* if not this then width = rest of dialog box */
     label[i]= new QLabel();
     label[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
     label[i]->setMinimumHeight(component_height);
@@ -4503,6 +4507,7 @@ Row_form_box(int column_count, QString *row_form_label,
       line_edit[i]->setEchoMode(QLineEdit::Password); /* maybe PasswordEchoOnEdit would be better */
       line_edit[i]->setMaximumHeight(component_height);
       line_edit[i]->setMinimumHeight(component_height);
+      line_edit[i]->setMinimumWidth(40); /* TEST!!!! */
       hbox_layout[i]->addWidget(line_edit[i]);
     }
     else if (row_form_is_password[i] == 0)
@@ -4527,7 +4532,7 @@ Row_form_box(int column_count, QString *row_form_label,
       //if ((row_form_type[i] & NUM_FLAG) != 0) text_edit[i]->setAlignment(Qt::AlignRight);
       hbox_layout[i]->addWidget(text_edit[i]);
     }
-    else /* row_form_is_password[i] == 2 */
+    else if (row_form_is_password[i] == 2) /* This is not used yet */
     {
       combo_box_edit[i]= new QComboBox();
       combo_box_edit[i]->setMaximumHeight(component_height);
@@ -4537,6 +4542,17 @@ Row_form_box(int column_count, QString *row_form_label,
       QStringList qs= parent->fake_statement(row_form_data[i]);
       for (int j= 0; j < qs.size(); ++j) combo_box_edit[i]->addItem(qs.at(j));
 
+      hbox_layout[i]->addWidget(combo_box_edit[i]);
+    }
+    else /* row_form_is_password[i] == 3 */
+    {
+      combo_box_edit[i]= new QComboBox();
+      combo_box_edit[i]->setMaximumHeight(component_height);
+      combo_box_edit[i]->setMinimumHeight(component_height);
+      combo_box_edit[i]->addItem("yes");
+      combo_box_edit[i]->addItem("no");
+      if (row_form_data[i] == "yes") combo_box_edit[i]->setCurrentIndex(0);
+      else combo_box_edit[i]->setCurrentIndex(1);
       hbox_layout[i]->addWidget(combo_box_edit[i]);
     }
     widget[i]= new QWidget();
@@ -4569,10 +4585,11 @@ Row_form_box(int column_count, QString *row_form_label,
   /* Removing widget_for_size_hint */
   /* Removing QSize size_hint */
   /* Instead we'll use scroll bar always on */
+  /* Todo: the height is a bit less than what we want if export/html. I added "+ 20" on 2021-10-20. */
   scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
   scroll_area->show();
   width_for_size_hint= scroll_area->width() + 25;
-  height_for_size_hint= scroll_area->height();
+  height_for_size_hint= scroll_area->height() + 20;
 
 
   //{
@@ -4617,7 +4634,10 @@ void handle_button_for_ok()
   {
     if (this_row_form_box->row_form_is_password_copy[i] == 1) this_row_form_box->row_form_data_copy[i]= line_edit[i]->text();
     else if (this_row_form_box->row_form_is_password_copy[i] == 0) this_row_form_box->row_form_data_copy[i]= text_edit[i]->toPlainText();
-    else this_row_form_box->row_form_data_copy[i]= combo_box_edit[i]->currentText();
+    else
+    {
+      this_row_form_box->row_form_data_copy[i]= combo_box_edit[i]->currentText();
+    }
   }
   is_ok= 1;
   garbage_collect();
@@ -8279,7 +8299,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     local_max_grid_rows= main_exports.max_row_count;
     local_copy_of_ocelot_xml= 0;
     local_is_including_thin_image= false;
-    printf("**** display_html export. max_row_count=%ld\n", local_max_grid_rows);
   }
   else
   {
@@ -8366,7 +8385,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
-
   if (local_ocelot_result_grid_column_names_copy == 1)
   {
     char *result_field_names_pointer;
@@ -9044,7 +9062,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 #if (OCELOT_IMPORT_EXPORT == 1)
   QByteArray escapers("");
   char escape_char= main_exports.columns_escaped_by[0];
-  char null_string[3];
+  char null_string[64]; /* todo: should be variable length, in theory this could overflow but usually it's \N */
   char *pointer_to_null_string;
   int length_of_null_string;
   int margin;
@@ -9057,10 +9075,9 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     for (int i= 0; i < main_exports.columns_terminated_by.size(); ++i) escapers[e++]= main_exports.columns_terminated_by[i];
     for (int i= 0; i < main_exports.lines_starting_by.size(); ++i) escapers[e++]= main_exports.lines_starting_by[i];
     for (int i= 0; i < main_exports.lines_terminated_by.size(); ++i) escapers[e++]= main_exports.lines_terminated_by[i];
-    null_string[0]= escape_char;
-    null_string[1]= 'N';
-    null_string[2]= '\0';
-    length_of_null_string= 2;
+    length_of_null_string= main_exports.ifnull.size();
+    for (int i= 0; i < length_of_null_string; ++i) null_string[i]= main_exports.ifnull[i];
+    null_string[length_of_null_string]= '\0';
     pointer_to_null_string= null_string;
     margin= main_exports.margin;
   }
@@ -9216,7 +9233,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 #if (OCELOT_IMPORT_EXPORT == 1)
   if (file_name != NULL)
   {
-    if (main_exports.divider == 1) copy_of_parent->history_file_write("TEE", divider_line, false);
+    if (main_exports.divider == true) copy_of_parent->history_file_write("TEE", divider_line, false);
   }
   else
     s.append(divider_line);
@@ -9253,7 +9270,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 #if (OCELOT_IMPORT_EXPORT == 1)
   if (file_name != NULL)
   {
-    if (main_exports.divider == 1) copy_of_parent->history_file_write("TEE", divider_line, false);
+    if (main_exports.divider == true) copy_of_parent->history_file_write("TEE", divider_line, false);
   }
   else
     s.append(divider_line);
@@ -9287,6 +9304,8 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       bool is_to_be_enclosed= true;
       if ((main_exports.columns_optionally == true) && ((field_value_flags & FIELD_VALUE_FLAG_IS_STRING) == 0))
         is_to_be_enclosed= false;
+      if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0)
+        is_to_be_enclosed= false;
 #endif
       if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0)
       {
@@ -9301,7 +9320,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       memset(pointer_to_history_line, ' ', margin);
       pointer_to_history_line+= margin;
 #if (OCELOT_IMPORT_EXPORT == 1)
-      if ((file_name != NULL) && (main_exports.pad == 0))
+      if ((file_name != NULL) && (main_exports.pad == false))
         pcv= QByteArray(pointer_to_source, length);
       else
         pcv= history_padder(pointer_to_source, length,
@@ -9343,7 +9362,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
           strcpy(pointer_to_history_line, main_exports.columns_enclosed_by.constData());
           pointer_to_history_line+= main_exports.columns_enclosed_by.size();
         }
-        if ((col < (history_result_column_count - 1)) || (main_exports.last == 1))
+        if ((col < (history_result_column_count - 1)) || (main_exports.last == true))
         {
           strcpy(pointer_to_history_line, main_exports.columns_terminated_by.constData());
           pointer_to_history_line+= main_exports.columns_terminated_by.size();
@@ -9377,7 +9396,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 #if (OCELOT_IMPORT_EXPORT == 1)
   if (file_name != NULL)
   {
-    if (main_exports.divider == 1) copy_of_parent->history_file_write("TEE", divider_line, false);
+    if (main_exports.divider == true) copy_of_parent->history_file_write("TEE", divider_line, false);
   }
   else
     s.append(divider_line);

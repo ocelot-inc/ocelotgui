@@ -13121,12 +13121,24 @@ void MainWindow::hparse_f_other(int flags)
 */
 int MainWindow::hparse_f_client_set_export()
 {
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FORMAT, "FORMAT");
+  if (hparse_errno > 0) return 0;
   int type;
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TEXT, "TEXT") == 1) type= TOKEN_KEYWORD_TEXT;
-  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRETTY, "PRETTY") == 1) type= TOKEN_KEYWORD_PRETTY;
-  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_HTML, "HTML") == 1) type= TOKEN_KEYWORD_HTML;
-  else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NONE, "NONE") == 1) return 1;
-  else {hparse_f_error(); return 0; }
+
+  {
+    QStringList q= { "text", "table", "html", "none" };
+    int picked= hparse_pick_from_list(q);
+    if (picked == -1)
+    {
+      hparse_f_error();
+      return 1;
+    }
+    if (picked == 0) type= TOKEN_KEYWORD_TEXT;
+    if (picked == 1) type= TOKEN_KEYWORD_TABLE;
+    if (picked == 2) type= TOKEN_KEYWORD_HTML;
+    if (picked == 3) type= TOKEN_KEYWORD_NONE;
+  }
+  if (type == TOKEN_KEYWORD_NONE) return 1;
 
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO") == 1)
   {
@@ -13135,23 +13147,45 @@ int MainWindow::hparse_f_client_set_export()
     if (hparse_errno > 0) return 0;
   }
   int k= 0; /* When k == 0 we don't accept, e.g. when it's HTML we don't have a MARGIN option */
-  if ((type == TOKEN_KEYWORD_TEXT) || (type == TOKEN_KEYWORD_PRETTY)) k= 1;
+  if ((type == TOKEN_KEYWORD_TEXT) || (type == TOKEN_KEYWORD_TABLE)) k= 1;
   if (k == 1) hparse_f_infile_or_outfile();
   if (hparse_errno > 0) return 0;
-  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLUMN_NAMES, "COLUMN_NAMES") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAX_ROW_COUNT, "MAX_ROW_COUNT") == 1)
+  while ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAX_ROW_COUNT, "MAX_ROW_COUNT") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLUMN_NAMES, "COLUMN_NAMES") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUERY, "QUERY") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW_COUNT, "ROW_COUNT") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MARGIN, "MARGIN") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAD, "PAD") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LAST, "LAST") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DIVIDER, "DIVIDER") == 1))
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DIVIDER, "DIVIDER") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IFNULL, "IFNULL") == 1))
   {
-    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) != 1)
+    if ((main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_MAX_ROW_COUNT)
+     || (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_MARGIN))
     {
-      hparse_f_error();
-      break;
-     }
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) != 1)
+      {
+        hparse_f_error();
+        break;
+      }
+    }
+    else if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_IFNULL)
+    {
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) != 1)
+      {
+        hparse_f_error();
+        break;
+      }
+    }
+    else
+    {
+      QStringList q= { "yes", "no" };
+      if (hparse_pick_from_list(q) == -1)
+      {
+        hparse_f_error();
+        break;
+      }
+    }
   }
   return 1;
 }
@@ -13271,8 +13305,6 @@ int MainWindow::hparse_f_client_set()
     return hparse_f_client_set_rule();
   }
   int last_accepted= main_token_types[hparse_i_of_last_accepted];
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
-  if (hparse_errno > 0) return 0;
 
 #if (OCELOT_IMPORT_EXPORT == 1)
   if (last_accepted == TOKEN_KEYWORD_OCELOT_EXPORT)
@@ -13280,6 +13312,9 @@ int MainWindow::hparse_f_client_set()
     return hparse_f_client_set_export();
   }
 #endif
+
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+  if (hparse_errno > 0) return 0;
 
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
   main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_FUNCTION);
@@ -13303,7 +13338,7 @@ int MainWindow::hparse_f_client_set()
   }
   if (q.count() > 0)
   {
-    if (hparse_pick_from_list(q) == false)
+    if (hparse_pick_from_list(q) == -1)
     {
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     }
@@ -13316,18 +13351,18 @@ int MainWindow::hparse_f_client_set()
 
 /*
   For picking a string literal when there are fixed choices.
-  Used for colors + fonts. Todo: use for more.
+  Used for colors + fonts.
   Todo: use for more. Pass a flag if it's to be enclosed in ''s. Pass a flag if it's to be sorted.
 */
-bool MainWindow::hparse_pick_from_list(QStringList q)
+int MainWindow::hparse_pick_from_list(QStringList q)
 {
   for (int q_i= 0; q_i < q.size(); ++q_i)
   {
     QString s= "'" + q.at(q_i) + "'";
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, s) == 1)
-      return true;
+      return q_i;
   }
-  return false;
+  return -1;
 }
 
 /*
