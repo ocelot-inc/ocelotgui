@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: October 25 2021
+   Last modified: November 10 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -1280,14 +1280,17 @@ QByteArray MainWindow::to_byte_array(QString q)
 /*
    SET ocelot_export ...; -- settings for dump of current result set, in one of several formats
    Many of the comments are about wishes that might never come true
+
+   SET ocelot_export ::= 'string' | option-list
+   Ordinarily one does not use 'string', but it is allowed because --ocelot_export = 'string' is allowed.
    Example: set by menu File|Export TEXT using the same default as the mysql client:
-   SET ocelot_export = TEXT
+   SET ocelot_export = FORMAT 'TEXT'
      INTO 'STDOUT'
      COLUMNS TERMINATED BY '\t' ENCLOSED BY '' ESCAPED BY '\'
      LINES STARTING BY '' TERMINATED BY '\n'
      MAX_ROW_COUNT 100000000 COLUMN_NAMES 'no'
      QUERY 'no' ROW_COUNT 'no' MARGIN 0 PAD 'no' LAST 'no' DIVIDER 'no' IFNULL '\N' ;
-   SET ocelot_export = TABLE
+   SET ocelot_export = FORMAT 'TABLE'
        INTO STDOUT
        FIELDS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY ''
        LINES STARTING BY '|' TERMINATED BY '\n';
@@ -1307,15 +1310,16 @@ QByteArray MainWindow::to_byte_array(QString q)
      there is no default file extension like .csv, but .txt might be okay for text
      [ADD TIMESTAMP] you could have multiple files, add timestamp or ordinal or random-string to each file name
      [IF FILE EXISTS ERROR|APPEND|TRUNCATE] Default = APPEND though mysql client would say ERROR
-   TEXT: (some call it DEP) (or DELIMITED?) (these defaults are for MySQL which is tab-separated but like CSV)
+   'TEXT': (some call it DEP) (or DELIMITED?) (these defaults are for MySQL which is tab-separated but like CSV)
      MySQL Shell calls it "tabbed".
      The same items that are in MySQL/MariaDB output file
      FIELDS|COLUMNS TERMINATED BY string
      FIELDS|COLUMNS ESCAPED BY string
      FIELDS|COLUMNS [OPTIONALLY] ENCLOSED BY string
      LINES STARTING BY string TERMINATED BY string
-   TABLE: (or FIXED?) (or TABULAR?) (or PRETTY?) (or BOXES?)
+   'TABLE': (or FIXED?) (or TABULAR?) (or PRETTY?) (or BOXES?)
      ClickHouse calls it PRETTY. MySQL Shell says result_format=table. (They also have "tabbed".)
+     https://mariadb.com/kb/en/mysql-command-line-client/ says "ascii-table"
      This is the +----+ style with Box drawing as in https://en.wikipedia.org/wiki/Box-drawing_character
      (but really the +-----+ style is fixed-width, columns terminated by |, lines terminated by special-stuff)
      SET ... COLUMN BOUNDARIES '|' LINE BOUNDARIES '-' INTERSECTIONS '+' HEADER LINE BOUNDARIES '='
@@ -1325,9 +1329,9 @@ QByteArray MainWindow::to_byte_array(QString q)
      HEADER LINES TERMINATED BY '=' AND '+'
      FILE STARTING BY '-' AND '+'
      FILE TERMINATED BY '-' AND '+'
-   HTML
+   'HTML'
      This has to just dump what we got for result grid, but with different limit for max_row_count
-   NONE:
+   'NONE':
      This is the default. Simple: there is no exporting.
    DEFAULT (no longer shown):
      TEE result set output will be like TABLE with -s and |s and +s, same as history output.
@@ -1458,10 +1462,44 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
   }
 }
 
-/* Todo: I hope that if a file is already open it will be closed somewhere; I haven't checked. */
+/*
+  Why recursion: We want to handle SET ocelot_export='format ''test'''; as well as ocelot_export=format 'test';
+                 because --ocelot_export is possible. And it might be --ocelot_export="format 'test'"
+  Why no checks: Ordinarily we've gone through hparse, eh? But we can unset that or have a command-line option.
+                 Maybe that means result will be junk but I don't think there's a crash possibility.
+  Todo: I hope that if a file is already open it will be closed somewhere; I haven't checked.
+*/
+#define MAX_EXPORT_TOKENS 100 /* We could use 'new' + dynamic but with current syntax 100 is more than enough */
 void MainWindow::import_export_rule_set(QString text)
 {
   export_defaults(0, &main_exports);
+
+  int export_token_offsets[MAX_EXPORT_TOKENS];
+  int export_token_lengths[MAX_EXPORT_TOKENS];
+  int export_token_types[MAX_EXPORT_TOKENS];
+  tokenize(text.data(),
+           text.size(),
+           &export_token_lengths[0], &export_token_offsets[0], MAX_EXPORT_TOKENS - 1,
+          (QChar*)"33333", 1, "", 1);
+  /* This next bit is pared down from tokens_to_keywords(). ansi_quotes=false so "..." might be acceptable */
+  {
+    char key2[MAX_KEYWORD_LENGTH + 1];
+    int i2, t, index;
+    QString s;
+    for (i2= 0; export_token_lengths[i2] != 0; ++i2)
+    {
+      s= text.mid(export_token_offsets[i2], export_token_lengths[i2]);
+      t= token_type(s.data(), export_token_lengths[i2], false);
+      export_token_types[i2]= t;
+      if ((t == TOKEN_TYPE_OTHER) && (export_token_lengths[i2] < MAX_KEYWORD_LENGTH))
+      {
+        QByteArray key_as_byte_array= s.toLocal8Bit();
+        const char *key= key_as_byte_array.data();
+        index= get_keyword_index(key, key2);
+        if (index != -1) export_token_types[i2]= index;
+      }
+    }
+  }
 
   QString s;
   QString rr= "";
@@ -1474,16 +1512,27 @@ void MainWindow::import_export_rule_set(QString text)
     export_set_checked();
     return; /* for default initialization we pass "" */
   }
-  if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) goto er_return;
-  /* Following does nothing until we actually start evaluating what's in text */
-  for (i= 0; main_token_lengths[i] != 0; ++i)
+  /* I removed the following line because if ocelot_export is a command-line option we don't go through hparse. */
+  //if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) goto er_return;
+  for (i= 0; export_token_lengths[i] != 0; ++i)
   {
-    token= main_token_types[i];
+    token= export_token_types[i];
 
+    if (text.mid(export_token_offsets[i], export_token_lengths[i]) == "=")
+    {
+      int tmp_i= next_i_v(i, +1, export_token_types, export_token_lengths);
+      if ((export_token_types[tmp_i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+       || (export_token_types[tmp_i] == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
+      {
+        QString s= text.mid(export_token_offsets[tmp_i], export_token_lengths[tmp_i]);
+        s= connect_stripper(s, true);
+        import_export_rule_set(s); /* recursion */
+      }
+    }
     if (token == TOKEN_KEYWORD_FORMAT)
     {
-      i= next_i(i, +1);
-      QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      i= next_i_v(i, +1, export_token_types, export_token_lengths);
+      QString s= text.mid(export_token_offsets[i], export_token_lengths[i]);
       s= connect_stripper(s, false);
       s= s.toUpper();
       if (s == "TEXT") token= TOKEN_KEYWORD_TEXT;
@@ -1512,8 +1561,8 @@ void MainWindow::import_export_rule_set(QString text)
 
     if (token == TOKEN_KEYWORD_INTO)
     {
-      i= next_i(i, +1);
-      main_exports.file_name= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      i= next_i_v(i, +1, export_token_types, export_token_lengths);
+      main_exports.file_name= text.mid(export_token_offsets[i], export_token_lengths[i]);
       main_exports.file_name= connect_stripper(main_exports.file_name, false); /* todo: consider: should we pass true rather than false here? */
     }
 
@@ -1527,8 +1576,8 @@ void MainWindow::import_export_rule_set(QString text)
     if (token == TOKEN_KEYWORD_MAX_ROW_COUNT)
     {
       lines_or_columns= 0;
-      i= next_i(i, +1);
-      s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      i= next_i_v(i, +1, export_token_types, export_token_lengths);
+      s= text.mid(export_token_offsets[i], export_token_lengths[i]);
       s= connect_stripper(s, false);
       int s_as_int= s.toInt();
       main_exports.max_row_count= s_as_int;
@@ -1536,8 +1585,8 @@ void MainWindow::import_export_rule_set(QString text)
     if (token == TOKEN_KEYWORD_IFNULL)
     {
       lines_or_columns= 0;
-      i= next_i(i, +1);
-      s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      i= next_i_v(i, +1, export_token_types, export_token_lengths);
+      s= text.mid(export_token_offsets[i], export_token_lengths[i]);
       s= connect_stripper(s, false);
       main_exports.ifnull= to_byte_array(s);
     }
@@ -1547,8 +1596,8 @@ void MainWindow::import_export_rule_set(QString text)
      || (token == TOKEN_KEYWORD_DIVIDER))
     {
       lines_or_columns= 0;
-      i= next_i(i, +1);
-      s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      i= next_i_v(i, +1, export_token_types, export_token_lengths);
+      s= text.mid(export_token_offsets[i], export_token_lengths[i]);
       s= connect_stripper(s, false); /* huh? is this needed? */
       bool s_as_bool;
       if (s == "yes") s_as_bool= true;
@@ -1563,12 +1612,12 @@ void MainWindow::import_export_rule_set(QString text)
     /* Todo: what if it's a number? or a constant like FALSE? */
     if ((token == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) || (token == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
     {
-      s= text.mid(main_token_offsets[i], main_token_lengths[i]);
+      s= text.mid(export_token_offsets[i], export_token_lengths[i]);
       s= connect_stripper(s, false);
-      i_prev_1= next_i(i, -1);         /* presumably BY */
-      i_prev_2= next_i(i_prev_1, -1);
+      i_prev_1= next_i_v(i, -1, export_token_types, export_token_lengths);         /* presumably BY */
+      i_prev_2= next_i_v(i_prev_1, -1, export_token_types, export_token_lengths);
 
-      token_prev_2= main_token_types[i_prev_2];
+      token_prev_2= export_token_types[i_prev_2];
 
       if (lines_or_columns == TOKEN_KEYWORD_COLUMNS)
       {
@@ -4666,7 +4715,7 @@ void MainWindow::action_exit()
   I'd like to produce the list once and consistently.
   And I know that hparse can figure out what's possible.
   Example: I want to get a list of the export types.
-           Pass SET ocelot_export format
+           Pass SET ocelot_export = format
            Result: TEXT or TABLE or HTML or NONE (and maybe someday DEFAULT) will be in hparse_expected.
            Split that  into a QStringList with " or " as separator with QString::split().
            Warning: It's case sensitive so OR won't split, but " or " within a string or name will split.
@@ -4795,7 +4844,7 @@ int MainWindow::action_export_function(int passed_type)
       /* todo: maybe I should be appending with row_form_data[] and letting the statement be not fake */
       QString text;
       QString token;
-      text= "SET ocelot_export FORMAT ";
+      text= "SET ocelot_export = FORMAT ";
       main_token_count_in_statement= 3;
       if (local_exports.type == TOKEN_KEYWORD_TEXT) token= "'text' ";
       else if (local_exports.type == TOKEN_KEYWORD_TABLE) token= "'table' ";
@@ -14284,6 +14333,24 @@ int MainWindow::next_i(int i_start, int i_increment)
   return i;
 }
 
+/* Variant of next_i() where we pass token_lengths + types rather than assume main_token_lengths + types */
+int MainWindow::next_i_v(int i_start, int i_increment, int token_types[], int token_lengths[])
+{
+  int i= i_start;
+  for (;;)
+  {
+    if ((i == 0) && (i_increment <= 0)) break;
+    if ((token_lengths[i] == 0) && (i_increment >= 0)) break;
+    i= i + i_increment;
+    if ((token_types[i] != TOKEN_TYPE_COMMENT_WITH_SLASH)
+      && (token_types[i] != TOKEN_TYPE_COMMENT_WITH_OCTOTHORPE)
+      && (token_types[i] != TOKEN_TYPE_COMMENT_WITH_MINUS))
+     break;
+  }
+  return i;
+}
+
+
 #if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   We use sql_mode to decide whether "..." is an identifier or a literal.
@@ -21289,10 +21356,17 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
 #endif //#if (OCELOT_MYSQL_INCLUDE == 0)
     return;
   }
+#ifdef OCELOT_IMPORT_EXPORT
+  if (keyword_index == TOKEN_KEYWORD_OCELOT_EXPORT)
+  {
+    import_export_rule_set(token2);
+    return;
+  }
+#endif
   if (keyword_index == TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS) { ocelot_client_side_functions= is_enable; return; }
   else
   {
-    /* Anything that starts with "ocelot_" except "ocelot_dbms" and "ocelot_client_side_functions" */
+    /* Anything that starts with "ocelot_" except "ocelot_dbms" "ocelot_client_side_functions" "ocelot_export" */
     if (xsettings_widget->ocelot_variable_set(keyword_index, token2) != ER_OVERFLOW)
     {
       /* It might not be ER_OK but we ignore errors here */
@@ -25866,6 +25940,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
   so we switched to this. 126 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
   Todo: ocelot_grid_border_size is no longer used but we'll probably add something else soon
+  We don't have ocelot_export in the list, I don't think it's needed.
 */
 int XSettings::ocelot_variables_create()
 {

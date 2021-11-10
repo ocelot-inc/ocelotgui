@@ -3242,6 +3242,7 @@ public:
   QFont get_font_from_style_sheet(QString style_string);
   void set_dbms_version_mask(QString);
   int next_i(int, int);
+  int next_i_v(int, int, int token_types[], int token_lengths[]);
   bool get_sql_mode(int who_is_calling, QString text, bool is_in_hparse, int start_token_number);
   QString get_doc_path(QString);
   void hparse_f_nexttoken();

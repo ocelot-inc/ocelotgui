@@ -114,3 +114,5 @@ ocelot_shortcut_refresh_variables="default"
 ocelot_shortcut_refresh_call_stack="default"
 ocelot_shortcut_next_window="default"
 ocelot_shortcut_previous_window="default"
+
+ocelot_export="format 'text' into 'stdout'"
