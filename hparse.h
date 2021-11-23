@@ -10494,9 +10494,24 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else hparse_f_error();
   }
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  /* Todo: TABLE statement is new in MySQL 8.0.19. I haven't checked it works in exotic situations. */
+  /* e.g. https://dev.mysql.com/doc/refman/8.0/en/table.html says it should work with UNION and INTO. */
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE, "TABLE"))
+  {
+    hparse_statement_type= TOKEN_KEYWORD_TABLE;
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
+    main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+    if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
+    hparse_f_order_by(TOKEN_KEYWORD_SELECT);
+    if (hparse_errno > 0) return;
+    hparse_f_limit(TOKEN_KEYWORD_SELECT);
+    if (hparse_errno > 0) return;
+  }
+#endif
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TRUNCATE, "TRUNCATE"))
   {
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return; /* todo: check: why do I need this here and not for other statements? */
     hparse_statement_type= TOKEN_KEYWORD_TRUNCATE;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
@@ -13173,7 +13188,7 @@ int MainWindow::hparse_f_client_set_export()
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAD, "PAD") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LAST, "LAST") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DIVIDER, "DIVIDER") == 1)
-   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IFNULL, "IFNULL") == 1))
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF") == 1))
   {
     if ((main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_MAX_ROW_COUNT)
      || (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_MARGIN))
@@ -13184,12 +13199,28 @@ int MainWindow::hparse_f_client_set_export()
         break;
       }
     }
-    else if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_IFNULL)
+    else if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_IF)
     {
-      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) != 1)
+      if (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1)
       {
-        hparse_f_error();
-        break;
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) != 1)
+        {
+          hparse_f_error();
+          break;
+        }
+      }
+      else
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FILE, "FILE");
+        if (hparse_errno > 0) break;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FILE, "EXISTS");
+        if (hparse_errno > 0) break;
+        QStringList q= { "append", "error", "replace" };
+        if (hparse_pick_from_list(q) == -1)
+        {
+          hparse_f_error();
+          break;
+        }
       }
     }
     else

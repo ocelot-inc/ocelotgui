@@ -210,6 +210,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_AND,
     TOKEN_KEYWORD_ANY,
     TOKEN_KEYWORD_ANY_VALUE,
+    TOKEN_KEYWORD_APPEND, /* no longer used */
     TOKEN_KEYWORD_AREA,
     TOKEN_KEYWORD_ARRAY,
     TOKEN_KEYWORD_AS,
@@ -439,6 +440,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_ENUM,
     TOKEN_KEYWORD_ENVELOPE,
     TOKEN_KEYWORD_EQUALS,
+    TOKEN_KEYWORD_ERROR, /* no longer used */
     TOKEN_KEYWORD_ESCAPE,
     TOKEN_KEYWORD_ESCAPED,
     TOKEN_KEYWORD_EVENT,
@@ -1417,7 +1419,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1182
+#define KEYWORD_LIST_SIZE 1184
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1464,6 +1466,7 @@ static const keywords strvalues[]=
       {"AND", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_AND},
       {"ANY", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ANY},
       {"ANY_VALUE", 0, FLAG_VERSION_MYSQL_ALL, TOKEN_KEYWORD_ANY_VALUE},
+      {"APPEND", 0, 0, TOKEN_KEYWORD_APPEND},
       {"AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AREA}, /* deprecated in MySQL 5.7.6 */
       {"ARRAY", 0, 0, TOKEN_KEYWORD_ARRAY},
       {"AS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_AS},
@@ -1688,6 +1691,7 @@ static const keywords strvalues[]=
       {"ENUM", 0, 0, TOKEN_KEYWORD_ENUM},
       {"ENVELOPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENVELOPE}, /* deprecated in MySQL 5.7.6 */
       {"EQUALS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EQUALS}, /* deprecated in MySQL 5.7.6 */
+      {"ERROR", 0, 0, TOKEN_KEYWORD_ERROR},
       {"ESCAPE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ESCAPE},
       {"ESCAPED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ESCAPED},
       {"EVENT", 0, 0, TOKEN_KEYWORD_EVENT},
@@ -2762,7 +2766,8 @@ struct export_settings {
   bool pad;
   bool last;  /* not user-changeable yet *//* does last column get a terminated-by? */
   bool divider;  /* not user-changeable yet *//* divider line e.g. +---+---+? */
-  QByteArray ifnull;
+  QByteArray if_null;
+  QByteArray if_file_exists;
 };
 #endif
 
@@ -4533,27 +4538,30 @@ Row_form_box(int column_count, QString *row_form_label,
       //if ((row_form_type[i] & NUM_FLAG) != 0) text_edit[i]->setAlignment(Qt::AlignRight);
       hbox_layout[i]->addWidget(text_edit[i]);
     }
-    else if (row_form_is_password[i] == 2) /* This is not used yet */
+    else /* form_is_password[i] == 2 or 3 or 4 */
     {
       combo_box_edit[i]= new QComboBox();
       combo_box_edit[i]->setMaximumHeight(component_height);
       combo_box_edit[i]->setMinimumHeight(component_height);
-      //combo_box_edit[i]->setTabChangesFocus(true);
-
-      QStringList qs= parent->fake_statement(row_form_data[i]);
-      for (int j= 0; j < qs.size(); ++j) combo_box_edit[i]->addItem(qs.at(j));
-
-      hbox_layout[i]->addWidget(combo_box_edit[i]);
-    }
-    else /* row_form_is_password[i] == 3 */
-    {
-      combo_box_edit[i]= new QComboBox();
-      combo_box_edit[i]->setMaximumHeight(component_height);
-      combo_box_edit[i]->setMinimumHeight(component_height);
-      combo_box_edit[i]->addItem("yes");
-      combo_box_edit[i]->addItem("no");
-      if (row_form_data[i] == "yes") combo_box_edit[i]->setCurrentIndex(0);
-      else combo_box_edit[i]->setCurrentIndex(1);
+      if (row_form_is_password[i] == 2) /* this is not used yet */
+      {
+        QStringList qs= parent->fake_statement(row_form_data[i]);
+        for (int j= 0; j < qs.size(); ++j) combo_box_edit[i]->addItem(qs.at(j));
+      }
+      if (row_form_is_password[i] == 3)
+      {
+        combo_box_edit[i]->addItem("yes");
+        combo_box_edit[i]->addItem("no");
+        if (row_form_data[i] == "yes") combo_box_edit[i]->setCurrentIndex(0);
+        else combo_box_edit[i]->setCurrentIndex(1);
+      }
+      if (row_form_is_password[i] == 4)
+      {
+        combo_box_edit[i]->addItem("append");
+        combo_box_edit[i]->addItem("error");
+        combo_box_edit[i]->addItem("replace");
+        combo_box_edit[i]->setCurrentIndex(0);
+      }
       hbox_layout[i]->addWidget(combo_box_edit[i]);
     }
     widget[i]= new QWidget();
@@ -9071,13 +9079,12 @@ QString copy_to_history(long int ocelot_history_max_row_count,
   {
     max_row_count= main_exports.max_row_count;
     int e= 0;
-    for (int i= 0; i < main_exports.columns_enclosed_by.size(); ++i) escapers[e++]= main_exports.columns_enclosed_by[i];
-    for (int i= 0; i < main_exports.columns_escaped_by.size(); ++i) escapers[e++]= main_exports.columns_escaped_by[i];
-    for (int i= 0; i < main_exports.columns_terminated_by.size(); ++i) escapers[e++]= main_exports.columns_terminated_by[i];
-    for (int i= 0; i < main_exports.lines_starting_by.size(); ++i) escapers[e++]= main_exports.lines_starting_by[i];
-    for (int i= 0; i < main_exports.lines_terminated_by.size(); ++i) escapers[e++]= main_exports.lines_terminated_by[i];
-    length_of_null_string= main_exports.ifnull.size();
-    for (int i= 0; i < length_of_null_string; ++i) null_string[i]= main_exports.ifnull[i];
+    if (main_exports.columns_enclosed_by.size() > 0) escapers[e++]= main_exports.columns_enclosed_by[0];
+    if (main_exports.columns_escaped_by.size() > 0) escapers[e++]= main_exports.columns_escaped_by[0];
+    if (main_exports.columns_terminated_by.size() > 0) escapers[e++]= main_exports.columns_terminated_by[0];
+    if (main_exports.lines_terminated_by.size() > 0) escapers[e++]= main_exports.lines_terminated_by[0];
+    length_of_null_string= main_exports.if_null.size();
+    for (int i= 0; i < length_of_null_string; ++i) null_string[i]= main_exports.if_null[i];
     null_string[length_of_null_string]= '\0';
     pointer_to_null_string= null_string;
     margin= main_exports.margin;

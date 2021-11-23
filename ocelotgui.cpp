@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: November 10 2021
+   Last modified: November 22 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -1261,7 +1261,7 @@ int MainWindow::statement_format_rule_set(QString text)
   Change QString to utf8 and then to QByteArray.
   Convert escapes, e.g. if QString contains \n, we want a byte value QChar::LineFeed
   According to https://dev.mysql.com/doc/refman/8.0/en/load-data.html the combinations that are escapes
-  are \0 \b \n \r \t \z \N. But I haven't handled \N (NULL) yet (for IFNULL I'm taking it as two letters).
+  are \0 \b \n \r \t \z \N. But I haven't handled \N (NULL) yet (for IF NULL I'm taking it as two letters).
   Todo: Check: why are you saying \\Z not \\z?
   Todo: Check if there are other combinations that aren't documented.
 */
@@ -1278,41 +1278,42 @@ QByteArray MainWindow::to_byte_array(QString q)
 }
 
 /*
-   SET ocelot_export ...; -- settings for dump of current result set, in one of several formats
-   Many of the comments are about wishes that might never come true
+  SET ocelot_export ...; -- settings for dump of current result set, in one of several formats
+  Many of the comments are about wishes that might never come true
 
-   SET ocelot_export ::= 'string' | option-list
-   Ordinarily one does not use 'string', but it is allowed because --ocelot_export = 'string' is allowed.
-   Example: set by menu File|Export TEXT using the same default as the mysql client:
-   SET ocelot_export = FORMAT 'TEXT'
-     INTO 'STDOUT'
-     COLUMNS TERMINATED BY '\t' ENCLOSED BY '' ESCAPED BY '\'
-     LINES STARTING BY '' TERMINATED BY '\n'
-     MAX_ROW_COUNT 100000000 COLUMN_NAMES 'no'
-     QUERY 'no' ROW_COUNT 'no' MARGIN 0 PAD 'no' LAST 'no' DIVIDER 'no' IFNULL '\N' ;
-   SET ocelot_export = FORMAT 'TABLE'
-       INTO STDOUT
-       FIELDS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY ''
-       LINES STARTING BY '|' TERMINATED BY '\n';
-   Export filename is specified separately by TEE filename, and OK result should say that
-     ... or it isn't, and we have an optional FILE|INTO clause
-   General types: TEXT, TABLE, HTML, JSON, YAML, LUA, HTML4, HTML5, DEFAULT (? and BATCH or RAW or XML?)
-                  SQL | INSERT STATEMENTS, MSGPACK, LATEX, TROFF
+  Some of the clauses are as in MySQL's INTO OUTPUT clauses but this has more options and file can be local.
 
-   As well as overriding TEE, this overrides --html-raw and --xml and --raw
-
-   INTO 'filename' | TEE | STDOUT | @variable | CLIPBOARD | TMPFILE | pipe/port | grid-widget | histfile
-     Maybe if you said FILE or FILES instead of INTO would help?
-     We considered saying OUTFILE = or INTO OUTFILE or FILE, hopefully '[literal]' is enough hint
-     We considered [INTO 'outfile'] and if it's absent then INTO STDOUT is default
-     IF EXISTS append | error | overwrite | add new + ordinal
-     ... Perhaps this overrides what TEE says, but a later TEE can override it
-     there is no default file extension like .csv, but .txt might be okay for text
-     [ADD TIMESTAMP] you could have multiple files, add timestamp or ordinal or random-string to each file name
-     [IF FILE EXISTS ERROR|APPEND|TRUNCATE] Default = APPEND though mysql client would say ERROR
-   'TEXT': (some call it DEP) (or DELIMITED?) (these defaults are for MySQL which is tab-separated but like CSV)
+  SET ocelot_export ::= 'string' | option-list
+  Ordinarily one does not use 'string', but it is allowed because --ocelot_export = 'string' is allowed.
+  Example: set by menu File|Export TEXT using the same default as the mysql client:
+  SET ocelot_export = FORMAT 'TEXT'
+    INTO 'STDOUT'
+    COLUMNS TERMINATED BY '\t' ENCLOSED BY '' ESCAPED BY '\'
+    LINES STARTING BY '' TERMINATED BY '\n'
+    MAX_ROW_COUNT 100000000 COLUMN_NAMES 'no'
+    QUERY 'no' ROW_COUNT 'no' MARGIN 0 PAD 'no' LAST 'no' DIVIDER 'no' IF NULL '\N'
+    IF FILE EXISTS 'append';
+  SET ocelot_export = FORMAT 'TABLE'
+      INTO STDOUT
+      FIELDS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY ''
+      LINES STARTING BY '|' TERMINATED BY '\n';
+  This overrides TEE and --html-raw and --xml and --raw and --batch.
+  Types supported now: TEXT, TABLE, HTML, NONE
+  Types to consider: JSON, YAML, LUA, HTML4, HTML5, DEFAULT (? and BATCH or RAW or XML?)
+                     SQL | INSERT STATEMENTS, MSGPACK, LATEX, TROFF
+  INTO 'filename' | STDOUT
+    Alternatives to INTO: FILE, OUTFILE, INTO OUTFILE. hopefully '[literal]' is enough hint
+    Alternatives to 'filename':| TEE | @variable | CLIPBOARD | TMPFILE | pipe/port | grid-widget | histfile
+    INTO STDOUT is default
+    Extra clauses to consider: IF EXISTS append | error | overwrite | add new + ordinal
+                               [ADD TIMESTAMP] you could have multiple files,
+                                               add timestamp or ordinal or random-string to each file name
+                               [IF FILE EXISTS ERROR|APPEND|REPLACE]
+                                               Default = APPEND though mysql client would say ERROR
+                                               Perhaps TRUNCATE would be clearer than REPLACE
+  'TEXT': (some call it DEP) (or DELIMITED?) (these defaults are for MySQL which is tab-separated but like CSV)
      MySQL Shell calls it "tabbed".
-     The same items that are in MySQL/MariaDB output file
+     The same items that are in MySQL/MariaDB output file, in order:
      FIELDS|COLUMNS TERMINATED BY string
      FIELDS|COLUMNS ESCAPED BY string
      FIELDS|COLUMNS [OPTIONALLY] ENCLOSED BY string
@@ -1331,27 +1332,35 @@ QByteArray MainWindow::to_byte_array(QString q)
      FILE TERMINATED BY '-' AND '+'
    'HTML'
      This has to just dump what we got for result grid, but with different limit for max_row_count
+     it's influenced by ocelot_grid_... settings
    'NONE':
      This is the default. Simple: there is no exporting.
    DEFAULT (no longer shown):
      TEE result set output will be like TABLE with -s and |s and +s, same as history output.
      So DEFAULT is what you are used to seeing with TEE.
-   Applicable for all types:
+   Applicable for all types: implemented:
+     MAX ROW_COUNT n default 100000000, if it's 0 but INCLUDE QUERY then only query will go out
+     COLUMN_NAMES 'yes' or 'no', if 'yes' then column names appear at start of result set
+     QUERY 'yes' or 'no', if 'yes' then query appears before result set
+           (default is true because exporting is like that, or false if DEFAULT)
+     ROW_COUNT 'yes' or 'no', if 'yes' then row count appears before result set
+     MARGIN n default 1 i.e. number of spaces before after each column, sometimes column-terminated-by does this
+     PAD 'yes' or 'no'
+     LAST 'yes' or 'no'
+     DIVIDER 'yes' or 'no'
+     IF NULL '\N' or it could be 'NULL' etc. but MySQL|MariaDB always say \N (or "fill with ****s"?)
+   Applicable for all types: not implemented:
+     MAX_ROW_COUNT SELECTED ROWS instead of MAX_ROW_COUNT n
      WIDTH FIXED|MINIMAL|MAXIMAL i.e. should we fill in blanks with leading|trailing spaces, as if PAD ' '
        and if fixed: truncate | newline
-     MAX ROW_COUNT = n or selected-rows, if it's 0 but INCLUDE QUERY then only query will go out
-     IFNULL '\N' or it could be 'NULL' etc. but MySQL|MariaDB always say \N (or "fill with ****s"?)
      BINARY AS ascii | hex | 'binary' | according to MySQL 8.0 setting for mysql client
-     Maybe someday ...
      MAXIMUM_BYTES, MAXIMUM_LINE_WIDTH
-     QUERY = n i.e. include query = true/false (default is true because exporting is like that, or false if DEFAULT)
-     INCLUDE RESULT COUNT = true/false although probably a better word for INCLUDE QUERY would do the job
      CHARACTER SET character-set-name                       default is UTF8
      DOUBLE QUOTES     Whether it's okay to double a quote character inside quotes,
                        SQL-style, e.g. 'The''Rain'.
                        This makes no sense if ENCLOSED BY is not ", or if ESCAPED BY is operating. Override them?
                        Default = no.
-     HEADER            include column names? Add Oracle-style Header separator?
+     HEADER            Add Oracle-style Header separator?
      MAXIMUM_COLUMN_WIDTH = n or as-in-definition, and WRAP | WORD-WRAP | TRUNCATE, and PAD with spaces
      FLUSH AFTER EACH ROW | AT END         Default = after each row
      SKIP IF same-regexp-as-for-history    Default = nothing
@@ -1359,26 +1368,30 @@ QByteArray MainWindow::to_byte_array(QString q)
      ONLY SELECTED ROWS                    Ordinarily we always output when we have a selection
                                            So this would imply: do not output until user selects
                                            Initially nothing is selected.
+                                           Would still be limited by MAX_ROW_COUNT
      ZIP or some other compression
    Re FIELDS|COLUMNS TERMINATED BY:
      It comes at the end of every column -- except the last column! So default end-of-row is x0a not 0x090a.
-     So allow "Include after last column"
+     So LAST 'yes' should mean "include columns-terminated-by string after last column"
    Re ENCLOSED BY:
      OPTIONALLY means applicable for numbers but not DATE/TIME/TIMESTAMP/[VAR]CHAR/[VAR]BINARY,
      and what matters is the definition i.e. '55' is not enclosed for string columns, 1e44 is enclosed for
      numeric columns.
      NULLs are never enclosed.
-   Re ESCAPED BY:
-     x00 becomes escape+'0',
+   Re ESCAPED BY: (NB: import and export will differ, this is only what we do with export)
+     default = \
+     x'00' becomes escape+'0',
      fields-terminated-by becomes escape+fields-terminated-by e.g. x09 becomes escape+x09 (default),
-     lines-terminated-by becomes escape+lines-terminated-by e.g. x0a becomes escape+0x0a (default),
      enclosed-by becomes escape+enclosed-by e.g. " becomes escape+" (there is no default),
      escaped-by becomes escape+escaped-by e.g. \ becomes escape+\ (default),
-     ?? lines-starting-by has not been checked,
-     NULL becomes escape+N.
+     lines-starting-by does not affect escaping,
+     lines-terminated-by becomes escape+lines-terminated-by e.g. x0a becomes escape+0x0a (default)
+       (but if there is more than one character then only the firstr character matters),
+     In mysql client NULL becomes escape+N which ordinarily means \N but it's WN if ESCAPED BY 'W'
+       (but if ESCAPED BY '' then it should be NULL)
+       (however since we have IF NULL we don't do that we take the exact if_null string),
      But this is a reason that more than one character for enclosing makes no sense, usually.
      Re escape+'0': I guess it's rational if we say ESCAPED BY '\' because then the output is \0
-     Todo: what if TERMINATED BY '\r\n'? Are ALL characters in the string escaped?
      Perhaps " should be escaped by "" i.e. double the character you delimit with, or ESCAPE BY DOUBLE QUOTES
    Re ambiguity:
      mysql client can say "| Warning | 1475 | First character of the FIELDS TERMINATED string is ambiguous;
@@ -1412,7 +1425,6 @@ QByteArray MainWindow::to_byte_array(QString q)
          Maybe I'd only have to insist that the escape character is ASCII. Or say it's bizarre.
 */
 
-
 void MainWindow::export_defaults(int passed_type, struct export_settings *exports)
 {
   (*exports).type= passed_type;
@@ -1431,7 +1443,8 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
   (*exports).pad= true;
   (*exports).last= true;
   (*exports).divider= true;
-  (*exports).ifnull= "\\N";
+  (*exports).if_null= "\\N";
+  (*exports).if_file_exists= "append";
   if (passed_type == TOKEN_KEYWORD_TEXT)
   {
     (*exports).columns_enclosed_by= "";
@@ -1573,35 +1586,26 @@ void MainWindow::import_export_rule_set(QString text)
     if (token == TOKEN_KEYWORD_OPTIONALLY)
       main_exports.columns_optionally= true;
 
-    if (token == TOKEN_KEYWORD_MAX_ROW_COUNT)
-    {
-      lines_or_columns= 0;
-      i= next_i_v(i, +1, export_token_types, export_token_lengths);
-      s= text.mid(export_token_offsets[i], export_token_lengths[i]);
-      s= connect_stripper(s, false);
-      int s_as_int= s.toInt();
-      main_exports.max_row_count= s_as_int;
-    }
-    if (token == TOKEN_KEYWORD_IFNULL)
-    {
-      lines_or_columns= 0;
-      i= next_i_v(i, +1, export_token_types, export_token_lengths);
-      s= text.mid(export_token_offsets[i], export_token_lengths[i]);
-      s= connect_stripper(s, false);
-      main_exports.ifnull= to_byte_array(s);
-    }
-
-    if ((token == TOKEN_KEYWORD_QUERY) || (token == TOKEN_KEYWORD_ROW_COUNT)
+    if ((token == TOKEN_KEYWORD_MAX_ROW_COUNT)
+     || (token == TOKEN_KEYWORD_NULL)
+     || (token == TOKEN_KEYWORD_EXISTS)
+     || (token == TOKEN_KEYWORD_COLUMN_NAMES) || (token == TOKEN_KEYWORD_QUERY)
+     || (token == TOKEN_KEYWORD_ROW_COUNT)
      || (token == TOKEN_KEYWORD_MARGIN) || (token == TOKEN_KEYWORD_PAD) || (token == TOKEN_KEYWORD_LAST)
      || (token == TOKEN_KEYWORD_DIVIDER))
     {
       lines_or_columns= 0;
       i= next_i_v(i, +1, export_token_types, export_token_lengths);
       s= text.mid(export_token_offsets[i], export_token_lengths[i]);
-      s= connect_stripper(s, false); /* huh? is this needed? */
+      s= connect_stripper(s, false);
+      int s_as_int= s.toInt();
       bool s_as_bool;
       if (s == "yes") s_as_bool= true;
       else s_as_bool= false;
+      if (token == TOKEN_KEYWORD_MAX_ROW_COUNT) main_exports.max_row_count= s_as_int;
+      if (token == TOKEN_KEYWORD_NULL) main_exports.if_null= to_byte_array(s);
+      if (token == TOKEN_KEYWORD_EXISTS) main_exports.if_file_exists= to_byte_array(s);
+      if (token == TOKEN_KEYWORD_COLUMN_NAMES) main_exports.column_names= s_as_bool;
       if (token == TOKEN_KEYWORD_QUERY) main_exports.query= s_as_bool;
       if (token == TOKEN_KEYWORD_ROW_COUNT) main_exports.row_count= s_as_bool;
       if (token == TOKEN_KEYWORD_MARGIN) main_exports.margin= s.toInt();
@@ -2695,7 +2699,12 @@ int MainWindow::history_file_start(QString history_type, QString file_name, QStr
       QFileInfo file_info(query);
       QString absolute_file_path= file_info.absoluteFilePath();
       ocelot_history_tee_file.setFileName(query);
-      open_result= ocelot_history_tee_file.open(QIODevice::Append | QIODevice::Text);
+      if (strcmp(main_exports.if_file_exists.data(), "error") == 0)
+        open_result= ocelot_history_tee_file.open(QIODevice::NewOnly | QIODevice::Text);
+      else if (strcmp(main_exports.if_file_exists.data(), "replace") == 0)
+        open_result= ocelot_history_tee_file.open(QIODevice::ReadWrite | QIODevice::Truncate | QIODevice::Text);
+      else /* strcmp(main_exports.if_file_exists.data(), "append") == 0 */
+        open_result= ocelot_history_tee_file.open(QIODevice::Append | QIODevice::Text);
       if (open_result == true) *rr= absolute_file_path;
       else *rr= absolute_file_path + " " + ocelot_history_tee_file.errorString();
     }
@@ -4769,9 +4778,9 @@ int MainWindow::action_export_function(int passed_type)
   Row_form_box *co;
   int co_is_ok;
   if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_TABLE))
-    column_count= 16; /* If you add or remove items, you have to change this */
+    column_count= 17; /* If you add or remove items, you have to change this */
   else
-    column_count= 3;
+    column_count= 4;
   QString *row_form_label= new QString[column_count];
   int *row_form_type= new int[column_count];
   int *row_form_is_password= new int[column_count];
@@ -4797,8 +4806,9 @@ int MainWindow::action_export_function(int passed_type)
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PAD].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 3; row_form_data[i]= bool_to_string(local_exports.pad); row_form_width[i]= '\x50';
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LAST].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 3; row_form_data[i]= bool_to_string(local_exports.last); row_form_width[i]= '\x50';
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DIVIDER].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 3; row_form_data[i]= bool_to_string(local_exports.divider); row_form_width[i]= '\x50';
-    row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_IFNULL].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.ifnull); row_form_width[i]= '\x04';
+    row_form_label[++i]= "if null"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.if_null); row_form_width[i]= '\x04';
   }
+  row_form_label[++i]= "if file exists"; row_form_type[i]= 0; row_form_is_password[i]= 4; row_form_data[i]= action_export_function_value(local_exports.if_file_exists); row_form_width[i]= '\x04';
   assert(i == column_count - 1);
   /* if (message == "File|Connect") */
   {
@@ -4839,13 +4849,14 @@ int MainWindow::action_export_function(int passed_type)
         local_exports.pad= string_to_bool(row_form_data[i++]);
         local_exports.last= string_to_bool(row_form_data[i++]);
         local_exports.divider= string_to_bool(row_form_data[i++]);
-        local_exports.ifnull= row_form_data[i++].trimmed().toUtf8();
+        local_exports.if_null= row_form_data[i++].trimmed().toUtf8();
       }
+      local_exports.if_file_exists= row_form_data[i++].trimmed().toUtf8();
       /* todo: maybe I should be appending with row_form_data[] and letting the statement be not fake */
       QString text;
       QString token;
       text= "SET ocelot_export = FORMAT ";
-      main_token_count_in_statement= 3;
+      main_token_count_in_statement= 4;
       if (local_exports.type == TOKEN_KEYWORD_TEXT) token= "'text' ";
       else if (local_exports.type == TOKEN_KEYWORD_TABLE) token= "'table' ";
       else if (local_exports.type == TOKEN_KEYWORD_HTML) token= "'html' ";
@@ -4856,7 +4867,7 @@ int MainWindow::action_export_function(int passed_type)
       if ((local_exports.type == TOKEN_KEYWORD_TEXT) || (local_exports.type == TOKEN_KEYWORD_TABLE))
       {
         /* e.g. '\\t' for text or '|' for table */
-        text= text + action_export_function_clause("COLUMNS TERMINATED BY", local_exports.columns_terminated_by);
+        text= text + action_export_function_clause("\nCOLUMNS TERMINATED BY", local_exports.columns_terminated_by);
         /* e.g. '' for text or '' for table */
         if (local_exports.columns_optionally == true) text= text + " OPTIONALLY ";
         text= text + action_export_function_clause("ENCLOSED BY", local_exports.columns_enclosed_by);
@@ -4868,7 +4879,7 @@ int MainWindow::action_export_function(int passed_type)
         text= text + action_export_function_clause("TERMINATED BY", local_exports.lines_terminated_by);
         main_token_count_in_statement+= 3 + 1 + 2 + 1 + 2 + 1 + 3 + 1 + 2 + 1;
       }
-      text= text + action_export_function_clause_i("MAX_ROW_COUNT", local_exports.max_row_count);
+      text= text + action_export_function_clause_i("\nMAX_ROW_COUNT", local_exports.max_row_count);
       text= text + action_export_function_clause_b("COLUMN_NAMES", local_exports.column_names);
       main_token_count_in_statement+= 1 + 1 + 1 + 1;
       if ((local_exports.type == TOKEN_KEYWORD_TEXT) || (local_exports.type == TOKEN_KEYWORD_TABLE))
@@ -4879,9 +4890,11 @@ int MainWindow::action_export_function(int passed_type)
         text= text + action_export_function_clause_b("PAD", local_exports.pad);
         text= text + action_export_function_clause_b("LAST", local_exports.last);
         text= text + action_export_function_clause_b("DIVIDER", local_exports.divider);
-        text= text + action_export_function_clause("IFNULL", local_exports.ifnull);
-        main_token_count_in_statement+= 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1;
+        text= text + action_export_function_clause("\nIF NULL", local_exports.if_null);
+        main_token_count_in_statement+= 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 1;
       }
+      text= text + action_export_function_clause("IF FILE EXISTS", local_exports.if_file_exists);
+      main_token_count_in_statement+= 3 + 1;
       text= text + ";";
       ++main_token_count_in_statement;
       action_change_one_setting_execute(text);
