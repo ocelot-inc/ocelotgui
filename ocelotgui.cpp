@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: November 22 2021
+   Last modified: November 30 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -1259,6 +1259,7 @@ int MainWindow::statement_format_rule_set(QString text)
 /*
   Called by import_export_rule_set().
   Change QString to utf8 and then to QByteArray.
+  Or: if it is X'....', convert hex digits directly to QByteArray.
   Convert escapes, e.g. if QString contains \n, we want a byte value QChar::LineFeed
   According to https://dev.mysql.com/doc/refman/8.0/en/load-data.html the combinations that are escapes
   are \0 \b \n \r \t \z \N. But I haven't handled \N (NULL) yet (for IF NULL I'm taking it as two letters).
@@ -1267,6 +1268,8 @@ int MainWindow::statement_format_rule_set(QString text)
 */
 QByteArray MainWindow::to_byte_array(QString q)
 {
+  if ((q.mid(1, 1) == "'") && (QString::compare(q.mid(0, 1), "X", Qt::CaseInsensitive) == 0))
+    return QByteArray::fromHex(q.toUtf8());
   QString s= q;
   s= s.replace("\\0", "\0");
   s= s.replace("\\b", "\b");
@@ -1282,6 +1285,7 @@ QByteArray MainWindow::to_byte_array(QString q)
   Many of the comments are about wishes that might never come true
 
   Some of the clauses are as in MySQL's INTO OUTPUT clauses but this has more options and file can be local.
+  (Of course one could say that about mysqldump too, but we're doing some things that mysqldump doesn't.)
 
   SET ocelot_export ::= 'string' | option-list
   Ordinarily one does not use 'string', but it is allowed because --ocelot_export = 'string' is allowed.
@@ -1297,6 +1301,7 @@ QByteArray MainWindow::to_byte_array(QString q)
       INTO STDOUT
       FIELDS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY ''
       LINES STARTING BY '|' TERMINATED BY '\n';
+  For most strings one can use X'....' e.g. x'09' instead of a tab character or '\t'.
   This overrides TEE and --html-raw and --xml and --raw and --batch.
   Types supported now: TEXT, TABLE, HTML, NONE
   Types to consider: JSON, YAML, LUA, HTML4, HTML5, DEFAULT (? and BATCH or RAW or XML?)
@@ -1392,8 +1397,11 @@ QByteArray MainWindow::to_byte_array(QString q)
        (however since we have IF NULL we don't do that we take the exact if_null string),
      But this is a reason that more than one character for enclosing makes no sense, usually.
      Re escape+'0': I guess it's rational if we say ESCAPED BY '\' because then the output is \0
-     Perhaps " should be escaped by "" i.e. double the character you delimit with, or ESCAPE BY DOUBLE QUOTES
-   Re ambiguity:
+    Re REPLACE:
+      This is more flexible than ESCAPE, although may ESCAPE is a better word
+      We don't need to escape "s because one can say REPLACE " WITH ""
+      Sometimes that would be good because doubling "s is an expectation for some products.
+    Re ambiguity:
      mysql client can say "| Warning | 1475 | First character of the FIELDS TERMINATED string is ambiguous;
      please use non-optional and non-empty FIELDS ENCLOSED BY |".
      ... Because it's stupid if escaped-by = terminated-by = enclosed-by i.e. the same character twice.
@@ -1444,6 +1452,8 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
   (*exports).last= true;
   (*exports).divider= true;
   (*exports).if_null= "\\N";
+  (*exports).replace_string= "X'22'";
+  (*exports).with_string= "X'22'";
   (*exports).if_file_exists= "append";
   if (passed_type == TOKEN_KEYWORD_TEXT)
   {
@@ -1480,16 +1490,21 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
                  because --ocelot_export is possible. And it might be --ocelot_export="format 'test'"
   Why no checks: Ordinarily we've gone through hparse, eh? But we can unset that or have a command-line option.
                  Maybe that means result will be junk but I don't think there's a crash possibility.
+                 Todo: We check some errors here but messages are terse English.
   Todo: I hope that if a file is already open it will be closed somewhere; I haven't checked.
+  For some errors, we check at end because if a clause is duplicated it might be okay the final time.
 */
 #define MAX_EXPORT_TOKENS 100 /* We could use 'new' + dynamic but with current syntax 100 is more than enough */
-void MainWindow::import_export_rule_set(QString text)
+QString MainWindow::import_export_rule_set(QString text)
 {
-  export_defaults(0, &main_exports);
+  struct export_settings local_exports;
+  export_defaults(0, &local_exports);
 
+  QString error_message= "";
   int export_token_offsets[MAX_EXPORT_TOKENS];
   int export_token_lengths[MAX_EXPORT_TOKENS];
   int export_token_types[MAX_EXPORT_TOKENS];
+  int token;
   tokenize(text.data(),
            text.size(),
            &export_token_lengths[0], &export_token_offsets[0], MAX_EXPORT_TOKENS - 1,
@@ -1503,6 +1518,7 @@ void MainWindow::import_export_rule_set(QString text)
     {
       s= text.mid(export_token_offsets[i2], export_token_lengths[i2]);
       t= token_type(s.data(), export_token_lengths[i2], false);
+      if (i2 == MAX_EXPORT_TOKENS - 4) error_message= "Too many tokens";
       export_token_types[i2]= t;
       if ((t == TOKEN_TYPE_OTHER) && (export_token_lengths[i2] < MAX_KEYWORD_LENGTH))
       {
@@ -1518,20 +1534,17 @@ void MainWindow::import_export_rule_set(QString text)
   QString rr= "";
   int i, i_prev_1, i_prev_2, token_prev_2;
   int lines_or_columns= 0;
-  int token;
+
   if (text == "")
   {
-    main_exports.type= TOKEN_KEYWORD_NONE;
-    export_set_checked();
-    return; /* for default initialization we pass "" */
+    local_exports.type= TOKEN_KEYWORD_NONE;
+    goto ok_ok_return; /* for default initialization we pass "" */
   }
-  /* I removed the following line because if ocelot_export is a command-line option we don't go through hparse. */
-  //if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) goto er_return;
   for (i= 0; export_token_lengths[i] != 0; ++i)
   {
     token= export_token_types[i];
-
-    if (text.mid(export_token_offsets[i], export_token_lengths[i]) == "=")
+    QString token_string= text.mid(export_token_offsets[i], export_token_lengths[i]);
+    if (token_string == "=")
     {
       int tmp_i= next_i_v(i, +1, export_token_types, export_token_lengths);
       if ((export_token_types[tmp_i] == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
@@ -1539,7 +1552,8 @@ void MainWindow::import_export_rule_set(QString text)
       {
         QString s= text.mid(export_token_offsets[tmp_i], export_token_lengths[tmp_i]);
         s= connect_stripper(s, true);
-        import_export_rule_set(s); /* recursion */
+        error_message= import_export_rule_set(s); /* recursion */
+        if (error_message > "") goto ok_return;
       }
     }
     if (token == TOKEN_KEYWORD_FORMAT)
@@ -1556,16 +1570,16 @@ void MainWindow::import_export_rule_set(QString text)
 
     if (token == TOKEN_KEYWORD_TABLE)
     {
-      main_exports.type= TOKEN_KEYWORD_TABLE;
+      local_exports.type= TOKEN_KEYWORD_TABLE;
       /* rest is default initially */
     }
     if (token == TOKEN_KEYWORD_TEXT)
     {
-      export_defaults(TOKEN_KEYWORD_TEXT, &main_exports);
+      export_defaults(TOKEN_KEYWORD_TEXT, &local_exports);
     }
     if (token == TOKEN_KEYWORD_HTML)
     {
-      export_defaults(TOKEN_KEYWORD_HTML, &main_exports);
+      export_defaults(TOKEN_KEYWORD_HTML, &local_exports);
     }
     if (token == TOKEN_KEYWORD_NONE)
     {
@@ -1575,8 +1589,8 @@ void MainWindow::import_export_rule_set(QString text)
     if (token == TOKEN_KEYWORD_INTO)
     {
       i= next_i_v(i, +1, export_token_types, export_token_lengths);
-      main_exports.file_name= text.mid(export_token_offsets[i], export_token_lengths[i]);
-      main_exports.file_name= connect_stripper(main_exports.file_name, false); /* todo: consider: should we pass true rather than false here? */
+      local_exports.file_name= text.mid(export_token_offsets[i], export_token_lengths[i]);
+      local_exports.file_name= connect_stripper(local_exports.file_name, false); /* todo: consider: should we pass true rather than false here? */
     }
 
     if ((token == TOKEN_KEYWORD_FIELDS) || (token == TOKEN_KEYWORD_COLUMNS))
@@ -1584,7 +1598,7 @@ void MainWindow::import_export_rule_set(QString text)
     if (token == TOKEN_KEYWORD_LINES)
       lines_or_columns= TOKEN_KEYWORD_LINES;
     if (token == TOKEN_KEYWORD_OPTIONALLY)
-      main_exports.columns_optionally= true;
+      local_exports.columns_optionally= true;
 
     if ((token == TOKEN_KEYWORD_MAX_ROW_COUNT)
      || (token == TOKEN_KEYWORD_NULL)
@@ -1592,7 +1606,7 @@ void MainWindow::import_export_rule_set(QString text)
      || (token == TOKEN_KEYWORD_COLUMN_NAMES) || (token == TOKEN_KEYWORD_QUERY)
      || (token == TOKEN_KEYWORD_ROW_COUNT)
      || (token == TOKEN_KEYWORD_MARGIN) || (token == TOKEN_KEYWORD_PAD) || (token == TOKEN_KEYWORD_LAST)
-     || (token == TOKEN_KEYWORD_DIVIDER))
+     || (token == TOKEN_KEYWORD_DIVIDER) || (token == TOKEN_KEYWORD_REPLACE) || (token == TOKEN_KEYWORD_WITH))
     {
       lines_or_columns= 0;
       i= next_i_v(i, +1, export_token_types, export_token_lengths);
@@ -1602,16 +1616,41 @@ void MainWindow::import_export_rule_set(QString text)
       bool s_as_bool;
       if (s == "yes") s_as_bool= true;
       else s_as_bool= false;
-      if (token == TOKEN_KEYWORD_MAX_ROW_COUNT) main_exports.max_row_count= s_as_int;
-      if (token == TOKEN_KEYWORD_NULL) main_exports.if_null= to_byte_array(s);
-      if (token == TOKEN_KEYWORD_EXISTS) main_exports.if_file_exists= to_byte_array(s);
-      if (token == TOKEN_KEYWORD_COLUMN_NAMES) main_exports.column_names= s_as_bool;
-      if (token == TOKEN_KEYWORD_QUERY) main_exports.query= s_as_bool;
-      if (token == TOKEN_KEYWORD_ROW_COUNT) main_exports.row_count= s_as_bool;
-      if (token == TOKEN_KEYWORD_MARGIN) main_exports.margin= s.toInt();
-      if (token == TOKEN_KEYWORD_PAD) main_exports.pad= s_as_bool;
-      if (token == TOKEN_KEYWORD_LAST) main_exports.last= s_as_bool;
-      if (token == TOKEN_KEYWORD_DIVIDER) main_exports.divider= s_as_bool;
+      for (int j= 0; j < s.size(); ++j)
+      {
+        if (s.at(j).unicode() > 127) { error_message= "Non-ASCII"; goto ok_return; }
+      }
+      if (token == TOKEN_KEYWORD_MAX_ROW_COUNT) local_exports.max_row_count= s_as_int;
+      if (token == TOKEN_KEYWORD_NULL) local_exports.if_null= to_byte_array(s);
+      if (token == TOKEN_KEYWORD_REPLACE)
+      {
+        local_exports.replace_string= to_byte_array(s);
+        if (local_exports.replace_string.length() > 1)
+        {
+          error_message= "REPLACE string maximum length = 1";
+          goto ok_return;
+        }
+      }
+      if (token == TOKEN_KEYWORD_WITH)
+      {
+        local_exports.with_string= to_byte_array(s);
+        if (local_exports.with_string.length() > 2)
+        {
+          error_message= "WITH string maximum length = 2";
+          goto ok_return;
+        }
+      }
+      if (token == TOKEN_KEYWORD_EXISTS)
+      {
+        local_exports.if_file_exists= to_byte_array(s);
+      }
+      if (token == TOKEN_KEYWORD_COLUMN_NAMES) local_exports.column_names= s_as_bool;
+      if (token == TOKEN_KEYWORD_QUERY) local_exports.query= s_as_bool;
+      if (token == TOKEN_KEYWORD_ROW_COUNT) local_exports.row_count= s_as_bool;
+      if (token == TOKEN_KEYWORD_MARGIN) local_exports.margin= s.toInt();
+      if (token == TOKEN_KEYWORD_PAD) local_exports.pad= s_as_bool;
+      if (token == TOKEN_KEYWORD_LAST) local_exports.last= s_as_bool;
+      if (token == TOKEN_KEYWORD_DIVIDER) local_exports.divider= s_as_bool;
     }
     /* Todo: what if it's a number? or a constant like FALSE? */
     if ((token == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE) || (token == TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE))
@@ -1625,41 +1664,54 @@ void MainWindow::import_export_rule_set(QString text)
 
       if (lines_or_columns == TOKEN_KEYWORD_COLUMNS)
       {
-        if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) main_exports.columns_enclosed_by= to_byte_array(s);
-        else if (token_prev_2 == TOKEN_KEYWORD_ESCAPED) main_exports.columns_escaped_by= to_byte_array(s);
-        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) main_exports.columns_terminated_by= to_byte_array(s);
-        else { printf("**** COLUMNS BAD?\n"); goto er_return; }
+        if (token_prev_2 == TOKEN_KEYWORD_ENCLOSED) local_exports.columns_enclosed_by= to_byte_array(s);
+        else if (token_prev_2 == TOKEN_KEYWORD_ESCAPED)
+        {
+          local_exports.columns_escaped_by= to_byte_array(s);
+          if (local_exports.columns_escaped_by.length() > 1)
+          {
+            error_message= "ESCAPED BY maximum length = 1";
+            goto ok_return;
+          }
+        }
+        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) local_exports.columns_terminated_by= to_byte_array(s);
+        else { error_message= "COLUMNS BAD?"; goto ok_return; }
       }
       if (lines_or_columns == TOKEN_KEYWORD_LINES)
       {
-        if (token_prev_2 == TOKEN_KEYWORD_STARTING) main_exports.lines_starting_by= to_byte_array(s);
-        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) main_exports.lines_terminated_by= to_byte_array(s);
-        else { printf("**** LINES BAD?\n"); goto er_return; }
+        if (token_prev_2 == TOKEN_KEYWORD_STARTING) local_exports.lines_starting_by= to_byte_array(s);
+        else if (token_prev_2 == TOKEN_KEYWORD_TERMINATED) local_exports.lines_terminated_by= to_byte_array(s);
+        else { error_message= "LINES BAD?"; goto ok_return; }
       }
     }
   }
 
-  if (main_exports.file_name != "")
+  if (local_exports.file_name != "")
   {
-    if (history_file_start("TEE", main_exports.file_name, &rr) == 0)
+    main_exports= local_exports;
+    if (history_file_start("TEE", local_exports.file_name, &rr) == 0)
     {
       make_and_put_open_message_in_result(ER_FILE_OPEN, 0, rr);
-      return;
+      goto ok_ok_return;
     }
     else
     {
       goto ok_return;
     }
   }
-ok_return:
-  export_set_checked();
+ok_return: /* bad name, might not be okay, error_message decides that */
+  if (error_message > "")
+  {
+    /* Todo: you could add the word "Error" and the token number and the token string */
+    put_message_in_result(error_message);
+    return error_message;
+  }
   if (rr == "") make_and_put_message_in_result(ER_OK, 0, (char*)"");
   else make_and_put_open_message_in_result(ER_OK_PLUS, 0, rr);
-  return;
-er_return:
-  /* todo: go back to prior main_exports.type */
-  make_and_put_message_in_result(ER_SYNTAX, 0, (char*)"");
-  return;
+ok_ok_return:
+  main_exports= local_exports;
+  export_set_checked();
+  return error_message;
 }
 
 /*
@@ -2702,7 +2754,9 @@ int MainWindow::history_file_start(QString history_type, QString file_name, QStr
       if (strcmp(main_exports.if_file_exists.data(), "error") == 0)
         open_result= ocelot_history_tee_file.open(QIODevice::NewOnly | QIODevice::Text);
       else if (strcmp(main_exports.if_file_exists.data(), "replace") == 0)
+      {
         open_result= ocelot_history_tee_file.open(QIODevice::ReadWrite | QIODevice::Truncate | QIODevice::Text);
+      }
       else /* strcmp(main_exports.if_file_exists.data(), "append") == 0 */
         open_result= ocelot_history_tee_file.open(QIODevice::Append | QIODevice::Text);
       if (open_result == true) *rr= absolute_file_path;
@@ -4778,7 +4832,7 @@ int MainWindow::action_export_function(int passed_type)
   Row_form_box *co;
   int co_is_ok;
   if ((passed_type == TOKEN_KEYWORD_TEXT) || (passed_type == TOKEN_KEYWORD_TABLE))
-    column_count= 17; /* If you add or remove items, you have to change this */
+    column_count= 19; /* If you add or remove items, you have to change this */
   else
     column_count= 4;
   QString *row_form_label= new QString[column_count];
@@ -4807,6 +4861,8 @@ int MainWindow::action_export_function(int passed_type)
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LAST].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 3; row_form_data[i]= bool_to_string(local_exports.last); row_form_width[i]= '\x50';
     row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_DIVIDER].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 3; row_form_data[i]= bool_to_string(local_exports.divider); row_form_width[i]= '\x50';
     row_form_label[++i]= "if null"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.if_null); row_form_width[i]= '\x04';
+    row_form_label[++i]= "replace"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.replace_string); row_form_width[i]= '\x04';
+    row_form_label[++i]= "  with"; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= action_export_function_value(local_exports.with_string); row_form_width[i]= '\x04';
   }
   row_form_label[++i]= "if file exists"; row_form_type[i]= 0; row_form_is_password[i]= 4; row_form_data[i]= action_export_function_value(local_exports.if_file_exists); row_form_width[i]= '\x04';
   assert(i == column_count - 1);
@@ -4850,6 +4906,8 @@ int MainWindow::action_export_function(int passed_type)
         local_exports.last= string_to_bool(row_form_data[i++]);
         local_exports.divider= string_to_bool(row_form_data[i++]);
         local_exports.if_null= row_form_data[i++].trimmed().toUtf8();
+        local_exports.replace_string= row_form_data[i++].trimmed().toUtf8();
+        local_exports.with_string= row_form_data[i++].trimmed().toUtf8();
       }
       local_exports.if_file_exists= row_form_data[i++].trimmed().toUtf8();
       /* todo: maybe I should be appending with row_form_data[] and letting the statement be not fake */
@@ -4891,9 +4949,11 @@ int MainWindow::action_export_function(int passed_type)
         text= text + action_export_function_clause_b("LAST", local_exports.last);
         text= text + action_export_function_clause_b("DIVIDER", local_exports.divider);
         text= text + action_export_function_clause("\nIF NULL", local_exports.if_null);
-        main_token_count_in_statement+= 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 1;
+        text= text + action_export_function_clause("\nREPLACE", local_exports.replace_string);
+        text= text + action_export_function_clause("WITH", local_exports.with_string);
+        main_token_count_in_statement+= 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 1 + 2 + 1 + 1;
       }
-      text= text + action_export_function_clause("IF FILE EXISTS", local_exports.if_file_exists);
+      text= text + action_export_function_clause("\nIF FILE EXISTS", local_exports.if_file_exists);
       main_token_count_in_statement+= 3 + 1;
       text= text + ";";
       ++main_token_count_in_statement;
@@ -4951,8 +5011,17 @@ QString MainWindow::action_export_function_value(QString input)
   return token_for_value;
 }
 
+/*
+  An export row_form_box string can be unquoted or hex-quoted, e.g. D or X'44'.
+  If it's unquoted, change ' inside the string to '' and surround with ''s.
+  If it's hex-quoted, don't change.
+  Apparently it's already stripped.
+  Todo: This doesn't have to be just for export, it could be good for all row_form_box strings.
+*/
 QString MainWindow::action_export_function_clause(QString keywords, QString literal)
 {
+  if ((literal.mid(1, 1) == "'") && (QString::compare(literal.mid(0, 1), "X", Qt::CaseInsensitive) == 0))
+    return " " + keywords + " " + literal + " ";
   QString escaped_literal= "";
   for (int i= 0; i < literal.size(); ++i)
   {
@@ -5540,10 +5609,8 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
   if (statement_edit_widget->dbms_version > "")
   {
     the_text.append("<br>using ");
-    if (connections_dbms[0] == DBMS_MYSQL) the_text.append("MySQL ");
-    if (connections_dbms[0] == DBMS_MARIADB) the_text.append("MariaDB ");
-    if (connections_dbms[0] == DBMS_TARANTOOL) the_text.append("Tarantool ");
-    the_text.append("DBMS server version ");
+    the_text.append(dbms_name()); /* "mysql" or "mariadb" or "tarantool" */
+    the_text.append(" DBMS server version ");
     the_text.append(statement_edit_widget->dbms_version);
   }
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -10824,6 +10891,13 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     history_file_to_history_widget(); /* TODO: Maybe this is the wrong time to call? */
     QString rr;
     history_file_start("HIST", ocelot_history_hist_file_name, &rr);
+#if (OCELOT_MYSQL_INCLUDE == 0)
+    if ((ocelot_dbms.contains("mysql", Qt::CaseInsensitive) == true) || (ocelot_dbms.contains("mariadb", Qt::CaseInsensitive) == true))
+    {
+      printf("Built with OCELOT_MYSQL_INCLUDE=0 so ocelot_dbms cannot be 'mysql' or 'mariadb'.\n");
+      exit(1);
+    }
+#endif
 #if (OCELOT_MYSQL_INCLUDE == 1)
     if (connections_dbms[0] == DBMS_MYSQL) connect_mysql(MYSQL_MAIN_CONNECTION);
 #ifdef DBMS_MARIADB
@@ -11345,6 +11419,25 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 }
 
 /*
+  Called from prompt_default() and action_about (for Help|About)
+  Return "tarantool" or "mysql" or "mariadb".
+  If connected to MariaDB, dbms_version will contain that. But if connected to MySQL, we have only numbers.
+*/
+QString MainWindow::dbms_name()
+{
+  QString s= ocelot_dbms;
+  QString dbms_name;
+  if (s.contains("Tarantool", Qt::CaseInsensitive)) dbms_name= "tarantool";
+  else
+  {
+    if (connections_is_connected[0] == 1) s= statement_edit_widget->dbms_version;
+    if (s.contains("MariaDB", Qt::CaseInsensitive)) dbms_name= "mariadb";
+    else dbms_name= "mysql";
+  }
+  return dbms_name;
+}
+
+/*
   Set prompt to default default.
   Do this if (user says prompt;) or (at start if ocelot_prompt_is_default == true)
   If --ocelot_dbms was specified: ocelot_dbms + >
@@ -11353,14 +11446,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 */
 void MainWindow::prompt_default()
 {
-  QString s= ocelot_dbms;
-  if (s.contains("Tarantool", Qt::CaseInsensitive)) ocelot_prompt= "tarantool>";
-  else
-  {
-    if (connections_is_connected[0] == 1) s= statement_edit_widget->dbms_version;
-    if (s.contains("MariaDB", Qt::CaseInsensitive)) ocelot_prompt= "mariadb>";
-    else ocelot_prompt= "mysql>";
-  }
+  ocelot_prompt= dbms_name() + ">"; /* e.g. "mysql>" */
   ocelot_prompt_is_default= true;
   statement_edit_widget->prompt_default= ocelot_prompt;
   statement_edit_widget->prompt_as_input_by_user= statement_edit_widget->prompt_default;
@@ -15770,7 +15856,8 @@ QString MainWindow::tarantool_get_messages(int connection_number)
   }
 
   /* Don't look for messages if deferred because the search itself might cause an error. */
-  if ((connections_dbms[0]= DBMS_TARANTOOL)
+  /* Todo:  This line used to contain "connections_dbms[0]= DBMS_TARANTOOL", make sure that was an error. */
+  if ((connections_dbms[0] == DBMS_TARANTOOL)
    && (tarantool_errno[connection_number] == ER_8372_INT))
     return messages;
 

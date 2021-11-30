@@ -4390,6 +4390,20 @@ int MainWindow::hparse_f_data_type(int context)
     return TOKEN_KEYWORD_UUID;
   }
 
+  /*
+    Todo: The idea here -- return main_token_types[hparse_i_of_last_accepted] instead of a TOKEN_KEYWORD
+          literal -- is applicable to some other cases in hparse_f_data_type, and would make code a bit shorter.
+    Todo: these are really Tarantool 2.10 types, but I haven't gotten around to making a flag for 2.10 yet.
+    Todo: currently this isn't just for CAST it can also be for column type, but check context again someday.
+  */
+  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ANY, "MAP") == 1)
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ARRAY, "ARRAY") == 1)
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAP, "ANY") == 1))
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+    return main_token_types[hparse_i_of_last_accepted];
+  }
+
   if (context == TOKEN_KEYWORD_DECLARE)
   {
     bool is_row_seen= false;
@@ -13188,12 +13202,28 @@ int MainWindow::hparse_f_client_set_export()
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PAD, "PAD") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LAST, "LAST") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DIVIDER, "DIVIDER") == 1)
+   || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPLACE, "REPLACE") == 1)
    || (hparse_f_accept(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF") == 1))
   {
     if ((main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_MAX_ROW_COUNT)
      || (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_MARGIN))
     {
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) != 1)
+      {
+        hparse_f_error();
+        break;
+      }
+    }
+    else if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_REPLACE)
+    {
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) != 1)
+      {
+        hparse_f_error();
+        break;
+      }
+      hparse_f_expect(FLAG_VERSION_ALL*k, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH");
+      if (hparse_errno > 0) break;
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) != 1)
       {
         hparse_f_error();
         break;

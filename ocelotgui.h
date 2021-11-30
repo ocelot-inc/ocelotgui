@@ -2767,6 +2767,7 @@ struct export_settings {
   bool last;  /* not user-changeable yet *//* does last column get a terminated-by? */
   bool divider;  /* not user-changeable yet *//* divider line e.g. +---+---+? */
   QByteArray if_null;
+  QByteArray replace_string, with_string;
   QByteArray if_file_exists;
 };
 #endif
@@ -3515,7 +3516,7 @@ public:
 #if (OCELOT_IMPORT_EXPORT == 1)
   QByteArray to_byte_array(QString);
   void export_defaults(int passed_type, struct export_settings *exports);
-  void import_export_rule_set(QString text);
+  QString import_export_rule_set(QString text);
   void export_set_checked();
 #endif
 
@@ -3677,6 +3678,7 @@ private:
   QString detached_value(QString);
   QString rect_value(QString);
   int execute_client_statement(QString text, int *additional_result);
+  QString dbms_name();
   void prompt_default();
   int conditional_settings_insert(QString text);
   void put_diagnostics_in_result(unsigned int);
@@ -9049,7 +9051,6 @@ QByteArray history_padder(char *str, int length,
   Re "if (OCELOT_IMPORT_EXPORT == 1)":
     This is for TEXT stuff e.g. CSV. See comments before import_export_rule_set().
     Todo: our size calculation is unsafe, we must add sizes of terminated_by enclosed_by etc.
-  Todo: We have a problem if columns_escaped_by is blank, it will ruin null displays.
 */
 #define HISTORY_COLUMN_MARGIN 1
 #define HISTORY_MAX_COLUMN_WIDTH 65535
@@ -9347,12 +9348,25 @@ QString copy_to_history(long int ocelot_history_max_row_count,
         {
           char c= pcv[j];
           /* Warning: if we allowed non-ASCII characters we'd have to allow for multi-byte here. */
-          if (c == 0x00) {*(pointer_to_history_line++)= escape_char; *(pointer_to_history_line++)= '0'; }
-          else if (escapers.contains(c))
+          if ((c == main_exports.replace_string.at(0)) && (main_exports.replace_string.length() > 0))
           {
-            *(pointer_to_history_line++)= escape_char; *(pointer_to_history_line++)= c;
+            if (main_exports.with_string.length() > 0) *(pointer_to_history_line++)= main_exports.with_string.at(0);
+            if (main_exports.with_string.length() > 1) *(pointer_to_history_line++)= main_exports.with_string.at(1);
           }
-          else *(pointer_to_history_line++)= c;
+          else
+          {
+            if (c == 0x00)
+            {
+              if (main_exports.columns_escaped_by.size() > 0) *(pointer_to_history_line++)= escape_char;
+              *(pointer_to_history_line++)= '0';
+            }
+            else if (escapers.contains(c))
+            {
+              if (main_exports.columns_escaped_by.size() > 0) *(pointer_to_history_line++)= escape_char;
+              *(pointer_to_history_line++)= c;
+            }
+            else *(pointer_to_history_line++)= c;
+          }
         }
       }
       else
