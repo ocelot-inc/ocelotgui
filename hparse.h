@@ -2563,6 +2563,13 @@ void MainWindow::hparse_f_opr_18(int who_is_calling, int allow_flags) /* Precede
     return;
   }
   else if (hparse_errno > 0) return;
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "["))
+  {
+    if (hparse_errno > 0) return;
+    hparse_f_bracketed_multi_expression();
+    //if (hparse_errno > 0) return;
+    return;
+  }
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "("))
   {
     if (hparse_errno > 0) return;
@@ -3110,6 +3117,18 @@ void MainWindow::hparse_f_parenthesized_multi_expression(int *expression_count)
     } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
   //hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  //if (hparse_errno > 0) return;
+}
+
+/* We've seen [ and with Tarantool that can mean array, possibly nested */
+void MainWindow::hparse_f_bracketed_multi_expression()
+{
+  do
+  {
+    hparse_f_opr_1(0, 0);
+    if (hparse_errno > 0) return;
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "]");
   //if (hparse_errno > 0) return;
 }
 

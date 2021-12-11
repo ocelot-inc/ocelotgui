@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.5.0
-   Last modified: November 30 2021
+   Last modified: December 10 2021
 */
 /*
   Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
@@ -12557,6 +12557,11 @@ void MainWindow::make_and_append_message_in_result(
       So I know that if something is "QString str" then I can compare characters within it to
       "QChar('u')" or "QChar(0x00e7)" etc. and I can get substrings with str.mid(position,length).
   The original program is tokenize.c which is a standalone that uses unsigned char* not QString.
+  Todo: Flaw: In Tarantool/Lua [[...]] is TOKEN_TYPE_LITERAL_WITH_BRACKET but in Tarantool/SQL [ and ]
+        will be TOKEN_TYPE_OPERATOR. So if we see [[ we try to determine whether the string is SQL or Lua.
+        But we don't skip back to statement start so would be confused by lua-statement; sql-statement.
+        And we assume if a word starts / and * it's SQL, but don't check for other kinds of comments.
+        Tarantool/Lua still might confused by [[ or ]] in strings or comments but that's not our problem.
 */
 
 void MainWindow::tokenize(QChar *text, int text_length, int *token_lengths,
@@ -12801,9 +12806,21 @@ next_char:
     if ((dbms_version_mask&FLAG_VERSION_TARANTOOL) != 0)
     {
       expected_char= '[';
-      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == '[')) goto string_starting_with_bracket_start;
+      if ((char_offset + 1 < text_length) && (text[char_offset + 1] == '['))
+      {
+        QString tmp_s= QString(text, char_offset); /* I wonder: could I say text-> and skip this assignment? */
+        QString word0, word1, word2;
+        if (token_number > 0) word0= tmp_s.mid(token_offsets[0],token_lengths[0]); else word0= "";
+        if (token_number > 1) word1= tmp_s.mid(token_offsets[1],token_lengths[1]); else word1= "";
+        if (token_number > 2) word2= tmp_s.mid(token_offsets[2],token_lengths[2]); else word2= "";
+        int tmp_statement_type;
+        if ((word0.mid(0,2) == "/*") || (word1.mid(0,2) == "/*") || (word2.mid(0,2) == "/*"))
+          tmp_statement_type= TOKEN_KEYWORD_SQL;
+        else tmp_statement_type= get_statement_type_low(word0, word1, word2);
+        if (tmp_statement_type == TOKEN_KEYWORD_DO_LUA) goto string_starting_with_bracket_start;
+      }
     }
-    goto one_byte_token; /* [ one-byte token which is never used */
+    goto one_byte_token; /* [ one-byte token which is never used except maybe in Tarantool arrays */
   }
   if (text[char_offset] == '\x5c')  goto one_byte_token; /* \ one-byte token which is never used */
   if (text[char_offset] == ']') goto one_byte_token; /* ] one-byte token which is never used */
@@ -13070,6 +13087,7 @@ int MainWindow::token_type(QChar *token, int token_length, bool ansi_quotes)
   }
 
   if (*token == '\x27') return TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE;
+
   if (token_length > 1)
   {
     if ((*token == 'N') || (*token == 'X') || (*token == 'B')
@@ -13094,6 +13112,10 @@ int MainWindow::token_type(QChar *token, int token_length, bool ansi_quotes)
   }
   //if (*token == '{') return TOKEN_TYPE_LITERAL_WITH_BRACE;
   if ((*token == '{') || (*token == '}')) return TOKEN_TYPE_OPERATOR;
+  if ((*token == '[') || (*token == ']'))
+  {
+    if (dbms_version_mask&FLAG_VERSION_TARANTOOL) return TOKEN_TYPE_OPERATOR;
+  }
   if (*token == '`') return TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK;
   if (*token == '@') return TOKEN_TYPE_IDENTIFIER_WITH_AT;
   if (token_length > 1)

@@ -3311,6 +3311,7 @@ public:
   void hparse_f_parameter_list(int);
   void hparse_f_parenthesized_expression();
   void hparse_f_parenthesized_multi_expression(int*);
+  void hparse_f_bracketed_multi_expression();
   void hparse_f_like_or_where();
   void hparse_f_from_or_like_or_where();
   void hparse_f_infile_or_outfile();
