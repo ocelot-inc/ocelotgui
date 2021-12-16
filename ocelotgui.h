@@ -4117,7 +4117,8 @@ public:
 #define TOKEN_LITERAL_FLAG_ODBC_STRING          (1+256)
 #define TOKEN_LITERAL_FLAG_DATE                 512
 #define TOKEN_LITERAL_FLAG_DATE_STRING          (1+512)
-#define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512)
+#define TOKEN_LITERAL_FLAG_MAP                  1024
+#define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512+1024)
 
 /*
   TOKEN_TYPE_... shows "what kind of token is it?" e.g. TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK.

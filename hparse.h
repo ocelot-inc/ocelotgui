@@ -686,6 +686,21 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned int flag_versio
       return 0;
     }
   }
+  if (token_literal_flags & TOKEN_LITERAL_FLAG_MAP)
+  {
+    if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "{") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ATTRIBUTE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
+      if (hparse_errno > 0) return 0;
+      hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, reftype, TOKEN_TYPE_LITERAL, "[literal]");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "}");
+      if (hparse_errno > 0) return 0;
+      return 1;
+    }
+  }
   if (token_literal_flags & TOKEN_LITERAL_FLAG_CONSTANT)
   {
     if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1)
