@@ -1,11 +1,11 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 1.5.0
-   Last modified: December 16 2021
+   Version: 1.6.0
+   Last modified: January 9 2022
 */
 /*
-  Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
+  Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -411,7 +411,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.5.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.6.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -2752,7 +2752,15 @@ int MainWindow::history_file_start(QString history_type, QString file_name, QStr
       QString absolute_file_path= file_info.absoluteFilePath();
       ocelot_history_tee_file.setFileName(query);
       if (strcmp(main_exports.if_file_exists.data(), "error") == 0)
+      {
+#if (QT_VERSION < 0x50b00)
+        /* QT_VERSION < 5.11 at compile-time, but QIODevice::NewOnly was made legal in Qt 5.11 */
+        if (file_info.exists() == true) open_result= false;
+        else open_result= ocelot_history_tee_file.open(QIODevice::WriteOnly | QIODevice::Text);
+#else
         open_result= ocelot_history_tee_file.open(QIODevice::NewOnly | QIODevice::Text);
+#endif
+      }
       else if (strcmp(main_exports.if_file_exists.data(), "replace") == 0)
       {
         open_result= ocelot_history_tee_file.open(QIODevice::ReadWrite | QIODevice::Truncate | QIODevice::Text);
@@ -3009,14 +3017,14 @@ void MainWindow::create_menu()
   QActionGroup *menu_file_export_group= new QActionGroup(menu_file_export);
   menu_file_export_group->setEnabled(true);
   //menu_file_export_group->setExclusive(true); should be automatic
-  menu_file_export_text_action= new QAction("text");
+  menu_file_export_text_action= new QAction("text", this);
   menu_file_export->addAction(menu_file_export_text_action);
   menu_file_export_text_action->setActionGroup(menu_file_export_group);
-  menu_file_export_table_action= new QAction("table");
+  menu_file_export_table_action= new QAction("table", this);
   menu_file_export->addAction(menu_file_export_table_action);
-  menu_file_export_html_action= new QAction("html");
+  menu_file_export_html_action= new QAction("html", this);
   menu_file_export->addAction(menu_file_export_html_action);
-  menu_file_export_none_action= new QAction("none");
+  menu_file_export_none_action= new QAction("none", this);
   menu_file_export->addAction(menu_file_export_none_action);
   menu_file_export_text_action->setCheckable(true);
   menu_file_export_table_action->setCheckable(true);
@@ -5569,7 +5577,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2021 by Peter Gulutzan.<br>\
+<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2022 by Peter Gulutzan.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -5651,10 +5659,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.5.0, July 19 2021  \
+  <BR>Version 1.6.0, January 9 2022  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2021 by Peter Gulutzan. All rights reserved.  \
+  <BR>Copyright (c) 2022 by Peter Gulutzan. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -22182,7 +22190,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2021 by Peter Gulutzan and others\n");
+  printf("Copyright (c) 2022 by Peter Gulutzan and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");

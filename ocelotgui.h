@@ -1,4 +1,4 @@
-/* Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
+/* Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -4098,6 +4098,7 @@ public:
   then the only acceptable literals are unsigned integers.
   Todo: The expected will still say "[literal]", more general than needed.
   Todo: We aren't specific enough, we don't use this enough.
+  Todo: Some values aren't used.
 */
 #define TOKEN_LITERAL_FLAG_STRING               1
 #define TOKEN_LITERAL_FLAG_SIGNED_INTEGER       2
@@ -4117,8 +4118,9 @@ public:
 #define TOKEN_LITERAL_FLAG_ODBC_STRING          (1+256)
 #define TOKEN_LITERAL_FLAG_DATE                 512
 #define TOKEN_LITERAL_FLAG_DATE_STRING          (1+512)
-#define TOKEN_LITERAL_FLAG_MAP                  1024
-#define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512+1024)
+#define TOKEN_LITERAL_FLAG_UUID                 1024
+#define TOKEN_LITERAL_FLAG_MAP                  2048
+#define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512+1024+2048)
 
 /*
   TOKEN_TYPE_... shows "what kind of token is it?" e.g. TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK.

@@ -1,4 +1,4 @@
-/* Copyright (c) 2021 by Peter Gulutzan. All rights reserved.
+/* Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -690,11 +690,11 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned int flag_versio
   {
     if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "{") == 1)
     {
-      hparse_f_expect(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ATTRIBUTE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      hparse_f_opr_1(0, 0); /* hmm, since {} contains expressions it's not really a literal, eh? */
       if (hparse_errno > 0) return 0;
       hparse_f_expect(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ":");
       if (hparse_errno > 0) return 0;
-      hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, reftype, TOKEN_TYPE_LITERAL, "[literal]");
+      hparse_f_opr_1(0, 0);
       if (hparse_errno > 0) return 0;
       hparse_f_expect(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "}");
       if (hparse_errno > 0) return 0;
@@ -13204,7 +13204,7 @@ int MainWindow::hparse_f_client_set_export()
   int type;
 
   {
-    QStringList q= { "text", "table", "html", "none" };
+    QStringList q= (QStringList() << "text" << "table" << "html" << "none");
     int picked= hparse_pick_from_list(q);
     if (picked == -1)
     {
@@ -13279,7 +13279,7 @@ int MainWindow::hparse_f_client_set_export()
         if (hparse_errno > 0) break;
         hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FILE, "EXISTS");
         if (hparse_errno > 0) break;
-        QStringList q= { "append", "error", "replace" };
+        QStringList q= (QStringList() << "append" << "error" << "replace");
         if (hparse_pick_from_list(q) == -1)
         {
           hparse_f_error();
@@ -13289,7 +13289,7 @@ int MainWindow::hparse_f_client_set_export()
     }
     else
     {
-      QStringList q= { "yes", "no" };
+      QStringList q= (QStringList() << "yes" << "no");
       if (hparse_pick_from_list(q) == -1)
       {
         hparse_f_error();

@@ -3,7 +3,7 @@ readmylogin.c Decrypt and display a MySQL .mylogin.cnf file.
 
 Uses openSSL libcrypto.so library. Does not use a MySQL library.
 
-Copyright (c) 2021 by Peter Gulutzan.
+Copyright (c) 2022 by Peter Gulutzan.
 
 All rights reserved.
 
