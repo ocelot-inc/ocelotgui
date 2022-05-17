@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.6.0
-   Last modified: January 9 2022
+   Last modified: May 17 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -8345,7 +8345,7 @@ QString MainWindow::debug_privilege_check(int statement_type)
     lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
 
     /* Can't prepare create-routine statements so test by actually creating and dropping a trivial for-test-only routine */
-    sprintf(call_statement, "create procedure xxxmdbug.xxxmdbugp () set @=@a");
+    sprintf(call_statement, "create procedure xxxmdbug.xxxmdbugp () set @a=@a");
     lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement);
     if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need create routine privilege on xxxmdbug.*. ");
     else
