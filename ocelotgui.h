@@ -3016,6 +3016,7 @@ class TextEditHistory;
 class TextEditWidget2;
 class XSettings;
 class Completer_widget;
+class Messagebox_flash;
 #if (OCELOT_FIND_WIDGET == 1)
 class Find_widget;
 #endif
@@ -3568,12 +3569,12 @@ public slots:
   void action_extra_rule_1();
   void history_markup_previous();
   void history_markup_next();
-  void action_option_detach_history_widget(bool checked); void detach_history_widget(bool checked);
-  void action_option_detach_result_grid_widget(bool checked); void detach_result_grid_widget(bool checked);
+  void action_option_detach_history_widget(bool checked);
+  void action_option_detach_result_grid_widget(bool checked);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
-  void action_option_detach_debug_widget(bool checked); void detach_debug_widget(bool checked);
+  void action_option_detach_debug_widget(bool checked);
 #endif
-  void action_option_detach_statement_widget(bool checked); void detach_statement_widget(bool checked);
+  void action_option_detach_statement_widget(bool checked); void detach_widget(int widget_type, bool checked);
   void action_option_next_window();
   void action_option_previous_window();
   void action_option_change_result_display(QString);
@@ -3643,6 +3644,8 @@ public slots:
   void menu_context(const QPoint &);
 //  int typer_to_ocelot_data_type(char *s); /* exists in ocelotgui.cpp but is commented out */
   char *typer_to_keyword(unsigned int); /* todo: check: why are some things in "public slots" not "public"? */
+
+  void initialize_after_main_window_show();
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
@@ -4869,6 +4872,7 @@ void handle_button_2()
 
 #endif // MESSAGE_BOX_H
 
+
 #ifndef COMPLETER_WIDGET_H
 #define COMPLETER_WIDGET_H
 
@@ -4925,6 +4929,46 @@ Completer_widget(MainWindow *m)
 };
 
 #endif // COMPLETER_WIDGET_H
+
+#ifndef MESSAGEBOX_FLASH_H
+#define MESSAGEBOX_FLASH_H
+
+/*
+  QMessagebox_flash is for putting up a QMessageBox, waiting 1 second, and closing.
+  It's used by initialize_after_main_window_show() because, for unknown reasons, the
+  main window rect() values are wrong unless we do this.
+  Other possible ways to kludge:
+    Just going to sleep for 1 second? No, that doesn't do the trick.
+    Calculate what main window size will be once showMaximized() really takes effect?
+*/
+
+class Messagebox_flash : public QMessageBox
+{
+  Q_OBJECT
+
+private:
+QTimer *timer;
+
+private slots:
+void timer_expired();
+
+protected:
+void showEvent(QShowEvent *event);
+
+public:
+
+Messagebox_flash()
+{
+  ;
+}
+
+~Messagebox_flash()
+{
+  ;
+}
+
+};
+#endif // MESSAGEBOX_FLASH_H
 
 #if (OCELOT_FIND_WIDGET == 1)
 #ifndef FIND_WIDGET_H

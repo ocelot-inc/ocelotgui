@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.6.0
-   Last modified: May 17 2022
+   Last modified: May 31 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -490,8 +490,6 @@ int dbms_query_connection_number;
 volatile int dbms_long_query_result;
 volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
-
-
 /*
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -739,14 +737,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   statement_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(statement_edit_widget, SIGNAL(customContextMenuRequested(const QPoint &)),
       this, SLOT(menu_context(const QPoint &)));
-
-  /* If any widget is detached, there might be some blinking. Probably not worth worrying about. */
-  if (ocelot_history_detached == "yes") detach_history_widget(true);
-  if (ocelot_grid_detached == "yes") detach_result_grid_widget(true);
-  if (ocelot_statement_detached == "yes") detach_statement_widget(true);
-#if (OCELOT_MYSQL_DEBUGGER == 1)
-  if (ocelot_debug_detached == "yes") detach_debug_widget(true);
-#endif
   /*
     If the command-line option was -p but not a password, then password input is necessary
     so put up the connection dialog box. Otherwise try immediately to connect.
@@ -764,6 +754,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   }
 
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
+
+  QTimer::singleShot(0, this, SLOT(initialize_after_main_window_show()));
+
   log("MainWindow end", 90);
 }
 
@@ -773,6 +766,36 @@ MainWindow::~MainWindow()
   delete ui;
 }
 
+/*
+  Some actions must wait till after MainWindow::MainWindow() has made the main window.
+  E.g. if ocelotgui --ocelot_statement_detach='yes', detaching won't work right until widget sizes are known.
+  Qt manuals say "A QTimer with a timeout interval of 0 will time out as soon as all the events
+  in the window system's event queue have been processed." so I expect that, given that we invoke with
+  QTimer::singleShot(0, this, SLOT(initialize_after_main_window_show()));
+  this will happen only after all the main events (show, paint, focusin, etc.) have already been processed.
+  But I still needed to issue Messagebox_flash, a drastic way to force an update.
+  There will be a lot of blinking. Probably not worth worrying about.
+*/
+void MainWindow::initialize_after_main_window_show()
+{
+  if ((ocelot_history_detached == "yes")
+      || (ocelot_grid_detached == "yes")
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+      || (ocelot_debug_detached == "yes")
+#endif
+      || (ocelot_statement_detached == "yes"))
+  {
+    Messagebox_flash msgbox;
+    msgbox.setText("Detaching ...");
+    msgbox.exec(); /* This should display for 1 second then disappear. */
+  }
+  if (ocelot_history_detached == "yes") action_option_detach_history_widget(true);
+  if (ocelot_grid_detached == "yes") action_option_detach_result_grid_widget(true);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  if (ocelot_debug_detached == "yes") action_option_detach_debug_widget(true);
+#endif
+  if (ocelot_statement_detached == "yes") action_option_detach_statement_widget(true);
+}
 
 /*
   We want to know the maximum widget size for dialog boxes.
@@ -781,12 +804,12 @@ MainWindow::~MainWindow()
 */
 void MainWindow::resizeEvent(QResizeEvent *ev)
 {
-  (void) ev; /* suppress "unused parameter" warning */
   QSize main_window_size= size();
   if (main_window_size.width() > main_window_maximum_width)
     main_window_maximum_width= main_window_size.width();
   if (main_window_size.height() > main_window_maximum_height)
     main_window_maximum_height= main_window_size.height();
+  QMainWindow::resizeEvent(ev);
 }
 
 /*
@@ -5080,6 +5103,16 @@ void MainWindow::action_export_none()
 
 /*
   detach
+  For SET ocelot_statement_detached (etc.) = "yes|no"; perhaps caused by menu item = Options|detach statement widget
+  Major changes for version 1.7 May+June 2022:
+    Separate functions for each widget type were consolidated into one function, detach_widget().
+    Method "hide + setGeometry + show" worked on only some distros, failed especially badly with Kaos.
+    Possibly windows maximized flag was part of the problem, so showNormal() instead.
+    Also the height was confusing because when a widget gets detached it increases by title bar size at least.
+  widget_type = TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED or TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED or TOKEN_KEYWORD_OCELOT_GRID_DETACHED or TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED
+  TODO: Don't shrink so much that you lose something major in main window
+        (maybe expand main window to include title bar size?)
+        However, result isn't disastrous if main window is currently too small.
   Would "floating" be a better word than "detached"? or "undock"? or "detachable"?
   Todo: Change border, size, title, frame width, position. Perhaps in Settings dialog.
         Update: now Settings dialog does allow for change of size and position.
@@ -5104,9 +5137,8 @@ void MainWindow::action_export_none()
         but we keep options in case we want to make a shortcut
   Todo: support other values: 'current', 'max', 'min', 'always on top', 'no buttons', '30%'
   Todo: (static) main must go back to original size if 'attach'
-  Todo: I'm repeating essentially the same method for each widget -- I should merge.
   Todo: I'm confused: include or exclude window frame? See http://doc.qt.io/qt-5/application-windows.html#window-geometry
-  Todo: Equivalent of detach_start and detach_stop for grid widget + debug widget
+  Todo: Equivalent of detach_start and detach_stop for grid widget + debug widget (+ statement widget?)
   Todo: We lose current focus when we detach. Save and restore it.
   Todo: indicate how many pixels each item takes currently, by adding to the combobox
   Todo: * ctrl + tab, ctrl + backtab ... don't work with detached, I tried for a while but gave up
@@ -5115,6 +5147,8 @@ void MainWindow::action_export_none()
   Todo: * In ostrings.h: add "attach ..."
   Todo: * Some shortcuts for attach|detach
   Todo: * check again re example.cnf and documentation
+  Todo: Possible bug: Kaos only (?): check mark doesn't appear before the word "attach" on options menu
+  Todo: bug: if we detach with command-line option, and prompt has time-of-day, time-of-day won't change
 */
 
 /*
@@ -5139,61 +5173,6 @@ void MainWindow::action_option_detach_history_widget(bool checked)
   action_change_one_setting(ocelot_history_detached, new_ocelot_history_detached, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED);
 }
 
-
-/*
-  For SET ocelot_history_detached= "yes|no"; perhaps caused by menu item = Options|detach history widget
-*/
-void MainWindow::detach_history_widget(bool checked)
-{
-  static int shrink= 0;
-  bool is_visible= history_edit_widget->isVisible();
-  ocelot_detach_history_widget= checked;
-  QPoint widget_point= history_edit_widget->mapToGlobal(QPoint(0, 0));
-  QRect widget_rect= history_edit_widget->rect();
-  int x, y, w, h;
-  if (ocelot_history_left == "default") x= widget_point.x();
-  else x= ocelot_history_left.toInt();
-  if (ocelot_history_top == "default") y= widget_point.y();
-  else y= ocelot_history_top.toInt();
-  if (ocelot_history_width == "default") w= widget_rect.width();
-  else w= ocelot_history_width.toInt();
-  if (ocelot_history_height == "default") h= widget_rect.height();
-  else h= ocelot_history_height.toInt();
-  QPoint main_point= mapToGlobal(QPoint(0, 0));
-  QRect main_rect= rect();
-  if (checked)
-  {
-    menu_options_action_option_detach_history_widget->setText("attach history widget");
-    history_edit_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
-    history_edit_widget->setWindowTitle("history widget");
-    if (ocelot_history_top == "default")
-    {
-      shrink= widget_rect.height();
-      int main_rect_height= main_rect.height() - shrink;
-      hide();
-      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      show();
-      y= main_point.y() + main_rect_height;
-    }
-    else shrink= 0;
-    history_edit_widget->setGeometry(x, y, w, h);
-    history_edit_widget->detach_start();
-  }
-  else
-  {
-    if (shrink != 0)
-    {
-      int main_rect_height= main_rect.height() + shrink;
-      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      shrink= 0;
-    }
-    menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
-    history_edit_widget->setWindowFlags(Qt::Widget);
-    history_edit_widget->detach_stop();
-  }
-  if (is_visible) history_edit_widget->show();
-}
-
 void MainWindow::action_option_detach_result_grid_widget(bool checked)
 {
   if (checked)
@@ -5207,58 +5186,6 @@ void MainWindow::action_option_detach_result_grid_widget(bool checked)
     new_ocelot_grid_detached= "no";
   }
   action_change_one_setting(ocelot_grid_detached, new_ocelot_grid_detached, TOKEN_KEYWORD_OCELOT_GRID_DETACHED);
-}
-
-/*
-  For SET ocelot_grid_detached= "yes|no"; perhaps caused by menu item = Options|detach grid widget
-*/
-void MainWindow::detach_result_grid_widget(bool checked)
-{
-  static int shrink= 0;
-  bool is_visible= result_grid_tab_widget->isVisible();
-  ocelot_detach_result_grid_widget= checked;
-  QPoint widget_point= result_grid_tab_widget->mapToGlobal(QPoint(0, 0));
-  QRect widget_rect= result_grid_tab_widget->rect();
-  int x, y, w, h;
-  if (ocelot_grid_left == "default") x= widget_point.x();
-  else x= ocelot_grid_left.toInt();
-  if (ocelot_grid_top == "default") y= widget_point.y();
-  else y= ocelot_grid_top.toInt();
-  if (ocelot_grid_width == "default") w= widget_rect.width();
-  else w= ocelot_grid_width.toInt();
-  if (ocelot_grid_height == "default") h= widget_rect.height();
-  else h= ocelot_grid_height.toInt();
-  QPoint main_point= mapToGlobal(QPoint(0, 0));
-  QRect main_rect= rect();
-  if (checked)
-  {
-    menu_options_action_option_detach_result_grid_widget->setText("attach result grid widget");
-    result_grid_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
-    result_grid_tab_widget->setWindowTitle("result grid widget");
-    if (ocelot_grid_top == "default")
-    {
-      shrink= widget_rect.height();
-      int main_rect_height= main_rect.height() - shrink;
-      hide();
-      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      show();
-      y= main_point.y() + main_rect_height;
-    }
-    else shrink= 0;
-    result_grid_tab_widget->setGeometry(x, y, w, h);
-  }
-  else
-  {
-    if (shrink != 0)
-    {
-      int main_rect_height= main_rect.height() + shrink;
-      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      shrink= 0;
-    }
-    menu_options_action_option_detach_result_grid_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
-    result_grid_tab_widget->setWindowFlags(Qt::Widget);
-  }
-  if (is_visible) result_grid_tab_widget->show();
 }
 
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -5278,60 +5205,6 @@ void MainWindow::action_option_detach_debug_widget(bool checked)
 }
 #endif
 
-#if (OCELOT_MYSQL_DEBUGGER == 1)
-/*
-  For SET ocelot_debug_detached= "yes|no"; perhaps caused by menu item = Options|detach debug widget
-*/
-void MainWindow::detach_debug_widget(bool checked)
-{
-  static int shrink= 0;
-  bool is_visible= debug_tab_widget->isVisible();
-  ocelot_detach_debug_widget= checked;
-  QPoint widget_point= debug_tab_widget->mapToGlobal(QPoint(0, 0));
-  QRect widget_rect= debug_tab_widget->rect();
-  int x, y, w, h;
-  if (ocelot_debug_left == "default") x= widget_point.x();
-  else x= ocelot_debug_left.toInt();
-  if (ocelot_debug_top == "default") y= widget_point.y();
-  else y= ocelot_debug_top.toInt();
-  if (ocelot_debug_width == "default") w= widget_rect.width();
-  else w= ocelot_debug_width.toInt();
-  if (ocelot_debug_height == "default") h= widget_rect.height();
-  else h= ocelot_debug_height.toInt();
-  QPoint main_point= mapToGlobal(QPoint(0, 0));
-  QRect main_rect= rect();
-  if (checked)
-  {
-    menu_options_action_option_detach_debug_widget->setText("attach debug widget");
-    debug_tab_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
-    debug_tab_widget->setWindowTitle("debug widget");
-    if (ocelot_debug_top == "default")
-    {
-      shrink= widget_rect.height();
-      int main_rect_height= main_rect.height() - shrink;
-      hide();
-      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      show();
-      y= main_point.y() + main_rect_height;
-    }
-    else shrink= 0;
-    debug_tab_widget->setGeometry(x, y, w, h);
-  }
-  else
-  {
-    if (shrink != 0)
-    {
-      int main_rect_height= main_rect.height() + shrink;
-      setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      shrink= 0;
-    }
-    menu_options_action_option_detach_debug_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
-    debug_tab_widget->setWindowFlags(Qt::Widget);
-  }
-  if (is_visible) debug_tab_widget->show();
-}
-#endif //if (OCELOT_MYSQL_DEBUGGER == 1)
-
 void MainWindow::action_option_detach_statement_widget(bool checked)
 {
   if (checked)
@@ -5347,44 +5220,95 @@ void MainWindow::action_option_detach_statement_widget(bool checked)
   action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED);
 }
 
-
 /*
-  For SET ocelot_statement_detached= "yes|no"; perhaps caused by menu item = Options|detach statement widget
+  See comments preceding action_option_detach_history_widget().
 */
-void MainWindow::detach_statement_widget(bool checked)
+void MainWindow::detach_widget(int widget_type, bool checked)
 {
-  static int shrink= 0;
-  bool is_visible= statement_edit_widget->isVisible();
-  ocelot_detach_statement_edit_widget= checked;
-  QPoint widget_point= statement_edit_widget->mapToGlobal(QPoint(0, 0));
-  QRect widget_rect= statement_edit_widget->rect();
+  if (isVisible() == false) return; /* this can be false if main window hasn't appeared yet */
+  static int shrink= 0; /* I forget why this is static, but it shouldn't matter. */
+  QWidget *widget; /* = statement_edit_widget etc. */
+  QString widget_left, widget_top, widget_width, widget_height; /* integer values or "default" */
+  QAction *menu_options_action_option_detach_widget; /* e.g. *menu_options_action_option_detach_statement_widget */
+  int menu_options_detach_widget; /* e.g. MENU_OPTIONS_DETACH_STATEMENT_WIDGET */
+  QString widget_text; /* e.g. "statement widget" */
   int x, y, w, h;
-  if (ocelot_statement_left == "default") x= widget_point.x();
-  else x= ocelot_statement_left.toInt();
-  if (ocelot_statement_top == "default") y= widget_point.y();
-  else y= ocelot_statement_top.toInt();
-  if (ocelot_statement_width == "default") w= widget_rect.width();
-  else w= ocelot_statement_width.toInt();
-  if (ocelot_statement_height == "default") h= widget_rect.height();
-  else h= ocelot_statement_height.toInt();
+  if (widget_type == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
+  {
+    widget= (QWidget*) statement_edit_widget;
+    menu_options_action_option_detach_widget= menu_options_action_option_detach_statement_widget;
+    widget_text= "statement widget";
+    menu_options_detach_widget= MENU_OPTIONS_DETACH_STATEMENT_WIDGET;
+    widget_left= ocelot_statement_left; widget_top= ocelot_statement_top; widget_width= ocelot_statement_width; widget_height= ocelot_statement_height;
+    ocelot_detach_statement_edit_widget= checked;
+  }
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  else if (widget_type == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
+  {
+    widget= (QWidget*) debug_tab_widget;
+    menu_options_action_option_detach_widget= menu_options_action_option_detach_debug_widget;
+    widget_text= "debug widget";
+    menu_options_detach_widget= MENU_OPTIONS_DETACH_DEBUG_WIDGET;
+    widget_left= ocelot_debug_left; widget_top= ocelot_debug_top; widget_width= ocelot_debug_width; widget_height= ocelot_debug_height;
+    ocelot_detach_statement_edit_widget= checked;
+  }
+#endif
+  else if (widget_type == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
+  {
+    widget= (QWidget*) result_grid_tab_widget;
+    menu_options_action_option_detach_widget= menu_options_action_option_detach_result_grid_widget;
+    widget_text= "result grid widget";
+    menu_options_detach_widget= MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET;
+    widget_left= ocelot_grid_left; widget_top= ocelot_grid_top; widget_width= ocelot_grid_width; widget_height= ocelot_grid_height;
+    ocelot_detach_result_grid_widget= checked;
+  }
+  else /* if (widget_type == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED) */
+  {
+    widget= (QWidget*) history_edit_widget;
+    menu_options_action_option_detach_widget= menu_options_action_option_detach_history_widget;
+    widget_text= "history widget";
+    menu_options_detach_widget= MENU_OPTIONS_DETACH_HISTORY_WIDGET;
+    widget_left= ocelot_history_left; widget_top= ocelot_history_top; widget_width= ocelot_history_width; widget_height= ocelot_history_height;
+    ocelot_detach_history_widget= checked;
+  }
+
+  QPoint widget_point= widget->mapToGlobal(QPoint(0, 0));
+  QRect widget_rect= widget->rect();
+  if (widget_left == "default") x= widget_point.x();
+  else x= widget_left.toInt();
+  if (widget_top == "default") y= widget_point.y();
+  else y= widget_top.toInt();
+  if (widget_width == "default") w= widget_rect.width();
+  else w= widget_width.toInt();
+  if (widget_height == "default") h= widget_rect.height();
+  else h= widget_height.toInt();
+  bool is_visible= widget->isVisible();
   QPoint main_point= mapToGlobal(QPoint(0, 0));
   QRect main_rect= rect();
   if (checked)
   {
-    menu_options_action_option_detach_statement_widget->setText("attach statement widget");
-    statement_edit_widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
-    statement_edit_widget->setWindowTitle("statement widget");
-    if (ocelot_statement_top == "default")
+    menu_options_action_option_detach_widget->setText("attach " + widget_text);
+    widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
+    widget->setWindowTitle(widget_text);
+    if (widget_top == "default")
     {
       shrink= widget_rect.height();
+      shrink+= QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
       int main_rect_height= main_rect.height() - shrink;
-      hide();
+      showNormal();
+      //hide();
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      show();
-      y= main_point.y() + main_rect_height;
+      //show();
+      y= main_point.y() + main_rect_height + QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
     }
     else shrink= 0;
-    statement_edit_widget->setGeometry(x, y, w, h);
+    if (is_visible)
+    {
+      //widget->hide();
+      widget->setGeometry(x, y, w, h - QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight));
+      if (widget_type == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED) history_edit_widget->detach_start();
+      //widget->show();
+    }
   }
   else
   {
@@ -5394,10 +5318,11 @@ void MainWindow::detach_statement_widget(bool checked)
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
       shrink= 0;
     }
-    menu_options_action_option_detach_statement_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
-    statement_edit_widget->setWindowFlags(Qt::Widget);
+    menu_options_action_option_detach_widget->setText(menu_strings[menu_off + menu_options_detach_widget]);
+    widget->setWindowFlags(Qt::Widget);
+    if (widget_type == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED) history_edit_widget->detach_stop();
   }
-  if (is_visible) statement_edit_widget->show();
+  if (is_visible) widget->show();
 }
 
 /*
@@ -18587,6 +18512,24 @@ void Completer_widget::timer_expired()
 
 /******************** completer_widget end   ************************************/
 
+/******************** Messagebox_flash start *************************************/
+void Messagebox_flash::showEvent( QShowEvent * event)
+{
+  timer= new QTimer(this);
+  timer->setSingleShot(true);
+  timer->setInterval(1000);
+  timer->start();
+  QObject::connect(timer, SIGNAL(timeout()), this, SLOT(timer_expired(void)));
+  QMessageBox::showEvent(event);
+}
+
+void Messagebox_flash::timer_expired()
+{
+  this->done(0); /* meaning = QDialog::done(int r) */
+}
+
+/******************** Messagebox_flash end *************************************/
+
 /******************** find_widget start   ************************************/
 #if (OCELOT_FIND_WIDGET == 1)
 /*
@@ -26289,25 +26232,25 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
     {
       if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED)
       {
-        if (qv == "no") { main_window->menu_options_action_option_detach_statement_widget->setChecked(false); main_window->detach_statement_widget(false); }
-        else {main_window->menu_options_action_option_detach_statement_widget->setChecked(true); main_window->detach_statement_widget(true); }
+        if (qv == "no") { main_window->menu_options_action_option_detach_statement_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED, false); }
+        else {main_window->menu_options_action_option_detach_statement_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED, true); }
       }
 #if (OCELOT_MYSQL_DEBUGGER == 1)
       if (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
       {
-        if (qv == "no") { main_window->menu_options_action_option_detach_debug_widget->setChecked(false); main_window->detach_debug_widget(false); }
-        else { main_window->menu_options_action_option_detach_debug_widget->setChecked(true); main_window->detach_debug_widget(true); }
+        if (qv == "no") { main_window->menu_options_action_option_detach_debug_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED, false); }
+        else { main_window->menu_options_action_option_detach_debug_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED, true); }
       }
 #endif
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
       {
-        if (qv == "no") { main_window->menu_options_action_option_detach_result_grid_widget->setChecked(false); main_window->detach_result_grid_widget(false); }
-        else { main_window->menu_options_action_option_detach_result_grid_widget->setChecked(true); main_window->detach_result_grid_widget(true); }
+        if (qv == "no") { main_window->menu_options_action_option_detach_result_grid_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_GRID_DETACHED, false); }
+        else { main_window->menu_options_action_option_detach_result_grid_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_GRID_DETACHED, true); }
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
       {
-        if (qv == "no") { main_window->menu_options_action_option_detach_history_widget->setChecked(false); main_window->detach_history_widget(false); }
-        else { main_window->menu_options_action_option_detach_history_widget->setChecked(true); main_window->detach_history_widget(true); }
+        if (qv == "no") { main_window->menu_options_action_option_detach_history_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED, false); }
+        else { main_window->menu_options_action_option_detach_history_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED, true); }
       }
     }
   }
