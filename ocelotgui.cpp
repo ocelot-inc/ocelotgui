@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.6.0
-   Last modified: May 31 2022
+   Last modified: June 1 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -6288,7 +6288,7 @@ QString MainWindow::get_font_style_as_string(QFont font)
     If (close size match) +1
     If (weight match) +1
     If (italic match) +1
-    If not ("*Webdings*" or "*Wingdings*" or "*Dingbats*") +2
+    If not ("*Webdings*" or "*Wingdings*" or "*Dingbats* or "*emoji" or "*orya*") +2
     ... But first part of the calculation differs in Windows because we got "MS Gothic" (yuck).
         Instead it is: If (Consolas | Lucida Console | Courier New) +3
   After you get it, it should determine the initial style sheets.
@@ -6349,6 +6349,8 @@ QFont MainWindow::get_fixed_font()
     {
       if ((plain.fontInfo().family().toUpper().contains("WINGDING"))
        || (plain.fontInfo().family().toUpper().contains("WEBDING"))
+       || (plain.fontInfo().family().toUpper().contains("EMOJI"))
+       || (plain.fontInfo().family().toUpper().contains("ORYA"))
        || (plain.fontInfo().family().toUpper().contains("DINGBAT")))
        ;
       else this_points+= 2;

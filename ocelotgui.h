@@ -11440,6 +11440,7 @@ private:
 */
 
 /* CodeEditor is actually used for both the statement widget and the debug widgets. */
+/* The constructor is in codeeditor.h. */
 
 #ifndef CODEEDITOR_H
 #define CODEEDITOR_H
@@ -11579,7 +11580,6 @@ protected:
 
 private:
   CodeEditor *codeEditor;
-
 
 };
 
@@ -12234,7 +12234,7 @@ if (current_widget != DEBUG_WIDGET)
 
       combo_box_for_font_size= new QComboBoxInSettings();
       combo_box_for_font_size_filler(actual_font_size);
-      maximum_value= "9999pt"; /* Todo: this does use scroll bar width but can still be too small */
+      maximum_value= "WWWWWW"; /* Todo: this does use scroll bar width but can still be too small */
       combo_box_for_font_size->setFixedWidth(this->fontMetrics().boundingRect(maximum_value).width()
                                              + style()->pixelMetric(QStyle::PM_ScrollBarExtent)
                                              + 4);
@@ -13597,7 +13597,7 @@ public:
    Events That Go To Detached Windows
    When we detach a widget by calling setWindowFlags(Qt::Window),
    it becomes independent so relevant events no longer go through
-   MainWindow::eventFilter. Therefore each has its own event filter,
+   MainWindow::eventFilter. Therefore each should have its own event filter,
    to redirect events to MainWindow::eventFilter.
 */
 
