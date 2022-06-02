@@ -2307,7 +2307,9 @@ For example on Ubuntu:<PRE>
  #Do the following if and only if build is for use with Qt4
  sudo apt-get install qt4-dev-tools
  #Do the following if and only if build is for use with Qt5
- sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools</PRE></P>
+ sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools
+ #Do the following if and only if build is for use with Qt6
+ sudo apt-get install qt-6-base-dev qt-6-base-dev-tools</PRE></P>
 
 <P>On RPM-like systems some packages must be installed first with
 "yum install" or "dnf install" or "urpmi".
@@ -2328,7 +2330,8 @@ For example on Mageia:<PRE>
 sudo dnf install qt6-qtbase qt-devel qt6-qtbase-devel</PRE></P>
 
 <P>On Manjaro which is an ArchLinux-like system:<PRE>
-sudo pacman -S cmake
+# Some people would recommend sudo pacman -S base-devel
+sudo pacman -S binutils make gcc cmake 
 sudo pacman -S mariadb-clients</PRE></P>
 
 <P>Unpack all the source files by saying:<PRE>
