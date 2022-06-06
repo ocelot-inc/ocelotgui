@@ -9,7 +9,7 @@
 #               Here is a way to get PKGBUILD along with the rest of ocelotgui source:
 #                 git clone https://github.com/ocelot-inc/ocelotgui
 #                 cd ocelotgui
-#               cd to the directory containing this file
+#               The file name should be PKGBUILD and the directory name should be ocelotgui.
 #               sudo pacman -S base-devel libmariadbclient cmake
 #               makepkg
 #               sudo pacman -U ./ocelotgui-1.6.0-1-x86_64.pkg.tar.zst
