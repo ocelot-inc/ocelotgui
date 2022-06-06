@@ -2333,6 +2333,7 @@ sudo dnf install qt6-qtbase qt-devel qt6-qtbase-devel</PRE></P>
 # Some people would recommend sudo pacman -S base-devel
 sudo pacman -S binutils make gcc cmake 
 sudo pacman -S mariadb-clients</PRE></P>
+<P>(Package builds on ArchLinux-like systems can also be done with the PKGBUILD file in the ocelotgui github repository.)</P>
 
 <P>Unpack all the source files by saying:<PRE>
  tar -zxvf ocelotgui_1.6.0.orig.tar.gz
