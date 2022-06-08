@@ -1,8 +1,8 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 1.6.0
-   Last modified: June 1 2022
+   Version: 1.7.0
+   Last modified: June 8 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -411,7 +411,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.6.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.7.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -5584,7 +5584,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.6.0, January 9 2022  \
+  <BR>Version 1.7.0, June 8 2022  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2022 by Peter Gulutzan. All rights reserved.  \

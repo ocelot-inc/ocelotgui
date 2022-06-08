@@ -12,7 +12,7 @@
 #               The file name should be PKGBUILD and the directory name should be ocelotgui.
 #               sudo pacman -S base-devel libmariadbclient cmake
 #               makepkg
-#               sudo pacman -U ./ocelotgui-1.6.0-1-x86_64.pkg.tar.zst
+#               sudo pacman -U ./ocelotgui-1.7.0-1-x86_64.pkg.tar.zst
 #               Now ocelotgui is ready to run. It might be necessary to run it twice.
 # For Qt 6:     Change depends=('qt5-base' ...) to depends=('qt6-base' ...)
 #               Change -DQT_VERSION=5 to -DQT_VERSION=6
@@ -32,7 +32,7 @@
 #Re cmake:      This is an out-of-source build and produces a RelWithDebInfo executable with an -O2 flag.
 #               For other options read CMakeLists.txt.
 pkgname=ocelotgui
-pkgver=1.6.0
+pkgver=1.7.0
 pkgrel=1
 pkgdesc="GUI client for MySQL or MariaDB or Tarantool DBMS"
 arch=("i686" "x86_64")
