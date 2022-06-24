@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: June 8 2022
+   Last modified: June 24 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -1307,7 +1307,7 @@ QByteArray MainWindow::to_byte_array(QString q)
   SET ocelot_export ...; -- settings for dump of current result set, in one of several formats
   Many of the comments are about wishes that might never come true
 
-  Some of the clauses are as in MySQL's INTO OUTPUT clauses but this has more options and file can be local.
+  Some of the clauses are as in MySQL's INTO OUTPUT clauses but ocelotgui has more options and file can be local.
   (Of course one could say that about mysqldump too, but we're doing some things that mysqldump doesn't.)
 
   SET ocelot_export ::= 'string' | option-list
@@ -1315,15 +1315,16 @@ QByteArray MainWindow::to_byte_array(QString q)
   Example: set by menu File|Export TEXT using the same default as the mysql client:
   SET ocelot_export = FORMAT 'TEXT'
     INTO 'STDOUT'
-    COLUMNS TERMINATED BY '\t' ENCLOSED BY '' ESCAPED BY '\'
-    LINES STARTING BY '' TERMINATED BY '\n'
+    COLUMNS TERMINATED BY X'09' ENCLOSED BY '' ESCAPED BY X'5C'
+    LINES STARTING BY '' TERMINATED BY X'0A'
     MAX_ROW_COUNT 100000000 COLUMN_NAMES 'no'
     QUERY 'no' ROW_COUNT 'no' MARGIN 0 PAD 'no' LAST 'no' DIVIDER 'no' IF NULL '\N'
     IF FILE EXISTS 'append';
   SET ocelot_export = FORMAT 'TABLE'
       INTO STDOUT
       FIELDS TERMINATED BY '|' ENCLOSED BY '' ESCAPED BY ''
-      LINES STARTING BY '|' TERMINATED BY '\n';
+      LINES STARTING BY '|' TERMINATED BY X'0A';
+
   For most strings one can use X'....' e.g. x'09' instead of a tab character or '\t'.
   This overrides TEE and --html-raw and --xml and --raw and --batch.
   Types supported now: TEXT, TABLE, HTML, NONE
@@ -1376,7 +1377,7 @@ QByteArray MainWindow::to_byte_array(QString q)
      PAD 'yes' or 'no'
      LAST 'yes' or 'no'
      DIVIDER 'yes' or 'no'
-     IF NULL '\N' or it could be 'NULL' etc. but MySQL|MariaDB always say \N (or "fill with ****s"?)
+     IF NULL '\N' or it could be 'NULL' etc. but MySQL|MariaDB always say \N (or "fill with ****s"?) see also "Re IF NULL".
    Applicable for all types: not implemented:
      MAX_ROW_COUNT SELECTED ROWS instead of MAX_ROW_COUNT n
      WIDTH FIXED|MINIMAL|MAXIMAL i.e. should we fill in blanks with leading|trailing spaces, as if PAD ' '
@@ -1398,6 +1399,19 @@ QByteArray MainWindow::to_byte_array(QString q)
                                            Initially nothing is selected.
                                            Would still be limited by MAX_ROW_COUNT
      ZIP or some other compression
+   Re escapes within the literals in the SET statement (this is not about escapes in what's exported):
+    Since tokenize() depends on (sql_mode_string.contains("NO_BACKSLASH_ESCAPES")),
+    changing sql_mode can change the statement's meaning. It's best to use X'..' for single-character
+    escaping. Apparently this is different from mysql client, which never escapes.
+    So you can use \t for tab, just like what you see with INTO OUTFILE, but we won't recommend it.
+    SELECT ... INTO OUTFILE also allows e.g. FIELDS TERMINATED BY X'0A'; so to that extent we're consistent.
+    Also \ is a bit of a bother with Windows file names in the INTO clause.
+    Therefore ESCAPED BY '\\' is okay just as in SELECT ... INTO OUTFILE, but we prefer X'5C'.
+    Typical: X'00' nul (or \0), X'08' backspace (or \b), X'09' tab (or \t), X'0A' line feed (or \n),
+             X'0D' carriage return (or \r), X'1A' control-Z (or \Z).  X'20' space (or \s),
+             X'22' double quote (or \"), X'27' single quote (or \'), X'5C' (or \\)
+    Warning: We do not escape what is in IF NULL strings.
+    Todo: Think what to do if we're not connected to MySQL/MariaDB. Local setting? Allow set sql_mode anyway?
    Re FIELDS|COLUMNS TERMINATED BY:
      It comes at the end of every column -- except the last column! So default end-of-row is x0a not 0x090a.
      So LAST 'yes' should mean "include columns-terminated-by string after last column"
@@ -1415,15 +1429,23 @@ QByteArray MainWindow::to_byte_array(QString q)
      lines-starting-by does not affect escaping,
      lines-terminated-by becomes escape+lines-terminated-by e.g. x0a becomes escape+0x0a (default)
        (but if there is more than one character then only the firstr character matters),
-     In mysql client NULL becomes escape+N which ordinarily means \N but it's WN if ESCAPED BY 'W'
-       (but if ESCAPED BY '' then it should be NULL)
-       (however since we have IF NULL we don't do that we take the exact if_null string),
      But this is a reason that more than one character for enclosing makes no sense, usually.
-     Re escape+'0': I guess it's rational if we say ESCAPED BY '\' because then the output is \0
+     Re escape+'0': I guess it's rational if we say ESCAPED BY X'5C' because then the output is \0
     Re REPLACE:
       This is more flexible than ESCAPE, although may ESCAPE is a better word
       We don't need to escape "s because one can say REPLACE " WITH ""
       Sometimes that would be good because doubling "s is an expectation for some products.
+    Re IF NULL:
+     In MySQL/MariaDB INTO OUTFILE NULL becomes escape+N which ordinarily means \N but it's WN if ESCAPED BY 'W'
+     but if ESCAPED BY '' then it should be NULL.
+       (however since we have IF NULL we don't do that we take the exact if_null string),
+      MySQL/MariaDB behaviour is: if ESCAPED BY is '' then say NULL, else say escaped-by-char + N.
+      Saying '\N' or 'NULL' won't have that effect, so to replicate it say DEFAULT, which is default.
+      We say if IF NULL value is DEFAULT then we'll do what MySQL/MariaDB do, else we output IF NULL value.
+      Warning: we do not escape what is in null strings. That is:
+               In copy_to_history() we do not check escapers for IF NULL values, so for
+               TERMINATED BY 'U' ESCAPED BY 'U' IF NULL 'NULL'
+                the result will be NULL it will not be N\ULL.
     Re ambiguity:
      mysql client can say "| Warning | 1475 | First character of the FIELDS TERMINATED string is ambiguous;
      please use non-optional and non-empty FIELDS ENCLOSED BY |".
@@ -1454,6 +1476,7 @@ QByteArray MainWindow::to_byte_array(QString q)
          If we allow multi-byte, see the warning in copy_to_history().
          I'd like to do differently. But I'd have to know whether X'...' i.e. VARBINARY was used.
          Maybe I'd only have to insist that the escape character is ASCII. Or say it's bizarre.
+   Todo: Check if user deletes or edits the output file. Currently we don't notice and there's no output.
 */
 
 void MainWindow::export_defaults(int passed_type, struct export_settings *exports)
@@ -1474,18 +1497,18 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
   (*exports).pad= true;
   (*exports).last= true;
   (*exports).divider= true;
-  (*exports).if_null= "\\N";
+  (*exports).if_null= "DEFAULT";
   (*exports).replace_string= "X'22'";
   (*exports).with_string= "X'22'";
   (*exports).if_file_exists= "append";
   if (passed_type == TOKEN_KEYWORD_TEXT)
   {
     (*exports).columns_enclosed_by= "";
-    (*exports).columns_escaped_by= "\\";
+    (*exports).columns_escaped_by= "X'5C'"; /* this will appear as \ */
     (*exports).column_names= 0;
-    (*exports).columns_terminated_by= "\t";
+    (*exports).columns_terminated_by= "X'09'";
     (*exports).lines_starting_by= "";
-    (*exports).lines_terminated_by= "\n";
+    (*exports).lines_terminated_by= "X'0A'";
     (*exports).query= false;
     (*exports).row_count= false;
     (*exports).max_row_count= 100000000;
@@ -1496,9 +1519,9 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
   }
   if (passed_type == TOKEN_KEYWORD_TABLE)
   {
-    (*exports).columns_escaped_by= "\\";
+    (*exports).columns_escaped_by= "X'5C'";
     (*exports).lines_starting_by= "|";
-    (*exports).lines_terminated_by= "\n";
+    (*exports).lines_terminated_by= "X'0A'";
     /* (*exports).pad= true; should be unnecessary */
   }
   if (passed_type == TOKEN_KEYWORD_HTML)
@@ -1726,6 +1749,8 @@ ok_return: /* bad name, might not be okay, error_message decides that */
   if (error_message > "")
   {
     /* Todo: you could add the word "Error" and the token number and the token string */
+    /* You want make_and_put_message_in_result but with ostrings that expects %, unlike E_ERROR */
+    error_message= "Error " + error_message;
     put_message_in_result(error_message);
     return error_message;
   }
@@ -4955,16 +4980,16 @@ int MainWindow::action_export_function(int passed_type)
       main_token_count_in_statement+= 2;
       if ((local_exports.type == TOKEN_KEYWORD_TEXT) || (local_exports.type == TOKEN_KEYWORD_TABLE))
       {
-        /* e.g. '\\t' for text or '|' for table */
+        /* e.g. X'09' tab for text or '|' for table */
         text= text + action_export_function_clause("\nCOLUMNS TERMINATED BY", local_exports.columns_terminated_by);
         /* e.g. '' for text or '' for table */
         if (local_exports.columns_optionally == true) text= text + " OPTIONALLY ";
         text= text + action_export_function_clause("ENCLOSED BY", local_exports.columns_enclosed_by);
-        /* e.g. '\\\\' for text or '' for table */
+        /* e.g. '\' for text or '' for table */
         text= text + action_export_function_clause("ESCAPED BY", local_exports.columns_escaped_by);
         /* e.g. '' for text or '|' for table */
         text= text + action_export_function_clause("LINES STARTING BY", local_exports.lines_starting_by);
-        /* e.g. '\\n' for text or '\\n' for table */
+        /* e.g. X'0A' line feed for text or X'0A' for table */
         text= text + action_export_function_clause("TERMINATED BY", local_exports.lines_terminated_by);
         main_token_count_in_statement+= 3 + 1 + 2 + 1 + 2 + 1 + 3 + 1 + 2 + 1;
       }

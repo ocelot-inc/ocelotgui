@@ -9132,9 +9132,27 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     if (main_exports.columns_escaped_by.size() > 0) escapers[e++]= main_exports.columns_escaped_by[0];
     if (main_exports.columns_terminated_by.size() > 0) escapers[e++]= main_exports.columns_terminated_by[0];
     if (main_exports.lines_terminated_by.size() > 0) escapers[e++]= main_exports.lines_terminated_by[0];
-    length_of_null_string= main_exports.if_null.size();
-    for (int i= 0; i < length_of_null_string; ++i) null_string[i]= main_exports.if_null[i];
-    null_string[length_of_null_string]= '\0';
+    if (QString::compare(main_exports.if_null, "DEFAULT", Qt::CaseInsensitive) == 0)
+    {
+      if (main_exports.columns_escaped_by.size() == 0)
+      {
+        strcpy(null_string, "NULL");
+        length_of_null_string= 4;
+      }
+      else
+      {
+        null_string[0]= escapers[0];
+        null_string[1]= 'N';
+        null_string[2]= '\0';
+        length_of_null_string= 2;
+      }
+    }
+    else
+    {
+      length_of_null_string= main_exports.if_null.size();
+      for (int i= 0; i < length_of_null_string; ++i) null_string[i]= main_exports.if_null[i];
+      null_string[length_of_null_string]= '\0';
+    }
     pointer_to_null_string= null_string;
     margin= main_exports.margin;
   }
