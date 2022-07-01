@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: June 24 2022
+   Last modified: July 1 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -726,8 +726,19 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   find_widget= new Find_widget(this);
   main_layout->addWidget(find_widget);
 #endif
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  object_explorer_widget= new ResultGrid(lmysql, this, true);
+  //main_layout->addWidget(object_explorer_widget);
+  /* We don't do much initialization here for object explorer. See object_explorer(). */
+  QHBoxLayout *upper_layout= new QHBoxLayout();
+  QWidget *upper_widget= new QWidget();
+  upper_widget->setLayout(main_layout);
+  upper_layout->addWidget(object_explorer_widget);
+  upper_layout->addWidget(upper_widget);
+  main_window->setLayout(upper_layout);
+#else
   main_window->setLayout(main_layout);
-
+#endif
   setCentralWidget(main_window);
 
   fill_menu();    /* Do this at a late stage because widgets must exist before we call connect() */
@@ -3111,6 +3122,9 @@ void MainWindow::create_menu()
   menu_settings_action_debug= menu_settings->addAction("");
 #endif
   menu_settings_action_extra_rule_1= menu_settings->addAction("");
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  menu_settings_action_object_explorer= menu_settings->addAction("");
+#endif
   menu_options= ui->menuBar->addMenu("");
   menu_options_action_option_detach_history_widget= menu_options->addAction("");
   menu_options_action_option_detach_result_grid_widget= menu_options->addAction("");
@@ -3238,6 +3252,9 @@ void MainWindow::fill_menu()
   menu_settings_action_debug->setText(menu_strings[menu_off + MENU_SETTINGS_DEBUG_WIDGET]);
 #endif
   menu_settings_action_extra_rule_1->setText(menu_strings[menu_off + MENU_SETTINGS_EXTRA_RULE_1]);
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  menu_settings_action_object_explorer->setText("Object Explorer Widget");
+#endif
   connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
   connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
   connect(menu_settings_action_grid, SIGNAL(triggered()), this, SLOT(action_grid()));
@@ -3246,6 +3263,9 @@ void MainWindow::fill_menu()
   connect(menu_settings_action_debug, SIGNAL(triggered()), this, SLOT(action_debug()));
 #endif
   connect(menu_settings_action_extra_rule_1, SIGNAL(triggered()), this, SLOT(action_extra_rule_1()));
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  connect(menu_settings_action_object_explorer, SIGNAL(triggered()), this, SLOT(action_object_explorer()));
+#endif
   menu_options->setTitle(menu_strings[menu_off + MENU_OPTIONS]);
   menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
   menu_options_action_option_detach_history_widget->setCheckable(true);
@@ -6077,6 +6097,14 @@ void MainWindow::action_extra_rule_1()
  }
   delete(se);
 }
+
+#if (OCELOT_OBJECT_EXPLORER == 1)
+void MainWindow::action_object_explorer()
+{
+  printf("**** action_object_explorer\n");
+  object_explorer();
+}
+#endif
 
 /* NB: ocelot_history_detached should be set after setting top|left|width|height not before */
 void MainWindow::action_history()
@@ -11588,11 +11616,11 @@ int MainWindow::conditional_settings_insert(QString text)
   Symbols: 'D' database 'C' column 'T' table 'F' function 'P' procedure 't' trigger 'E' event 'I' index
            'K' keyword and 'i' identifier-unknown-type (temporary) 'V' variable
    When is rehash_scan() called:
-    Only the "REHASH" statement does anything.
-    During connect | reconnect | "use" statement, we could look at
-    --auto-rehash or --no-auto-rehash or --skip-auto-rehash. We don't.
-    During "use" statement, we could redo rehashing. We don't.
-    So default = TRUE but unlike with mysql client nothing is automatic.
+    Only the "REHASH" statement does anything for sure.
+    During connect | reconnect | "use" statement, we look at
+    --auto-rehash or --no-auto-rehash or --skip-auto-rehash. We do.
+    During "use" statement, we could redo rehashing. We do.
+    So default = TRUE which is like --auto-rehash being default but only if connect.
     This affects unsigned short ocelot_auto_rehash.
   When is rehash_search() called:
     When user hits ` i.e. backtick show the choices.
@@ -18932,7 +18960,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     }
   }
   QByteArray f= qtextedit_result_changes->find(tmp_result_row_number, result_column_no);
-
   if (f.size() > 1)
   {
     is_image= true; /* image paste experiment */
@@ -18977,6 +19004,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     int new_cell_width_as_int= result_grid->get_cell_width_or_height_as_int(new_cell_width, result_grid->character_count_to_pixel_count(MIN_WIDTH_IN_CHARS));
     if (new_cell_width_as_int > 0) width_i= new_cell_width_as_int;
   }
+
   {
     width_i-= result_grid->setting_ocelot_grid_cell_border_size_as_int * 2;
 //    width_i-= result_grid->setting_ocelot_grid_cell_drag_line_size_as_int;
@@ -18999,9 +19027,11 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       else
         sprintf(tmp_td, "<TD %swidth=%d>", bgcolor, width_i);
     }
+
     strcpy(tmp_pointer, tmp_td);
     tmp_pointer+= strlen(tmp_td);
   }
+
   if (result == true)
   {
     char tmp_div[24];
@@ -19055,6 +19085,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     }
     return tmp_pointer - original_tmp_pointer;
   }
+
   char c;
   QString s;
   int column_width_in_chars= (width_n / max_width_of_a_char); /* TEST!!!! */
@@ -26446,6 +26477,151 @@ XSettings::~XSettings()
 }
 
 #endif // XSETTINGS
+
+#if (OCELOT_OBJECT_EXPLORER == 1)
+/*
+  These are thoughts about what is sometimes called an "object explorer".
+  Position:
+    It's a widget on the left with the same priority as history/grid/statement.
+    Detachable. Often hidden. Default hidden. If hidden, won't be updated.
+  Components:
+    Schemas
+      Tables
+        Columns
+  ... Schema is optional, it won't appear for Tarantool.
+  ... Column have a "Key" and "Type" icon
+  ... You see only what is in your current database, or at least that is preferable.
+  ... There will be a tooltip for everything
+  Fillup:
+    Initial, when shown.
+    Updated, which will have to be a user choice because we don't know whether other users have changed.
+  Line to connect foreign-key references:
+    Ordinarily there are no grid lines. We can put some in in order to show a connection.
+    The connection can be for key and reference columns, or table-to-table.
+    To avoid cluttering, we'll only show when the connection-key is chosen.
+  Implementing with ResultGrid:
+    In common: it's the result of a SELECT
+    In common: Settings | grid widget affects explorer too.
+    Difference: we don't want the grid lines to show, that should apply only for showing connections.
+    Difference: no squeeze
+    Difference: don't repeat schema, don't repeat table
+    Difference: don't show columns unless table chosen, etc.
+  Left click to:
+    Click on table should cause show of columns. (OR: maybe that's only for "+")
+  Customizing:
+    Maybe you only see what you have SELECT privilege for.
+    Icon for key column. Icon for column type.
+  Choosing:
+    View | Explorer. Not visible by default. (Actually we don't have a View menu item.)
+  SET statements:
+    Unknown.
+  + sign:
+    Start with just Table column, and "+". If somebody clicks the "+", there is is expansion i.e. columns appear.
+    There is no "filter settings" dialog box.
+  Right click to:
+    Sort (causes a dialog box for what you want to sort) (a bit absurd, you should just make an ORDER BY)
+    Filter (causes a dialog box for what you want to filter) (a bit absurd, you should just make a WHERE)
+    Add|Remove icons
+    Produce SELECT | ALTER | CREATE statement
+    Refresh, because we don't automatically refresh, because we don't know what other users are doing
+    The same things can be on the main menu.
+  Help:
+    You'll need quite a bit of in-context help, there are so many options.
+  Drag and Drop:
+    This would be for building a query.
+  ?? Should we have MainWindow::initialize_widget_object_explorer()?
+  ocelot_explorer_refresh():
+    In ocelot_explorer_refresh(), do a bunch of SELECTs -- same as what you'd do for auto-completion work, eh?
+      In that case, rehash_scan() covers it mostly. action_execute_one_statement() may be analogous too.
+    Get some menu item to do a call to it, until we have a bespoke item. (or: some SQL statement.)
+  object_explorer_fillup():
+    Assume object_explorer_refresh() succeeded.
+    Mainly you want to display, but I think fillup is needed first.
+    Again, what is in action_execute_one_statement() should give you good ideas.
+  object_explorer_close():
+    This should happen when a server is disconnected, or deliberate user call.
+    Don't get rid of what was done via rehash_scan() or equivalent, hope that something else does that.
+    Destroy any other objects you needed, but maybe not object_explorer_widget.
+  DIALOG BOX: The next step will be adding a dialog box with only Hidden|Visible and OK|Cancel
+    Settings | Object Explorer does the job
+    Color and font will be the same as grid widget settings.
+    Eventualy we will need height | width | etc. as for other settings dialog boxes.
+    Settings -- Object Explorer
+      Hidden Or Visible                 Default = Hidden
+      Keep or Refresh                   Default = Keep (but REHASH or auto-rehash refreshes anyway)
+      Sort _______________              Default = Alphabetic
+      Filter _____________              Default = SCHEMA LIKE '%' AND COLUMN LIKE '%'
+      Width ______________              Hmm, we intend to have height | width | etc. later.
+      Include Primary|Foreign Lines _
+      Include Key Icon for Primary or Indexed _
+      Expand By Default                 Default = No, so you see "+" icon after each table, click to expand
+      Enclose table
+      Keystroke that copies to end of statement widget
+      Keystroke that drops the object
+      OK | Cancel
+  SHORTCUTS
+    For example, typing 'C' goes to the next thing that starts with 'C'
+    If user types "schema_name.", scroll the object explorer so that's visible.
+  FIRST TODO:
+    Find out what that little blank is when you first display a result grid.
+    Hide the object explorer widget if/when not connected.
+  TODO:
+    Your initial setup of upper_layout might be dangerous, check it more thoroughly.
+    Search for calculations that depend on whole width, instead of main_window width.
+    Check whether a change to grid settings will affect object_explorer_widget (probably not).
+  NOW IT IS STRAIGHTFORWARD:
+    In the rg, call prepare_for_display_html() then a variant of display_html() that does:
+    same loop, but with the additional decoration icons, the filtering, etc.
+    And the source is the object_explorer_items struct.
+    But should the variant be in the rg, or in MainWindow?
+    ?? Or: search information_schema again.
+       Also the struct will have extra fields with flags "this was expanded|collapsed".
+*/
+
+void MainWindow::object_explorer()
+{
+  long unsigned int r;
+  char *row_pointer;
+  unsigned int column_length;
+  unsigned int i;
+  struct object_explorer_items xx;
+  printf("**** object_explorer\n");
+  /* Something like what happens in rehash_search(). */
+  /* ?? Maybe you should have a limit on the size, like SQL Server does (65535). */
+  object_explorer_items *oei= new object_explorer_items[rehash_result_row_count];
+  QString all_text= "";
+  for (r= 0; r < rehash_result_row_count; ++r)
+  {
+    row_pointer= rehash_result_set_copy_rows[r];
+    oei[r].column_0= oei[r].column_1= oei[r].column_2= "";
+    for (i= 0; i < rehash_result_column_count; ++i)
+    {
+      memcpy(&column_length, row_pointer, sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int) + sizeof(char);
+      /* Now row_pointer points to contents, length has # of bytes */
+      if (i == 0) oei[r].column_0= QByteArray(row_pointer, column_length);
+      if (i == 1) oei[r].column_1= QByteArray(row_pointer, column_length);
+      if (i == 2) oei[r].column_2= QByteArray(row_pointer, column_length);
+      row_pointer+= column_length;
+      all_text= all_text + oei[r].column_0 + " " + oei[r].column_1 + " " + oei[r].column_2 + "\n";
+    }
+  }
+  QMessageBox msgbox;
+  msgbox.setText(all_text);
+  msgbox.exec();
+  /* !! DELETE oei IF YOU SAID NEW! */
+  object_explorer_widget->display_html_object_explorer(oei, rehash_result_row_count, rehash_result_column_count);
+}
+
+void MainWindow::object_explorer_refresh()
+{
+  printf("**** object_explorer_refresh\n");
+}
+void MainWindow::object_explorer_fillup()
+{
+  printf("**** object_explorer_fillup\n");
+}
+#endif //if (OCELOT_OBJECT_EXPLORER == 1)
 
 #ifdef DBMS_TARANTOOL
 #if (OCELOT_THIRD_PARTY==1)

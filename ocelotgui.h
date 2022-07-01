@@ -37,6 +37,11 @@
 #define OCELOT_IMPORT_EXPORT 1
 #endif
 
+/* To remove most of the code related to object explorer, set OCELOT_OBJECT_EXPLORER 0 */
+#ifndef OCELOT_OBJECT_EXPLORER
+#define OCELOT_OBJECT_EXPLORER 0
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -168,7 +173,6 @@ typedef struct
 #endif
 #endif
 #endif
-
 
 enum {                                        /* possible returns from token_type() */
   TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
@@ -2644,6 +2648,8 @@ static const fontweights fontweightsvalues[]=
   };
 #define FONTWEIGHTSVALUES_SIZE 10 /* # of entries in fontweightsvalues */
 
+
+
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -2769,6 +2775,14 @@ struct export_settings {
   QByteArray if_null;
   QByteArray replace_string, with_string;
   QByteArray if_file_exists;
+};
+#endif
+
+#if (OCELOT_OBJECT_EXPLORER == 1)
+struct object_explorer_items { /* This struct definition is for MainWindow and ResultGrid */
+  QByteArray column_0;
+  QByteArray column_1;
+  QByteArray column_2;
 };
 #endif
 
@@ -3522,6 +3536,12 @@ public:
   void export_set_checked();
 #endif
 
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  void object_explorer();
+  void object_explorer_refresh();
+  void object_explorer_fillup();
+#endif
+
 public slots:
   void action_connect();
   void action_connect_once(QString);
@@ -3567,6 +3587,9 @@ public slots:
   void action_debug();
 #endif
   void action_extra_rule_1();
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  void action_object_explorer();
+#endif
   void history_markup_previous();
   void history_markup_next();
   void action_option_detach_history_widget(bool checked);
@@ -3856,6 +3879,9 @@ private:
 #if (OCELOT_FIND_WIDGET == 1)
   Find_widget *find_widget;
 #endif
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  ResultGrid *object_explorer_widget;
+#endif
   XSettings *xsettings_widget;
   QMenu *menu_file;
     QAction *menu_file_action_connect;
@@ -3894,6 +3920,9 @@ private:
     QAction *menu_settings_action_statement;
     QAction *menu_settings_action_debug;
     QAction *menu_settings_action_extra_rule_1;
+#if (OCELOT_OBJECT_EXPLORER == 1)
+    QAction *menu_settings_action_object_explorer;
+#endif
 public:
   QMenu *menu_options;
   QAction *menu_options_action_option_detach_history_widget;
@@ -8740,6 +8769,109 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   is_paintable= 1;
   return;
 }
+
+#if (OCELOT_OBJECT_EXPLORER == 1)
+/* See comments before MainWindow::object_explorer() */
+/* Todo:
+   Items like gridx_field_types might not need to be set up every time.
+   The output will contain this, which I think is odd: </TR><TR><TD width=    ><TD width=148>C</TD>
+*/
+
+void display_html_object_explorer(object_explorer_items *oei,
+                                  long int rehash_result_row_count,
+                                  int rehash_result_column_count)
+{
+  switch_to_html_text_edit(); /* When should this really be done? And how often? */
+
+  /* We don't really have a result set but maybe we can fool the functions that we call. */
+  gridx_column_count= 3;
+  //if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
+  gridx_field_types= new short unsigned int[gridx_column_count];
+  gridx_field_types[0]= OCELOT_DATA_TYPE_TEXT;
+  gridx_field_types[1]= OCELOT_DATA_TYPE_TEXT;
+  gridx_field_types[2]= OCELOT_DATA_TYPE_TEXT;
+  result_column_count= 3;
+  //if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
+  result_field_flags= new unsigned int[result_column_count];
+  result_field_flags[0]= 0;
+  result_field_flags[1]= 0;
+  result_field_flags[2]= 0;
+  //if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
+  grid_column_widths= new unsigned int[gridx_column_count];
+  grid_column_widths[0]= 150;
+  grid_column_widths[1]= 150;
+  grid_column_widths[2]= 150;
+
+  long int r;
+printf("display_html_object_explorer\n");
+  prepare_for_display_html();
+  int tmp_size= 10000;                                       /* !! FIX SO THIS IS MAX! */
+  char *tmp;
+  tmp= new char[tmp_size];
+  char *tmp_pointer= &tmp[0];
+  strcpy(tmp_pointer, ocelot_grid_table_start);
+  tmp_pointer+= strlen(ocelot_grid_table_start);
+
+  //Result_qtextedit *html_text_edit;
+  //html_text_edit= new Result_qtextedit(this);
+  for (r= 0; r < rehash_result_row_count; ++r)
+  {
+printf("r=%ld\n", r);
+    strcpy(tmp_pointer, ocelot_grid_detail_row_start);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_start);
+    for (unsigned int result_column_no= 0; result_column_no < rehash_result_column_count; ++result_column_no)
+    {
+printf("result_column_no=%d\n", result_column_no);
+      strcpy(tmp_pointer, ocelot_grid_detail_char_column_start);
+      tmp_pointer+= strlen(ocelot_grid_detail_char_column_start);
+      QByteArray s;
+      if (result_column_no == 0) s= oei[r].column_0;
+      if (result_column_no == 1) s= oei[r].column_1;
+      if (result_column_no == 2) s= oei[r].column_2;
+      //strcpy(tmp_pointer, s.data());
+      //tmp_pointer+= s.size();
+
+      /* HERE IS THE SECTION THAT WE NEED TO WORK ON!!! */
+      /* todo: check is i supposed to be base-0 or base-1? */
+      /* todo: is result_set_value_flags possible is_image() or NUM_FLAG? */
+      /* todo: what if new_cell_height becomes positive? */
+      int new_cell_height;
+      tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
+                                                    ocelot_grid_detail_char_column_start,
+                                                    tmp_pointer,
+                                                    s.data() /* result_set_pointer */,
+                                                    0 /* result_set_value_flags */,
+                                                    s.size() /* v_length */,
+                                                    TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                                                    grid_column_widths[result_column_no],
+                                                    150 /* grid_row_heights[grid_row] */,
+                                                    result_grid_font,
+                                                    setting_max_width_of_a_char,
+                                                    result_column_no,
+                                                    r /* tmp_result_row_number */,
+                                                    ocelot_grid_detail_char_column_end,
+                                                    &new_cell_height,
+                                                    result_column_no);
+      strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
+      tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
+    }
+    strcpy(tmp_pointer, ocelot_grid_detail_row_end);
+    tmp_pointer+= strlen(ocelot_grid_detail_row_end);
+  }
+  strcpy(tmp_pointer, ocelot_grid_table_end);
+  tmp_pointer+= strlen(ocelot_grid_table_end);
+
+  *tmp_pointer='\0'; /* todo: how are you going to escape \0 in a column? */
+  printf("tmp=\n%s\n", tmp);
+
+  html_text_edit->setHtml(tmp);
+  html_text_edit->moveCursor(QTextCursor::Start);
+  html_text_edit->ensureCursorVisible();
+  delete [] tmp;
+  is_paintable= 1;
+  return;
+}
+#endif
 
 #ifdef DBMS_TARANTOOL
 /* Given column name e.g. f_15_1 return number e.g. 15 */
