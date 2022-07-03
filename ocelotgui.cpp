@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: July 1 2022
+   Last modified: July 3 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -652,7 +652,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
   ocelot_statement_height= ocelot_statement_left= ocelot_statement_top= ocelot_statement_width= "default";
   ocelot_statement_detached= "no";
-
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  ocelot_object_explorer_visible= "No";
+#endif
   ocelot_debug_height= ocelot_statement_height;
   ocelot_debug_left= ocelot_statement_left;
   ocelot_debug_top= ocelot_statement_top;
@@ -6101,8 +6103,19 @@ void MainWindow::action_extra_rule_1()
 #if (OCELOT_OBJECT_EXPLORER == 1)
 void MainWindow::action_object_explorer()
 {
-  printf("**** action_object_explorer\n");
-  object_explorer();
+  Settings *se= new Settings(OBJECT_EXPLORER_WIDGET, this);
+  int result= se->exec();
+  if (result == QDialog::Accepted)
+  {
+    ocelot_object_explorer_visible= new_ocelot_object_explorer_visible;
+    if (ocelot_object_explorer_visible == "Yes")
+    {
+      object_explorer();
+      object_explorer_widget->show();
+    }
+    else object_explorer_widget->hide();
+  }
+  delete(se);
 }
 #endif
 
@@ -26542,6 +26555,9 @@ XSettings::~XSettings()
     This should happen when a server is disconnected, or deliberate user call.
     Don't get rid of what was done via rehash_scan() or equivalent, hope that something else does that.
     Destroy any other objects you needed, but maybe not object_explorer_widget.
+  Creating object_explorer_items *oei:
+    For some reson "T" comes after all "C" so we work to make it before.
+    Todo: should be permanent, should be re-created if rehash or refresh
   DIALOG BOX: The next step will be adding a dialog box with only Hidden|Visible and OK|Cancel
     Settings | Object Explorer does the job
     Color and font will be the same as grid widget settings.
@@ -26576,6 +26592,7 @@ XSettings::~XSettings()
     But should the variant be in the rg, or in MainWindow?
     ?? Or: search information_schema again.
        Also the struct will have extra fields with flags "this was expanded|collapsed".
+  Todo: Usually when we change a Settings item the result is we generate a SET statement.
 */
 
 void MainWindow::object_explorer()
@@ -26585,32 +26602,59 @@ void MainWindow::object_explorer()
   unsigned int column_length;
   unsigned int i;
   struct object_explorer_items xx;
+  unsigned int oei_count= 0;
   printf("**** object_explorer\n");
   /* Something like what happens in rehash_search(). */
   /* ?? Maybe you should have a limit on the size, like SQL Server does (65535). */
-  object_explorer_items *oei= new object_explorer_items[rehash_result_row_count];
-  QString all_text= "";
+  /* todo: "* 2" is too much, you only need to allow for adding "T", which should mean nothing. */
+  object_explorer_items *oei= new object_explorer_items[rehash_result_row_count * 2];
+  QByteArray column_0= "";
+  QByteArray column_1= "";
+  QByteArray column_2= "";
   for (r= 0; r < rehash_result_row_count; ++r)
   {
     row_pointer= rehash_result_set_copy_rows[r];
-    oei[r].column_0= oei[r].column_1= oei[r].column_2= "";
+    column_0= column_1= column_2= ""; /* This is probably unncessary */
     for (i= 0; i < rehash_result_column_count; ++i)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
       /* Now row_pointer points to contents, length has # of bytes */
-      if (i == 0) oei[r].column_0= QByteArray(row_pointer, column_length);
-      if (i == 1) oei[r].column_1= QByteArray(row_pointer, column_length);
-      if (i == 2) oei[r].column_2= QByteArray(row_pointer, column_length);
+      {
+        if (i == 0) column_0= QByteArray(row_pointer, column_length);
+        if (i == 1) column_1= QByteArray(row_pointer, column_length);
+        if (i == 2) column_2= QByteArray(row_pointer, column_length);
+        if (i == 2)
+        {
+          if (column_0  != "T")
+          {
+            if (column_0 == "C")
+            {
+              if ((oei_count != 0) && (oei[oei_count - 1].column_0 == "C") && (column_1 == oei[oei_count - 1].column_1))
+              {
+                ;
+              }
+              else
+              {
+                oei[oei_count].column_0= "T";
+                oei[oei_count].column_1= column_1;
+                oei[oei_count].column_2= "BASE TABLE";
+                ++oei_count;
+              }
+            }
+            oei[oei_count].column_0= column_0;
+            oei[oei_count].column_1= column_1;
+            oei[oei_count].column_2= column_2;
+            ++oei_count;
+          }
+        }
+      }
       row_pointer+= column_length;
-      all_text= all_text + oei[r].column_0 + " " + oei[r].column_1 + " " + oei[r].column_2 + "\n";
     }
   }
-  QMessageBox msgbox;
-  msgbox.setText(all_text);
-  msgbox.exec();
+
   /* !! DELETE oei IF YOU SAID NEW! */
-  object_explorer_widget->display_html_object_explorer(oei, rehash_result_row_count, rehash_result_column_count);
+  object_explorer_widget->display_html_object_explorer(oei, oei_count, rehash_result_column_count);
 }
 
 void MainWindow::object_explorer_refresh()

@@ -3117,6 +3117,9 @@ public:
   QString ocelot_debug_top, new_ocelot_debug_top;
   QString ocelot_debug_width, new_ocelot_debug_width;
   QString ocelot_debug_detached, new_ocelot_debug_detached;
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  QString ocelot_object_explorer_visible, new_ocelot_object_explorer_visible;
+#endif
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
   QString ocelot_grid_focus_cell_background_color, new_ocelot_grid_focus_cell_background_color;
@@ -6237,7 +6240,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 #define STATEMENT_WIDGET 3
 #define DEBUG_WIDGET 4
 #define EXTRA_RULE_1 5
-
+#define OBJECT_EXPLORER_WIDGET 6
 
 #ifndef RESULT_CHANGES_H
 #define RESULT_CHANGES_H
@@ -8778,29 +8781,32 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 */
 
 void display_html_object_explorer(object_explorer_items *oei,
-                                  long int rehash_result_row_count,
+                                  long int oei_count,
                                   int rehash_result_column_count)
 {
   switch_to_html_text_edit(); /* When should this really be done? And how often? */
 
   /* We don't really have a result set but maybe we can fool the functions that we call. */
-  gridx_column_count= 3;
+  gridx_column_count= 4;
   //if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
   gridx_field_types= new short unsigned int[gridx_column_count];
   gridx_field_types[0]= OCELOT_DATA_TYPE_TEXT;
   gridx_field_types[1]= OCELOT_DATA_TYPE_TEXT;
   gridx_field_types[2]= OCELOT_DATA_TYPE_TEXT;
-  result_column_count= 3;
+  gridx_field_types[3]= OCELOT_DATA_TYPE_TEXT;
+  result_column_count= 4;
   //if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
   result_field_flags= new unsigned int[result_column_count];
   result_field_flags[0]= 0;
   result_field_flags[1]= 0;
   result_field_flags[2]= 0;
+  result_field_flags[3]= 0;
   //if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   grid_column_widths= new unsigned int[gridx_column_count];
-  grid_column_widths[0]= 150;
+  grid_column_widths[0]=  50;
   grid_column_widths[1]= 150;
   grid_column_widths[2]= 150;
+  grid_column_widths[3]= 150;
 
   long int r;
 printf("display_html_object_explorer\n");
@@ -8814,20 +8820,25 @@ printf("display_html_object_explorer\n");
 
   //Result_qtextedit *html_text_edit;
   //html_text_edit= new Result_qtextedit(this);
-  for (r= 0; r < rehash_result_row_count; ++r)
+  for (r= 0; r < oei_count; ++r)
   {
 printf("r=%ld\n", r);
     strcpy(tmp_pointer, ocelot_grid_detail_row_start);
     tmp_pointer+= strlen(ocelot_grid_detail_row_start);
-    for (unsigned int result_column_no= 0; result_column_no < rehash_result_column_count; ++result_column_no)
+
+    /* Eventually we want the "+" sign here. */
+
+
+    for (unsigned int result_column_no= 0; result_column_no < rehash_result_column_count + 1; ++result_column_no)
     {
 printf("result_column_no=%d\n", result_column_no);
       strcpy(tmp_pointer, ocelot_grid_detail_char_column_start);
       tmp_pointer+= strlen(ocelot_grid_detail_char_column_start);
       QByteArray s;
-      if (result_column_no == 0) s= oei[r].column_0;
-      if (result_column_no == 1) s= oei[r].column_1;
-      if (result_column_no == 2) s= oei[r].column_2;
+      if (result_column_no == 0) s= "+";
+      if (result_column_no == 1) s= oei[r].column_0;
+      if (result_column_no == 2) s= oei[r].column_1;
+      if (result_column_no == 3) s= oei[r].column_2;
       //strcpy(tmp_pointer, s.data());
       //tmp_pointer+= s.size();
 
@@ -12252,6 +12263,11 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_debug_top= copy_of_parent->ocelot_debug_top;
   copy_of_parent->new_ocelot_debug_width= copy_of_parent->ocelot_debug_width;
   copy_of_parent->new_ocelot_debug_detached= copy_of_parent->ocelot_debug_detached;
+
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  copy_of_parent->new_ocelot_object_explorer_visible= copy_of_parent->ocelot_object_explorer_visible;
+#endif
+
   {
     QString s;
     if (current_widget == MAIN_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_MENU];
@@ -12262,13 +12278,16 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     if (current_widget == DEBUG_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_DEBUG];
 #endif
     if (current_widget == EXTRA_RULE_1) s= menu_strings[menu_off + MENU_SETTINGS_FOR_EXTRA_RULE_1];
+#if (OCELOT_OBJECT_EXPLORER == 1)
+    if (current_widget == OBJECT_EXPLORER_WIDGET) s= "Object Explorer";
+#endif
     setWindowTitle(s);                                                /* affects "this"] */
   }
 
   /* Todo: following calculation should actually be width of largest tr(label) + approximately 5. */
   int label_for_color_width= this->fontMetrics().boundingRect("W").width();
-#if (OCELOT_MYSQL_DEBUGGER == 1)
-if (current_widget != DEBUG_WIDGET)
+#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_OBJECT_EXPLORER == 1))
+if ((current_widget != DEBUG_WIDGET) && (current_widget != OBJECT_EXPLORER_WIDGET))
 #endif
 {
   /* Hboxes for foreground, background, and highlights */
@@ -12653,6 +12672,22 @@ if (current_widget == GRID_WIDGET)
     widget_for_size[1]->setLayout(hbox_layout_for_size[1]);
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
   }
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  if (current_widget == OBJECT_EXPLORER_WIDGET)
+  {
+    widget_for_size[0]= new QWidget(this);
+    label_for_size[0]= new QLabel("Visible");
+    combo_box_for_size[0]= new QComboBox();
+    combo_box_for_size[0]->addItem("No");
+    combo_box_for_size[0]->addItem("Yes");
+    combo_box_for_size[0]->setCurrentIndex(combo_box_for_size[0]->findText(copy_of_parent->new_ocelot_object_explorer_visible));
+    hbox_layout_for_size[0]= new QHBoxLayout();
+    hbox_layout_for_size[0]->addWidget(label_for_size[0]);
+    hbox_layout_for_size[0]->addWidget(combo_box_for_size[0]);
+    widget_for_size[0]->setLayout(hbox_layout_for_size[0]);
+    connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
+  }
+#endif
   /* The Cancel and OK buttons */
   widget_3= new QWidget(this);
   button_for_cancel= new QPushButton(menu_strings[menu_off + MENU_CANCEL], this);
@@ -12666,8 +12701,8 @@ if (current_widget == GRID_WIDGET)
   widget_3->setLayout(hbox_layout_3);
   /* Put the HBoxes in a VBox */
   main_layout= new QVBoxLayout();
-#if (OCELOT_MYSQL_DEBUGGER == 1)
-  if (current_widget != DEBUG_WIDGET)
+#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_OBJECT_EXPLORER == 1))
+  if ((current_widget != DEBUG_WIDGET) && (current_widget != OBJECT_EXPLORER_WIDGET))
 #endif
   {
     for (int ci= 0; ci < 11; ++ci) main_layout->addWidget(widget_for_color[ci]);
@@ -12693,8 +12728,11 @@ if (current_widget == GRID_WIDGET)
   }
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[0]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  if (current_widget == OBJECT_EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[0]);
+#endif
   main_layout->addWidget(widget_3);
-  if (current_widget != DEBUG_WIDGET) handle_combo_box_1(current_widget);
+  if ((current_widget != DEBUG_WIDGET) && (current_widget != OBJECT_EXPLORER_WIDGET)) handle_combo_box_1(current_widget);
   /*
     If one merely says
     this->setLayout(main_layout);
@@ -13623,6 +13661,10 @@ void handle_combo_box_for_size_0(int i)
     copy_of_parent->new_ocelot_grid_cell_height= combo_box_for_size[0]->itemText(i);
   if (current_widget == EXTRA_RULE_1)
     copy_of_parent->new_ocelot_extra_rule_1_condition= combo_box_for_size[0]->itemText(i);
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  if (current_widget == OBJECT_EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_object_explorer_visible= combo_box_for_size[0]->itemText(i);
+#endif
 }
 
 
