@@ -2780,9 +2780,10 @@ struct export_settings {
 
 #if (OCELOT_OBJECT_EXPLORER == 1)
 struct object_explorer_items { /* This struct definition is for MainWindow and ResultGrid */
-  QByteArray column_0;
-  QByteArray column_1;
-  QByteArray column_2;
+  QByteArray object_type;
+  QByteArray object_name;
+  QByteArray column_name;
+  bool is_min;
 };
 #endif
 
@@ -3119,6 +3120,7 @@ public:
   QString ocelot_debug_detached, new_ocelot_debug_detached;
 #if (OCELOT_OBJECT_EXPLORER == 1)
   QString ocelot_object_explorer_visible, new_ocelot_object_explorer_visible;
+  QString ocelot_object_explorer_expanded, new_ocelot_object_explorer_expanded;
 #endif
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
@@ -3540,9 +3542,9 @@ public:
 #endif
 
 #if (OCELOT_OBJECT_EXPLORER == 1)
-  void object_explorer();
-  void object_explorer_refresh();
-  void object_explorer_fillup();
+  void object_explorer_show();
+  void object_explorer_expanded();
+  void object_explorer_close();
 #endif
 
 public slots:
@@ -3685,6 +3687,9 @@ private:
   void initialize_widget_history();
   int result_grid_add_tab();
   void initialize_widget_statement();
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  void initialize_widget_object_explorer();
+#endif
   void menu_edit_zoominorout(int);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void debug_menu_enable_or_disable(int statement_type);
@@ -3883,7 +3888,11 @@ private:
   Find_widget *find_widget;
 #endif
 #if (OCELOT_OBJECT_EXPLORER == 1)
+public:
   ResultGrid *object_explorer_widget;
+  object_explorer_items *oei;
+  unsigned oei_count;
+private:
 #endif
   XSettings *xsettings_widget;
   QMenu *menu_file;
@@ -6360,6 +6369,9 @@ private:
   QString qtextedit_cell_content;  /* cell contents. but if it's an image we get U+fffc or something like that */
                                    /* Actually this probably should be in locals */
   bool qtextedit_at_end;           /* If document doesn't fill result widget, this can become true */
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  bool qtextedit_is_min_max_clicked;
+#endif
 
   Result_changes *qtextedit_result_changes;
 
@@ -6898,6 +6910,9 @@ bool is_image_format(int length, char* pointer)
 */
 bool is_fancy()
 {
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  if (this == copy_of_parent->object_explorer_widget) return true;
+#endif
   if ((result_row_count == 0) || (result_column_count == 0)) return false;
   if (html_text_edit == NULL) return false;
   if ((copy_of_ocelot_batch != 0)
@@ -8778,19 +8793,32 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 /* Todo:
    Items like gridx_field_types might not need to be set up every time.
    The output will contain this, which I think is odd: </TR><TR><TD width=    ><TD width=148>C</TD>
+   Todo: wrong pixmap size!
+   Todo: There's another way to set up an image, see image().
+   Todo: need to restore what's in parent!
+   Todo: how to know where user clicks?
+         void Result_qtextedit::mouseMoveEvent(QMouseEvent *event) sees where we are if it's a regular rg
+         but nothing happens when I'm hovering over a display_html_object rg
+         because (result_grid->is_fancy() == false)
+         we changed so it is always true but I think that is too much
+   Todo: You should also be watching for
+         ResultGrid* r;
+         for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
+         ... because gont change happens for this bozo too
+         ... I think we should start at -1 in such loops, and if it's -1 there's an always-existent object explorer widget
+    Todo: we sould be watching for
+          int MainWindow::result_grid_add_tab()
+          r->installEventFilter(this); * must catch fontChange, show, etc. *
+          r->grid_vertical_scroll_bar->installEventFilter(this);
+    Todo: use of pixmap() function this might have State = Off. And the width + height is odd.
 */
 
-void display_html_object_explorer(object_explorer_items *oei,
-                                  long int oei_count,
-                                  int rehash_result_column_count)
+void initialize() /* default object explorer widget settings, most of which will never change */
 {
-  switch_to_html_text_edit(); /* When should this really be done? And how often? */
-
-  /* We don't really have a result set but maybe we can fool the functions that we call. */
   gridx_column_count= 4;
   //if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
   gridx_field_types= new short unsigned int[gridx_column_count];
-  gridx_field_types[0]= OCELOT_DATA_TYPE_TEXT;
+  gridx_field_types[0]= OCELOT_DATA_TYPE_BINARY;
   gridx_field_types[1]= OCELOT_DATA_TYPE_TEXT;
   gridx_field_types[2]= OCELOT_DATA_TYPE_TEXT;
   gridx_field_types[3]= OCELOT_DATA_TYPE_TEXT;
@@ -8803,77 +8831,175 @@ void display_html_object_explorer(object_explorer_items *oei,
   result_field_flags[3]= 0;
   //if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   grid_column_widths= new unsigned int[gridx_column_count];
-  grid_column_widths[0]=  50;
-  grid_column_widths[1]= 150;
-  grid_column_widths[2]= 150;
-  grid_column_widths[3]= 150;
+  /* grid_column_widths[] will be settled during display_html_object_explorer */
+  //grid_column_widths[0]=  50;
+  //grid_column_widths[1]= 150;
+  //grid_column_widths[2]= 150;
+  //grid_column_widths[3]= 150;
+  /* The following line is so is_fancy() will return true. Todo: If we replace with non-grid, should be 0. */
+  //  result_row_count= rehash_result_column_count; result_column_count= 4;
+}
 
-  long int r;
+
+void display_html_object_explorer()
+{
+  long unsigned int r;
+  unsigned int r_of_t= 0;                                   /* so when we see "C" we can find its "T" */
+
+  int new_cell_height; /* TODO: WE HAVE TO DO SOMETHING WITH THIS! */
+
+  switch_to_html_text_edit(); /* When should this really be done? And how often? */
+
+  /* We don't really have a result set but maybe we can fool the functions that we call. */
+
+  // TODO! OBVIOUSLY YOU MUST RESTORE ORIGINAL VALUES WHEN YOU'RE DONE HERE!
+  copy_of_parent->ocelot_extra_rule_1_condition= "data_type LIKE '%BINARY'";
+  copy_of_parent->ocelot_extra_rule_1_display_as= "image";
+
+  /* Todo: decide if this should be in initialize() */
+  QByteArray bytearray_min; /* PNG for table-minimize i.e. don't show columns */
+  {
+    QIcon icon_min= this->style()->standardIcon(QStyle::SP_TitleBarMinButton);
+    QPixmap pixmap_min;
+    pixmap_min= icon_min.pixmap(12,12);
+    QBuffer buffer_min(&bytearray_min);
+    buffer_min.open(QIODevice::WriteOnly);
+    pixmap_min.save(&buffer_min, "PNG");
+  }
+  QByteArray bytearray_max; /* PNG for table-maximize i.e. do show columns */
+  {
+    QIcon icon_max= this->style()->standardIcon(QStyle::SP_TitleBarMaxButton);
+    QPixmap pixmap_max;
+    pixmap_max= icon_max.pixmap(12,12);
+    QBuffer buffer_max(&bytearray_max);
+    buffer_max.open(QIODevice::WriteOnly);
+    pixmap_max.save(&buffer_max, "PNG");
+  }
+
+  unsigned int total_object_name_size= 0;
+  unsigned int total_column_name_size= 0;
+  unsigned int displayed_row_count= 0; /* this will be less than oei_count if some tables are minimized */
+  {
+    unsigned int object_name_size, max_object_name_size= 0;
+    unsigned int column_name_size, max_column_name_size= 0;
+    for (r= 0; r < copy_of_parent->oei_count; ++r)
+    {
+      if (copy_of_parent->oei[r].object_type == "T") r_of_t= r;
+      if ((copy_of_parent->oei[r].object_type != "C") || (copy_of_parent->oei[r_of_t].is_min == false))
+      {
+        object_name_size= copy_of_parent->oei[r].object_name.size();
+        total_object_name_size+= object_name_size;
+        if (max_object_name_size < object_name_size) max_object_name_size= object_name_size;
+        column_name_size= copy_of_parent->oei[r].column_name.size();
+        total_column_name_size+= column_name_size;
+        if (max_column_name_size < column_name_size) max_column_name_size= column_name_size;
+        ++displayed_row_count;
+      }
+    }
+    if (max_object_name_size > 20) max_object_name_size= 20; /* arbitrary, big names take more rows */
+    if (max_column_name_size > 20) max_column_name_size= 20;
+    char tmp_string_1[1024];
+    grid_column_widths[0]= get_column_width_in_pixels("W", false, false); /* Actually [0] is image but shrink it */
+    grid_column_widths[1]= get_column_width_in_pixels("W", false, false);
+    unsigned int i;
+    for (i= 0; i < max_object_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
+    grid_column_widths[2]= get_column_width_in_pixels(tmp_string_1, false, false);
+    for (i= 0; i < max_column_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
+    grid_column_widths[3]= get_column_width_in_pixels(tmp_string_1, false, false);
+  }
+  {
+    /* as in grid_column_size_calc */
+    /* todo: with result_grid_font max_height_of_a_char default = 26, that's unexpectedly large */
+    //QFont *pointer_to_font;
+    //pointer_to_font= &result_grid_font;
+    //QFontMetrics mm= QFontMetrics(*pointer_to_font);
+    //max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
+    //printf("**** displayed_row_count=%d, max_height_of_a_char=%d\n", displayed_row_count, max_height_of_a_char);
+    //grid_column_heights= new unsigned int[displayed_row_count]; /* todo: leak! wasn't it enough already? */
+    //int cell_height_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_height, max_height_of_a_char);
+    //for (unsigned int i= 0; i < displayed_row_count; ++i) grid_row_heights[i]= cell_height_as_int;
+    for (unsigned int i= 0; i < displayed_row_count; ++i) grid_row_heights[i]= 15;
+  }
+
 printf("display_html_object_explorer\n");
   prepare_for_display_html();
-  int tmp_size= 10000;                                       /* !! FIX SO THIS IS MAX! */
+  /* TODO: You have max_object_name_size and max_column_name_size and displayed_row_count, use them! */
+  int tmp_size= 50000;                                       /* !! FIX SO THIS IS MAX! */
   char *tmp;
   tmp= new char[tmp_size];
   char *tmp_pointer= &tmp[0];
+  char *tmp_pointer_before_thin_image_call; /* For the first column. Includes height which may need changing. */
+
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
+  r_of_t= 0;                                   /* so when we see "C" we can find its "T" */
 
   //Result_qtextedit *html_text_edit;
   //html_text_edit= new Result_qtextedit(this);
-  for (r= 0; r < oei_count; ++r)
+  for (r= 0; r < copy_of_parent->oei_count; ++r)
   {
 printf("r=%ld\n", r);
-    strcpy(tmp_pointer, ocelot_grid_detail_row_start);
-    tmp_pointer+= strlen(ocelot_grid_detail_row_start);
-
-    /* Eventually we want the "+" sign here. */
-
-
-    for (unsigned int result_column_no= 0; result_column_no < rehash_result_column_count + 1; ++result_column_no)
+    if (copy_of_parent->oei[r].object_type == "T") r_of_t= r;
+    /* Skip column if table minimized */
+    if ((copy_of_parent->oei[r].object_type != "C") || (copy_of_parent->oei[r_of_t].is_min == false))
     {
-printf("result_column_no=%d\n", result_column_no);
-      strcpy(tmp_pointer, ocelot_grid_detail_char_column_start);
-      tmp_pointer+= strlen(ocelot_grid_detail_char_column_start);
-      QByteArray s;
-      if (result_column_no == 0) s= "+";
-      if (result_column_no == 1) s= oei[r].column_0;
-      if (result_column_no == 2) s= oei[r].column_1;
-      if (result_column_no == 3) s= oei[r].column_2;
-      //strcpy(tmp_pointer, s.data());
-      //tmp_pointer+= s.size();
+      strcpy(tmp_pointer, ocelot_grid_detail_row_start);
+      tmp_pointer+= strlen(ocelot_grid_detail_row_start);
+      tmp_pointer_before_thin_image_call= tmp_pointer;
+      tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[r]);
 
-      /* HERE IS THE SECTION THAT WE NEED TO WORK ON!!! */
-      /* todo: check is i supposed to be base-0 or base-1? */
-      /* todo: is result_set_value_flags possible is_image() or NUM_FLAG? */
-      /* todo: what if new_cell_height becomes positive? */
-      int new_cell_height;
-      tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
-                                                    ocelot_grid_detail_char_column_start,
-                                                    tmp_pointer,
-                                                    s.data() /* result_set_pointer */,
-                                                    0 /* result_set_value_flags */,
-                                                    s.size() /* v_length */,
-                                                    TEXTEDITFRAME_CELL_TYPE_DETAIL,
-                                                    grid_column_widths[result_column_no],
-                                                    150 /* grid_row_heights[grid_row] */,
-                                                    result_grid_font,
-                                                    setting_max_width_of_a_char,
-                                                    result_column_no,
-                                                    r /* tmp_result_row_number */,
-                                                    ocelot_grid_detail_char_column_end,
-                                                    &new_cell_height,
-                                                    result_column_no);
-      strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
-      tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
+      for (unsigned int result_column_no= 0; result_column_no < 4; ++result_column_no)
+      {
+printf("result_column_no=%d\n", result_column_no);
+        QByteArray s;
+        if (result_column_no == 0)
+        {
+          if (copy_of_parent->oei[r].is_min == false) s= bytearray_min;
+          else s= bytearray_max;
+        }
+        if (result_column_no == 1) s= copy_of_parent->oei[r].object_type;
+        if (result_column_no == 2) s= copy_of_parent->oei[r].object_name;
+        if (result_column_no == 3) s= copy_of_parent->oei[r].column_name;
+        //strcpy(tmp_pointer, s.data());
+        //tmp_pointer+= s.size();
+        /* HERE IS THE SECTION THAT WE NEED TO WORK ON!!! */
+        /* todo: check is i supposed to be base-0 or base-1? */
+        /* todo: is result_set_value_flags possible is_image() or NUM_FLAG? */
+        /* todo: what if new_cell_height becomes positive? */
+        tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
+                                                     ocelot_grid_detail_char_column_start,
+                                                     tmp_pointer,
+                                                     s.data() /* result_set_pointer */,
+                                                     0 /* result_set_value_flags */,
+                                                     s.size() /* v_length */,
+                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                                                     grid_column_widths[result_column_no],
+                                                     150 /* grid_row_heights[grid_row] */,
+                                                     result_grid_font,
+                                                     setting_max_width_of_a_char,
+                                                     result_column_no,
+                                                     r /* tmp_result_row_number */,
+                                                     ocelot_grid_detail_char_column_end,
+                                                     &new_cell_height,
+                                                     result_column_no);
+        strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
+        tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
+      }
+      if (new_cell_height > 0)
+      {
+        thin_image(tmp_pointer_before_thin_image_call, (const char*) "TD", new_cell_height); /* overwrite */
+      }
+      strcpy(tmp_pointer, ocelot_grid_detail_row_end);
+      tmp_pointer+= strlen(ocelot_grid_detail_row_end);
     }
-    strcpy(tmp_pointer, ocelot_grid_detail_row_end);
-    tmp_pointer+= strlen(ocelot_grid_detail_row_end);
   }
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
 
-  *tmp_pointer='\0'; /* todo: how are you going to escape \0 in a column? */
+  *tmp_pointer= '\0'; /* todo: how are you going to escape \0 in a column? */
   printf("tmp=\n%s\n", tmp);
+
+  printf("ocelot_grid_detail_char_column_start=%s.\n", ocelot_grid_detail_char_column_start);
 
   html_text_edit->setHtml(tmp);
   html_text_edit->moveCursor(QTextCursor::Start);
@@ -8882,6 +9008,31 @@ printf("result_column_no=%d\n", result_column_no);
   is_paintable= 1;
   return;
 }
+
+/*
+  User clicked the object explorer min|max column, so toggle between min and max.
+  Find what the underlying table name is within the grid.
+  Mark it as the opposite of what it was before.
+  Do display_html_object_explorer again.
+  We don't depend on gridx row number because entries before this might have been skipped,
+  but comparing object name (assuming object is a table) should work.
+*/
+void toggle(QByteArray object_name)
+{
+  printf("**** toggle! %s.\n", object_name.data());
+  for (unsigned int r= 0; r < copy_of_parent->oei_count; ++r)
+  {
+    if ((copy_of_parent->oei[r].object_type == "T") && (copy_of_parent->oei[r].object_name == object_name))
+    {
+      printf("**** match!\n");
+      if (copy_of_parent->oei[r].is_min == false) copy_of_parent->oei[r].is_min= true;
+      else copy_of_parent->oei[r].is_min= false;
+      /* We could say "break;" here, it shouldn't matter. */
+    }
+  }
+  display_html_object_explorer();
+}
+
 #endif
 
 #ifdef DBMS_TARANTOOL
@@ -12266,6 +12417,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 
 #if (OCELOT_OBJECT_EXPLORER == 1)
   copy_of_parent->new_ocelot_object_explorer_visible= copy_of_parent->ocelot_object_explorer_visible;
+  copy_of_parent->new_ocelot_object_explorer_expanded= copy_of_parent->ocelot_object_explorer_expanded;
 #endif
 
   {
@@ -12686,6 +12838,17 @@ if (current_widget == GRID_WIDGET)
     hbox_layout_for_size[0]->addWidget(combo_box_for_size[0]);
     widget_for_size[0]->setLayout(hbox_layout_for_size[0]);
     connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
+    widget_for_size[1]= new QWidget(this);
+    label_for_size[1]= new QLabel("Expanded");
+    combo_box_for_size[1]= new QComboBox();
+    combo_box_for_size[1]->addItem("No");
+    combo_box_for_size[1]->addItem("Yes");
+    combo_box_for_size[1]->setCurrentIndex(combo_box_for_size[1]->findText(copy_of_parent->new_ocelot_object_explorer_expanded));
+    hbox_layout_for_size[1]= new QHBoxLayout();
+    hbox_layout_for_size[1]->addWidget(label_for_size[1]);
+    hbox_layout_for_size[1]->addWidget(combo_box_for_size[1]);
+    widget_for_size[1]->setLayout(hbox_layout_for_size[1]);
+    connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
   }
 #endif
   /* The Cancel and OK buttons */
@@ -12730,6 +12893,7 @@ if (current_widget == GRID_WIDGET)
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
 #if (OCELOT_OBJECT_EXPLORER == 1)
   if (current_widget == OBJECT_EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[0]);
+  if (current_widget == OBJECT_EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[1]);
 #endif
   main_layout->addWidget(widget_3);
   if ((current_widget != DEBUG_WIDGET) && (current_widget != OBJECT_EXPLORER_WIDGET)) handle_combo_box_1(current_widget);
@@ -13674,6 +13838,10 @@ void handle_combo_box_for_size_1(int i)
     copy_of_parent->new_ocelot_grid_cell_border_size= QString::number(i);
   if (current_widget == EXTRA_RULE_1)
     copy_of_parent->new_ocelot_extra_rule_1_display_as= combo_box_for_size[1]->itemText(i);
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  if (current_widget == OBJECT_EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_object_explorer_expanded= combo_box_for_size[1]->itemText(i);
+#endif
 }
 
 

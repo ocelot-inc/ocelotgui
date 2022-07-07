@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: July 3 2022
+   Last modified: July 6 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -654,6 +654,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_statement_detached= "no";
 #if (OCELOT_OBJECT_EXPLORER == 1)
   ocelot_object_explorer_visible= "No";
+  ocelot_object_explorer_expanded= "No";
 #endif
   ocelot_debug_height= ocelot_statement_height;
   ocelot_debug_left= ocelot_statement_left;
@@ -708,7 +709,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ui->menuBar->setStyleSheet(ocelot_menu_style_string);
   initialize_widget_history();
   initialize_widget_statement();
-
   /*
     2018-10-08 setFont() before adding tab with ResultGrid, in hope that ResultGrid
     will inherit and that will fix the bug where initial height is too small.
@@ -730,6 +730,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
 #if (OCELOT_OBJECT_EXPLORER == 1)
   object_explorer_widget= new ResultGrid(lmysql, this, true);
+  initialize_widget_object_explorer();
   //main_layout->addWidget(object_explorer_widget);
   /* We don't do much initialization here for object explorer. See object_explorer(). */
   QHBoxLayout *upper_layout= new QHBoxLayout();
@@ -6107,10 +6108,11 @@ void MainWindow::action_object_explorer()
   int result= se->exec();
   if (result == QDialog::Accepted)
   {
+    ocelot_object_explorer_expanded= new_ocelot_object_explorer_expanded;
     ocelot_object_explorer_visible= new_ocelot_object_explorer_visible;
     if (ocelot_object_explorer_visible == "Yes")
     {
-      object_explorer();
+      object_explorer_show();
       object_explorer_widget->show();
     }
     else object_explorer_widget->hide();
@@ -18860,6 +18862,9 @@ void Result_qtextedit::construct()
       this, SLOT(menu_context_t(const QPoint &)));
   qtextedit_result_changes= new Result_changes(this); /* ~Result_qtextedit() should delete this */
 //  show();
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  qtextedit_is_min_max_clicked= false;
+#endif
 }
 
 #ifdef OLD_STUFF
@@ -19835,7 +19840,28 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
   {
     qtextedit_drag_start_time= QDateTime::currentMSecsSinceEpoch();
   }
-
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  printf("****\n");
+  if (result_grid == result_grid->copy_of_parent->object_explorer_widget)
+  {
+    printf("**** object_explorer_widget\n");
+    if ((qtextedit_is_in_drag_for_column == false) && (qtextedit_is_in_drag_for_row == false))
+    {
+      printf("**** not drag\n");
+      if (event->button() == Qt::LeftButton)
+      {
+        printf("****    Qt::LeftButton\n");
+        printf("**** qtextedit_columns_per_row %d\n", qtextedit_columns_per_row);
+        printf("**** row number = %d, column number = %d\n", result_grid->focus_result_row_number, result_grid->focus_column_number);
+        printf("**** block number = %d\n", qtextedit_block_number);
+        printf("****\n");
+        qtextedit_is_min_max_clicked= true;
+      }
+    }
+    /* TODO: find out why I have to say "return;" here! */
+    return;
+  }
+#endif
   QTextEdit::mousePressEvent(event);
   result_grid->color_change();
   QTextCursor text_cursor_0= cursorForPosition(QPoint(qtextedit_x, qtextedit_y));
@@ -19896,6 +19922,17 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
 {
   if (result_grid->is_fancy() == false) { QTextEdit::mouseReleaseEvent(event); return; }
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  if (result_grid == result_grid->copy_of_parent->object_explorer_widget)
+  {
+    printf("**** row number = %d, column number = %d\n", result_grid->focus_result_row_number, result_grid->focus_column_number);
+    if (qtextedit_is_min_max_clicked == true)
+    {
+      qtextedit_is_min_max_clicked= false;
+      result_grid->toggle("t");
+    }
+  }
+#endif
   if ((qtextedit_is_in_drag_for_column == true) || (qtextedit_is_in_drag_for_row == true))
   {
     bool is_dragged= false;
@@ -26547,10 +26584,6 @@ XSettings::~XSettings()
     In ocelot_explorer_refresh(), do a bunch of SELECTs -- same as what you'd do for auto-completion work, eh?
       In that case, rehash_scan() covers it mostly. action_execute_one_statement() may be analogous too.
     Get some menu item to do a call to it, until we have a bespoke item. (or: some SQL statement.)
-  object_explorer_fillup():
-    Assume object_explorer_refresh() succeeded.
-    Mainly you want to display, but I think fillup is needed first.
-    Again, what is in action_execute_one_statement() should give you good ideas.
   object_explorer_close():
     This should happen when a server is disconnected, or deliberate user call.
     Don't get rid of what was done via rehash_scan() or equivalent, hope that something else does that.
@@ -26592,59 +26625,112 @@ XSettings::~XSettings()
     But should the variant be in the rg, or in MainWindow?
     ?? Or: search information_schema again.
        Also the struct will have extra fields with flags "this was expanded|collapsed".
+  object_explorer_show():
+    will do rehash_scan() (as if REHASH statement was executed), then fill up oei struc,
+    so that when object_explorer_widget->show() happens there will be an explorer widget to show.
+    There are several ways it can fail, which should cause a dialog box without showing.
+    Maybe better dialog box labels would be "Activate" and (if already activated and visible) "Refresh".
+  Todo: get displayed sizes right:
+        height should be known based on font
+        width should be knowable based on max number of characters
   Todo: Usually when we change a Settings item the result is we generate a SET statement.
+  Todo: oei struct object_explorer_items has a flag: bool is_min
+        if is_min and table: we don't show the columns
+        if is_min is false: we show the columns
+        if somebody clicks on the icon in column 2
+          look Result_qtextedit::mouseMoveEvent to see how we know row number and column number
+          possibly void Result_qtextedit::mousePressEvent(QMouseEvent *event)
+          if currently is_min == true: change the icon to max, change the flag to false
+          if currently is_min == false: change the icon to min, change the flag to true
+          the default should always be true
+        the flag only matters for "T" so column 2 should be nothing for other object types
+        we probably need yet one more struct component to store what the grid row number is
+        TODO: object_explorer_show() should merely give error dialog boxes if something is not ready.
+              object_explorer_refresh() should give an error dialog box if rehash/refresh fails.
+              Or maybe there is no difference, there should be only one button and it does everything.
+        THE PLAN NOW IS: object_explorer_show() always does a rehash_scan so object_explorer_refresh is a no-op.
+                         but you can change the prompt to "refresh and show again" if it's already visible
+        Todo: "Expanded" could be something like "All Maximized" or "All Minimized"
+        Todo: If I click outside the boxes, it decides to do something
 */
 
-void MainWindow::object_explorer()
+void MainWindow::initialize_widget_object_explorer()
 {
+  object_explorer_widget->initialize();
+  oei= NULL;
+  oei_count= 0;
+}
+
+void MainWindow::object_explorer_show()
+{
+/* todo: check the error_or_ok_message result and do something about it ... qmessagebox will do */
+/* !! DELETE oei IF YOU SAID NEW! (no, we don't do that unless user decides to remove the whole thing) */
+  char error_or_ok_message[1024];
+  rehash_scan(error_or_ok_message);
+  if (strncmp(error_or_ok_message, "OK", 2) != 0)
+  {
+    QMessageBox msgbox;
+    msgbox.setText(error_or_ok_message);
+    msgbox.exec();
+    return;
+  }
+  printf("**** rehash_scan result = %s.\n", error_or_ok_message);
+  bool is_min= false;
+  if (ocelot_object_explorer_expanded == "Yes") is_min= false;
+  if (oei != NULL)
+  {
+    delete [] oei;
+    oei_count= 0;
+  }
   long unsigned int r;
   char *row_pointer;
   unsigned int column_length;
   unsigned int i;
-  struct object_explorer_items xx;
-  unsigned int oei_count= 0;
+//  struct object_explorer_items xx;
   printf("**** object_explorer\n");
   /* Something like what happens in rehash_search(). */
   /* ?? Maybe you should have a limit on the size, like SQL Server does (65535). */
   /* todo: "* 2" is too much, you only need to allow for adding "T", which should mean nothing. */
-  object_explorer_items *oei= new object_explorer_items[rehash_result_row_count * 2];
-  QByteArray column_0= "";
-  QByteArray column_1= "";
-  QByteArray column_2= "";
+  oei= new object_explorer_items[rehash_result_row_count * 2];
+  QByteArray object_type= "";
+  QByteArray object_name= "";
+  QByteArray column_name= "";
   for (r= 0; r < rehash_result_row_count; ++r)
   {
     row_pointer= rehash_result_set_copy_rows[r];
-    column_0= column_1= column_2= ""; /* This is probably unncessary */
+    object_type= object_name= column_name= ""; /* This is probably unncessary */
     for (i= 0; i < rehash_result_column_count; ++i)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
       /* Now row_pointer points to contents, length has # of bytes */
       {
-        if (i == 0) column_0= QByteArray(row_pointer, column_length);
-        if (i == 1) column_1= QByteArray(row_pointer, column_length);
-        if (i == 2) column_2= QByteArray(row_pointer, column_length);
+        if (i == 0) object_type= QByteArray(row_pointer, column_length);
+        if (i == 1) object_name= QByteArray(row_pointer, column_length);
+        if (i == 2) column_name= QByteArray(row_pointer, column_length);
         if (i == 2)
         {
-          if (column_0  != "T")
+          if (object_type  != "T")
           {
-            if (column_0 == "C")
+            if (object_type == "C")
             {
-              if ((oei_count != 0) && (oei[oei_count - 1].column_0 == "C") && (column_1 == oei[oei_count - 1].column_1))
+              if ((oei_count != 0) && (oei[oei_count - 1].object_type == "C") && (object_name == oei[oei_count - 1].object_name))
               {
                 ;
               }
               else
               {
-                oei[oei_count].column_0= "T";
-                oei[oei_count].column_1= column_1;
-                oei[oei_count].column_2= "BASE TABLE";
+                oei[oei_count].object_type= "T";
+                oei[oei_count].object_name= object_name;
+                oei[oei_count].column_name= "BASE TABLE";
+                oei[oei_count].is_min= is_min;
                 ++oei_count;
               }
             }
-            oei[oei_count].column_0= column_0;
-            oei[oei_count].column_1= column_1;
-            oei[oei_count].column_2= column_2;
+            oei[oei_count].object_type= object_type;
+            oei[oei_count].object_name= object_name;
+            oei[oei_count].column_name= column_name;
+            oei[oei_count].is_min= is_min;
             ++oei_count;
           }
         }
@@ -26652,19 +26738,23 @@ void MainWindow::object_explorer()
       row_pointer+= column_length;
     }
   }
-
-  /* !! DELETE oei IF YOU SAID NEW! */
-  object_explorer_widget->display_html_object_explorer(oei, oei_count, rehash_result_column_count);
+  object_explorer_widget->display_html_object_explorer();
 }
 
-void MainWindow::object_explorer_refresh()
+/* Todo: the idea of "expanded" is that all columns are shown for all tables, is_min is off by default */
+void MainWindow::object_explorer_expanded()
 {
-  printf("**** object_explorer_refresh\n");
+  printf("**** object_explorer_expanded\n");
 }
-void MainWindow::object_explorer_fillup()
+
+/* Todo: This could be called when we're shutting down (?). Clean up anything made with new. */
+void MainWindow::object_explorer_close()
 {
-  printf("**** object_explorer_fillup\n");
+  printf("**** object_explorer_close\n");
 }
+
+/* Todo: Add: a function for destroying all objects created for the widget (though not the widget itself?) */
+
 #endif //if (OCELOT_OBJECT_EXPLORER == 1)
 
 #ifdef DBMS_TARANTOOL
