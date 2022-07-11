@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: July 6 2022
+   Last modified: July 11 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -538,7 +538,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   log("MainWindow start", 90); /* Ordinarily this is less than ocelot_log_level so won't appear */
   initial_asserts();  /* Check that some defined | constant values are okay. */
-
   /* Initialization */
 
   main_window_maximum_width= 0;
@@ -600,6 +599,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 //  saved_font=&tmp_font;
 //  result_grid_table_widget= new ResultGrid(0, saved_font, this);
 
+#if (OCELOT_OBJECT_EXPLORER == 1)
+  ocelot_object_explorer_visible= "No";
+  ocelot_object_explorer_expanded= "No";
+  object_explorer_widget= NULL;
+#endif
   result_grid_tab_widget= new QTabWidget48(this); /* 2015-08-25 added "this" */
   result_grid_tab_widget->hide();
 
@@ -621,7 +625,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   main_window= new QWidget(this);                  /* 2015-08-25 added "this" */
 
   completer_widget= new Completer_widget(this);
-
   ocelot_grid_cell_height= "default";              /* todo: should be changeable with Settings menu item */
   ocelot_grid_cell_width= "default";               /* todo: should be changeable with Settings menu item */
 
@@ -652,10 +655,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
   ocelot_statement_height= ocelot_statement_left= ocelot_statement_top= ocelot_statement_width= "default";
   ocelot_statement_detached= "no";
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  ocelot_object_explorer_visible= "No";
-  ocelot_object_explorer_expanded= "No";
-#endif
   ocelot_debug_height= ocelot_statement_height;
   ocelot_debug_left= ocelot_statement_left;
   ocelot_debug_top= ocelot_statement_top;
@@ -671,7 +670,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_histfilesize= "2000000000";
   ocelot_histsize= "500";
   lmysql= new ldbms();                               /* lmysql will be deleted in action_exit(). */
-
   xsettings_widget= new XSettings(this);
   /* picking up possible settings options from argc+argv after setting initial defaults, so late */
   /* as a result, ocelotgui --version and ocelotgui --help will look slow */
@@ -703,7 +701,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
-
   make_style_strings();
   //main_window->setStyleSheet(ocelot_menu_style_string);
   ui->menuBar->setStyleSheet(ocelot_menu_style_string);
@@ -731,8 +728,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #if (OCELOT_OBJECT_EXPLORER == 1)
   object_explorer_widget= new ResultGrid(lmysql, this, true);
   initialize_widget_object_explorer();
-  //main_layout->addWidget(object_explorer_widget);
-  /* We don't do much initialization here for object explorer. See object_explorer(). */
   QHBoxLayout *upper_layout= new QHBoxLayout();
   QWidget *upper_widget= new QWidget();
   upper_widget->setLayout(main_layout);
@@ -2003,8 +1998,16 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 
   {
     ResultGrid* r;
+#if (OCELOT_OBJECT_EXPLORER == 1)
+    for (int i_r= -1; i_r < ocelot_grid_actual_tabs; ++i_r)
+#else
     for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
+#endif
     {
+#if (OCELOT_OBJECT_EXPLORER == 1)
+      if (i_r == -1) { r= object_explorer_widget; if (r == NULL) continue; }
+      else
+#endif
       r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
       if (obj == r)
       {
@@ -6113,7 +6116,6 @@ void MainWindow::action_object_explorer()
     if (ocelot_object_explorer_visible == "Yes")
     {
       object_explorer_show();
-      object_explorer_widget->show();
     }
     else object_explorer_widget->hide();
   }
@@ -19075,7 +19077,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
         sprintf(img_start, "<img width=%d height=%d src=\"data:image/", width_i, height_candidate);
       else
         sprintf(img_start, "<img width=%d src=\"data:image/", width_i);
-
       /* IMAGE TEST!!!! What happens if I don't say what the width is? */
       if (grid_column_no > 0)
       {
@@ -19841,20 +19842,12 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
     qtextedit_drag_start_time= QDateTime::currentMSecsSinceEpoch();
   }
 #if (OCELOT_OBJECT_EXPLORER == 1)
-  printf("****\n");
-  if (result_grid == result_grid->copy_of_parent->object_explorer_widget)
+ if (result_grid == result_grid->copy_of_parent->object_explorer_widget)
   {
-    printf("**** object_explorer_widget\n");
     if ((qtextedit_is_in_drag_for_column == false) && (qtextedit_is_in_drag_for_row == false))
     {
-      printf("**** not drag\n");
       if (event->button() == Qt::LeftButton)
       {
-        printf("****    Qt::LeftButton\n");
-        printf("**** qtextedit_columns_per_row %d\n", qtextedit_columns_per_row);
-        printf("**** row number = %d, column number = %d\n", result_grid->focus_result_row_number, result_grid->focus_column_number);
-        printf("**** block number = %d\n", qtextedit_block_number);
-        printf("****\n");
         qtextedit_is_min_max_clicked= true;
       }
     }
@@ -19925,11 +19918,10 @@ void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
 #if (OCELOT_OBJECT_EXPLORER == 1)
   if (result_grid == result_grid->copy_of_parent->object_explorer_widget)
   {
-    printf("**** row number = %d, column number = %d\n", result_grid->focus_result_row_number, result_grid->focus_column_number);
     if (qtextedit_is_min_max_clicked == true)
     {
       qtextedit_is_min_max_clicked= false;
-      result_grid->toggle("t");
+      result_grid->object_explorer_toggle(result_grid->focus_result_row_number);
     }
   }
 #endif
@@ -26445,8 +26437,16 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
   {
     ResultGrid* r;
     main_window->make_style_strings();
+#if (OCELOT_OBJECT_EXPLORER == 1)
+    for (int i_r= -1; i_r < ocelot_grid_actual_tabs; ++i_r)
+#else
     for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
+#endif
     {
+#if (OCELOT_OBJECT_EXPLORER == 1)
+      if (i_r == -1) { r= main_window->object_explorer_widget; if (r == NULL) continue; }
+      else
+#endif
       r= qobject_cast<ResultGrid*>(main_window->result_grid_tab_widget->widget(i_r));
       r->set_all_style_sheets(main_window->ocelot_grid_style_string, *qstring_target, 1, is_font_changed);
     }
@@ -26543,8 +26543,9 @@ XSettings::~XSettings()
   ... You see only what is in your current database, or at least that is preferable.
   ... There will be a tooltip for everything
   Fillup:
-    Initial, when shown.
-    Updated, which will have to be a user choice because we don't know whether other users have changed.
+    When user chooses Settings|ocelot explorer widget and chooses Visible and OK.
+    User has to repeat that for refresh -- we don't know whether other users have changed.
+    In another product this would be done with a View menu.
   Line to connect foreign-key references:
     Ordinarily there are no grid lines. We can put some in in order to show a connection.
     The connection can be for key and reference columns, or table-to-table.
@@ -26556,18 +26557,33 @@ XSettings::~XSettings()
     Difference: no squeeze
     Difference: don't repeat schema, don't repeat table
     Difference: don't show columns unless table chosen, etc.
-  Left click to:
-    Click on table should cause show of columns. (OR: maybe that's only for "+")
+  Minmax column:
+    It contains a Unicode circled plus character or a Unicode circled minus character.
+    Click to toggle. When it's minus, the table's columns aren't shown.
+    It's treated as a header item, that is, Settings for header affect it
   Customizing:
     Maybe you only see what you have SELECT privilege for.
     Icon for key column. Icon for column type.
-  Choosing:
-    View | Explorer. Not visible by default. (Actually we don't have a View menu item.)
   SET statements:
     Unknown.
   + sign:
     Start with just Table column, and "+". If somebody clicks the "+", there is is expansion i.e. columns appear.
-    There is no "filter settings" dialog box.
+    Todo: What about an icon for table mnimize/maximize? Well, I tried that. To make a pixmap, I said
+           copy_of_parent->ocelot_extra_rule_1_condition= "data_type LIKE '%BINARY'";
+           copy_of_parent->ocelot_extra_rule_1_display_as= "image";
+           QByteArray bytearray_min;
+           {
+             QIcon icon_min= this->style()->standardIcon(QStyle::SP_TitleBarMinButton);
+             QPixmap pixmap_min;
+             pixmap_min= icon_min.pixmap(12,12);
+             QBuffer buffer_min(&bytearray_min);
+             buffer_min.open(QIODevice::WriteOnly);
+             pixmap_min.save(&buffer_min, "PNG");
+           }
+           and in initialize I said gridx_field_types[0]= OCELOT_DATA_TYPE_BINARY; etc.
+           The problem was: the row height became twice what I expected. So I abandoned that idea for now.
+          I'll pass "+" and "-". This could be changed to "circled plus" etc. with different background colour.
+          There is no "filter settings" dialog box.
   Right click to:
     Sort (causes a dialog box for what you want to sort) (a bit absurd, you should just make an ORDER BY)
     Filter (causes a dialog box for what you want to filter) (a bit absurd, you should just make a WHERE)
@@ -26579,11 +26595,8 @@ XSettings::~XSettings()
     You'll need quite a bit of in-context help, there are so many options.
   Drag and Drop:
     This would be for building a query.
-  ?? Should we have MainWindow::initialize_widget_object_explorer()?
-  ocelot_explorer_refresh():
-    In ocelot_explorer_refresh(), do a bunch of SELECTs -- same as what you'd do for auto-completion work, eh?
-      In that case, rehash_scan() covers it mostly. action_execute_one_statement() may be analogous too.
-    Get some menu item to do a call to it, until we have a bespoke item. (or: some SQL statement.)
+  MainWindow::initialize_widget_object_explorer():
+    should do whatever initializing happens for resultgrid tabs
   object_explorer_close():
     This should happen when a server is disconnected, or deliberate user call.
     Don't get rid of what was done via rehash_scan() or equivalent, hope that something else does that.
@@ -26611,6 +26624,7 @@ XSettings::~XSettings()
   SHORTCUTS
     For example, typing 'C' goes to the next thing that starts with 'C'
     If user types "schema_name.", scroll the object explorer so that's visible.
+    Todo: No, we have a Find widget, it should apply.
   FIRST TODO:
     Find out what that little blank is when you first display a result grid.
     Hide the object explorer widget if/when not connected.
@@ -26652,13 +26666,18 @@ XSettings::~XSettings()
                          but you can change the prompt to "refresh and show again" if it's already visible
         Todo: "Expanded" could be something like "All Maximized" or "All Minimized"
         Todo: If I click outside the boxes, it decides to do something
+        Todo: user might set e.g. vertical or raw. make sure such settings have no effect on explorer widget
 */
 
 void MainWindow::initialize_widget_object_explorer()
 {
-  object_explorer_widget->initialize();
+  object_explorer_widget->object_explorer_initialize();
   oei= NULL;
   oei_count= 0;
+  /* Todo: Following is also what we do for ResultGrid in result_grid_add_tab. Reduce duplication? */
+  object_explorer_widget->installEventFilter(this); /* must catch fontChange, show, etc. */
+  object_explorer_widget->grid_vertical_scroll_bar->installEventFilter(this);
+  object_explorer_widget->set_all_style_sheets(ocelot_grid_style_string, 0, 0, false);
 }
 
 void MainWindow::object_explorer_show()
@@ -26674,7 +26693,6 @@ void MainWindow::object_explorer_show()
     msgbox.exec();
     return;
   }
-  printf("**** rehash_scan result = %s.\n", error_or_ok_message);
   bool is_min= false;
   if (ocelot_object_explorer_expanded == "Yes") is_min= false;
   if (oei != NULL)
@@ -26687,7 +26705,6 @@ void MainWindow::object_explorer_show()
   unsigned int column_length;
   unsigned int i;
 //  struct object_explorer_items xx;
-  printf("**** object_explorer\n");
   /* Something like what happens in rehash_search(). */
   /* ?? Maybe you should have a limit on the size, like SQL Server does (65535). */
   /* todo: "* 2" is too much, you only need to allow for adding "T", which should mean nothing. */
@@ -26738,7 +26755,13 @@ void MainWindow::object_explorer_show()
       row_pointer+= column_length;
     }
   }
-  object_explorer_widget->display_html_object_explorer();
+  //object_explorer_widget->hide(); /* Is this necessary? */
+  /* Following line was a bad idea, caused a crash ... but we need it */
+  object_explorer_widget->result_row_count= oei_count;
+  /* this is in the initialize function */
+  /* object_explorer_widget->result_column_count= 4; */ /* todo: you can move this, it's always the same */
+  object_explorer_widget->display_html(0, 0); /* effectively: object_explorer_display_html() */
+  object_explorer_widget->show();
 }
 
 /* Todo: the idea of "expanded" is that all columns are shown for all tables, is_min is off by default */
