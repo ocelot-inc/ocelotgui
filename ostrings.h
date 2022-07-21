@@ -836,91 +836,94 @@ static const char *s_color_list[]=
 #define MENU_SETTINGS_STATEMENT_WIDGET         27
 #define MENU_SETTINGS_DEBUG_WIDGET 28
 #define MENU_SETTINGS_EXTRA_RULE_1       29
-#define MENU_OPTIONS       30
-#define MENU_OPTIONS_DETACH_HISTORY_WIDGET       31
-#define MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET       32
-#define MENU_OPTIONS_DETACH_DEBUG_WIDGET       33
-#define MENU_OPTIONS_DETACH_STATEMENT_WIDGET 34
-#define MENU_OPTIONS_NEXT_WINDOW 35
-#define MENU_OPTIONS_PREVIOUS_WINDOW 36
-#define MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL 37
-#define MENU_OPTIONS_RESULT_DISPLAY_VERTICAL 38
-#define MENU_OPTIONS_RESULT_DISPLAY_HTML 39
-#define MENU_OPTIONS_RESULT_DISPLAY_XML 40
-#define MENU_OPTIONS_RESULT_DISPLAY_RAW 41
-#define MENU_OPTIONS_RESULT_DISPLAY_BATCH 42
-#define MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW 43
-#define MENU_DEBUG       44
-#define MENU_DEBUG_INSTALL       45
-#define MENU_DEBUG_SETUP       46
-#define MENU_DEBUG_DEBUG       47
-#define MENU_DEBUG_BREAKPOINT       48
-#define MENU_DEBUG_CONTINUE       49
-#define MENU_DEBUG_LEAVE       50
-#define MENU_DEBUG_NEXT       51
-#define MENU_DEBUG_SKIP       52
-#define MENU_DEBUG_STEP       53
-#define MENU_DEBUG_CLEAR       54
-#define MENU_DEBUG_DELETE       55
-#define MENU_DEBUG_EXIT       56
-#define MENU_DEBUG_INFORMATION       57
-#define MENU_DEBUG_REFRESH_SERVER_VARIABLES       58
-#define MENU_DEBUG_REFRESH_USER_VARIABLES       59
-#define MENU_DEBUG_REFRESH_VARIABLES       60
-#define MENU_DEBUG_REFRESH_CALL_STACK       61
-#define MENU_HELP       62
-#define MENU_HELP_ABOUT       63
-#define MENU_HELP_THE_MANUAL       64
-#define MENU_HELP_LIBMYSQLCLIENT       65
-#define MENU_HELP_SETTINGS       66
-static int MENU_STATEMENT_TEXT_COLOR= 67;
-static int MENU_STATEMENT_BACKGROUND_COLOR= 68;
-static int MENU_STATEMENT_HIGHLIGHT_LITERAL_COLOR= 69;
-static int MENU_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR= 70;
-static int MENU_STATEMENT_HIGHLIGHT_COMMENT_COLOR= 71;
-static int MENU_STATEMENT_HIGHLIGHT_OPERATOR_COLOR= 72;
-static int MENU_STATEMENT_HIGHLIGHT_KEYWORD_COLOR= 73;
-static int MENU_STATEMENT_PROMPT_BACKGROUND_COLOR= 74;
-static int MENU_STATEMENT_BORDER_COLOR= 75;
-static int MENU_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR= 76;
-static int MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR= 77;
-static int MENU_GRID_TEXT_COLOR= 78;
-static int MENU_GRID_BACKGROUND_COLOR= 79;
-static int MENU_GRID_CELL_BORDER_COLOR= 80;
-static int MENU_GRID_OUTER_COLOR= 81;
-static int MENU_GRID_HEADER_BACKGROUND_COLOR= 82;
-static int MENU_GRID_FOCUS_CELL_BACKGROUND_COLOR= 83;
-static int MENU_GRID_CELL_HEIGHT= 84;
-static int MENU_GRID_CELL_BORDER_SIZE= 85;
-static int MENU_GRID_CELL_WIDTH= 86;
-static int MENU_HISTORY_TEXT_COLOR= 87;
-static int MENU_HISTORY_BACKGROUND_COLOR= 88;
-static int MENU_HISTORY_BORDER_COLOR= 89;
-static int MENU_MENU_TEXT_COLOR= 90;
-static int MENU_MENU_BACKGROUND_COLOR= 91;
-static int MENU_MENU_BORDER_COLOR= 92;
-static int MENU_FONT= 93;
-static int MENU_MAX_ROW_COUNT= 94;
-static int MENU_SYNTAX_CHECKER=95;
-static int MENU_DETACHED= 96;
-static int MENU_TOP= 97;
-static int MENU_LEFT= 98;
-static int MENU_WIDTH= 99;
-static int MENU_HEIGHT= 100;
-static int MENU_CONDITION= 101;
-static int MENU_DISPLAY_AS= 102;
-static int MENU_CANCEL= 103;
-static int MENU_OK= 104;
-static int MENU_SETTINGS_FOR_MENU= 105;
-static int MENU_SETTINGS_FOR_HISTORY= 106;
-static int MENU_SETTINGS_FOR_GRID= 107;
-static int MENU_SETTINGS_FOR_STATEMENT= 108;
-static int MENU_SETTINGS_FOR_DEBUG= 109;
-static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 110;
-static int MENU_GRID_HTML_EFFECTS= 111; /* was MENU_PICK_NEW_FONT= 111; until version 1.5 */
-#define MENU_CONNECTION_DIALOG_BOX 112
-#define MENU_FILE_CONNECT_HEADING 113
-#define MENU_END 114
+#define MENU_SETTINGS_EXPLORER_WIDGET       30
+#define MENU_OPTIONS       31
+#define MENU_OPTIONS_DETACH_HISTORY_WIDGET       32
+#define MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET       33
+#define MENU_OPTIONS_DETACH_DEBUG_WIDGET       34
+#define MENU_OPTIONS_DETACH_STATEMENT_WIDGET 35
+#define MENU_OPTIONS_DETACH_EXPLORER_WIDGET 36
+#define MENU_OPTIONS_NEXT_WINDOW 37
+#define MENU_OPTIONS_PREVIOUS_WINDOW 38
+#define MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL 39
+#define MENU_OPTIONS_RESULT_DISPLAY_VERTICAL 40
+#define MENU_OPTIONS_RESULT_DISPLAY_HTML 41
+#define MENU_OPTIONS_RESULT_DISPLAY_XML 42
+#define MENU_OPTIONS_RESULT_DISPLAY_RAW 43
+#define MENU_OPTIONS_RESULT_DISPLAY_BATCH 44
+#define MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW 45
+#define MENU_DEBUG       46
+#define MENU_DEBUG_INSTALL       47
+#define MENU_DEBUG_SETUP       48
+#define MENU_DEBUG_DEBUG       49
+#define MENU_DEBUG_BREAKPOINT       50
+#define MENU_DEBUG_CONTINUE       51
+#define MENU_DEBUG_LEAVE       52
+#define MENU_DEBUG_NEXT       53
+#define MENU_DEBUG_SKIP       54
+#define MENU_DEBUG_STEP       55
+#define MENU_DEBUG_CLEAR       56
+#define MENU_DEBUG_DELETE       57
+#define MENU_DEBUG_EXIT       58
+#define MENU_DEBUG_INFORMATION       59
+#define MENU_DEBUG_REFRESH_SERVER_VARIABLES       60
+#define MENU_DEBUG_REFRESH_USER_VARIABLES       61
+#define MENU_DEBUG_REFRESH_VARIABLES       62
+#define MENU_DEBUG_REFRESH_CALL_STACK       63
+#define MENU_HELP       64
+#define MENU_HELP_ABOUT       65
+#define MENU_HELP_THE_MANUAL       66
+#define MENU_HELP_LIBMYSQLCLIENT       67
+#define MENU_HELP_SETTINGS       68
+static int MENU_STATEMENT_TEXT_COLOR= 69;
+static int MENU_STATEMENT_BACKGROUND_COLOR= 70;
+static int MENU_STATEMENT_HIGHLIGHT_LITERAL_COLOR= 71;
+static int MENU_STATEMENT_HIGHLIGHT_IDENTIFIER_COLOR= 72;
+static int MENU_STATEMENT_HIGHLIGHT_COMMENT_COLOR= 73;
+static int MENU_STATEMENT_HIGHLIGHT_OPERATOR_COLOR= 74;
+static int MENU_STATEMENT_HIGHLIGHT_KEYWORD_COLOR= 75;
+static int MENU_STATEMENT_PROMPT_BACKGROUND_COLOR= 76;
+static int MENU_STATEMENT_BORDER_COLOR= 77;
+static int MENU_STATEMENT_HIGHLIGHT_CURRENT_LINE_COLOR= 78;
+static int MENU_STATEMENT_HIGHLIGHT_FUNCTION_COLOR= 79;
+static int MENU_GRID_TEXT_COLOR= 80;
+static int MENU_GRID_BACKGROUND_COLOR= 81;
+static int MENU_GRID_CELL_BORDER_COLOR= 82;
+static int MENU_GRID_OUTER_COLOR= 83;
+static int MENU_GRID_HEADER_BACKGROUND_COLOR= 84;
+static int MENU_GRID_FOCUS_CELL_BACKGROUND_COLOR= 85;
+static int MENU_GRID_CELL_HEIGHT= 86;
+static int MENU_GRID_CELL_BORDER_SIZE= 87;
+static int MENU_GRID_CELL_WIDTH= 88;
+static int MENU_HISTORY_TEXT_COLOR= 89;
+static int MENU_HISTORY_BACKGROUND_COLOR= 90;
+static int MENU_HISTORY_BORDER_COLOR= 91;
+static int MENU_MENU_TEXT_COLOR= 92;
+static int MENU_MENU_BACKGROUND_COLOR= 93;
+static int MENU_MENU_BORDER_COLOR= 94;
+static int MENU_FONT= 95;
+static int MENU_MAX_ROW_COUNT= 96;
+static int MENU_SYNTAX_CHECKER=97;
+static int MENU_DETACHED= 98;
+static int MENU_TOP= 99;
+static int MENU_LEFT= 100;
+static int MENU_WIDTH= 101;
+static int MENU_HEIGHT= 102;
+static int MENU_CONDITION= 103;
+static int MENU_DISPLAY_AS= 104;
+static int MENU_CANCEL= 105;
+static int MENU_OK= 106;
+static int MENU_SETTINGS_FOR_MENU= 107;
+static int MENU_SETTINGS_FOR_HISTORY= 108;
+static int MENU_SETTINGS_FOR_GRID= 109;
+static int MENU_SETTINGS_FOR_STATEMENT= 110;
+static int MENU_SETTINGS_FOR_DEBUG= 111;
+static int MENU_SETTINGS_FOR_EXTRA_RULE_1= 112;
+static int MENU_SETTINGS_FOR_EXPLORER= 113;
+static int MENU_GRID_HTML_EFFECTS= 114; /* was MENU_PICK_NEW_FONT= 111; until version 1.5 */
+#define MENU_CONNECTION_DIALOG_BOX 115
+#define MENU_FILE_CONNECT_HEADING 116
+#define MENU_END 117
 
 static const char *menu_strings[]=
 {
@@ -955,11 +958,13 @@ static const char *menu_strings[]=
 "Statement Widget", /* MENU_SETTINGS_STATEMENT_WIDGET */
 "Debug Widget", /* MENU_SETTINGS_DEBUG_WIDGET */
 "Extra Rule 1", /* MENU_SETTINGS_EXTRA_RULE_1 */
+"Explorer Widget", /* MENU_SETTINGS_EXPLORER_WIDGET */
 "Options", /* MENU_OPTIONS */
 "detach history widget", /* MENU_OPTIONS_DETACH_HISTORY_WIDGET */
 "detach result grid widget", /* MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET */
 "detach debug widget", /* MENU_OPTIONS_DETACH_DEBUG_WIDGET */
 "detach statement widget", /* MENU_OPTIONS_DETACH_STATEMENT_WIDGET */
+"detach explorer widget", /* MENU_OPTIONS_DETACH_EXPLORER_WIDGET */
 "next window", /* MENU_OPTIONS_NEXT_WINDOW */
 "previous window", /* MENU_OPTIONS_PREVIOUS_WINDOW */
 "result display = 'horizontal'", /* MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL */
@@ -1036,6 +1041,7 @@ static const char *menu_strings[]=
     "Settings -- -- for Statement",
     "Settings -- -- for Debug",
     "Settings -- -- for Extra Rule 1",
+    "Settings -- -- for Explorer",
     "Grid Html effects", /* Used to be "Pick new font". Since version 1.5 we don't call QFontDialog */
     "Connection Dialog Box",
     "File|Connect. Usually only the first 8 fields are important.",
@@ -1070,11 +1076,13 @@ static const char *menu_strings[]=
     "Instruction Widget", /* MENU_SETTINGS_STATEMENT_WIDGET */
     "Debug Widget", /* MENU_SETTINGS_DEBUG_WIDGET */
     "Règle supplémentaire 1", /* MENU_SETTINGS_EXTRA_RULE_1 */
+    "Explorateur Widget", /* MENU_SETTINGS_EXPLORER_WIDGET */
     "Options", /* MENU_OPTIONS */
     "Détacher history widget", /* MENU_OPTIONS_DETACH_HISTORY_WIDGET */
     "Détacher result grid widget", /* MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET */
     "Détacher debug widget", /* MENU_OPTIONS_DETACH_DEBUG_WIDGET */
     "Détacher statement widget", /* MENU_OPTIONS_DETACH_STATEMENT_WIDGET */
+    "Détacher explorateur widget", /* MENU_OPTIONS_DETACH_EXPLORER_WIDGET */
     "Fenêtre prochaine ", /* MENU_OPTIONS_NEXT_WINDOW */
     "Fenêtre précédente", /* MENU_OPTIONS_PREVIOUS_WINDOW */
     "affichage des résultats = 'horizontal'", /* MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL */
@@ -1151,6 +1159,7 @@ static const char *menu_strings[]=
         "Réglages -- -- pour Instruction",
         "Réglages -- -- pour Debug",
         "Réglages -- -- pour Règle supplémentaire 1",
+        "Réglages -- -- pour Explorateur",
         "Grille effets de html",
         "Connexion Boîte de dialogue",
         "Fichier|Connexion. Habituellement, seuls les 8 premiers champs sont importants."

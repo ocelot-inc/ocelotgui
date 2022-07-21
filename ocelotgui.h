@@ -37,9 +37,9 @@
 #define OCELOT_IMPORT_EXPORT 1
 #endif
 
-/* To remove most of the code related to object explorer, set OCELOT_OBJECT_EXPLORER 0 */
-#ifndef OCELOT_OBJECT_EXPLORER
-#define OCELOT_OBJECT_EXPLORER 0
+/* To remove most of the code related to object explorer, set OCELOT_explorer 0 */
+#ifndef OCELOT_explorer
+#define OCELOT_EXPLORER 0
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 0)
@@ -776,6 +776,11 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_DEBUG_LEFT,
     TOKEN_KEYWORD_OCELOT_DEBUG_TOP,
     TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED, /* if OCELOT_EXPLORER == 1 */
+    TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT, /* if OCELOT_EXPLORER == 1 */
+    TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT, /* if OCELOT_EXPLORER == 1 */
+    TOKEN_KEYWORD_OCELOT_EXPLORER_TOP, /* if OCELOT_EXPLORER == 1 */
+    TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH, /* if OCELOT_EXPLORER == 1 */
     TOKEN_KEYWORD_OCELOT_EXPORT, /* if OCELOT_IMPORT_EXPORT == 1 */
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION,
@@ -1423,7 +1428,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1184
+#define KEYWORD_LIST_SIZE 1189
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2027,6 +2032,11 @@ static const keywords strvalues[]=
     {"OCELOT_DEBUG_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT},
     {"OCELOT_DEBUG_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP},
     {"OCELOT_DEBUG_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH},
+    {"OCELOT_EXPLORER_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED}, /* if OCELOT_EXPLORER == 1 */
+    {"OCELOT_EXPLORER_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT}, /* if OCELOT_EXPLORER == 1 */
+    {"OCELOT_EXPLORER_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT}, /* if OCELOT_EXPLORER == 1 */
+    {"OCELOT_EXPLORER_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP}, /* if OCELOT_EXPLORER == 1 */
+    {"OCELOT_EXPLORER_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH}, /* if OCELOT_EXPLORER == 1 */
     {"OCELOT_EXPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */
     {"OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR},
     {"OCELOT_EXTRA_RULE_1_CONDITION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION},
@@ -2778,13 +2788,13 @@ struct export_settings {
 };
 #endif
 
-#if (OCELOT_OBJECT_EXPLORER == 1)
-struct object_explorer_items { /* This struct definition is for MainWindow and ResultGrid */
+#if (OCELOT_EXPLORER == 1)
+struct explorer_items { /* This struct definition is for MainWindow and ResultGrid */
   QByteArray object_type;
   QByteArray object_name;
   QByteArray column_name;
-  bool is_min;
-  int gridx_row_number;
+  bool is_min; /* true if minimized "T" */
+  int display_row_number; /* number within the display. equals -1 if skippable */
 };
 #endif
 
@@ -2991,6 +3001,7 @@ extern int MENU_SETTINGS_FOR_GRID;
 extern int MENU_SETTINGS_FOR_STATEMENT;
 extern int MENU_SETTINGS_FOR_DEBUG;
 extern int MENU_SETTINGS_FOR_EXTRA_RULE_1;
+extern int MENU_SETTINGS_FOR_EXPLORER;
 extern int MENU_GRID_HTML_EFFECTS; /* was for font dialog, but since version 1.5 we don't call QFontDialog*/
 
 extern unsigned int menu_off;
@@ -3119,10 +3130,16 @@ public:
   QString ocelot_debug_top, new_ocelot_debug_top;
   QString ocelot_debug_width, new_ocelot_debug_width;
   QString ocelot_debug_detached, new_ocelot_debug_detached;
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  QString ocelot_object_explorer_visible, new_ocelot_object_explorer_visible;
-  QString ocelot_object_explorer_expanded, new_ocelot_object_explorer_expanded;
-#endif
+/* if (OCELOT_EXPLORER == 1) */
+  QString ocelot_explorer_height, new_ocelot_explorer_height;
+  QString ocelot_explorer_left, new_ocelot_explorer_left;
+  QString ocelot_explorer_top, new_ocelot_explorer_top;
+  QString ocelot_explorer_width, new_ocelot_explorer_width;
+  QString ocelot_explorer_detached, new_ocelot_explorer_detached;
+  QString ocelot_explorer_visible, new_ocelot_explorer_visible;
+  QString ocelot_explorer_expanded, new_ocelot_explorer_expanded;
+  QString ocelot_explorer_query, new_ocelot_explorer_query;
+/* endif */
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
   QString ocelot_grid_focus_cell_background_color, new_ocelot_grid_focus_cell_background_color;
@@ -3542,10 +3559,11 @@ public:
   void export_set_checked();
 #endif
 
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  void object_explorer_show();
-  void object_explorer_expanded();
-  void object_explorer_close();
+#if (OCELOT_EXPLORER == 1)
+  void explorer_show();
+  void explorer_expanded();
+  void explorer_query();
+  void explorer_close();
 #endif
 
 public slots:
@@ -3592,16 +3610,19 @@ public slots:
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_debug();
 #endif
-  void action_extra_rule_1();
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  void action_object_explorer();
+#if (OCELOT_EXPLORER == 1)
+  void action_explorer();
 #endif
+  void action_extra_rule_1();
   void history_markup_previous();
   void history_markup_next();
   void action_option_detach_history_widget(bool checked);
   void action_option_detach_result_grid_widget(bool checked);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_option_detach_debug_widget(bool checked);
+#endif
+#if (OCELOT_EXPLORER == 1)
+  void action_option_detach_explorer_widget(bool checked);
 #endif
   void action_option_detach_statement_widget(bool checked); void detach_widget(int widget_type, bool checked);
   void action_option_next_window();
@@ -3688,8 +3709,8 @@ private:
   void initialize_widget_history();
   int result_grid_add_tab();
   void initialize_widget_statement();
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  void initialize_widget_object_explorer();
+#if (OCELOT_EXPLORER == 1)
+  void initialize_widget_explorer();
 #endif
   void menu_edit_zoominorout(int);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -3888,10 +3909,10 @@ private:
 #if (OCELOT_FIND_WIDGET == 1)
   Find_widget *find_widget;
 #endif
-#if (OCELOT_OBJECT_EXPLORER == 1)
+#if (OCELOT_EXPLORER == 1)
 public:
-  ResultGrid *object_explorer_widget;
-  object_explorer_items *oei;
+  ResultGrid *explorer_widget;
+  explorer_items *oei;
   unsigned oei_count;
 private:
 #endif
@@ -3933,8 +3954,8 @@ private:
     QAction *menu_settings_action_statement;
     QAction *menu_settings_action_debug;
     QAction *menu_settings_action_extra_rule_1;
-#if (OCELOT_OBJECT_EXPLORER == 1)
-    QAction *menu_settings_action_object_explorer;
+#if (OCELOT_EXPLORER == 1)
+    QAction *menu_settings_action_explorer;
 #endif
 public:
   QMenu *menu_options;
@@ -3942,6 +3963,9 @@ public:
     QAction *menu_options_action_option_detach_result_grid_widget;
 #if (OCELOT_MYSQL_DEBUGGER == 1)
     QAction *menu_options_action_option_detach_debug_widget;
+#endif
+#if (OCELOT_EXPLORER == 1)
+    QAction *menu_options_action_option_detach_explorer_widget;
 #endif
     QAction *menu_options_action_option_detach_statement_widget;
     QAction *menu_options_action_next_window;
@@ -6250,7 +6274,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
 #define STATEMENT_WIDGET 3
 #define DEBUG_WIDGET 4
 #define EXTRA_RULE_1 5
-#define OBJECT_EXPLORER_WIDGET 6
+#define EXPLORER_WIDGET 6 /* if (OCELOT_EXPLORER == 1) */
 
 #ifndef RESULT_CHANGES_H
 #define RESULT_CHANGES_H
@@ -6370,7 +6394,7 @@ private:
   QString qtextedit_cell_content;  /* cell contents. but if it's an image we get U+fffc or something like that */
                                    /* Actually this probably should be in locals */
   bool qtextedit_at_end;           /* If document doesn't fill result widget, this can become true */
-#if (OCELOT_OBJECT_EXPLORER == 1)
+#if (OCELOT_EXPLORER == 1)
   bool qtextedit_is_min_max_clicked;
 #endif
 
@@ -6911,8 +6935,8 @@ bool is_image_format(int length, char* pointer)
 */
 bool is_fancy()
 {
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  if (this == copy_of_parent->object_explorer_widget) return true;
+#if (OCELOT_EXPLORER == 1)
+  if (this == copy_of_parent->explorer_widget) return true;
 #endif
   if ((result_row_count == 0) || (result_column_count == 0)) return false;
   if (html_text_edit == NULL) return false;
@@ -8108,8 +8132,8 @@ void prepare_for_display_html()
     /* Todo: Check harder. Some things might not be initialized yet for this call. */
     /* Todo: We're not ready yet for ocelot_vertical != 0 */
     //if (copy_of_ocelot_html != 0)
-#if (OCELOT_OBJECT_EXPLORER == 1)
-    if ((result_row_count != 0) && (result_column_count != 0) && (this != parent->object_explorer_widget))
+#if (OCELOT_EXPLORER == 1)
+    if ((result_row_count != 0) && (result_column_count != 0) && (this != parent->explorer_widget))
 #else
     if ((result_row_count != 0) && (result_column_count != 0))
 #endif
@@ -8341,10 +8365,10 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
 */
 void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 {
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  if (this == copy_of_parent->object_explorer_widget)
+#if (OCELOT_EXPLORER == 1)
+  if (this == copy_of_parent->explorer_widget)
   {
-    object_explorer_display_html(new_grid_vertical_scroll_bar_value);
+    explorer_display_html(new_grid_vertical_scroll_bar_value);
     return;
   }
 #endif
@@ -8800,8 +8824,8 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
   return;
 }
 
-#if (OCELOT_OBJECT_EXPLORER == 1)
-/* See comments before MainWindow::object_explorer() */
+#if (OCELOT_EXPLORER == 1)
+/* See comments before MainWindow::explorer() */
 /* Todo:
    Items like gridx_field_types might not need to be set up every time.
    The output will contain this, which I think is odd: </TR><TR><TD width=    ><TD width=148>C</TD>
@@ -8817,7 +8841,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
          ResultGrid* r;
          for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
          ... because gont change happens for this bozo too
-         ... I think we should start at -1 in such loops, and if it's -1 there's an always-existent object explorer widget
+         ... I think we should start at -1 in such loops, and if it's -1 there's an always-existent explorer widget
     Todo: we sould be watching for
           int MainWindow::result_grid_add_tab()
           r->installEventFilter(this); * must catch fontChange, show, etc. *
@@ -8825,10 +8849,15 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
     Todo: use of pixmap() function this might have State = Off. And the width + height is odd.
 */
 
+/* Todo: decide if this should be in initialize() */
+QByteArray bytearray_min; /* = "⊕" for table-minimize i.e. don't show columns */
+QByteArray bytearray_max; /* = "⊖" for table-maximize i.e. do show columns */
+unsigned int explorer_first_result_row;
+
 /*
-  Todo: maybe this should be early in ResultGrid constructor, "if (this == main_window->object_explorer_widget)"
+  Todo: maybe this should be early in ResultGrid constructor, "if (this == main_window->explorer_widget)"
 */
-void object_explorer_initialize() /* default object explorer widget settings, most of which will never change */
+void explorer_initialize() /* default explorer widget settings, most of which will never change */
 {
   gridx_column_count= 4;
   //if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
@@ -8846,7 +8875,7 @@ void object_explorer_initialize() /* default object explorer widget settings, mo
   result_field_flags[3]= 0;
   //if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   grid_column_widths= new unsigned int[gridx_column_count];
-  /* grid_column_widths[] will be settled during object_explorer_display_html */
+  /* grid_column_widths[] will be settled during explorer_display_html */
   //grid_column_widths[0]=  50;
   //grid_column_widths[1]= 150;
   //grid_column_widths[2]= 150;
@@ -8854,20 +8883,147 @@ void object_explorer_initialize() /* default object explorer widget settings, mo
   /* The following line is so is_fancy() will return true. Todo: If we replace with non-grid, should be 0. */
   //  result_row_count= rehash_result_column_count; result_column_count= 4;
   copy_of_ocelot_batch= copy_of_ocelot_xml= copy_of_ocelot_raw= ocelot_vertical_copy= 0;
+  ocelot_result_grid_column_names_copy= 0;
+
+  /* Todo: decide if this should be in initialize() */
+  bytearray_min= "⊕"; /* for table-minimize i.e. don't show columns */
+  bytearray_max= "⊖"; /* for table-maximize i.e. do show columns */
 }
 
-/* todo: should this be private? */
-void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or what user clicked */
+#define explorer_FIXED_NAME_WIDTH 20 /* arbitrary, big names take more lines */
+/* The explorer_display_html() stuff that must be called once.
+  Todo: Loop 1 only needs to be done once, we're repeating it for every refresh.
+  result_row_count is the maximum for the vertical scroll bar
+  explorer_widget->result_row_count = main_window->oei_count minus what won't be displayed
+  Re per-column loop:
+    Mostly this loop is same as the one in explorer_display_html().
+    If it's a "C" in a minimized "T", or if it's false for conditional settings, it will be skipped.
+    The constant calling to copy_html_cell() is totally wasted time if there are no conditional settings.
+    We don't care what any of the results are, except whether cell height becomes 0.
+    We're assuming type = detail not header, that may be wrong but I doubt it affects whether to skip.
+*/
+void explorer_display()
 {
+printf("**** explorer_display\n");
+  switch_to_html_text_edit(); /* When should this really be done? And how often? */
   unsigned int r_of_t= 0;                                   /* so when we see "C" we can find its "T" */
-  //unsigned int result_row_count= copy_of_parent->oei_count; /* todo: see what we do before calling display_html */
+  int new_cell_height;
 
-  if (result_row_count == 0) return; /* unnecessary? */
+  result_row_count= 0; /* this will be less than oei_count if some tables are minimized */
+
+  unsigned int tmp_result_row_number;
+
+  /* Loop 1: Calculate maximum width of object_name and column_name for all rows */
+  {
+    unsigned int object_name_size, max_object_name_size= 0;
+    unsigned int column_name_size, max_column_name_size= 0;
+    for (tmp_result_row_number= 0; tmp_result_row_number < copy_of_parent->oei_count; ++tmp_result_row_number)
+    {
+      bool is_row_skippable= false;
+      if (copy_of_parent->oei[tmp_result_row_number].object_type == "T") r_of_t= tmp_result_row_number;
+      if ((copy_of_parent->oei[tmp_result_row_number].object_type != "C") || (copy_of_parent->oei[r_of_t].is_min == false))
+      {
+        for (unsigned int result_column_no= 0; result_column_no < 4; ++result_column_no)
+        {
+          QByteArray s;
+          if (result_column_no == 0)
+          {
+            if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= bytearray_min;
+            else s= bytearray_max;
+          }
+          if (result_column_no == 1) s= copy_of_parent->oei[tmp_result_row_number].object_type;
+          if (result_column_no == 2) s= copy_of_parent->oei[tmp_result_row_number].object_name;
+          if (result_column_no == 3) s= copy_of_parent->oei[tmp_result_row_number].column_name;
+          char tmp[2048];
+          char *tmp_pointer= &tmp[0];
+          tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
+                                                     ocelot_grid_detail_char_column_start,
+                                                     tmp_pointer,
+                                                     s.data() /* result_set_pointer */,
+                                                     0 /* result_set_value_flags */,
+                                                     s.size() /* v_length */,
+                                                     TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                                                     /* !! WHY RESULT_COLUMN_NO? */
+                                                     30 /* grid_column_widths[result_column_no] */,
+                                                     30 /* grid_row_heights[grid_row] */,
+                                                     result_grid_font,
+                                                     setting_max_width_of_a_char,
+                                                     result_column_no,
+                                                     tmp_result_row_number,
+                                                     ocelot_grid_detail_char_column_end,
+                                                     &new_cell_height,
+                                                     result_column_no);
+          if (new_cell_height == 0) is_row_skippable= true;
+        }
+        if (is_row_skippable == true)
+        {
+          /* Skip row, user said SET ocelot_grid_cell_height=0 ... */
+          copy_of_parent->oei[tmp_result_row_number].display_row_number= -1;
+          continue;
+        }
+
+        object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
+        if (max_object_name_size < object_name_size) max_object_name_size= object_name_size;
+        column_name_size= copy_of_parent->oei[tmp_result_row_number].column_name.size();
+        if (max_column_name_size < column_name_size) max_column_name_size= column_name_size;
+        copy_of_parent->oei[tmp_result_row_number].display_row_number= result_row_count;
+        ++result_row_count;
+      }
+      else copy_of_parent->oei[tmp_result_row_number].display_row_number= -1;
+    }
+
+    if (max_object_name_size > explorer_FIXED_NAME_WIDTH) max_object_name_size= explorer_FIXED_NAME_WIDTH;
+    if (max_column_name_size > explorer_FIXED_NAME_WIDTH) max_column_name_size= explorer_FIXED_NAME_WIDTH;
+    char tmp_string_1[explorer_FIXED_NAME_WIDTH * 4];
+    /* Todo: Following lines should restrict column#1/#2 widths to one char width but I get two char widths. */
+    grid_column_widths[0]= get_column_width_in_pixels("W", false, false); /* Actually [0] is bytearray_min|max */
+    grid_column_widths[1]= get_column_width_in_pixels("W", false, false);
+printf("**** grid_column_widths[0]=%d\n", grid_column_widths[0]);
+    unsigned int i;
+    for (i= 0; i < max_object_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
+    grid_column_widths[2]= get_column_width_in_pixels(tmp_string_1, false, false);
+    for (i= 0; i < max_column_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
+    grid_column_widths[3]= get_column_width_in_pixels(tmp_string_1, false, false);
+  }
+
+  /* TODO: result_row_count might be 0 if there is filtering, in that case clear screen and return */
+
+  vertical_scroll_bar_initialize(); /* has to be done after we know result_row_count */
+  prepare_for_display_html();
+  display_html(0, 0);  /* effectively: explorer_display_html(0) */
+}
+
+/* todo: should this function be private? */
+/*
+  Re calculations of width and height:
+  To prevent jumping around with width during vertical scroll, html_text_edit has a consistent width.
+  This width is based on max_object_name_size, max_column_name_size.
+  They are never more than explorer_FIXED_NAME_WIDTH.
+  First pass is: for all rows, to get max_object_name_size, max_column_name_size.
+                 ... but we don't consider items that are filtered or suppressed due to bytearray_min
+  Second pass is: for rows until it would overflow widget height: output and decide height.
+  Each row's height should be in grid_row_heights[]. Total html_text_edit height may vary.
+  WARNING: There is no such thing as 1-char width, we always expand to 3, I forget why.
+  Todo: I appear to be assuming that characters will be single-width. Maybe calculate max in pixels?
+  Changed plan:
+    Width and height are determined by Settings.
+    If setting is "default", width is some fixed amount -- percentage of main widget?
+    Width of each column can still be determined from content. Or what the hell, depend on horizontal scrollbar.
+    Or: Note what the widest one is, and get its width.
+  Todo: re row_height+= 9;
+        Something is wrong with our minimum height calculation in get_cell_width_or_height_as_int()
+  Todo: Re start of loop: what you really should be doing is finding the oei[] with the right grid row
+*/
+
+void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or what user clicked */
+{
+printf("**** explorer_display_html\n");
+  unsigned int grid_row;
+  if (copy_of_parent->oei_count == 0) return; /* unnecessary? screen should be cleared? */
 
   int new_cell_height; /* TODO: WE HAVE TO DO SOMETHING WITH THIS! */
 
-  vertical_scroll_bar_initialize();
-  switch_to_html_text_edit(); /* When should this really be done? And how often? */
+  unsigned int tmp_result_row_number;
 
   /* We don't really have a result set but maybe we can fool the functions that we call. */
 
@@ -8875,92 +9031,93 @@ void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0
   //copy_of_parent->ocelot_extra_rule_1_condition= "data_type LIKE '%BINARY'";
   //copy_of_parent->ocelot_extra_rule_1_display_as= "image";
 
-  /* Todo: decide if this should be in initialize() */
-  QByteArray bytearray_min= "⊕"; /* for table-minimize i.e. don't show columns */
-  QByteArray bytearray_max= "⊖"; /* for table-maximize i.e. do show columns */
-
   is_paintable= 0; /* todo: decide the exact spot where you should be setting this */
-  unsigned int total_object_name_size= 0;
-  unsigned int total_column_name_size= 0;
-  unsigned int displayed_row_count= 0; /* this will be less than oei_count if some tables are minimized */
 
-  unsigned int grid_row;
-  unsigned int local_max_grid_rows= 5; /* TEST!! */
-  unsigned int tmp_result_row_number;
+  /* explorer_first_result_row = result row whose grid row matches new_grid_vertical_scroll_bar_value */
+  for (explorer_first_result_row= 0; explorer_first_result_row < copy_of_parent->oei_count; ++explorer_first_result_row)
   {
-    unsigned int object_name_size, max_object_name_size= 0;
-    unsigned int column_name_size, max_column_name_size= 0;
-    for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-         (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) local_max_grid_rows);
-         ++tmp_result_row_number, ++grid_row)
-    {
-      if (copy_of_parent->oei[tmp_result_row_number].object_type == "T") r_of_t= tmp_result_row_number;
-      if ((copy_of_parent->oei[tmp_result_row_number].object_type != "C") || (copy_of_parent->oei[r_of_t].is_min == false))
-      {
-        object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
-        total_object_name_size+= object_name_size;
-        if (max_object_name_size < object_name_size) max_object_name_size= object_name_size;
-        column_name_size= copy_of_parent->oei[tmp_result_row_number].column_name.size();
-        total_column_name_size+= column_name_size;
-        if (max_column_name_size < column_name_size) max_column_name_size= column_name_size;
-        copy_of_parent->oei[tmp_result_row_number].gridx_row_number= displayed_row_count;
-        ++displayed_row_count;
-      }
-      else copy_of_parent->oei[tmp_result_row_number].gridx_row_number= -1;
-    }
-    if (max_object_name_size > 20) max_object_name_size= 20; /* arbitrary, big names take more rows */
-    if (max_column_name_size > 20) max_column_name_size= 20;
-    char tmp_string_1[1024];
-    grid_column_widths[0]= get_column_width_in_pixels("W", false, false); /* Actually [0] is image but shrink it */
-    grid_column_widths[1]= get_column_width_in_pixels("W", false, false);
-    unsigned int i;
-    for (i= 0; i < max_object_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
-    grid_column_widths[2]= get_column_width_in_pixels(tmp_string_1, false, false);
-    for (i= 0; i < max_column_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
-    grid_column_widths[3]= get_column_width_in_pixels(tmp_string_1, false, false);
+    if (copy_of_parent->oei[explorer_first_result_row].display_row_number == new_grid_vertical_scroll_bar_value) break;
   }
+  /* TODO: What should happen if you didn't find it? Probably it's a bad error but just go back to start? */
+
   {
     /* as in grid_column_size_calc */
     /* todo: with result_grid_font max_height_of_a_char default = 26, that's unexpectedly large */
     /* Todo: This will crash if you have more than 1000 items, maybe pass a fixed height */
     QFont *pointer_to_font;
-    pointer_to_font= &result_grid_font;
+   pointer_to_font= &result_grid_font;
     QFontMetrics mm= QFontMetrics(*pointer_to_font);
     max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
-//    grid_row_heights= new unsigned int[displayed_row_count]; /* todo: leak! wasn't it enough already? */
-    int cell_height_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_height, max_height_of_a_char);
-    /* todo: find out why this has to be <= rather than < */
-    for (unsigned int i= 0; i <= displayed_row_count; ++i) grid_row_heights[i]= cell_height_as_int;
+
   }
-  prepare_for_display_html();
+  int cell_height_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_height, max_height_of_a_char);
+
+  unsigned int total_object_name_size= 0;
+  unsigned int total_column_name_size= 0;
+  /* Loop 2: Calculate how many rows will be in the current display and approximately how big they are. */
+  /* TODO: MINIMUM = 1! */
+  unsigned int local_max_grid_rows= 0;
+  {
+    unsigned int object_name_size;
+    unsigned int column_name_size;
+    unsigned int total_grid_row_heights= 0;
+    total_grid_row_heights= 12; /* Perhaps = # of pixels before first row and after last row */
+    for (tmp_result_row_number= new_grid_vertical_scroll_bar_value;
+         tmp_result_row_number < copy_of_parent->oei_count;
+         ++tmp_result_row_number)
+    {
+      if (copy_of_parent->oei[tmp_result_row_number].display_row_number != -1) /* i.e. not skippable */
+      {
+        object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
+        total_object_name_size+= object_name_size;
+        column_name_size= copy_of_parent->oei[tmp_result_row_number].column_name.size();
+        total_column_name_size+= column_name_size;
+        unsigned int row_height= cell_height_as_int;
+        if ((object_name_size > explorer_FIXED_NAME_WIDTH) || (column_name_size > explorer_FIXED_NAME_WIDTH)) row_height+= cell_height_as_int;
+        row_height+= setting_ocelot_grid_cell_border_size_as_int * 2; /* Maybe this sort of makes sense */
+        row_height+= 9; /* This surely does not make sense but apparently corresponds with reality */
+        /* TODO: HOW HIGH IS HORIZONTAL SCROLL BAR? */
+        if ((total_grid_row_heights + row_height) >= (unsigned int) this->height())
+        {
+          if (local_max_grid_rows > 0) break; /* minimum number of rows to display is 1 */
+        }
+        grid_row_heights[local_max_grid_rows]= row_height;
+        total_grid_row_heights+= row_height;
+        ++local_max_grid_rows;
+      }
+    }
+  }
+printf("**** local_max_grid_rows=%d\n", local_max_grid_rows);
   /* "* 5" is because each character might cause multiple bytes due to UTF-8 or HTML escaping */
   /* "* 500" is a very vague guess about the per-row overhead thinking about width, div, color extras */
   /* "500" is a very vague guess about the per-display overhead */
   /* todo: fix so you've got a better estimate, or do a dummy pass first, or use byte array not char */
-  int tmp_size= displayed_row_count * 5
+  int tmp_size= local_max_grid_rows * 5
                + total_object_name_size * 5
                + total_column_name_size * 5
-               + displayed_row_count * 500
+               + local_max_grid_rows * 500
                + 500;
   char *tmp;
 
   tmp= new char[tmp_size];
-  char *tmp_pointer= &tmp[0];
+
   char *tmp_pointer_before_thin_image_call; /* For the first column. Includes height which may need changing. */
+  QTextDocument d; /* will be used for height calculation */
+  int html_text_edit_height, html_text_edit_width; /* result of height calculation */
+
+repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if result won't fit well in widget */
+  char *tmp_pointer= &tmp[0];
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
-  r_of_t= 0;                                   /* so when we see "C" we can find its "T" */
 
   //Result_qtextedit *html_text_edit;
   //html_text_edit= new Result_qtextedit(this);
 
-  for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) local_max_grid_rows);
-       ++tmp_result_row_number, ++grid_row)
+  for (tmp_result_row_number= explorer_first_result_row, grid_row= 0;
+       (tmp_result_row_number < copy_of_parent->oei_count) && (grid_row < local_max_grid_rows);
+       ++tmp_result_row_number)
   {
-    if (copy_of_parent->oei[tmp_result_row_number].object_type == "T") r_of_t= tmp_result_row_number;
-    /* Skip column if table minimized */
-    if ((copy_of_parent->oei[tmp_result_row_number].object_type != "C") || (copy_of_parent->oei[r_of_t].is_min == false))
+    if (copy_of_parent->oei[tmp_result_row_number].display_row_number != -1) /* i.e. not skippable */
     {
       strcpy(tmp_pointer, ocelot_grid_detail_row_start);
       tmp_pointer+= strlen(ocelot_grid_detail_row_start);
@@ -8982,7 +9139,7 @@ void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0
         //tmp_pointer+= s.size();
         /* HERE IS THE SECTION THAT WE NEED TO WORK ON!!! */
         /* todo: check is i supposed to be base-0 or base-1? */
-        /* todo: is result_set_value_flags possible is_image() or NUM_FLAG? */
+        /* todo: is result_set_value_flags possible is_image() or NUM_FLAG? Um, I guess not */
         /* todo: what if new_cell_height becomes positive? */
 
         if (result_column_no == 0)
@@ -9010,6 +9167,7 @@ void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0
                                                        0 /* result_set_value_flags */,
                                                        s.size() /* v_length */,
                                                        TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                                                       /* !! WHY RESULT_COLUMN_NO? */
                                                        grid_column_widths[result_column_no],
                                                        grid_row_heights[grid_row],
                                                        result_grid_font,
@@ -9022,24 +9180,22 @@ void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0
         //strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
         //tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
       }
-      if (new_cell_height > 0)
+      if (new_cell_height > 0) /* todo: apparently this never happens, find out why */
       {
         thin_image(tmp_pointer_before_thin_image_call, (const char*) "TD", new_cell_height); /* overwrite */
       }
       strcpy(tmp_pointer, ocelot_grid_detail_row_end);
       tmp_pointer+= strlen(ocelot_grid_detail_row_end);
+      ++grid_row;
     }
   }
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0'; /* todo: how are you going to escape \0 in a column? */
-  html_text_edit->setHtml(tmp);
-  html_text_edit->moveCursor(QTextCursor::Start);
-  html_text_edit->ensureCursorVisible();
 
   /*
     Now adjust the width and height of the widget.
-    NB: Settings | object explorer widget will eventually have width + height, which may be "default".
+    NB: Settings | explorer widget will eventually have width + height, which may be "default".
     It seems that setting for the client widget doesn't matter.
     Ordinarily we'd like html_text_edit to fill the width and we should reduce width if it's unnecessary.
     As for height, since we might want a horizontal scroll bar, it should be just below html_text_edit.
@@ -9048,6 +9204,10 @@ void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0
        QAbstractTextDocumentLayout *l = d.documentLayout();
        QRectF qr= l->frameBoundingRect(d.rootFrame());
        int h= qr.height(); int w= qr.width();
+     Re repeating:
+       Maybe it would be possible to calculate row sizes only once, but I failed to get it right.
+       So we see how big html_text_edit becomes, and if it is larger than the widget size,
+       we remove a row and repeat. This happens too often, probably initial calculation is wrong.
      Todo: You only need this for one row, you can figure out height later by multiplying.
            Hmm, no that might not be quite right because a row can require two lines.
      Todo: Because of the scroll bars, this isn't exactly right.
@@ -9055,16 +9215,26 @@ void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0
      Todo: This doesn't settle how we should only do the necessary number, we pump out the whole list.
      Warning: ResultGrid and Result_qtextedit have methods for resizeEvent.
      Todo: Actually width only needs to be done initially, when font changes, or for detach resize.
+     See also: https://stackoverflow.com/questions/32467079/update-qtextdocuments-size
   */
-  QTextDocument d;
   d.setHtml(tmp);
-  int h= d.size().height(); int w= d.size().width();
-  html_text_edit->setMinimumWidth(w);
-  html_text_edit->setMaximumWidth(w);
-  this->setMaximumWidth(w);
-  html_text_edit->setMinimumHeight(h);
+  html_text_edit_height= d.size().height();
+  if (copy_of_parent->ocelot_explorer_width == "default") html_text_edit_width= d.size().width();
+  else html_text_edit_width= copy_of_parent->ocelot_explorer_width.toInt();
+  if ((html_text_edit_height > this->height()) && (local_max_grid_rows > 1))
+  {
+    --local_max_grid_rows;
+    goto repeat_loop;
+  }
 
-  //printf("%s\n", tmp);
+  html_text_edit->setHtml(tmp);
+  html_text_edit->moveCursor(QTextCursor::Start);
+  html_text_edit->ensureCursorVisible();
+
+  html_text_edit->setMinimumWidth(html_text_edit_width);
+  html_text_edit->setMaximumWidth(html_text_edit_width);
+  this->setMaximumWidth(html_text_edit_width);
+  html_text_edit->setMinimumHeight(html_text_edit_height);
 
   delete [] tmp;
   is_paintable= 1;
@@ -9073,40 +9243,39 @@ void object_explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0
 }
 
 /*
-  User clicked the object explorer min|max column, so toggle between min and max.
+  User clicked the explorer min|max column, so toggle between min and max.
   Find what the underlying table name is within the grid.
   Mark it as the opposite of what it was before.
-  Do object_explorer_display_html again.
+  Do explorer_display_html again.
   We don't depend on gridx row number directly because entries before this might have been skipped,
-  but we can store gridx row number in oei during object_explorer_display_html().
+  but we can store gridx row number in oei during explorer_display_html().
   Alternative: comparing object name (assuming object is a table) should work.
+  TODO: THIS IS WRONG IF WE SCROLLED. IT SHOULD BE display_row_number - first_row_number. HERE AND EVERYUWHERE!
+  TODO: THIS LOSES SCROLL BAR VALUE.
 */
-void object_explorer_toggle(int focus_result_row_number)
+void explorer_toggle(int focus_result_row_number)
 {
-  for (unsigned int r= 0; r < copy_of_parent->oei_count; ++r)
+  if (copy_of_parent->oei[focus_result_row_number].object_type == "T")
   {
-    if ((copy_of_parent->oei[r].object_type == "T") && (copy_of_parent->oei[r].gridx_row_number == focus_result_row_number))
-    {
-      if (copy_of_parent->oei[r].is_min == false) copy_of_parent->oei[r].is_min= true;
-      else copy_of_parent->oei[r].is_min= false;
-      /* We could say "break;" here, it shouldn't matter. */
-    }
+    if (copy_of_parent->oei[focus_result_row_number].is_min == false) copy_of_parent->oei[focus_result_row_number].is_min= true;
+    else copy_of_parent->oei[focus_result_row_number].is_min= false;
   }
-  object_explorer_display_html(0);
+  explorer_display();
 }
 
+
 /*
-  Get width and height of one row in object explorer.
+  Get width and height of one row in explorer.
   Call this after rehash because there must be at least one row.
   This should only be needed once, provided we don't allow dragging or rows with multiple lines.
   (Or: allow rows with multiple lines but keep a record of heights.)
   So this is done with a dummy oei, eh?
   Warning: height of two rows is not necessarily (height of one row * 2)
-  Warning: object_explorer_display_html should not resize and show
+  Warning: explorer_display_html should not resize and show
 */
-void object_explorer_row_size()
+void explorer_row_size()
 {
-  /* 2: call object_explorer_display_html for one */
+  /* 2: call explorer_display_html for one */
   /* 3: set w and h */
   /* 4: adjust the widget, although this will depend on whether there are scroll bars */
   /*    well, the widget size won't change, although the html_text_edit_size might */
@@ -9882,6 +10051,9 @@ int get_cell_width_or_height_as_int(QString cell_width_or_height_as_qstring, int
   //if (cell_width_or_height_as_int > 0)
   {
     if (cell_width_or_height_as_int > 1000) cell_width_or_height_as_int= 1000; /* arbitrary maximum */
+#if (OCELOT_EXPLORER == 1)
+    if (this == copy_of_parent->explorer_widget) return cell_width_or_height_as_int;
+#endif
     if (cell_width_or_height_as_int < min) cell_width_or_height_as_int= min; /* arbitrary minimum */
   }
   return cell_width_or_height_as_int;
@@ -11106,6 +11278,7 @@ bool show_event()
   Todo: Nothing happens if I click and hold, I have to click and release and hold.
   Some possible event types: 17 Show, 78 UpdateLater, 12 Paint, 5 MouseMove, 129 HoverMove, 110 ToolTip,
                              3 MouseButtonRelease, 18 Hide, 11 Leave, 25 WindowDeactivate, 128 HoverLeave
+                             78 PolishRequest (todo: find out what this means)
                              But if we call display_html() we miss 1 Timer, 2 MouseButtonPress
   Todo: I don't see why is_fancy is needed since I guess is only around for html.
 */
@@ -11113,6 +11286,7 @@ bool show_event()
 bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
 {
   (void)connections_dbms;
+
   int new_value;
   /* It's impossible to get here if the scroll bar is hidden, but it happens. Well, maybe only for "turning it off" events. */
   if (grid_vertical_scroll_bar->isVisible() == false)
@@ -12110,6 +12284,10 @@ private:
   QLabel *label_for_color_show[11];
   MainWindow *copy_of_parent;
 
+#if (OCELOT_EXPLORER == 1)
+  QTextEdit *text_for_query;
+#endif
+
   /* current_widget = MAIN_WIDGET | HISTORY_WIDGET | GRID_WIDGET | STATEMENT_WIDGET | etc. */
   int current_widget;
 
@@ -12408,7 +12586,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
     Change the assert in ocelotgui.cpp if MENU_FONT changes in ostrings.h.
   */
-  menu_strings_menu_font_copy= menu_strings[menu_off + 93];
+  menu_strings_menu_font_copy= menu_strings[menu_off + 95];
 
   int settings_width, settings_height;
 
@@ -12495,9 +12673,15 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_debug_width= copy_of_parent->ocelot_debug_width;
   copy_of_parent->new_ocelot_debug_detached= copy_of_parent->ocelot_debug_detached;
 
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  copy_of_parent->new_ocelot_object_explorer_visible= copy_of_parent->ocelot_object_explorer_visible;
-  copy_of_parent->new_ocelot_object_explorer_expanded= copy_of_parent->ocelot_object_explorer_expanded;
+#if (OCELOT_EXPLORER == 1)
+  copy_of_parent->new_ocelot_explorer_height= copy_of_parent->ocelot_explorer_height;
+  copy_of_parent->new_ocelot_explorer_left= copy_of_parent->ocelot_explorer_left;
+  copy_of_parent->new_ocelot_explorer_top= copy_of_parent->ocelot_explorer_top;
+  copy_of_parent->new_ocelot_explorer_width= copy_of_parent->ocelot_explorer_width;
+  copy_of_parent->new_ocelot_explorer_detached= copy_of_parent->ocelot_explorer_detached;
+  copy_of_parent->new_ocelot_explorer_visible= copy_of_parent->ocelot_explorer_visible;
+  copy_of_parent->new_ocelot_explorer_expanded= copy_of_parent->ocelot_explorer_expanded;
+  copy_of_parent->new_ocelot_explorer_query= copy_of_parent->ocelot_explorer_query;
 #endif
 
   {
@@ -12510,16 +12694,16 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     if (current_widget == DEBUG_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_DEBUG];
 #endif
     if (current_widget == EXTRA_RULE_1) s= menu_strings[menu_off + MENU_SETTINGS_FOR_EXTRA_RULE_1];
-#if (OCELOT_OBJECT_EXPLORER == 1)
-    if (current_widget == OBJECT_EXPLORER_WIDGET) s= "Object Explorer";
+#if (OCELOT_EXPLORER == 1)
+    if (current_widget == EXPLORER_WIDGET) s= menu_strings[menu_off + MENU_SETTINGS_FOR_EXPLORER];
 #endif
     setWindowTitle(s);                                                /* affects "this"] */
   }
 
   /* Todo: following calculation should actually be width of largest tr(label) + approximately 5. */
   int label_for_color_width= this->fontMetrics().boundingRect("W").width();
-#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_OBJECT_EXPLORER == 1))
-if ((current_widget != DEBUG_WIDGET) && (current_widget != OBJECT_EXPLORER_WIDGET))
+#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_EXPLORER == 1))
+if ((current_widget != DEBUG_WIDGET) && (current_widget != EXPLORER_WIDGET))
 #endif
 {
   /* Hboxes for foreground, background, and highlights */
@@ -12751,7 +12935,48 @@ if (current_widget == GRID_WIDGET)
   connect(combo_box_for_html_effects, SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_html_effects(int)));
 }
 
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+  {
+    widget_for_size[0]= new QWidget(this);
+    label_for_size[0]= new QLabel("Visible");
+    combo_box_for_size[0]= new QComboBox();
+    combo_box_for_size[0]->addItem("No");
+    combo_box_for_size[0]->addItem("Yes");
+    combo_box_for_size[0]->setCurrentIndex(combo_box_for_size[0]->findText(copy_of_parent->new_ocelot_explorer_visible));
+    hbox_layout_for_size[0]= new QHBoxLayout();
+    hbox_layout_for_size[0]->addWidget(label_for_size[0]);
+    hbox_layout_for_size[0]->addWidget(combo_box_for_size[0]);
+    widget_for_size[0]->setLayout(hbox_layout_for_size[0]);
+    connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
+    widget_for_size[1]= new QWidget(this);
+    label_for_size[1]= new QLabel("Expanded");
+    combo_box_for_size[1]= new QComboBox();
+    combo_box_for_size[1]->addItem("No");
+    combo_box_for_size[1]->addItem("Yes");
+    combo_box_for_size[1]->setCurrentIndex(combo_box_for_size[1]->findText(copy_of_parent->new_ocelot_explorer_expanded));
+    hbox_layout_for_size[1]= new QHBoxLayout();
+    hbox_layout_for_size[1]->addWidget(label_for_size[1]);
+    hbox_layout_for_size[1]->addWidget(combo_box_for_size[1]);
+    widget_for_size[1]->setLayout(hbox_layout_for_size[1]);
+    connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
+    widget_for_size[2]= new QWidget(this);
+    label_for_size[2]= new QLabel("Query");
+    text_for_query= new QTextEdit;
+    text_for_query->setText(copy_of_parent->new_ocelot_explorer_query);
+    combo_box_for_size[2]= new QComboBox();
+    hbox_layout_for_size[2]= new QHBoxLayout();
+    hbox_layout_for_size[2]->addWidget(label_for_size[2]);
+    hbox_layout_for_size[2]->addWidget(text_for_query);
+    widget_for_size[2]->setLayout(hbox_layout_for_size[2]);
+    connect(combo_box_for_size[2], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_2(int)));
+  }
+#endif
+
   if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET)
+#if (OCELOT_EXPLORER == 1)
+   || (current_widget == EXPLORER_WIDGET)
+#endif
    || (current_widget == STATEMENT_WIDGET) || (current_widget == DEBUG_WIDGET))
   {
     QString current_value;
@@ -12765,6 +12990,10 @@ if (current_widget == GRID_WIDGET)
       current_value= copy_of_parent->ocelot_grid_detached;
     else if (current_widget == STATEMENT_WIDGET)
       current_value= copy_of_parent->ocelot_statement_detached;
+#if (OCELOT_EXPLORER == 1)
+    else if (current_widget == EXPLORER_WIDGET)
+      current_value= copy_of_parent->ocelot_explorer_detached;
+#endif
     else
       current_value= copy_of_parent->ocelot_debug_detached;
     combo_box_filler(&combo_box_for_detached, current_value, true);
@@ -12783,6 +13012,10 @@ if (current_widget == GRID_WIDGET)
       current_value= copy_of_parent->ocelot_grid_top;
     else if (current_widget == STATEMENT_WIDGET)
       current_value= copy_of_parent->ocelot_statement_top;
+#if (OCELOT_EXPLORER == 1)
+    else if (current_widget == EXPLORER_WIDGET)
+      current_value= copy_of_parent->ocelot_explorer_top;
+#endif
     else
       current_value= copy_of_parent->ocelot_debug_top;
     combo_box_filler(&combo_box_for_top, current_value, false);
@@ -12799,6 +13032,10 @@ if (current_widget == GRID_WIDGET)
       current_value= copy_of_parent->ocelot_grid_left;
     else if (current_widget == STATEMENT_WIDGET)
       current_value= copy_of_parent->ocelot_statement_left;
+#if (OCELOT_EXPLORER == 1)
+    else if (current_widget == EXPLORER_WIDGET)
+      current_value= copy_of_parent->ocelot_explorer_left;
+#endif
     else
       current_value= copy_of_parent->ocelot_debug_left;
     combo_box_filler(&combo_box_for_left, current_value, false);
@@ -12815,6 +13052,10 @@ if (current_widget == GRID_WIDGET)
       current_value= copy_of_parent->ocelot_grid_width;
     else if (current_widget == STATEMENT_WIDGET)
       current_value= copy_of_parent->ocelot_statement_width;
+#if (OCELOT_EXPLORER == 1)
+    else if (current_widget == EXPLORER_WIDGET)
+      current_value= copy_of_parent->ocelot_explorer_width;
+#endif
     else
       current_value= copy_of_parent->ocelot_debug_width;
     combo_box_filler(&combo_box_for_width, current_value, false);
@@ -12831,6 +13072,10 @@ if (current_widget == GRID_WIDGET)
       current_value= copy_of_parent->ocelot_grid_height;
     else if (current_widget == STATEMENT_WIDGET)
       current_value= copy_of_parent->ocelot_statement_height;
+#if (OCELOT_EXPLORER == 1)
+    else if (current_widget == EXPLORER_WIDGET)
+      current_value= copy_of_parent->ocelot_explorer_height;
+#endif
     else
       current_value= copy_of_parent->ocelot_debug_height;
     combo_box_filler(&combo_box_for_height, current_value, false);
@@ -12904,33 +13149,6 @@ if (current_widget == GRID_WIDGET)
     widget_for_size[1]->setLayout(hbox_layout_for_size[1]);
     connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
   }
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  if (current_widget == OBJECT_EXPLORER_WIDGET)
-  {
-    widget_for_size[0]= new QWidget(this);
-    label_for_size[0]= new QLabel("Visible");
-    combo_box_for_size[0]= new QComboBox();
-    combo_box_for_size[0]->addItem("No");
-    combo_box_for_size[0]->addItem("Yes");
-    combo_box_for_size[0]->setCurrentIndex(combo_box_for_size[0]->findText(copy_of_parent->new_ocelot_object_explorer_visible));
-    hbox_layout_for_size[0]= new QHBoxLayout();
-    hbox_layout_for_size[0]->addWidget(label_for_size[0]);
-    hbox_layout_for_size[0]->addWidget(combo_box_for_size[0]);
-    widget_for_size[0]->setLayout(hbox_layout_for_size[0]);
-    connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
-    widget_for_size[1]= new QWidget(this);
-    label_for_size[1]= new QLabel("Expanded");
-    combo_box_for_size[1]= new QComboBox();
-    combo_box_for_size[1]->addItem("No");
-    combo_box_for_size[1]->addItem("Yes");
-    combo_box_for_size[1]->setCurrentIndex(combo_box_for_size[1]->findText(copy_of_parent->new_ocelot_object_explorer_expanded));
-    hbox_layout_for_size[1]= new QHBoxLayout();
-    hbox_layout_for_size[1]->addWidget(label_for_size[1]);
-    hbox_layout_for_size[1]->addWidget(combo_box_for_size[1]);
-    widget_for_size[1]->setLayout(hbox_layout_for_size[1]);
-    connect(combo_box_for_size[1], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_1(int)));
-  }
-#endif
   /* The Cancel and OK buttons */
   widget_3= new QWidget(this);
   button_for_cancel= new QPushButton(menu_strings[menu_off + MENU_CANCEL], this);
@@ -12944,8 +13162,8 @@ if (current_widget == GRID_WIDGET)
   widget_3->setLayout(hbox_layout_3);
   /* Put the HBoxes in a VBox */
   main_layout= new QVBoxLayout();
-#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_OBJECT_EXPLORER == 1))
-  if ((current_widget != DEBUG_WIDGET) && (current_widget != OBJECT_EXPLORER_WIDGET))
+#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_EXPLORER == 1))
+  if ((current_widget != DEBUG_WIDGET) && (current_widget != EXPLORER_WIDGET))
 #endif
   {
     for (int ci= 0; ci < 11; ++ci) main_layout->addWidget(widget_for_color[ci]);
@@ -12960,7 +13178,15 @@ if (current_widget == GRID_WIDGET)
   {
     main_layout->addWidget(widget_for_html_effects);
   }
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[0]);
+  if (current_widget == EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[1]);
+  if (current_widget == EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[2]);
+#endif
   if ((current_widget == HISTORY_WIDGET) || (current_widget == GRID_WIDGET)
+#if (OCELOT_EXPLORER == 1)
+   || (current_widget == EXPLORER_WIDGET)
+#endif
    || (current_widget == STATEMENT_WIDGET) || (current_widget == DEBUG_WIDGET))
   {
     main_layout->addWidget(widget_for_detached);
@@ -12971,12 +13197,8 @@ if (current_widget == GRID_WIDGET)
   }
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[0]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  if (current_widget == OBJECT_EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[0]);
-  if (current_widget == OBJECT_EXPLORER_WIDGET) main_layout->addWidget(widget_for_size[1]);
-#endif
   main_layout->addWidget(widget_3);
-  if ((current_widget != DEBUG_WIDGET) && (current_widget != OBJECT_EXPLORER_WIDGET)) handle_combo_box_1(current_widget);
+  if ((current_widget != DEBUG_WIDGET) && (current_widget != EXPLORER_WIDGET)) handle_combo_box_1(current_widget);
   /*
     If one merely says
     this->setLayout(main_layout);
@@ -13837,6 +14059,10 @@ void handle_combo_box_for_detached(int item_number)
     copy_of_parent->new_ocelot_grid_detached= q;
   else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_detached= q;
+#if (OCELOT_EXPLORER == 1)
+  else if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_detached= q;
+#endif
   else
     copy_of_parent->new_ocelot_debug_detached= q;
 }
@@ -13856,6 +14082,10 @@ void handle_combo_box_for_top(int item_number)
     copy_of_parent->new_ocelot_grid_top= q;
   else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_top= q;
+#if (OCELOT_EXPLORER == 1)
+  else if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_top= q;
+#endif
   else
     copy_of_parent->new_ocelot_debug_top= q;
 }
@@ -13869,6 +14099,10 @@ void handle_combo_box_for_left(int item_number)
     copy_of_parent->new_ocelot_grid_left= q;
   else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_left= q;
+#if (OCELOT_EXPLORER == 1)
+  else if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_left= q;
+#endif
   else
     copy_of_parent->new_ocelot_debug_left= q;
 }
@@ -13882,6 +14116,10 @@ void handle_combo_box_for_width(int item_number)
     copy_of_parent->new_ocelot_grid_width= q;
   else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_width= q;
+#if (OCELOT_EXPLORER == 1)
+  else if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_width= q;
+#endif
   else
     copy_of_parent->new_ocelot_debug_width= q;
 }
@@ -13895,6 +14133,10 @@ void handle_combo_box_for_height(int item_number)
     copy_of_parent->new_ocelot_grid_height= q;
   else if (current_widget == STATEMENT_WIDGET)
     copy_of_parent->new_ocelot_statement_height= q;
+#if (OCELOT_EXPLORER == 1)
+  else if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_height= q;
+#endif
   else
     copy_of_parent->new_ocelot_debug_height= q;
 }
@@ -13905,9 +14147,9 @@ void handle_combo_box_for_size_0(int i)
     copy_of_parent->new_ocelot_grid_cell_height= combo_box_for_size[0]->itemText(i);
   if (current_widget == EXTRA_RULE_1)
     copy_of_parent->new_ocelot_extra_rule_1_condition= combo_box_for_size[0]->itemText(i);
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  if (current_widget == OBJECT_EXPLORER_WIDGET)
-    copy_of_parent->new_ocelot_object_explorer_visible= combo_box_for_size[0]->itemText(i);
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_visible= combo_box_for_size[0]->itemText(i);
 #endif
 }
 
@@ -13918,9 +14160,9 @@ void handle_combo_box_for_size_1(int i)
     copy_of_parent->new_ocelot_grid_cell_border_size= QString::number(i);
   if (current_widget == EXTRA_RULE_1)
     copy_of_parent->new_ocelot_extra_rule_1_display_as= combo_box_for_size[1]->itemText(i);
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  if (current_widget == OBJECT_EXPLORER_WIDGET)
-    copy_of_parent->new_ocelot_object_explorer_expanded= combo_box_for_size[1]->itemText(i);
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_expanded= combo_box_for_size[1]->itemText(i);
 #endif
 }
 
@@ -13929,6 +14171,10 @@ void handle_combo_box_for_size_2(int item_number)
 {
   QString q= combo_box_for_size[2]->itemText(item_number);
   copy_of_parent->new_ocelot_grid_cell_width= q;
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+    copy_of_parent->new_ocelot_explorer_query= text_for_query->toPlainText();
+#endif
 }
 
 
@@ -14128,7 +14374,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 126
+#define OCELOT_VARIABLES_SIZE 131
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */

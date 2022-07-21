@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: July 11 2022
+   Last modified: July 17 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -385,6 +385,9 @@
   static bool ocelot_detach_debug_widget= false;
 #endif
   static bool ocelot_detach_statement_edit_widget= false;
+#if (OCELOT_EXPLORER == 1)
+  static bool ocelot_detach_explorer_widget= false;
+#endif
 
   static int is_libmysqlclient_loaded= 0;
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -599,10 +602,13 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 //  saved_font=&tmp_font;
 //  result_grid_table_widget= new ResultGrid(0, saved_font, this);
 
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  ocelot_object_explorer_visible= "No";
-  ocelot_object_explorer_expanded= "No";
-  object_explorer_widget= NULL;
+#if (OCELOT_EXPLORER == 1)
+  ocelot_explorer_height= ocelot_explorer_left= ocelot_explorer_top= ocelot_explorer_width= "default";
+  ocelot_explorer_detached= "no";
+  ocelot_explorer_visible= "No";
+  ocelot_explorer_expanded= "No";
+  /* ocelot_explorer_query is set up elsewhere, I hope */
+  explorer_widget= NULL;
 #endif
   result_grid_tab_widget= new QTabWidget48(this); /* 2015-08-25 added "this" */
   result_grid_tab_widget->hide();
@@ -725,13 +731,13 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   find_widget= new Find_widget(this);
   main_layout->addWidget(find_widget);
 #endif
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  object_explorer_widget= new ResultGrid(lmysql, this, true);
-  initialize_widget_object_explorer();
+#if (OCELOT_EXPLORER == 1)
+  explorer_widget= new ResultGrid(lmysql, this, true);
+  initialize_widget_explorer();
   QHBoxLayout *upper_layout= new QHBoxLayout();
   QWidget *upper_widget= new QWidget();
   upper_widget->setLayout(main_layout);
-  upper_layout->addWidget(object_explorer_widget);
+  upper_layout->addWidget(explorer_widget);
   upper_layout->addWidget(upper_widget);
   main_window->setLayout(upper_layout);
 #else
@@ -804,6 +810,9 @@ void MainWindow::initialize_after_main_window_show()
   if (ocelot_debug_detached == "yes") action_option_detach_debug_widget(true);
 #endif
   if (ocelot_statement_detached == "yes") action_option_detach_statement_widget(true);
+#if (OCELOT_EXPLORER == 1)
+  if (ocelot_explorer_detached == "yes") action_option_detach_explorer_widget(true);
+#endif
 }
 
 /*
@@ -1998,14 +2007,14 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
 
   {
     ResultGrid* r;
-#if (OCELOT_OBJECT_EXPLORER == 1)
+#if (OCELOT_EXPLORER == 1)
     for (int i_r= -1; i_r < ocelot_grid_actual_tabs; ++i_r)
 #else
     for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
 #endif
     {
-#if (OCELOT_OBJECT_EXPLORER == 1)
-      if (i_r == -1) { r= object_explorer_widget; if (r == NULL) continue; }
+#if (OCELOT_EXPLORER == 1)
+      if (i_r == -1) { r= explorer_widget; if (r == NULL) continue; }
       else
 #endif
       r= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
@@ -3128,8 +3137,8 @@ void MainWindow::create_menu()
   menu_settings_action_debug= menu_settings->addAction("");
 #endif
   menu_settings_action_extra_rule_1= menu_settings->addAction("");
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  menu_settings_action_object_explorer= menu_settings->addAction("");
+#if (OCELOT_EXPLORER == 1)
+  menu_settings_action_explorer= menu_settings->addAction("");
 #endif
   menu_options= ui->menuBar->addMenu("");
   menu_options_action_option_detach_history_widget= menu_options->addAction("");
@@ -3138,6 +3147,9 @@ void MainWindow::create_menu()
   menu_options_action_option_detach_debug_widget= menu_options->addAction("");
 #endif
   menu_options_action_option_detach_statement_widget= menu_options->addAction("");
+#if (OCELOT_EXPLORER == 1)
+  menu_options_action_option_detach_explorer_widget= menu_options->addAction("");
+#endif
   menu_options_action_next_window= menu_options->addAction("");
   menu_options_action_previous_window= menu_options->addAction("");
   menu_options_action_batch= menu_options->addAction("");
@@ -3258,8 +3270,8 @@ void MainWindow::fill_menu()
   menu_settings_action_debug->setText(menu_strings[menu_off + MENU_SETTINGS_DEBUG_WIDGET]);
 #endif
   menu_settings_action_extra_rule_1->setText(menu_strings[menu_off + MENU_SETTINGS_EXTRA_RULE_1]);
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  menu_settings_action_object_explorer->setText("Object Explorer Widget");
+#if (OCELOT_EXPLORER == 1)
+  menu_settings_action_explorer->setText(menu_strings[menu_off + MENU_SETTINGS_EXPLORER_WIDGET]);
 #endif
   connect(menu_settings_action_menu, SIGNAL(triggered()), this, SLOT(action_menu()));
   connect(menu_settings_action_history, SIGNAL(triggered()), this, SLOT(action_history()));
@@ -3269,8 +3281,8 @@ void MainWindow::fill_menu()
   connect(menu_settings_action_debug, SIGNAL(triggered()), this, SLOT(action_debug()));
 #endif
   connect(menu_settings_action_extra_rule_1, SIGNAL(triggered()), this, SLOT(action_extra_rule_1()));
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  connect(menu_settings_action_object_explorer, SIGNAL(triggered()), this, SLOT(action_object_explorer()));
+#if (OCELOT_EXPLORER == 1)
+  connect(menu_settings_action_explorer, SIGNAL(triggered()), this, SLOT(action_explorer()));
 #endif
   menu_options->setTitle(menu_strings[menu_off + MENU_OPTIONS]);
   menu_options_action_option_detach_history_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
@@ -3291,6 +3303,12 @@ void MainWindow::fill_menu()
   menu_options_action_option_detach_statement_widget->setCheckable(true);
   menu_options_action_option_detach_statement_widget->setChecked(ocelot_detach_statement_edit_widget);
   connect(menu_options_action_option_detach_statement_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_statement_widget(bool)));
+#if (OCELOT_EXPLORER == 1)
+  menu_options_action_option_detach_explorer_widget->setText(menu_strings[menu_off + MENU_OPTIONS_DETACH_EXPLORER_WIDGET]);
+  menu_options_action_option_detach_explorer_widget->setCheckable(true);
+  menu_options_action_option_detach_explorer_widget->setChecked(ocelot_detach_explorer_widget);
+  connect(menu_options_action_option_detach_explorer_widget, SIGNAL(triggered(bool)), this, SLOT(action_option_detach_explorer_widget(bool)));
+#endif
   menu_options_action_next_window->setText(menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
   connect(menu_options_action_next_window, SIGNAL(triggered(bool)), this, SLOT(action_option_next_window()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW, "", false, true);
@@ -5271,6 +5289,23 @@ void MainWindow::action_option_detach_statement_widget(bool checked)
   action_change_one_setting(ocelot_statement_detached, new_ocelot_statement_detached, TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED);
 }
 
+#if (OCELOT_EXPLORER == 1)
+void MainWindow::action_option_detach_explorer_widget(bool checked)
+{
+  if (checked)
+  {
+    ocelot_explorer_detached= "no";
+    new_ocelot_explorer_detached= "yes";
+  }
+  else
+  {
+    ocelot_explorer_detached= "yes";
+    new_ocelot_explorer_detached= "no";
+  }
+  action_change_one_setting(ocelot_explorer_detached, new_ocelot_explorer_detached, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED);
+}
+#endif
+
 /*
   See comments preceding action_option_detach_history_widget().
 */
@@ -5301,7 +5336,18 @@ void MainWindow::detach_widget(int widget_type, bool checked)
     widget_text= "debug widget";
     menu_options_detach_widget= MENU_OPTIONS_DETACH_DEBUG_WIDGET;
     widget_left= ocelot_debug_left; widget_top= ocelot_debug_top; widget_width= ocelot_debug_width; widget_height= ocelot_debug_height;
-    ocelot_detach_statement_edit_widget= checked;
+    ocelot_detach_statement_edit_widget= checked; /* Todo: should this be ocelot_detach_debug_widget= checked? */
+  }
+#endif
+#if (OCELOT_EXPLORER == 1)
+  else if (widget_type == TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED)
+  {
+    widget= (QWidget*) explorer_widget;
+    menu_options_action_option_detach_widget= menu_options_action_option_detach_explorer_widget;
+    widget_text= "explorer widget";
+    menu_options_detach_widget= MENU_OPTIONS_DETACH_EXPLORER_WIDGET;
+    widget_left= ocelot_explorer_left; widget_top= ocelot_explorer_top; widget_width= ocelot_explorer_width; widget_height= ocelot_explorer_height;
+    ocelot_detach_explorer_widget= checked;
   }
 #endif
   else if (widget_type == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
@@ -6085,6 +6131,33 @@ void MainWindow::action_debug()
 }
 #endif
 
+#if (OCELOT_EXPLORER == 1)
+/* !!!!! FIX !!!!! */
+void MainWindow::action_explorer()
+{
+  Settings *se= new Settings(EXPLORER_WIDGET, this);
+  int result= se->exec();
+  if (result == QDialog::Accepted)
+  {
+    /* Todo: check: do we need to change style sheet for this stuff? */
+    action_change_one_setting(ocelot_explorer_height, new_ocelot_explorer_height, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT);
+    action_change_one_setting(ocelot_explorer_left, new_ocelot_explorer_left, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT);
+    action_change_one_setting(ocelot_explorer_top, new_ocelot_explorer_top, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP);
+    action_change_one_setting(ocelot_explorer_width, new_ocelot_explorer_width, TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH);
+    action_change_one_setting(ocelot_explorer_detached, new_ocelot_explorer_detached, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED);
+    ocelot_explorer_expanded= new_ocelot_explorer_expanded;
+    ocelot_explorer_query= new_ocelot_explorer_query;
+    ocelot_explorer_visible= new_ocelot_explorer_visible;
+    if (ocelot_explorer_visible == "Yes")
+    {
+      explorer_show();
+    }
+    else explorer_widget->hide();
+  }
+  delete(se);
+}
+#endif
+
 /*
   TODO: extra_rule_1 could affect statement | prompt | word, not just cell
   TODO: Action could be to invoke a Lua procedure, not just char/hex/image
@@ -6103,25 +6176,6 @@ void MainWindow::action_extra_rule_1()
  }
   delete(se);
 }
-
-#if (OCELOT_OBJECT_EXPLORER == 1)
-void MainWindow::action_object_explorer()
-{
-  Settings *se= new Settings(OBJECT_EXPLORER_WIDGET, this);
-  int result= se->exec();
-  if (result == QDialog::Accepted)
-  {
-    ocelot_object_explorer_expanded= new_ocelot_object_explorer_expanded;
-    ocelot_object_explorer_visible= new_ocelot_object_explorer_visible;
-    if (ocelot_object_explorer_visible == "Yes")
-    {
-      object_explorer_show();
-    }
-    else object_explorer_widget->hide();
-  }
-  delete(se);
-}
-#endif
 
 /* NB: ocelot_history_detached should be set after setting top|left|width|height not before */
 void MainWindow::action_history()
@@ -13155,9 +13209,9 @@ void MainWindow::initial_asserts()
 
   #ifdef OCELOT_OS_LINUX
   #if defined(NDEBUG)
-    if (MENU_FONT != 93) {printf("assert(MENU_FONT == 93);"); exit(1); }
+    if (MENU_FONT != 95) {printf("assert(MENU_FONT == 93);"); exit(1); }
   #else
-    assert(MENU_FONT == 93); /* See kludge alert in ocelotgui.h Settings() */
+    assert(MENU_FONT == 95); /* See kludge alert in ocelotgui.h Settings() */
   #endif
   #else
     assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
@@ -13176,11 +13230,11 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "124" to the new size */
+  /* That is okay but you must change this occurrence of "133" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 128);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 133);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -18655,6 +18709,7 @@ void Messagebox_flash::timer_expired()
              then backspace so the search is only for "b" and see bl is still highlighted in statement
   Todo: There is too much space between the statement widget and the find widget
   Todo: Maybe save space by only loading components when activate, and deleting them when close
+  Todo: bug: if a word goes over one line in HTML display, find fails (if I recall right, we added a line feed)
 */
 
 /* called from new Find_widget() which is called just before main_window->setLayout(main_layout) */
@@ -18864,7 +18919,7 @@ void Result_qtextedit::construct()
       this, SLOT(menu_context_t(const QPoint &)));
   qtextedit_result_changes= new Result_changes(this); /* ~Result_qtextedit() should delete this */
 //  show();
-#if (OCELOT_OBJECT_EXPLORER == 1)
+#if (OCELOT_EXPLORER == 1)
   qtextedit_is_min_max_clicked= false;
 #endif
 }
@@ -19007,6 +19062,12 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   if ((result == true) && (new_cell_height != ""))
   {
     int nchi= result_grid->get_cell_width_or_height_as_int(new_cell_height, result_grid->max_height_of_a_char);
+#if (OCELOT_EXPLORER == 1)
+    if ((nchi == 0) && (result_grid->copy_of_parent->explorer_widget == result_grid))
+    {
+      *new_cell_height_as_int= 0;
+    }
+#endif
     if ((nchi > 0)
      && (QString::compare("default", new_cell_height, Qt::CaseInsensitive) != 0))
       *new_cell_height_as_int= nchi;
@@ -19257,6 +19318,23 @@ QString Result_qtextedit::unstripper(QString value_to_unstrip)
 */
 int Result_qtextedit::result_row_number_from_grid_row_number(int grid_row_number)
 {
+#if (OCELOT_EXPLORER == 1)
+  /* There might have been skipping and scrolling. Todo: what if for some reason nothing is found? */
+  if (result_grid == result_grid->copy_of_parent->explorer_widget)
+  {
+    unsigned int local_grid_row_number= 0;
+    unsigned int r;
+    for (r= result_grid->explorer_first_result_row; r < result_grid->copy_of_parent->oei_count; ++r)
+    {
+      if (result_grid->copy_of_parent->oei[r].display_row_number != -1)
+      {
+        if ((unsigned int) grid_row_number == local_grid_row_number) break;
+        ++local_grid_row_number;
+      }
+    }
+    return r;
+  }
+#endif
   int result_row_number= grid_row_number + result_grid->grid_vertical_scroll_bar->value();
   if (result_grid->copy_of_ocelot_vertical == 1)
   {
@@ -19266,6 +19344,7 @@ int Result_qtextedit::result_row_number_from_grid_row_number(int grid_row_number
   {
     if (result_grid->ocelot_result_grid_column_names_copy == 1) --result_row_number;
   }
+
   return result_row_number;
 }
 
@@ -19637,6 +19716,15 @@ QString Result_qtextedit::to_plain_text()
 
 void Result_qtextedit::mouseDoubleClickEvent(QMouseEvent *event)
 {
+#if (OCELOT_EXPLORER == 1)
+  if (result_grid == result_grid->copy_of_parent->explorer_widget)
+  {
+    /* Append to statement_edit_text! Compare completer_widget::mouseDoubleClickEvent */
+    QString text= result_grid->copy_of_parent->statement_edit_widget->toPlainText();
+    text= text + qtextedit_cell_content;
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
+  }
+#endif
   QTextEdit::mouseDoubleClickEvent(event);
 }
 
@@ -19841,8 +19929,8 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
   {
     qtextedit_drag_start_time= QDateTime::currentMSecsSinceEpoch();
   }
-#if (OCELOT_OBJECT_EXPLORER == 1)
- if (result_grid == result_grid->copy_of_parent->object_explorer_widget)
+#if (OCELOT_EXPLORER == 1)
+ if (result_grid == result_grid->copy_of_parent->explorer_widget)
   {
     if ((qtextedit_is_in_drag_for_column == false) && (qtextedit_is_in_drag_for_row == false))
     {
@@ -19915,13 +20003,13 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 void Result_qtextedit::mouseReleaseEvent(QMouseEvent *event)
 {
   if (result_grid->is_fancy() == false) { QTextEdit::mouseReleaseEvent(event); return; }
-#if (OCELOT_OBJECT_EXPLORER == 1)
-  if (result_grid == result_grid->copy_of_parent->object_explorer_widget)
+#if (OCELOT_EXPLORER == 1)
+  if (result_grid == result_grid->copy_of_parent->explorer_widget)
   {
     if (qtextedit_is_min_max_clicked == true)
     {
       qtextedit_is_min_max_clicked= false;
-      result_grid->object_explorer_toggle(result_grid->focus_result_row_number);
+      result_grid->explorer_toggle(result_grid->focus_result_row_number);
     }
   }
 #endif
@@ -26111,7 +26199,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 126 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 131 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
   Todo: ocelot_grid_border_size is no longer used but we'll probably add something else soon
   We don't have ocelot_export in the list, I don't think it's needed.
 */
@@ -26128,6 +26216,11 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_debug_left, NULL, 10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT},
     {&main_window->ocelot_debug_top, NULL, 10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP},
     {&main_window->ocelot_debug_width, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH},
+    {&main_window->ocelot_explorer_detached, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED},
+    {&main_window->ocelot_explorer_height, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT},
+    {&main_window->ocelot_explorer_left, NULL, 10000, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT},
+    {&main_window->ocelot_explorer_top, NULL, 10000, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP},
+    {&main_window->ocelot_explorer_width, NULL,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH},
     {&main_window->ocelot_extra_rule_1_background_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR},
     {&main_window->ocelot_extra_rule_1_condition, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION},
     {&main_window->ocelot_extra_rule_1_display_as, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS},
@@ -26246,7 +26339,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 126;
+  int i= 131;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;
@@ -26326,6 +26419,9 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
 #if (OCELOT_MYSQL_DEBUGGER == 1)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED)
 #endif
+#if (OCELOT_EXPLORER == 1)
+   || (keyword_index == TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED)
+#endif
    || (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
    || (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED))
   {
@@ -26340,6 +26436,13 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
       {
         if (qv == "no") { main_window->menu_options_action_option_detach_debug_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED, false); }
         else { main_window->menu_options_action_option_detach_debug_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED, true); }
+      }
+#endif
+#if (OCELOT_EXPLORER== 1)
+      if (keyword_index == TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED)
+      {
+        if (qv == "no") { main_window->menu_options_action_option_detach_explorer_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED, false); }
+        else { main_window->menu_options_action_option_detach_explorer_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED, true); }
       }
 #endif
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
@@ -26437,14 +26540,14 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
   {
     ResultGrid* r;
     main_window->make_style_strings();
-#if (OCELOT_OBJECT_EXPLORER == 1)
+#if (OCELOT_EXPLORER == 1)
     for (int i_r= -1; i_r < ocelot_grid_actual_tabs; ++i_r)
 #else
     for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
 #endif
     {
-#if (OCELOT_OBJECT_EXPLORER == 1)
-      if (i_r == -1) { r= main_window->object_explorer_widget; if (r == NULL) continue; }
+#if (OCELOT_EXPLORER == 1)
+      if (i_r == -1) { r= main_window->explorer_widget; if (r == NULL) continue; }
       else
 #endif
       r= qobject_cast<ResultGrid*>(main_window->result_grid_tab_widget->widget(i_r));
@@ -26528,7 +26631,7 @@ XSettings::~XSettings()
 
 #endif // XSETTINGS
 
-#if (OCELOT_OBJECT_EXPLORER == 1)
+#if (OCELOT_EXPLORER == 1)
 /*
   These are thoughts about what is sometimes called an "object explorer".
   Position:
@@ -26587,6 +26690,7 @@ XSettings::~XSettings()
   Right click to:
     Sort (causes a dialog box for what you want to sort) (a bit absurd, you should just make an ORDER BY)
     Filter (causes a dialog box for what you want to filter) (a bit absurd, you should just make a WHERE)
+            Really, most filtering can be done with a slight variant of SET ocelot_grid_... WHERE ...;
     Add|Remove icons
     Produce SELECT | ALTER | CREATE statement
     Refresh, because we don't automatically refresh, because we don't know what other users are doing
@@ -26595,60 +26699,62 @@ XSettings::~XSettings()
     You'll need quite a bit of in-context help, there are so many options.
   Drag and Drop:
     This would be for building a query.
-  MainWindow::initialize_widget_object_explorer():
+  MainWindow::initialize_widget_explorer():
     should do whatever initializing happens for resultgrid tabs
-  object_explorer_close():
+  explorer_close():
     This should happen when a server is disconnected, or deliberate user call.
     Don't get rid of what was done via rehash_scan() or equivalent, hope that something else does that.
-    Destroy any other objects you needed, but maybe not object_explorer_widget.
-  Creating object_explorer_items *oei:
+    Destroy any other objects you needed, but maybe not explorer_widget.
+  Creating explorer_items *oei:
     For some reson "T" comes after all "C" so we work to make it before.
     Todo: should be permanent, should be re-created if rehash or refresh
   DIALOG BOX: The next step will be adding a dialog box with only Hidden|Visible and OK|Cancel
-    Settings | Object Explorer does the job
+    Settings | Explorer does the job
     Color and font will be the same as grid widget settings.
     Eventualy we will need height | width | etc. as for other settings dialog boxes.
-    Settings -- Object Explorer
+    Settings -- Explorer
       Hidden Or Visible                 Default = Hidden
       Keep or Refresh                   Default = Keep (but REHASH or auto-rehash refreshes anyway)
       Sort _______________              Default = Alphabetic
       Filter _____________              Default = SCHEMA LIKE '%' AND COLUMN LIKE '%'
-      Width ______________              Hmm, we intend to have height | width | etc. later.
       Include Primary|Foreign Lines _
       Include Key Icon for Primary or Indexed _
       Expand By Default                 Default = No, so you see "+" icon after each table, click to expand
       Enclose table
-      Keystroke that copies to end of statement widget
+      Keystroke that copies to end of statement widget (maybe not needed if you say "auto copy when click")
       Keystroke that drops the object
-      OK | Cancel
+      Whether to collapse column_name column under object_name | "scrunch to N columns"
+      SQL _____________________________ The statement that makes it; we provide a default of course.
+      Detached _ top _ left _ width _ height _
+      OK | Cancel   ? could be something more like Apply or Refresh or Rehash
   SHORTCUTS
     For example, typing 'C' goes to the next thing that starts with 'C'
-    If user types "schema_name.", scroll the object explorer so that's visible.
+    If user types "schema_name.", scroll the explorer so that's visible.
     Todo: No, we have a Find widget, it should apply.
   FIRST TODO:
     Find out what that little blank is when you first display a result grid.
-    Hide the object explorer widget if/when not connected.
+    Hide the explorer widget if/when not connected.
   TODO:
     Your initial setup of upper_layout might be dangerous, check it more thoroughly.
     Search for calculations that depend on whole width, instead of main_window width.
-    Check whether a change to grid settings will affect object_explorer_widget (probably not).
+    Check whether a change to grid settings will affect explorer_widget (probably not).
   NOW IT IS STRAIGHTFORWARD:
     In the rg, call prepare_for_display_html() then a variant of display_html() that does:
     same loop, but with the additional decoration icons, the filtering, etc.
-    And the source is the object_explorer_items struct.
+    And the source is the explorer_items struct.
     But should the variant be in the rg, or in MainWindow?
     ?? Or: search information_schema again.
        Also the struct will have extra fields with flags "this was expanded|collapsed".
-  object_explorer_show():
+  explorer_show():
     will do rehash_scan() (as if REHASH statement was executed), then fill up oei struc,
-    so that when object_explorer_widget->show() happens there will be an explorer widget to show.
+    so that when explorer_widget->show() happens there will be an explorer widget to show.
     There are several ways it can fail, which should cause a dialog box without showing.
     Maybe better dialog box labels would be "Activate" and (if already activated and visible) "Refresh".
   Todo: get displayed sizes right:
         height should be known based on font
         width should be knowable based on max number of characters
   Todo: Usually when we change a Settings item the result is we generate a SET statement.
-  Todo: oei struct object_explorer_items has a flag: bool is_min
+  Todo: oei struct explorer_items has a flag: bool is_min
         if is_min and table: we don't show the columns
         if is_min is false: we show the columns
         if somebody clicks on the icon in column 2
@@ -26659,28 +26765,88 @@ XSettings::~XSettings()
           the default should always be true
         the flag only matters for "T" so column 2 should be nothing for other object types
         we probably need yet one more struct component to store what the grid row number is
-        TODO: object_explorer_show() should merely give error dialog boxes if something is not ready.
-              object_explorer_refresh() should give an error dialog box if rehash/refresh fails.
+        TODO: explorer_show() should merely give error dialog boxes if something is not ready.
+              explorer_refresh() should give an error dialog box if rehash/refresh fails.
               Or maybe there is no difference, there should be only one button and it does everything.
-        THE PLAN NOW IS: object_explorer_show() always does a rehash_scan so object_explorer_refresh is a no-op.
+        THE PLAN NOW IS: explorer_show() always does a rehash_scan so explorer_refresh is a no-op.
                          but you can change the prompt to "refresh and show again" if it's already visible
         Todo: "Expanded" could be something like "All Maximized" or "All Minimized"
         Todo: If I click outside the boxes, it decides to do something
         Todo: user might set e.g. vertical or raw. make sure such settings have no effect on explorer widget
+        Todo: we could say, instead of "C", "C(PK,FK,I)"
+        Todo: Right-click shows menu, ^C i.e. Copy is one of the options
+        Todo: Make sure Find widget finds for any of the columns in the result
+        Todo: SET ocelot_grid_cell_height=0 WHERE ...;
+              This does the equivalent of "filtering" ... if the conditions are true, the row is not displayed.
+              More clauses e.g. AND widget_number = -1 (this would make it apply for tabbed results too)
+              More clauses e.g. WHERE column IS FOREIGN KEY | PRIMARY KEY | UNIQUE | INDEXED
+              You can add a Filter combobox which generates the statement
+              We only need to do it if there is a SET ocelot_grid_cell_height=0 statement
+        Todo: Find out why scrolling with information_schema is so slow
+        Todo: example.cnf should include the new words
+        Todo: auto_refresh? or depend on auto_rehash?
+        Things that sort of work:
+              Settings | Grid and SET ocelot_grid_... WHERE work for colour change, at least.
+              SET ocelot_grid_cell_height ... WHERE causes row to disappear, i.e. this is our "filter".
+              New keywords e.g. TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED
+              Options | detach explorer widget
+              Find_widget. A quick check with ^F indicates that it is okay.
+              Menu Settings for explorer dialog box. I can change "No" to "Yes".
+              Vertical scroll bar.
+              Double click will paste a cell's content at end of statement widget.
+              Settings | width affects width.
 */
 
-void MainWindow::initialize_widget_object_explorer()
+void MainWindow::initialize_widget_explorer()
 {
-  object_explorer_widget->object_explorer_initialize();
+  explorer_widget->explorer_initialize();
   oei= NULL;
   oei_count= 0;
   /* Todo: Following is also what we do for ResultGrid in result_grid_add_tab. Reduce duplication? */
-  object_explorer_widget->installEventFilter(this); /* must catch fontChange, show, etc. */
-  object_explorer_widget->grid_vertical_scroll_bar->installEventFilter(this);
-  object_explorer_widget->set_all_style_sheets(ocelot_grid_style_string, 0, 0, false);
+  explorer_widget->installEventFilter(this); /* must catch fontChange, show, etc. */
+  explorer_widget->grid_vertical_scroll_bar->installEventFilter(this);
+  explorer_widget->set_all_style_sheets(ocelot_grid_style_string, 0, 0, false);
+  /* Todo: Not sure where to put this. And it's wrong if Tarantool. Copied from rehash_scan(). */
+  /* Todo: Can I add newlines safely? */
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  char query[1024];
+  sprintf(query, "select 'D',database(),'' "
+                 "union all "
+                 "select 'C',table_name,column_name "
+                   "from information_schema.columns "
+                 "where table_schema = database() "
+                 "union all "
+                 "select 'T',table_name,table_type "
+                 "from information_schema.tables "
+                 "where table_schema = database() "
+                 "union all "
+                 "select 'F',routine_name,routine_type "
+                 "from information_schema.routines "
+                 "where routine_schema = database() and routine_type = 'FUNCTION' "
+                 "union all "
+                 "select 'P',routine_name,routine_type "
+                 "from information_schema.routines "
+                 "where routine_schema = database() and routine_type = 'PROCEDURE' "
+                 "union all "
+                 "select 't',trigger_name,'' "
+                 "from information_schema.triggers "
+                 "where trigger_schema = database() "
+                 "union all "
+                 "select 'E',event_name,'' "
+                 "from information_schema.events "
+                 "where event_schema = database() "
+                 "union all "
+                 "select 'I',table_name,index_name "
+                 "from information_schema.statistics "
+                 "where table_schema = database() "
+         );
+#else
+  error -- think harder about how to handle switch to a different DBMS, and reuse of rehash_scan
+#endif
+    ocelot_explorer_query= query;
 }
 
-void MainWindow::object_explorer_show()
+void MainWindow::explorer_show()
 {
 /* todo: check the error_or_ok_message result and do something about it ... qmessagebox will do */
 /* !! DELETE oei IF YOU SAID NEW! (no, we don't do that unless user decides to remove the whole thing) */
@@ -26694,7 +26860,7 @@ void MainWindow::object_explorer_show()
     return;
   }
   bool is_min= false;
-  if (ocelot_object_explorer_expanded == "Yes") is_min= false;
+  if (ocelot_explorer_expanded == "Yes") is_min= false;
   if (oei != NULL)
   {
     delete [] oei;
@@ -26704,11 +26870,11 @@ void MainWindow::object_explorer_show()
   char *row_pointer;
   unsigned int column_length;
   unsigned int i;
-//  struct object_explorer_items xx;
+//  struct explorer_items xx;
   /* Something like what happens in rehash_search(). */
   /* ?? Maybe you should have a limit on the size, like SQL Server does (65535). */
   /* todo: "* 2" is too much, you only need to allow for adding "T", which should mean nothing. */
-  oei= new object_explorer_items[rehash_result_row_count * 2];
+  oei= new explorer_items[rehash_result_row_count * 2];
   QByteArray object_type= "";
   QByteArray object_name= "";
   QByteArray column_name= "";
@@ -26755,30 +26921,35 @@ void MainWindow::object_explorer_show()
       row_pointer+= column_length;
     }
   }
-  //object_explorer_widget->hide(); /* Is this necessary? */
-  /* Following line was a bad idea, caused a crash ... but we need it */
-  object_explorer_widget->result_row_count= oei_count;
+  //explorer_widget->hide(); /* Is this necessary? */
   /* this is in the initialize function */
-  /* object_explorer_widget->result_column_count= 4; */ /* todo: you can move this, it's always the same */
-  object_explorer_widget->display_html(0, 0); /* effectively: object_explorer_display_html() */
-  object_explorer_widget->show();
+  /* explorer_widget->result_column_count= 4; */ /* todo: you can move this, it's always the same */
+  explorer_widget->explorer_display();  /* effectively: explorer_display_html(0) */
+  explorer_widget->show();
 }
 
 /* Todo: the idea of "expanded" is that all columns are shown for all tables, is_min is off by default */
-void MainWindow::object_explorer_expanded()
+void MainWindow::explorer_expanded()
 {
-  printf("**** object_explorer_expanded\n");
+  printf("**** explorer_expanded\n");
 }
 
-/* Todo: This could be called when we're shutting down (?). Clean up anything made with new. */
-void MainWindow::object_explorer_close()
+/* Todo: the idea of "query" is that users can change the big union statement for rehash_scan() */
+void MainWindow::explorer_query()
 {
-  printf("**** object_explorer_close\n");
+  printf("**** explorer_query\n");
+}
+
+
+/* Todo: This could be called when we're shutting down (?). Clean up anything made with new. */
+void MainWindow::explorer_close()
+{
+  printf("**** explorer_close\n");
 }
 
 /* Todo: Add: a function for destroying all objects created for the widget (though not the widget itself?) */
 
-#endif //if (OCELOT_OBJECT_EXPLORER == 1)
+#endif //if (OCELOT_EXPLORER == 1)
 
 #ifdef DBMS_TARANTOOL
 #if (OCELOT_THIRD_PARTY==1)
