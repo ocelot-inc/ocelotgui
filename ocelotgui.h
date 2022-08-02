@@ -37,8 +37,8 @@
 #define OCELOT_IMPORT_EXPORT 1
 #endif
 
-/* To remove most of the code related to object explorer, set OCELOT_explorer 0 */
-#ifndef OCELOT_explorer
+/* To remove most of the code related to object explorer, #define OCELOT_EXPLORER 0 */
+#ifndef OCELOT_EXPLORER
 #define OCELOT_EXPLORER 0
 #endif
 
@@ -780,6 +780,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT, /* if OCELOT_EXPLORER == 1 */
     TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT, /* if OCELOT_EXPLORER == 1 */
     TOKEN_KEYWORD_OCELOT_EXPLORER_TOP, /* if OCELOT_EXPLORER == 1 */
+    TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE, /* if OCELOT_EXPLORER == 1 */
     TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH, /* if OCELOT_EXPLORER == 1 */
     TOKEN_KEYWORD_OCELOT_EXPORT, /* if OCELOT_IMPORT_EXPORT == 1 */
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR,
@@ -1428,7 +1429,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1189
+#define KEYWORD_LIST_SIZE 1190
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2036,6 +2037,7 @@ static const keywords strvalues[]=
     {"OCELOT_EXPLORER_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT}, /* if OCELOT_EXPLORER == 1 */
     {"OCELOT_EXPLORER_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT}, /* if OCELOT_EXPLORER == 1 */
     {"OCELOT_EXPLORER_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP}, /* if OCELOT_EXPLORER == 1 */
+    {"OCELOT_EXPLORER_VISIBLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE}, /* if OCELOT_EXPLORER == 1 */
     {"OCELOT_EXPLORER_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH}, /* if OCELOT_EXPLORER == 1 */
     {"OCELOT_EXPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */
     {"OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR},
@@ -2789,11 +2791,12 @@ struct export_settings {
 #endif
 
 #if (OCELOT_EXPLORER == 1)
-struct explorer_items { /* This struct definition is for MainWindow and ResultGrid */
-  QByteArray object_type;
-  QByteArray object_name;
-  QByteArray column_name;
-  bool is_min; /* true if minimized "T" */
+struct explorer_items {   /* This struct definition is for MainWindow and ResultGrid */
+  QByteArray object_type; /* e.g. 'T' or 'C' */
+  QByteArray object_name; /* e.g. table name */
+  QByteArray part_name;   /* e.g. column name */
+  QByteArray part_type;   /* e.g. column type */
+  bool is_min;            /* true if minimized "T" */
   int display_row_number; /* number within the display. equals -1 if skippable */
 };
 #endif
@@ -3049,6 +3052,9 @@ class Find_widget;
 #endif
 class Result_qtextedit;
 class Result_changes;
+#if (OCELOT_EXPLORER == 1)
+class Small_dialog_box;
+#endif
 
 QT_END_NAMESPACE
 
@@ -3561,9 +3567,11 @@ public:
 
 #if (OCELOT_EXPLORER == 1)
   void explorer_show();
+  int explorer_rehash(char *);
   void explorer_expanded();
-  void explorer_query();
+  bool explorer_query();
   void explorer_close();
+  void explorer_context_menu(QPoint &pos);
 #endif
 
 public slots:
@@ -3724,7 +3732,8 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu(); void fill_menu();
-  int rehash_scan(char *); int rehash_scan_for_tarantool(char *);
+  int rehash_scan_all(char *);
+  int rehash_scan(char *, bool is_explorer); int rehash_scan_for_tarantool(char *, bool is_explorer);
   void rehash_scan_one_space(int space_number);
   QString rehash_search(QString table_name, char *search_string, int reftype,
                         QString hparse_token,
@@ -4937,6 +4946,8 @@ void handle_button_2()
 };
 
 #endif // MESSAGE_BOX_H
+
+
 
 
 #ifndef COMPLETER_WIDGET_H
@@ -6418,6 +6429,13 @@ void menu_context_t(const QPoint & pos)
   menu_context_t_2(pos);
 }
 
+#if (OCELOT_EXPLORER == 1)
+void menu_context_t_explorer(const QPoint &pos)
+{
+  menu_context_t_2_explorer(pos);
+}
+#endif
+
 protected:
 void changeEvent(QEvent *e);
 void closeEvent(QCloseEvent *e);
@@ -6443,7 +6461,10 @@ void redo();
 void selectAll();
 void zoomIn();
 void zoomOut();
-void menu_context_t_2(const QPoint & pos);
+void menu_context_t_2(const QPoint &pos);
+#if (OCELOT_EXPLORER == 1)
+void menu_context_t_2_explorer(const QPoint &pos);
+#endif
 int copy_html_cell(char *ocelot_grid_detail_numeric_column_start, char *ocelot_grid_detail_char_column_start,
                    char *tmp_pointer, char *result_pointer, char result_set_value_flags, int v_length, int cell_type,
                    int width, int height, QFont result_grid_font, int setting_max_width_of_a_char,
@@ -6562,6 +6583,7 @@ private:
   QScrollArea *grid_scroll_area;
   int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
 public:
+  int result_grid_type; /* 0 or EXPLORER_WIDGET */
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   unsigned int result_column_count;
   long unsigned int result_row_count, grid_result_row_count;
@@ -6686,8 +6708,10 @@ ResultGrid(
 //        MYSQL_RES *mysql_res,
         ldbms *passed_lmysql,
         MainWindow *parent,
-        bool is_displayable): QWidget(parent)
+        bool is_displayable,
+        int passed_result_grid_type): QWidget(parent)
 {
+  result_grid_type= passed_result_grid_type;
   is_paintable= 0;
 
   /* todo: see if we can get rid of client and go direct to resultgrid */
@@ -6936,7 +6960,7 @@ bool is_image_format(int length, char* pointer)
 bool is_fancy()
 {
 #if (OCELOT_EXPLORER == 1)
-  if (this == copy_of_parent->explorer_widget) return true;
+  if (result_grid_type == EXPLORER_WIDGET) return true;
 #endif
   if ((result_row_count == 0) || (result_column_count == 0)) return false;
   if (html_text_edit == NULL) return false;
@@ -8366,7 +8390,7 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
 void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 {
 #if (OCELOT_EXPLORER == 1)
-  if (this == copy_of_parent->explorer_widget)
+  if (result_grid_type == EXPLORER_WIDGET)
   {
     explorer_display_html(new_grid_vertical_scroll_bar_value);
     return;
@@ -8840,7 +8864,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
    Todo: You should also be watching for
          ResultGrid* r;
          for (int i_r= 0; i_r < ocelot_grid_actual_tabs; ++i_r)
-         ... because gont change happens for this bozo too
+         ... because font change happens for this bozo too
          ... I think we should start at -1 in such loops, and if it's -1 there's an always-existent explorer widget
     Todo: we sould be watching for
           int MainWindow::result_grid_add_tab()
@@ -8853,26 +8877,39 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 QByteArray bytearray_min; /* = "⊕" for table-minimize i.e. don't show columns */
 QByteArray bytearray_max; /* = "⊖" for table-maximize i.e. do show columns */
 unsigned int explorer_first_result_row;
+#define EXPLORER_COLUMN_COUNT 3
 
 /*
+  Re scroll bars:
+    We have a separate vertical scroll bar, it is always present although if it is was possible to have
+    only one row then it would look odd. We ordinarily have no need for a horizontal scroll bar because
+    with width="default" we allot enough. So we say ScrollBarAlwaysOff here. But, oddly, if we say
+    width='200' or something else too small, a horizontal scroll bar appears anyway, which is fine.
   Todo: maybe this should be early in ResultGrid constructor, "if (this == main_window->explorer_widget)"
+  Todo: There are "new" assignments in this, probably we don't eliminate them when closing the explorer.
+  Todo: This could be called from ResultGrid() if result_grid_type == EXPLORER_WIDGET
 */
 void explorer_initialize() /* default explorer widget settings, most of which will never change */
 {
-  gridx_column_count= 4;
+  batch_text_edit->hide(); /* shouldn't be needed. see switch_to_html */
+  hide();
+  gridx_column_count= EXPLORER_COLUMN_COUNT;
   //if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
   gridx_field_types= new short unsigned int[gridx_column_count];
   gridx_field_types[0]= OCELOT_DATA_TYPE_TEXT;
   gridx_field_types[1]= OCELOT_DATA_TYPE_TEXT;
   gridx_field_types[2]= OCELOT_DATA_TYPE_TEXT;
-  gridx_field_types[3]= OCELOT_DATA_TYPE_TEXT;
-  result_column_count= 4;
+  result_column_count= EXPLORER_COLUMN_COUNT;
+  result_field_types= new unsigned short int[result_column_count];
+  result_field_types[0]= OCELOT_DATA_TYPE_TEXT;
+  result_field_types[1]= OCELOT_DATA_TYPE_TEXT;
+  result_field_types[2]= OCELOT_DATA_TYPE_TEXT;
+
   //if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
   result_field_flags= new unsigned int[result_column_count];
   result_field_flags[0]= 0;
   result_field_flags[1]= 0;
   result_field_flags[2]= 0;
-  result_field_flags[3]= 0;
   //if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   grid_column_widths= new unsigned int[gridx_column_count];
   /* grid_column_widths[] will be settled during explorer_display_html */
@@ -8888,9 +8925,29 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
   /* Todo: decide if this should be in initialize() */
   bytearray_min= "⊕"; /* for table-minimize i.e. don't show columns */
   bytearray_max= "⊖"; /* for table-maximize i.e. do show columns */
+
+  int result_field_names_size= strlen("MIN") + strlen("OBJECT_TYPE") + strlen("OBJECT_NAME")
+                           + sizeof(unsigned int) * EXPLORER_COLUMN_COUNT;
+  result_field_names= new char[result_field_names_size];
+  char *result_field_names_pointer= &result_field_names[0];
+  unsigned int v_length;
+  char field_name[256];
+  for (unsigned int i= 0; i < result_column_count; ++i)
+  {
+    if (i == 0) {v_length= 3; strcpy(field_name, "MIN"); }
+    if (i == 1) {v_length= 11; strcpy(field_name, "OBJECT_TYPE"); }
+    if (i == 2) {v_length= 11; strcpy(field_name, "OBJECT_NAME"); }
+    memcpy(result_field_names_pointer, &v_length, sizeof(unsigned int));
+    result_field_names_pointer+= sizeof(unsigned int);
+    memcpy(result_field_names_pointer, field_name, v_length);
+    result_field_names_pointer+= v_length;
+  }
+
+  grid_scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  grid_scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 }
 
-#define explorer_FIXED_NAME_WIDTH 20 /* arbitrary, big names take more lines */
+#define EXPLORER_FIXED_NAME_WIDTH 20 /* arbitrary, big names take more lines */
 /* The explorer_display_html() stuff that must be called once.
   Todo: Loop 1 only needs to be done once, we're repeating it for every refresh.
   result_row_count is the maximum for the vertical scroll bar
@@ -8901,10 +8958,15 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
     The constant calling to copy_html_cell() is totally wasted time if there are no conditional settings.
     We don't care what any of the results are, except whether cell height becomes 0.
     We're assuming type = detail not header, that may be wrong but I doubt it affects whether to skip.
+  Todo: We're trying to ensure that grid_column_widths[0], grid_column_widths[1] are small by not
+        calling get_column_width_in_pixels which won't give < MIN_WIDTH_IN_CHARS and is affected
+        by vertical scroll bar width -- which shouldn't affect us provided that we don't allow resize
+        or drag. Are we sure resize or drag can't happen? The other way to do it might be
+        if (result_grid_type == OCELOT_EXPLORER) return min_width;" in get_column_width_in_pixels().
+        Should you be adding setting_ocelot_grid_cell_border_size_as_int? Is that already done somewhere?
 */
 void explorer_display()
 {
-printf("**** explorer_display\n");
   switch_to_html_text_edit(); /* When should this really be done? And how often? */
   unsigned int r_of_t= 0;                                   /* so when we see "C" we can find its "T" */
   int new_cell_height;
@@ -8913,27 +8975,34 @@ printf("**** explorer_display\n");
 
   unsigned int tmp_result_row_number;
 
-  /* Loop 1: Calculate maximum width of object_name and column_name for all rows */
+  /* Loop 1: Calculate maximum width of object_name for all rows */
   {
     unsigned int object_name_size, max_object_name_size= 0;
-    unsigned int column_name_size, max_column_name_size= 0;
     for (tmp_result_row_number= 0; tmp_result_row_number < copy_of_parent->oei_count; ++tmp_result_row_number)
     {
       bool is_row_skippable= false;
       if (copy_of_parent->oei[tmp_result_row_number].object_type == "T") r_of_t= tmp_result_row_number;
       if ((copy_of_parent->oei[tmp_result_row_number].object_type != "C") || (copy_of_parent->oei[r_of_t].is_min == false))
       {
-        for (unsigned int result_column_no= 0; result_column_no < 4; ++result_column_no)
+        for (unsigned int result_column_no= 0; result_column_no < EXPLORER_COLUMN_COUNT; ++result_column_no)
         {
           QByteArray s;
           if (result_column_no == 0)
           {
-            if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= bytearray_min;
-            else s= bytearray_max;
+            if (copy_of_parent->oei[tmp_result_row_number].object_type == "T")
+            {
+              if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= bytearray_min;
+              else s= bytearray_max;
+            }
+            else s= "";
           }
           if (result_column_no == 1) s= copy_of_parent->oei[tmp_result_row_number].object_type;
-          if (result_column_no == 2) s= copy_of_parent->oei[tmp_result_row_number].object_name;
-          if (result_column_no == 3) s= copy_of_parent->oei[tmp_result_row_number].column_name;
+          if (result_column_no == 2)
+          {
+            s= copy_of_parent->oei[tmp_result_row_number].object_name;
+            if (copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+              s= copy_of_parent->oei[tmp_result_row_number].part_name;
+          }
           char tmp[2048];
           char *tmp_pointer= &tmp[0];
           tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_detail_numeric_column_start,
@@ -8964,42 +9033,35 @@ printf("**** explorer_display\n");
 
         object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
         if (max_object_name_size < object_name_size) max_object_name_size= object_name_size;
-        column_name_size= copy_of_parent->oei[tmp_result_row_number].column_name.size();
-        if (max_column_name_size < column_name_size) max_column_name_size= column_name_size;
         copy_of_parent->oei[tmp_result_row_number].display_row_number= result_row_count;
         ++result_row_count;
       }
       else copy_of_parent->oei[tmp_result_row_number].display_row_number= -1;
     }
-
-    if (max_object_name_size > explorer_FIXED_NAME_WIDTH) max_object_name_size= explorer_FIXED_NAME_WIDTH;
-    if (max_column_name_size > explorer_FIXED_NAME_WIDTH) max_column_name_size= explorer_FIXED_NAME_WIDTH;
-    char tmp_string_1[explorer_FIXED_NAME_WIDTH * 4];
+    if (max_object_name_size > EXPLORER_FIXED_NAME_WIDTH) max_object_name_size= EXPLORER_FIXED_NAME_WIDTH;
+    char tmp_string_1[EXPLORER_FIXED_NAME_WIDTH * 4];
     /* Todo: Following lines should restrict column#1/#2 widths to one char width but I get two char widths. */
-    grid_column_widths[0]= get_column_width_in_pixels("W", false, false); /* Actually [0] is bytearray_min|max */
-    grid_column_widths[1]= get_column_width_in_pixels("W", false, false);
-printf("**** grid_column_widths[0]=%d\n", grid_column_widths[0]);
+    QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
+    grid_column_widths[0]= grid_column_widths[1]= result_grid_font_metrics.maxWidth();
     unsigned int i;
     for (i= 0; i < max_object_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
     grid_column_widths[2]= get_column_width_in_pixels(tmp_string_1, false, false);
-    for (i= 0; i < max_column_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
-    grid_column_widths[3]= get_column_width_in_pixels(tmp_string_1, false, false);
   }
-
   /* TODO: result_row_count might be 0 if there is filtering, in that case clear screen and return */
 
   vertical_scroll_bar_initialize(); /* has to be done after we know result_row_count */
   prepare_for_display_html();
   display_html(0, 0);  /* effectively: explorer_display_html(0) */
+
 }
 
 /* todo: should this function be private? */
 /*
   Re calculations of width and height:
   To prevent jumping around with width during vertical scroll, html_text_edit has a consistent width.
-  This width is based on max_object_name_size, max_column_name_size.
-  They are never more than explorer_FIXED_NAME_WIDTH.
-  First pass is: for all rows, to get max_object_name_size, max_column_name_size.
+  This width is based on max_object_name_size.
+  They are never more than EXPLORER_FIXED_NAME_WIDTH.
+  First pass is: for all rows, to get max_object_name_size.
                  ... but we don't consider items that are filtered or suppressed due to bytearray_min
   Second pass is: for rows until it would overflow widget height: output and decide height.
   Each row's height should be in grid_row_heights[]. Total html_text_edit height may vary.
@@ -9010,6 +9072,12 @@ printf("**** grid_column_widths[0]=%d\n", grid_column_widths[0]);
     If setting is "default", width is some fixed amount -- percentage of main widget?
     Width of each column can still be determined from content. Or what the hell, depend on horizontal scrollbar.
     Or: Note what the widest one is, and get its width.
+  Re nulls:
+    The default query that we set up in initialize_widget_explorer() selects ''s not nulls,
+    e.g. "select 'D',database(),null,null\n". Since we don't expect nulls, we don't keep flags in oei[]
+    and result_field_flags[] and result_value_flags are always 0. Therefore to check for not applicable, use
+    set ocelot_grid_background_color='yellow' where value = '';
+    If in future we have a situation where that's not so, we'll have to add flag fields in the struct.
   Todo: re row_height+= 9;
         Something is wrong with our minimum height calculation in get_cell_width_or_height_as_int()
   Todo: Re start of loop: what you really should be doing is finding the oei[] with the right grid row
@@ -9017,7 +9085,6 @@ printf("**** grid_column_widths[0]=%d\n", grid_column_widths[0]);
 
 void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or what user clicked */
 {
-printf("**** explorer_display_html\n");
   unsigned int grid_row;
   if (copy_of_parent->oei_count == 0) return; /* unnecessary? screen should be cleared? */
 
@@ -9051,17 +9118,14 @@ printf("**** explorer_display_html\n");
 
   }
   int cell_height_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_height, max_height_of_a_char);
-
   unsigned int total_object_name_size= 0;
-  unsigned int total_column_name_size= 0;
   /* Loop 2: Calculate how many rows will be in the current display and approximately how big they are. */
   /* TODO: MINIMUM = 1! */
   unsigned int local_max_grid_rows= 0;
   {
     unsigned int object_name_size;
-    unsigned int column_name_size;
     unsigned int total_grid_row_heights= 0;
-    total_grid_row_heights= 12; /* Perhaps = # of pixels before first row and after last row */
+    total_grid_row_heights= 12; /* Perhaps = # of pixels before first row and after last row i.e. margin? */
     for (tmp_result_row_number= new_grid_vertical_scroll_bar_value;
          tmp_result_row_number < copy_of_parent->oei_count;
          ++tmp_result_row_number)
@@ -9069,14 +9133,13 @@ printf("**** explorer_display_html\n");
       if (copy_of_parent->oei[tmp_result_row_number].display_row_number != -1) /* i.e. not skippable */
       {
         object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
+        if (copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+          object_name_size= copy_of_parent->oei[tmp_result_row_number].part_name.size();
         total_object_name_size+= object_name_size;
-        column_name_size= copy_of_parent->oei[tmp_result_row_number].column_name.size();
-        total_column_name_size+= column_name_size;
         unsigned int row_height= cell_height_as_int;
-        if ((object_name_size > explorer_FIXED_NAME_WIDTH) || (column_name_size > explorer_FIXED_NAME_WIDTH)) row_height+= cell_height_as_int;
+        if (object_name_size > EXPLORER_FIXED_NAME_WIDTH) row_height+= cell_height_as_int;
         row_height+= setting_ocelot_grid_cell_border_size_as_int * 2; /* Maybe this sort of makes sense */
         row_height+= 9; /* This surely does not make sense but apparently corresponds with reality */
-        /* TODO: HOW HIGH IS HORIZONTAL SCROLL BAR? */
         if ((total_grid_row_heights + row_height) >= (unsigned int) this->height())
         {
           if (local_max_grid_rows > 0) break; /* minimum number of rows to display is 1 */
@@ -9087,14 +9150,13 @@ printf("**** explorer_display_html\n");
       }
     }
   }
-printf("**** local_max_grid_rows=%d\n", local_max_grid_rows);
   /* "* 5" is because each character might cause multiple bytes due to UTF-8 or HTML escaping */
   /* "* 500" is a very vague guess about the per-row overhead thinking about width, div, color extras */
   /* "500" is a very vague guess about the per-display overhead */
   /* todo: fix so you've got a better estimate, or do a dummy pass first, or use byte array not char */
+  /* todo: is 500 taking into account thin image? */
   int tmp_size= local_max_grid_rows * 5
                + total_object_name_size * 5
-               + total_column_name_size * 5
                + local_max_grid_rows * 500
                + 500;
   char *tmp;
@@ -9124,24 +9186,31 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
       tmp_pointer_before_thin_image_call= tmp_pointer;
       tmp_pointer+= thin_image(tmp_pointer, (const char*) "TD", grid_row_heights[grid_row]);
 
-      for (unsigned int result_column_no= 0; result_column_no < 4; ++result_column_no)
+      for (unsigned int result_column_no= 0; result_column_no < EXPLORER_COLUMN_COUNT; ++result_column_no)
       {
         QByteArray s;
         if (result_column_no == 0)
         {
-          if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= bytearray_min;
-          else s= bytearray_max;
+          if (copy_of_parent->oei[tmp_result_row_number].object_type == "T")
+          {
+            if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= bytearray_min;
+            else s= bytearray_max;
+          }
+          else s= "";
         }
         if (result_column_no == 1) s= copy_of_parent->oei[tmp_result_row_number].object_type;
-        if (result_column_no == 2) s= copy_of_parent->oei[tmp_result_row_number].object_name;
-        if (result_column_no == 3) s= copy_of_parent->oei[tmp_result_row_number].column_name;
+        if (result_column_no == 2)
+        {
+          s= copy_of_parent->oei[tmp_result_row_number].object_name;
+          if (copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+            s= copy_of_parent->oei[tmp_result_row_number].part_name;
+        }
         //strcpy(tmp_pointer, s.data());
         //tmp_pointer+= s.size();
         /* HERE IS THE SECTION THAT WE NEED TO WORK ON!!! */
         /* todo: check is i supposed to be base-0 or base-1? */
         /* todo: is result_set_value_flags possible is_image() or NUM_FLAG? Um, I guess not */
         /* todo: what if new_cell_height becomes positive? */
-
         if (result_column_no == 0)
           tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_header_numeric_column_start,
                                                        ocelot_grid_header_char_column_start,
@@ -9219,7 +9288,9 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
   */
   d.setHtml(tmp);
   html_text_edit_height= d.size().height();
-  if (copy_of_parent->ocelot_explorer_width == "default") html_text_edit_width= d.size().width();
+  /* When calculating widget width we assume there is always a vertical scroll bar */
+  if (copy_of_parent->ocelot_explorer_width == "default")
+    html_text_edit_width= d.size().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent);
   else html_text_edit_width= copy_of_parent->ocelot_explorer_width.toInt();
   if ((html_text_edit_height > this->height()) && (local_max_grid_rows > 1))
   {
@@ -10052,7 +10123,12 @@ int get_cell_width_or_height_as_int(QString cell_width_or_height_as_qstring, int
   {
     if (cell_width_or_height_as_int > 1000) cell_width_or_height_as_int= 1000; /* arbitrary maximum */
 #if (OCELOT_EXPLORER == 1)
-    if (this == copy_of_parent->explorer_widget) return cell_width_or_height_as_int;
+    if ((result_grid_type == EXPLORER_WIDGET)
+     && (cell_width_or_height_as_int == 0)
+     && (QString::compare(cell_width_or_height_as_qstring, "default", Qt::CaseInsensitive) != 0))
+     {
+      return cell_width_or_height_as_int;
+     }
 #endif
     if (cell_width_or_height_as_int < min) cell_width_or_height_as_int= min; /* arbitrary minimum */
   }
@@ -10876,7 +10952,6 @@ int get_column_width_in_pixels(QString s, bool is_header, bool is_image_flag)
                                    Qt::TextWrapAnywhere + Qt::TextIncludeTrailingSpaces, /* int flags = (see comments before start of this routine) */
                                    s); /* QString & text= cell contents */
   unsigned int min_width= r2.width();
-
   /* Kludge alert. It's a mystery, but above min-width calculation sometimes isn't enough.
      However, increasing it should be okay if this is a detail cell and vertical != 0. */
   int really_minimal= character_count_to_pixel_count(1);
@@ -12941,8 +13016,8 @@ if (current_widget == GRID_WIDGET)
     widget_for_size[0]= new QWidget(this);
     label_for_size[0]= new QLabel("Visible");
     combo_box_for_size[0]= new QComboBox();
-    combo_box_for_size[0]->addItem("No");
-    combo_box_for_size[0]->addItem("Yes");
+    combo_box_for_size[0]->addItem("no");
+    combo_box_for_size[0]->addItem("yes");
     combo_box_for_size[0]->setCurrentIndex(combo_box_for_size[0]->findText(copy_of_parent->new_ocelot_explorer_visible));
     hbox_layout_for_size[0]= new QHBoxLayout();
     hbox_layout_for_size[0]->addWidget(label_for_size[0]);
@@ -12952,8 +13027,8 @@ if (current_widget == GRID_WIDGET)
     widget_for_size[1]= new QWidget(this);
     label_for_size[1]= new QLabel("Expanded");
     combo_box_for_size[1]= new QComboBox();
-    combo_box_for_size[1]->addItem("No");
-    combo_box_for_size[1]->addItem("Yes");
+    combo_box_for_size[1]->addItem("no");
+    combo_box_for_size[1]->addItem("yes");
     combo_box_for_size[1]->setCurrentIndex(combo_box_for_size[1]->findText(copy_of_parent->new_ocelot_explorer_expanded));
     hbox_layout_for_size[1]= new QHBoxLayout();
     hbox_layout_for_size[1]->addWidget(label_for_size[1]);
@@ -12969,7 +13044,8 @@ if (current_widget == GRID_WIDGET)
     hbox_layout_for_size[2]->addWidget(label_for_size[2]);
     hbox_layout_for_size[2]->addWidget(text_for_query);
     widget_for_size[2]->setLayout(hbox_layout_for_size[2]);
-    connect(combo_box_for_size[2], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_2(int)));
+    /* For some reason I don't get a signal for this, so I'll assume change and do things in handle_button_for_ok */
+    //connect(combo_box_for_size[2], SIGNAL(currentTextChanged(QString)), this, SLOT(handle_text_changed(QString)));
   }
 #endif
 
@@ -13545,6 +13621,9 @@ private slots:
 /* If user clicks OK, end. The caller will move changed "new" settings to non-new. */
 void handle_button_for_ok()
 {
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET) copy_of_parent->new_ocelot_explorer_query= text_for_query->toPlainText();
+#endif
   done(QDialog::Accepted); /* i.e. close() but return Accepted */
 }
 
@@ -14171,12 +14250,7 @@ void handle_combo_box_for_size_2(int item_number)
 {
   QString q= combo_box_for_size[2]->itemText(item_number);
   copy_of_parent->new_ocelot_grid_cell_width= q;
-#if (OCELOT_EXPLORER == 1)
-  if (current_widget == EXPLORER_WIDGET)
-    copy_of_parent->new_ocelot_explorer_query= text_for_query->toPlainText();
-#endif
 }
-
 
 /* See comment that begins with the words "Font comments" */
 int get_font_weight_as_qfont_weight(QString font_weight_string)
@@ -14368,13 +14442,14 @@ private:
 #define OCELOT_VARIABLE_FLAG_SET_FONT_STYLE     0x22
 #define OCELOT_VARIABLE_FLAG_SET_FONT_SIZE      0x42
 #define OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT    0x82
+#define OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE    0x04
 #define OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT    1
 #define OCELOT_VARIABLE_ENUM_SET_FOR_GRID         2
 #define OCELOT_VARIABLE_ENUM_SET_FOR_HISTORY      3
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 131
+#define OCELOT_VARIABLES_SIZE 132
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
@@ -14424,5 +14499,56 @@ int ocelot_variables_size();
 
 };
 #endif //#ifndef XSETTINGS_H
+
+#if (OCELOT_EXPLORER == 1)
+#ifndef SMALL_DIALOG_H
+#define SMALL_DIALOG_H
+class Small_dialog: public QDialog
+{
+  Q_OBJECT
+
+public:
+QLineEdit line_edit;
+
+/*
+  Input = title and label and default string. Output = what user entered.
+  This is only called from explorer at the moment, but maybe is useful for more in future.
+*/
+Small_dialog(QString passed_title, QString passed_label, QString passed_value)
+{
+  QLabel label;
+  QHBoxLayout layout;
+  setWindowTitle(passed_title);
+  label.setText(passed_label);
+  line_edit.setText(passed_value);
+  layout.addWidget(&label);
+  layout.addWidget(&line_edit);
+  setLayout(&layout);
+  installEventFilter(this);
+}
+
+bool eventFilter(QObject *obj, QEvent *event)
+{
+  if (event->type() == QEvent::KeyPress)
+  {
+    QKeyEvent *key= static_cast<QKeyEvent *>(event);
+    if ((key->key() == Qt::Key_Enter) || (key->key() == Qt::Key_Return))
+    {
+      accept();
+      return false;
+    }
+  }
+  return false;
+}
+
+
+~Small_dialog()
+{
+  ;
+}
+
+};
+#endif // #ifndef SMALL_DIALOG_H
+#endif // #if (COMPLETER_WIDGET == 1)
 
 #endif // OCELOTGUI_H
