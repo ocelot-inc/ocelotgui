@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: July 17 2022
+   Last modified: August 9 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -573,7 +573,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   connections_is_connected[0]= 0;
   mysql_res= 0;
-
   /* client variable defaults */
   /* Most settings done here might be overridden when connect_mysql_options_2 reads options. */
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -767,7 +766,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   {
     action_connect();
   }
-
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
 
   QTimer::singleShot(0, this, SLOT(initialize_after_main_window_show()));
@@ -11090,7 +11088,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (ocelot_auto_rehash != 0)
       {
         char error_or_ok_message[ER_MAX_LENGTH];
-        int i= rehash_scan_all(error_or_ok_message);
+        int i= rehash_scan(error_or_ok_message, false);
         if (i == ER_OK_REHASH)
         {
           put_message_in_result(error_or_ok_message);
@@ -11282,10 +11280,19 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   if (statement_type == TOKEN_KEYWORD_REHASH)   /* Regardless whether ocelot_auto_rehash = 1 */
   {
     char error_or_ok_message[ER_MAX_LENGTH];
-    rehash_scan_all(error_or_ok_message); /* We don't check if return = ER_OK but if it failed then rehash_result_row_count = 0 */
+    rehash_scan(error_or_ok_message, false); /* We don't check if return = ER_OK but if it failed then rehash_result_row_count = 0 */
     put_message_in_result(error_or_ok_message);
     return 1;
   }
+#if (OCELOT_EXPLORER == 1)
+  if (statement_type == TOKEN_KEYWORD_RELOAD)
+   {
+     char error_or_ok_message[ER_MAX_LENGTH];
+     explorer_rehash(error_or_ok_message);
+     put_message_in_result(error_or_ok_message);
+     return 1;
+   }
+#endif
   /* TODO: "STATUS" should output as much information as the mysql client does. */
   /* Todo: connections_is_connected is still 1 after lost connection or SHUTDOWN, fix that somewhere */
   if (statement_type == TOKEN_KEYWORD_STATUS)
@@ -11701,24 +11708,7 @@ int MainWindow::conditional_settings_insert(QString text)
     more. But this means there could be thousands of entries
     in the cache, and searches are sequential.
     Todo: add an order-by in the select, and do binary searches.
-  TODO: TEST!! This wasn't working properly for Tarantool but I think we've got it fixed now.
-  Todo: Due to ocelot_explorer we want a "default" (for rehash only, or for comparing to ocelot_explorer_query)
-  Todo: Due to ocelot_explorer for REHASH statement we want to call both, as we should do for explorer_show()
 */
-/*
-  rehash_scan(false) sets up what we need for autocomplete.
-  explorer_rehash(), which calls rehash_scan(true), sets up what we need for explorer.
-  We always call both for REHASH; or if --auto_rehash or if context-menu-choice=Rehash
-*/
-int MainWindow::rehash_scan_all(char *error_or_ok_message)
-{
-  int r= rehash_scan(error_or_ok_message, true);
-#if (OCELOT_EXPLORER == 1)
-  if (r != ER_OK_REHASH) return r;
-  r= explorer_rehash(error_or_ok_message);
-#endif
-  return r;
-}
 
 int MainWindow::rehash_scan(char *error_or_ok_message, bool is_explorer)
 {
@@ -11897,6 +11887,9 @@ int MainWindow::rehash_scan_for_tarantool(char *error_or_ok_message, bool is_exp
     /* We replaced eval() with tnt_select calls so we can use fewer privileges. */
     tarantool_table_ids.clear(); tarantool_table_names.clear();
     tarantool_column_table_names.clear(); tarantool_column_names.clear();
+#if (OCELOT_EXPLORER == 1)
+    tarantool_type_names.clear();
+#endif
     tarantool_index_table_names.clear(); tarantool_index_names.clear();
     tarantool_trigger_names.clear();
     rehash_scan_one_space(281); /* 281 is "_vspace" */
@@ -12137,7 +12130,19 @@ void MainWindow::rehash_scan_one_space(int space_number)
                 tarantool_column_names << returned_string;
               }
             }
-            else lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy); /* skip type */
+            else
+            {
+#if (OCELOT_EXPLORER == 1)
+              if ((value_length == 4) && (returned_string == "type"))
+              {
+                value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+                returned_string= QString::fromUtf8(value, value_length);
+                tarantool_type_names << returned_string;
+              }
+              else
+#endif
+              lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy); /* skip type */
+            }
           }
         }
       }
@@ -14868,7 +14873,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     delete lmysql;
     return 1;
   }
-
   if (is_libtarantool_loaded == 0)
   {
     /* Todo: QMessageBox should have a parent, use "= new" */
@@ -14888,7 +14892,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
 
   /* tnt[] is static global */
   tnt[connection_number]= lmysql->ldbms_tnt_net(NULL);
-
   if (ocelot_opt_connect_timeout > 0)
   {
     struct timeval tvp;
@@ -14992,7 +14995,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     //  tarantool_memtx_use_mvcc_engine= tarantool_internal_query(query_string, connection_number).toInt();
     //}
   }
-
   /* Old Tarantool (before 2.1.2?) need box.sql.execute not box.execute */
   /* If box.execute() fails and box.sql.execute() fails, SQL is impossible. */
   if (connection_number == 0)
@@ -19958,15 +19960,13 @@ void Result_qtextedit::mousePressEvent(QMouseEvent *event)
     qtextedit_drag_start_time= QDateTime::currentMSecsSinceEpoch();
   }
 #if (OCELOT_EXPLORER == 1)
- if (result_grid->result_grid_type == EXPLORER_WIDGET)
+  if ((result_grid->result_grid_type == EXPLORER_WIDGET)
+   && (qtextedit_is_in_drag_for_column == false) && (qtextedit_is_in_drag_for_row == false)
+   && (event->button() == Qt::LeftButton)
+   && (qtextedit_column_number == 1)
+   && (qtextedit_cell_content > ""))
   {
-    if ((qtextedit_is_in_drag_for_column == false) && (qtextedit_is_in_drag_for_row == false))
-    {
-      if (event->button() == Qt::LeftButton)
-      {
-        qtextedit_is_min_max_clicked= true;
-      }
-    }
+    qtextedit_is_min_max_clicked= true;
     /* TODO: find out why I have to say "return;" here! */
     return;
   }
@@ -20191,6 +20191,7 @@ painter.drawPixmap(0, 0, p);
 //painter.drawPixmap(event->rect(), p);
 return;
 #endif
+/* Todo: Find out why this is called repeatedly when visible, even if nothing's going on. */
 void Result_qtextedit::paintEvent(QPaintEvent *event)
 {
   QTextEdit::paintEvent(event);
@@ -20360,7 +20361,6 @@ void Result_qtextedit::menu_context_t_2(const QPoint & pos)
         Maybe don't make submenus?
   Todo: for CREATE TABLE LIKE: see whether the widget you use for ^F Find might have been useful
   Warning: do not define QAction objects inside {}s, exec() will not know about them.
-  Warning: rehash; isn't working properly at the time this is written.
   Todo: Bug: If we move the cursor while the menu is up, mousemovevent won't happen, so row number is wrong.
   Todo: Maybe "load" an instruction? But that can be a general idea, not necessarily associated with explorer.
 */
@@ -20450,14 +20450,29 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
   }
   if (object_type == "I")
   {
+    /* Todo: For Tarantool we should be enclosing in ""s */
     action_drop_index.setText("Drop index " + part_name + " on " + object_name + ";");
     menu.addAction(&action_drop_index);
     if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
     {
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
       action_show_index.setText("Show index from " + object_name + ";");
+#endif
+#ifdef DBMS_TARANTOOL
+    if (connections_dbms[0] == DBMS_TARANTOOL)
+      action_show_index.setText("select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '_collation');");
+#endif
       menu.addAction(&action_show_index);
     }
-    action_select_index.setText("Select * from information_schema.statistics where index_name = '" + part_name + "';");
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
+      action_select_index.setText("Select * from information_schema.statistics where index_name = '" + part_name + "';");
+#endif
+#ifdef DBMS_TARANTOOL
+    if (connections_dbms[0] == DBMS_TARANTOOL)
+      action_select_index.setText("Select * from \"_index\" where \"name\" = '" + part_name + "';");
+#endif
     menu.addAction(&action_select_index);
   }
   action_rehash.setText("Rehash;");
@@ -22508,10 +22523,13 @@ void MainWindow::connect_init(int connection_number)
   if (connection_number == 0)
   {
     menu_file_export->setEnabled(true);
+#if (OCELOT_EXPLORER == 1)
+    initialize_widget_explorer_after_connect();
+#endif
     if (ocelot_auto_rehash != 0)
     {
       char error_or_ok_message[ER_MAX_LENGTH];
-      rehash_scan_all(error_or_ok_message); /* Todo: should we display the error/ok message that rehash_scan() produces? */
+      rehash_scan(error_or_ok_message, false); /* Todo: should we display the error/ok message that rehash_scan() produces? */
     }
   }
 }
@@ -26911,19 +26929,19 @@ XSettings::~XSettings()
     * Most things that affect Settings | Result Grid affect explorer too.
     * One difference: dragging doesn't happen. There wouldn't be much point, since items are short.
   Columns: all of which are 'TEXT':
-    #1: Min. = Unicode circled plus character or Unicode circled minus character if table, else blank.
-        If it's a table, this can be clicked to hide the columns, or to show them again.
+    #1: Min. = Unicode Black Down-Pointing Triangle or Black Right-Pointing Triangle if database or table.
+        If it's a database or table, this can be clicked to hide the parts e.g. columns, or to show them again.
         (We call this "toggling".)
         It's treated as a header item, that is, Result Grid Settings for header affect it.
         So ordinarily it has a different background color.
     #2: object_type. T or C or P or I or E or t
     #3: object_name. for example, if object_type='T', this is a table name.
-        If object_type='C', this is a column name and is taken part_name.
+        If object_type='C', this is a column name and is taken from part_name.
   Settings ... for Explorer
     Visible: yes|no. Default no. So if you don't change this to 'yes', there's nothing.
-    Expanded: yes.no. Default no. This means the the stylized + or - is + by default.
+    Expanded: yes.no. Currently this does nothing.
     Query: a long select with unions.
-      The query selects only within the current database, so if you haven't said 'USE database', there's nothing.
+      The default query selects all databases.
       Users can change this query, for example removing union select from columns means they'll never appear.
     Detached|Top|Left|Width|Height:
       As with other widgets, the explorer is detachable and the explorer's size + position are settable
@@ -26938,14 +26956,13 @@ XSettings::~XSettings()
       For example if it's over a table, then table-related menu items will appear.
       The list of possible items is in the comment preceding menu_context_t_2_explorer).
   SET statements:
-    SET ocelot_grid_cell_height ... WHERE ...; causes matching rows to disappear, i.e. this is our "filter".
+    SET ocelot_grid_cell_height=0 ... WHERE ...; causes matching rows to disappear, i.e. this is our "filter".
     New keywords begin with TOKEN_KEYWORD_OCELOT_EXPLORER e.g. TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED
     Important one: ocelot_visible='yes'|'no'
-  REHASH:
-    Others call this "Refresh" or "Refresh all". We use REHASH since it's an existing user statement.
-    REHASH is necessary because we don't know when others might change data definitions.
-    Whenever users say REHASH, both the auto-completion tables and the explorer tables are redone.
-    So --auto_rehash affects the explorer too.
+  RELOAD:
+    Others call this "Refresh" or "Refresh all". We use RELOAD since it's an existing keyword.
+    RELOAD is necessary because we don't know when others might change data definitions.
+    Whenever users say RELOAD, the explorer tables are redone.
     In another product this would be done with a View menu.
   Options:
     New options: Detach|Attach explorer widget.
@@ -26970,23 +26987,18 @@ XSettings::~XSettings()
   Todo: When you first display a result grid, there is a little blank. It's batch_text_edit.
         Should it be initially hidden for all result grid? I haven't decided yet.
   Todo: Hide the explorer widget if/when not connected.
-  Todo: This has not been tried with Tarantool yet.
   Todo: Your initial setup of upper_layout might be dangerous, check it more thoroughly.
         Search for calculations that depend on whole width, instead of main_window width.
         Check whether a change to grid settings will affect explorer_widget (probably not).
-  Todo: "MIN" is not a wonderfulname. It should be short. It should be like what is in Settings,
-        which currently is "Expand". There might be some standard term. Collapse? Tables only? Hide columns?
-        Hide parts?
+  Todo: "MIN" is not a wonderfulname. It should be short.
+        There might be some standard term. Collapse? Tables only? Hide columns? Hide parts?
   explorer_show():
     will do rehash_scan() (as if REHASH statement was executed), then fill up oei struc,
     so that when explorer_widget->show() happens there will be an explorer widget to show.
     There are several ways it can fail, which should cause a dialog box without showing.
   Todo: Usually when we change a Settings item the result is we generate a SET statement.
         TODO: explorer_show() should merely give error dialog boxes if something is not ready.
-              explorer_refresh() should give an error dialog box if rehash/refresh fails.
-              Or maybe there is no difference, there should be only one button and it does everything.
-        THE PLAN NOW IS: explorer_show() always does a rehash_scan so explorer_refresh is a no-op.
-                         but you can change the prompt to "refresh and show again" if it's already visible
+              explorer_rehah() should give an error dialog box if rehash/refresh fails.
         Todo: user might set e.g. vertical or raw. make sure such settings have no effect on explorer widget
         Todo: we could say, instead of "C", "C(PK,FK,I)"
         Todo: ^C i.e. Copy should be possible on explorer cells
@@ -26996,12 +27008,8 @@ XSettings::~XSettings()
         Todo: example.cnf should include the new words
         Todo: This initializes ocelot_explorer_query to MySQL default, but we need Tarantool default
               which might change upon re-connect.
-        Todo: asking for column_type is okay for MySQL/MariaDB but not for Tarantool
-               maybe nothing here is right for Tarantool, eh?
         Todo: Now that everything is in object_name we lose a bit of ability with
               SET ocelot_grid_... WHERE column_name ... unless we say column_type='C' means something
-        Todo: Check if Expanded works
-              "Expanded" could be something like "All Maximized" or "All Minimized"
 */
 void MainWindow::initialize_widget_explorer()
 {
@@ -27013,40 +27021,61 @@ void MainWindow::initialize_widget_explorer()
   explorer_widget->grid_vertical_scroll_bar->installEventFilter(this);
   explorer_widget->set_all_style_sheets(ocelot_grid_style_string, 0, 0, false);
   /* Todo: Not sure where to put this. And it's wrong if Tarantool. Compare query of rehash_scan(). */
+
+}
+
+/*
+  Called from: connect_init().
+  After we connect or reconnect, we might need to change the query that we use for the explorer.
+  Todo: Flaw: This will override any change that a user makes with Settings|Explorer.
+        It might be better to have two ocelot_explorer_queries, one for Tarantool, one for MySQL/MariaDB.
+  Todo: think harder about how to handle switch to a different DBMS
+  Todo: Create _tables and _columns if they haven't already been created.
+  Todo: If explorer_rehash fails, probably because we lack an important select privilege,
+        mark that explorer is disabled and explain the problem.
+  Todo: Temporarily I've set auto_rehash=0. Put it back in .my.cnf.
+*/
+void MainWindow::initialize_widget_explorer_after_connect()
+{
 #if (OCELOT_MYSQL_INCLUDE == 1)
-  ocelot_explorer_query= "select 'D',database(),'',''\n"
+  if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MARIADB))
+  ocelot_explorer_query= "select 'D',schema_name,schema_name,'',''\n"
+                 "from information_schema.schemata\n"
                  "union all\n"
-                 "select 'C',table_name,column_name,column_type\n"
-                 "from information_schema.columns\n"
-                 "where table_schema = database()\n"
-                 "union all\n"
-                 "select 'T',table_name,table_type,''\n"
+                 "select 'T',table_schema,table_name,table_type,''\n"
                  "from information_schema.tables\n"
-                 "where table_schema = database()\n"
                  "union all\n"
-                 "select 'F',routine_name,routine_type,''\n"
-                 "from information_schema.routines\n"
-                 "where routine_schema = database() and routine_type = 'FUNCTION'\n"
+                 "select 'C',table_schema,table_name,column_name,column_type\n"
+                 "from information_schema.columns\n"
                  "union all\n"
-                 "select 'P',routine_name,routine_type,''\n"
-                 "from information_schema.routines\n"
-                 "where routine_schema = database() and routine_type = 'PROCEDURE'\n"
-                 "union all\n"
-                 "select 't',trigger_name,'',''\n"
-                 "from information_schema.triggers\n"
-                 "where trigger_schema = database()\n"
-                 "union all\n"
-                 "select 'E',event_name,'',''\n"
-                 "from information_schema.events\n"
-                 "where event_schema = database()\n"
-                 "union all\n"
-                 "select 'I',table_name,index_name,''\n"
+                 "select 'I',table_schema,table_name,index_name,''\n"
                  "from information_schema.statistics\n"
-                 "where table_schema = database();"
+                 "union all\n"
+                 "select 't',trigger_schema,trigger_name,'',''\n"
+                 "from information_schema.triggers\n"
+                 "union all\n"
+                 "select 'F',routine_schema,routine_name,routine_type,''\n"
+                 "from information_schema.routines\n"
+                 "where routine_type = 'FUNCTION'\n"
+                 "union all\n"
+                 "select 'P',routine_schema,routine_name,routine_type,''\n"
+                 "from information_schema.routines\n"
+                 "where routine_type = 'PROCEDURE'\n"
+                 "union all\n"
+                 "select 'E',event_schema,event_name,'',''\n"
+                 "from information_schema.events\n"
+                 ";"
          ;
-#else
-  error -- think harder about how to handle switch to a different DBMS, and reuse of rehash_scan
 #endif
+  if (connections_dbms[0] == DBMS_TARANTOOL)
+    ocelot_explorer_query= "select 'D','main','','',//\n"
+                   "union all\n"
+                   "select 'C',table_schema,table_name,column_name,data_type\n"
+                   "from _columns\n"
+                   "union all\n"
+                   "select 'T',table_schema,table_name,table_type,''\n"
+                   "from _tables;"
+    ;
 }
 
 
@@ -27054,7 +27083,7 @@ void MainWindow::initialize_widget_explorer()
   Todo:
   !! DELETE oei IF YOU SAID NEW! (no, we don't do that unless user decides to remove the whole thing)
   Method:
-    Call rehash_scan with is_explorer=false, then call again with is_explorer==true.
+    Call rehash_scan with is_explorer=true.
     Set up oei.
     REHASH initially calls rehash_scan with is_explorer=false, because we might have wrecked things for autocomplete.
     Todo #1: The second rehash_scan call is only necessary if there was a difference but we fail to check.
@@ -27067,7 +27096,7 @@ void MainWindow::explorer_show()
   //statement_edit_widget->setPlainText("REHASH;");
   //if (action_execute(1) != 0) return; /* != 0 means rehash failed for some reason */
   char error_or_ok_message[1024];
-  int rehash_scan_result= rehash_scan_all(error_or_ok_message);
+  int rehash_scan_result= explorer_rehash(error_or_ok_message);
   if (rehash_scan_result != ER_OK_REHASH) return; /* Todo: does user see this result? */
   explorer_widget->explorer_display();  /* effectively: explorer_display_html(0) */
   explorer_widget->show();
@@ -27080,116 +27109,212 @@ void MainWindow::explorer_show()
   so we always will call rehash() twice, once for autocomplete use, once for explorer use.
 SET ocelot_explorer_visible='yes'; -- if already visible: depends whether something else changed, but that's a bit hard to know
                                     if not already visible: rehash
-Menu context edit menu rehash:        REHASH
-REHASH:                               rehash_scan() for autocomplete, also explorer_rehash_scan if ocelot_explorer_visible='yes'
---auto_rehash:                          so on startup or after USE, REHASH will happen
+Menu context edit menu rehash:        RELOAD
+RELOAD:                               explorer_rehash_scan if ocelot_explorer_visible='yes'
+--auto_rehash:                        affects REHASH not RELOAD
 After explorer_rehash, vertical scroll bar should go back to start
 
-Called from: execute_client_statement if (statement_type == TOKEN_KEYWORD_USE)
-             so if --auto_rehash, both rehash_scan() and explorer_rehash() are called
-Called from: execute_client_statement if (statement_type == TOKEN_KEYWORD_REHASH)
-             so both rehash_scan() and explorer_rehash() are called
-Called from: connect_init
-  called from explorer_show() which is due to OCELOT_EXPLORER_VISIBLE='yes' or a choice on context menu
-             rehash_scan() is not called, only explorer_rehash is called
-  Todo:
-  Todo: explorer_show() calls explorer_rehash(true) every time, there might be times when it's not needed.
-  Todo: We return something other than ER_OK_REHASH if failure, but we don't do anything about it.
-  Todo: if we could do the same thing for both autocomplete use and explorer use, it would be quicker.
-  TODO: Skip if explorer not visible!
+Called from: execute_client_statement if (statement == RELOAD;)
+Called from: explorer_show() which is due to OCELOT_EXPLORER_VISIBLE='yes' or a choice on context menu
+  Method:
+    For each schema
+      For each item of this schema
+        If "T"
+          add to oei
+          For each item
+            If "C" of this "T":
+              add to oei
+            If "I" of this "T":
+              add to oei
+        If "t" or "P" or "E" or "F":
+          add to oei (these will come last because of the way the UNION was done)
+  TODO: For rehash_scan_for_tarantool(), if explorer:
+        We should ignore what is not in the query, e.g. if user decided not to get 'I', or added a 'WHERE'.
 */
 int MainWindow::explorer_rehash(char *error_or_ok_message)
 {
+  log("explorer_rehash start", 65);
+  if (ocelot_explorer_visible == "no")
+  {
+    strcpy(error_or_ok_message, "RELOAD only works if explorer is visible. To make it visible, use Settings|Explorer or SET ocelot_explorer_visible='yes';");
+    return ER_ERROR;
+  }
   int rehash_scan_result;
   rehash_scan_result= rehash_scan(error_or_ok_message, true); /* "true" means "is_explorer == true" */
   if (strncmp(error_or_ok_message, "OK", 2) != 0)
   {
-    QMessageBox msgbox;
-    msgbox.setText(error_or_ok_message);
-    msgbox.exec();
     return rehash_scan_result;
   }
-  bool is_min= false;
-  if (ocelot_explorer_expanded == "Yes") is_min= false;
   if (oei != NULL)
   {
     delete [] oei;
     oei_count= 0;
+    oei= NULL;
   }
   long unsigned int r;
   char *row_pointer;
   unsigned int column_length;
   unsigned int i;
-//  struct explorer_items xx;
+
   /* Something like what happens in rehash_search(). */
   /* ?? Maybe you should have a limit on the size, like SQL Server does (65535). */
   /* todo: "* 2" is too much, you only need to allow for adding "T", which should mean nothing. */
   oei= new explorer_items[rehash_result_row_count * 2];
-  QByteArray object_type= "";
-  QByteArray object_name= "";
-  QByteArray part_name= "";
-  QByteArray part_type= "";
-  for (r= 0; r < rehash_result_row_count; ++r)
+#ifdef DBMS_TARANTOOL
+  if (connections_dbms[0] == DBMS_TARANTOOL)
   {
-    row_pointer= rehash_result_set_copy_rows[r];
-    object_type= object_name= part_name= ""; /* This is probably unncessary */
-    for (i= 0; i < rehash_result_column_count; ++i)
+    oei[oei_count].object_type= "D"; /* Tarantool has no schemas but we'll pretend with a dummy named "main" */
+    oei[oei_count].schema_name= "main";
+    oei[oei_count].object_name= "main";
+    oei[oei_count].part_name= "";
+    oei[oei_count].part_type= "";
+    oei[oei_count].is_min= true;
+    ++oei_count;
+    for (int i= 0; i < tarantool_table_names.count(); ++i)
     {
-      memcpy(&column_length, row_pointer, sizeof(unsigned int));
-      char flag= *(row_pointer + sizeof(unsigned int));
-      row_pointer+= sizeof(unsigned int) + sizeof(char);
-      /* Now row_pointer points to contents, length has # of bytes */
+      oei[oei_count].object_type= "T";
+      oei[oei_count].schema_name= "main";
+      oei[oei_count].object_name= tarantool_table_names.at(i).toUtf8();
+      oei[oei_count].part_name= "";
+      oei[oei_count].part_type= "";
+      oei[oei_count].is_min= true;
+      ++oei_count;
+    }
+    for (int i= 0; i < tarantool_column_names.count(); ++i)
+    {
+      oei[oei_count].object_type= "C";
+      oei[oei_count].schema_name= "main";
+      oei[oei_count].object_name= tarantool_column_table_names.at(i).toUtf8();
+      oei[oei_count].part_name= tarantool_column_names.at(i).toUtf8();
+      oei[oei_count].part_type= tarantool_type_names.at(i).toUtf8();
+      oei[oei_count].is_min= true;
+      ++oei_count;
+    }
+    for (int i= 0; i < tarantool_index_names.count(); ++i)
+    {
+      oei[oei_count].object_type= "I";
+      oei[oei_count].schema_name= "main";
+      oei[oei_count].object_name= tarantool_index_table_names.at(i).toUtf8();
+      oei[oei_count].part_name= tarantool_index_names.at(i).toUtf8();
+      oei[oei_count].part_type= "";
+      oei[oei_count].is_min= true;
+      ++oei_count;
+    }
+    for (int i= 0; i < tarantool_trigger_names.count(); ++i)
+    {
+      oei[oei_count].object_type= "t";
+      oei[oei_count].schema_name= "main";
+      oei[oei_count].object_name= tarantool_trigger_names.at(i).toUtf8();
+      oei[oei_count].part_name= "";
+      oei[oei_count].part_type= "";
+      oei[oei_count].is_min= true;
+      ++oei_count;
+    }
+  }
+#endif
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  if (connections_dbms[0] != DBMS_TARANTOOL)
+  {
+    for (r= 0; r < rehash_result_row_count; ++r)
+    {
+      row_pointer= rehash_result_set_copy_rows[r];
+      for (i= 0; i < rehash_result_column_count; ++i)
       {
-        if (i == 0) object_type= QByteArray(row_pointer, column_length);
-        if (i == 1) object_name= QByteArray(row_pointer, column_length);
-        if (i == 2) part_name= QByteArray(row_pointer, column_length);
-        if (i == 3)
+        memcpy(&column_length, row_pointer, sizeof(unsigned int));
+        //char flag= *(row_pointer + sizeof(unsigned int));
+        row_pointer+= sizeof(unsigned int) + sizeof(char);
+        /* Now row_pointer points to contents, length has # of bytes */
         {
-          part_type= QByteArray(row_pointer, column_length);
-        }
-        if (i == rehash_result_column_count - 1)
-        {
-          if (object_type  != "T")
+          if (i == 0) oei[oei_count].object_type= QByteArray(row_pointer, column_length);
+          if (i == 1) oei[oei_count].schema_name= QByteArray(row_pointer, column_length);
+          if (i == 2) oei[oei_count].object_name= QByteArray(row_pointer, column_length);
+          if (i == 3) oei[oei_count].part_name= QByteArray(row_pointer, column_length);
+          if (i == 4) oei[oei_count].part_type= QByteArray(row_pointer, column_length);
+          if (i == rehash_result_column_count - 1) /* i.e. if now we have all columns */
           {
-            if (object_type == "C")
-            {
-              if ((oei_count != 0) && (oei[oei_count - 1].object_type == "C") && (object_name == oei[oei_count - 1].object_name))
-              {
-                ;
-              }
-              else
-              {
-                oei[oei_count].object_type= "T";
-                oei[oei_count].object_name= object_name;
-                oei[oei_count].part_name= "BASE TABLE";
-                oei[oei_count].part_type= "";
-                /* what about flag? */
-                oei[oei_count].is_min= is_min;
-                ++oei_count;
-              }
-            }
-            oei[oei_count].object_type= object_type;
-            oei[oei_count].object_name= object_name;
-            oei[oei_count].part_name= part_name;
-            oei[oei_count].part_type= part_type;
-            oei[oei_count].is_min= is_min;
+            oei[oei_count].is_min= true;
             ++oei_count;
           }
         }
+        row_pointer+= column_length;
       }
-      row_pointer+= column_length;
     }
   }
+#endif
   //explorer_widget->hide(); /* Is this necessary? */
   /* this is in the initialize function */
-  /* explorer_widget->result_column_count= 4; */ /* todo: you can move this, it's always the same */
+  explorer_sort();
+  log("explorer_rehash end", 65);
   return ER_OK_REHASH;
 }
 
-/* Todo: the idea of "expanded" is that all columns are shown for all tables, is_min is off by default */
+/*
+  Given oei that we produce in explorer_rehash(), sort so 'C' and 'I' are under 'T'.
+  Todo: Perhaps 't' should be under 'T' too.
+  Todo: There could be more ways to sort.
+  Todo: There are probably thousands of items so speeding this up might be good. Add to tracing|logging?
+        One thing that we can take advantage of: all things of same type are together, I think.
+*/
+void MainWindow::explorer_sort()
+{
+  explorer_items *oei_copy;
+  oei_copy= new explorer_items[oei_count];
+  unsigned int i_of_copy= 0;
+
+  for (unsigned int i_of_schema= 0; i_of_schema < oei_count; ++i_of_schema)
+  {
+    if (oei[i_of_schema].object_type != "D") break; /* This assumes that schemas precede all other types */
+    oei_copy[i_of_copy++]= oei[i_of_schema];
+    for (unsigned int i_of_main= 0; i_of_main < oei_count; ++i_of_main)
+    {
+      if (oei[i_of_main].schema_name == oei[i_of_schema].schema_name)
+      {
+        if (oei[i_of_main].object_type == "T")
+        {
+          oei_copy[i_of_copy++]= oei[i_of_main];
+          for (unsigned int i_of_column= 0; i_of_column < oei_count; ++i_of_column)
+          {
+            if ((oei[i_of_column].object_type == "C")
+             && (oei[i_of_column].object_name == oei[i_of_main].object_name)
+             && (oei[i_of_column].schema_name == oei[i_of_schema].schema_name))
+              oei_copy[i_of_copy++]= oei[i_of_column];
+          }
+          for (unsigned int i_of_index= 0; i_of_index < oei_count; ++i_of_index)
+          {
+            if ((oei[i_of_index].object_type == "I")
+             && (oei[i_of_index].object_name == oei[i_of_main].object_name)
+             && (oei[i_of_index].schema_name == oei[i_of_schema].schema_name))
+              oei_copy[i_of_copy++]= oei[i_of_index];
+          }
+        } /* closes if (oei[i_of_main].object_type == "T") */
+        else if ((oei[i_of_main].object_type == "P")
+              || (oei[i_of_main].object_type == "F")
+              || (oei[i_of_main].object_type == "t")
+              || (oei[i_of_main].object_type == "E"))
+                oei_copy[i_of_copy++]= oei[i_of_main];
+      } /* closes if (oei[i_of_main].schema_name == oei[i_of_schema].schema_name) */
+    } /* closes i_of_main loop */
+  } /* closes i_of_schema  loop */
+  for (unsigned int i= 0; i < oei_count; ++i) oei[i]= oei_copy[i];
+
+  delete [] oei_copy;
+
+  /* Check */
+  //for (unsigned int i= 0; i < oei_count; ++i)
+  //{
+  //  char tmp0[256]; strcpy(tmp0, oei[i].object_type);
+  //  char tmp1[256]; strcpy(tmp1, oei[i].schema_name);
+  //  char tmp2[256]; strcpy(tmp2, oei[i].object_name);
+  //  char tmp3[256]; strcpy(tmp3, oei[i].part_name);
+  //  printf("%s %s.%s.%s\n", tmp0,tmp1,tmp2,tmp3);
+  //}
+  //exit(0);
+}
+
+/* Todo: "expanded" does nothing but is still in Settings|explorer in case there's some use for it someday. */
 void MainWindow::explorer_expanded()
 {
-  printf("**** explorer_expanded\n");
+  ;
 }
 
 /*
@@ -27200,7 +27325,7 @@ void MainWindow::explorer_expanded()
 */
 bool MainWindow::explorer_query()
 {
-  printf("**** explorer_query\n");
+  ;
   return true;
 }
 
@@ -27208,8 +27333,18 @@ bool MainWindow::explorer_query()
 /* Todo: This could be called when we're shutting down (?). Clean up anything made with new. */
 void MainWindow::explorer_close()
 {
-  printf("**** explorer_close\n");
+  ;
 }
+
+/*
+  In order to do a query for explorer for Tarantool, we need an information_schema equivalent.
+  Luckily I produced one when working for Tarantool:
+  https://www.tarantool.io/en/doc/latest/reference/reference_sql/sql_plus_lua/#sql-lua-functions
+  But it can fail if some privilege is missing.
+*/
+//void MainWindow::make_information_schema()
+//{
+//}
 
 /* Todo: Add: a function for destroying all objects created for the widget (though not the widget itself?) */
 

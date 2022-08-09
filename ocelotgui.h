@@ -39,7 +39,7 @@
 
 /* To remove most of the code related to object explorer, #define OCELOT_EXPLORER 0 */
 #ifndef OCELOT_EXPLORER
-#define OCELOT_EXPLORER 0
+#define OCELOT_EXPLORER 1
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 0)
@@ -2793,10 +2793,11 @@ struct export_settings {
 #if (OCELOT_EXPLORER == 1)
 struct explorer_items {   /* This struct definition is for MainWindow and ResultGrid */
   QByteArray object_type; /* e.g. 'T' or 'C' */
+  QByteArray schema_name; /* e.g. table_schema */
   QByteArray object_name; /* e.g. table name */
   QByteArray part_name;   /* e.g. column name */
   QByteArray part_type;   /* e.g. column type */
-  bool is_min;            /* true if minimized "T" */
+  bool is_min;            /* e.g. true if minimized "D" or "T" */
   int display_row_number; /* number within the display. equals -1 if skippable */
 };
 #endif
@@ -3568,6 +3569,7 @@ public:
 #if (OCELOT_EXPLORER == 1)
   void explorer_show();
   int explorer_rehash(char *);
+  void explorer_sort();
   void explorer_expanded();
   bool explorer_query();
   void explorer_close();
@@ -3719,6 +3721,7 @@ private:
   void initialize_widget_statement();
 #if (OCELOT_EXPLORER == 1)
   void initialize_widget_explorer();
+  void initialize_widget_explorer_after_connect();
 #endif
   void menu_edit_zoominorout(int);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -3732,7 +3735,6 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu(); void fill_menu();
-  int rehash_scan_all(char *);
   int rehash_scan(char *, bool is_explorer); int rehash_scan_for_tarantool(char *, bool is_explorer);
   void rehash_scan_one_space(int space_number);
   QString rehash_search(QString table_name, char *search_string, int reftype,
@@ -4045,6 +4047,9 @@ private:
   QStringList tarantool_table_names;
   QStringList tarantool_column_table_names;
   QStringList tarantool_column_names;
+#if (OCELOT_EXPLORER == 1)
+  QStringList tarantool_type_names;
+#endif
   QStringList tarantool_index_table_names;
   QStringList tarantool_index_names;
   QStringList tarantool_trigger_names;
@@ -8873,9 +8878,17 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
     Todo: use of pixmap() function this might have State = Off. And the width + height is odd.
 */
 
-/* Todo: decide if this should be in initialize() */
-QByteArray bytearray_min; /* = "⊕" for table-minimize i.e. don't show columns */
-QByteArray bytearray_max; /* = "⊖" for table-maximize i.e. do show columns */
+/*
+  The symbols for min|max aka collapse|expand.
+  ▼ U+25BC Black Down-Pointing Triangle means "It has been expanded".
+    So clicking it means: change it to right-pointing and collapse.
+  ▶ U+25B6 Black Right-Pointing Triangle means "It can be expanded".
+    So clicking it means: change it to down-pointing and expand.
+  We had some choices e.g. White instead of Black, Pointer instead of Triangle, "⊕"|"⊖".
+  Perhaps instead of a QByteArray we could have used a literal.
+*/
+#define EXPLORER_MIN "▼"
+#define EXPLORER_MAX "▶"
 unsigned int explorer_first_result_row;
 #define EXPLORER_COLUMN_COUNT 3
 
@@ -8893,38 +8906,23 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
 {
   batch_text_edit->hide(); /* shouldn't be needed. see switch_to_html */
   hide();
-  gridx_column_count= EXPLORER_COLUMN_COUNT;
-  //if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
+  gridx_column_count= result_column_count= EXPLORER_COLUMN_COUNT;
+  /* Todo: if following things already exist, delete them, else there's a small leak. */
   gridx_field_types= new short unsigned int[gridx_column_count];
-  gridx_field_types[0]= OCELOT_DATA_TYPE_TEXT;
-  gridx_field_types[1]= OCELOT_DATA_TYPE_TEXT;
-  gridx_field_types[2]= OCELOT_DATA_TYPE_TEXT;
-  result_column_count= EXPLORER_COLUMN_COUNT;
   result_field_types= new unsigned short int[result_column_count];
-  result_field_types[0]= OCELOT_DATA_TYPE_TEXT;
-  result_field_types[1]= OCELOT_DATA_TYPE_TEXT;
-  result_field_types[2]= OCELOT_DATA_TYPE_TEXT;
-
-  //if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
   result_field_flags= new unsigned int[result_column_count];
-  result_field_flags[0]= 0;
-  result_field_flags[1]= 0;
-  result_field_flags[2]= 0;
+  for (int i= 0; i < EXPLORER_COLUMN_COUNT; ++i)
+  {
+    gridx_field_types[i]= result_field_types[i]= OCELOT_DATA_TYPE_TEXT;
+    result_field_flags[i]= 0;
+  }
   //if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   grid_column_widths= new unsigned int[gridx_column_count];
   /* grid_column_widths[] will be settled during explorer_display_html */
-  //grid_column_widths[0]=  50;
-  //grid_column_widths[1]= 150;
-  //grid_column_widths[2]= 150;
-  //grid_column_widths[3]= 150;
   /* The following line is so is_fancy() will return true. Todo: If we replace with non-grid, should be 0. */
   //  result_row_count= rehash_result_column_count; result_column_count= 4;
   copy_of_ocelot_batch= copy_of_ocelot_xml= copy_of_ocelot_raw= ocelot_vertical_copy= 0;
   ocelot_result_grid_column_names_copy= 0;
-
-  /* Todo: decide if this should be in initialize() */
-  bytearray_min= "⊕"; /* for table-minimize i.e. don't show columns */
-  bytearray_max= "⊖"; /* for table-maximize i.e. do show columns */
 
   int result_field_names_size= strlen("MIN") + strlen("OBJECT_TYPE") + strlen("OBJECT_NAME")
                            + sizeof(unsigned int) * EXPLORER_COLUMN_COUNT;
@@ -8954,7 +8952,8 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
   explorer_widget->result_row_count = main_window->oei_count minus what won't be displayed
   Re per-column loop:
     Mostly this loop is same as the one in explorer_display_html().
-    If it's a "C" in a minimized "T", or if it's false for conditional settings, it will be skipped.
+    If it's a "C" or "I" in a minimized "T", or if it's anything except "D" in a minimized "D",
+    or if it's false for conditional settings, it will be skipped.
     The constant calling to copy_html_cell() is totally wasted time if there are no conditional settings.
     We don't care what any of the results are, except whether cell height becomes 0.
     We're assuming type = detail not header, that may be wrong but I doubt it affects whether to skip.
@@ -8964,43 +8963,64 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
         or drag. Are we sure resize or drag can't happen? The other way to do it might be
         if (result_grid_type == OCELOT_EXPLORER) return min_width;" in get_column_width_in_pixels().
         Should you be adding setting_ocelot_grid_cell_border_size_as_int? Is that already done somewhere?
+   Todo: if USE, or if visible='yes' and USE has already happened, emphasize current by making it bold.
+         Is there a SET instruction that can do this?
 */
 void explorer_display()
 {
   switch_to_html_text_edit(); /* When should this really be done? And how often? */
-  unsigned int r_of_t= 0;                                   /* so when we see "C" we can find its "T" */
+  explorer_display_part();
+  /* TODO: result_row_count might be 0 if there is filtering, in that case clear screen and return */
+  /* vertical_scroll_bar_initialize() has to be done after we know result_row_count */
+  vertical_scroll_bar_initialize();
+  prepare_for_display_html();
+  display_html(0, 0);  /* effectively: explorer_display_html(0) */
+}
+void explorer_display_part()
+{
+  unsigned int r_of_d= 0;                            /* so when we se anything but "D" we can find its "D" */
+  unsigned int r_of_t= 0;                            /* so when we see "C" or "I" we can find its "T" */
   int new_cell_height;
-
-  result_row_count= 0; /* this will be less than oei_count if some tables are minimized */
+  result_row_count= 0; /* this will be less than oei_count if some rows are skipped e.g. due to minimize */
 
   unsigned int tmp_result_row_number;
 
-  /* Loop 1: Calculate maximum width of object_name for all rows */
+  unsigned int object_name_size, max_object_name_size= 0;
+  for (tmp_result_row_number= 0; tmp_result_row_number < copy_of_parent->oei_count; ++tmp_result_row_number)
   {
-    unsigned int object_name_size, max_object_name_size= 0;
-    for (tmp_result_row_number= 0; tmp_result_row_number < copy_of_parent->oei_count; ++tmp_result_row_number)
+    bool is_row_skippable= false;
+    QString object_type= copy_of_parent->oei[tmp_result_row_number].object_type;
+    if (object_type == "D") r_of_d= tmp_result_row_number;
+    if (object_type == "T") r_of_t= tmp_result_row_number;
+    if (object_type != "D")
     {
-      bool is_row_skippable= false;
-      if (copy_of_parent->oei[tmp_result_row_number].object_type == "T") r_of_t= tmp_result_row_number;
-      if ((copy_of_parent->oei[tmp_result_row_number].object_type != "C") || (copy_of_parent->oei[r_of_t].is_min == false))
+      if (copy_of_parent->oei[r_of_d].is_min == true) is_row_skippable= true;
+      if (copy_of_parent->oei[r_of_d].display_row_number == -1) is_row_skippable= true;
+      if ((object_type == "C") || (object_type == "I"))
+      {
+        if (copy_of_parent->oei[r_of_t].is_min == true) is_row_skippable= true;
+        if (copy_of_parent->oei[r_of_t].display_row_number == -1) is_row_skippable= true;
+      }
+      if (is_row_skippable == false)
       {
         for (unsigned int result_column_no= 0; result_column_no < EXPLORER_COLUMN_COUNT; ++result_column_no)
         {
           QByteArray s;
           if (result_column_no == 0)
           {
-            if (copy_of_parent->oei[tmp_result_row_number].object_type == "T")
+            if ((object_type == "D") || (object_type == "T"))
             {
-              if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= bytearray_min;
-              else s= bytearray_max;
+              if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= EXPLORER_MIN;
+              else s= EXPLORER_MAX;
             }
             else s= "";
           }
-          if (result_column_no == 1) s= copy_of_parent->oei[tmp_result_row_number].object_type;
+        if (result_column_no == 1) s= object_type.toUtf8();
           if (result_column_no == 2)
           {
             s= copy_of_parent->oei[tmp_result_row_number].object_name;
-            if (copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+            if ((copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+             || (copy_of_parent->oei[tmp_result_row_number].object_type == "I"))
               s= copy_of_parent->oei[tmp_result_row_number].part_name;
           }
           char tmp[2048];
@@ -9022,22 +9042,20 @@ void explorer_display()
                                                      ocelot_grid_detail_char_column_end,
                                                      &new_cell_height,
                                                      result_column_no);
-          if (new_cell_height == 0) is_row_skippable= true;
+          if (new_cell_height == 0) {is_row_skippable= true; continue; }
         }
-        if (is_row_skippable == true)
-        {
-          /* Skip row, user said SET ocelot_grid_cell_height=0 ... */
-          copy_of_parent->oei[tmp_result_row_number].display_row_number= -1;
-          continue;
-        }
-
-        object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
-        if (max_object_name_size < object_name_size) max_object_name_size= object_name_size;
-        copy_of_parent->oei[tmp_result_row_number].display_row_number= result_row_count;
-        ++result_row_count;
       }
-      else copy_of_parent->oei[tmp_result_row_number].display_row_number= -1;
     }
+    if (is_row_skippable == true)
+    {
+      /* Skip row, user said SET ocelot_grid_cell_height=0 ..., or upper object is minimized */
+      copy_of_parent->oei[tmp_result_row_number].display_row_number= -1;
+      continue;
+    }
+    object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
+    if (max_object_name_size < object_name_size) max_object_name_size= object_name_size;
+    copy_of_parent->oei[tmp_result_row_number].display_row_number= result_row_count;
+    ++result_row_count;
     if (max_object_name_size > EXPLORER_FIXED_NAME_WIDTH) max_object_name_size= EXPLORER_FIXED_NAME_WIDTH;
     char tmp_string_1[EXPLORER_FIXED_NAME_WIDTH * 4];
     /* Todo: Following lines should restrict column#1/#2 widths to one char width but I get two char widths. */
@@ -9047,12 +9065,6 @@ void explorer_display()
     for (i= 0; i < max_object_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
     grid_column_widths[2]= get_column_width_in_pixels(tmp_string_1, false, false);
   }
-  /* TODO: result_row_count might be 0 if there is filtering, in that case clear screen and return */
-
-  vertical_scroll_bar_initialize(); /* has to be done after we know result_row_count */
-  prepare_for_display_html();
-  display_html(0, 0);  /* effectively: explorer_display_html(0) */
-
 }
 
 /* todo: should this function be private? */
@@ -9062,11 +9074,13 @@ void explorer_display()
   This width is based on max_object_name_size.
   They are never more than EXPLORER_FIXED_NAME_WIDTH.
   First pass is: for all rows, to get max_object_name_size.
-                 ... but we don't consider items that are filtered or suppressed due to bytearray_min
+                 ... but we don't consider items that are filtered or suppressed due to EXPLORER_MIN
   Second pass is: for rows until it would overflow widget height: output and decide height.
   Each row's height should be in grid_row_heights[]. Total html_text_edit height may vary.
-  WARNING: There is no such thing as 1-char width, we always expand to 3, I forget why.
+  Todo: Ordinarily there is no such thing as 1-char width, we always expand to 3, I forget why.
+        I'm ignoring that for explorer but if it's due to drag I really must make sure user can't drag.
   Todo: I appear to be assuming that characters will be single-width. Maybe calculate max in pixels?
+        There's some sort of calculation based on "if character needs 3 bytes" somewhere, I think.
   Changed plan:
     Width and height are determined by Settings.
     If setting is "default", width is some fixed amount -- percentage of main widget?
@@ -9078,8 +9092,6 @@ void explorer_display()
     and result_field_flags[] and result_value_flags are always 0. Therefore to check for not applicable, use
     set ocelot_grid_background_color='yellow' where value = '';
     If in future we have a situation where that's not so, we'll have to add flag fields in the struct.
-  Todo: re row_height+= 9;
-        Something is wrong with our minimum height calculation in get_cell_width_or_height_as_int()
   Todo: Re start of loop: what you really should be doing is finding the oei[] with the right grid row
 */
 
@@ -9133,13 +9145,15 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
       if (copy_of_parent->oei[tmp_result_row_number].display_row_number != -1) /* i.e. not skippable */
       {
         object_name_size= copy_of_parent->oei[tmp_result_row_number].object_name.size();
-        if (copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+        if ((copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+         || (copy_of_parent->oei[tmp_result_row_number].object_type == "I"))
           object_name_size= copy_of_parent->oei[tmp_result_row_number].part_name.size();
         total_object_name_size+= object_name_size;
         unsigned int row_height= cell_height_as_int;
         if (object_name_size > EXPLORER_FIXED_NAME_WIDTH) row_height+= cell_height_as_int;
         row_height+= setting_ocelot_grid_cell_border_size_as_int * 2; /* Maybe this sort of makes sense */
-        row_height+= 9; /* This surely does not make sense but apparently corresponds with reality */
+        /* Todo: I removed the following because I think it was due to a bug. But should I add any pixels? */
+//        row_height+= 9; /* This surely does not make sense but apparently corresponds with reality */
         if ((total_grid_row_heights + row_height) >= (unsigned int) this->height())
         {
           if (local_max_grid_rows > 0) break; /* minimum number of rows to display is 1 */
@@ -9189,20 +9203,22 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
       for (unsigned int result_column_no= 0; result_column_no < EXPLORER_COLUMN_COUNT; ++result_column_no)
       {
         QByteArray s;
+        QString object_type= copy_of_parent->oei[tmp_result_row_number].object_type;
         if (result_column_no == 0)
         {
-          if (copy_of_parent->oei[tmp_result_row_number].object_type == "T")
+          if ((object_type == "D") || (object_type == "T"))
           {
-            if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= bytearray_min;
-            else s= bytearray_max;
+            if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= EXPLORER_MIN;
+            else s= EXPLORER_MAX;
           }
           else s= "";
         }
-        if (result_column_no == 1) s= copy_of_parent->oei[tmp_result_row_number].object_type;
+        if (result_column_no == 1) s= object_type.toUtf8();
         if (result_column_no == 2)
         {
           s= copy_of_parent->oei[tmp_result_row_number].object_name;
-          if (copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+          if ((copy_of_parent->oei[tmp_result_row_number].object_type == "C")
+           || (copy_of_parent->oei[tmp_result_row_number].object_type == "I"))
             s= copy_of_parent->oei[tmp_result_row_number].part_name;
         }
         //strcpy(tmp_pointer, s.data());
@@ -9323,15 +9339,34 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
   Alternative: comparing object name (assuming object is a table) should work.
   TODO: THIS IS WRONG IF WE SCROLLED. IT SHOULD BE display_row_number - first_row_number. HERE AND EVERYUWHERE!
   TODO: THIS LOSES SCROLL BAR VALUE.
+  Todo: Actually I think we can be sure we're looking at a "D" or "T" so the initial check should be unnecessary.
+  Todo: The only thing in explorer_display() that we care about is display_row_number, so splitting something
+        out of explorer_display() will be a good idea.
+  WHAT YOU REALLY HAVE TO DO IS:
+    for each item
+      change display_row_number
+    setMaximum on the vertical scroll bar, it will be +- column_count
+  Todo: In vertical_scroll_bar_initialize() we use grid_result_row_count, which tends to be 0.
+        That wrecked toggle(). But why didn't it wreck other functions?
 */
 void explorer_toggle(int focus_result_row_number)
 {
-  if (copy_of_parent->oei[focus_result_row_number].object_type == "T")
+  QString object_type= copy_of_parent->oei[focus_result_row_number].object_type;
+  if ((object_type == "D") || (object_type == "T"))
   {
     if (copy_of_parent->oei[focus_result_row_number].is_min == false) copy_of_parent->oei[focus_result_row_number].is_min= true;
     else copy_of_parent->oei[focus_result_row_number].is_min= false;
+    explorer_display_part();
+    display_html(grid_vertical_scroll_bar->value(), 0);
+    if (result_row_count <= 1) grid_vertical_scroll_bar->hide();
+    else
+    {
+      grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+      grid_vertical_scroll_bar->show();
+    }
+    //
+    //explorer_display();
   }
-  explorer_display();
 }
 
 
@@ -11361,7 +11396,6 @@ bool show_event()
 bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
 {
   (void)connections_dbms;
-
   int new_value;
   /* It's impossible to get here if the scroll bar is hidden, but it happens. Well, maybe only for "turning it off" events. */
   if (grid_vertical_scroll_bar->isVisible() == false)
