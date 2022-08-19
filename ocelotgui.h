@@ -999,6 +999,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_REDOFILE,
     TOKEN_KEYWORD_REDUNDANT,
     TOKEN_KEYWORD_REFERENCES,
+    TOKEN_KEYWORD_REFRESH,
     TOKEN_KEYWORD_REGEXP,
     TOKEN_KEYWORD_REHASH,
     TOKEN_KEYWORD_RELEASE,
@@ -1429,7 +1430,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1190
+#define KEYWORD_LIST_SIZE 1191
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2257,6 +2258,7 @@ static const keywords strvalues[]=
     {"REDOFILE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_REDOFILE},
       {"REDUNDANT", 0, 0, TOKEN_KEYWORD_REDUNDANT},
       {"REFERENCES", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_REFERENCES},
+      {"REFRESH", 0, 0, TOKEN_KEYWORD_REFRESH},
       {"REGEXP", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_REGEXP},
       {"REHASH", 0, 0, TOKEN_KEYWORD_REHASH}, /* ocelotgui keyword */
       {"RELEASE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_RELEASE},
@@ -2797,7 +2799,7 @@ struct explorer_items {   /* This struct definition is for MainWindow and Result
   QByteArray object_name; /* e.g. table name */
   QByteArray part_name;   /* e.g. column name */
   QByteArray part_type;   /* e.g. column type */
-  bool is_min;            /* e.g. true if minimized "D" or "T" */
+  char flags;             /* e.g. EXPLORER_FLAG_MIN != 0 if minimized "S" or "T" or "V" */
   int display_row_number; /* number within the display. equals -1 if skippable */
 };
 #endif
@@ -3144,7 +3146,7 @@ public:
   QString ocelot_explorer_width, new_ocelot_explorer_width;
   QString ocelot_explorer_detached, new_ocelot_explorer_detached;
   QString ocelot_explorer_visible, new_ocelot_explorer_visible;
-  QString ocelot_explorer_expanded, new_ocelot_explorer_expanded;
+  QString ocelot_explorer_sort, new_ocelot_explorer_sort;
   QString ocelot_explorer_query, new_ocelot_explorer_query;
 /* endif */
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
@@ -3567,10 +3569,10 @@ public:
 #endif
 
 #if (OCELOT_EXPLORER == 1)
-  void explorer_show();
-  int explorer_rehash(char *);
+  int explorer_refresh_caller(char *);
+  int explorer_refresh(char *);
+  //int explorer_qsort_compare(const void * a, const void * b);
   void explorer_sort();
-  void explorer_expanded();
   bool explorer_query();
   void explorer_close();
   void explorer_context_menu(QPoint &pos);
@@ -4048,7 +4050,9 @@ private:
   QStringList tarantool_column_table_names;
   QStringList tarantool_column_names;
 #if (OCELOT_EXPLORER == 1)
+  QStringList tarantool_table_engines;
   QStringList tarantool_type_names;
+  QStringList tarantool_index_column_numbers;
 #endif
   QStringList tarantool_index_table_names;
   QStringList tarantool_index_names;
@@ -8891,6 +8895,10 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 #define EXPLORER_MAX "▶"
 unsigned int explorer_first_result_row;
 #define EXPLORER_COLUMN_COUNT 3
+#define EXPLORER_FLAG_MIN 1/* = 1 if minimized */
+#define EXPLORER_FLAG_FILTERED 2 /* = 2 if filtered */
+#define EXPLORER_FLAG_NOT_FILTERED 4 /* = 4 if not filtered i.e. this alone is not filtered, all others are */
+
 
 /*
   Re scroll bars:
@@ -8952,7 +8960,7 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
   explorer_widget->result_row_count = main_window->oei_count minus what won't be displayed
   Re per-column loop:
     Mostly this loop is same as the one in explorer_display_html().
-    If it's a "C" or "I" in a minimized "T", or if it's anything except "D" in a minimized "D",
+    If it's a "C" or "I" in a minimized "T" or "V", or if it's anything except "S" in a minimized "S",
     or if it's false for conditional settings, it will be skipped.
     The constant calling to copy_html_cell() is totally wasted time if there are no conditional settings.
     We don't care what any of the results are, except whether cell height becomes 0.
@@ -8978,8 +8986,8 @@ void explorer_display()
 }
 void explorer_display_part()
 {
-  unsigned int r_of_d= 0;                            /* so when we se anything but "D" we can find its "D" */
-  unsigned int r_of_t= 0;                            /* so when we see "C" or "I" we can find its "T" */
+  unsigned int r_of_s= 0;                            /* so when we se anything but "S" we can find its "S" */
+  unsigned int r_of_t= 0;                            /* so when we see "C" or "I" we can find its "T"  or "V" */
   int new_cell_height;
   result_row_count= 0; /* this will be less than oei_count if some rows are skipped e.g. due to minimize */
 
@@ -8990,15 +8998,15 @@ void explorer_display_part()
   {
     bool is_row_skippable= false;
     QString object_type= copy_of_parent->oei[tmp_result_row_number].object_type;
-    if (object_type == "D") r_of_d= tmp_result_row_number;
-    if (object_type == "T") r_of_t= tmp_result_row_number;
-    if (object_type != "D")
+    if (object_type == "S") r_of_s= tmp_result_row_number;
+    if ((object_type == "T") || (object_type == "V")) r_of_t= tmp_result_row_number;
+    if ((copy_of_parent->oei[r_of_s].flags&EXPLORER_FLAG_FILTERED) != 0) is_row_skippable= true;
+    if (object_type != "S")
     {
-      if (copy_of_parent->oei[r_of_d].is_min == true) is_row_skippable= true;
-      if (copy_of_parent->oei[r_of_d].display_row_number == -1) is_row_skippable= true;
+      if ((copy_of_parent->oei[r_of_s].flags&EXPLORER_FLAG_MIN) != 0) is_row_skippable= true;
       if ((object_type == "C") || (object_type == "I"))
       {
-        if (copy_of_parent->oei[r_of_t].is_min == true) is_row_skippable= true;
+        if ((copy_of_parent->oei[r_of_t].flags&EXPLORER_FLAG_MIN) != 0) is_row_skippable= true;
         if (copy_of_parent->oei[r_of_t].display_row_number == -1) is_row_skippable= true;
       }
       if (is_row_skippable == false)
@@ -9008,9 +9016,9 @@ void explorer_display_part()
           QByteArray s;
           if (result_column_no == 0)
           {
-            if ((object_type == "D") || (object_type == "T"))
+            if ((object_type == "S") || (object_type == "T") || (object_type == "V"))
             {
-              if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= EXPLORER_MIN;
+              if ((copy_of_parent->oei[tmp_result_row_number].flags&EXPLORER_FLAG_MIN) == 0) s= EXPLORER_MIN;
               else s= EXPLORER_MAX;
             }
             else s= "";
@@ -9048,7 +9056,7 @@ void explorer_display_part()
     }
     if (is_row_skippable == true)
     {
-      /* Skip row, user said SET ocelot_grid_cell_height=0 ..., or upper object is minimized */
+      /* Skip row, user said SET ocelot_grid_cell_height=0 ..., or upper object is minimized, or filter */
       copy_of_parent->oei[tmp_result_row_number].display_row_number= -1;
       continue;
     }
@@ -9206,9 +9214,9 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
         QString object_type= copy_of_parent->oei[tmp_result_row_number].object_type;
         if (result_column_no == 0)
         {
-          if ((object_type == "D") || (object_type == "T"))
+          if ((object_type == "S") || (object_type == "T") || (object_type == "V"))
           {
-            if (copy_of_parent->oei[tmp_result_row_number].is_min == false) s= EXPLORER_MIN;
+            if ((copy_of_parent->oei[tmp_result_row_number].flags&EXPLORER_FLAG_MIN) == 0) s= EXPLORER_MIN;
             else s= EXPLORER_MAX;
           }
           else s= "";
@@ -9339,7 +9347,8 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
   Alternative: comparing object name (assuming object is a table) should work.
   TODO: THIS IS WRONG IF WE SCROLLED. IT SHOULD BE display_row_number - first_row_number. HERE AND EVERYUWHERE!
   TODO: THIS LOSES SCROLL BAR VALUE.
-  Todo: Actually I think we can be sure we're looking at a "D" or "T" so the initial check should be unnecessary.
+  Todo: Actually I think we can be sure we're looking at a "S" or "T" or "V"
+        so the initial check should be unnecessary.
   Todo: The only thing in explorer_display() that we care about is display_row_number, so splitting something
         out of explorer_display() will be a good idea.
   WHAT YOU REALLY HAVE TO DO IS:
@@ -9352,10 +9361,10 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
 void explorer_toggle(int focus_result_row_number)
 {
   QString object_type= copy_of_parent->oei[focus_result_row_number].object_type;
-  if ((object_type == "D") || (object_type == "T"))
+  if ((object_type == "S") || (object_type == "T") || (object_type == "V"))
   {
-    if (copy_of_parent->oei[focus_result_row_number].is_min == false) copy_of_parent->oei[focus_result_row_number].is_min= true;
-    else copy_of_parent->oei[focus_result_row_number].is_min= false;
+    if ((copy_of_parent->oei[focus_result_row_number].flags&EXPLORER_FLAG_MIN) == 0) copy_of_parent->oei[focus_result_row_number].flags |= EXPLORER_FLAG_MIN;
+    else copy_of_parent->oei[focus_result_row_number].flags &= (~EXPLORER_FLAG_MIN);
     explorer_display_part();
     display_html(grid_vertical_scroll_bar->value(), 0);
     if (result_row_count <= 1) grid_vertical_scroll_bar->hide();
@@ -9369,6 +9378,73 @@ void explorer_toggle(int focus_result_row_number)
   }
 }
 
+/*
+  Filter so only this S (and its components) are visible
+    set all other "S" so their display_row_number is -1
+  Then you inevitably are at 0 row of the vertical scroll bar
+  Currently we only do this for "S"
+  We call this for "not filtered" too, i.e. we are in effect toggling the filtered flag
+*/
+void explorer_filter(int focus_result_row_number)
+{
+  /* ? of course we are point to an "S" so this should be unnecessary */
+  QString object_type= copy_of_parent->oei[focus_result_row_number].object_type;
+  char is_not_filtered= (copy_of_parent->oei[focus_result_row_number].flags&EXPLORER_FLAG_NOT_FILTERED);
+
+  if (object_type == "S")
+  {
+    for (unsigned int i= 0; i < copy_of_parent->oei_count; ++i)
+    {
+      if (copy_of_parent->oei[i].object_type != "S") continue;
+      if (is_not_filtered != 0)
+      {
+        copy_of_parent->oei[i].flags &= (~EXPLORER_FLAG_FILTERED);
+        copy_of_parent->oei[i].flags &= (~EXPLORER_FLAG_NOT_FILTERED);
+      }
+      else
+      {
+        if (i == (unsigned int) focus_result_row_number)
+        {
+          copy_of_parent->oei[i].flags &= (~EXPLORER_FLAG_FILTERED);
+          copy_of_parent->oei[i].flags |= EXPLORER_FLAG_NOT_FILTERED;
+        }
+        else
+        {
+          copy_of_parent->oei[i].flags |= EXPLORER_FLAG_FILTERED;
+        }
+      }
+    }
+    explorer_display_part();
+    display_html(0, 0);
+    if (result_row_count <= 1) grid_vertical_scroll_bar->hide();
+    else
+    {
+      grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+      grid_vertical_scroll_bar->show();
+    }
+    //
+    //explorer_display();
+  }
+}
+
+/*
+  Turn off all filtering, and set all min = yes. This is the original condition.
+*/
+void explorer_reset()
+{
+  for (unsigned int i= 0; i < copy_of_parent->oei_count; ++i)
+  {
+    copy_of_parent->oei[i].flags= EXPLORER_FLAG_MIN;
+  }
+  explorer_display_part();
+  display_html(0, 0);
+  if (result_row_count <= 1) grid_vertical_scroll_bar->hide();
+  else
+  {
+    grid_vertical_scroll_bar->setMaximum(result_row_count - 1);
+    grid_vertical_scroll_bar->show();
+  }
+}
 
 /*
   Get width and height of one row in explorer.
@@ -12789,7 +12865,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_explorer_width= copy_of_parent->ocelot_explorer_width;
   copy_of_parent->new_ocelot_explorer_detached= copy_of_parent->ocelot_explorer_detached;
   copy_of_parent->new_ocelot_explorer_visible= copy_of_parent->ocelot_explorer_visible;
-  copy_of_parent->new_ocelot_explorer_expanded= copy_of_parent->ocelot_explorer_expanded;
+  copy_of_parent->new_ocelot_explorer_sort= copy_of_parent->ocelot_explorer_sort;
   copy_of_parent->new_ocelot_explorer_query= copy_of_parent->ocelot_explorer_query;
 #endif
 
@@ -13059,11 +13135,11 @@ if (current_widget == GRID_WIDGET)
     widget_for_size[0]->setLayout(hbox_layout_for_size[0]);
     connect(combo_box_for_size[0], SIGNAL(currentIndexChanged(int)), this, SLOT(handle_combo_box_for_size_0(int)));
     widget_for_size[1]= new QWidget(this);
-    label_for_size[1]= new QLabel("Expanded");
+    label_for_size[1]= new QLabel("Sort alphabetically");
     combo_box_for_size[1]= new QComboBox();
     combo_box_for_size[1]->addItem("no");
     combo_box_for_size[1]->addItem("yes");
-    combo_box_for_size[1]->setCurrentIndex(combo_box_for_size[1]->findText(copy_of_parent->new_ocelot_explorer_expanded));
+    combo_box_for_size[1]->setCurrentIndex(combo_box_for_size[1]->findText(copy_of_parent->new_ocelot_explorer_sort));
     hbox_layout_for_size[1]= new QHBoxLayout();
     hbox_layout_for_size[1]->addWidget(label_for_size[1]);
     hbox_layout_for_size[1]->addWidget(combo_box_for_size[1]);
@@ -14275,7 +14351,7 @@ void handle_combo_box_for_size_1(int i)
     copy_of_parent->new_ocelot_extra_rule_1_display_as= combo_box_for_size[1]->itemText(i);
 #if (OCELOT_EXPLORER == 1)
   if (current_widget == EXPLORER_WIDGET)
-    copy_of_parent->new_ocelot_explorer_expanded= combo_box_for_size[1]->itemText(i);
+    copy_of_parent->new_ocelot_explorer_sort= combo_box_for_size[1]->itemText(i);
 #endif
 }
 

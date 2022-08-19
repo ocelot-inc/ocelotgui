@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: August 9 2022
+   Last modified: August 19 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -605,7 +605,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_explorer_height= ocelot_explorer_left= ocelot_explorer_top= ocelot_explorer_width= "default";
   ocelot_explorer_detached= "no";
   ocelot_explorer_visible= "no";
-  ocelot_explorer_expanded= "no";
+  ocelot_explorer_sort= "no";
   /* ocelot_explorer_query is set up elsewhere, I hope (e.g. in initialize_widget_explorer) */
   explorer_widget= NULL;
 #endif
@@ -6136,7 +6136,7 @@ void MainWindow::action_explorer()
   int result= se->exec();
   if (result == QDialog::Accepted)
   {
-    ocelot_explorer_expanded= new_ocelot_explorer_expanded;
+    ocelot_explorer_sort= new_ocelot_explorer_sort;
     if (ocelot_explorer_query != new_ocelot_explorer_query)
     {
       /* Todo: if the query is invalid, QDialog::Accepted shouldn't matter, this should fail */
@@ -11277,6 +11277,15 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     make_and_put_message_in_result(ER_PRINT, 0, (char*)"");
     return 1;
   }
+#if (OCELOT_EXPLORER == 1)
+  if (statement_type == TOKEN_KEYWORD_REFRESH)
+   {
+     char error_or_ok_message[ER_MAX_LENGTH];
+     explorer_refresh_caller(error_or_ok_message); /* todo: this returns an int result which we don't use */
+     put_message_in_result(error_or_ok_message);
+     return 1;
+   }
+#endif
   if (statement_type == TOKEN_KEYWORD_REHASH)   /* Regardless whether ocelot_auto_rehash = 1 */
   {
     char error_or_ok_message[ER_MAX_LENGTH];
@@ -11284,15 +11293,6 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     put_message_in_result(error_or_ok_message);
     return 1;
   }
-#if (OCELOT_EXPLORER == 1)
-  if (statement_type == TOKEN_KEYWORD_RELOAD)
-   {
-     char error_or_ok_message[ER_MAX_LENGTH];
-     explorer_rehash(error_or_ok_message);
-     put_message_in_result(error_or_ok_message);
-     return 1;
-   }
-#endif
   /* TODO: "STATUS" should output as much information as the mysql client does. */
   /* Todo: connections_is_connected is still 1 after lost connection or SHUTDOWN, fix that somewhere */
   if (statement_type == TOKEN_KEYWORD_STATUS)
@@ -11839,6 +11839,7 @@ else
     row_pointer+= sizeof(unsigned int) + sizeof(char);
     strncpy(column_value, row_pointer, column_length);
     column_value[column_length]= '\0';
+    /* Todo: If explorer, we should count "S" schema and "V" view and "T" triggers as well. */
     if (strcmp(column_value, "C") == 0) ++count_of_columns;
     if (strcmp(column_value, "T") == 0) ++count_of_tables;
     if (strcmp(column_value, "F") == 0) ++count_of_functions;
@@ -11888,7 +11889,7 @@ int MainWindow::rehash_scan_for_tarantool(char *error_or_ok_message, bool is_exp
     tarantool_table_ids.clear(); tarantool_table_names.clear();
     tarantool_column_table_names.clear(); tarantool_column_names.clear();
 #if (OCELOT_EXPLORER == 1)
-    tarantool_type_names.clear();
+    tarantool_type_names.clear(); tarantool_table_engines.clear(); tarantool_index_column_numbers.clear();
 #endif
     tarantool_index_table_names.clear(); tarantool_index_names.clear();
     tarantool_trigger_names.clear();
@@ -12019,23 +12020,39 @@ error_return:
   Re possible changes in format:
     Todo: This will fail if the name fields are not in the expected positions. We should check "format" clauses in _space.
     If new fields are added at the end, or if the order ofiems in the column list changes, we should be safe.
+  Re index column:
+    In _vindex column 5 there is a "parts" array. For system tables members are usually arrays.
+    For SQL tables members are usually maps. Although multi-column indexes are possible, we only note the first.
+    If members are arrays then the column that the index part refers to is the first array item.
+    If members are maps then the column that the index part refers to is the one named "field".
+    We put this number in index_column_numbers but the job is not done yet -- we convert it later
+    to a column name for oei[].part_type.
 */
 void MainWindow::rehash_scan_one_space(int space_number)
 {
   int field_number_of_id;
   int field_number_of_name;
   int field_number_of_columns;
+#if (OCELOT_EXPLORER == 1)
+  int field_number_of_engine= -1;
+  int field_number_of_sql= -1;
+#endif
   if (space_number == 281) /* 281 is "_vspace" */
   {
     field_number_of_id= 0;
     field_number_of_name= 2;
     field_number_of_columns= 6;
+#if (OCELOT_EXPLORER == 1)
+    field_number_of_engine= 3;
+    field_number_of_sql= 5;
+    field_number_of_columns= 6;
+#endif
   }
   if (space_number == 289) /* 289 is "_vindex" */
   {
     field_number_of_id= 0;
     field_number_of_name= 2;
-    field_number_of_columns= -1;
+    field_number_of_columns= 5;
   }
   if (space_number == 328) /* 328 is "_trigger" */
   {
@@ -12094,6 +12111,106 @@ void MainWindow::rehash_scan_one_space(int space_number)
           tarantool_trigger_names << returned_string;
         }
       }
+#if (OCELOT_EXPLORER == 1)
+      else if ((field_number == field_number_of_engine)
+            && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) == MP_STR))
+      {
+        /* blackhole | memtx | vinyl | sysview | service. We might replace with what's in 'sql'. */
+        const char *value;
+        uint32_t value_length;
+        value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+        QString returned_string= QString::fromUtf8(value, value_length);
+        tarantool_table_engines << returned_string;
+      }
+      else if ((field_number == field_number_of_sql)
+            && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) == MP_MAP))
+      {
+        /* Possibly: 'sql'+create-view-statement, 'view'+true. let's take the 'sql'. */
+        /* Todo: much here is a duplicate of what we do for field_number_of_columns */
+        uint32_t number_of_map_members= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_data_copy);
+        for (unsigned int i= 0; i < number_of_map_members; ++i)
+        {
+          const char *value;
+          uint32_t value_length;
+          QString returned_string;
+          int typex= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
+          if (typex != MP_STR)
+          {
+            value_length= 0;
+            lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
+          }
+          else
+          {
+            value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+            returned_string= QString::fromUtf8(value, value_length);
+            if ((value_length == 3) && (returned_string == "sql"))
+            {
+              value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+              returned_string= QString::fromUtf8(value, value_length);
+              int i_of_last_engine= tarantool_table_engines.size() - 1;
+              tarantool_table_engines[i_of_last_engine]= returned_string;
+            }
+            else
+              lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy); /* skip */
+          }
+        }
+      }
+      else if ((field_number == field_number_of_columns)
+            && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) == MP_ARRAY)
+            && (space_number == 289)) /* see comment preceding this function = "Re index column" */
+      {
+        const char *tarantool_tnt_reply_data_copy_pushed= tarantool_tnt_reply_data_copy; /* push */
+        int column_5_field_number= -1;
+        uint32_t number_of_column_5_parts= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
+        for (unsigned int part_number= 0; part_number < number_of_column_5_parts; ++part_number)
+        {
+          int type_of= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
+          if (type_of == MP_ARRAY)
+          {
+            uint32_t i_array_count= lmysql->ldbms_mp_decode_array(&tarantool_tnt_reply_data_copy);
+            for (unsigned int i_array_number= 0; i_array_number < i_array_count; ++i_array_number)
+            {
+              int array_element_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
+              if (array_element_type == MP_UINT)
+              {
+                column_5_field_number= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data_copy);
+                break;
+              }
+              else lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
+            }
+          }
+          else if (type_of == MP_MAP)
+          {
+            uint32_t i_map_count= lmysql->ldbms_mp_decode_map(&tarantool_tnt_reply_data_copy);
+            const char *value= NULL;
+            uint32_t value_length;
+            for (unsigned int i_map_number= 0; i_map_number < i_map_count * 2; ++i_map_number)
+            {
+              int map_element_type= lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy);
+              if (map_element_type == MP_STR)
+              {
+                value= lmysql->ldbms_mp_decode_str(&tarantool_tnt_reply_data_copy, &value_length);
+              }
+              else if (map_element_type == MP_UINT)
+              {
+                uint32_t x= lmysql->ldbms_mp_decode_uint(&tarantool_tnt_reply_data_copy);
+                if ((value_length == 5) && memcmp(value, "field",5) == 0)
+                {
+                  column_5_field_number= x;
+                  break;
+                }
+              }
+              else lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);
+            }
+          }
+          else lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);      /* skip */
+          if (column_5_field_number != -1) break;
+        }
+        tarantool_index_column_numbers << QString::number(column_5_field_number);
+        tarantool_tnt_reply_data_copy= tarantool_tnt_reply_data_copy_pushed; /* pop */
+        lmysql->ldbms_mp_next(&tarantool_tnt_reply_data_copy);      /* skip */
+      }
+#endif
       else if ((field_number == field_number_of_columns)
             && (lmysql->ldbms_mp_typeof(*tarantool_tnt_reply_data_copy) == MP_ARRAY))
       {
@@ -13528,6 +13645,9 @@ bool MainWindow::is_client_statement(int token, int i,QString text)
   ||  (token == TOKEN_KEYWORD_PRINT)
   ||  (token == TOKEN_KEYWORD_PROMPT)
   ||  (token == TOKEN_KEYWORD_QUIT)
+#if (OCELOT_EXPLORER == 1)
+  ||  (token == TOKEN_KEYWORD_REFRESH)
+#endif
   ||  (token == TOKEN_KEYWORD_REHASH)
   ||  (token == TOKEN_KEYWORD_SOURCE)
   ||  (token == TOKEN_KEYWORD_STATUS)
@@ -19778,6 +19898,22 @@ void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
   tip= tip + " y_end= " + QString::number(qtextedit_y_end);
   //tip= tip + " content=" + qtextedit_cell_content; removed because big contents cause slowdown
 
+#if (OCELOT_EXPLORER == 1)
+  if ((result_grid->result_grid_type == EXPLORER_WIDGET)
+   && (qtextedit_at_end == false))
+  {
+    /* Todo: probably this lookup method is duplicated somewhere, and is more complete somewhere. */
+    QString row_type= result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_type;
+    if (row_type == "S") tip= "Schema";
+    if (row_type == "T") tip= "Table";
+    if (row_type == "C") tip= "Column";
+    if (row_type == "I") tip= "Index";
+    if (row_type == "F") tip= "Function";
+    if (row_type == "P") tip= "Procedure";
+    if (row_type == "R") tip= "Trigger";
+    tip= tip + ". Right-click to see context menu. ";
+  }
+#endif
   if (qtextedit_at_end == true) tip= tip + " (At End)"; /* If this is so, nothing else matters */
 
   setToolTip(tip);
@@ -20335,7 +20471,10 @@ void Result_qtextedit::menu_context_t_2(const QPoint & pos)
   User has asked for explorer context menu, presumably by right-clicking on explorer_widget.
   From oei[qtextedit_result_row_number] I can get object_type, object_name, column_name.
   User can press Esc, or click outside the choices, to select nothing.
+  Put up a menu with &QAction. Each QAction has a text (which should be ostrings.h?), and maybe an SQL statement.
   Todo: Make it start & pos!
+  QAction Text What to do if clicked
+  ----    ---- ---------------------
   Select Rows                       done, we say SELECT * FROM table-name LIMIT 1000;
   Table Inspector                         apparently this just allows analyze etc.
   Copy to Clipboard -->             done, for one cell
@@ -20349,7 +20488,7 @@ void Result_qtextedit::menu_context_t_2(const QPoint & pos)
   Drop Table...                     done (also Drop procedure)
   Truncate Table...                 done
   Search Table Data...                    meaning select from all tables, all text columns, returning counts
-  Refresh All                       done, as rehash
+  Refresh All                       done, as refresh
   I see what QAction exec() returns, rather than slots, it's less hassle than defining with parameters.
   Todo: I could be specific, e.g. instead of "Copy to clipboard" say "Copy TABLE_X to clipboard"
   Todo: Watch out for "at end", if you're past it then there's nothing useful you can do.
@@ -20363,45 +20502,80 @@ void Result_qtextedit::menu_context_t_2(const QPoint & pos)
   Warning: do not define QAction objects inside {}s, exec() will not know about them.
   Todo: Bug: If we move the cursor while the menu is up, mousemovevent won't happen, so row number is wrong.
   Todo: Maybe "load" an instruction? But that can be a general idea, not necessarily associated with explorer.
+  Todo: Format the SQL statements according to whatever happened with a format statement earlier.
+  Todo: Maybe some actions could be scriptable, i.e. users can associate SQL statements with actions.
 */
 void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
 {
   if (qtextedit_at_end == true) return;
-  QString object_type= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_type);
-  QString object_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_name);
-  QString part_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].part_name);
-  QString part_type= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].part_type);
   result_grid->copy_of_parent->log("menu_context_t_2_explorer start", 90);
 
   QMenu menu;
-  QAction action_select_table;
-  QAction action_copy_to_clipboard;
+  QAction action_select_rows;           /* Text="Select Rows". If clicked: SELECT statement. */
+  QAction action_copy_to_clipboard;      /* Text="Copy to clipboard". If clicked: per text. */
 #ifdef OCELOT_IMPORT_EXPORT
   QMenu *submenu_export;
   QAction action_export_text;
   QAction action_export_table;
   QAction action_export_html;
 #endif
-  QAction action_copy_to_statement_widget;
-  QAction action_show_create_table;
+  QAction action_send_to_sql_editor;
+  QAction action_create_table;
   QAction action_create_table_like;
   QAction action_drop_table;
+  QAction action_create_view;
+  QAction action_drop_view;
   QAction action_truncate_table;
+  QAction action_show_column;
+  QAction action_drop_column;
+  QAction action_create_procedure;
   QAction action_drop_procedure;
-  QAction action_show_create_procedure;
   QAction action_drop_index;
   QAction action_show_index;
   QAction action_select_index;
-  QAction action_show_column;
-  QAction action_drop_column;
-  QAction action_rehash;
-  if (object_type == "T")
+  /* no "table maintenance" */
+  QAction action_set_as_default_schema;
+  QAction action_filter_to_this_schema;
+  QAction action_schema_inspector;
+  QAction action_create_schema;
+  QAction action_alter_schema;
+  QAction action_show_trigger;
+  QAction action_drop_trigger;
+  QAction action_drop_schema;
+  /* no "search table data" */
+  QAction action_reset;
+  QAction action_refresh;
+
+  QString object_type= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_type);
+  QString schema_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].schema_name);
+  QString object_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_name);
+  QString part_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].part_name);
+  QString part_type= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].part_type);
+  char flags= result_grid->copy_of_parent->oei[qtextedit_result_row_number].flags;
+  QString full_object_name, full_part_name;
+
+  /* Todo: Let delimiter be blank if it's not necessary. */
+  QString delimiter= "\"";
+  if (connections_dbms[0] == DBMS_TARANTOOL) ;
+  else if (sql_mode_ansi_quotes == false) delimiter= "`";
+  QString full_schema_name= delimiter + schema_name + delimiter;
+  /* Todo: don't add schema qualifier if it's not necessary */
+  QString qualifier= "";
+  if (connections_dbms[0] == DBMS_TARANTOOL) ;
+  else qualifier= full_schema_name + ".";
+  full_object_name= qualifier+ delimiter + object_name + delimiter;
+  full_part_name= qualifier+ delimiter + part_name + delimiter;
+
+  /* Set up QActions in order they were defined. Nothing variable here. */
+  if ((object_type == "T") || (object_type == "V"))
   {
-    action_select_table.setText("Select * from " + object_name + " limit 1000;");
-    menu.addAction(&action_select_table);
+    action_select_rows.setText("Select rows");
+    menu.addAction(&action_select_rows);
   }
-  action_copy_to_clipboard.setText("Copy to clipboard");
-  menu.addAction(&action_copy_to_clipboard);
+  {
+    action_copy_to_clipboard.setText("Copy to clipboard");
+    menu.addAction(&action_copy_to_clipboard);
+  }
 #ifdef OCELOT_IMPORT_EXPORT
   if (object_type == "T")
   {
@@ -20414,129 +20588,111 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
     submenu_export->addAction(&action_export_html);
   }
 #endif
-  action_copy_to_statement_widget.setText("Copy to statement widget");
-  menu.addAction(&action_copy_to_statement_widget);
+  {
+    action_send_to_sql_editor.setText("Send to SQL editor");
+    menu.addAction(&action_send_to_sql_editor);
+  }
   menu.addSeparator();
   if (object_type == "T")
   {
     if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
     {
-      action_show_create_table.setText("Show create table " + object_name + ";");
-      menu.addAction(&action_show_create_table);
+      action_create_table.setText("Create table");
+      menu.addAction(&action_create_table);
     }
     action_create_table_like.setText("Create table like");
     menu.addAction(&action_create_table_like);
-    action_drop_table.setText("Drop table " + object_name + ";");
+    action_drop_table.setText("Drop table");
     menu.addAction(&action_drop_table);
-    action_truncate_table.setText("Truncate table " + object_name + ";");
+    action_truncate_table.setText("Truncate table");
     menu.addAction(&action_truncate_table);
+  }
+  /* Todo: imore f object_type == "V" */
+  if (object_type == "V")
+  {
+    action_create_view.setText("Create view");
+    menu.addAction(&action_create_view);
+    action_drop_view.setText("Drop view");
+    menu.addAction(&action_drop_view);
   }
   if (object_type == "C")
   {
     action_show_column.setText("Show column");
     menu.addAction(&action_show_column);
-    action_drop_column.setText("Alter table " + object_name + " drop column " + part_name + ";");
-    menu.addAction(&action_drop_column);
+    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
+    {
+      action_drop_column.setText("Drop column");
+      menu.addAction(&action_drop_column);
+    }
   }
   if (object_type == "P")
   {
-    action_drop_procedure.setText("Drop procedure " + object_name + ";");
+    action_drop_procedure.setText("Drop procedure");
     menu.addAction(&action_drop_procedure);
     if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
     {
-      action_show_create_procedure.setText("Show create procedure " + object_name + ";");
-      menu.addAction(&action_show_create_procedure);
+      action_create_procedure.setText("Create procedure");
+      menu.addAction(&action_create_procedure);
     }
   }
   if (object_type == "I")
   {
-    /* Todo: For Tarantool we should be enclosing in ""s */
-    action_drop_index.setText("Drop index " + part_name + " on " + object_name + ";");
+    action_drop_index.setText("Drop index");
     menu.addAction(&action_drop_index);
-    if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
-    {
-#if (OCELOT_MYSQL_INCLUDE == 1)
-    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
-      action_show_index.setText("Show index from " + object_name + ";");
-#endif
-#ifdef DBMS_TARANTOOL
-    if (connections_dbms[0] == DBMS_TARANTOOL)
-      action_show_index.setText("select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '_collation');");
-#endif
-      menu.addAction(&action_show_index);
-    }
-#if (OCELOT_MYSQL_INCLUDE == 1)
-    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
-      action_select_index.setText("Select * from information_schema.statistics where index_name = '" + part_name + "';");
-#endif
-#ifdef DBMS_TARANTOOL
-    if (connections_dbms[0] == DBMS_TARANTOOL)
-      action_select_index.setText("Select * from \"_index\" where \"name\" = '" + part_name + "';");
-#endif
+    action_show_index.setText("Show index");
+    menu.addAction(&action_show_index);
+    action_select_index.setText("Select index");
     menu.addAction(&action_select_index);
   }
-  action_rehash.setText("Rehash;");
-  menu.addAction(&action_rehash);
+  if ((object_type == "S") && (connections_dbms[0] != DBMS_TARANTOOL))
+  {
+    action_set_as_default_schema.setText("Set as default schema");
+    menu.addAction(&action_set_as_default_schema);
+    if ((flags&EXPLORER_FLAG_NOT_FILTERED) != 0) action_filter_to_this_schema.setText("Do not filter to this schema");
+    else action_filter_to_this_schema.setText("Filter to this schema");
+    menu.addAction(&action_filter_to_this_schema);
+    action_schema_inspector.setText("Schema inspector");
+    menu.addAction(&action_schema_inspector);
+    action_create_schema.setText("Create schema");
+    menu.addAction(&action_create_schema);
+    action_alter_schema.setText("Alter schema");
+    menu.addAction(&action_alter_schema);
+    action_drop_schema.setText("Drop schema");
+    menu.addAction(&action_drop_schema);
+  }
+  if (object_type == "R")
+  {
+    action_show_trigger.setText("show trigger");
+    menu.addAction(&action_show_trigger);
+    action_drop_trigger.setText("drop trigger");
+    menu.addAction(&action_drop_trigger);
+  }
+  menu.addSeparator();
+  {
+    action_reset.setText("Reset");
+    menu.addAction(&action_reset);
+  }
+  {
+    action_refresh.setText("Refresh");
+    menu.addAction(&action_refresh);
+  }
   // this doesn't print, in wonder why ... if (pos == QCursor::pos()) printf("pos == QCursor::pos\n");
   QAction *menu_exec_result= menu.exec(QCursor::pos());
-  if (menu_exec_result == &action_copy_to_clipboard)
+
+  /* switch (menu_exec_result) ... */
+  if (menu_exec_result == &action_select_rows)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+                "Select * from " + full_object_name + " limit 1000;");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_copy_to_clipboard)
   {
     /* This copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier. */
     QApplication::clipboard()->setText(qtextedit_cell_content);
   }
-  if (menu_exec_result == &action_copy_to_statement_widget)
-  {
-    /* This copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier. */
-    QString text= result_grid->copy_of_parent->statement_edit_widget->toPlainText();
-    text= text + qtextedit_cell_content;
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-  }
-  if (menu_exec_result == &action_create_table_like)
-  {
-    Small_dialog *sm= new Small_dialog("Enter new table name and type Enter", "New name", "");
-    sm->exec();
-    QString text= "Create table " + sm->line_edit.text().toUtf8() + " like " + object_name + ";";
-    delete sm;
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  if (menu_exec_result == &action_show_column)
-  {
-    int index_count= 0;
-    for (int i= 0; i < result_grid->copy_of_parent->oei_count; ++i)
-    {
-      if ((result_grid->copy_of_parent->oei[i].object_type == "I")
-       && (result_grid->copy_of_parent->oei[i].object_name == object_name)
-       && (result_grid->copy_of_parent->oei[i].part_name == part_name))
-        ++index_count;
-    }
-    QString occurs_text= QString::number(index_count) + " times";
-    if (index_count == 1) occurs_text= "1 time";
-    QString text= "select '" + part_name + "' as column_name,"
-                       + "'" + part_type + "' as column_type,"
-                       + "'" + occurs_text + "' as occurs_in_indexes;";
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  if ((menu_exec_result == &action_select_table)
-   || (menu_exec_result == &action_drop_table)
-   || (menu_exec_result == &action_truncate_table)
-   || (menu_exec_result == &action_show_create_table)
-   || (menu_exec_result == &action_drop_procedure)
-   || (menu_exec_result == &action_show_create_procedure)
-   || (menu_exec_result == &action_drop_index)
-   || (menu_exec_result == &action_show_index)
-   || (menu_exec_result == &action_select_index)
-   || (menu_exec_result == &action_drop_column)
-   || (menu_exec_result == &action_rehash))
-  {
-    char tmp[1024];
-    strcpy(tmp, menu_exec_result->text().toUtf8());
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(menu_exec_result->text());
-    result_grid->copy_of_parent->action_execute(1);
-  }
 #ifdef OCELOT_IMPORT_EXPORT
-  if ((menu_exec_result == &action_export_text)
+  else if ((menu_exec_result == &action_export_text)
    || (menu_exec_result == &action_export_table)
    || (menu_exec_result == &action_export_html))
   {
@@ -20550,14 +20706,213 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
     if (function_result == 1) /* Todo: check that function_result != 1 if dialog-cancel or SET failure */
     {
       QString file_name= main_exports.file_name;
-      QString text= "SELECT /* FOR EXPORT TO " + file_name + "*/ * FROM " + object_name + ";";
+      QString text= "SELECT /* FOR EXPORT TO " + file_name + "*/ * FROM " + full_object_name + ";";
       result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
       result_grid->copy_of_parent->action_execute(1);
       main_exports= copy_of_main_exports;
     }
-  result_grid->copy_of_parent->log("menu_context_t_2_explorer end", 90);
   }
 #endif
+  else if (menu_exec_result == &action_send_to_sql_editor)
+  {
+    /* This copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier. */
+    QString text= result_grid->copy_of_parent->statement_edit_widget->toPlainText();
+    text= text + qtextedit_cell_content;
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
+  }
+  else if (menu_exec_result == &action_create_table)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Show create table " + object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_create_table_like)
+  {
+    Small_dialog *sm= new Small_dialog("Enter new table name and type Enter", "New name", "");
+    sm->exec();
+    QString text= "Create table " + sm->line_edit.text().toUtf8() + " like " + full_object_name + ";";
+    delete sm;
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_drop_table)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Drop table " + full_object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_create_view)
+  {
+    if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        "Show create view " + object_name + ";");
+    else /* presumably DBMS_TARANTOOL and in that case we stored it in engine, which became part */
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        part_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_drop_view)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Drop view " + full_object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_truncate_table)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Truncate table " + full_object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_create_procedure)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Show create procedure " + full_object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_drop_procedure)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Drop procedure " + full_object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_drop_index)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Drop index " + full_part_name + " on " + full_object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_show_index)
+  {
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        "Show index from " + full_object_name + ";");
+#endif
+#ifdef DBMS_TARANTOOL
+    if (connections_dbms[0] == DBMS_TARANTOOL)
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        "select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '" + object_name + "');");
+#endif
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_select_index)
+  {
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        "Select * from information_schema.statistics where index_name = '" + part_name + "';");
+#endif
+#ifdef DBMS_TARANTOOL
+    if (connections_dbms[0] == DBMS_TARANTOOL)
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        "Select * from \"_vindex\" where \"name\" = '" + part_name + "';");
+#endif
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_show_column)
+  {
+    int index_count= 0;
+    for (unsigned int i= 0; i < result_grid->copy_of_parent->oei_count; ++i)
+    {
+      if (result_grid->copy_of_parent->oei[i].object_type == "I")
+      {
+        if ((result_grid->copy_of_parent->oei[i].object_name == object_name)
+         && (result_grid->copy_of_parent->oei[i].part_type == part_name))
+        {
+          ++index_count;
+        }
+      }
+    }
+    QString occurs_text= QString::number(index_count) + " times";
+    if (index_count == 1) occurs_text= "1 time";
+    QString text= "select '" + part_name + "' as column_name,"
+                       + "'" + part_type + "' as column_type,"
+                       + "'" + occurs_text + "' as occurs_in_indexes;";
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_drop_column)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Alter table " + full_object_name + " drop column " + full_part_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_set_as_default_schema)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Use " + full_schema_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_filter_to_this_schema)
+  {
+    result_grid->explorer_filter(qtextedit_result_row_number);
+  }
+  else if (menu_exec_result == &action_schema_inspector)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+    "select schema_name,"
+    " (select count(*) from information_schema.tables where table_schema='" + schema_name + "') as table_count,"
+    " (select count(*) from information_schema.routines where routine_schema='" + schema_name + "') as routine_count,"
+    " (select count(*) from information_schema.triggers where trigger_schema='" + schema_name + "') as trigger_count,"
+    " schema_comment"
+    " from information_schema.schemata"
+    " where schema_name='" + schema_name + "';");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_create_schema)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Show create schema " + full_schema_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_alter_schema)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Alter schema " + full_schema_name +
+      " character set=" + part_name +
+      " collate=" + part_type +
+      ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_drop_schema)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Drop schema " + full_schema_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_show_trigger)
+  {
+#if (OCELOT_MYSQL_INCLUDE == 1)
+    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        "Select * from information_schema.triggers where trigger_name = '" + object_name + "';");
+#endif
+#ifdef DBMS_TARANTOOL
+    if (connections_dbms[0] == DBMS_TARANTOOL)
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+        "Select * from \"_trigger\" where \"name\" = '" + object_name + "';");
+#endif
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_drop_trigger)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Drop trigger " + full_object_name + ";");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else if (menu_exec_result == &action_reset)
+  {
+    result_grid->explorer_reset();
+  }
+  else if (menu_exec_result == &action_refresh)
+  {
+    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
+      "Refresh;");
+    result_grid->copy_of_parent->action_execute(1);
+  }
+  else {;} /* unknown action, probably exec() returned NULL */
+
+  result_grid->copy_of_parent->log("menu_context_t_2_explorer end", 90);
 }
 
 #endif
@@ -26733,7 +27088,13 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
     qv= qv.toLower();
     if ((qv != "yes") && (qv != "no")) return ER_ILLEGAL_VALUE;
     *qstring_target= qv;
-    if (qv == "yes") main_window->explorer_show();
+    if (qv == "yes")
+    {
+      char error_or_ok_message[ER_MAX_LENGTH]; /* todo: we're not showing this message to the user */
+      int ret= main_window->explorer_refresh_caller(error_or_ok_message);
+      if (ret != ER_OK_REHASH) return ret;
+      return ER_OK;
+    }
     else main_window->explorer_widget->hide();
   }
 #endif
@@ -26934,7 +27295,7 @@ XSettings::~XSettings()
         (We call this "toggling".)
         It's treated as a header item, that is, Result Grid Settings for header affect it.
         So ordinarily it has a different background color.
-    #2: object_type. T or C or P or I or E or t
+    #2: object_type. S or T or V or C or P or I or E or t
     #3: object_name. for example, if object_type='T', this is a table name.
         If object_type='C', this is a column name and is taken from part_name.
   Settings ... for Explorer
@@ -26959,10 +27320,10 @@ XSettings::~XSettings()
     SET ocelot_grid_cell_height=0 ... WHERE ...; causes matching rows to disappear, i.e. this is our "filter".
     New keywords begin with TOKEN_KEYWORD_OCELOT_EXPLORER e.g. TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED
     Important one: ocelot_visible='yes'|'no'
-  RELOAD:
-    Others call this "Refresh" or "Refresh all". We use RELOAD since it's an existing keyword.
-    RELOAD is necessary because we don't know when others might change data definitions.
-    Whenever users say RELOAD, the explorer tables are redone.
+  REFRESH:
+    Others call this "Refresh" or "Refresh all".
+    REFRESH is necessary because we don't know when other users might change data definitions. And it's slow.
+    Whenever users say REFRESH, the explorer tables are redone.
     In another product this would be done with a View menu.
   Options:
     New options: Detach|Attach explorer widget.
@@ -26990,14 +27351,15 @@ XSettings::~XSettings()
   Todo: Your initial setup of upper_layout might be dangerous, check it more thoroughly.
         Search for calculations that depend on whole width, instead of main_window width.
         Check whether a change to grid settings will affect explorer_widget (probably not).
+  Todo: It's a bit unfortunate that explorer's abbreviation is 'S' for schema but rehash's is 'D' for database.
   Todo: "MIN" is not a wonderfulname. It should be short.
         There might be some standard term. Collapse? Tables only? Hide columns? Hide parts?
-  explorer_show():
+  explorer_refresh_caller():
     will do rehash_scan() (as if REHASH statement was executed), then fill up oei struc,
     so that when explorer_widget->show() happens there will be an explorer widget to show.
     There are several ways it can fail, which should cause a dialog box without showing.
   Todo: Usually when we change a Settings item the result is we generate a SET statement.
-        TODO: explorer_show() should merely give error dialog boxes if something is not ready.
+        TODO: explorer_refresh_caller() should merely give error dialog boxes if something is not ready.
               explorer_rehah() should give an error dialog box if rehash/refresh fails.
         Todo: user might set e.g. vertical or raw. make sure such settings have no effect on explorer widget
         Todo: we could say, instead of "C", "C(PK,FK,I)"
@@ -27010,6 +27372,7 @@ XSettings::~XSettings()
               which might change upon re-connect.
         Todo: Now that everything is in object_name we lose a bit of ability with
               SET ocelot_grid_... WHERE column_name ... unless we say column_type='C' means something
+        Todo: In Tarantool, how good it would be to have options for creating information_schema_tables etc.!
 */
 void MainWindow::initialize_widget_explorer()
 {
@@ -27031,7 +27394,7 @@ void MainWindow::initialize_widget_explorer()
         It might be better to have two ocelot_explorer_queries, one for Tarantool, one for MySQL/MariaDB.
   Todo: think harder about how to handle switch to a different DBMS
   Todo: Create _tables and _columns if they haven't already been created.
-  Todo: If explorer_rehash fails, probably because we lack an important select privilege,
+  Todo: If explorer_refresh fails, probably because we lack an important select privilege,
         mark that explorer is disabled and explain the problem.
   Todo: Temporarily I've set auto_rehash=0. Put it back in .my.cnf.
 */
@@ -27039,7 +27402,7 @@ void MainWindow::initialize_widget_explorer_after_connect()
 {
 #if (OCELOT_MYSQL_INCLUDE == 1)
   if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MARIADB))
-  ocelot_explorer_query= "select 'D',schema_name,schema_name,'',''\n"
+  ocelot_explorer_query= "select 'S',schema_name,schema_name,default_character_set_name,default_collation_name\n"
                  "from information_schema.schemata\n"
                  "union all\n"
                  "select 'T',table_schema,table_name,table_type,''\n"
@@ -27048,10 +27411,10 @@ void MainWindow::initialize_widget_explorer_after_connect()
                  "select 'C',table_schema,table_name,column_name,column_type\n"
                  "from information_schema.columns\n"
                  "union all\n"
-                 "select 'I',table_schema,table_name,index_name,''\n"
+                 "select 'I',table_schema,table_name,index_name,column_name\n"
                  "from information_schema.statistics\n"
                  "union all\n"
-                 "select 't',trigger_schema,trigger_name,'',''\n"
+                 "select 'R',trigger_schema,trigger_name,'',''\n"
                  "from information_schema.triggers\n"
                  "union all\n"
                  "select 'F',routine_schema,routine_name,routine_type,''\n"
@@ -27068,7 +27431,7 @@ void MainWindow::initialize_widget_explorer_after_connect()
          ;
 #endif
   if (connections_dbms[0] == DBMS_TARANTOOL)
-    ocelot_explorer_query= "select 'D','main','','',//\n"
+    ocelot_explorer_query= "select 'S','main','','',//\n"
                    "union all\n"
                    "select 'C',table_schema,table_name,column_name,data_type\n"
                    "from _columns\n"
@@ -27090,16 +27453,19 @@ void MainWindow::initialize_widget_explorer_after_connect()
     Todo #2: It would be so much nicer if rehash_scan didn't have so many globals.
     Todo #3: we have flag, and if ((flag & FIELD_VALUE_FLAG_IS_NULL) != 0) might be true, but we don't use it
     Todo #5: if failure, should not be visible, eh? we fail to check for failure of explorer_display()
+    Todo #6: REFRESH; statement causes this. Therefore it jumps back to 0 on the scroll bar.
+             With explorer_toggle(): we could assume that scroll bar position is unchanged.
+             Ideally we could try to find the same item again, and if we fail then retreat to most-recent item
+             of the same type or of upper type in the hierarchy, but that gets complicated, especially if there
+             has been collapsing and filtering.
 */
-void MainWindow::explorer_show()
+int MainWindow::explorer_refresh_caller(char *error_or_ok_message)
 {
-  //statement_edit_widget->setPlainText("REHASH;");
-  //if (action_execute(1) != 0) return; /* != 0 means rehash failed for some reason */
-  char error_or_ok_message[1024];
-  int rehash_scan_result= explorer_rehash(error_or_ok_message);
-  if (rehash_scan_result != ER_OK_REHASH) return; /* Todo: does user see this result? */
+  int rehash_scan_result= explorer_refresh(error_or_ok_message);
+  if (rehash_scan_result != ER_OK_REHASH) return rehash_scan_result; /* Todo: does user see this result? */
   explorer_widget->explorer_display();  /* effectively: explorer_display_html(0) */
   explorer_widget->show();
+  return ER_OK_REHASH;
 }
 
 /*
@@ -27109,34 +27475,39 @@ void MainWindow::explorer_show()
   so we always will call rehash() twice, once for autocomplete use, once for explorer use.
 SET ocelot_explorer_visible='yes'; -- if already visible: depends whether something else changed, but that's a bit hard to know
                                     if not already visible: rehash
-Menu context edit menu rehash:        RELOAD
-RELOAD:                               explorer_rehash_scan if ocelot_explorer_visible='yes'
---auto_rehash:                        affects REHASH not RELOAD
-After explorer_rehash, vertical scroll bar should go back to start
+Menu context edit menu rehash:        REFRESH
+REFRESH:                              explorer_rehash_scan if ocelot_explorer_visible='yes'
+--auto_rehash:                        affects REHASH not REFRESH
+After explorer_refresh, vertical scroll bar should go back to start
 
-Called from: execute_client_statement if (statement == RELOAD;)
-Called from: explorer_show() which is due to OCELOT_EXPLORER_VISIBLE='yes' or a choice on context menu
+Called from: execute_client_statement if (statement == REFRESH;)
+Called from: explorer_refresh_caller() which is due to OCELOT_EXPLORER_VISIBLE='yes' or a choice on context menu
   Method:
     For each schema
       For each item of this schema
-        If "T"
+        If "T" or "V"
           add to oei
           For each item
             If "C" of this "T":
               add to oei
             If "I" of this "T":
               add to oei
-        If "t" or "P" or "E" or "F":
+        If "R" or "P" or "E" or "F":
           add to oei (these will come last because of the way the UNION was done)
   TODO: For rehash_scan_for_tarantool(), if explorer:
         We should ignore what is not in the query, e.g. if user decided not to get 'I', or added a 'WHERE'.
+  Todo: Maybe we can throw away the result set as soon as we have the oei.
+  Todo: Since refresh including qsort can take a second on an almost minimal information_schema,
+        think of ways to speed up. E.g. check last update to see whether a change happened,
+        make a special qsort table so each swap becomes smaller, assume system tables won't change,
+        take advantage of all things of same type being together initially (I think).
 */
-int MainWindow::explorer_rehash(char *error_or_ok_message)
+int MainWindow::explorer_refresh(char *error_or_ok_message)
 {
-  log("explorer_rehash start", 65);
+  log("explorer_refresh start", 65);
   if (ocelot_explorer_visible == "no")
   {
-    strcpy(error_or_ok_message, "RELOAD only works if explorer is visible. To make it visible, use Settings|Explorer or SET ocelot_explorer_visible='yes';");
+    strcpy(error_or_ok_message, "REFRESH only works if explorer is visible. To make it visible, use Settings|Explorer or SET ocelot_explorer_visible='yes';");
     return ER_ERROR;
   }
   int rehash_scan_result;
@@ -27159,25 +27530,26 @@ int MainWindow::explorer_rehash(char *error_or_ok_message)
   /* Something like what happens in rehash_search(). */
   /* ?? Maybe you should have a limit on the size, like SQL Server does (65535). */
   /* todo: "* 2" is too much, you only need to allow for adding "T", which should mean nothing. */
+  /*       COMMENT ON THIS TODO: ???? in fact maybe we don't even need *2 any more, eh? */
   oei= new explorer_items[rehash_result_row_count * 2];
 #ifdef DBMS_TARANTOOL
   if (connections_dbms[0] == DBMS_TARANTOOL)
   {
-    oei[oei_count].object_type= "D"; /* Tarantool has no schemas but we'll pretend with a dummy named "main" */
+    oei[oei_count].object_type= "S"; /* Tarantool has no schemas but we'll pretend with a dummy named "main" */
     oei[oei_count].schema_name= "main";
     oei[oei_count].object_name= "main";
     oei[oei_count].part_name= "";
     oei[oei_count].part_type= "";
-    oei[oei_count].is_min= true;
+    oei[oei_count].flags= EXPLORER_FLAG_MIN;
     ++oei_count;
     for (int i= 0; i < tarantool_table_names.count(); ++i)
     {
       oei[oei_count].object_type= "T";
       oei[oei_count].schema_name= "main";
       oei[oei_count].object_name= tarantool_table_names.at(i).toUtf8();
-      oei[oei_count].part_name= "";
+      oei[oei_count].part_name= tarantool_table_engines.at(i).toUtf8();
       oei[oei_count].part_type= "";
-      oei[oei_count].is_min= true;
+      oei[oei_count].flags= EXPLORER_FLAG_MIN;
       ++oei_count;
     }
     for (int i= 0; i < tarantool_column_names.count(); ++i)
@@ -27187,27 +27559,42 @@ int MainWindow::explorer_rehash(char *error_or_ok_message)
       oei[oei_count].object_name= tarantool_column_table_names.at(i).toUtf8();
       oei[oei_count].part_name= tarantool_column_names.at(i).toUtf8();
       oei[oei_count].part_type= tarantool_type_names.at(i).toUtf8();
-      oei[oei_count].is_min= true;
+      oei[oei_count].flags= EXPLORER_FLAG_MIN;
       ++oei_count;
     }
     for (int i= 0; i < tarantool_index_names.count(); ++i)
     {
+      QString c= "";
+      int counter= 0;
+      int index_column_number= tarantool_index_column_numbers.at(i).toInt();
+      for (int j= 0; j < tarantool_column_names.count(); ++j)
+      {
+        if (tarantool_index_table_names.at(i) == tarantool_column_table_names.at(j))
+        {
+          if (counter == index_column_number)
+          {
+            c= tarantool_column_names.at(j);
+            break;
+          }
+          ++counter;
+        }
+      }
       oei[oei_count].object_type= "I";
       oei[oei_count].schema_name= "main";
       oei[oei_count].object_name= tarantool_index_table_names.at(i).toUtf8();
       oei[oei_count].part_name= tarantool_index_names.at(i).toUtf8();
-      oei[oei_count].part_type= "";
-      oei[oei_count].is_min= true;
+      oei[oei_count].part_type= c.toUtf8();
+      oei[oei_count].flags= EXPLORER_FLAG_MIN;
       ++oei_count;
     }
     for (int i= 0; i < tarantool_trigger_names.count(); ++i)
     {
-      oei[oei_count].object_type= "t";
+      oei[oei_count].object_type= "R";
       oei[oei_count].schema_name= "main";
       oei[oei_count].object_name= tarantool_trigger_names.at(i).toUtf8();
       oei[oei_count].part_name= "";
       oei[oei_count].part_type= "";
-      oei[oei_count].is_min= true;
+      oei[oei_count].flags= EXPLORER_FLAG_MIN;
       ++oei_count;
     }
   }
@@ -27232,7 +27619,7 @@ int MainWindow::explorer_rehash(char *error_or_ok_message)
           if (i == 4) oei[oei_count].part_type= QByteArray(row_pointer, column_length);
           if (i == rehash_result_column_count - 1) /* i.e. if now we have all columns */
           {
-            oei[oei_count].is_min= true;
+            oei[oei_count].flags= EXPLORER_FLAG_MIN;
             ++oei_count;
           }
         }
@@ -27244,32 +27631,115 @@ int MainWindow::explorer_rehash(char *error_or_ok_message)
   //explorer_widget->hide(); /* Is this necessary? */
   /* this is in the initialize function */
   explorer_sort();
-  log("explorer_rehash end", 65);
+  log("explorer_refresh end", 65);
   return ER_OK_REHASH;
 }
 
+
 /*
-  Given oei that we produce in explorer_rehash(), sort so 'C' and 'I' are under 'T'.
+  E.g.
+    "S","information_schema",'',''
+      "T","information_schema","Table-Name",""
+        "C","information_schema","Table-Name","Part-Name",
+        "I","information_schema","Table-Name","Part-Name",
+  Case Sensitive
+  Alternative: If user chose "definition order", return diff-of-row-number when names are different
+  Possible enhancement: allow for case-insensitive sorting
+*/
+int static explorer_qsort_compare(const void *a, const void *b)
+{
+  struct explorer_items ea= *(struct explorer_items *) a;
+  struct explorer_items eb= *(struct explorer_items *) b;
+  int schema_comparison_result= QString::compare(ea.schema_name, eb.schema_name, Qt::CaseInsensitive);
+  if (schema_comparison_result != 0) return schema_comparison_result;
+  /* same schema name */
+  //if (ea.object_type == "S") return -1;
+  //if (eb.object_type == "S") return +1;
+  int ea_main_number, eb_main_number;
+  if (ea.object_type == "S") ea_main_number= 0;
+  else if ((ea.object_type == "T") || (ea.object_type == "V") || (ea.object_type == "C") || (ea.object_type == "I")) ea_main_number= 1;
+  else if (ea.object_type == "F") ea_main_number= 2;
+  else if (ea.object_type == "P") ea_main_number= 3;
+  else if (ea.object_type == "E") ea_main_number= 4;
+  else ea_main_number= 5; /* presumably "t" */
+  if (eb.object_type == "S") eb_main_number= 0;
+  else if ((eb.object_type == "T") || (eb.object_type == "V") || (eb.object_type == "C") || (eb.object_type == "I")) eb_main_number= 1;
+  else if (eb.object_type == "F") eb_main_number= 2;
+  else if (eb.object_type == "P") eb_main_number= 3;
+  else if (eb.object_type == "E") eb_main_number= 4;
+  else eb_main_number= 5; /* presumably "R" */
+  if (ea_main_number != eb_main_number) return ea_main_number - eb_main_number;
+  /* ... so main numbers are the same ... */
+  int object_comparison_result= QString::compare(ea.object_name, eb.object_name, Qt::CaseInsensitive);
+  if (object_comparison_result != 0) return object_comparison_result;
+  /* ... so object names are the same, which should only occur for T|V and C|I ... */
+  int ea_part_type, eb_part_type;
+  if ((ea.object_type == "T") || (ea.object_type == "V")) ea_part_type= 0;
+  else if (ea.object_type == "C") ea_part_type= 1;
+  else ea_part_type= 2; /* presumably "I" */
+  if ((eb.object_type == "T") || (eb.object_type == "V")) eb_part_type= 0;
+  else if (eb.object_type == "C") eb_part_type= 1;
+  else eb_part_type= 2; /* presumably "I" */
+  if (ea_part_type != eb_part_type) return ea_part_type - eb_part_type;
+  /* ... so schema name and object name and type are the same ... */
+  return QString::compare(ea.part_name, eb.part_name, Qt::CaseInsensitive);
+}
+
+/*
+  Given oei that we produce in explorer_refresh(), sort so there is a hierarchy:
+    schema -> object -> part, specifically 'C' and 'I' are under 'T' or 'V',
+    and alphabetic within the hierarchy unless Settings|explorer said to keep defined order.
+    Saying explorer_sort == "no" might be slightly faster and preserves column-definition order within table.
   Todo: Perhaps 't' should be under 'T' too.
   Todo: There could be more ways to sort.
-  Todo: There are probably thousands of items so speeding this up might be good. Add to tracing|logging?
-        One thing that we can take advantage of: all things of same type are together, I think.
 */
 void MainWindow::explorer_sort()
 {
+  log("explorer_sort start", 65);
+
+  for (int i= 0; i < oei_count; ++i)
+  {
+    if (oei[i].object_type == "T")
+    {
+      bool is_view= false;
+      if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
+      {
+        if ((oei[i].part_name == "VIEW") || (oei[i].part_name == "SYSTEM VIEW"))
+          is_view= true;
+      }
+      else /* presumably == DBMS_TARANTOOL */
+      {
+        /* Todo: This only checks for user-created views starting with CREATE. Why not "sysview"? */
+        QString s= QString(oei[i].part_name);
+        if (s.startsWith("create", Qt::CaseInsensitive))
+          is_view= true;
+      }
+      if (is_view)
+      {
+        oei[i].object_type= "V";
+      }
+    }
+  }
+
+  if (ocelot_explorer_sort == "yes")
+  {
+    qsort(oei, oei_count, sizeof(struct explorer_items), explorer_qsort_compare);
+    log("explorer_sort end", 65);
+    return;
+  }
   explorer_items *oei_copy;
   oei_copy= new explorer_items[oei_count];
   unsigned int i_of_copy= 0;
 
   for (unsigned int i_of_schema= 0; i_of_schema < oei_count; ++i_of_schema)
   {
-    if (oei[i_of_schema].object_type != "D") break; /* This assumes that schemas precede all other types */
+    if (oei[i_of_schema].object_type != "S") break; /* This assumes that schemas precede all other types */
     oei_copy[i_of_copy++]= oei[i_of_schema];
     for (unsigned int i_of_main= 0; i_of_main < oei_count; ++i_of_main)
     {
       if (oei[i_of_main].schema_name == oei[i_of_schema].schema_name)
       {
-        if (oei[i_of_main].object_type == "T")
+        if ((oei[i_of_main].object_type == "T") || (oei[i_of_main].object_type == "V"))
         {
           oei_copy[i_of_copy++]= oei[i_of_main];
           for (unsigned int i_of_column= 0; i_of_column < oei_count; ++i_of_column)
@@ -27289,7 +27759,7 @@ void MainWindow::explorer_sort()
         } /* closes if (oei[i_of_main].object_type == "T") */
         else if ((oei[i_of_main].object_type == "P")
               || (oei[i_of_main].object_type == "F")
-              || (oei[i_of_main].object_type == "t")
+              || (oei[i_of_main].object_type == "R")
               || (oei[i_of_main].object_type == "E"))
                 oei_copy[i_of_copy++]= oei[i_of_main];
       } /* closes if (oei[i_of_main].schema_name == oei[i_of_schema].schema_name) */
@@ -27308,13 +27778,7 @@ void MainWindow::explorer_sort()
   //  char tmp3[256]; strcpy(tmp3, oei[i].part_name);
   //  printf("%s %s.%s.%s\n", tmp0,tmp1,tmp2,tmp3);
   //}
-  //exit(0);
-}
-
-/* Todo: "expanded" does nothing but is still in Settings|explorer in case there's some use for it someday. */
-void MainWindow::explorer_expanded()
-{
-  ;
+  log("explorer_sort end", 65);
 }
 
 /*
