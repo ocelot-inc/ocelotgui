@@ -630,6 +630,26 @@ int MainWindow::hparse_f_acceptf(int pass_number, QString replacee)
   return 0;
 }
 
+/*
+  A variant of hparse_f_accept during SET target=value [, ...] so we skip target if we've already done it.
+  Todo: this is okay for simple situations but wouldn't work for ... SET a=(x=y), x=z.
+  The idea is that the caller will remove the matching item for tokens.
+  An alternative is to search backward as far as the SET and not try to accept if it's seen before.
+*/
+int MainWindow::hparse_f_accept_in_set(unsigned int flag_version, QStringList tokens, int *i_of_matched)
+{
+  for (int i= 0; i < tokens.size(); ++i)
+  {
+    QString token= tokens.at(i);
+    if (hparse_f_accept(flag_version, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, token) == 1)
+    {
+      *i_of_matched= i;
+      return 1;
+    }
+  }
+  return 0;
+}
+
 /* expect means: if current == expected then get next and return 1; else error */
 int MainWindow::hparse_f_expect(unsigned int flag_version, unsigned char reftype,int proposed_type, QString token)
 {
@@ -13338,10 +13358,46 @@ int MainWindow::hparse_f_client_set_rule()
   Todo: it's really TOKEN_TYPE_IDENTIFIER so see what hovering does
   Todo: we have autocomplete for color and font_style|weight|family but we culd have more
   Todo: why is it an error if starts with ocelot_ but isn't specifically one of the reserved ocelot_ items?
+  Todo: Replace flag-test duplicate-check technique with QStringList technique used for ocelot_menuitem_*.
 */
 int MainWindow::hparse_f_client_set()
 {
   bool is_conditional_settings_possible= false;
+
+  #if (OCELOT_EXPLORER == 1)
+    QStringList qp= (QStringList() << "OCELOT_MENUITEM_ACTION" << "OCELOT_MENUITEM_SHORTCUT" << "OCELOT_MENUITEM_TEXT");
+    int i_of_match;
+    if (hparse_f_accept_in_set(FLAG_VERSION_ALL, qp, &i_of_match) == 1)
+    {
+      for (;;)
+      {
+        if (hparse_errno > 0) return 0;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_errno > 0) return 0;
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+        if (hparse_errno > 0) return 0;
+        qp.removeAt(i_of_match);
+        if (qp.size() == 0) break;
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 0) break;
+        if (hparse_f_accept_in_set(FLAG_VERSION_ALL, qp, &i_of_match) == 0) hparse_f_error();
+        if (hparse_errno > 0) break;
+      }
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHERE, "WHERE");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT, "OCELOT_MENUITEM_TEXT");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_errno > 0) return 0;
+      QStringList q;
+      q.clear(); /* unnecessary? */
+      for (int i= 0; i < explorer_widget->html_text_edit->explorer_context_menu->cmi_count; ++i)
+        q.append(explorer_widget->html_text_edit->explorer_context_menu->cmi[i].text);
+      if (hparse_pick_from_list(q) == -1) hparse_f_error();
+      if (hparse_errno > 0) return 0;
+      return 1;
+    }
+  #endif
+
 
   /* 1=grid_background_color. 2=grid_text_color. 4=grid_font_size. 8=grid_border_color.
      16=grid_font_style. 32=grid_font_weight. 64=grid_font_family. 128=grid_border_size (no longer used),

@@ -831,6 +831,12 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_IMPORT, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     TOKEN_KEYWORD_OCELOT_LANGUAGE,
     TOKEN_KEYWORD_OCELOT_LOG_LEVEL,
+    TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION,
+    TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_DBMSS,
+    TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_TYPES,
+    TOKEN_KEYWORD_OCELOT_MENUITEM_ENABLED,
+    TOKEN_KEYWORD_OCELOT_MENUITEM_SHORTCUT,
+    TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT,
     TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR,
     TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY,
@@ -1430,7 +1436,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1191
+#define KEYWORD_LIST_SIZE 1197
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2089,6 +2095,12 @@ static const keywords strvalues[]=
     {"OCELOT_IMPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_IMPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     {"OCELOT_LANGUAGE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {"OCELOT_LOG_LEVEL", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
+    {"OCELOT_MENUITEM_ACTION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION},
+    {"OCELOT_MENUITEM_APPLICABLE_DBMSS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_DBMSS},
+    {"OCELOT_MENUITEM_APPLICABLE_TYPES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_TYPES},
+    {"OCELOT_MENUITEM_ENABLED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_ENABLED},
+    {"OCELOT_MENUITEM_SHORTCUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_SHORTCUT},
+    {"OCELOT_MENUITEM_TEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT},
     {"OCELOT_MENU_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
     {"OCELOT_MENU_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR},
     {"OCELOT_MENU_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY},
@@ -3057,6 +3069,7 @@ class Result_qtextedit;
 class Result_changes;
 #if (OCELOT_EXPLORER == 1)
 class Small_dialog_box;
+class Context_menu;
 #endif
 
 QT_END_NAMESPACE
@@ -3146,7 +3159,7 @@ public:
   QString ocelot_explorer_width, new_ocelot_explorer_width;
   QString ocelot_explorer_detached, new_ocelot_explorer_detached;
   QString ocelot_explorer_visible, new_ocelot_explorer_visible;
-  QString ocelot_explorer_sort, new_ocelot_explorer_sort;
+  QString ocelot_explorer_sort, new_ocelot_explorer_sort; /* todo: make changeable on command line like others */
   QString ocelot_explorer_query, new_ocelot_explorer_query;
 /* endif */
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
@@ -3202,6 +3215,8 @@ public:
   QString ocelot_menu_font_style, new_ocelot_menu_font_style;
   QString ocelot_menu_font_weight, new_ocelot_menu_font_weight;
   QString ocelot_menu_style_string;
+  QString ocelot_menuitem_action; /* if ocelot_explorer == 1 */
+  QString ocelot_menuitem_text; /* if ocelot_explorer==1 */
 
   QStringList conditional_settings;
 
@@ -3307,6 +3322,7 @@ public:
   //int hparse_f_accept_key(int);
   int hparse_f_acceptn(int,QString,int);
   int hparse_f_acceptf(int pass_number, QString replacee);
+  int hparse_f_accept_in_set(unsigned int,QStringList, int *i_of_matched);
   void hparse_f_expected_initialize();
   void hparse_f_expected_clear();
   int hparse_f_expected_exact(int reftype);
@@ -6402,21 +6418,11 @@ private:
   int qtextedit_x;                 /* from event->x() (changed to event->pos().x() due to qt 6 change) */
   int qtextedit_y;                 /* from event->y() (changed to event->pos().y() due to qt 6 change) */
   int qtextedit_block_number;      /* what we calculate other things from */
-  int qtextedit_grid_row_number;        /* row number, starts at 1, includes header row, within display */
-  int qtextedit_result_row_number;      /* row number from result set, derived from qtextedit_grid_row_number */
   int qtextedit_column_number;     /* column number, starts at 1, includes thin image column */
-  bool qtextedit_is_before_column; /* x is on a pixel that precedes qtextedit_column */
-  bool qtextedit_is_before_row;    /* y is on a pixel that precedes qtextedit_row */
   int qtextedit_x_start;         /* start of the column that x is on */
   int qtextedit_x_end;           /* end of the column that x is on, border included (actual width = end - start) */
   int qtextedit_y_start;         /* start of the row that y is on */
   int qtextedit_y_end;           /* end of the row that y is on, border included (actual height = end - start) */
-  QString qtextedit_cell_content;  /* cell contents. but if it's an image we get U+fffc or something like that */
-                                   /* Actually this probably should be in locals */
-  bool qtextedit_at_end;           /* If document doesn't fill result widget, this can become true */
-#if (OCELOT_EXPLORER == 1)
-  bool qtextedit_is_min_max_clicked;
-#endif
 
   Result_changes *qtextedit_result_changes;
 
@@ -6425,9 +6431,22 @@ private:
   int result_row_number_from_grid_row_number(int grid_row_number);
   int grid_row_number_from_result_row_number(int result_row_number);
 //  int result_column_number_from_grid_column_number(int grid_row_number, int grid_column_number);
-  QString unstripper(QString value_to_unstrip);
   void generate_update();
   QString to_plain_text();
+
+public:
+  QString unstripper(QString value_to_unstrip);
+  int qtextedit_grid_row_number;        /* row number, starts at 1, includes header row, within display */
+  int qtextedit_result_row_number;      /* row number from result set, derived from qtextedit_grid_row_number */
+  bool qtextedit_at_end;           /* If document doesn't fill result widget, this can become true */
+  bool qtextedit_is_before_row;    /* y is on a pixel that precedes qtextedit_row */
+  bool qtextedit_is_before_column; /* x is on a pixel that precedes qtextedit_column */
+  QString qtextedit_cell_content;  /* cell contents. but if it's an image we get U+fffc or something like that */
+                                   /* Actually this probably should be in locals */
+#if (OCELOT_EXPLORER == 1)
+  bool qtextedit_is_min_max_clicked;
+  Context_menu *explorer_context_menu;
+#endif
 
 private slots:
 // e.g. void timer_expired();
@@ -7034,7 +7053,7 @@ QString fillup(MYSQL_RES *mysql_res,
               &result_max_column_widths);
     if (result != "OK")
     {
-      fillup_garbage_collect();
+      fillup_garbage_collect(false);
       return result;
     }
   }
@@ -7549,7 +7568,7 @@ void display(int due_to,
 #endif
 //  if ((due_to == 0) || (due_to == 1))
   {
-    display_garbage_collect();
+    display_garbage_collect(false);
     copy_result_to_gridx();
     /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
        said what gridx_row_count is. */
@@ -8969,7 +8988,7 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
         calling get_column_width_in_pixels which won't give < MIN_WIDTH_IN_CHARS and is affected
         by vertical scroll bar width -- which shouldn't affect us provided that we don't allow resize
         or drag. Are we sure resize or drag can't happen? The other way to do it might be
-        if (result_grid_type == OCELOT_EXPLORER) return min_width;" in get_column_width_in_pixels().
+        if (result_grid_type == EXPLORER_WIDGET) return min_width;" in get_column_width_in_pixels().
         Should you be adding setting_ocelot_grid_cell_border_size_as_int? Is that already done somewhere?
    Todo: if USE, or if visible='yes' and USE has already happened, emphasize current by making it bold.
          Is there a SET instruction that can do this?
@@ -9187,6 +9206,7 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
 
   char *tmp_pointer_before_thin_image_call; /* For the first column. Includes height which may need changing. */
   QTextDocument d; /* will be used for height calculation */
+  d.setDocumentMargin(0); /* Default margin is 4 so if I don't do this html_text_edit_width will be off. */
   int html_text_edit_height, html_text_edit_width; /* result of height calculation */
 
 repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if result won't fit well in widget */
@@ -9313,9 +9333,11 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
   d.setHtml(tmp);
   html_text_edit_height= d.size().height();
   /* When calculating widget width we assume there is always a vertical scroll bar */
+  /* I don't know why "+ 2" but it won't do significant damage. Maybe "+ 3" would be even better. */
   if (copy_of_parent->ocelot_explorer_width == "default")
-    html_text_edit_width= d.size().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    html_text_edit_width= d.size().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent) + 2;
   else html_text_edit_width= copy_of_parent->ocelot_explorer_width.toInt();
+
   if ((html_text_edit_height > this->height()) && (local_max_grid_rows > 1))
   {
     --local_max_grid_rows;
@@ -11611,8 +11633,11 @@ void text_align(TextEditWidget *cell_text_edit_widget, enum Qt::AlignmentFlag al
     Perhaps it would be better to clear only if current size > (some minimum)?
   Warning: we check if (result_set_copy == 0) to ensure there's a result.
 */
-void fillup_garbage_collect()
+void fillup_garbage_collect(bool is_final)
 {
+#if (OCELOT_EXPLORER == 1)
+  if (is_final == false) assert(result_grid_type != EXPLORER_WIDGET);
+#endif
   if (result_field_types != 0) { delete [] result_field_types; result_field_types= 0; }
   if (result_field_charsetnrs != 0) { delete [] result_field_charsetnrs; result_field_charsetnrs= 0; }
   if (result_field_flags != 0) { delete [] result_field_flags; result_field_flags= 0; }
@@ -11625,8 +11650,11 @@ void fillup_garbage_collect()
   if (result_max_column_widths != 0) { delete [] result_max_column_widths; result_max_column_widths= 0; }
 }
 
-void display_garbage_collect()
+void display_garbage_collect(bool is_final)
 {
+#if (OCELOT_EXPLORER == 1)
+  if (is_final == false) assert(result_grid_type != EXPLORER_WIDGET);
+#endif
   if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
   if (grid_column_dbms_sources != 0) { delete [] grid_column_dbms_sources; grid_column_dbms_sources= 0; }
@@ -11636,9 +11664,9 @@ void display_garbage_collect()
   if (gridx_flags != 0) { delete [] gridx_flags; gridx_flags= 0; }
   if (gridx_field_types != 0) { delete [] gridx_field_types; gridx_field_types= 0; }
   if (html_text_edit != NULL) delete html_text_edit;
-  html_text_edit= new Result_qtextedit(this);
+  if (is_final == false) html_text_edit= new Result_qtextedit(this);
   if (batch_text_edit != NULL) delete batch_text_edit;
-  batch_text_edit= new QTextEdit(this);
+  if (is_final == false) batch_text_edit= new QTextEdit(this);
 }
 
 #ifdef OLD_STUFF
@@ -11881,11 +11909,11 @@ unsigned int dbms_get_field_name_length(unsigned int column_number, int connecti
   This probably will never be called explicitly, but if MainWindow parent is deleted when
   the program ends, we'll get here.
   Todo: check if above comment is still true now if we remove tabs
-  Todo: why not display_garbage_collect()?
 */
 ~ResultGrid()
 {
-  fillup_garbage_collect();
+  fillup_garbage_collect(true);
+  display_garbage_collect(true);
 }
 
 
@@ -11977,6 +12005,7 @@ bool conditional_setting_evaluate(int cs_number,
                                   QString *cs_new_cell_height,    /* return */
                                   QString *cs_new_cell_width)     /* return */
 {
+  copy_of_parent->log("conditional_setting_evaluate", 15);
   if (cs_cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL) return false; /* Temporary till we handle headers */
   ResultGrid *rg= this;
   MainWindow *mw= rg->copy_of_parent;
@@ -14559,7 +14588,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 132
+#define OCELOT_VARIABLES_SIZE 134
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
@@ -14639,6 +14668,7 @@ Small_dialog(QString passed_title, QString passed_label, QString passed_value)
 
 bool eventFilter(QObject *obj, QEvent *event)
 {
+  (void)obj;
   if (event->type() == QEvent::KeyPress)
   {
     QKeyEvent *key= static_cast<QKeyEvent *>(event);
@@ -14651,7 +14681,6 @@ bool eventFilter(QObject *obj, QEvent *event)
   return false;
 }
 
-
 ~Small_dialog()
 {
   ;
@@ -14659,6 +14688,157 @@ bool eventFilter(QObject *obj, QEvent *event)
 
 };
 #endif // #ifndef SMALL_DIALOG_H
-#endif // #if (COMPLETER_WIDGET == 1)
+#endif // #if (OCELOT_EXPLORER == 1)
+
+#if (OCELOT_EXPLORER == 1)
+#ifndef CONTEXT_MENU_H
+#define CONTEXT_MENU_H
+
+/*
+  User has asked for explorer context menu, presumably by right-clicking on explorer_widget.
+  From oei[qtextedit_result_row_number] I can get object_type, object_name, column_name.
+  User can press Esc, or click outside the choices, to select nothing.
+  Put up a menu with &QAction. Each QAction has a text (which should be ostrings.h?), and maybe an SQL statement.
+  Todo: Make it start & pos!
+  QAction Text What to do if clicked
+  ----    ---- ---------------------
+  Select Rows                       done, we say SELECT * FROM table-name LIMIT 1000;
+  Table Inspector                         apparently this just allows analyze etc.
+  Copy name to Clipboard -->        done, for one cell
+  Table Data Export Wizard          done
+  Table Data Import Wizard
+  Send to SQL Editor                done, as send to statement edit widget. same as mousedoubleclickevent
+  Create Table ...                  done, as show create table
+  Create Table Like ...             done, with dialog box to give new table name
+  Alter Table...                          close? we have drop column
+  Table Maintenance...
+  Drop Table...                     done (also Drop procedure)
+  Truncate Table...                 done
+  Search Table Data...                    meaning select from all tables, all text columns, returning counts
+  Refresh All                       done, as refresh
+  I see what QAction exec() returns, rather than slots, it's less hassle than defining with parameters.
+  Todo: I could be specific, e.g. instead of "Copy to clipboard" say "Copy TABLE_X to clipboard"
+  Todo: Put all the actions in a table: &action, what-to-put-in-text, when-visible, what-to-do-if-clicked. E.g.:
+        Action               Text            Action                     Shortcut    Applicable Types
+        ------               ----            -------------              --------    ----------------
+        &action_select_rows "select rows"    "SELECT * FROM $part_name;             T, V
+                                             ?? or Lua? Or Read file? Or C program?
+        This can be done with a SET statement:
+          SET text='SELECT ROWS', statement='SELECT * FROM $object_name LIMIT 1;', shortcut='Ctrl+F'
+          WHERE name='select_rows';
+        Or a dialog box: containing all:
+          Fixed Statement Name | Text ___| SQL Statement ____ | Shortcut ___
+        If we did it, users would have to be able to specify parameters e.g.:
+          $schema_name $object_name $part_name $clipboard $focus_cell + whatever you used for PROMPT
+        Some actions are not SQL statements e.g.:
+          [Reset] [Copy $cell to clipboard] [Copy $cell to statement widget] [Text Export Dialog Box]
+        Actions can be client statements.
+        Unfortunately actions cannot be multiple statements, but you could call a procedure.
+        The default should be in ostrings.h for the sake of the French translation.
+        But "load" an instruction can be a general idea, not necessarily associated with explorer.
+        You could have an associated Alt|Control QKeySequence too.
+        But you'll need to add more, and you can't add an indefinite number of QAction with what you have now.
+        But if you allow add, you'll have to allow subtract too. And items need names. And will Reset wipe adds?
+        So have a look at fill_menu(), and particularly things like TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT.
+        Because this trick is applicable to all menus, except that I don't want to make many changes at once.
+        Hmm, how could I handle submenus?
+          Maybe as part of text e.g. "Dialog ... Text", "Dialog ... Html", etc.
+          Alas, that would restrict you to only one submenu.
+        Hmm, maybe there's only one "Applicable Type", so you'd act separately for 'T' and 'V'.
+  Todo: Add "Hide"?
+  Todo: Maybe I can import too, by calling LOAD DATA.
+  Todo: There's been a non-repeatable crash. Maybe use "new" and "delete" for all objects?
+        Maybe don't make submenus? Maybe it's fixed?
+        Due to occasional mysterious crashes when we had a context menu created and destroyed within
+        one function, we switched to having a context menu that is always existent. But perhaps we should
+        change that to "as long as explorer widget is visible", i.e. delete if hide().
+  Todo: for CREATE TABLE LIKE: see whether the widget you use for ^F Find might have been useful
+  Warning: do not define QAction objects inside {}s, exec() will not know about them.
+  Todo: Bug: If we move the cursor while the menu is up, mousemoveevent won't happen, so row number is wrong.
+  Todo: Format the SQL statements according to whatever happened with a format statement earlier.
+  Todo: At one point we're using q->unstripper(), for data type, because the enum data type might contain ''s.
+        Fine, but what about names that contain "s or `s?
+        Anyway q->unstripper() looks a bit silly, why don't we use QString replace() as we seem to do elsewhere?
+  Todo: Maybe the text|table|html decision could be done with a $dialog
+  Todo: In cmi the action could be multiple statements including server SQL, client statement, RESET; etc.
+        and maybe something more e.g. Lua statements, program execute
+  Todo: Shortcut should be changeable, but would be confusing because we have SET OCELOT_SHORTCUT_... now.
+  Todo: "Cut" could remove a line until the next reset.
+  todo: something for menu->addSeparator()
+  todo: validity check, although for default that isn't needed
+  Todo: Syntax so far = SET ocelot_menuitem_action='...' WHERE ocelot_menuitem_text='[cmi.text choices]';
+        This causes Context_menu::edit(). So actions are "scriptable".
+        Todo: extend thus:
+          Allow NEW and all components (text, statement, etc.) to be added|changed.
+          Allow effect on main menu too.
+          Allow new thing = "Enabled".
+  Note: SET ocelot_menu_background_color etc. will affect context menu too.
+  Note: For show create view we don't have a Tarantool statement but we stored it in part.
+  Note: CREATE TABLE ... is depending on default schema so if you haven't said USE it will cause an error.
+  Re macros: text and statement can have them. See the Wikipedia article "String interpolation".
+    Some possibilities were: %xxx or $xxx or {xxx} or ${xxx} or {d ...}. Choice was $xxx, no beautiful reason.
+    Currently Context_menu::replacer() substitutes $cell $clipboard $dialog $object_name $occurs_text
+    $part_name $part_type $schema_name $statement. It also looks for special instructions e.g. CLIPBOARD=.
+    NB: $cell copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier.
+    Replace '$macro_name' with 'not-delimited-macro-name' then replace $macro_name with delimited-macro-name.
+  TODO: BUG: For 'C' for Send to SQL editor, we copy the name not the qualified name.
+  TODO: BUG: At one point we failed to show a table. It's okay now but watch for it happening again.
+  TODO: BUG: occasional crash, again. I'm seeing whether it helps if I avoid "new".
+             By the way I don't need to copy action_pointer into the cmi struct, since I already have it.
+             In fact, maybe the cmi struct should have QAction?
+  Todo: I dunno about 'M' and 'T' and '*'. Perhaps 'M%' | 'MariaDB' etc. and '%' would be clearer.
+  Todo: Context_menu::edit() should propose a text for the sake of ER_OK_PLUS e.g. warning what's not done.
+*/
+class Context_menu: public QWidget
+{
+  Q_OBJECT
+
+private:
+  ResultGrid *result_grid;
+  Result_qtextedit *q;
+  void construct();
+
+struct context_menu_items {
+    QAction *action_pointer;  /* e.g. &action_select_rows */
+    QString action;           /* e.g. "Select * FROM $object_name limit 1000;" */
+    QString applicable_dbmss; /* e.g. "M" or "T" */
+    QString applicable_types; /* e.g. "T,V" */
+    QString enabled;          /* e.g. "" (not used yet) */
+    QString shortcut;         /* e.g. "" (not used yet) (key sequence) */
+    QString text;             /* e.g. "select rows" */
+};
+/* There are only about 35 default context menu items but allow for users making more. */
+#define MAX_CMI_COUNT 40
+
+  QString replacer(QString);
+  int add_qaction(QString action, QString applicable_dbmss, QString applicable_types,
+                  QString enabled, QString shortcut, QString text);
+  QString cm_delimited_object_name; /* variables beginning with cm_ are for use in macro replacement */
+  QString cm_object_type;
+  QString cm_cell;
+  QAction list_of_actions[MAX_CMI_COUNT];
+
+public:
+  void menu_context_t_2_explorer(const QPoint & pos);
+  int edit(int i_of_cmi, int target_type, QString text);
+  QMenu *menu;
+  context_menu_items cmi[MAX_CMI_COUNT];
+  int cmi_count= 0;
+
+Context_menu(ResultGrid *m, Result_qtextedit *passed_q)
+{
+  result_grid= m;
+  q= passed_q;
+  construct();
+}
+
+~Context_menu()
+{
+  ;
+}
+
+};
+#endif // #ifndef CONTEXT_MENU_H
+#endif // #if (OCELOT_EXPLORER == 1)
 
 #endif // OCELOTGUI_H

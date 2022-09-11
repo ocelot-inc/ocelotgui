@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: August 19 2022
+   Last modified: September 11 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -220,7 +220,7 @@
 #define STRING_LENGTH_512 512
 
 /* MAX_HPARSE_ERRMSG_LENGTH should be enough for all keywords that begin with "OCELOT_" */
-#define MAX_HPARSE_ERRMSG_LENGTH 3900
+#define MAX_HPARSE_ERRMSG_LENGTH 4096
 
 /* Connect arguments and options */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
@@ -613,7 +613,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   result_grid_tab_widget->hide();
 
   main_layout= new QVBoxLayout();
-
   history_edit_widget= new TextEditHistory(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -626,13 +625,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   create_widget_debug();
 #endif
-
   main_window= new QWidget(this);                  /* 2015-08-25 added "this" */
 
   completer_widget= new Completer_widget(this);
   ocelot_grid_cell_height= "default";              /* todo: should be changeable with Settings menu item */
   ocelot_grid_cell_width= "default";               /* todo: should be changeable with Settings menu item */
-
   /*
     Defaults for items that can be changed with Settings menu item.
     First we get current values, after processing of any Qt options on the command line.
@@ -643,7 +640,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   */
   set_current_colors_and_font(fixed_font); /* set ocelot_statement_text_color, ocelot_grid_text_color, etc. */
   ocelot_statement_border_color= s_color_list[COLOR_BLACK*2 + 1];
-
   ocelot_statement_highlight_literal_color= s_color_list[COLOR_RED*2 + 1];
   ocelot_statement_highlight_identifier_color= s_color_list[COLOR_GREEN*2 + 1];
   ocelot_statement_highlight_comment_color= s_color_list[COLOR_LIMEGREEN*2 + 1];
@@ -690,7 +686,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     print_help();
     exit(0);
   }
-
   for (int q_i= 0; strcmp(string_languages[q_i]," ") > 0; ++q_i)
   {
     QString s= string_languages[q_i];
@@ -703,7 +698,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   }
 
   set_dbms_version_mask(ocelot_dbms);
-
   for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
   make_style_strings();
@@ -732,6 +726,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
 #if (OCELOT_EXPLORER == 1)
   explorer_widget= new ResultGrid(lmysql, this, true, EXPLORER_WIDGET);
+  explorer_widget->html_text_edit->explorer_context_menu->menu->setStyleSheet(ocelot_menu_style_string);
   initialize_widget_explorer();
   QHBoxLayout *upper_layout= new QHBoxLayout();
   QWidget *upper_widget= new QWidget();
@@ -959,6 +954,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
 */
 void MainWindow::statement_edit_widget_formatter()
 {
+  log("statement_edit_widget_formatter", 15);
   if (((ocelot_statement_syntax_checker.toInt()) & FLAG_FOR_HIGHLIGHTS) == 0) return;
   int max_rule_tokens= ocelot_statement_format_rule.size();
   int *rule_token_offsets= new int[max_rule_tokens];
@@ -1559,6 +1555,7 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
 #define MAX_EXPORT_TOKENS 100 /* We could use 'new' + dynamic but with current syntax 100 is more than enough */
 QString MainWindow::import_export_rule_set(QString text)
 {
+  log("import_export_rule_set", 15);
   struct export_settings local_exports;
   export_defaults(0, &local_exports);
 
@@ -4891,6 +4888,7 @@ void MainWindow::action_exit()
 */
 QStringList MainWindow::fake_statement(QString fake_statement_text)
 {
+  log("fake_statement", 15);
   main_token_push();
   main_token_lengths[0]= 0;
   tokenize(fake_statement_text.data(),
@@ -6263,6 +6261,7 @@ void MainWindow::action_change_one_setting(QString old_setting,
 */
 void MainWindow::action_change_one_setting_execute(QString text)
 {
+  log("action_change_one_setting_execute", 15);
   main_token_new(text.size());
   tokenize(text.data(),
            text.size(),
@@ -10517,8 +10516,8 @@ int MainWindow::action_execute_one_statement(QString text)
             {
               rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(i_r));
               rg->is_paintable= 0;
-              rg->fillup_garbage_collect();
-              rg->display_garbage_collect();
+              rg->fillup_garbage_collect(false);
+              rg->display_garbage_collect(false);
             }
             rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
             //QFont tmp_font;
@@ -11450,6 +11449,51 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(er, 0, (char*)"");
         return 1;
       }
+#if (OCELOT_EXPLORER == 1)
+      /* !! BUT THIS WORKS ONLY IF WE WENT THROUGH HPARSE !! */
+      if ((sub_token_types[0] == TOKEN_KEYWORD_SET)
+       && (sub_token_types[1] >= TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION)
+       && (sub_token_types[1] <= TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT))
+      {
+        int i_of_cmi= -1;
+        for (int k= 1; ; ++k)
+        {
+          if (sub_token_lengths[k] == 0) break;
+          if (sub_token_types[k] == TOKEN_KEYWORD_WHERE)
+          {
+            QString wtext= text.mid(sub_token_offsets[k + 3], sub_token_lengths[k + 3]);
+            QString stripped_wtext= connect_stripper(wtext, true);
+            for (i_of_cmi= 0; i_of_cmi < explorer_widget->html_text_edit->explorer_context_menu->cmi_count; ++i_of_cmi)
+            {
+              if (QString::compare(stripped_wtext, explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].text, Qt::CaseInsensitive) == 0)
+              {
+                break;
+              }
+            }
+          }
+        }
+        if (i_of_cmi == -1)
+        {
+          char message_0_rows[]= "0 rows";
+          make_and_put_message_in_result(ER_OK_PLUS, 0, message_0_rows);
+          return 1;
+        }
+        for (int k= 1; sub_token_lengths[k] != 0; ++k)
+        {
+          int sub_token_type= sub_token_types[k];
+          if (sub_token_type == TOKEN_KEYWORD_WHERE) break;
+          if ( (sub_token_type >= TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION)
+           && (sub_token_type <= TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT))
+          {
+            QString target_value= text.mid(sub_token_offsets[k + 2], sub_token_lengths[k + 2]);
+            explorer_widget->html_text_edit->explorer_context_menu->edit(i_of_cmi, sub_token_type, target_value);
+          }
+        }
+        char message_edited[]= "edited";
+        make_and_put_message_in_result(ER_OK_PLUS, 0, message_edited);
+        return 1;
+      }
+#endif
 #if (OCELOT_IMPORT_EXPORT == 1)
       if (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_EXPORT)
       {
@@ -11527,6 +11571,7 @@ void MainWindow::prompt_default()
 #define MAX_CONDITIONAL_STATEMENT_TOKENS 100
 int MainWindow::conditional_settings_insert(QString text)
 {
+  log("conditional_settings_insert", 15);
   int token_offsets[MAX_CONDITIONAL_STATEMENT_TOKENS];
   int token_lengths[MAX_CONDITIONAL_STATEMENT_TOKENS];
   tokenize(text.data(),
@@ -11869,6 +11914,7 @@ error_return:
 #ifdef DBMS_TARANTOOL
 int MainWindow::rehash_scan_for_tarantool(char *error_or_ok_message, bool is_explorer)
 {
+  (void)is_explorer;
   int count_of_columns= 0;
   int count_of_tables= 0;
   int count_of_functions= 0;
@@ -13378,7 +13424,7 @@ void MainWindow::initial_asserts()
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 134);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 140);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -15411,6 +15457,7 @@ void MainWindow::tarantool_flush_and_save_reply(unsigned int connection_number)
 */
 QString MainWindow::get_statement_type(QString q_dbms_query, int *statement_type)
 {
+  log("get_statement_type", 15);
   int token_offsets[100]; /* Surely a single assignable target can't have more */
   int token_lengths[100];
   tokenize(q_dbms_query.data(),
@@ -19071,6 +19118,10 @@ void Result_qtextedit::construct()
       this, SLOT(menu_context_t(const QPoint &)));
   qtextedit_result_changes= new Result_changes(this); /* ~Result_qtextedit() should delete this */
 //  show();
+#if (OCELOT_EXPLORER == 1)
+  if (result_grid->result_grid_type == EXPLORER_WIDGET)
+    explorer_context_menu= new Context_menu(result_grid, this);
+#endif
 }
 
 #ifdef OLD_STUFF
@@ -19748,6 +19799,7 @@ void Result_qtextedit::generate_update()
 /*
   Todo: see what we do with main widgets when they lose focus
   Todo: I'm not even sure that we get here, maybe event filter catches focusOutEvent
+        (Update: we do get here when showing explorer and right-clicking to get context menu)
   Todo: If we did a mousepress then the cursor is blinking. Figure out how to turn it off
 */
 #ifdef OLDSTUFF
@@ -19868,6 +19920,7 @@ void Result_qtextedit::mouseDoubleClickEvent(QMouseEvent *event)
 #if (OCELOT_EXPLORER == 1)
   if (result_grid->result_grid_type == EXPLORER_WIDGET)
   {
+    cell_analyze(event->pos().x(), event->pos().y());
     /* Append to statement_edit_text! Compare completer_widget::mouseDoubleClickEvent */
     QString text= result_grid->copy_of_parent->statement_edit_widget->toPlainText();
     text= text + qtextedit_cell_content;
@@ -19906,6 +19959,7 @@ void Result_qtextedit::mouseMoveEvent(QMouseEvent *event)
     QString row_type= result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_type;
     if (row_type == "S") tip= "Schema";
     if (row_type == "T") tip= "Table";
+    if (row_type == "V") tip= "View";
     if (row_type == "C") tip= "Column";
     if (row_type == "I") tip= "Index";
     if (row_type == "F") tip= "Function";
@@ -19975,8 +20029,7 @@ void Result_qtextedit::cell_analyze(int x, int y)
   QTextCursor text_cursor= cursorForPosition(QPoint(x, y));
   qtextedit_block_number= text_cursor.blockNumber() - 1;
   qtextedit_grid_row_number= qtextedit_block_number / qtextedit_columns_per_row;
-  qtextedit_result_row_number= result_row_number_from_grid_row_number(qtextedit_grid_row_number);
-  qtextedit_column_number= qtextedit_block_number % qtextedit_columns_per_row;
+  qtextedit_result_row_number= result_row_number_from_grid_row_number(qtextedit_grid_row_number);  qtextedit_column_number= qtextedit_block_number % qtextedit_columns_per_row;
   int border_size= result_grid->copy_of_parent->ocelot_grid_cell_border_size.toInt();
   qtextedit_is_before_column= false;
   qtextedit_is_before_row= false;
@@ -20065,7 +20118,10 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
    "Wheat" as can be seen in the Settings menu.
    It's a mystery to me that color_change() caused cursor disappearance because QTextCursor confuses me.
    I see that color_change() calls display_html() so maybe this won't the be only cursor-loser situation.
-   There's a workaround at the end of this routin
+   There's a workaround at the end of this routine
+ Re cell_analyze: Usually we can depend on mouseMoveEvent doing this, but it won't get activated if there is
+                  a context menu and we move out of it to Result_qtextedit. Same problem with mouseDoubleClick.
+                  I don't know why the problem occurs, perhaps it involves an edit filter or a focus event.
  Todo: After I've said mousePressEvent, there's an endless calling of paintEvent although nothing happened.
        It doesn't hog CPU and disappears after the next statement, but presumably something went wrong.
        Todo: Here's a theory to check: it's merely because the cursor is blinking.
@@ -20074,6 +20130,7 @@ void TextEditFrame::mousePressEvent(QMouseEvent *event)
 void Result_qtextedit::mousePressEvent(QMouseEvent *event)
 {
   if (result_grid->is_fancy() == false) { QTextEdit::mousePressEvent(event); return; }
+  if (result_grid->result_grid_type == EXPLORER_WIDGET) cell_analyze(event->pos().x(), event->pos().y());
   result_grid->focus_result_row_number= result_row_number_from_grid_row_number(qtextedit_grid_row_number); /* so that background = Grid Focus Cell Background Color */
   result_grid->focus_column_number= qtextedit_column_number;
 
@@ -20467,349 +20524,119 @@ void Result_qtextedit::menu_context_t_2(const QPoint & pos)
 }
 
 #if (OCELOT_EXPLORER == 1)
-/*
-  User has asked for explorer context menu, presumably by right-clicking on explorer_widget.
-  From oei[qtextedit_result_row_number] I can get object_type, object_name, column_name.
-  User can press Esc, or click outside the choices, to select nothing.
-  Put up a menu with &QAction. Each QAction has a text (which should be ostrings.h?), and maybe an SQL statement.
-  Todo: Make it start & pos!
-  QAction Text What to do if clicked
-  ----    ---- ---------------------
-  Select Rows                       done, we say SELECT * FROM table-name LIMIT 1000;
-  Table Inspector                         apparently this just allows analyze etc.
-  Copy to Clipboard -->             done, for one cell
-  Table Data Export Wizard          done
-  Table Data Import Wizard
-  Send to SQL Editor                done, as send to statement edit widget. same as mousedoubleclickevent
-  Create Table ...                  done, as show create table
-  Create Table Like ...             done, with dialog box to give new table name
-  Alter Table...                          close? we have drop column
-  Table Maintenance...
-  Drop Table...                     done (also Drop procedure)
-  Truncate Table...                 done
-  Search Table Data...                    meaning select from all tables, all text columns, returning counts
-  Refresh All                       done, as refresh
-  I see what QAction exec() returns, rather than slots, it's less hassle than defining with parameters.
-  Todo: I could be specific, e.g. instead of "Copy to clipboard" say "Copy TABLE_X to clipboard"
-  Todo: Watch out for "at end", if you're past it then there's nothing useful you can do.
-  Todo: showing SQL is clever but how do you handle the French translation?
-  Todo: Texts should be in ostrings.h.
-  Todo: Add "Hide"?
-  Todo: Maybe I can import too, by calling LOAD DATA.
-  Todo: There's been a non-repeatable crash. Maybe use "new" and "delete" for all objects?
-        Maybe don't make submenus?
-  Todo: for CREATE TABLE LIKE: see whether the widget you use for ^F Find might have been useful
-  Warning: do not define QAction objects inside {}s, exec() will not know about them.
-  Todo: Bug: If we move the cursor while the menu is up, mousemovevent won't happen, so row number is wrong.
-  Todo: Maybe "load" an instruction? But that can be a general idea, not necessarily associated with explorer.
-  Todo: Format the SQL statements according to whatever happened with a format statement earlier.
-  Todo: Maybe some actions could be scriptable, i.e. users can associate SQL statements with actions.
-*/
+/* Comments about Context_menu should be in ocelotgui.h before the words "class Context_menu: public QWidget" */
 void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
 {
-  if (qtextedit_at_end == true) return;
-  result_grid->copy_of_parent->log("menu_context_t_2_explorer start", 90);
+  explorer_context_menu->menu_context_t_2_explorer(pos);
+  return;
+}
 
-  QMenu menu;
-  QAction action_select_rows;           /* Text="Select Rows". If clicked: SELECT statement. */
-  QAction action_copy_to_clipboard;      /* Text="Copy to clipboard". If clicked: per text. */
-#ifdef OCELOT_IMPORT_EXPORT
-  QMenu *submenu_export;
-  QAction action_export_text;
-  QAction action_export_table;
-  QAction action_export_html;
 #endif
-  QAction action_send_to_sql_editor;
-  QAction action_create_table;
-  QAction action_create_table_like;
-  QAction action_drop_table;
-  QAction action_create_view;
-  QAction action_drop_view;
-  QAction action_truncate_table;
-  QAction action_show_column;
-  QAction action_drop_column;
-  QAction action_create_procedure;
-  QAction action_drop_procedure;
-  QAction action_drop_index;
-  QAction action_show_index;
-  QAction action_select_index;
-  /* no "table maintenance" */
-  QAction action_set_as_default_schema;
-  QAction action_filter_to_this_schema;
-  QAction action_schema_inspector;
-  QAction action_create_schema;
-  QAction action_alter_schema;
-  QAction action_show_trigger;
-  QAction action_drop_trigger;
-  QAction action_drop_schema;
-  /* no "search table data" */
-  QAction action_reset;
-  QAction action_refresh;
 
-  QString object_type= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_type);
-  QString schema_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].schema_name);
-  QString object_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].object_name);
-  QString part_name= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].part_name);
-  QString part_type= QString::fromUtf8(result_grid->copy_of_parent->oei[qtextedit_result_row_number].part_type);
-  char flags= result_grid->copy_of_parent->oei[qtextedit_result_row_number].flags;
-  QString full_object_name, full_part_name;
+/******************** Result_qtextedit end   ************************************/
 
+/******************** Context_menu start   ************************************/
+
+/* Comments about Context_menu should be in ocelotgui.h before the words "class Context_menu: public QWidget" */
+void Context_menu::construct()
+{
+  menu= new QMenu();
+  add_qaction("CLIPBOARD=$object_name", "*", "S,T,P,F,E,R", "", "", "Copy to clipboard");
+  add_qaction("CLIPBOARD=$part_name", "*", "C,I", "", "", "Copy to clipboard");
+  add_qaction("ACTION=$object_name", "*", "S,T,P,F,E,R", "", "", "Send to SQL editor");
+  add_qaction("ACTION=$part_name", "*", "C,I", "", "", "Send to SQL editor");
+  add_qaction("USE $schema_name;", "M", "S", "", "", "Set as default schema");
+  add_qaction("FILTER=$schema_name", "M", "S", "", "", "Filter to this schema");
+  add_qaction("select schema_name,"
+           " (select count(*) from information_schema.tables where table_schema='$schema_name') as table_count,"
+           " (select count(*) from information_schema.routines where routine_schema='$schema_name') as routine_count,"
+           " (select count(*) from information_schema.triggers where trigger_schema='$schema_name') as trigger_count,"
+           " schema_comment"
+           " from information_schema.schemata"
+           " where schema_name='$schema_name';", "*", "S", "", "", "Schema inspector");
+  add_qaction("Show create schema $schema_name;", "M", "S", "", "", "Create schema");
+  add_qaction("Alter schema $schema_name"
+           " character set=$part_name"
+           " collate=$part_type;", "M", "S", "", "", "Alter schema");
+  add_qaction("Drop schema $schema;", "M", "S", "", "", "Drop schema");
+  add_qaction("Select * from $object_name limit 100;", "*", "T,V", "", "", "Select rows");
+#ifdef OCELOT_IMPORT_EXPORT
+  add_qaction("EXPORT_TEXT;", "*", "T,V", "", "", "Export dialog - Text");
+  add_qaction("EXPORT_TABLE;", "*", "T,V", "", "", "Export dialog - Table");
+  add_qaction("EXPORT_HTML;", "*", "T,V", "", "", "Export dialog - Html");
+#endif
+  add_qaction("Show create table $object_name;", "*", "T", "", "", "Create table");
+  add_qaction("Create table $dialog like $object_name;", "M", "T", "", "", "Create table like");
+  add_qaction("Drop table $object_name;", "*", "T", "", "", "Drop table");
+  add_qaction("Truncate table $object_name;", "*", "T", "", "", "Truncate table");
+  add_qaction("show create view $object_name;", "M", "V", "", "", "Show create view");
+  add_qaction("$part_name;", "T", "V", "", "", "Show create view");
+  add_qaction("Drop view $objecct_name;",  "*", "V", "", "", "Drop view");
+  add_qaction("select '$part_name' as column_name,"
+          "'$part_type' as column_type,"
+          "'$occurs_text' as occurs_in_indexes;", "*", "C", "", "", "Show column");
+  add_qaction("Alter table $object_name drop column $part_name;", "*", "C", "", "", "Drop column");
+  add_qaction("Show index from $object_name;", "M", "I", "", "", "Show index");
+  add_qaction("Select * from \"_vindex\" where \"name\" = '$part_name';", "T", "I", "", "", "Show index");
+  add_qaction("Select * from information_schema.statistics where index_name = '$part_name';", "M", "I", "", "", "Select index");
+  add_qaction("select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '$object_name');", "T", "I", "", "", "Select index");
+  add_qaction("Drop index $part_name on $object_name;", "*", "I", "", "", "Drop index");
+  add_qaction("Show create procedure $objecct_name;", "*", "P", "", "", "Create procedure");
+  add_qaction("Drop procedure $objecct_name;", "*", "P", "", "", "Drop procedure");
+  add_qaction("Drop function $objecct_name;", "*", "F", "", "", "Drop function");
+  add_qaction("Select * from information_schema.triggers where trigger_name = $object_name", "M", "R", "", "", "Show trigger");
+  add_qaction("Select * from \"_trigger\" where \"name\" = '$object_name';", "T", "R", "", "", "Show trigger");
+  add_qaction("Drop trigger $object_name;", "*", "R", "", "", "Drop trigger");
+  add_qaction("RESET;", "*", "*", "", "", "Reset");
+  add_qaction("Refresh;", "*", "*", "", "", "Refresh");
+  return;
+}
+
+int Context_menu::add_qaction(QString action, QString applicable_dbmss, QString applicable_types,
+                              QString enabled, QString shortcut, QString text)
+{
+  if (cmi_count >= MAX_CMI_COUNT) return -1; /* Fail. Increase MAX_CMI_COUNT if this happens. */
+
+  //QAction *action_pointer= new QAction();
+  /* Todo: if new failed, return -2 */
+  cmi[cmi_count]= {&list_of_actions[cmi_count], action, applicable_dbmss, applicable_types, enabled, shortcut, text};
+  menu->addAction(cmi[cmi_count].action_pointer);
+  ++cmi_count;
+  return 0;
+}
+
+QString Context_menu::replacer(QString s)
+{
+  cm_object_type= QString::fromUtf8(result_grid->copy_of_parent->oei[q->qtextedit_result_row_number].object_type);
+  QString schema_name= QString::fromUtf8(result_grid->copy_of_parent->oei[q->qtextedit_result_row_number].schema_name);
+  QString object_name= QString::fromUtf8(result_grid->copy_of_parent->oei[q->qtextedit_result_row_number].object_name);
+  QString part_name= QString::fromUtf8(result_grid->copy_of_parent->oei[q->qtextedit_result_row_number].part_name);
+  QString part_type= QString::fromUtf8(result_grid->copy_of_parent->oei[q->qtextedit_result_row_number].part_type);
+
+  //char flags= result_grid->copy_of_parent->oei[q->qtextedit_result_row_number].flags;
   /* Todo: Let delimiter be blank if it's not necessary. */
   QString delimiter= "\"";
   if (connections_dbms[0] == DBMS_TARANTOOL) ;
   else if (sql_mode_ansi_quotes == false) delimiter= "`";
-  QString full_schema_name= delimiter + schema_name + delimiter;
+  QString delimited_schema_name= delimiter + schema_name + delimiter;
   /* Todo: don't add schema qualifier if it's not necessary */
   QString qualifier= "";
   if (connections_dbms[0] == DBMS_TARANTOOL) ;
-  else qualifier= full_schema_name + ".";
-  full_object_name= qualifier+ delimiter + object_name + delimiter;
-  full_part_name= qualifier+ delimiter + part_name + delimiter;
+  else qualifier= delimited_schema_name + ".";
+  cm_delimited_object_name= qualifier+ delimiter + object_name + delimiter;
+  cm_cell= q->qtextedit_cell_content;
+  QString delimited_part_name= qualifier+ delimiter + part_name + delimiter;
 
-  /* Set up QActions in order they were defined. Nothing variable here. */
-  if ((object_type == "T") || (object_type == "V"))
-  {
-    action_select_rows.setText("Select rows");
-    menu.addAction(&action_select_rows);
-  }
-  {
-    action_copy_to_clipboard.setText("Copy to clipboard");
-    menu.addAction(&action_copy_to_clipboard);
-  }
-#ifdef OCELOT_IMPORT_EXPORT
-  if (object_type == "T")
-  {
-    submenu_export= menu.addMenu("Export dialog ...");
-    action_export_text.setText("text");
-    action_export_table.setText("table");
-    action_export_html.setText("html");
-    submenu_export->addAction(&action_export_text);
-    submenu_export->addAction(&action_export_table);
-    submenu_export->addAction(&action_export_html);
-  }
-#endif
-  {
-    action_send_to_sql_editor.setText("Send to SQL editor");
-    menu.addAction(&action_send_to_sql_editor);
-  }
-  menu.addSeparator();
-  if (object_type == "T")
-  {
-    if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
-    {
-      action_create_table.setText("Create table");
-      menu.addAction(&action_create_table);
-    }
-    action_create_table_like.setText("Create table like");
-    menu.addAction(&action_create_table_like);
-    action_drop_table.setText("Drop table");
-    menu.addAction(&action_drop_table);
-    action_truncate_table.setText("Truncate table");
-    menu.addAction(&action_truncate_table);
-  }
-  /* Todo: imore f object_type == "V" */
-  if (object_type == "V")
-  {
-    action_create_view.setText("Create view");
-    menu.addAction(&action_create_view);
-    action_drop_view.setText("Drop view");
-    menu.addAction(&action_drop_view);
-  }
-  if (object_type == "C")
-  {
-    action_show_column.setText("Show column");
-    menu.addAction(&action_show_column);
-    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
-    {
-      action_drop_column.setText("Drop column");
-      menu.addAction(&action_drop_column);
-    }
-  }
-  if (object_type == "P")
-  {
-    action_drop_procedure.setText("Drop procedure");
-    menu.addAction(&action_drop_procedure);
-    if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
-    {
-      action_create_procedure.setText("Create procedure");
-      menu.addAction(&action_create_procedure);
-    }
-  }
-  if (object_type == "I")
-  {
-    action_drop_index.setText("Drop index");
-    menu.addAction(&action_drop_index);
-    action_show_index.setText("Show index");
-    menu.addAction(&action_show_index);
-    action_select_index.setText("Select index");
-    menu.addAction(&action_select_index);
-  }
-  if ((object_type == "S") && (connections_dbms[0] != DBMS_TARANTOOL))
-  {
-    action_set_as_default_schema.setText("Set as default schema");
-    menu.addAction(&action_set_as_default_schema);
-    if ((flags&EXPLORER_FLAG_NOT_FILTERED) != 0) action_filter_to_this_schema.setText("Do not filter to this schema");
-    else action_filter_to_this_schema.setText("Filter to this schema");
-    menu.addAction(&action_filter_to_this_schema);
-    action_schema_inspector.setText("Schema inspector");
-    menu.addAction(&action_schema_inspector);
-    action_create_schema.setText("Create schema");
-    menu.addAction(&action_create_schema);
-    action_alter_schema.setText("Alter schema");
-    menu.addAction(&action_alter_schema);
-    action_drop_schema.setText("Drop schema");
-    menu.addAction(&action_drop_schema);
-  }
-  if (object_type == "R")
-  {
-    action_show_trigger.setText("show trigger");
-    menu.addAction(&action_show_trigger);
-    action_drop_trigger.setText("drop trigger");
-    menu.addAction(&action_drop_trigger);
-  }
-  menu.addSeparator();
-  {
-    action_reset.setText("Reset");
-    menu.addAction(&action_reset);
-  }
-  {
-    action_refresh.setText("Refresh");
-    menu.addAction(&action_refresh);
-  }
-  // this doesn't print, in wonder why ... if (pos == QCursor::pos()) printf("pos == QCursor::pos\n");
-  QAction *menu_exec_result= menu.exec(QCursor::pos());
-
-  /* switch (menu_exec_result) ... */
-  if (menu_exec_result == &action_select_rows)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-                "Select * from " + full_object_name + " limit 1000;");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_copy_to_clipboard)
-  {
-    /* This copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier. */
-    QApplication::clipboard()->setText(qtextedit_cell_content);
-  }
-#ifdef OCELOT_IMPORT_EXPORT
-  else if ((menu_exec_result == &action_export_text)
-   || (menu_exec_result == &action_export_table)
-   || (menu_exec_result == &action_export_html))
-  {
-    int keyword;
-    if (menu_exec_result == &action_export_text) keyword= TOKEN_KEYWORD_TEXT;
-    if (menu_exec_result == &action_export_table) keyword= TOKEN_KEYWORD_TABLE;
-    if (menu_exec_result == &action_export_html) keyword= TOKEN_KEYWORD_HTML;
-    struct export_settings copy_of_main_exports;
-    copy_of_main_exports= main_exports;
-    int function_result= result_grid->copy_of_parent->action_export_function(keyword);
-    if (function_result == 1) /* Todo: check that function_result != 1 if dialog-cancel or SET failure */
-    {
-      QString file_name= main_exports.file_name;
-      QString text= "SELECT /* FOR EXPORT TO " + file_name + "*/ * FROM " + full_object_name + ";";
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-      result_grid->copy_of_parent->action_execute(1);
-      main_exports= copy_of_main_exports;
-    }
-  }
-#endif
-  else if (menu_exec_result == &action_send_to_sql_editor)
-  {
-    /* This copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier. */
-    QString text= result_grid->copy_of_parent->statement_edit_widget->toPlainText();
-    text= text + qtextedit_cell_content;
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-  }
-  else if (menu_exec_result == &action_create_table)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Show create table " + object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_create_table_like)
+  if (s.contains("$dialog", Qt::CaseInsensitive) == true)
   {
     Small_dialog *sm= new Small_dialog("Enter new table name and type Enter", "New name", "");
     sm->exec();
-    QString text= "Create table " + sm->line_edit.text().toUtf8() + " like " + full_object_name + ";";
+    QString text= "Create table " + sm->line_edit.text().toUtf8() + " like " + cm_delimited_object_name + ";";
+    QString dialog_result= sm->line_edit.text().toUtf8();
     delete sm;
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-    result_grid->copy_of_parent->action_execute(1);
+    s.replace("$dialog", dialog_result, Qt::CaseInsensitive);
   }
-  else if (menu_exec_result == &action_drop_table)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Drop table " + full_object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_create_view)
-  {
-    if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MYSQL))
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        "Show create view " + object_name + ";");
-    else /* presumably DBMS_TARANTOOL and in that case we stored it in engine, which became part */
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        part_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_drop_view)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Drop view " + full_object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_truncate_table)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Truncate table " + full_object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_create_procedure)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Show create procedure " + full_object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_drop_procedure)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Drop procedure " + full_object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_drop_index)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Drop index " + full_part_name + " on " + full_object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_show_index)
-  {
-#if (OCELOT_MYSQL_INCLUDE == 1)
-    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        "Show index from " + full_object_name + ";");
-#endif
-#ifdef DBMS_TARANTOOL
-    if (connections_dbms[0] == DBMS_TARANTOOL)
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        "select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '" + object_name + "');");
-#endif
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_select_index)
-  {
-#if (OCELOT_MYSQL_INCLUDE == 1)
-    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        "Select * from information_schema.statistics where index_name = '" + part_name + "';");
-#endif
-#ifdef DBMS_TARANTOOL
-    if (connections_dbms[0] == DBMS_TARANTOOL)
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        "Select * from \"_vindex\" where \"name\" = '" + part_name + "';");
-#endif
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_show_column)
+  if (s.contains("$occurs_text", Qt::CaseInsensitive) == true)
   {
     int index_count= 0;
     for (unsigned int i= 0; i < result_grid->copy_of_parent->oei_count; ++i)
@@ -20825,99 +20652,137 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
     }
     QString occurs_text= QString::number(index_count) + " times";
     if (index_count == 1) occurs_text= "1 time";
-    QString text= "select '" + part_name + "' as column_name,"
-                       + "'" + part_type + "' as column_type,"
-                       + "'" + occurs_text + "' as occurs_in_indexes;";
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-    result_grid->copy_of_parent->action_execute(1);
+    s.replace("$occurs_text", occurs_text, Qt::CaseInsensitive);
   }
-  else if (menu_exec_result == &action_drop_column)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Alter table " + full_object_name + " drop column " + full_part_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_set_as_default_schema)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Use " + full_schema_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_filter_to_this_schema)
-  {
-    result_grid->explorer_filter(qtextedit_result_row_number);
-  }
-  else if (menu_exec_result == &action_schema_inspector)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-    "select schema_name,"
-    " (select count(*) from information_schema.tables where table_schema='" + schema_name + "') as table_count,"
-    " (select count(*) from information_schema.routines where routine_schema='" + schema_name + "') as routine_count,"
-    " (select count(*) from information_schema.triggers where trigger_schema='" + schema_name + "') as trigger_count,"
-    " schema_comment"
-    " from information_schema.schemata"
-    " where schema_name='" + schema_name + "';");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_create_schema)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Show create schema " + full_schema_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_alter_schema)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Alter schema " + full_schema_name +
-      " character set=" + part_name +
-      " collate=" + part_type +
-      ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_drop_schema)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Drop schema " + full_schema_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_show_trigger)
-  {
-#if (OCELOT_MYSQL_INCLUDE == 1)
-    if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        "Select * from information_schema.triggers where trigger_name = '" + object_name + "';");
-#endif
-#ifdef DBMS_TARANTOOL
-    if (connections_dbms[0] == DBMS_TARANTOOL)
-      result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-        "Select * from \"_trigger\" where \"name\" = '" + object_name + "';");
-#endif
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_drop_trigger)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Drop trigger " + full_object_name + ";");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else if (menu_exec_result == &action_reset)
-  {
-    result_grid->explorer_reset();
-  }
-  else if (menu_exec_result == &action_refresh)
-  {
-    result_grid->copy_of_parent->statement_edit_widget->setPlainText(
-      "Refresh;");
-    result_grid->copy_of_parent->action_execute(1);
-  }
-  else {;} /* unknown action, probably exec() returned NULL */
-
-  result_grid->copy_of_parent->log("menu_context_t_2_explorer end", 90);
+  s.replace("'$schema_name'", "'" + schema_name + "'", Qt::CaseInsensitive);
+  s.replace("$schema_name", delimited_schema_name, Qt::CaseInsensitive);
+  s.replace("'$object_name'", "'" + object_name + "'", Qt::CaseInsensitive);
+  s.replace("$object_name", cm_delimited_object_name, Qt::CaseInsensitive);
+  s.replace("$part_name", part_name, Qt::CaseInsensitive);
+  s.replace("$part_type", part_type, Qt::CaseInsensitive);
+  s.replace("$cell", cm_cell, Qt::CaseInsensitive);
+  s.replace("$clipboard", QApplication::clipboard()->text());
+  s.replace("$action", result_grid->copy_of_parent->statement_edit_widget->toPlainText());
+  return s;
 }
 
-#endif
+void Context_menu::menu_context_t_2_explorer(const QPoint & pos)
+{
+  (void)pos;
+  if (q->qtextedit_at_end == true) return;
+  assert(q->qtextedit_is_before_column != true);
+  assert(q->qtextedit_is_before_row != true);
 
-/******************** Result_qtextedit end   ************************************/
+  result_grid->copy_of_parent->log("menu_context_t_2_explorer start", 90);
+  QString dbms= "M"; /* MariaDB/MySQL assumed */
+  if (connections_dbms[0] == DBMS_TARANTOOL) dbms= "T";
+  int cmi_count_visible= 0;
+  for (int i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
+  {
+    replacer(""); /* so we get cm_object_type and cm_delimited_object_name */
+    bool is_object_type_match= false;
+    if ((cmi[i_of_cmi].applicable_types.contains(cm_object_type) == true)
+     || (cmi[i_of_cmi].applicable_types.contains("*") == true))
+      is_object_type_match= true;
+    bool is_dbms_match= false;
+    if ((cmi[i_of_cmi].applicable_dbmss.contains("*") == true)
+     || (cmi[i_of_cmi].applicable_dbmss.contains(dbms) == true))
+      is_dbms_match= true;
+    if ((is_object_type_match == true) && (is_dbms_match == true))
+    {
+      cmi[i_of_cmi].action_pointer->setVisible(true);
+      cmi[i_of_cmi].action_pointer->setText(replacer(cmi[i_of_cmi].text));
+      //cmi[i_of_cmi].action_pointer->setEnabled(true);
+      /* Todo: some things should be disabled for privilege reasons e.g. drop information_schema */
+      ++cmi_count_visible;
+    }
+    else cmi[i_of_cmi].action_pointer->setVisible(false);
+  }
+  QAction *exec_result= menu->exec(QCursor::pos());
+  int i_of_cmi;
+  for (i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
+  {
+    if (exec_result == cmi[i_of_cmi].action_pointer)
+    {
+      QString s= cmi[i_of_cmi].action.trimmed();
+      if (s.startsWith("CLIPBOARD=", Qt::CaseInsensitive) == true) /* probably "CLIPBOARD=$cell" */
+      {
+        s= replacer(s);
+        s= s.right(s.size()-10);
+        QApplication::clipboard()->setText(s);
+      }
+      else if (s.startsWith("ACTION=", Qt::CaseInsensitive) == true) /* probably "ACTION=$cell" */
+      {
+        s= replacer(s);
+        s= s.right(s.size()-10);
+        result_grid->copy_of_parent->statement_edit_widget->setPlainText(s);
+      }
+#ifdef OCELOT_IMPORT_EXPORT
+      else if ((s == "EXPORT_TEXT;")
+       || (s == "EXPORT_TABLE;")
+       || (s == "EXPORT_HTML;"))
+      {
+        int keyword;
+        if (s == "EXPORT_TEXT;") keyword= TOKEN_KEYWORD_TEXT;
+        if (s == "EXPORT_TABLE;") keyword= TOKEN_KEYWORD_TABLE;
+        if (s == "EXPORT_HTML;") keyword= TOKEN_KEYWORD_HTML;
+        struct export_settings copy_of_main_exports;
+        copy_of_main_exports= main_exports;
+        int function_result= result_grid->copy_of_parent->action_export_function(keyword);
+        if (function_result == 1) /* Todo: check that function_result != 1 if dialog-cancel or SET failure */
+        {
+          QString file_name= main_exports.file_name;
+          QString text= "SELECT /* FOR EXPORT TO " + file_name + "*/ * FROM " + cm_delimited_object_name + ";";
+          result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
+          result_grid->copy_of_parent->action_execute(1);
+          main_exports= copy_of_main_exports;
+        }
+      }
+#endif
+      else if (s == "RESET;")
+        result_grid->explorer_reset();
+      else if (s.startsWith("FILTER=", Qt::CaseInsensitive) == true) /* probably "FILTER=$schema_name" */
+        result_grid->explorer_filter(q->qtextedit_result_row_number);
+      else
+      {
+        result_grid->copy_of_parent->statement_edit_widget->setPlainText(replacer(s));
+        assert(result_grid->copy_of_parent->main_token_max_count >= (unsigned int) s.size());
+        result_grid->copy_of_parent->action_execute(1);
+      }
+      break;
+    }
+  }
+  if (i_of_cmi == cmi_count)
+  {
+    assert(exec_result == NULL);  /* unknown action, probably exec() returned NULL */
+  }
+  result_grid->copy_of_parent->log("menu_context_t_2_explorer end", 90);
+  return;
+}
+
+
+int Context_menu::edit(int i_of_cmi, int target_type, QString target_value)
+{
+  QString stripped_target_value= result_grid->copy_of_parent->connect_stripper(target_value, true);
+  if (target_type == TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION) cmi[i_of_cmi].action= stripped_target_value;
+  if (target_type == TOKEN_KEYWORD_OCELOT_MENUITEM_SHORTCUT) cmi[i_of_cmi].shortcut= stripped_target_value;
+  if (target_type == TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT) cmi[i_of_cmi].text= stripped_target_value;
+  return 1;
+}
+
+/* I'm able to handle the switching with connect() and lambdas, thus:
+   (in class Context_Menu private slots) void cmi_switcher(int cmi_index);
+   (in Context_menu::add_qaction) int i= cmi_count; connect(cmi[cmi_count].action_pointer, &QAction::triggered,[this, i] { cmi_switcher(i); });
+   (here) uncomment
+   Currently I'm happy with looking at the exec() result but this method might be better for main menu bar
+*/
+//void Context_menu::cmi_switcher(int cmi_index)
+//{
+//  printf("**** cmi_switcher %d\n", cmi_index);
+//}
+
+/******************** Context_menu end   ************************************/
+
 
 #ifdef OLD_STUFF
 /*
@@ -21506,6 +21371,7 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
 /* todo: this might be okay for a Linux file that ends lines with \n, but what about Windows? */
 void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 {
+  log("connect_read_my_cnf", 15);
   //FILE *file;
   char line[2048];
   int token_offsets[100]; /* actually 10 is enough, currently */
@@ -23345,6 +23211,7 @@ int MainWindow::setup_find(QString t_schema, QString t_name)
 
 int MainWindow::setup_generate(int routine_number)
 {
+  log("setup_generate", 15);
   debug_label_list.clear();
   if (debug_track_user_variables == 1) debug_tmp_user_variables.clear();
   QString s;
@@ -26818,7 +26685,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 132 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 134 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
   Todo: ocelot_grid_border_size is no longer used but we'll probably add something else soon
   We don't have ocelot_export in the list, I don't think it's needed.
 */
@@ -26887,6 +26754,8 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_html,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW},
     {&main_window->ocelot_language, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {NULL, &ocelot_log_level,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
+    {&main_window->ocelot_menuitem_action, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION},
+    {&main_window->ocelot_menuitem_text, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT},
     {&main_window->ocelot_menu_background_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
     {&main_window->ocelot_menu_border_color, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR},
     {&main_window->ocelot_menu_font_family, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY},
@@ -26959,7 +26828,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 132;
+  int i= 134;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;
@@ -27204,6 +27073,10 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
   {
     main_window->make_style_strings();
     main_window->ui->menuBar->setStyleSheet(main_window->ocelot_menu_style_string);
+#if (OCELOT_EXPLORER == 1)
+    if (main_window->explorer_widget != NULL)
+      main_window->explorer_widget->html_text_edit->explorer_context_menu->menu->setStyleSheet(main_window->ocelot_menu_style_string);
+#endif
   }
   if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1)
   {
@@ -27284,8 +27157,8 @@ XSettings::~XSettings()
   Style:
     It's a result grid. So it is wider, and has less decoration, compared to others.
     However, users get some features without needing to learn anything new:
-    * SET works. E.g. SET ocelot_grid_background_color = 'tan' WHERE row_number = 5;
-    * ^Find works.
+    * SET works. E.g. SET ocelot_grid_background_color = 'tan' WHERE row_number = 5; (if you REFRESH)
+    * ^Find works. (if it's visible)
     * Vertical scroll bar works.
     * Most things that affect Settings | Result Grid affect explorer too.
     * One difference: dragging doesn't happen. There wouldn't be much point, since items are short.
@@ -27300,10 +27173,10 @@ XSettings::~XSettings()
         If object_type='C', this is a column name and is taken from part_name.
   Settings ... for Explorer
     Visible: yes|no. Default no. So if you don't change this to 'yes', there's nothing.
-    Expanded: yes.no. Currently this does nothing.
+    Sort alphabetically: If 'yes', objects of the same type are sorted alphabetically. Default is 'no'.
     Query: a long select with unions.
       The default query selects all databases.
-      Users can change this query, for example removing union select from columns means they'll never appear.
+      Users can change this query to add WHERE clauss. Affects MySQL/MariaDB only.
     Detached|Top|Left|Width|Height:
       As with other widgets, the explorer is detachable and the explorer's size + position are settable
       when it is detached.
@@ -27315,34 +27188,34 @@ XSettings::~XSettings()
     Right Click: puts up a context menu.
       The relevant context is what row the mouse is over.
       For example if it's over a table, then table-related menu items will appear.
-      The list of possible items is in the comment preceding menu_context_t_2_explorer).
+      The list of possible items is in the comment preceding menu_context_t_2_explorer.
   SET statements:
     SET ocelot_grid_cell_height=0 ... WHERE ...; causes matching rows to disappear, i.e. this is our "filter".
     New keywords begin with TOKEN_KEYWORD_OCELOT_EXPLORER e.g. TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED
     Important one: ocelot_visible='yes'|'no'
   REFRESH:
-    Others call this "Refresh" or "Refresh all".
+    A bit similar to REHASH, but this gets all schemas (databases) -- so has an effect on the server..
     REFRESH is necessary because we don't know when other users might change data definitions. And it's slow.
     Whenever users say REFRESH, the explorer tables are redone.
     In another product this would be done with a View menu.
   Options:
     New options: Detach|Attach explorer widget.
-  TODO: There should be a tooltip for everything. In fact that's true for result grid too.
+  TODO: Tooltip changes. In fact that's true for result grid too.
         Could be "Explorer" + "Right-click for context menu" + "See Help|Explorer" + object type = Column, X, in table Y
   Todo: Something that shows referencing|referenced relationships of foreign keys, preferably visual.
         Add to query: something that gets us foreign keys.
   Todo: SET could have an additional possible condition: AND result_grid_number = -1.
   Todo: If you lack privileges for an object, you should gray some things in the menu.
         This would always be true if current database = information_schema.
-  Todo: Pixmaps instead of Unicode characters for + and -.
+  Todo: Pixmaps instead of Unicode characters for Down-pointing and Right-pointing triangle.
   Todo: Dialog box for Filter (can be done with SET ocelot_grid_cell_size=0 or query change)
-  Todo: Dialog box for Sort (can be done with query change)
+  Todo: Dialog box for Sort (can be done with query change) (we already have Settings|Sort alphabetically)
   Todo: Help|Explorer widget, and change to README.
   Todo: example.cnf should have whatever the new options are.
   Todo: Drag and Drop: This would be for building a query.
   Todo: Check for leaks, and check for result-grid changes that cause items to be destroyed and re-created.
-  Todo: The initial query might be simplified if we had 'C' after 'T'.
   Todo: When font changes or some other condition changes, or new USE, automatically adjust explorer.
+        Actually font changes do have immediate effect.
   Todo: Start with visible, but just leave a message saying to look at Explorer|Help.
   Todo: Shortcut. For example, typing 'C' goes to the next thing that starts with 'C' (there's also ^F FInd).
   Todo: When you first display a result grid, there is a little blank. It's batch_text_edit.
@@ -27350,7 +27223,7 @@ XSettings::~XSettings()
   Todo: Hide the explorer widget if/when not connected.
   Todo: Your initial setup of upper_layout might be dangerous, check it more thoroughly.
         Search for calculations that depend on whole width, instead of main_window width.
-        Check whether a change to grid settings will affect explorer_widget (probably not).
+        Check whether a change to grid settings will affect explorer_widget (usually yes).
   Todo: It's a bit unfortunate that explorer's abbreviation is 'S' for schema but rehash's is 'D' for database.
   Todo: "MIN" is not a wonderfulname. It should be short.
         There might be some standard term. Collapse? Tables only? Hide columns? Hide parts?
@@ -27384,7 +27257,6 @@ void MainWindow::initialize_widget_explorer()
   explorer_widget->grid_vertical_scroll_bar->installEventFilter(this);
   explorer_widget->set_all_style_sheets(ocelot_grid_style_string, 0, 0, false);
   /* Todo: Not sure where to put this. And it's wrong if Tarantool. Compare query of rehash_scan(). */
-
 }
 
 /*
@@ -27393,7 +27265,7 @@ void MainWindow::initialize_widget_explorer()
   Todo: Flaw: This will override any change that a user makes with Settings|Explorer.
         It might be better to have two ocelot_explorer_queries, one for Tarantool, one for MySQL/MariaDB.
   Todo: think harder about how to handle switch to a different DBMS
-  Todo: Create _tables and _columns if they haven't already been created.
+        There might be some things made for the previous DBMS that should be deleted now.
   Todo: If explorer_refresh fails, probably because we lack an important select privilege,
         mark that explorer is disabled and explain the problem.
   Todo: Temporarily I've set auto_rehash=0. Put it back in .my.cnf.
@@ -27439,6 +27311,8 @@ void MainWindow::initialize_widget_explorer_after_connect()
                    "select 'T',table_schema,table_name,table_type,''\n"
                    "from _tables;"
     ;
+  char error_or_ok_message[1024];
+  if (ocelot_explorer_visible  == "yes") explorer_refresh_caller(error_or_ok_message);
 }
 
 
@@ -27697,7 +27571,7 @@ void MainWindow::explorer_sort()
 {
   log("explorer_sort start", 65);
 
-  for (int i= 0; i < oei_count; ++i)
+  for (unsigned int i= 0; i < oei_count; ++i)
   {
     if (oei[i].object_type == "T")
     {
