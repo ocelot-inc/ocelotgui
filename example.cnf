@@ -3,6 +3,13 @@
 #... but it's only an example of syntax, not of good taste
 [ocelot]
 
+ocelot_explorer_detached='no'
+ocelot_explorer_left='default'
+ocelot_explorer_top='default'
+ocelot_explorer_width='default'
+ocelot_explorer_height='default'
+ocelot_explorer_visible='no'
+
 ocelot_grid_text_color='Indigo'
 ocelot_grid_background_color='DodgerBlue'
 ocelot_grid_header_background_color='Ivory'

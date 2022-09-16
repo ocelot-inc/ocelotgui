@@ -4991,11 +4991,13 @@ private:
   QStringList string_list_tooltips;
   int current_row;
   QList<int> token_type_list;
+  int associated_widget_type;
 void copy_string_list();
 void construct();
 void show_wrapper();
-void line_colors();
+void line_colors(int associated_widget_type);
 void set_current_row(int);
+void call_for_action();
 
 private slots:
 void timer_expired();
@@ -5003,10 +5005,13 @@ void timer_expired();
 protected:
 void mousePressEvent(QMouseEvent *event);
 void mouseDoubleClickEvent(QMouseEvent *event);
+void focusInEvent(QFocusEvent *event);
+void focusOutEvent(QFocusEvent *event);
+void keyPressEvent(QKeyEvent *event);
 
 public:
 void set_timer_interval();
-void initialize();
+void initialize(int w);
 void hide_wrapper();
 void clear_wrapper();
 int count_wrapper();
@@ -6403,7 +6408,7 @@ private:
        unsigned int min_width_in_pixels;
     };
 
-  ResultGrid *result_grid;
+
   int qtextedit_drag_start_x; /* See comment = Dragging theory. */
   int qtextedit_drag_start_y;
   int qtextedit_drag_start_time;
@@ -6435,6 +6440,7 @@ private:
   QString to_plain_text();
 
 public:
+  ResultGrid *result_grid;
   QString unstripper(QString value_to_unstrip);
   int qtextedit_grid_row_number;        /* row number, starts at 1, includes header row, within display */
   int qtextedit_result_row_number;      /* row number from result set, derived from qtextedit_grid_row_number */
@@ -6507,9 +6513,14 @@ Result_qtextedit(ResultGrid *m)
 
 /* Todo: don't forget to delete [] grid_columns somewhere */
 /* It might not be necessary to delete anything made in Result_qtextedit::construct(), but try anyway. */
+/* explorer_context_menu has its own destructor */
 ~Result_qtextedit()
 {
-  delete qtextedit_result_changes;
+  if (qtextedit_result_changes != NULL)
+  {
+    delete qtextedit_result_changes;
+    qtextedit_result_changes= NULL;
+  }
 }
 
 };
@@ -14698,9 +14709,10 @@ bool eventFilter(QObject *obj, QEvent *event)
   User has asked for explorer context menu, presumably by right-clicking on explorer_widget.
   From oei[qtextedit_result_row_number] I can get object_type, object_name, column_name.
   User can press Esc, or click outside the choices, to select nothing.
-  Put up a menu with &QAction. Each QAction has a text (which should be ostrings.h?), and maybe an SQL statement.
+  Put up a "menu" (well, it looks like one but it's not actually QMenu it's Completer_widget).
+  Each menu item has a text (which should be ostrings.h?), and maybe an SQL statement.
   Todo: Make it start & pos!
-  QAction Text What to do if clicked
+  Action  Text What to do if clicked
   ----    ---- ---------------------
   Select Rows                       done, we say SELECT * FROM table-name LIMIT 1000;
   Table Inspector                         apparently this just allows analyze etc.
@@ -14716,16 +14728,17 @@ bool eventFilter(QObject *obj, QEvent *event)
   Truncate Table...                 done
   Search Table Data...                    meaning select from all tables, all text columns, returning counts
   Refresh All                       done, as refresh
-  I see what QAction exec() returns, rather than slots, it's less hassle than defining with parameters.
   Todo: I could be specific, e.g. instead of "Copy to clipboard" say "Copy TABLE_X to clipboard"
-  Todo: Put all the actions in a table: &action, what-to-put-in-text, when-visible, what-to-do-if-clicked. E.g.:
-        Action               Text            Action                     Shortcut    Applicable Types
-        ------               ----            -------------              --------    ----------------
-        &action_select_rows "select rows"    "SELECT * FROM $part_name;             T, V
+  Todo: Put all the actions in a table: what-to-put-in-text, when-visible, what-to-do-if-clicked. E.g.:
+        Text            Action                     Shortcut    Applicable Types
+        ----            -------------              --------    ----------------
+        "select rows"   "SELECT * FROM $part_name;              T, V
                                              ?? or Lua? Or Read file? Or C program?
         This can be done with a SET statement:
-          SET text='SELECT ROWS', statement='SELECT * FROM $object_name LIMIT 1;', shortcut='Ctrl+F'
-          WHERE name='select_rows';
+          SET ocelot_menuitem_text='SELECT ROWS',
+              ocelot_menuitem_statement=statement='SELECT * FROM $object_name LIMIT 1;',
+              ocelot_menuitem_shortcut='Ctrl+F'
+          WHERE ocelot_menuitem_text='select_rows';
         Or a dialog box: containing all:
           Fixed Statement Name | Text ___| SQL Statement ____ | Shortcut ___
         If we did it, users would have to be able to specify parameters e.g.:
@@ -14733,11 +14746,10 @@ bool eventFilter(QObject *obj, QEvent *event)
         Some actions are not SQL statements e.g.:
           [Reset] [Copy $cell to clipboard] [Copy $cell to statement widget] [Text Export Dialog Box]
         Actions can be client statements.
-        Unfortunately actions cannot be multiple statements, but you could call a procedure.
+        Actions can be multiple statements, but we might need a length limit, but you could call a procedure.
         The default should be in ostrings.h for the sake of the French translation.
         But "load" an instruction can be a general idea, not necessarily associated with explorer.
-        You could have an associated Alt|Control QKeySequence too.
-        But you'll need to add more, and you can't add an indefinite number of QAction with what you have now.
+        But you'll need to add more, and you can't add an indefinite number of actions with what you have now.
         But if you allow add, you'll have to allow subtract too. And items need names. And will Reset wipe adds?
         So have a look at fill_menu(), and particularly things like TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT.
         Because this trick is applicable to all menus, except that I don't want to make many changes at once.
@@ -14753,8 +14765,8 @@ bool eventFilter(QObject *obj, QEvent *event)
         one function, we switched to having a context menu that is always existent. But perhaps we should
         change that to "as long as explorer widget is visible", i.e. delete if hide().
   Todo: for CREATE TABLE LIKE: see whether the widget you use for ^F Find might have been useful
-  Warning: do not define QAction objects inside {}s, exec() will not know about them.
   Todo: Bug: If we move the cursor while the menu is up, mousemoveevent won't happen, so row number is wrong.
+        (I think this is fixed.)
   Todo: Format the SQL statements according to whatever happened with a format statement earlier.
   Todo: At one point we're using q->unstripper(), for data type, because the enum data type might contain ''s.
         Fine, but what about names that contain "s or `s?
@@ -14762,7 +14774,7 @@ bool eventFilter(QObject *obj, QEvent *event)
   Todo: Maybe the text|table|html decision could be done with a $dialog
   Todo: In cmi the action could be multiple statements including server SQL, client statement, RESET; etc.
         and maybe something more e.g. Lua statements, program execute
-  Todo: Shortcut should be changeable, but would be confusing because we have SET OCELOT_SHORTCUT_... now.
+  Todo: Our SET ocelot_menuitem_shortcut="...' confuses because we have SET OCELOT_SHORTCUT_... too.
   Todo: "Cut" could remove a line until the next reset.
   todo: something for menu->addSeparator()
   todo: validity check, although for default that isn't needed
@@ -14773,6 +14785,7 @@ bool eventFilter(QObject *obj, QEvent *event)
           Allow effect on main menu too.
           Allow new thing = "Enabled".
   Note: SET ocelot_menu_background_color etc. will affect context menu too.
+        Todo: consider: base on statement widget instead, or make menu fixed font
   Note: For show create view we don't have a Tarantool statement but we stored it in part.
   Note: CREATE TABLE ... is depending on default schema so if you haven't said USE it will cause an error.
   Re macros: text and statement can have them. See the Wikipedia article "String interpolation".
@@ -14784,10 +14797,13 @@ bool eventFilter(QObject *obj, QEvent *event)
   TODO: BUG: For 'C' for Send to SQL editor, we copy the name not the qualified name.
   TODO: BUG: At one point we failed to show a table. It's okay now but watch for it happening again.
   TODO: BUG: occasional crash, again. I'm seeing whether it helps if I avoid "new".
-             By the way I don't need to copy action_pointer into the cmi struct, since I already have it.
-             In fact, maybe the cmi struct should have QAction?
   Todo: I dunno about 'M' and 'T' and '*'. Perhaps 'M%' | 'MariaDB' etc. and '%' would be clearer.
   Todo: Context_menu::edit() should propose a text for the sake of ER_OK_PLUS e.g. warning what's not done.
+  Todo: line_colors() looks like a good spot for marking something as disabled
+  Todo: in set_current_row give a specific tooltip, e.g. text of action
+  Todo: re shortcutter(): Check if visible? Check if explorer is visible? return something if match and action?
+  Todo: how to see what the current values are? At least make a separate .h file?
+  Todo: example.cnf changes
 */
 class Context_menu: public QWidget
 {
@@ -14799,36 +14815,40 @@ private:
   void construct();
 
 struct context_menu_items {
-    QAction *action_pointer;  /* e.g. &action_select_rows */
     QString action;           /* e.g. "Select * FROM $object_name limit 1000;" */
     QString applicable_dbmss; /* e.g. "M" or "T" */
     QString applicable_types; /* e.g. "T,V" */
     QString enabled;          /* e.g. "" (not used yet) */
     QString shortcut;         /* e.g. "" (not used yet) (key sequence) */
     QString text;             /* e.g. "select rows" */
+    bool is_visible;
 };
 /* There are only about 35 default context menu items but allow for users making more. */
 #define MAX_CMI_COUNT 40
 
   QString replacer(QString);
-  int add_qaction(QString action, QString applicable_dbmss, QString applicable_types,
+  int add_action(QString action, QString applicable_dbmss, QString applicable_types,
                   QString enabled, QString shortcut, QString text);
   QString cm_delimited_object_name; /* variables beginning with cm_ are for use in macro replacement */
   QString cm_object_type;
   QString cm_cell;
-  QAction list_of_actions[MAX_CMI_COUNT];
+
+protected:
+  void keyPressEvent(QKeyEvent *event);
 
 public:
   void menu_context_t_2_explorer(const QPoint & pos);
   int edit(int i_of_cmi, int target_type, QString text);
-  QMenu *menu;
   context_menu_items cmi[MAX_CMI_COUNT];
-  int cmi_count= 0;
+  int cmi_count;
+  void action(int current_row, int i_of_cmi);
+  bool shortcutter(QKeySequence qk);
 
 Context_menu(ResultGrid *m, Result_qtextedit *passed_q)
 {
   result_grid= m;
   q= passed_q;
+  cmi_count= 0;
   construct();
 }
 

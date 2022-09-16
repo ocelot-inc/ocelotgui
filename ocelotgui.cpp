@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: September 11 2022
+   Last modified: September 16 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -621,7 +621,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   QFont fixed_font= get_fixed_font();
   history_edit_widget->setFont(fixed_font);
   statement_edit_widget->setFont(fixed_font);
-
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   create_widget_debug();
 #endif
@@ -726,7 +725,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
 #if (OCELOT_EXPLORER == 1)
   explorer_widget= new ResultGrid(lmysql, this, true, EXPLORER_WIDGET);
-  explorer_widget->html_text_edit->explorer_context_menu->menu->setStyleSheet(ocelot_menu_style_string);
+  explorer_widget->html_text_edit->explorer_context_menu->setStyleSheet(ocelot_menu_style_string);
   initialize_widget_explorer();
   QHBoxLayout *upper_layout= new QHBoxLayout();
   QWidget *upper_widget= new QWidget();
@@ -930,7 +929,7 @@ void MainWindow::statement_edit_widget_setstylesheet()
     }
   }
 #endif
-  completer_widget->initialize();
+  completer_widget->initialize(STATEMENT_WIDGET);
 }
 
 /*
@@ -2041,6 +2040,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   if (event->type() != QEvent::KeyPress) return false;
   QKeyEvent *key= static_cast<QKeyEvent *>(event);
   /* See comment with label "Shortcut Duplication" */
+
   if (keypress_shortcut_handler(key, false) == true) return true;
   if (obj != statement_edit_widget) return false;
   if ((key->key() == Qt::Key_Down) && (completer_widget->key_up_or_down(+1))) return true;
@@ -2103,6 +2103,12 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   if ((modifiers & Qt::AltModifier) != 0) qki= (qki | Qt::ALT);
   if ((modifiers & Qt::MetaModifier) != 0) qki= (qki | Qt::META);
   QKeySequence qk= QKeySequence(key->key() | qki);
+#if (OCELOT_EXPLORER == 1)
+  if (explorer_widget != NULL)
+  {
+    if (explorer_widget->html_text_edit->explorer_context_menu->shortcutter(qk) == true) return true;
+  }
+#endif
   if ((qk == ocelot_shortcut_copy_keysequence)
    && (return_true_if_copy)) return true;
   if (qk == ocelot_shortcut_connect_keysequence) { action_connect(); return true; }
@@ -6952,6 +6958,10 @@ void MainWindow::component_size_calc(int *character_height, int *borders_height)
   Alternative: we could create a widget, apply style_string to it, then ask what its font is,
   but that's probably a bit slower because we have to show() the widget first.
   Some font weights are Qt 5.6: https://doc-snapshots.qt.io/qt5-5.6/qfont.html#Weight-enum
+  Todo: we are tokenizing klunkily. This caused an assert with
+        ... ;font-weight:400} QMenu::item:disabled {background-color:gray}
+        because we expected either ; or end-of-string. So we added a check for } there too.
+        But there are other things that could be wrong with strings.
 */
 QFont MainWindow::get_font_from_style_sheet(QString style_string)
 {
@@ -6989,6 +6999,7 @@ QFont MainWindow::get_font_from_style_sheet(QString style_string)
   {
     int font_weight_start= style_string.indexOf("font-weight:");
     int font_weight_end= style_string.indexOf(";", font_weight_start);
+    if (font_weight_end < 0) font_weight_end= style_string.indexOf("}", font_weight_start);
     if (font_weight_end < 0) font_weight_end= style_string.length();
     QString font_weight= style_string.mid(font_weight_start + 12, font_weight_end - (font_weight_start + 12));
     font_weight= font_weight.trimmed();
@@ -11450,7 +11461,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         return 1;
       }
 #if (OCELOT_EXPLORER == 1)
-      /* !! BUT THIS WORKS ONLY IF WE WENT THROUGH HPARSE !! */
+      /* !! TODO: BUT THIS WORKS ONLY IF WE WENT THROUGH HPARSE !! */
       if ((sub_token_types[0] == TOKEN_KEYWORD_SET)
        && (sub_token_types[1] >= TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION)
        && (sub_token_types[1] <= TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT))
@@ -18400,14 +18411,14 @@ char * MainWindow::typer_to_keyword(unsigned int ocelot_type)
 */
 void Completer_widget::construct()
 {
-  setParent(main_window->statement_edit_widget);
+  setParent(main_window->statement_edit_widget); /* This can change during initialize() */
   setWindowFlags(Qt::WindowStaysOnTopHint);
   timer= new QTimer(this);
   timer->setSingleShot(true);
   set_timer_interval();
   current_row= 0;
-  string_list= QStringList ();        /* Qt default constructors create empty lists but I worry anyway. */
-  string_list_tooltips= QStringList ();
+  string_list= QStringList();        /* Qt default constructors create empty lists but I worry anyway. */
+  string_list_tooltips= QStringList();
   token_type_list= QList<int> ();
   setReadOnly(true);
   QObject::connect(timer, SIGNAL(timeout()), this, SLOT(timer_expired(void)));
@@ -18453,14 +18464,14 @@ void Completer_widget::hide_wrapper()
 void Completer_widget::show_wrapper()
 {
   if (main_window->statement_edit_widget->document()->isEmpty()) return;
-  line_colors();
+  line_colors(associated_widget_type);
   show();
   timer_reset(); /* although timer->stop((); is maybe unnecessary */
   main_window->menu_edit_action_autocomplete->setEnabled(true);
 }
 
 /* Similar to something in codeeditor.h */
-void Completer_widget::line_colors()
+void Completer_widget::line_colors(int associated_widget_type)
 {
   QList<QTextEdit::ExtraSelection> extraSelections;
   QTextCursor tc= textCursor();
@@ -18471,9 +18482,15 @@ void Completer_widget::line_colors()
     if (i != 0) tc.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, 1);
     setTextCursor(tc);
     QTextEdit::ExtraSelection selection;
-    int token_type= token_type_list.at(i);
     int flags= 0;
-    QTextCharFormat format_of_current_token= main_window->get_format_of_current_token(token_type, flags, "");
+    QTextCharFormat format_of_current_token;
+    if (associated_widget_type == STATEMENT_WIDGET)
+    {
+      int token_type= token_type_list.at(i);
+      format_of_current_token= main_window->get_format_of_current_token(token_type, flags, "");
+    }
+    else /* EXPLORER_WIDGET -- but dubious choice, this is for identifier */
+      format_of_current_token= main_window->get_format_of_current_token(TOKEN_TYPE_IDENTIFIER, 0, "");
     line_color= format_of_current_token.foreground().color();
     selection.format.setForeground(line_color);
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -18483,7 +18500,10 @@ void Completer_widget::line_colors()
     setExtraSelections(extraSelections);
     if (i != current_row)
     {
-      line_color= QColor(main_window->ocelot_statement_background_color);
+      if (associated_widget_type == STATEMENT_WIDGET)
+        line_color= QColor(main_window->ocelot_statement_background_color);
+      else /* EXPLORER_WIDGET */
+        line_color= QColor(main_window->ocelot_menu_background_color);
     }
     else
     {
@@ -18504,9 +18524,22 @@ void Completer_widget::line_colors()
   call when statement_edit_widget stylesheet change
   we could use something different from the statement_edit_widget style string, but I haven't seen a reason
 */
-void Completer_widget::initialize()
+void Completer_widget::initialize(int w)
 {
-  setStyleSheet(main_window->ocelot_statement_style_string);
+  associated_widget_type= w; /* either STATEMENT_WIDGET or EXPLORER_WIDGET */
+  if (associated_widget_type == STATEMENT_WIDGET)
+  {
+    setParent(main_window->statement_edit_widget);
+    setWindowFlags(Qt::WindowStaysOnTopHint);
+    setStyleSheet(main_window->ocelot_statement_style_string);
+  }
+  else /* EXPLORER_WIDGET */
+  {
+    setParent(main_window);
+    setWindowFlags(Qt::WindowStaysOnTopHint);
+    setStyleSheet(main_window->ocelot_menu_style_string);
+  }
+  /* TODO: WHAT SHOULD WE REALLY USE FOR EXPLORER? */
   size_and_position_change();
 }
 
@@ -18573,7 +18606,11 @@ This should be done in reaction to statement_edit_widget->resize too, but
 
 void Completer_widget::size_and_position_change()
 {
-  QFont f= main_window->get_font_from_style_sheet(main_window->ocelot_statement_style_string);
+  QFont f;
+  if (associated_widget_type == STATEMENT_WIDGET)
+    f= main_window->get_font_from_style_sheet(main_window->ocelot_statement_style_string);
+  else /* EXPLORER_WIDGET */
+    f= main_window->get_font_from_style_sheet(main_window->ocelot_menu_style_string);
   QFontMetrics fm(f);
   QString s= "";
   copy_string_list();
@@ -18595,8 +18632,18 @@ void Completer_widget::size_and_position_change()
   desired_width+= verticalScrollBar()->width();
   desired_width+= 2 * frameWidth() + 16; /* why + 16? I don't know. But it helps. */
 
-  int maximum_width= main_window->statement_edit_widget->width();
-  int maximum_height= main_window->statement_edit_widget->height();
+  int maximum_width, maximum_height;
+  if (associated_widget_type == STATEMENT_WIDGET)
+  {
+    maximum_width= main_window->statement_edit_widget->width();
+    maximum_height= main_window->statement_edit_widget->height();
+  }
+  else
+  {
+    /* TODO: SHOULD BE CURRENT POSITION TILL END. AND THIS ASSUMES NO DETACHING! */
+    maximum_width= main_window->width() - main_window->explorer_widget->width();
+    maximum_height= main_window->height();
+  }
   if (desired_width > maximum_width)
   {
     desired_height+= horizontalScrollBar()->height(); /* do this only if there will be a horizontal scroll bar */
@@ -18605,8 +18652,16 @@ void Completer_widget::size_and_position_change()
   desired_height+= 2 * frameWidth();
   desired_height+= count_wrapper() * 2; /* why * 2? I don't know. But it helps. */
 
-  QRect r3= main_window->statement_edit_widget->cursorRect();
-  int desired_x= r3.x() + main_window->statement_edit_widget->prompt_width_calculate();
+  QRect r3;
+  if (associated_widget_type == STATEMENT_WIDGET)
+    r3= main_window->statement_edit_widget->cursorRect();
+  else /* EXPLORER_WIDGET */
+    r3= main_window->explorer_widget->html_text_edit->cursorRect();
+  int desired_x;
+  if (associated_widget_type == STATEMENT_WIDGET)
+    desired_x= r3.x() + main_window->statement_edit_widget->prompt_width_calculate();
+  else /* EXPLORER_WIDGET todo: can shift more than this if it wouldn't interfere with maximum width */
+    desired_x= r3.x() + 24;
   int desired_y= r3.y() + r3.height();
   /* If there isn't enough width, try to shift completer_widget left. If still not enough, shift to x=0 and reduce width. */
   int space_after_x= maximum_width - (desired_x + desired_width);
@@ -18647,7 +18702,10 @@ void Completer_widget::size_and_position_change()
   }
   //setFixedSize(desired_width, desired_height);
   resize(desired_width, desired_height);
-  move(desired_x, desired_y);
+  if (associated_widget_type == STATEMENT_WIDGET)
+    move(desired_x, desired_y);
+  else /* EXPLORER_WIDGET */
+    move(desired_x, desired_y);
 }
 
 /*
@@ -18711,8 +18769,17 @@ void Completer_widget::updater()
 
 /* todo: change ostrings.h so tooltip text can be in French */
 /* todo: don't change the tooltip unless there's something different to say, but this checking might be inefficient */
+/* todo: we seem to call set_current_row with new_current_row==0 a huge number of times, find out why. */
 void Completer_widget::set_current_row(int new_current_row)
 {
+#if (OCELOT_EXPLORER == 1)
+  if (associated_widget_type == EXPLORER_WIDGET)
+  {
+    setToolTip("Context menu. Click to execute explorer action");
+    current_row= new_current_row;
+    return;
+  }
+#endif
   if ((new_current_row != current_row) || (string_list_tooltips.count() < 3))
   {
    if (string_list_tooltips.count() > new_current_row)
@@ -18767,7 +18834,7 @@ bool Completer_widget::key_up_or_down(int plus_or_minus_one)
   if ((plus_or_minus_one == +1) && (current_row >= count_wrapper() - 1)) return true;
   if ((plus_or_minus_one == -1) && (current_row <= 0)) return false;
   set_current_row(current_row + plus_or_minus_one);
-  line_colors();
+  line_colors(associated_widget_type);
 
   /* Todo: This works but is a ridiculous way to ensure cursor stays visible. */
   QTextCursor cursor= textCursor();
@@ -18790,22 +18857,73 @@ void Completer_widget::mousePressEvent(QMouseEvent *event)
   QTextCursor tc= cursorForPosition(event->pos());
   int tc_original_block_number= tc.blockNumber();
   set_current_row(tc_original_block_number);
-  line_colors();
+  line_colors(associated_widget_type);
   tc.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
   tc.movePosition(QTextCursor::NextBlock, QTextCursor::MoveAnchor, tc_original_block_number);
   setTextCursor(tc);
-  main_window->statement_edit_widget->setFocus();
+  if (associated_widget_type == STATEMENT_WIDGET)
+    main_window->statement_edit_widget->setFocus();
+  else /* EXPLORER_WIDGET */
+    call_for_action();
 }
 
 /*
   If user double-clicks an item, that's equivalent to single-click followed by autocomplete key.
   When you double click, you get mousePressEvent first, so current_row is known by this time.
+  Todo: It seems that, at least for explorer menu, mousePressEvent happens and we never reach here.
+        But that might be a problem, it would mean that the second click is going up the line to explorer widget?
 */
 void Completer_widget::mouseDoubleClickEvent(QMouseEvent *event)
 {
   (void) event;
   main_window->statement_edit_widget->setFocus();
   main_window->menu_edit_autocomplete();
+}
+
+/* Probably focusInEvent will happen only when Context_menu calls Completer_widget. Unnecessary override. */
+void Completer_widget::focusInEvent(QFocusEvent *event)
+{
+  QTextEdit::focusInEvent(event);
+  line_colors(EXPLORER_WIDGET); /* so that the first item in the list gets "emphasis" */
+}
+
+/* When Context_menu calls Completer_widget, hide it as soon as e.g. mouse click outside. */
+void Completer_widget::focusOutEvent(QFocusEvent *event)
+{
+  QTextEdit::focusOutEvent(event);
+#if (OCELOT_EXPLORER == 1)
+  if (associated_widget_type == EXPLORER_WIDGET)
+  {
+    hide();
+    initialize(STATEMENT_WIDGET);
+  }
+#endif
+}
+
+/*
+  Ordinarily I expect keyPressEvent will be caught in eventfilter_function, and that seems to be the case
+  when parent is statement_edit_widget, but not when parent is explorer_widget. So some duplication here.
+  What about shortcut?
+  Re Key_Escape: I think it's normal for QDialog and QMenu that Esc causes focus loss, so hide().
+  Re Key_Tab: Todo: we should treat this like we treat Key_Enter but we never see it.
+              I think if it wasn't disabled on menu|edit we would at least get to Context_menu::shortcutter().
+*/
+void Completer_widget::keyPressEvent(QKeyEvent *event)
+{
+  QKeyEvent *key= event;
+  if (main_window->keypress_shortcut_handler(key, false) == true) {;} /* todo: this isn't seen */
+  if (key->key() == Qt::Key_Down) key_up_or_down(+1);
+  if (key->key() == Qt::Key_Up) key_up_or_down(-1);
+  if ((key->key() == Qt::Key_Enter) || (key->key() == Qt::Key_Return)) call_for_action();
+  if (key->key() == Qt::Key_Escape) hide();
+  event->ignore(); /* ? unless there's some reason we should let the key percolate upwards to an ultimate owner? */
+}
+
+/* called from mousePressEvent, keyPressEvent if Key_Enter */
+void Completer_widget::call_for_action()
+{
+  main_window->explorer_widget->html_text_edit->explorer_context_menu->action(current_row, -1);
+  hide();
 }
 
 void Completer_widget::timer_reset()
@@ -19097,6 +19215,8 @@ void Find_widget::keyPressEvent(QKeyEvent *event)
 */
 void Result_qtextedit::construct()
 {
+  qtextedit_result_changes= NULL; /* to avoid bad "delete" in ~Result_qtextedit */
+  explorer_context_menu= NULL;
   setMouseTracking(true);
   document()->setDocumentMargin(0);
   /* test!! Hey it works. But should be an option. */
@@ -19828,6 +19948,7 @@ void Result_qtextedit::focusOutEvent(QFocusEvent *event)
 void Result_qtextedit::keyPressEvent(QKeyEvent *event)
 {
   if (result_grid->is_fancy() == false) { QTextEdit::keyPressEvent(event); return; }
+  if (result_grid->result_grid_type == EXPLORER_WIDGET) { QTextEdit::keyPressEvent(event); return; }
   MainWindow *m= result_grid->copy_of_parent;
 
   /* TEXT!!!! TODO: I DO NOT KNOW WHAT THIS WAS FOR. MAYBE IT SHOULD BE RESTORED. */
@@ -19844,7 +19965,6 @@ void Result_qtextedit::keyPressEvent(QKeyEvent *event)
     return;
   }
   QString content_in_cell_before_keypress= qtextedit_cell_content;
-
   bool is_printable= true;
   if (qtextedit_at_end == true) {is_printable= false; }
   if (qtextedit_is_before_column == true) {is_printable= false; }
@@ -20540,67 +20660,61 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
 /* Comments about Context_menu should be in ocelotgui.h before the words "class Context_menu: public QWidget" */
 void Context_menu::construct()
 {
-  menu= new QMenu();
-  add_qaction("CLIPBOARD=$object_name", "*", "S,T,P,F,E,R", "", "", "Copy to clipboard");
-  add_qaction("CLIPBOARD=$part_name", "*", "C,I", "", "", "Copy to clipboard");
-  add_qaction("ACTION=$object_name", "*", "S,T,P,F,E,R", "", "", "Send to SQL editor");
-  add_qaction("ACTION=$part_name", "*", "C,I", "", "", "Send to SQL editor");
-  add_qaction("USE $schema_name;", "M", "S", "", "", "Set as default schema");
-  add_qaction("FILTER=$schema_name", "M", "S", "", "", "Filter to this schema");
-  add_qaction("select schema_name,"
+  add_action("CLIPBOARD=$object_name", "*", "S,T,P,F,E,R", "", "", "Copy to clipboard");
+  add_action("CLIPBOARD=$part_name", "*", "C,I", "", "", "Copy to clipboard");
+  add_action("ACTION=$object_name", "*", "S,T,P,F,E,R", "", "", "Send to SQL editor");
+  add_action("ACTION=$part_name", "*", "C,I", "", "", "Send to SQL editor");
+  add_action("USE $schema_name;", "M", "S", "", "", "Set as default schema");
+  add_action("FILTER=$schema_name", "M", "S", "", "", "Filter to this schema");
+  add_action("select schema_name,"
            " (select count(*) from information_schema.tables where table_schema='$schema_name') as table_count,"
            " (select count(*) from information_schema.routines where routine_schema='$schema_name') as routine_count,"
            " (select count(*) from information_schema.triggers where trigger_schema='$schema_name') as trigger_count,"
            " schema_comment"
            " from information_schema.schemata"
            " where schema_name='$schema_name';", "*", "S", "", "", "Schema inspector");
-  add_qaction("Show create schema $schema_name;", "M", "S", "", "", "Create schema");
-  add_qaction("Alter schema $schema_name"
+  add_action("Show create schema $schema_name;", "M", "S", "", "", "Create schema");
+  add_action("Alter schema $schema_name"
            " character set=$part_name"
            " collate=$part_type;", "M", "S", "", "", "Alter schema");
-  add_qaction("Drop schema $schema;", "M", "S", "", "", "Drop schema");
-  add_qaction("Select * from $object_name limit 100;", "*", "T,V", "", "", "Select rows");
+  add_action("Drop schema $schema;", "M", "S", "", "", "Drop schema");
+  add_action("Select * from $object_name limit 100;", "*", "T,V", "", "", "Select rows");
 #ifdef OCELOT_IMPORT_EXPORT
-  add_qaction("EXPORT_TEXT;", "*", "T,V", "", "", "Export dialog - Text");
-  add_qaction("EXPORT_TABLE;", "*", "T,V", "", "", "Export dialog - Table");
-  add_qaction("EXPORT_HTML;", "*", "T,V", "", "", "Export dialog - Html");
+  add_action("EXPORT_TEXT;", "*", "T,V", "", "", "Export dialog - Text");
+  add_action("EXPORT_TABLE;", "*", "T,V", "", "", "Export dialog - Table");
+  add_action("EXPORT_HTML;", "*", "T,V", "", "", "Export dialog - Html");
 #endif
-  add_qaction("Show create table $object_name;", "*", "T", "", "", "Create table");
-  add_qaction("Create table $dialog like $object_name;", "M", "T", "", "", "Create table like");
-  add_qaction("Drop table $object_name;", "*", "T", "", "", "Drop table");
-  add_qaction("Truncate table $object_name;", "*", "T", "", "", "Truncate table");
-  add_qaction("show create view $object_name;", "M", "V", "", "", "Show create view");
-  add_qaction("$part_name;", "T", "V", "", "", "Show create view");
-  add_qaction("Drop view $objecct_name;",  "*", "V", "", "", "Drop view");
-  add_qaction("select '$part_name' as column_name,"
+  add_action("Show create table $object_name;", "*", "T", "", "", "Create table");
+  add_action("Create table $dialog like $object_name;", "M", "T", "", "", "Create table like");
+  add_action("Drop table $object_name;", "*", "T", "", "", "Drop table");
+  add_action("Truncate table $object_name;", "*", "T", "", "", "Truncate table");
+  add_action("show create view $object_name;", "M", "V", "", "", "Show create view");
+  add_action("$part_name;", "T", "V", "", "", "Show create view");
+  add_action("Drop view $objecct_name;",  "*", "V", "", "", "Drop view");
+  add_action("select '$part_name' as column_name,"
           "'$part_type' as column_type,"
           "'$occurs_text' as occurs_in_indexes;", "*", "C", "", "", "Show column");
-  add_qaction("Alter table $object_name drop column $part_name;", "*", "C", "", "", "Drop column");
-  add_qaction("Show index from $object_name;", "M", "I", "", "", "Show index");
-  add_qaction("Select * from \"_vindex\" where \"name\" = '$part_name';", "T", "I", "", "", "Show index");
-  add_qaction("Select * from information_schema.statistics where index_name = '$part_name';", "M", "I", "", "", "Select index");
-  add_qaction("select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '$object_name');", "T", "I", "", "", "Select index");
-  add_qaction("Drop index $part_name on $object_name;", "*", "I", "", "", "Drop index");
-  add_qaction("Show create procedure $objecct_name;", "*", "P", "", "", "Create procedure");
-  add_qaction("Drop procedure $objecct_name;", "*", "P", "", "", "Drop procedure");
-  add_qaction("Drop function $objecct_name;", "*", "F", "", "", "Drop function");
-  add_qaction("Select * from information_schema.triggers where trigger_name = $object_name", "M", "R", "", "", "Show trigger");
-  add_qaction("Select * from \"_trigger\" where \"name\" = '$object_name';", "T", "R", "", "", "Show trigger");
-  add_qaction("Drop trigger $object_name;", "*", "R", "", "", "Drop trigger");
-  add_qaction("RESET;", "*", "*", "", "", "Reset");
-  add_qaction("Refresh;", "*", "*", "", "", "Refresh");
-  return;
+  add_action("Alter table $object_name drop column $part_name;", "*", "C", "", "", "Drop column");
+  add_action("Show index from $object_name;", "M", "I", "", "", "Show index");
+  add_action("Select * from \"_vindex\" where \"name\" = '$part_name';", "T", "I", "", "", "Show index");
+  add_action("Select * from information_schema.statistics where index_name = '$part_name';", "M", "I", "", "", "Select index");
+  add_action("select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '$object_name');", "T", "I", "", "", "Select index");
+  add_action("Drop index $part_name on $object_name;", "*", "I", "", "", "Drop index");
+  add_action("Show create procedure $objecct_name;", "*", "P", "", "", "Create procedure");
+  add_action("Drop procedure $objecct_name;", "*", "P", "", "", "Drop procedure");
+  add_action("Drop function $objecct_name;", "*", "F", "", "", "Drop function");
+  add_action("Select * from information_schema.triggers where trigger_name = $object_name", "M", "R", "", "", "Show trigger");
+  add_action("Select * from \"_trigger\" where \"name\" = '$object_name';", "T", "R", "", "", "Show trigger");
+  add_action("Drop trigger $object_name;", "*", "R", "", "", "Drop trigger");
+  add_action("RESET;", "*", "*", "", "", "Reset");
+  add_action("Refresh;", "*", "*", "", "", "Refresh");
 }
 
-int Context_menu::add_qaction(QString action, QString applicable_dbmss, QString applicable_types,
+int Context_menu::add_action(QString action, QString applicable_dbmss, QString applicable_types,
                               QString enabled, QString shortcut, QString text)
 {
   if (cmi_count >= MAX_CMI_COUNT) return -1; /* Fail. Increase MAX_CMI_COUNT if this happens. */
-
-  //QAction *action_pointer= new QAction();
-  /* Todo: if new failed, return -2 */
-  cmi[cmi_count]= {&list_of_actions[cmi_count], action, applicable_dbmss, applicable_types, enabled, shortcut, text};
-  menu->addAction(cmi[cmi_count].action_pointer);
+  cmi[cmi_count]= {action, applicable_dbmss, applicable_types, enabled, shortcut, text, false};
   ++cmi_count;
   return 0;
 }
@@ -20670,13 +20784,17 @@ void Context_menu::menu_context_t_2_explorer(const QPoint & pos)
 {
   (void)pos;
   if (q->qtextedit_at_end == true) return;
+  result_grid->copy_of_parent->log("menu_context_t_2_explorer start", 90);
   assert(q->qtextedit_is_before_column != true);
   assert(q->qtextedit_is_before_row != true);
 
-  result_grid->copy_of_parent->log("menu_context_t_2_explorer start", 90);
+  q->result_grid->copy_of_parent->completer_widget->initialize(EXPLORER_WIDGET);
+  q->result_grid->copy_of_parent->completer_widget->clear_wrapper();
+
   QString dbms= "M"; /* MariaDB/MySQL assumed */
   if (connections_dbms[0] == DBMS_TARANTOOL) dbms= "T";
   int cmi_count_visible= 0;
+  int max_visible_text_length= 0;
   for (int i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
   {
     replacer(""); /* so we get cm_object_type and cm_delimited_object_name */
@@ -20690,76 +20808,109 @@ void Context_menu::menu_context_t_2_explorer(const QPoint & pos)
       is_dbms_match= true;
     if ((is_object_type_match == true) && (is_dbms_match == true))
     {
-      cmi[i_of_cmi].action_pointer->setVisible(true);
-      cmi[i_of_cmi].action_pointer->setText(replacer(cmi[i_of_cmi].text));
-      //cmi[i_of_cmi].action_pointer->setEnabled(true);
+      cmi[i_of_cmi].is_visible= true;
+      /* Todo: shortcut should be right-aligned */
+      QString visible_text= replacer(cmi[i_of_cmi].text);
+      if (visible_text.length() > max_visible_text_length) max_visible_text_length= visible_text.length();
       /* Todo: some things should be disabled for privilege reasons e.g. drop information_schema */
+      /*       (mark disabled by setting to gray, or reducing brightness in line_color() function) */
       ++cmi_count_visible;
     }
-    else cmi[i_of_cmi].action_pointer->setVisible(false);
+    else cmi[i_of_cmi].is_visible= false;
   }
-  QAction *exec_result= menu->exec(QCursor::pos());
-  int i_of_cmi;
-  for (i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
+
+  /* Loop again so we can right-align shortcut, assuming fixed font */
+  for (int i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
   {
-    if (exec_result == cmi[i_of_cmi].action_pointer)
+    QString spacer= " ";
+    if (cmi[i_of_cmi].is_visible == true)
     {
-      QString s= cmi[i_of_cmi].action.trimmed();
-      if (s.startsWith("CLIPBOARD=", Qt::CaseInsensitive) == true) /* probably "CLIPBOARD=$cell" */
-      {
-        s= replacer(s);
-        s= s.right(s.size()-10);
-        QApplication::clipboard()->setText(s);
-      }
-      else if (s.startsWith("ACTION=", Qt::CaseInsensitive) == true) /* probably "ACTION=$cell" */
-      {
-        s= replacer(s);
-        s= s.right(s.size()-10);
-        result_grid->copy_of_parent->statement_edit_widget->setPlainText(s);
-      }
-#ifdef OCELOT_IMPORT_EXPORT
-      else if ((s == "EXPORT_TEXT;")
-       || (s == "EXPORT_TABLE;")
-       || (s == "EXPORT_HTML;"))
-      {
-        int keyword;
-        if (s == "EXPORT_TEXT;") keyword= TOKEN_KEYWORD_TEXT;
-        if (s == "EXPORT_TABLE;") keyword= TOKEN_KEYWORD_TABLE;
-        if (s == "EXPORT_HTML;") keyword= TOKEN_KEYWORD_HTML;
-        struct export_settings copy_of_main_exports;
-        copy_of_main_exports= main_exports;
-        int function_result= result_grid->copy_of_parent->action_export_function(keyword);
-        if (function_result == 1) /* Todo: check that function_result != 1 if dialog-cancel or SET failure */
-        {
-          QString file_name= main_exports.file_name;
-          QString text= "SELECT /* FOR EXPORT TO " + file_name + "*/ * FROM " + cm_delimited_object_name + ";";
-          result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
-          result_grid->copy_of_parent->action_execute(1);
-          main_exports= copy_of_main_exports;
-        }
-      }
-#endif
-      else if (s == "RESET;")
-        result_grid->explorer_reset();
-      else if (s.startsWith("FILTER=", Qt::CaseInsensitive) == true) /* probably "FILTER=$schema_name" */
-        result_grid->explorer_filter(q->qtextedit_result_row_number);
-      else
-      {
-        result_grid->copy_of_parent->statement_edit_widget->setPlainText(replacer(s));
-        assert(result_grid->copy_of_parent->main_token_max_count >= (unsigned int) s.size());
-        result_grid->copy_of_parent->action_execute(1);
-      }
-      break;
+      QString visible_text= replacer(cmi[i_of_cmi].text);
+      visible_text= visible_text + spacer.repeated(max_visible_text_length - visible_text.length());
+      visible_text= visible_text + " " + cmi[i_of_cmi].shortcut;
+      q->result_grid->copy_of_parent->completer_widget->append_wrapper(visible_text, "", TOKEN_TYPE_IDENTIFIER, TOKEN_FLAG_IS_NEW, "K");
     }
   }
-  if (i_of_cmi == cmi_count)
-  {
-    assert(exec_result == NULL);  /* unknown action, probably exec() returned NULL */
-  }
+
+  q->result_grid->copy_of_parent->completer_widget->size_and_position_change();
+  q->result_grid->copy_of_parent->completer_widget->show();
+  q->result_grid->copy_of_parent->completer_widget->setFocus();
   result_grid->copy_of_parent->log("menu_context_t_2_explorer end", 90);
-  return;
 }
 
+/* if due to mousepressevent: current_row >= 0, i_of_cmi == -1 */
+/* if due to shortcutter: current_row == -1, i_of_cmi >= 0 */
+void Context_menu::action(int current_row, int i_of_cmi)
+{
+  int i_of_cmi_visible= 0;
+  bool is_match= false;
+  if (current_row >= 0)
+  {
+    for (i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
+    {
+      if (cmi[i_of_cmi].is_visible == false) continue;
+      if (i_of_cmi_visible == current_row)
+      {
+        is_match= true;
+        break;
+      }
+      if (i_of_cmi_visible != current_row)
+      ++i_of_cmi_visible;
+    }
+  }
+  if (is_match == false)
+  {
+    /* ?? Unknown action. This must be an error, eh? */
+    return;
+  }
+  {
+    QString s= cmi[i_of_cmi].action.trimmed();
+    if (s.startsWith("CLIPBOARD=", Qt::CaseInsensitive) == true) /* probably "CLIPBOARD=$cell" */
+    {
+      s= replacer(s);
+      s= s.right(s.size()-10);
+      QApplication::clipboard()->setText(s);
+    }
+    else if (s.startsWith("ACTION=", Qt::CaseInsensitive) == true) /* probably "ACTION=$cell" */
+    {
+      s= replacer(s);
+      s= s.right(s.size()-10);
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(s);
+    }
+#ifdef OCELOT_IMPORT_EXPORT
+    else if ((s == "EXPORT_TEXT;")
+     || (s == "EXPORT_TABLE;")
+     || (s == "EXPORT_HTML;"))
+    {
+      int keyword;
+      if (s == "EXPORT_TEXT;") keyword= TOKEN_KEYWORD_TEXT;
+      if (s == "EXPORT_TABLE;") keyword= TOKEN_KEYWORD_TABLE;
+      if (s == "EXPORT_HTML;") keyword= TOKEN_KEYWORD_HTML;
+      struct export_settings copy_of_main_exports;
+      copy_of_main_exports= main_exports;
+      int function_result= result_grid->copy_of_parent->action_export_function(keyword);
+      if (function_result == 1) /* Todo: check that function_result != 1 if dialog-cancel or SET failure */
+      {
+        QString file_name= main_exports.file_name;
+        QString text= "SELECT /* FOR EXPORT TO " + file_name + "*/ * FROM " + cm_delimited_object_name + ";";
+        result_grid->copy_of_parent->statement_edit_widget->setPlainText(text);
+        result_grid->copy_of_parent->action_execute(1);
+        main_exports= copy_of_main_exports;
+      }
+    }
+#endif
+    else if (s == "RESET;")
+      result_grid->explorer_reset();
+    else if (s.startsWith("FILTER=", Qt::CaseInsensitive) == true) /* probably "FILTER=$schema_name" */
+      result_grid->explorer_filter(q->qtextedit_result_row_number);
+    else
+    {
+      result_grid->copy_of_parent->statement_edit_widget->setPlainText(replacer(s));
+      assert(result_grid->copy_of_parent->main_token_max_count >= (unsigned int) s.size());
+      result_grid->copy_of_parent->action_execute(1);
+    }
+  }
+}
 
 int Context_menu::edit(int i_of_cmi, int target_type, QString target_value)
 {
@@ -20770,7 +20921,7 @@ int Context_menu::edit(int i_of_cmi, int target_type, QString target_value)
   return 1;
 }
 
-/* I'm able to handle the switching with connect() and lambdas, thus:
+/* With menus I'd be able to handle the switching with connect() and lambdas, thus:
    (in class Context_Menu private slots) void cmi_switcher(int cmi_index);
    (in Context_menu::add_qaction) int i= cmi_count; connect(cmi[cmi_count].action_pointer, &QAction::triggered,[this, i] { cmi_switcher(i); });
    (here) uncomment
@@ -20780,6 +20931,29 @@ int Context_menu::edit(int i_of_cmi, int target_type, QString target_value)
 //{
 //  printf("**** cmi_switcher %d\n", cmi_index);
 //}
+
+void Context_menu::keyPressEvent(QKeyEvent *event)
+{
+  (void)event;
+}
+
+bool Context_menu::shortcutter(QKeySequence qk)
+{
+  for (int i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
+  {
+    QString i_of_cmi_shortcut= cmi[i_of_cmi].shortcut;
+    if (i_of_cmi_shortcut != "")
+    {
+      QKeySequence qk_of_shortcut= QKeySequence(i_of_cmi_shortcut);
+      if (qk_of_shortcut == qk)
+      {
+        action(-1, i_of_cmi);
+        return true;
+      }
+    }
+  }
+  return false;
+}
 
 /******************** Context_menu end   ************************************/
 
@@ -27075,7 +27249,7 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
     main_window->ui->menuBar->setStyleSheet(main_window->ocelot_menu_style_string);
 #if (OCELOT_EXPLORER == 1)
     if (main_window->explorer_widget != NULL)
-      main_window->explorer_widget->html_text_edit->explorer_context_menu->menu->setStyleSheet(main_window->ocelot_menu_style_string);
+      main_window->explorer_widget->html_text_edit->explorer_context_menu->setStyleSheet(main_window->ocelot_menu_style_string);
 #endif
   }
   if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1)
