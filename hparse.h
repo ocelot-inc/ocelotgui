@@ -13358,14 +13358,14 @@ int MainWindow::hparse_f_client_set_rule()
   Todo: it's really TOKEN_TYPE_IDENTIFIER so see what hovering does
   Todo: we have autocomplete for color and font_style|weight|family but we culd have more
   Todo: why is it an error if starts with ocelot_ but isn't specifically one of the reserved ocelot_ items?
-  Todo: Replace flag-test duplicate-check technique with QStringList technique used for ocelot_menuitem_*.
+  Todo: Replace flag-test duplicate-check technique with QStringList technique used for ocelot_explorer_*.
 */
 int MainWindow::hparse_f_client_set()
 {
   bool is_conditional_settings_possible= false;
 
   #if (OCELOT_EXPLORER == 1)
-    QStringList qp= (QStringList() << "OCELOT_MENUITEM_ACTION" << "OCELOT_MENUITEM_SHORTCUT" << "OCELOT_MENUITEM_TEXT");
+    QStringList qp= (QStringList() << "OCELOT_EXPLORER_ACTION" << "OCELOT_EXPLORER_SHORTCUT" << "OCELOT_EXPLORER_TEXT");
     int i_of_match;
     if (hparse_f_accept_in_set(FLAG_VERSION_ALL, qp, &i_of_match) == 1)
     {
@@ -13384,7 +13384,7 @@ int MainWindow::hparse_f_client_set()
       }
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHERE, "WHERE");
       if (hparse_errno > 0) return 0;
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT, "OCELOT_MENUITEM_TEXT");
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT, "OCELOT_EXPLORER_TEXT");
       if (hparse_errno > 0) return 0;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
       if (hparse_errno > 0) return 0;

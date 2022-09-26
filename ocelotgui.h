@@ -776,13 +776,26 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_DEBUG_LEFT,
     TOKEN_KEYWORD_OCELOT_DEBUG_TOP,
     TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH,
-    TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED, /* if OCELOT_EXPLORER == 1 */
-    TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT, /* if OCELOT_EXPLORER == 1 */
-    TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT, /* if OCELOT_EXPLORER == 1 */
-    TOKEN_KEYWORD_OCELOT_EXPLORER_TOP, /* if OCELOT_EXPLORER == 1 */
-    TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE, /* if OCELOT_EXPLORER == 1 */
-    TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH, /* if OCELOT_EXPLORER == 1 */
-    TOKEN_KEYWORD_OCELOT_EXPORT, /* if OCELOT_IMPORT_EXPORT == 1 */
+
+    TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_APPLICABLE_DBMSS,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_APPLICABLE_TYPES,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_BACKGROUND_COLOR,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_FAMILY,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_SIZE,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_STYLE,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_WEIGHT,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT_COLOR,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_TOP,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE,
+    TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH,
+    TOKEN_KEYWORD_OCELOT_EXPORT,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS,
@@ -831,12 +844,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_IMPORT, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     TOKEN_KEYWORD_OCELOT_LANGUAGE,
     TOKEN_KEYWORD_OCELOT_LOG_LEVEL,
-    TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION,
-    TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_DBMSS,
-    TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_TYPES,
-    TOKEN_KEYWORD_OCELOT_MENUITEM_ENABLED,
-    TOKEN_KEYWORD_OCELOT_MENUITEM_SHORTCUT,
-    TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT,
     TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR,
     TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY,
@@ -1436,7 +1443,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1197
+#define KEYWORD_LIST_SIZE 1203
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2040,12 +2047,25 @@ static const keywords strvalues[]=
     {"OCELOT_DEBUG_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT},
     {"OCELOT_DEBUG_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP},
     {"OCELOT_DEBUG_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH},
-    {"OCELOT_EXPLORER_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED}, /* if OCELOT_EXPLORER == 1 */
-    {"OCELOT_EXPLORER_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT}, /* if OCELOT_EXPLORER == 1 */
-    {"OCELOT_EXPLORER_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT}, /* if OCELOT_EXPLORER == 1 */
-    {"OCELOT_EXPLORER_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP}, /* if OCELOT_EXPLORER == 1 */
-    {"OCELOT_EXPLORER_VISIBLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE}, /* if OCELOT_EXPLORER == 1 */
-    {"OCELOT_EXPLORER_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH}, /* if OCELOT_EXPLORER == 1 */
+
+    {"OCELOT_EXPLORER_ACTION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION},
+    {"OCELOT_EXPLORER_APPLICABLE_DBMSS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_APPLICABLE_DBMSS},
+    {"OCELOT_EXPLORER_APPLICABLE_TYPES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_APPLICABLE_TYPES},
+    {"OCELOT_EXPLORER_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_BACKGROUND_COLOR},
+    {"OCELOT_EXPLORER_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED},
+    {"OCELOT_EXPLORER_ENABLED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED},
+    {"OCELOT_EXPLORER_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_FAMILY},
+    {"OCELOT_EXPLORER_FONT_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_SIZE},
+    {"OCELOT_EXPLORER_FONT_STYLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_STYLE},
+    {"OCELOT_EXPLORER_FONT_WEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_WEIGHT},
+    {"OCELOT_EXPLORER_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT},
+    {"OCELOT_EXPLORER_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT},
+    {"OCELOT_EXPLORER_SHORTCUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT},
+    {"OCELOT_EXPLORER_TEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT},
+    {"OCELOT_EXPLORER_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT_COLOR},
+    {"OCELOT_EXPLORER_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP},
+    {"OCELOT_EXPLORER_VISIBLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE},
+    {"OCELOT_EXPLORER_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH},
     {"OCELOT_EXPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */
     {"OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_BACKGROUND_COLOR},
     {"OCELOT_EXTRA_RULE_1_CONDITION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION},
@@ -2095,12 +2115,6 @@ static const keywords strvalues[]=
     {"OCELOT_IMPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_IMPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     {"OCELOT_LANGUAGE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {"OCELOT_LOG_LEVEL", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
-    {"OCELOT_MENUITEM_ACTION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_ACTION},
-    {"OCELOT_MENUITEM_APPLICABLE_DBMSS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_DBMSS},
-    {"OCELOT_MENUITEM_APPLICABLE_TYPES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_APPLICABLE_TYPES},
-    {"OCELOT_MENUITEM_ENABLED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_ENABLED},
-    {"OCELOT_MENUITEM_SHORTCUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_SHORTCUT},
-    {"OCELOT_MENUITEM_TEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENUITEM_TEXT},
     {"OCELOT_MENU_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
     {"OCELOT_MENU_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR},
     {"OCELOT_MENU_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY},
@@ -3061,6 +3075,7 @@ class TextEditHistory;
 class TextEditWidget2;
 class XSettings;
 class Completer_widget;
+class C_widget;
 class Messagebox_flash;
 #if (OCELOT_FIND_WIDGET == 1)
 class Find_widget;
@@ -3153,6 +3168,7 @@ public:
   QString ocelot_debug_width, new_ocelot_debug_width;
   QString ocelot_debug_detached, new_ocelot_debug_detached;
 /* if (OCELOT_EXPLORER == 1) */
+  QString ocelot_explorer_style_string;
   QString ocelot_explorer_height, new_ocelot_explorer_height;
   QString ocelot_explorer_left, new_ocelot_explorer_left;
   QString ocelot_explorer_top, new_ocelot_explorer_top;
@@ -3161,6 +3177,12 @@ public:
   QString ocelot_explorer_visible, new_ocelot_explorer_visible;
   QString ocelot_explorer_sort, new_ocelot_explorer_sort; /* todo: make changeable on command line like others */
   QString ocelot_explorer_query, new_ocelot_explorer_query;
+  QString ocelot_explorer_text_color, new_ocelot_explorer_text_color;
+  QString ocelot_explorer_background_color, new_ocelot_explorer_background_color;
+  QString ocelot_explorer_font_family, new_ocelot_explorer_font_family;
+  QString ocelot_explorer_font_size, new_ocelot_explorer_font_size;
+  QString ocelot_explorer_font_style, new_ocelot_explorer_font_style;
+  QString ocelot_explorer_font_weight, new_ocelot_explorer_font_weight;
 /* endif */
   QString ocelot_grid_text_color, new_ocelot_grid_text_color;
   QString ocelot_grid_background_color, new_ocelot_grid_background_color;
@@ -3215,8 +3237,8 @@ public:
   QString ocelot_menu_font_style, new_ocelot_menu_font_style;
   QString ocelot_menu_font_weight, new_ocelot_menu_font_weight;
   QString ocelot_menu_style_string;
-  QString ocelot_menuitem_action; /* if ocelot_explorer == 1 */
-  QString ocelot_menuitem_text; /* if ocelot_explorer==1 */
+  QString ocelot_explorer_action;
+  QString ocelot_explorer_text;
 
   QStringList conditional_settings;
 
@@ -3576,6 +3598,8 @@ public:
   QString get_font_style_as_string(QFont);
 
   Completer_widget *completer_widget= NULL;
+  C_widget *c_widget= NULL;
+
 
 #if (OCELOT_IMPORT_EXPORT == 1)
   QByteArray to_byte_array(QString);
@@ -3583,6 +3607,7 @@ public:
   QString import_export_rule_set(QString text);
   void export_set_checked();
 #endif
+  int read_file(int keyword, QString file_name, QString table_name);
 
 #if (OCELOT_EXPLORER == 1)
   int explorer_refresh_caller(char *);
@@ -3600,7 +3625,7 @@ public slots:
   void action_exit();
 #if (OCELOT_IMPORT_EXPORT == 1)
   QStringList fake_statement(QString fake_statement_text);
-  int action_export_function(int);
+  int action_export_function(int import_or_export, int);
   const char *bool_to_string(bool input);
   bool string_to_bool(QString input);
   QString action_export_function_value(QString input);
@@ -3765,6 +3790,7 @@ private:
   QString rect_value(QString);
   int execute_client_statement(QString text, int *additional_result);
   QString dbms_name();
+  bool is_context_menu_name(int token_type);
   void prompt_default();
   int conditional_settings_insert(QString text);
   void put_diagnostics_in_result(unsigned int);
@@ -4985,19 +5011,14 @@ class Completer_widget: public QTextEdit
   Q_OBJECT
 
 private:
-  MainWindow *main_window;
   QTimer *timer;
   QStringList string_list;
   QStringList string_list_tooltips;
   int current_row;
   QList<int> token_type_list;
-  int associated_widget_type;
 void copy_string_list();
-void construct();
 void show_wrapper();
-void line_colors(int associated_widget_type);
 void set_current_row(int);
-void call_for_action();
 
 private slots:
 void timer_expired();
@@ -5005,11 +5026,14 @@ void timer_expired();
 protected:
 void mousePressEvent(QMouseEvent *event);
 void mouseDoubleClickEvent(QMouseEvent *event);
-void focusInEvent(QFocusEvent *event);
-void focusOutEvent(QFocusEvent *event);
 void keyPressEvent(QKeyEvent *event);
 
+
 public:
+MainWindow *main_window;
+int associated_widget_type;
+void construct(MainWindow *m);
+void call_for_action();
 void set_timer_interval();
 void initialize(int w);
 void hide_wrapper();
@@ -5021,11 +5045,12 @@ void append_wrapper(QString token, QString hparse_token, int token_type, int fla
 bool key_up_or_down(int);
 void updater();
 void timer_reset();
+bool shortcut_override(QKeySequence shortcut);
+void line_colors(int associated_widget_type);
 
-Completer_widget(MainWindow *m)
+Completer_widget()
 {
-  main_window= m;
-  construct();
+  ;
 }
 
 ~Completer_widget()
@@ -5034,8 +5059,40 @@ Completer_widget(MainWindow *m)
 }
 
 };
-
 #endif // COMPLETER_WIDGET_H
+
+#ifndef C_WIDGET_H
+#define C_WIDGET_H
+
+/* This will be for explorer only. Inherit Completer_widget but parent will be (?) main window. */
+
+class C_widget: public Completer_widget
+{
+  Q_OBJECT
+
+private:
+
+private slots:
+
+protected:
+void focusInEvent(QFocusEvent *event);
+void focusOutEvent(QFocusEvent *event);
+
+public:
+
+/* First this should do an implicit call of Completer_widget::Completer_widget() but don't assume it. */
+C_widget()
+{
+  ;
+}
+
+~C_widget()
+{
+  ;
+}
+
+};
+#endif // C_WIDGET_H
 
 #ifndef MESSAGEBOX_FLASH_H
 #define MESSAGEBOX_FLASH_H
@@ -6619,9 +6676,9 @@ class ResultGrid: public QWidget
   Q_OBJECT
 private:
   QWidget *client;
-  QScrollArea *grid_scroll_area;
   int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
 public:
+  QScrollArea *grid_scroll_area;
   int result_grid_type; /* 0 or EXPLORER_WIDGET */
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   unsigned int result_column_count;
@@ -6908,7 +6965,12 @@ ResultGrid(
 
   /* 2018-10-08 Maybe this will finally fix the bug where initial cell height was too small? */
   // result_grid_font= this->font();
-  result_grid_font= parent->get_font_from_style_sheet(parent->ocelot_grid_style_string);
+#if (OCELOT_EXPLORER == 1)
+  if (result_grid_type == EXPLORER_WIDGET)
+    result_grid_font= parent->get_font_from_style_sheet(parent->ocelot_explorer_style_string);
+  else
+#endif
+    result_grid_font= parent->get_font_from_style_sheet(parent->ocelot_grid_style_string);
 
   settings_change_calc();
 
@@ -8196,7 +8258,7 @@ void prepare_for_display_html()
     /* Todo: We're not ready yet for ocelot_vertical != 0 */
     //if (copy_of_ocelot_html != 0)
 #if (OCELOT_EXPLORER == 1)
-    if ((result_row_count != 0) && (result_column_count != 0) && (this != parent->explorer_widget))
+    if ((result_row_count != 0) && (result_column_count != 0) && (result_grid_type != EXPLORER_WIDGET))
 #else
     if ((result_row_count != 0) && (result_column_count != 0))
 #endif
@@ -8222,24 +8284,40 @@ void prepare_for_display_html()
       int html_border_size;
 
       QString tmp_border_color= get_border_color();
-
       strcpy(html_border_color, tmp_border_color.toUtf8());
-      strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
-      strcpy(html_background_color, copy_of_parent->ocelot_grid_background_color.toUtf8());
       strcpy(html_header_background_color, copy_of_parent->ocelot_grid_header_background_color.toUtf8());
-      strcpy(html_font_family, copy_of_parent->ocelot_grid_font_family.toUtf8());
-      strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
-      strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
-      strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
       strcpy(html_outer_color, copy_of_parent->ocelot_grid_outer_color.toUtf8());
-
       html_border_size= copy_of_parent->ocelot_grid_cell_border_size.toInt();
-
+      if (result_grid_type == EXPLORER_WIDGET)
+      {
+        strcpy(html_color, copy_of_parent->ocelot_explorer_text_color.toUtf8());
+        strcpy(html_background_color, copy_of_parent->ocelot_explorer_background_color.toUtf8());
+        strcpy(html_font_family, copy_of_parent->ocelot_explorer_font_family.toUtf8());
+        strcpy(html_font_size, copy_of_parent->ocelot_explorer_font_size.toUtf8());
+        strcpy(html_font_style, copy_of_parent->ocelot_explorer_font_style.toUtf8());
+        strcpy(html_font_weight, copy_of_parent->ocelot_explorer_font_weight.toUtf8());
+      }
+      else
+      {
+        strcpy(html_color, copy_of_parent->ocelot_grid_text_color.toUtf8());
+        strcpy(html_background_color, copy_of_parent->ocelot_grid_background_color.toUtf8());
+        strcpy(html_font_family, copy_of_parent->ocelot_grid_font_family.toUtf8());
+        strcpy(html_font_size, copy_of_parent->ocelot_grid_font_size.toUtf8());
+        strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
+        strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
+      }
       char tmp_div[512];
       {
         /* TEST!!! start: See whether we can change color, at least. HTML only! SHOULD BE IN A LOOP! */
         QString new_tooltip= "";
-        QString new_style_sheet= copy_of_parent->ocelot_grid_style_string;
+
+        QString new_style_sheet, old_style_sheet;
+#if (OCELOT_EXPLORER == 1)
+        if (result_grid_type == EXPLORER_WIDGET)
+          new_style_sheet= old_style_sheet= copy_of_parent->ocelot_explorer_style_string;
+        else
+#endif
+          new_style_sheet= old_style_sheet= copy_of_parent->ocelot_grid_style_string;
         QString new_cell_height= "";
         QString new_cell_width= "";
         bool result= conditional_setting_evaluate(
@@ -8250,7 +8328,7 @@ void prepare_for_display_html()
              0, /* doesn't matter */
              0, /* doesn't matter */
              TEXTEDITFRAME_CELL_TYPE_DETAIL, /* text_edit_frames[text_edit_frames_index]->cell_type, */
-             copy_of_parent->ocelot_grid_style_string,          /* old_style_sheet */
+             old_style_sheet,          /* old_style_sheet */
              true,        /* is_always_true */
              &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width);
         if (result == true)
@@ -9098,7 +9176,7 @@ void explorer_display_part()
     char tmp_string_1[EXPLORER_FIXED_NAME_WIDTH * 4];
     /* Todo: Following lines should restrict column#1/#2 widths to one char width but I get two char widths. */
     QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
-    grid_column_widths[0]= grid_column_widths[1]= result_grid_font_metrics.maxWidth();
+    grid_column_widths[0]= grid_column_widths[1]= result_grid_font_metrics.boundingRect("W").width();
     unsigned int i;
     for (i= 0; i < max_object_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
     grid_column_widths[2]= get_column_width_in_pixels(tmp_string_1, false, false);
@@ -9128,7 +9206,7 @@ void explorer_display_part()
     The default query that we set up in initialize_widget_explorer() selects ''s not nulls,
     e.g. "select 'D',database(),null,null\n". Since we don't expect nulls, we don't keep flags in oei[]
     and result_field_flags[] and result_value_flags are always 0. Therefore to check for not applicable, use
-    set ocelot_grid_background_color='yellow' where value = '';
+    set ocelot_explorer_background_color='yellow' where value = ''; (doesn't work yet)
     If in future we have a situation where that's not so, we'll have to add flag fields in the struct.
   Todo: Re start of loop: what you really should be doing is finding the oei[] with the right grid row
 */
@@ -10260,8 +10338,6 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 int get_cell_width_or_height_as_int(QString cell_width_or_height_as_qstring, int min)
 {
   int cell_width_or_height_as_int;
-  char tmp[64];
-  strcpy(tmp, cell_width_or_height_as_qstring.toUtf8());
   cell_width_or_height_as_int= cell_width_or_height_as_qstring.toInt();
   //if (cell_width_or_height_as_int > 0)
   {
@@ -11465,7 +11541,7 @@ void resizeEvent(QResizeEvent *event)
 /*
   Called from eventfilter
   "    if (event->type() == QEvent::FontChange) return (result_grid_table_widget->fontchange_event());"
-  Todo: This never happens, set_all_style_sheets() gets called for font change.
+  Todo: happens but I guess it's not important, set_all_style_sheets() gets called for font change.
 */
 int fontchange_event()
 {
@@ -12184,7 +12260,13 @@ bool conditional_setting_evaluate_till_true(
 {
   ResultGrid *rg= this;
   MainWindow *mw= rg->copy_of_parent;
-  QString old_style_sheet= mw->ocelot_grid_style_string;
+  QString old_style_sheet;
+#if (OCELOT_EXPLORER == 1)
+  if (result_grid_type == EXPLORER_WIDGET)
+    old_style_sheet= mw->ocelot_explorer_style_string;
+  else
+#endif
+    old_style_sheet= mw->ocelot_grid_style_string;
   bool result;
   for (int i= 0; i < mw->conditional_settings.count(); ++i)
   {
@@ -12907,6 +12989,12 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_explorer_visible= copy_of_parent->ocelot_explorer_visible;
   copy_of_parent->new_ocelot_explorer_sort= copy_of_parent->ocelot_explorer_sort;
   copy_of_parent->new_ocelot_explorer_query= copy_of_parent->ocelot_explorer_query;
+  copy_of_parent->new_ocelot_explorer_text_color= copy_of_parent->ocelot_explorer_text_color;
+  copy_of_parent->new_ocelot_explorer_background_color= copy_of_parent->ocelot_explorer_background_color;
+  copy_of_parent->new_ocelot_explorer_font_family= copy_of_parent->ocelot_explorer_font_family;
+  copy_of_parent->new_ocelot_explorer_font_size= copy_of_parent->ocelot_explorer_font_size;
+  copy_of_parent->new_ocelot_explorer_font_style= copy_of_parent->ocelot_explorer_font_style;
+  copy_of_parent->new_ocelot_explorer_font_weight= copy_of_parent->ocelot_explorer_font_weight;
 #endif
 
   {
@@ -12927,8 +13015,8 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
 
   /* Todo: following calculation should actually be width of largest tr(label) + approximately 5. */
   int label_for_color_width= this->fontMetrics().boundingRect("W").width();
-#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_EXPLORER == 1))
-if ((current_widget != DEBUG_WIDGET) && (current_widget != EXPLORER_WIDGET))
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+if (current_widget != DEBUG_WIDGET)
 #endif
 {
   /* Hboxes for foreground, background, and highlights */
@@ -13032,6 +13120,15 @@ if ((current_widget != DEBUG_WIDGET) && (current_widget != EXPLORER_WIDGET))
         actual_font_style= copy_of_parent->new_ocelot_menu_font_style;
         actual_font_weight= copy_of_parent->new_ocelot_menu_font_weight;
       }
+#if (OCELOT_EXPLORER == 1)
+      if (current_widget == EXPLORER_WIDGET)
+      {
+        actual_font_family= copy_of_parent->connect_stripper(copy_of_parent->new_ocelot_explorer_font_family, false);
+        actual_font_size= copy_of_parent->new_ocelot_explorer_font_size;
+        actual_font_style= copy_of_parent->new_ocelot_explorer_font_style;
+        actual_font_weight= copy_of_parent->new_ocelot_explorer_font_weight;
+      }
+#endif
       /* todo: what if it's extra widget? */
 
       combo_box_for_font_name= new QComboBoxInSettings(); /* Should I say "this"? */
@@ -13388,8 +13485,8 @@ if (current_widget == GRID_WIDGET)
   widget_3->setLayout(hbox_layout_3);
   /* Put the HBoxes in a VBox */
   main_layout= new QVBoxLayout();
-#if ((OCELOT_MYSQL_DEBUGGER == 1) || (OCELOT_EXPLORER == 1))
-  if ((current_widget != DEBUG_WIDGET) && (current_widget != EXPLORER_WIDGET))
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  if (current_widget != DEBUG_WIDGET)
 #endif
   {
     for (int ci= 0; ci < 11; ++ci) main_layout->addWidget(widget_for_color[ci]);
@@ -13424,7 +13521,7 @@ if (current_widget == GRID_WIDGET)
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[0]);
   if (current_widget == EXTRA_RULE_1) main_layout->addWidget(widget_for_size[1]);
   main_layout->addWidget(widget_3);
-  if ((current_widget != DEBUG_WIDGET) && (current_widget != EXPLORER_WIDGET)) handle_combo_box_1(current_widget);
+  if (current_widget != DEBUG_WIDGET) handle_combo_box_1(current_widget);
   /*
     If one merely says
     this->setLayout(main_layout);
@@ -13592,6 +13689,22 @@ void set_widget_values(int ci)
               break; }
     }
   }
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+  {
+    switch (ci)
+    {
+    case 0: { color_type= menu_strings[menu_off + MENU_MENU_TEXT_COLOR];
+              color_name= copy_of_parent->new_ocelot_explorer_text_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    case 1: { color_type= menu_strings[menu_off + MENU_MENU_BACKGROUND_COLOR];
+              color_name= copy_of_parent->new_ocelot_explorer_background_color;
+              color_name= copy_of_parent->canonical_color_name(color_name);
+              break; }
+    }
+  }
+#endif
   label_for_color[ci]->setText(color_type);
   //label_for_color_rgb[ci]->setText(color_name);
   int cli;
@@ -13666,7 +13779,7 @@ void handle_combo_box_1(int i)
     combo_box_for_font_size->hide();
     text_for_font_example->hide();
   }
-  if ((i == HISTORY_WIDGET) || (i == MAIN_WIDGET))
+  if ((i == HISTORY_WIDGET) || (i == MAIN_WIDGET) || (i == EXPLORER_WIDGET))
   {
     widget_for_color[2]->hide();
     widget_for_color[3]->hide();
@@ -13685,6 +13798,13 @@ void handle_combo_box_1(int i)
     main_layout->removeWidget(widget_for_color[9]);
     main_layout->removeWidget(widget_for_color[10]);
   }
+#if (OCELOT_EXPLORER == 1)
+  if (i == EXPLORER_WIDGET)
+  {
+    widget_for_color[8]->hide();
+    main_layout->removeWidget(widget_for_color[8]);
+  }
+#endif
 }
 
 void label_for_font_dialog_set_text()
@@ -13761,6 +13881,26 @@ void label_for_font_dialog_set_text()
       s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_menu_font_style);
     }
   }
+
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+  {
+    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_explorer_font_family);
+    s_for_label_for_font_dialog.append(" ");
+    s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_explorer_font_size);
+    s_for_label_for_font_dialog.append("pt");
+    if (QString::compare(copy_of_parent->new_ocelot_explorer_font_weight, "normal") != 0)
+    {
+      s_for_label_for_font_dialog.append(" ");
+      s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_explorer_font_weight);
+    }
+    if (QString::compare(copy_of_parent->new_ocelot_explorer_font_style, "normal") != 0)
+    {
+      s_for_label_for_font_dialog.append(" ");
+      s_for_label_for_font_dialog.append(copy_of_parent->new_ocelot_explorer_font_style);
+    }
+  }
+#endif
 
   label_for_font_dialog->setText(s_for_label_for_font_dialog);
 }
@@ -13848,6 +13988,17 @@ void handle_combo_box_for_color_pick_0(int item_number)
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[0]->setStyleSheet(s);
   }
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+  {
+    QString new_color= combo_box_for_color_pick[0]->itemText(item_number);
+    copy_of_parent->new_ocelot_explorer_text_color= new_color;
+    label_for_color_rgb[0]->setText(copy_of_parent->rgb_to_color(new_color));
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[0]->setStyleSheet(s);
+  }
+#endif
 
   text_for_font_example_filler(label_for_color_rgb[0]->text(),
                                label_for_color_rgb[1]->text(),
@@ -13911,7 +14062,18 @@ void handle_combo_box_for_color_pick_1(int item_number)
     s.append(copy_of_parent->qt_color(new_color));
     label_for_color_show[1]->setStyleSheet(s);
   }
-
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+  {
+    QString new_color= combo_box_for_color_pick[1]->itemText(item_number);
+    new_color= copy_of_parent->canonical_color_name(new_color);
+    copy_of_parent->new_ocelot_explorer_background_color= new_color;
+    label_for_color_rgb[1]->setText(copy_of_parent->rgb_to_color(new_color));
+    QString s= "border: 1px solid black; background-color: ";
+    s.append(copy_of_parent->qt_color(new_color));
+    label_for_color_show[1]->setStyleSheet(s);
+  }
+#endif
   text_for_font_example_filler(label_for_color_rgb[0]->text(),
                                label_for_color_rgb[1]->text(),
                                actual_font_family,
@@ -14151,6 +14313,15 @@ void handle_combo_box_for_font_any_change()
     style= &(copy_of_parent->new_ocelot_menu_font_style);
     weight= &(copy_of_parent->new_ocelot_menu_font_weight);
   }
+#if (OCELOT_EXPLORER == 1)
+  if (current_widget == EXPLORER_WIDGET)
+  {
+    family= &(copy_of_parent->new_ocelot_explorer_font_family);
+    size= &(copy_of_parent->new_ocelot_explorer_font_size);
+    style= &(copy_of_parent->new_ocelot_explorer_font_style);
+    weight= &(copy_of_parent->new_ocelot_explorer_font_weight);
+  }
+#endif
   /* todo: just pass family, weight, style. no need for candidates */
   QString family_candidate, weight_candidate, style_candidate;
   combo_box_for_font_name_parse(combo_box_for_font_name->currentText(),
@@ -14599,7 +14770,8 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_MENU         4
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
-#define OCELOT_VARIABLES_SIZE 134
+#define OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER     7
+#define OCELOT_VARIABLES_SIZE 140
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
@@ -14730,21 +14902,21 @@ bool eventFilter(QObject *obj, QEvent *event)
   Refresh All                       done, as refresh
   Todo: I could be specific, e.g. instead of "Copy to clipboard" say "Copy TABLE_X to clipboard"
   Todo: Put all the actions in a table: what-to-put-in-text, when-visible, what-to-do-if-clicked. E.g.:
-        Text            Action                     Shortcut    Applicable Types
-        ----            -------------              --------    ----------------
-        "select rows"   "SELECT * FROM $part_name;              T, V
+        Text            Action                       Shortcut    Applicable Types
+        ----            -------------                --------    ----------------
+        "select rows"   "SELECT * FROM ${part_name};             T, V
                                              ?? or Lua? Or Read file? Or C program?
         This can be done with a SET statement:
-          SET ocelot_menuitem_text='SELECT ROWS',
-              ocelot_menuitem_statement=statement='SELECT * FROM $object_name LIMIT 1;',
-              ocelot_menuitem_shortcut='Ctrl+F'
-          WHERE ocelot_menuitem_text='select_rows';
+          SET ocelot_explorer_text='SELECT ROWS',
+              ocelot_explorer_statement=statement='SELECT * FROM ${object_name} LIMIT 1;',
+              ocelot_explorer_shortcut='Ctrl+F'
+          WHERE ocelot_explorer_text='select_rows';
         Or a dialog box: containing all:
           Fixed Statement Name | Text ___| SQL Statement ____ | Shortcut ___
         If we did it, users would have to be able to specify parameters e.g.:
-          $schema_name $object_name $part_name $clipboard $focus_cell + whatever you used for PROMPT
+          ${schema_name} ${object_name} ${part_name} ${clipboard} ${focus_cell} + whatever you used for PROMPT
         Some actions are not SQL statements e.g.:
-          [Reset] [Copy $cell to clipboard] [Copy $cell to statement widget] [Text Export Dialog Box]
+          [Reset] [Copy ${cell} to clipboard] [Copy ${cell} to statement widget] [Text Export Dialog Box]
         Actions can be client statements.
         Actions can be multiple statements, but we might need a length limit, but you could call a procedure.
         The default should be in ostrings.h for the sake of the French translation.
@@ -14771,14 +14943,14 @@ bool eventFilter(QObject *obj, QEvent *event)
   Todo: At one point we're using q->unstripper(), for data type, because the enum data type might contain ''s.
         Fine, but what about names that contain "s or `s?
         Anyway q->unstripper() looks a bit silly, why don't we use QString replace() as we seem to do elsewhere?
-  Todo: Maybe the text|table|html decision could be done with a $dialog
+  Todo: Maybe the text|table|html decision could be done with a ${dialog}
   Todo: In cmi the action could be multiple statements including server SQL, client statement, RESET; etc.
         and maybe something more e.g. Lua statements, program execute
-  Todo: Our SET ocelot_menuitem_shortcut="...' confuses because we have SET OCELOT_SHORTCUT_... too.
+  Todo: Our SET ocelot_explorer_shortcut="...' confuses because we have SET OCELOT_SHORTCUT_... too.
   Todo: "Cut" could remove a line until the next reset.
   todo: something for menu->addSeparator()
   todo: validity check, although for default that isn't needed
-  Todo: Syntax so far = SET ocelot_menuitem_action='...' WHERE ocelot_menuitem_text='[cmi.text choices]';
+  Todo: Syntax so far = SET ocelot_explorer_action='...' WHERE ocelot_explorer_text='[cmi.text choices]';
         This causes Context_menu::edit(). So actions are "scriptable".
         Todo: extend thus:
           Allow NEW and all components (text, statement, etc.) to be added|changed.
@@ -14789,11 +14961,11 @@ bool eventFilter(QObject *obj, QEvent *event)
   Note: For show create view we don't have a Tarantool statement but we stored it in part.
   Note: CREATE TABLE ... is depending on default schema so if you haven't said USE it will cause an error.
   Re macros: text and statement can have them. See the Wikipedia article "String interpolation".
-    Some possibilities were: %xxx or $xxx or {xxx} or ${xxx} or {d ...}. Choice was $xxx, no beautiful reason.
-    Currently Context_menu::replacer() substitutes $cell $clipboard $dialog $object_name $occurs_text
-    $part_name $part_type $schema_name $statement. It also looks for special instructions e.g. CLIPBOARD=.
-    NB: $cell copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier.
-    Replace '$macro_name' with 'not-delimited-macro-name' then replace $macro_name with delimited-macro-name.
+    Some possibilities were: %xxx or $xxx or {xxx} or ${xxx} or {d ...}. Choice was ${xxx}, no beautiful reason.
+    Currently Context_menu::replacer() substitutes ${cell} ${clipboard} ${dialog} ${object_name} ${occurs_text}
+    ${part_name} ${part_type} ${schema_name} ${statement}. It also looks for special instructions e.g. CLIPBOARD=.
+    NB: ${cell} copies the cell at QCursor::pos(), which might not be the cell that was clicked earlier.
+    Replace '${macro_name}' with 'not-delimited-macro-name' then replace ${macro_name} with delimited-macro-name.
   TODO: BUG: For 'C' for Send to SQL editor, we copy the name not the qualified name.
   TODO: BUG: At one point we failed to show a table. It's okay now but watch for it happening again.
   TODO: BUG: occasional crash, again. I'm seeing whether it helps if I avoid "new".
@@ -14804,6 +14976,18 @@ bool eventFilter(QObject *obj, QEvent *event)
   Todo: re shortcutter(): Check if visible? Check if explorer is visible? return something if match and action?
   Todo: how to see what the current values are? At least make a separate .h file?
   Todo: example.cnf changes
+  Todo: some things should be disabled for privilege reasons e.g. drop information_schema
+        (mark disabled by setting to gray, or reducing brightness in line_color() function)
+  Todo: re Completer_widget::shortcut_override(): we use this to override Tab if it's a main-menu shortcut,
+        which is default. But we should override other main-menu shortcuts if there's a context-menu item
+        for the same key sequence, which we can probably do with Context_menu::shortcutter().
+        A complication: if it's disabled on the main menu, the action won't happen.
+        A complication: actually I rather like the idea of e.g. Edit|Copy to copy what's in the menu.
+  Todo: better import. Currently we only allow: no dialog box, UTF8, columns terminated by comma,
+        lines terminated by line break e.g. lf, char|varchar must have ''s, no line break inside a column.
+        Given that we can get data type from oei[n].part_type when oei[n].object_type='C', this is poor.
+  Todo: Since we might someday do import|export with data types + column names, the alphabetical order choice
+        for explorer_widget is bad. We should keep column numbers, or we should not sort by column names.
 */
 class Context_menu: public QWidget
 {
@@ -14815,7 +14999,7 @@ private:
   void construct();
 
 struct context_menu_items {
-    QString action;           /* e.g. "Select * FROM $object_name limit 1000;" */
+    QString action;           /* e.g. "Select * FROM ${object_name} limit 1000;" */
     QString applicable_dbmss; /* e.g. "M" or "T" */
     QString applicable_types; /* e.g. "T,V" */
     QString enabled;          /* e.g. "" (not used yet) */
