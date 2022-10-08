@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: September 26 2022
+   Last modified: October 8 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -7123,6 +7123,22 @@ QFont MainWindow::get_font_from_style_sheet(QString style_string)
   return font;
 }
 
+/* Warning: assumption that color: comes before background-color: */
+QString MainWindow::get_color_from_style_sheet(QString style_string)
+{
+  int color_start= style_string.indexOf("color:");
+  int color_end= style_string.indexOf(";", color_start);
+  QString color= style_string.mid(color_start + 6, color_end - (color_start + 6));
+  return color;
+}
+
+QString MainWindow::get_background_color_from_style_sheet(QString style_string)
+{
+  int background_color_start= style_string.indexOf("background-color:");
+  int background_color_end= style_string.indexOf(";", background_color_start);
+  QString color= style_string.mid(background_color_start + 17, background_color_end - (background_color_start + 17));
+  return color;
+}
 
 /*
   Get the next statement in a string.
@@ -7623,7 +7639,6 @@ QString MainWindow::select_1_row(const char *select_statement)
 
   if (unexpected_error != NULL) s= unexpected_error;
   else s= "";
-
   return s;
 }
 #endif //if (OCELOT_MYSQL_INCLUDE == 1)
@@ -11528,50 +11543,6 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         make_and_put_message_in_result(er, 0, (char*)"");
         return 1;
       }
-#if (OCELOT_EXPLORER == 1)
-      /* !! TODO: BUT THIS WORKS ONLY IF WE WENT THROUGH HPARSE !! */
-      if ((sub_token_types[0] == TOKEN_KEYWORD_SET)
-       && (is_context_menu_name(sub_token_types[1]) == true))
-      {
-        int i_of_cmi= -1;
-        for (int k= 1; ; ++k)
-        {
-          if (sub_token_lengths[k] == 0) break;
-          if (sub_token_types[k] == TOKEN_KEYWORD_WHERE)
-          {
-            QString wtext= text.mid(sub_token_offsets[k + 3], sub_token_lengths[k + 3]);
-            QString stripped_wtext= connect_stripper(wtext, true);
-            for (i_of_cmi= 0; i_of_cmi < explorer_widget->html_text_edit->explorer_context_menu->cmi_count; ++i_of_cmi)
-            {
-              if (QString::compare(stripped_wtext, explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].text, Qt::CaseInsensitive) == 0)
-              {
-                break;
-              }
-            }
-          }
-        }
-        if (i_of_cmi == -1)
-        {
-          char message_0_rows[]= "0 rows";
-          make_and_put_message_in_result(ER_OK_PLUS, 0, message_0_rows);
-          return 1;
-        }
-        for (int k= 1; sub_token_lengths[k] != 0; ++k)
-        {
-          int sub_token_type= sub_token_types[k];
-          if (sub_token_type == TOKEN_KEYWORD_WHERE) break;
-          if (is_context_menu_name(sub_token_type) == true)
-          {
-printf("**** huh?\n");
-            QString target_value= text.mid(sub_token_offsets[k + 2], sub_token_lengths[k + 2]);
-            explorer_widget->html_text_edit->explorer_context_menu->edit(i_of_cmi, sub_token_type, target_value);
-          }
-        }
-        char message_edited[]= "edited";
-        make_and_put_message_in_result(ER_OK_PLUS, 0, message_edited);
-        return 1;
-      }
-#endif
 #if (OCELOT_IMPORT_EXPORT == 1)
       if (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_EXPORT)
       {
@@ -11686,17 +11657,9 @@ int MainWindow::conditional_settings_insert(QString text)
     }
     if (expected_token == 2)
     {
-      if ((token_upper != "OCELOT_GRID_BACKGROUND_COLOR")
-       && (token_upper != "OCELOT_GRID_TEXT_COLOR")
-       && (token_upper != "OCELOT_GRID_FONT_SIZE")
-       && (token_upper != "OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR")
-       && (token_upper != "OCELOT_GRID_FONT_STYLE")
-       && (token_upper != "OCELOT_GRID_FONT_WEIGHT")
-       && (token_upper != "OCELOT_GRID_FONT_FAMILY")
-       //&& (token_upper != "OCELOT_GRID_BORDER_SIZE")
-       && (token_upper != "OCELOT_GRID_TOOLTIP")
-       && (token_upper != "OCELOT_GRID_CELL_HEIGHT")
-       && (token_upper != "OCELOT_GRID_CELL_WIDTH"))
+     int token_type= get_keyword_index_from_qstring(token_upper);
+      /* Checking that it's OCELOT_EXPLORER_BACKGROUND_COLOR, OCELOT_GRID_FONT_STYLE, etc. */
+      if ((strvalues[token_type].reserved_flags & FLAG_VERSION_CONDITIONAL) == 0)
          return ER_ERROR;
       token_2= token_upper;
       o.append(token_upper + " ");
@@ -11712,11 +11675,8 @@ int MainWindow::conditional_settings_insert(QString text)
     }
     if (expected_token == 4)
     {
-      if (token_2.left(17) == "OCELOT_GRID_FONT_") o.append(token + " ");
-      //else if (token_2 == "OCELOT_GRID_BORDER_SIZE") o.append(token + " ");
-      else if (token_2 == "OCELOT_GRID_TOOLTIP") o.append(token + " ");
-      else if (token_2 == "OCELOT_GRID_CELL_HEIGHT") o.append(token + " ");
-      else if (token_2 == "OCELOT_GRID_CELL_WIDTH") o.append(token + " ");
+      /* e.g. font_..., tooltip, cell_height, cell_width -- anything that does not mention color */
+      if (token_2.contains("COLOR") == false) o.append(token + " ");
       else {
         if ((token.left(1) != "'") || (token.right(1) != "'")) return ER_ILLEGAL_VALUE;
         token= token.mid(1, token.size() -2);
@@ -11746,7 +11706,7 @@ int MainWindow::conditional_settings_insert(QString text)
        && (token_upper != "COLUMN_NUMBER")
        && (token_upper != "COLUMN_TYPE")
        && (token_upper != "ROW_NUMBER")
-       && (token_upper != "VALUE"))
+       && (token_upper != "VALUE")) /* the only permissible explorer word */
         return ER_ERROR;
       o.append(token_upper + " ");
       expected_token= 7;
@@ -11795,6 +11755,45 @@ int MainWindow::conditional_settings_insert(QString text)
   /* This makes maximum number of statements = 1. It should be temporary! */
   conditional_settings.clear();
   conditional_settings.insert(0, o);
+  /* Immediate evaluation for explorer action | shortcut | text which are permanent */
+  for (int i_of_cmi= 0; i_of_cmi < explorer_widget->html_text_edit->explorer_context_menu->cmi_count; ++i_of_cmi)
+  {
+    bool result_of_evaluate= false;
+    QString cs_new_style_sheet;
+    QString style_string= ocelot_explorer_style_string;
+    QString cs_new_tooltip;
+    QString cs_new_cell_height;
+    QString cs_new_cell_width;
+    QString cs_new_action= "[]";
+    QString cs_new_shortcut= "[]";
+    QString cs_new_text= "[]";
+    QString string= explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].text;
+    /* Todo: Stripping lead+trail spaces does not remove a shortcut. Should we remove shortcuts? */
+    //string= string.trimmed(); unnecessary?
+    QByteArray string_utf8= string.toUtf8();
+    result_of_evaluate= explorer_widget->conditional_setting_evaluate(0,
+                                        1,           /* i.e. result set column number */
+                                        1,       /* e.g. text_frame->ancestor_grid_result_row_number */
+                                        string_utf8.data(),       /* e.g. text_frame->content_pointer */
+                                        0,          /* e.g. FIELD_VALUE_FLAG_IS_NULL */
+                                        string_utf8.size(), /* e.g. text_frame->content_length */
+                                        TEXTEDITFRAME_CELL_TYPE_DETAIL,  /* e.g. text_frame->cell_type */
+                                        style_string,
+                                        false,
+                                        &cs_new_tooltip,
+                                        &cs_new_style_sheet,
+                                        &cs_new_cell_height,
+                                        &cs_new_cell_width,
+                                        &cs_new_action,
+                                        &cs_new_shortcut,
+                                        &cs_new_text);
+    if (result_of_evaluate == true)
+    {
+      if (cs_new_action != "[]") explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].action= cs_new_action;
+      if (cs_new_shortcut != "[]") explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].shortcut= cs_new_shortcut;
+      if (cs_new_text != "[]") explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].text= cs_new_text;
+    }
+  }
   return 0;
 }
 
@@ -11843,6 +11842,7 @@ int MainWindow::conditional_settings_insert(QString text)
     more. But this means there could be thousands of entries
     in the cache, and searches are sequential.
     Todo: add an order-by in the select, and do binary searches.
+  Todo: if error, show results of mysql_error as well (as we do when user-input statements fail)
 */
 
 int MainWindow::rehash_scan(char *error_or_ok_message, bool is_explorer)
@@ -18550,7 +18550,12 @@ void Completer_widget::show_wrapper()
   main_window->menu_edit_action_autocomplete->setEnabled(true);
 }
 
-/* Similar to something in codeeditor.h */
+/* Similar to something in codeeditor.h
+   Todo: With explorer_widget and result_of_evaluate == true, changes to text_color and background_color go okay,
+         but setFont() fails with the QFont that I get from get_font_from_style_sheet().
+         So insert html? Or the answer might be hinted at in
+         https://stackoverflow.com/questions/39531626/qtextedit-update-single-qtextcharformat
+*/
 void Completer_widget::line_colors(int associated_widget_type)
 {
   QList<QTextEdit::ExtraSelection> extraSelections;
@@ -18563,14 +18568,51 @@ void Completer_widget::line_colors(int associated_widget_type)
     setTextCursor(tc);
     QTextEdit::ExtraSelection selection;
     int flags= 0;
+    bool result_of_evaluate= false;
+    QString cs_new_style_sheet;
     QTextCharFormat format_of_current_token;
+    QString cs_new_tooltip;
+    QString cs_new_cell_height;
+    QString cs_new_cell_width;
+    int returned_cs_number;
+    QString style_string= main_window->ocelot_explorer_style_string;
+    if (associated_widget_type == EXPLORER_WIDGET)
+    {
+      QString string= string_list.at(i);
+      /* Todo: Stripping lead+trail spaces does not remove a shortcut. Should we remove shortcuts? */
+      string= string.trimmed();
+      QByteArray string_utf8= string.toUtf8();
+      result_of_evaluate= main_window->explorer_widget->conditional_setting_evaluate_till_true(
+                                          1,           /* i.e. result set column number */
+                                          1,       /* e.g. text_frame->ancestor_grid_result_row_number */
+                                          string_utf8.data(),       /* e.g. text_frame->content_pointer */
+                                          0,          /* e.g. FIELD_VALUE_FLAG_IS_NULL */
+                                          string_utf8.size(), /* e.g. text_frame->content_length */
+                                          TEXTEDITFRAME_CELL_TYPE_DETAIL,  /* e.g. text_frame->cell_type */
+                                          &cs_new_tooltip,        /* return */
+                                          &cs_new_style_sheet,    /* return */
+                                          &cs_new_cell_height,    /* return */
+                                          &cs_new_cell_width,     /* return */
+                                          &returned_cs_number);        /* return */
+      if (result_of_evaluate == true) style_string= cs_new_style_sheet;
+    }
     if (associated_widget_type == STATEMENT_WIDGET)
     {
       int token_type= token_type_list.at(i);
       format_of_current_token= main_window->get_format_of_current_token(token_type, flags, "");
     }
     else /* EXPLORER_WIDGET -- but unfortunate, since statement choices allow customizing depending on type */
-      format_of_current_token.setForeground(QColor(main_window->qt_color(main_window->ocelot_explorer_text_color)));
+    {
+      if (result_of_evaluate == true)
+      {
+        QString color= main_window->get_color_from_style_sheet(style_string);
+        format_of_current_token.setForeground(QColor(color));
+      }
+      else
+      {
+        format_of_current_token.setForeground(QColor(main_window->qt_color(main_window->ocelot_explorer_text_color)));
+      }
+    }
     line_color= format_of_current_token.foreground().color();
     selection.format.setForeground(line_color);
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -18583,7 +18625,14 @@ void Completer_widget::line_colors(int associated_widget_type)
       if (associated_widget_type == STATEMENT_WIDGET)
         line_color= QColor(main_window->ocelot_statement_background_color);
       else /* EXPLORER_WIDGET */
+      {
+      if (result_of_evaluate == true)
+      {
+        line_color= main_window->get_background_color_from_style_sheet(style_string);
+      }
+      else
         line_color= QColor(main_window->ocelot_explorer_background_color);
+      }
     }
     else
     {
@@ -18616,7 +18665,8 @@ void Completer_widget::initialize(int w)
   }
   else /* EXPLORER_WIDGET */
   {
-    setParent(main_window);
+    if (main_window->ocelot_explorer_detached == "no") setParent(main_window);
+    else setParent(main_window->explorer_widget);
     setWindowFlags(Qt::WindowStaysOnTopHint);
     setStyleSheet(main_window->ocelot_explorer_style_string);
   }
@@ -18722,7 +18772,7 @@ void Completer_widget::size_and_position_change()
   else
   {
     /* TODO: SHOULD BE CURRENT POSITION TILL END. AND THIS ASSUMES NO DETACHING! */
-    maximum_width= main_window->width() - main_window->explorer_widget->width();
+      maximum_width= main_window->width() - main_window->explorer_widget->width();
     maximum_height= main_window->height();
   }
   if (desired_width > maximum_width)
@@ -20054,9 +20104,57 @@ void Result_qtextedit::keyPressEvent(QKeyEvent *event)
   if (result_grid->is_fancy() == false) { QTextEdit::keyPressEvent(event); return; }
   if (result_grid->result_grid_type == EXPLORER_WIDGET)
   {
-//    QKeyEvent *key= event;
+    QKeyEvent *key= event;
 //    if (key->key() == Qt::Key_Down) ...
-//    if (key->key() == Qt::Key_Up) ...
+    if ((key->key() == Qt::Key_Up) || (key->key() == Qt::Key_Down))
+    {
+      int frrn= result_grid->focus_result_row_number;            /* = result row of current focus */
+      /* skip if frrn = 0 already? */
+      int prev_visible= -1;
+      int next_visible= -1;
+      int fdrn= result_grid->copy_of_parent->oei[frrn].display_row_number;       /* = focus's display row number */
+      for (unsigned int i= 0; i < result_grid->copy_of_parent->oei_count; ++i)     /* go through oei skipping invisibles */
+      {
+        int n= result_grid->copy_of_parent->oei[i].display_row_number;
+        if (n != -1)
+        {
+          if (n == fdrn - 1) { prev_visible= i; }
+          if (n == fdrn + 1) { next_visible= i; }
+          if (n == fdrn) { ; }
+        }
+      }
+      int gvsbv= result_grid->grid_vertical_scroll_bar_value;
+      if (key->key() == Qt::Key_Up)
+      {
+        if (prev_visible == -1) return;
+        fdrn= prev_visible;
+        int fdrid= result_grid->explorer_first_result_row;
+        if (fdrn < fdrid)
+        {
+          result_grid->focus_result_row_number= fdrn;
+          result_grid->grid_vertical_scroll_bar->triggerAction(QAbstractSlider::SliderSingleStepSub);
+          return; /* explorer_display_html should be done by vertical_scroll_bar_event() */
+        }
+      }
+      else
+      {
+        if (next_visible == -1) return;
+        fdrn= next_visible;
+        int fdrid= result_grid->explorer_first_result_row;
+        int fddid= result_grid->copy_of_parent->oei[fdrid].display_row_number;
+        unsigned int last_row_in_display=  fddid + result_grid->explorer_max_grid_rows;
+        unsigned int this_row_in_display=  result_grid->copy_of_parent->oei[fdrn].display_row_number;
+        if (this_row_in_display == last_row_in_display)
+        {
+          int fdrn_new_value= result_grid->copy_of_parent->oei[fdrn].display_row_number;
+          result_grid->focus_result_row_number= fdrn;
+          result_grid->grid_vertical_scroll_bar->setValue(fdrn_new_value);
+          return; /* explorer_display_html should be done by vertical_scroll_bar_event() */
+        }
+      }
+      result_grid->focus_result_row_number= fdrn; /* we get here if we don't need to scroll */
+      result_grid->explorer_display_html(gvsbv);
+    }
 //    /* assume accept() */
     return;
   }
@@ -21041,15 +21139,6 @@ void Context_menu::action(int current_row, int i_of_cmi)
       result_grid->copy_of_parent->action_execute(1);
     }
   }
-}
-
-int Context_menu::edit(int i_of_cmi, int target_type, QString target_value)
-{
-  QString stripped_target_value= result_grid->copy_of_parent->connect_stripper(target_value, true);
-  if (target_type == TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION) cmi[i_of_cmi].action= stripped_target_value;
-  if (target_type == TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT) cmi[i_of_cmi].shortcut= stripped_target_value;
-  if (target_type == TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT) cmi[i_of_cmi].text= stripped_target_value;
-  return 1;
 }
 
 /* With menus I'd be able to handle the switching with connect() and lambdas, thus:
@@ -27007,7 +27096,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_debug_left, NULL, 10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_DEBUG_LEFT},
     {&main_window->ocelot_debug_top, NULL, 10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP},
     {&main_window->ocelot_debug_width, NULL,  10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH},
-    {&main_window->ocelot_explorer_action, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER, TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION},
+    {&main_window->ocelot_explorer_action, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION},
     {&main_window->ocelot_explorer_background_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER, TOKEN_KEYWORD_OCELOT_EXPLORER_BACKGROUND_COLOR},
     {&main_window->ocelot_explorer_detached, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED},
     {&main_window->ocelot_explorer_font_family, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_FAMILY},
@@ -27016,7 +27105,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_explorer_font_weight, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_WEIGHT},
     {&main_window->ocelot_explorer_height, NULL,  10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT},
     {&main_window->ocelot_explorer_left, NULL, 10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT},
-    {&main_window->ocelot_explorer_text, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT},
+    {&main_window->ocelot_explorer_text, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT},
     {&main_window->ocelot_explorer_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT_COLOR},
     {&main_window->ocelot_explorer_top, NULL, 10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP},
     {&main_window->ocelot_explorer_visible, NULL, -1, 0, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE},
@@ -27520,6 +27609,22 @@ XSettings::~XSettings()
     In another product this would be done with a View menu.
   Options:
     New options: Detach|Attach explorer widget.
+  The explorer widget is actually a grid widget with html.
+  To users we want it to look like it's in same class as menu|history|grid|statement.
+  Class explorer_widget We don't have a subclass for it at this time
+  Re navigation:
+    The scroll bar is always present.
+    We want effect of Up|Down to look the same as with Completer_widget::keyPressEvent
+    but the mechanism is different: Change focus_result_row_number and call explorer_display_html,
+    which will call copy_html_cell, which will change colour for result_grid->focus_result_row_number.
+    So in Result_qtextedit::keyPressEvent(QKeyEvent *event) we arrange that if user presses Up key:
+    If (we are at position 0)
+      if scroll bar position == 0 do nothing
+      else change scroll bar position, which requires explorer_display_html(new-position)
+                                       which requires result_grid->grid_vertical_scroll_bar->setValue(n);
+    Else
+      change focus_result_row_number, it is 1 before where we were
+    (If it's not EXPLORER_WIDGET then Up and Down are presumably within the edit area so that's a different path.)
   TODO: Tooltip changes. In fact that's true for result grid too.
         Could be "Explorer" + "Right-click for context menu" + "See Help|Explorer" + object type = Column, X, in table Y
   Todo: Something that shows referencing|referenced relationships of foreign keys, preferably visual.
@@ -27560,12 +27665,14 @@ XSettings::~XSettings()
         Todo: SET ... WHERE column IS FOREIGN KEY | PRIMARY KEY | UNIQUE | INDEXED
               You can add a Filter combobox which generates the statement
               We only need to do it if there is a SET ocelot_grid_cell_height=0 statement
-        Todo: example.cnf should include the new words
+        Todo: example.cnf should include the new words, including ocelot_max_settings=n if you produce that
         Todo: This initializes ocelot_explorer_query to MySQL default, but we need Tarantool default
               which might change upon re-connect.
         Todo: Now that everything is in object_name we lose a bit of ability with
               SET ocelot_grid_... WHERE column_name ... unless we say column_type='C' means something
         Todo: In Tarantool, how good it would be to have options for creating information_schema_tables etc.!
+        Todo: There could be an ocelot_explorer_focus_cell_background_color as there is for grid_cell
+        Todo: There could be an ocelot_explorer_tooltip as there is for grid
 */
 void MainWindow::initialize_widget_explorer()
 {
@@ -27987,6 +28094,24 @@ bool MainWindow::explorer_query()
   return true;
 }
 
+/*
+  Called from hparse_f_client_statement after SET ... WHERE ocelot_explorer_text=
+  For explorer the possible text values are all the oei items (explorer widget) and all the cmi items
+  (explorer context menu).
+  Todo: This isn't precise enough, we should be looking at part_name part_type etc.
+*/
+QStringList MainWindow::explorer_text_list()
+{
+  QStringList q;
+  q.clear(); /* unnecessary? */
+  for (int i= 0; i < explorer_widget->html_text_edit->explorer_context_menu->cmi_count; ++i)
+    q.append(explorer_widget->html_text_edit->explorer_context_menu->cmi[i].text);
+  for (unsigned int i= 0; i < oei_count; ++i)
+  {
+    q.append(oei[i].object_name);
+  }
+  return q;
+}
 
 /* Todo: This could be called when we're shutting down (?). Clean up anything made with new. */
 void MainWindow::explorer_close()
@@ -28003,6 +28128,7 @@ void MainWindow::explorer_close()
 //void MainWindow::make_information_schema()
 //{
 //}
+
 
 /* Todo: Add: a function for destroying all objects created for the widget (though not the widget itself?) */
 

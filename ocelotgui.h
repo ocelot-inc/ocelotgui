@@ -122,6 +122,8 @@ typedef struct
 #define FLAG_VERSION_TARANTOOL_2_7    262144
 #define FLAG_VERSION_TARANTOOL_ALL    (262144 | 65536 | 32768 | 1024)
 #define FLAG_VERSION_DEFAULT FLAG_VERSION_MYSQL_OR_MARIADB_ALL
+#define FLAG_VERSION_CONDITIONAL 524288
+
 
 #include <assert.h>
 #include <stdint.h>
@@ -2048,21 +2050,21 @@ static const keywords strvalues[]=
     {"OCELOT_DEBUG_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_TOP},
     {"OCELOT_DEBUG_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_DEBUG_WIDTH},
 
-    {"OCELOT_EXPLORER_ACTION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION},
+    {"OCELOT_EXPLORER_ACTION", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION},
     {"OCELOT_EXPLORER_APPLICABLE_DBMSS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_APPLICABLE_DBMSS},
     {"OCELOT_EXPLORER_APPLICABLE_TYPES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_APPLICABLE_TYPES},
-    {"OCELOT_EXPLORER_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_BACKGROUND_COLOR},
+    {"OCELOT_EXPLORER_BACKGROUND_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_BACKGROUND_COLOR},
     {"OCELOT_EXPLORER_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED},
     {"OCELOT_EXPLORER_ENABLED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED},
-    {"OCELOT_EXPLORER_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_FAMILY},
-    {"OCELOT_EXPLORER_FONT_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_SIZE},
-    {"OCELOT_EXPLORER_FONT_STYLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_STYLE},
-    {"OCELOT_EXPLORER_FONT_WEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_WEIGHT},
+    {"OCELOT_EXPLORER_FONT_FAMILY", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_FAMILY},
+    {"OCELOT_EXPLORER_FONT_SIZE", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_SIZE},
+    {"OCELOT_EXPLORER_FONT_STYLE", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_STYLE},
+    {"OCELOT_EXPLORER_FONT_WEIGHT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_WEIGHT},
     {"OCELOT_EXPLORER_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_HEIGHT},
     {"OCELOT_EXPLORER_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_LEFT},
-    {"OCELOT_EXPLORER_SHORTCUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT},
-    {"OCELOT_EXPLORER_TEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT},
-    {"OCELOT_EXPLORER_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT_COLOR},
+    {"OCELOT_EXPLORER_SHORTCUT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT},
+    {"OCELOT_EXPLORER_TEXT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT},
+    {"OCELOT_EXPLORER_TEXT_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT_COLOR},
     {"OCELOT_EXPLORER_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_TOP},
     {"OCELOT_EXPLORER_VISIBLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_VISIBLE},
     {"OCELOT_EXPLORER_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_WIDTH},
@@ -2071,26 +2073,26 @@ static const keywords strvalues[]=
     {"OCELOT_EXTRA_RULE_1_CONDITION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_CONDITION},
     {"OCELOT_EXTRA_RULE_1_DISPLAY_AS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS},
     {"OCELOT_EXTRA_RULE_1_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR},
-    {"OCELOT_GRID_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR},
+    {"OCELOT_GRID_BACKGROUND_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR},
     {"OCELOT_GRID_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE}, /* no longer used */
     {"OCELOT_GRID_CELL_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR},
     {"OCELOT_GRID_CELL_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
-    {"OCELOT_GRID_CELL_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
-    {"OCELOT_GRID_CELL_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH},
+    {"OCELOT_GRID_CELL_HEIGHT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
+    {"OCELOT_GRID_CELL_WIDTH", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH},
     {"OCELOT_GRID_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_DETACHED},
-    {"OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR},
-    {"OCELOT_GRID_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY},
-    {"OCELOT_GRID_FONT_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE},
-    {"OCELOT_GRID_FONT_STYLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE},
-    {"OCELOT_GRID_FONT_WEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT},
+    {"OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR},
+    {"OCELOT_GRID_FONT_FAMILY", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY},
+    {"OCELOT_GRID_FONT_SIZE", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_SIZE},
+    {"OCELOT_GRID_FONT_STYLE", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_STYLE},
+    {"OCELOT_GRID_FONT_WEIGHT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_WEIGHT},
     {"OCELOT_GRID_HEADER_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HEADER_BACKGROUND_COLOR},
     {"OCELOT_GRID_HEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HEIGHT},
     {"OCELOT_GRID_HTML_EFFECTS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_HTML_EFFECTS},
     {"OCELOT_GRID_LEFT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_LEFT},
     {"OCELOT_GRID_OUTER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_OUTER_COLOR},
     {"OCELOT_GRID_TABS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TABS},
-    {"OCELOT_GRID_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR},
-    {"OCELOT_GRID_TOOLTIP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP},
+    {"OCELOT_GRID_TEXT_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_TEXT_COLOR},
+    {"OCELOT_GRID_TOOLTIP", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_TOOLTIP},
     {"OCELOT_GRID_TOP", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_TOP},
     {"OCELOT_GRID_WIDTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_WIDTH},
     {"OCELOT_HISTFILEFLAGS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_HISTFILEFLAGS},
@@ -3330,6 +3332,8 @@ public:
   int main_window_maximum_height;
   void component_size_calc(int *character_height, int *borders_height);
   QFont get_font_from_style_sheet(QString style_string);
+  QString get_color_from_style_sheet(QString style_string);
+  QString get_background_color_from_style_sheet(QString style_string);
   void set_dbms_version_mask(QString);
   int next_i(int, int);
   int next_i_v(int, int, int token_types[], int token_lengths[]);
@@ -3615,6 +3619,7 @@ public:
   //int explorer_qsort_compare(const void * a, const void * b);
   void explorer_sort();
   bool explorer_query();
+  QStringList explorer_text_list();
   void explorer_close();
   void explorer_context_menu(QPoint &pos);
 #endif
@@ -5012,7 +5017,6 @@ class Completer_widget: public QTextEdit
 
 private:
   QTimer *timer;
-  QStringList string_list;
   QStringList string_list_tooltips;
   int current_row;
   QList<int> token_type_list;
@@ -5030,6 +5034,7 @@ void keyPressEvent(QKeyEvent *event);
 
 
 public:
+QStringList string_list;
 MainWindow *main_window;
 int associated_widget_type;
 void construct(MainWindow *m);
@@ -6676,10 +6681,11 @@ class ResultGrid: public QWidget
   Q_OBJECT
 private:
   QWidget *client;
-  int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
 public:
+  int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
   QScrollArea *grid_scroll_area;
   int result_grid_type; /* 0 or EXPLORER_WIDGET */
+  unsigned int explorer_max_grid_rows;
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   unsigned int result_column_count;
   long unsigned int result_row_count, grid_result_row_count;
@@ -8320,6 +8326,9 @@ void prepare_for_display_html()
           new_style_sheet= old_style_sheet= copy_of_parent->ocelot_grid_style_string;
         QString new_cell_height= "";
         QString new_cell_width= "";
+        QString new_action= "";
+        QString new_shortcut= "";
+        QString new_text= "";
         bool result= conditional_setting_evaluate(
              0, /* cs_number */
              0, /* doesn't matter */
@@ -8330,7 +8339,8 @@ void prepare_for_display_html()
              TEXTEDITFRAME_CELL_TYPE_DETAIL, /* text_edit_frames[text_edit_frames_index]->cell_type, */
              old_style_sheet,          /* old_style_sheet */
              true,        /* is_always_true */
-             &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width);
+             &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width,
+             &new_action, &new_shortcut, &new_text);
         if (result == true)
         {
           strcpy(tmp_div, " .E0 {");                        /* for <div> */
@@ -8966,7 +8976,7 @@ void display_html_html_vertical(int new_grid_vertical_scroll_bar_value)
 }
 
 #if (OCELOT_EXPLORER == 1)
-/* See comments before MainWindow::explorer() */
+/* See comments before MainWindow::initialize_widget_explorer(). */
 /* Todo:
    Items like gridx_field_types might not need to be set up every time.
    The output will contain this, which I think is odd: </TR><TR><TD width=    ><TD width=148>C</TD>
@@ -9249,12 +9259,12 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
   unsigned int total_object_name_size= 0;
   /* Loop 2: Calculate how many rows will be in the current display and approximately how big they are. */
   /* TODO: MINIMUM = 1! */
-  unsigned int local_max_grid_rows= 0;
+  explorer_max_grid_rows= 0;
   {
     unsigned int object_name_size;
     unsigned int total_grid_row_heights= 0;
     total_grid_row_heights= 12; /* Perhaps = # of pixels before first row and after last row i.e. margin? */
-    for (tmp_result_row_number= new_grid_vertical_scroll_bar_value;
+    for (tmp_result_row_number= explorer_first_result_row;
          tmp_result_row_number < copy_of_parent->oei_count;
          ++tmp_result_row_number)
     {
@@ -9272,11 +9282,11 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
 //        row_height+= 9; /* This surely does not make sense but apparently corresponds with reality */
         if ((total_grid_row_heights + row_height) >= (unsigned int) this->height())
         {
-          if (local_max_grid_rows > 0) break; /* minimum number of rows to display is 1 */
+          if (explorer_max_grid_rows > 0) break; /* minimum number of rows to display is 1 */
         }
-        grid_row_heights[local_max_grid_rows]= row_height;
+        grid_row_heights[explorer_max_grid_rows]= row_height;
         total_grid_row_heights+= row_height;
-        ++local_max_grid_rows;
+        ++explorer_max_grid_rows;
       }
     }
   }
@@ -9285,9 +9295,9 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
   /* "500" is a very vague guess about the per-display overhead */
   /* todo: fix so you've got a better estimate, or do a dummy pass first, or use byte array not char */
   /* todo: is 500 taking into account thin image? */
-  int tmp_size= local_max_grid_rows * 5
+  int tmp_size= explorer_max_grid_rows * 5
                + total_object_name_size * 5
-               + local_max_grid_rows * 500
+               + explorer_max_grid_rows * 500
                + 500;
   char *tmp;
 
@@ -9298,7 +9308,7 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
   d.setDocumentMargin(0); /* Default margin is 4 so if I don't do this html_text_edit_width will be off. */
   int html_text_edit_height, html_text_edit_width; /* result of height calculation */
 
-repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if result won't fit well in widget */
+repeat_loop: /* go back to here and redo with smaller explorer_max_grid_rows if result won't fit well in widget */
   char *tmp_pointer= &tmp[0];
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
@@ -9307,7 +9317,7 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
   //html_text_edit= new Result_qtextedit(this);
 
   for (tmp_result_row_number= explorer_first_result_row, grid_row= 0;
-       (tmp_result_row_number < copy_of_parent->oei_count) && (grid_row < local_max_grid_rows);
+       (tmp_result_row_number < copy_of_parent->oei_count) && (grid_row < explorer_max_grid_rows);
        ++tmp_result_row_number)
   {
     if (copy_of_parent->oei[tmp_result_row_number].display_row_number != -1) /* i.e. not skippable */
@@ -9424,15 +9434,18 @@ repeat_loop: /* go back to here and redo with smaller local_max_grid_rows if res
   /* When calculating widget width we assume there is always a vertical scroll bar */
   /* I don't know why "+ 2" but it won't do significant damage. Maybe "+ 3" would be even better. */
   if (copy_of_parent->ocelot_explorer_width == "default")
+  {
     html_text_edit_width= d.size().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent) + 2;
+    /* Extra width if detached so space for context menu, whose parent is explorer_widget if detached. */
+    if (copy_of_parent->ocelot_explorer_detached == "yes") html_text_edit_width+= 300;
+  }
   else html_text_edit_width= copy_of_parent->ocelot_explorer_width.toInt();
 
-  if ((html_text_edit_height > this->height()) && (local_max_grid_rows > 1))
+  if ((html_text_edit_height > this->height()) && (explorer_max_grid_rows > 1))
   {
-    --local_max_grid_rows;
+    --explorer_max_grid_rows;
     goto repeat_loop;
   }
-
   html_text_edit->setHtml(tmp);
   html_text_edit->moveCursor(QTextCursor::Start);
   html_text_edit->ensureCursorVisible();
@@ -12090,7 +12103,10 @@ bool conditional_setting_evaluate(int cs_number,
                                   QString *cs_new_tooltip,        /* return */
                                   QString *cs_new_style_sheet,    /* return */
                                   QString *cs_new_cell_height,    /* return */
-                                  QString *cs_new_cell_width)     /* return */
+                                  QString *cs_new_cell_width,     /* return */
+                                  QString *cs_new_action,         /* return */
+                                  QString *cs_new_shortcut,       /* return */
+                                  QString *cs_new_text)           /* return */
 {
   copy_of_parent->log("conditional_setting_evaluate", 15);
   if (cs_cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL) return false; /* Temporary till we handle headers */
@@ -12187,9 +12203,9 @@ bool conditional_setting_evaluate(int cs_number,
           QString setting_value= text.mid(token_offsets[target_index + 2], token_lengths[target_index + 2]);
           if (setting_value.mid(0, 1) == "'") setting_value= setting_value.mid(1, setting_value.size() - 2);
           QString setting= text.mid(token_offsets[target_index], token_lengths[target_index]);
-          if (setting == "OCELOT_GRID_BACKGROUND_COLOR") k= new_style_sheet.indexOf("background-color:") + 17;
-          else if (setting == "OCELOT_GRID_TEXT_COLOR") k= new_style_sheet.indexOf("color:") + 6;
-          else if (setting == "OCELOT_GRID_FONT_SIZE")
+          if (setting.contains("_BACKGROUND_COLOR")) k= new_style_sheet.indexOf("background-color:") + 17;
+          else if (setting.contains("_TEXT_COLOR")) k= new_style_sheet.indexOf("color:") + 6;
+          else if (setting.contains("_FONT_SIZE"))
           {
             k= new_style_sheet.indexOf("font-size:") + 10;
             setting_value= setting_value + "pt";
@@ -12200,15 +12216,15 @@ bool conditional_setting_evaluate(int cs_number,
 //            k= new_style_sheet.indexOf(" ", k) + 1;
 //            k= new_style_sheet.indexOf(" ", k) + 1;
 //          }
-          else if (setting == "OCELOT_GRID_FONT_STYLE") k= new_style_sheet.indexOf("font-style:") + 11;
-          else if (setting == "OCELOT_GRID_FONT_WEIGHT") k= new_style_sheet.indexOf("font-weight:") + 12;
-          else if (setting == "OCELOT_GRID_FONT_FAMILY") k= new_style_sheet.indexOf("font-family:") + 12;
-//          else if (setting == "OCELOT_GRID_BORDER_SIZE") /* now we only use ocelot_grid_cell_border_size */
+          else if (setting.contains("_FONT_STYLE")) k= new_style_sheet.indexOf("font-style:") + 11;
+          else if (setting.contains("_FONT_WEIGHT")) k= new_style_sheet.indexOf("font-weight:") + 12;
+          else if (setting.contains("_FONT_FAMILY")) k= new_style_sheet.indexOf("font-family:") + 12;
+//          else if (setting.contains("_BORDER_SIZE")) /* now we only use ocelot_grid_cell_border_size */
 //          {
 //            k= new_style_sheet.indexOf("border:") + 7;
 //            setting_value= setting_value + "px";
 //          }
-          else if (setting == "OCELOT_GRID_TOOLTIP")
+          else if (setting.contains("_TOOLTIP"))
           {
             *cs_new_tooltip= setting_value; /* caller can say setTooltip */
             continue;
@@ -12221,6 +12237,22 @@ bool conditional_setting_evaluate(int cs_number,
           else if (setting == "OCELOT_GRID_CELL_WIDTH")
           {
             *cs_new_cell_width= setting_value; /* caller can change */
+            continue;
+          }
+
+          else if (setting == "OCELOT_EXPLORER_ACTION")
+          {
+            *cs_new_action= setting_value; /* caller can change */
+            continue;
+          }
+          else if (setting == "OCELOT_EXPLORER_SHORTCUT")
+          {
+            *cs_new_shortcut= setting_value; /* caller can change */
+            continue;
+          }
+          else if (setting == "OCELOT_EXPLORER_TEXT")
+          {
+            *cs_new_text= setting_value; /* caller can change */
             continue;
           }
           else break;
@@ -12270,6 +12302,7 @@ bool conditional_setting_evaluate_till_true(
   bool result;
   for (int i= 0; i < mw->conditional_settings.count(); ++i)
   {
+    QString cs_new_action, cs_new_shortcut, cs_new_text;
     result= conditional_setting_evaluate(i,
     cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
     cs_result_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
@@ -12282,7 +12315,10 @@ bool conditional_setting_evaluate_till_true(
     cs_new_tooltip,        /* return */
     cs_new_style_sheet,    /* return */
     cs_new_cell_height,    /* return */
-    cs_new_cell_width);     /* return */
+    cs_new_cell_width,     /* return */
+    &cs_new_action,
+    &cs_new_shortcut,
+    &cs_new_text);
     if (result == true)
     {
       *returned_cs_number= i;
@@ -14874,6 +14910,16 @@ bool eventFilter(QObject *obj, QEvent *event)
 #endif // #if (OCELOT_EXPLORER == 1)
 
 #if (OCELOT_EXPLORER == 1)
+
+/***********************************************************/
+/* THE EXPLORER WIDGET */
+/***********************************************************/
+
+/*
+  Class explorer_widget does not exist at this time.
+  For comments about it, see comments before MainWindow::initialize_widget_explorer().
+*/
+
 #ifndef CONTEXT_MENU_H
 #define CONTEXT_MENU_H
 
@@ -14951,7 +14997,7 @@ bool eventFilter(QObject *obj, QEvent *event)
   todo: something for menu->addSeparator()
   todo: validity check, although for default that isn't needed
   Todo: Syntax so far = SET ocelot_explorer_action='...' WHERE ocelot_explorer_text='[cmi.text choices]';
-        This causes Context_menu::edit(). So actions are "scriptable".
+        This some things to be updated immediately, others affected during display. So actions are "scriptable".
         Todo: extend thus:
           Allow NEW and all components (text, statement, etc.) to be added|changed.
           Allow effect on main menu too.
@@ -14970,7 +15016,7 @@ bool eventFilter(QObject *obj, QEvent *event)
   TODO: BUG: At one point we failed to show a table. It's okay now but watch for it happening again.
   TODO: BUG: occasional crash, again. I'm seeing whether it helps if I avoid "new".
   Todo: I dunno about 'M' and 'T' and '*'. Perhaps 'M%' | 'MariaDB' etc. and '%' would be clearer.
-  Todo: Context_menu::edit() should propose a text for the sake of ER_OK_PLUS e.g. warning what's not done.
+  Todo: During SET ocelot_explorer_... propose a text for the sake of ER_OK_PLUS e.g. warning what's not done.
   Todo: line_colors() looks like a good spot for marking something as disabled
   Todo: in set_current_row give a specific tooltip, e.g. text of action
   Todo: re shortcutter(): Check if visible? Check if explorer is visible? return something if match and action?
@@ -15022,7 +15068,6 @@ protected:
 
 public:
   void menu_context_t_2_explorer(const QPoint & pos);
-  int edit(int i_of_cmi, int target_type, QString text);
   context_menu_items cmi[MAX_CMI_COUNT];
   int cmi_count;
   void action(int current_row, int i_of_cmi);
