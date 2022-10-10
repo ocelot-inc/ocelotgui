@@ -12729,6 +12729,11 @@ int MainWindow::hparse_f_variables(int *i_of_define)
     If we are not connected, the default is "mysql" but the user can start with
     ocelotgui --ocelot_dbms=mariadb, and we store that in ocelot_dbms.
     I think that set_dbms_version() handles all this nowadays.
+  Todo: Typing "The rain in Spain falls mainly in the plain", then fiddling with edits at the end, is noticeably
+        slow. It's almost certainly because the first word is an error and the number of choices for the first
+        word of a statement is so great. Proof: typing "Select the rain in Spain falls mainly in the plain",
+        then fiddling with edits at the end, is not noticeably slower. So perhaps come up with a special check
+        for when what you're changing is long after the error and the word with the error hasn't changed.
 */
 void MainWindow::hparse_f_multi_block(QString text)
 {
@@ -13745,6 +13750,17 @@ int MainWindow::hparse_f_client_statement()
           if (hparse_errno > 0) return 0;
           if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_AND, "AND") != 1)
            && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_OR, "OR") != 1)) break;
+        }
+      }
+      else /* For some assignees WHERE is compulsory. Todo: this only checks last assignee, should check all.  */
+      {
+        if ((assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION)
+         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED)
+         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT)
+         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT))
+        {
+          hparse_f_error();
+          return 0;
         }
       }
     }

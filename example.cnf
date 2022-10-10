@@ -3,6 +3,25 @@
 #... but it's only an example of syntax, not of good taste
 [ocelot]
 
+#ocelot_explorer_action=
+#ocelot_explorer_applicable_dbmss=
+#ocelot_explorer_applicable_types=
+#ocelot_explorer_background_color=
+ocelot_explorer_detached='no'
+ocelot_explorer_enabled=''
+#ocelot_explorer_font_family=
+#ocelot_explorer_font_size=
+#ocelot_explorer_font_style=
+#ocelot_explorer_font_weight=
+ocelot_explorer_height='default'
+ocelot_explorer_left='default'
+#ocelot_explorer_shortcut=
+#ocelot_explorer_text=
+#ocelot_explorer_text_color=
+ocelot_explorer_top='default'
+ocelot_explorer_visible='no'
+ocelot_explorer_width='default'
+
 ocelot_explorer_detached='no'
 ocelot_explorer_left='default'
 ocelot_explorer_top='default'
@@ -48,6 +67,7 @@ ocelot_history_height='default'
 ocelot_histfileflags='L'
 ocelot_histfilesize=2000000000
 ocelot_histsize=500
+ocelot_max_conditions='5'
 
 ocelot_menu_text_color='skyblue'
 ocelot_menu_background_color='tomato'

@@ -268,6 +268,7 @@
   static unsigned short ocelot_opt_local_infile= 0;    /* --local_infile[=n]  for MYSQL_OPT_LOCAL_INFILE */
   /* QString ocelot_login_path */            /* --login_path=s */
   static unsigned short int ocelot_log_level= 100;          /* --ocelot_log_level */
+  static unsigned short int ocelot_max_conditions= 5;
   static unsigned long int ocelot_max_allowed_packet= 16777216; /* --max_allowed_packet=n */
   static unsigned long int ocelot_max_join_size= 1000000; /* --max_join_size = n */
   static unsigned short ocelot_named_commands= 0;         /* --named_commands */
@@ -11551,9 +11552,25 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         return 1;
       }
 #endif
+      if (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_MAX_CONDITIONS)
+      {
+        QString new_value_string= text.mid(sub_token_offsets[3], sub_token_lengths[3]);
+        ocelot_max_conditions= new_value_string.toInt();
+        while (conditional_settings.count() > ocelot_max_conditions) /* remove existing in reverse order */
+          conditional_settings.removeAt(0);
+        put_message_in_result("OK");
+        return 1;
+      }
       // todo: I think we won't get here if name doesn't start with ocelot_, but maybe make sure again
       if ((sub_token_types[4] == TOKEN_KEYWORD_WHERE) || (text.mid(sub_token_offsets[4], sub_token_lengths[4]) == ","))
       {
+        if (conditional_settings.count() >= ocelot_max_conditions)
+        {
+          char msg[512];
+          sprintf(msg, "Error: maximum number of conditional statements is %d. To increase, say SET ocelot_max_conditions=N;", ocelot_max_conditions);
+          put_message_in_result(msg);
+          return 1;
+        }
         int er= conditional_settings_insert(text);
         if (er != ER_OVERFLOW)
         {
@@ -11752,9 +11769,8 @@ int MainWindow::conditional_settings_insert(QString text)
       else return ER_ERROR;
     }
   }
-  /* This makes maximum number of statements = 1. It should be temporary! */
-  conditional_settings.clear();
-  conditional_settings.insert(0, o);
+  /* Increase conditional_settings.count() which could slow display so ocelot_max_conditionals should be small. */
+  conditional_settings.append(o);
   /* Immediate evaluation for explorer action | shortcut | text which are permanent */
   for (int i_of_cmi= 0; i_of_cmi < explorer_widget->html_text_edit->explorer_context_menu->cmi_count; ++i_of_cmi)
   {
@@ -11765,13 +11781,14 @@ int MainWindow::conditional_settings_insert(QString text)
     QString cs_new_cell_height;
     QString cs_new_cell_width;
     QString cs_new_action= "[]";
+    QString cs_new_enabled= "[]";
     QString cs_new_shortcut= "[]";
     QString cs_new_text= "[]";
     QString string= explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].text;
     /* Todo: Stripping lead+trail spaces does not remove a shortcut. Should we remove shortcuts? */
     //string= string.trimmed(); unnecessary?
     QByteArray string_utf8= string.toUtf8();
-    result_of_evaluate= explorer_widget->conditional_setting_evaluate(0,
+    result_of_evaluate= explorer_widget->conditional_setting_evaluate(conditional_settings.count() - 1,
                                         1,           /* i.e. result set column number */
                                         1,       /* e.g. text_frame->ancestor_grid_result_row_number */
                                         string_utf8.data(),       /* e.g. text_frame->content_pointer */
@@ -11785,11 +11802,13 @@ int MainWindow::conditional_settings_insert(QString text)
                                         &cs_new_cell_height,
                                         &cs_new_cell_width,
                                         &cs_new_action,
+                                        &cs_new_enabled,
                                         &cs_new_shortcut,
                                         &cs_new_text);
     if (result_of_evaluate == true)
     {
       if (cs_new_action != "[]") explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].action= cs_new_action;
+      if (cs_new_enabled != "[]") explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].enabled= cs_new_enabled.toLower();
       if (cs_new_shortcut != "[]") explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].shortcut= cs_new_shortcut;
       if (cs_new_text != "[]") explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].text= cs_new_text;
     }
@@ -13519,7 +13538,6 @@ void MainWindow::initial_asserts()
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
   assert(TOKEN_KEYWORD_QUESTIONMARK == TOKEN_KEYWORDS_START);
-
 #ifdef ADDITIONAL_ASSERTS
   //* Test strvalues is ordered by bsearching for every item. */
   // This is commented out i.e. we don't define ADDITIONAL_ASSERTS unless there has been a change to the list */
@@ -18576,9 +18594,9 @@ void Completer_widget::line_colors(int associated_widget_type)
     QString cs_new_cell_width;
     int returned_cs_number;
     QString style_string= main_window->ocelot_explorer_style_string;
+    QString string= string_list.at(i);
     if (associated_widget_type == EXPLORER_WIDGET)
     {
-      QString string= string_list.at(i);
       /* Todo: Stripping lead+trail spaces does not remove a shortcut. Should we remove shortcuts? */
       string= string.trimmed();
       QByteArray string_utf8= string.toUtf8();
@@ -18594,7 +18612,10 @@ void Completer_widget::line_colors(int associated_widget_type)
                                           &cs_new_cell_height,    /* return */
                                           &cs_new_cell_width,     /* return */
                                           &returned_cs_number);        /* return */
-      if (result_of_evaluate == true) style_string= cs_new_style_sheet;
+      if (result_of_evaluate == true)
+      {
+        style_string= cs_new_style_sheet;
+      }
     }
     if (associated_widget_type == STATEMENT_WIDGET)
     {
@@ -18620,23 +18641,38 @@ void Completer_widget::line_colors(int associated_widget_type)
     selection.cursor.clearSelection();
     extraSelections.append(selection);
     setExtraSelections(extraSelections);
-    if (i != current_row)
+
+    bool is_enabled= true;
+    if (associated_widget_type == EXPLORER_WIDGET)
     {
-      if (associated_widget_type == STATEMENT_WIDGET)
-        line_color= QColor(main_window->ocelot_statement_background_color);
-      else /* EXPLORER_WIDGET */
+      int i_of_cmi= i_of_cmi_of_text(string);
+      if (i_of_cmi != -1)
       {
-      if (result_of_evaluate == true)
-      {
-        line_color= main_window->get_background_color_from_style_sheet(style_string);
-      }
-      else
-        line_color= QColor(main_window->ocelot_explorer_background_color);
+        QString e= main_window->explorer_widget->html_text_edit->explorer_context_menu->cmi[i_of_cmi].enabled;
+        if (e == "no") is_enabled= false;
       }
     }
+    if (is_enabled == false) line_color= Qt::lightGray;
     else
     {
-      line_color= QColor(main_window->ocelot_statement_highlight_current_line_color).lighter(160);
+      if (i != current_row)
+      {
+        if (associated_widget_type == STATEMENT_WIDGET)
+          line_color= QColor(main_window->ocelot_statement_background_color);
+        else /* EXPLORER_WIDGET */
+        {
+          if (result_of_evaluate == true)
+          {
+            line_color= main_window->get_background_color_from_style_sheet(style_string);
+          }
+          else
+            line_color= QColor(main_window->ocelot_explorer_background_color);
+        }
+      }
+      else
+      {
+        line_color= QColor(main_window->ocelot_statement_highlight_current_line_color).lighter(160);
+      }
     }
     selection.format.setBackground(line_color);
     selection.format.setProperty(QTextFormat::FullWidthSelection, true);
@@ -18647,6 +18683,30 @@ void Completer_widget::line_colors(int associated_widget_type)
   }
   tc.movePosition(QTextCursor::Start, QTextCursor::MoveAnchor, 1);
   setTextCursor(tc);
+}
+
+/*
+  Called from: line_colors() but probably interesting elsewhere
+  We want to know whether an item the explorer context menu is matched with a cmi that has enabled = 'no'.
+  Warning: the menu text can include the shortcut, which you don't want to compare.
+*/
+int Completer_widget::i_of_cmi_of_text(QString string)
+{
+  QString trimmed_string= string.trimmed();
+  int cmi_count= main_window->explorer_widget->html_text_edit->explorer_context_menu->cmi_count;
+  for (int i= 0; i < cmi_count; ++i)
+  {
+    QString t= main_window->explorer_widget->html_text_edit->explorer_context_menu->cmi[i].text;
+    QString s= main_window->explorer_widget->html_text_edit->explorer_context_menu->cmi[i].shortcut;
+    if ((s != "") && (trimmed_string.contains(s)))
+    {
+      int shortcut_length= s.length();
+      trimmed_string= trimmed_string.left(trimmed_string.length() - shortcut_length);
+      trimmed_string= trimmed_string.trimmed();
+    }
+    if (t == trimmed_string) return i;
+  }
+  return -1;
 }
 
 /*
@@ -21063,9 +21123,9 @@ void Context_menu::menu_context_t_2_explorer(const QPoint & pos)
 void Context_menu::action(int current_row, int i_of_cmi)
 {
   int i_of_cmi_visible= 0;
-  bool is_match= false;
   if (current_row >= 0)
   {
+    bool is_match= false;
     for (i_of_cmi= 0; i_of_cmi < cmi_count; ++i_of_cmi)
     {
       if (cmi[i_of_cmi].is_visible == false) continue;
@@ -21077,10 +21137,16 @@ void Context_menu::action(int current_row, int i_of_cmi)
       if (i_of_cmi_visible != current_row)
       ++i_of_cmi_visible;
     }
+    if (is_match == false)
+    {
+      /* ?? Unknown action. This must be an error, eh? */
+      printf("Unknown action\n");
+      return;
+    }
   }
-  if (is_match == false)
+  if (cmi[i_of_cmi].enabled == "no")
   {
-    /* ?? Unknown action. This must be an error, eh? */
+    printf("**** enabled = no\n");
     return;
   }
   {
@@ -21129,7 +21195,9 @@ void Context_menu::action(int current_row, int i_of_cmi)
     }
 #endif
     else if (s == "RESET;")
+    {
       result_grid->explorer_reset();
+    }
     else if (s.startsWith("FILTER=", Qt::CaseInsensitive) == true) /* probably "FILTER=${schema_name}" */
       result_grid->explorer_filter(q->qtextedit_result_row_number);
     else
@@ -27080,7 +27148,6 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
   so we switched to this. 140 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
-  Todo: ocelot_grid_border_size is no longer used but we'll probably add something else soon
   We don't have ocelot_export in the list, I don't think it's needed.
 */
 int XSettings::ocelot_variables_create()
@@ -27115,7 +27182,6 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_extra_rule_1_display_as, NULL,  -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS},
     {&main_window->ocelot_extra_rule_1_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR},
     {&main_window->ocelot_grid_background_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR},
-    {&main_window->ocelot_grid_border_size, NULL,  9, 0, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE},
     {&main_window->ocelot_grid_cell_border_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR},
     {&main_window->ocelot_grid_cell_border_size, NULL,  10, 0, OCELOT_VARIABLE_ENUM_SET_FOR_GRID, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
     {&main_window->ocelot_grid_cell_height, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
@@ -27156,6 +27222,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_html,  1, 0, 0, TOKEN_KEYWORD_OCELOT_HTMLRAW},
     {&main_window->ocelot_language, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {NULL, &ocelot_log_level,  10000, 0, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
+    {NULL, &ocelot_max_conditions, 10000,  0, 0, TOKEN_KEYWORD_OCELOT_MAX_CONDITIONS},
     {&main_window->ocelot_menu_background_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
     {&main_window->ocelot_menu_border_color, NULL,  -1, 0, 0, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR},
     {&main_window->ocelot_menu_font_family, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_FAMILY, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY},
@@ -27566,21 +27633,20 @@ XSettings::~XSettings()
   Style:
     It's a result grid. So it is wider, and has less decoration, compared to others.
     However, users get some features without needing to learn anything new:
-    * SET works. E.g. SET ocelot_grid_background_color = 'tan' WHERE row_number = 5; (if you REFRESH)
+    * SET works. E.g. SET ocelot_explorer_background_color = 'tan' WHERE value > 'sys'; (if you REFRESH)
     * ^Find works. (if it's visible)
     * Vertical scroll bar works.
-    * Most things that affect Settings | Result Grid affect explorer too.
     * One difference: dragging doesn't happen. There wouldn't be much point, since items are short.
   Columns: all of which are 'TEXT':
     #1: Min. = Unicode Black Down-Pointing Triangle or Black Right-Pointing Triangle if database or table.
         If it's a database or table, this can be clicked to hide the parts e.g. columns, or to show them again.
         (We call this "toggling".)
-        It's treated as a header item, that is, Result Grid Settings for header affect it.
-        So ordinarily it has a different background color.
+        Ordinarily it has a different background color (grid header background color).
     #2: object_type. S or T or V or C or P or I or E or t
     #3: object_name. for example, if object_type='T', this is a table name.
         If object_type='C', this is a column name and is taken from part_name.
   Settings ... for Explorer
+    Explorer Text Color | Background Color | Font -- As with other widgets, these can all be changed.
     Visible: yes|no. Default no. So if you don't change this to 'yes', there's nothing.
     Sort alphabetically: If 'yes', objects of the same type are sorted alphabetically. Default is 'no'.
     Query: a long select with unions.
@@ -27599,11 +27665,11 @@ XSettings::~XSettings()
       For example if it's over a table, then table-related menu items will appear.
       The list of possible items is in the comment preceding menu_context_t_2_explorer.
   SET statements:
-    SET ocelot_grid_cell_height=0 ... WHERE ...; causes matching rows to disappear, i.e. this is our "filter".
-    New keywords begin with TOKEN_KEYWORD_OCELOT_EXPLORER e.g. TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED
+    ???? Remove this? SET ocelot_grid_cell_height=0 ... WHERE ...; causes matching rows to disappear, i.e. this is our "filter".
+    New keywords begin with OCELOT_EXPLORER e.g. OCELOT_EXPLORER_DETACHED
     Important one: ocelot_visible='yes'|'no'
   REFRESH:
-    A bit similar to REHASH, but this gets all schemas (databases) -- so has an effect on the server..
+    A bit similar to REHASH, but this gets all schemas (databases) -- so has an effect on the server.
     REFRESH is necessary because we don't know when other users might change data definitions. And it's slow.
     Whenever users say REFRESH, the explorer tables are redone.
     In another product this would be done with a View menu.
@@ -27629,11 +27695,10 @@ XSettings::~XSettings()
         Could be "Explorer" + "Right-click for context menu" + "See Help|Explorer" + object type = Column, X, in table Y
   Todo: Something that shows referencing|referenced relationships of foreign keys, preferably visual.
         Add to query: something that gets us foreign keys.
-  Todo: SET could have an additional possible condition: AND result_grid_number = -1.
   Todo: If you lack privileges for an object, you should gray some things in the menu.
         This would always be true if current database = information_schema.
   Todo: Pixmaps instead of Unicode characters for Down-pointing and Right-pointing triangle.
-  Todo: Dialog box for Filter (can be done with SET ocelot_grid_cell_size=0 or query change)
+  Todo: Dialog box for Filter (can be done with query change)
   Todo: Dialog box for Sort (can be done with query change) (we already have Settings|Sort alphabetically)
   Todo: Help|Explorer widget, and change to README.
   Todo: example.cnf should have whatever the new options are.
@@ -27673,6 +27738,10 @@ XSettings::~XSettings()
         Todo: In Tarantool, how good it would be to have options for creating information_schema_tables etc.!
         Todo: There could be an ocelot_explorer_focus_cell_background_color as there is for grid_cell
         Todo: There could be an ocelot_explorer_tooltip as there is for grid
+        Todo: If font = Nimbus mono the height is too great, although with other fonts problem wasn't noticed.
+        Todo: ostrings.h needs new items for explorer-related errors and settings
+        Todo:  a main-menu "set focus" or at least "set visible" shortcut, (change to "hide" when it's visible)
+      Todo: Add more one-keystroke controls for navigating in explorer
 */
 void MainWindow::initialize_widget_explorer()
 {

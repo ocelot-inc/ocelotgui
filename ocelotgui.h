@@ -803,7 +803,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS,
     TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR,
-    TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE, /* no longer used */
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT,
@@ -846,6 +845,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_IMPORT, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     TOKEN_KEYWORD_OCELOT_LANGUAGE,
     TOKEN_KEYWORD_OCELOT_LOG_LEVEL,
+    TOKEN_KEYWORD_OCELOT_MAX_CONDITIONS,
     TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR,
     TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY,
@@ -2055,7 +2055,7 @@ static const keywords strvalues[]=
     {"OCELOT_EXPLORER_APPLICABLE_TYPES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_APPLICABLE_TYPES},
     {"OCELOT_EXPLORER_BACKGROUND_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_BACKGROUND_COLOR},
     {"OCELOT_EXPLORER_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_DETACHED},
-    {"OCELOT_EXPLORER_ENABLED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED},
+    {"OCELOT_EXPLORER_ENABLED", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED},
     {"OCELOT_EXPLORER_FONT_FAMILY", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_FAMILY},
     {"OCELOT_EXPLORER_FONT_SIZE", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_SIZE},
     {"OCELOT_EXPLORER_FONT_STYLE", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_EXPLORER_FONT_STYLE},
@@ -2074,7 +2074,6 @@ static const keywords strvalues[]=
     {"OCELOT_EXTRA_RULE_1_DISPLAY_AS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_DISPLAY_AS},
     {"OCELOT_EXTRA_RULE_1_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_EXTRA_RULE_1_TEXT_COLOR},
     {"OCELOT_GRID_BACKGROUND_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_BACKGROUND_COLOR},
-    {"OCELOT_GRID_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_BORDER_SIZE}, /* no longer used */
     {"OCELOT_GRID_CELL_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_COLOR},
     {"OCELOT_GRID_CELL_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
     {"OCELOT_GRID_CELL_HEIGHT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
@@ -2117,6 +2116,7 @@ static const keywords strvalues[]=
     {"OCELOT_IMPORT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_IMPORT}, /* if OCELOT_IMPORT_EXPORT == 1 */ /* unused */
     {"OCELOT_LANGUAGE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LANGUAGE},
     {"OCELOT_LOG_LEVEL", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_OCELOT_LOG_LEVEL},
+    {"OCELOT_MAX_CONDITIONS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MAX_CONDITIONS},
     {"OCELOT_MENU_BACKGROUND_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BACKGROUND_COLOR},
     {"OCELOT_MENU_BORDER_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_BORDER_COLOR},
     {"OCELOT_MENU_FONT_FAMILY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_FAMILY},
@@ -3196,7 +3196,6 @@ public:
   QString ocelot_grid_font_weight, new_ocelot_grid_font_weight;
   QString ocelot_grid_cell_border_color, new_ocelot_grid_cell_border_color;
   QString ocelot_grid_outer_color, new_ocelot_grid_outer_color;
-  QString ocelot_grid_border_size, new_ocelot_grid_border_size; /* no longer used */
   QString ocelot_grid_cell_border_size, new_ocelot_grid_cell_border_size;
 //  QString ocelot_grid_cell_drag_line_size, new_ocelot_grid_cell_drag_line_size; /* no longer used */
   QString ocelot_grid_cell_height, new_ocelot_grid_cell_height;
@@ -5052,6 +5051,7 @@ void updater();
 void timer_reset();
 bool shortcut_override(QKeySequence shortcut);
 void line_colors(int associated_widget_type);
+int i_of_cmi_of_text(QString string);
 
 Completer_widget()
 {
@@ -8208,7 +8208,6 @@ int thin_image(char *tmp_pointer, const char *th_or_td, int height)
 
   border-color = copy_of_parent->ocelot_grid_cell_border_color;
   copy_of_parent->ocelot_grid_cell_drag_line_color; (no)
-  copy_of_parent->ocelot_grid_border_size; (no)
   copy_of_parent->ocelot_grid_cell_border_size;
   copy_of_parent->ocelot_grid_cell_drag_line_size;
   Todo: I think hide() is unnecessary because the caller has already done it.
@@ -8327,6 +8326,7 @@ void prepare_for_display_html()
         QString new_cell_height= "";
         QString new_cell_width= "";
         QString new_action= "";
+        QString new_enabled= "";
         QString new_shortcut= "";
         QString new_text= "";
         bool result= conditional_setting_evaluate(
@@ -8340,7 +8340,7 @@ void prepare_for_display_html()
              old_style_sheet,          /* old_style_sheet */
              true,        /* is_always_true */
              &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width,
-             &new_action, &new_shortcut, &new_text);
+             &new_action, &new_enabled, &new_shortcut, &new_text);
         if (result == true)
         {
           strcpy(tmp_div, " .E0 {");                        /* for <div> */
@@ -12105,6 +12105,7 @@ bool conditional_setting_evaluate(int cs_number,
                                   QString *cs_new_cell_height,    /* return */
                                   QString *cs_new_cell_width,     /* return */
                                   QString *cs_new_action,         /* return */
+                                  QString *cs_new_enabled,        /* return */
                                   QString *cs_new_shortcut,       /* return */
                                   QString *cs_new_text)           /* return */
 {
@@ -12245,6 +12246,11 @@ bool conditional_setting_evaluate(int cs_number,
             *cs_new_action= setting_value; /* caller can change */
             continue;
           }
+          else if (setting == "OCELOT_EXPLORER_ENABLED")
+          {
+            *cs_new_enabled= setting_value; /* caller can change */
+            continue;
+          }
           else if (setting == "OCELOT_EXPLORER_SHORTCUT")
           {
             *cs_new_shortcut= setting_value; /* caller can change */
@@ -12302,7 +12308,7 @@ bool conditional_setting_evaluate_till_true(
   bool result;
   for (int i= 0; i < mw->conditional_settings.count(); ++i)
   {
-    QString cs_new_action, cs_new_shortcut, cs_new_text;
+    QString cs_new_action, cs_new_enabled, cs_new_shortcut, cs_new_text;
     result= conditional_setting_evaluate(i,
     cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
     cs_result_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
@@ -12317,6 +12323,7 @@ bool conditional_setting_evaluate_till_true(
     cs_new_cell_height,    /* return */
     cs_new_cell_width,     /* return */
     &cs_new_action,
+    &cs_new_enabled,
     &cs_new_shortcut,
     &cs_new_text);
     if (result == true)
@@ -12971,7 +12978,6 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
   copy_of_parent->new_ocelot_grid_font_weight= copy_of_parent->ocelot_grid_font_weight;
   copy_of_parent->new_ocelot_grid_cell_border_color= copy_of_parent->ocelot_grid_cell_border_color;
   copy_of_parent->new_ocelot_grid_outer_color= copy_of_parent->ocelot_grid_outer_color;
-//  copy_of_parent->new_ocelot_grid_border_size= copy_of_parent->ocelot_grid_border_size;
   copy_of_parent->new_ocelot_grid_cell_border_size= copy_of_parent->ocelot_grid_cell_border_size;
   copy_of_parent->new_ocelot_grid_cell_width= copy_of_parent->ocelot_grid_cell_width;
   copy_of_parent->new_ocelot_grid_cell_height= copy_of_parent->ocelot_grid_cell_height;
@@ -13730,11 +13736,11 @@ void set_widget_values(int ci)
   {
     switch (ci)
     {
-    case 0: { color_type= menu_strings[menu_off + MENU_MENU_TEXT_COLOR];
+    case 0: { color_type= "Explorer Text Color";
               color_name= copy_of_parent->new_ocelot_explorer_text_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
-    case 1: { color_type= menu_strings[menu_off + MENU_MENU_BACKGROUND_COLOR];
+    case 1: { color_type= "Explorer Background Color";
               color_name= copy_of_parent->new_ocelot_explorer_background_color;
               color_name= copy_of_parent->canonical_color_name(color_name);
               break; }
@@ -14788,7 +14794,6 @@ class XSettings : public QWidget
   Todo: Make sure ocelot_horizontal and ocelot_htmlraw, which have no variables, actually cause the changes.
   Todo: Check whether there has actually been a style change.
   Todo: For grid's set_all_style_sheets, we only redo existing display if there has been a font change.
-  Todo: ocelot_grid_border_size isn't on the settings menu (well, we're not going to bother with it anyway)
   Todo: merge with Settings class?
 */
 
@@ -15017,7 +15022,7 @@ bool eventFilter(QObject *obj, QEvent *event)
   TODO: BUG: occasional crash, again. I'm seeing whether it helps if I avoid "new".
   Todo: I dunno about 'M' and 'T' and '*'. Perhaps 'M%' | 'MariaDB' etc. and '%' would be clearer.
   Todo: During SET ocelot_explorer_... propose a text for the sake of ER_OK_PLUS e.g. warning what's not done.
-  Todo: line_colors() looks like a good spot for marking something as disabled
+  Todo: line_colors() looks like a good spot for marking something as disabled -- nearly done.
   Todo: in set_current_row give a specific tooltip, e.g. text of action
   Todo: re shortcutter(): Check if visible? Check if explorer is visible? return something if match and action?
   Todo: how to see what the current values are? At least make a separate .h file?
