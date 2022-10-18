@@ -950,6 +950,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_PERCENTILE_CONT,
     TOKEN_KEYWORD_PERCENTILE_DISC,
     TOKEN_KEYWORD_PERCENT_RANK,
+    TOKEN_KEYWORD_PERIOD,
     TOKEN_KEYWORD_PERIOD_ADD,
     TOKEN_KEYWORD_PERIOD_DIFF,
     TOKEN_KEYWORD_PERSIST,
@@ -1236,6 +1237,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SYSDATE,
         TOKEN_KEYWORD_SYSLOG,
     TOKEN_KEYWORD_SYSTEM,
+    TOKEN_KEYWORD_SYSTEM_TIME,
     TOKEN_KEYWORD_SYSTEM_USER,
     TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN,
     TOKEN_KEYWORD_TAB,
@@ -1316,6 +1318,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_VAR_SAMP,
         TOKEN_KEYWORD_VERBOSE,
     TOKEN_KEYWORD_VERSION,
+    TOKEN_KEYWORD_VERSIONING,
     TOKEN_KEYWORD_VERSION_TOKEN_ADMIN,
         TOKEN_KEYWORD_VERTICAL,
     TOKEN_KEYWORD_VIEW,
@@ -1445,7 +1448,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1203
+#define KEYWORD_LIST_SIZE 1206
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2222,6 +2225,7 @@ static const keywords strvalues[]=
       {"PERCENTILE_CONT", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_CONT}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"PERCENTILE_DISC", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERCENTILE_DISC}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
       {"PERCENT_RANK", FLAG_VERSION_MYSQL_8_0, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_2_2, TOKEN_KEYWORD_PERCENT_RANK},
+      {"PERIOD", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_PERIOD},
       {"PERIOD_ADD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PERIOD_ADD},
       {"PERIOD_DIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PERIOD_DIFF},
     {"PERSIST", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_PERSIST},
@@ -2508,6 +2512,7 @@ static const keywords strvalues[]=
       {"SYSDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SYSDATE},
         {"SYSLOG", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_SYSLOG},
       {"SYSTEM", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SYSTEM}, /* ocelotgui keyword */
+      {"SYSTEM_TIME", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_SYSTEM_TIME},
       {"SYSTEM_USER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SYSTEM_USER},
           {"SYSTEM_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN},
       {"TAB", 0, 0, TOKEN_KEYWORD_TAB}, /* for format rule */
@@ -2588,6 +2593,7 @@ static const keywords strvalues[]=
       {"VAR_SAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VAR_SAMP},
         {"VERBOSE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_VERBOSE},
       {"VERSION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_OPTION, TOKEN_KEYWORD_VERSION},
+      {"VERSIONING", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_VERSIONING},
           {"VERSION_TOKEN_ADMIN", 0, 0, TOKEN_KEYWORD_VERSION_TOKEN_ADMIN},
         {"VERTICAL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_VERTICAL},
       {"VIEW", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_VIEW},
@@ -3429,7 +3435,7 @@ public:
   int hparse_f_create_definition(int);
   int hparse_f_default_clause(int);
   int hparse_f_current_timestamp();
-  void hparse_f_column_definition();
+  void hparse_f_column_definition(int last_word);
   void hparse_f_comment();
   void hparse_f_column_list(int,int);
   void hparse_f_engine();
@@ -3872,9 +3878,9 @@ private:
   void tee_export(QString);
   QString history_markup_copy_for_history(QString);
   int history_file_start(QString, QString, QString *r);        /* see comment=tee+hist */
-  void history_file_stop(QString);                 /* see comment=tee+hist */
 public:
   void history_file_write(QString, QString, bool);       /* see comment=tee+hist */
+  void history_file_stop(QString);                 /* see comment=tee+hist */
 private:
   void history_file_to_history_widget();           /* see comment=tee+hist */
   int history_line(char *);
@@ -6686,6 +6692,7 @@ public:
   QScrollArea *grid_scroll_area;
   int result_grid_type; /* 0 or EXPLORER_WIDGET */
   unsigned int explorer_max_grid_rows;
+  unsigned int explorer_max_name_width_in_chars;                 /* = EXPLORER_FIXED_NAME_WIDTH if default */
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   unsigned int result_column_count;
   long unsigned int result_row_count, grid_result_row_count;
@@ -8217,8 +8224,16 @@ int thin_image(char *tmp_pointer, const char *th_or_td, int height)
      (someday look up: is default = groove? ridge? inset? outset?)
 */
 
+/*
+  Re ocelot_grid_table_start size: Each condition_div adds about 150 characters to ocelot_grid_table_start,
+  which has about 400 characters for other things.
+  Therefore if we have 10 conditions we need at least 150 * 10 + 400 == 2000.
+  Double that. And say you can't increase OCELOT_MAX_CONDITIONS to more than 10.
+*/
+#define MAX_MAX_CONDITIONS 10
+
 /* shared */
-char ocelot_grid_table_start[1896]; /* TODO: this can be too small if many conditionals */
+char ocelot_grid_table_start[4000]; /* See comment above re ocelot_grid_table_start size */
 char ocelot_grid_header_row_start[32];
 char ocelot_grid_header_row_end[32];
 char ocelot_grid_header_numeric_column_start[32];
@@ -8311,9 +8326,12 @@ void prepare_for_display_html()
         strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
         strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
       }
-      char tmp_div[512];
+      char condition_div[512];
+      QByteArray all_condition_divs;
+      all_condition_divs.clear(); /* probably unnecessary */
+      /* Produce a "<div ...>" for each conditional setting (HTML only!) See whether we can change color at least */
+      for (int condition_number= 0; condition_number < copy_of_parent->conditional_settings.count(); ++condition_number)
       {
-        /* TEST!!! start: See whether we can change color, at least. HTML only! SHOULD BE IN A LOOP! */
         QString new_tooltip= "";
 
         QString new_style_sheet, old_style_sheet;
@@ -8330,7 +8348,7 @@ void prepare_for_display_html()
         QString new_shortcut= "";
         QString new_text= "";
         bool result= conditional_setting_evaluate(
-             0, /* cs_number */
+             condition_number, /* cs_number */
              0, /* doesn't matter */
              0, /* doesn't matter */
              0, /* doesn't matter */
@@ -8341,16 +8359,17 @@ void prepare_for_display_html()
              true,        /* is_always_true */
              &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width,
              &new_action, &new_enabled, &new_shortcut, &new_text);
-        if (result == true)
+        if (result == true) /* unnecessary, we passed always_true */
         {
-          strcpy(tmp_div, " .E0 {");                        /* for <div> */
-          strcat(tmp_div, new_style_sheet.toUtf8());
-          strcat(tmp_div, "} ");
+          sprintf(condition_div, " .E%d {", condition_number);        /* so <div> label is E0, E1, etc. */
+          strcat(condition_div, new_style_sheet.toUtf8());
+          strcat(condition_div, "} ");
         }
-        else tmp_div[0]= '\0';
+        else condition_div[0]= '\0';
+        all_condition_divs.append(condition_div);
       }
       sprintf(ocelot_grid_table_start,"<HTML><HEAD><style type=text/css>"
-              " %s "                                                /* tmp_div */
+              " %s "                                                /* all_condition_divs */
               " table {border-style: solid; background-color: %s; border-color: %s} "    /* html_border_color */
               " body {"
               "background-color: purple; "
@@ -8366,7 +8385,7 @@ void prepare_for_display_html()
               "background-color: %s; "                              /* html_background_color */
               "}"
               "</style></HEAD><BODY bgcolor=%s><TABLE BORDER=%d blue>", /* html_border_size */
-              tmp_div,
+              all_condition_divs.data(),
               html_border_color, /* table{background-color:...} will look like cell border color */
               html_border_color, /* table{border-color:...} will look like cell border color */
               html_color,        /* body {color} will be color of text in th and td */
@@ -9016,8 +9035,7 @@ unsigned int explorer_first_result_row;
 #define EXPLORER_FLAG_MIN 1/* = 1 if minimized */
 #define EXPLORER_FLAG_FILTERED 2 /* = 2 if filtered */
 #define EXPLORER_FLAG_NOT_FILTERED 4 /* = 4 if not filtered i.e. this alone is not filtered, all others are */
-
-
+#define EXPLORER_FIXED_NAME_WIDTH 20 /* arbitrary, big names take more lines */
 /*
   Re scroll bars:
     We have a separate vertical scroll bar, it is always present although if it is was possible to have
@@ -9071,7 +9089,6 @@ void explorer_initialize() /* default explorer widget settings, most of which wi
   grid_scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 }
 
-#define EXPLORER_FIXED_NAME_WIDTH 20 /* arbitrary, big names take more lines */
 /* The explorer_display_html() stuff that must be called once.
   Todo: Loop 1 only needs to be done once, we're repeating it for every refresh.
   result_row_count is the maximum for the vertical scroll bar
@@ -9102,12 +9119,26 @@ void explorer_display()
   prepare_for_display_html();
   display_html(0, 0);  /* effectively: explorer_display_html(0) */
 }
+
 void explorer_display_part()
 {
   unsigned int r_of_s= 0;                            /* so when we se anything but "S" we can find its "S" */
   unsigned int r_of_t= 0;                            /* so when we see "C" or "I" we can find its "T"  or "V" */
   int new_cell_height;
   result_row_count= 0; /* this will be less than oei_count if some rows are skipped e.g. due to minimize */
+  QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
+
+  if (copy_of_parent->ocelot_explorer_width == "default")
+    explorer_max_name_width_in_chars= EXPLORER_FIXED_NAME_WIDTH;
+  {
+    int width_of_one_char= result_grid_font_metrics.boundingRect("W").width();
+    int width_of_widget= copy_of_parent->ocelot_explorer_width.toInt();
+    width_of_widget-= (style()->pixelMetric(QStyle::PM_ScrollBarExtent) + 2);
+    width_of_widget-= (width_of_one_char * 7); /* size of preceding columns + extra */
+    width_of_widget-= setting_ocelot_grid_cell_border_size_as_int * 6; /* assuming 3 columns */
+    explorer_max_name_width_in_chars= width_of_widget / width_of_one_char;
+    if (explorer_max_name_width_in_chars < EXPLORER_FIXED_NAME_WIDTH) explorer_max_name_width_in_chars= EXPLORER_FIXED_NAME_WIDTH;
+  }
 
   unsigned int tmp_result_row_number;
 
@@ -9182,10 +9213,10 @@ void explorer_display_part()
     if (max_object_name_size < object_name_size) max_object_name_size= object_name_size;
     copy_of_parent->oei[tmp_result_row_number].display_row_number= result_row_count;
     ++result_row_count;
-    if (max_object_name_size > EXPLORER_FIXED_NAME_WIDTH) max_object_name_size= EXPLORER_FIXED_NAME_WIDTH;
-    char tmp_string_1[EXPLORER_FIXED_NAME_WIDTH * 4];
+    if (max_object_name_size > explorer_max_name_width_in_chars) max_object_name_size= explorer_max_name_width_in_chars;
+    if (max_object_name_size > 128) max_object_name_size= 128;
+    char tmp_string_1[128 * 4 + 1]; /* if 128-char name, all 4-byte chars, 0-terminated */
     /* Todo: Following lines should restrict column#1/#2 widths to one char width but I get two char widths. */
-    QFontMetrics result_grid_font_metrics= QFontMetrics(result_grid_font);
     grid_column_widths[0]= grid_column_widths[1]= result_grid_font_metrics.boundingRect("W").width();
     unsigned int i;
     for (i= 0; i < max_object_name_size; ++i) {tmp_string_1[i]= 'W';} tmp_string_1[i]= '\0';
@@ -9198,7 +9229,7 @@ void explorer_display_part()
   Re calculations of width and height:
   To prevent jumping around with width during vertical scroll, html_text_edit has a consistent width.
   This width is based on max_object_name_size.
-  They are never more than EXPLORER_FIXED_NAME_WIDTH.
+  They are never more than explorer_max_name_width_in_chars which by default is EXPLORER_FIXED_NAME_WIDTH.
   First pass is: for all rows, to get max_object_name_size.
                  ... but we don't consider items that are filtered or suppressed due to EXPLORER_MIN
   Second pass is: for rows until it would overflow widget height: output and decide height.
@@ -9276,7 +9307,7 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
           object_name_size= copy_of_parent->oei[tmp_result_row_number].part_name.size();
         total_object_name_size+= object_name_size;
         unsigned int row_height= cell_height_as_int;
-        if (object_name_size > EXPLORER_FIXED_NAME_WIDTH) row_height+= cell_height_as_int;
+        if (object_name_size > explorer_max_name_width_in_chars) row_height+= cell_height_as_int;
         row_height+= setting_ocelot_grid_cell_border_size_as_int * 2; /* Maybe this sort of makes sense */
         /* Todo: I removed the following because I think it was due to a bug. But should I add any pixels? */
 //        row_height+= 9; /* This surely does not make sense but apparently corresponds with reality */
@@ -15060,7 +15091,7 @@ struct context_menu_items {
 };
 /* There are only about 35 default context menu items but allow for users making more. */
 #define MAX_CMI_COUNT 40
-
+//  QString strip_crlf(QByteArray result_row_value);
   QString replacer(QString);
   int add_action(QString action, QString applicable_dbmss, QString applicable_types,
                   QString enabled, QString shortcut, QString text);

@@ -1,5 +1,5 @@
 #Example showing some Ocelot-specific settings
-#This could be appended to an option file such as ~.my.cnf
+#This could be appended to an option file such as ~/.my.cnf
 #... but it's only an example of syntax, not of good taste
 [ocelot]
 

@@ -31,6 +31,7 @@
   Todo: DEFAULT doesn't have to be followed by a literal, it can be an expression
   Todo: PERCENTILE_CONT and PERCENTILE_DISC can have WITHIN GROUP (ORDER BY ...)
   Todo: MEDIAN should only allow OVER (PARTITION ...) but not OVER (ORDER BY ...)
+  Todo: More support of MariaDB 10.3 system versioning -- https://mariadb.com/kb/en/system-versioned-tables/
   Todo: other stuff in MariaDB 10.3.3 e.g. FOR ... END FOR loops
 */
 
@@ -3323,7 +3324,7 @@ void MainWindow::hparse_f_alter_specification()
         {
           if (hparse_f_qualified_name_of_operand(TOKEN_FLAG_IS_NEW, false,false,true) == 0) hparse_f_error();
           if (hparse_errno > 0) return;
-          hparse_f_column_definition();
+          hparse_f_column_definition(0);
           if (hparse_errno > 0) return;
         } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
         hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
@@ -3333,7 +3334,7 @@ void MainWindow::hparse_f_alter_specification()
       {
         if (hparse_f_qualified_name_of_operand(TOKEN_FLAG_IS_NEW, false,false,true) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
-        hparse_f_column_definition();
+        hparse_f_column_definition(0);
         if (hparse_errno > 0) return;
         if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FIRST") == 1) {;}
         else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AFTER") == 1)
@@ -3383,7 +3384,7 @@ void MainWindow::hparse_f_alter_specification()
     if (hparse_errno > 0) return;
     if (hparse_f_qualified_name_of_operand(0, false,false,true) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
-    hparse_f_column_definition();
+    hparse_f_column_definition(0);
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FIRST") == 1) {;}
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AFTER") == 1)
@@ -3557,7 +3558,7 @@ void MainWindow::hparse_f_alter_specification()
     hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN");
     if (hparse_f_qualified_name_of_operand(0, false,false,true) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
-    hparse_f_column_definition();
+    hparse_f_column_definition(0);
     if (hparse_errno > 0) return;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FIRST") == 1) {;}
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AFTER") == 1)
@@ -4714,7 +4715,7 @@ int MainWindow::hparse_f_current_timestamp()
   The clause order for column definitions is what MySQL 5.7
   accepts, which differs from what the MySQL 5.7 manual says.
 */
-void MainWindow::hparse_f_column_definition()
+void MainWindow::hparse_f_column_definition(int last_word)
 {
   int data_type= hparse_f_data_type(TOKEN_KEYWORD_COLUMN);
   if (data_type == -1) hparse_f_error();
@@ -4728,29 +4729,44 @@ void MainWindow::hparse_f_column_definition()
     if (hparse_errno > 0) return;
     generated_seen= true;
   }
+  else if (last_word == TOKEN_KEYWORD_START) hparse_f_error();
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)
   {
     generated_seen= true;
   }
+  if (hparse_errno != 0) return;
   if (generated_seen == true)
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
-    if (hparse_errno > 0) return;
-    hparse_f_opr_1(0, 0);
-    if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
-    if (hparse_errno > 0) return;
-    if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW, "ROW") == 1)
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
-        hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PERSISTENT");
+      if ((last_word == 0) && (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_START, "START") == 1))
+        {;}
+      else if ((last_word == TOKEN_KEYWORD_START) && (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1))
+        {;}
+      else hparse_f_error();
     }
-    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
+    else if (last_word == TOKEN_KEYWORD_START) hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "ROW");
+    else
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
-        hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STORED");
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+      if (hparse_errno > 0) return;
+      hparse_f_opr_1(0, 0);
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+      if (hparse_errno > 0) return;
+      if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
+      {
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
+          hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PERSISTENT");
+      }
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
+      {
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIRTUAL") == 0)
+          hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STORED");
+      }
     }
   }
+  if (hparse_errno != 0) return;
   bool null_seen= false, default_seen= false, auto_increment_seen= false;
   bool unique_seen= false, primary_seen= false, comment_seen= false, column_format_seen= false;
   bool on_seen= false, invisible_seen= false, constraint_seen= false;
@@ -5166,6 +5182,13 @@ void MainWindow::hparse_f_table_or_partition_options(int keyword)
         if (hparse_errno > 0) return;
       } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+      if (hparse_errno > 0) return;
+    }
+    else if ((keyword == TOKEN_KEYWORD_TABLE) && (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH") == 1))
+    {
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SYSTEM, "SYSTEM");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VERSIONING, "VERSIONING");
       if (hparse_errno > 0) return;
     }
     else
@@ -8216,13 +8239,35 @@ void MainWindow::hparse_f_statement(int block_top)
         main_token_flags[hparse_i] |= TOKEN_FLAG_IS_START_IN_COLUMN_LIST;
         bool comma_is_seen;
         bool item_is_seen;
+        int last_word= 0;
         do
         {
           comma_is_seen= false;
           item_is_seen= false;
-          if (hparse_f_qualified_name_of_operand(TOKEN_FLAG_IS_NEW, false,false,true) == 1)
+          if (last_word == TOKEN_KEYWORD_END)
           {
-            hparse_f_column_definition();
+            if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PERIOD, "PERIOD"))
+            {
+              hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR, "FOR");
+              if (hparse_errno != 0) return;
+              hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SYSTEM_TIME, "SYSTEM_TIME");
+              if (hparse_errno != 0) return;
+              hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+              if (hparse_errno != 0) return;
+              if (hparse_f_qualified_name_of_operand(TOKEN_FLAG_IS_NEW, false,false,true) != 1) hparse_f_error();
+              if (hparse_errno != 0) return;
+              hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
+              if (hparse_errno != 0) return;
+              if (hparse_f_qualified_name_of_operand(TOKEN_FLAG_IS_NEW, false,false,true) != 1) hparse_f_error();
+              if (hparse_errno != 0) return;
+              hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+              if (hparse_errno != 0) return;
+              item_is_seen= true;
+            }
+          }
+          else if (hparse_f_qualified_name_of_operand(TOKEN_FLAG_IS_NEW, false,false,true) == 1)
+          {
+            hparse_f_column_definition(last_word);
             if (hparse_errno > 0) return;
             item_is_seen= true;
           }
@@ -8237,6 +8282,15 @@ void MainWindow::hparse_f_statement(int block_top)
             hparse_f_error();
             return;
           }
+          /* Did the last item end with ROW START or ROW END? */
+          last_word= main_token_types[hparse_i_of_last_accepted];
+          if ((last_word == TOKEN_KEYWORD_START) || (last_word == TOKEN_KEYWORD_END))
+          {
+            int hparse_i_of_before_last_word= next_i(hparse_i_of_last_accepted, -1);
+            int before_last_word= main_token_types[hparse_i_of_before_last_word];
+            if (before_last_word != TOKEN_KEYWORD_ROW) last_word= 0;
+          }
+          else last_word= 0;
           if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","))
           {
             main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_END_IN_COLUMN_LIST;
