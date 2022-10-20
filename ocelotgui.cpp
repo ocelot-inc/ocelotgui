@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: October 18 2022
+   Last modified: October 20 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -612,7 +612,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
   result_grid_tab_widget= new QTabWidget48(this); /* 2015-08-25 added "this" */
   result_grid_tab_widget->hide();
-
   main_layout= new QVBoxLayout();
   history_edit_widget= new TextEditHistory(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
@@ -682,7 +681,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     print_version();
     exit(0);
   }
-
   if (ocelot_help != 0)                              /* e.g. if user said "ocelotgui --help" */
   {
     print_help();
@@ -1493,6 +1491,7 @@ QByteArray MainWindow::to_byte_array(QString q)
          I'd like to do differently. But I'd have to know whether X'...' i.e. VARBINARY was used.
          Maybe I'd only have to insist that the escape character is ASCII. Or say it's bizarre.
    Todo: Check if user deletes or edits the output file. Currently we don't notice and there's no output.
+   Todo: Maybe max_row_count could default to ocelot_history_max_row_count if we get that before calling this.
 */
 
 void MainWindow::export_defaults(int passed_type, struct export_settings *exports)
@@ -2565,7 +2564,7 @@ void MainWindow::tee_export(QString result_set_for_history)
 {
   if (main_exports.query == true) history_file_write("TEE", query_utf16, true);
   if (main_exports.row_count == true) history_file_write("TEE", statement_edit_widget->result, true);
-  if (result_set_for_history > "")
+  if (main_exports.max_row_count > 0) /* ? For some reason this was "if result_set_for_history > "" */
   {
 #if (OCELOT_IMPORT_EXPORT == 1)
     if (main_exports.type == TOKEN_KEYWORD_HTML)

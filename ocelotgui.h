@@ -9130,6 +9130,7 @@ void explorer_display_part()
 
   if (copy_of_parent->ocelot_explorer_width == "default")
     explorer_max_name_width_in_chars= EXPLORER_FIXED_NAME_WIDTH;
+  else
   {
     int width_of_one_char= result_grid_font_metrics.boundingRect("W").width();
     int width_of_widget= copy_of_parent->ocelot_explorer_width.toInt();
@@ -9977,7 +9978,7 @@ QByteArray history_padder(char *str, int length,
   * The "8192" for vertical output is arbitrary. Max should be calculated.
   * Displaying an image as if it's a bunch of characters is a waste of time.
   Re "if (OCELOT_IMPORT_EXPORT == 1)":
-    This is for TEXT stuff e.g. CSV. See comments before import_export_rule_set().
+    This is for TEXT stuff e.g. CSV. See comments before export_defaults().
     Todo: our size calculation is unsafe, we must add sizes of terminated_by enclosed_by etc.
 */
 #define HISTORY_COLUMN_MARGIN 1
@@ -10341,6 +10342,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
       *(pointer_to_history_line++)= '|';
       row_pointer+= column_length;
     }
+    /* Todo: Probably something is obsolete here, I think TOKEN_KEYWORD_DEFAULT is no longer a possibility. */
 #if (OCELOT_IMPORT_EXPORT == 1)
     if ((file_name != NULL) && (main_exports.type != TOKEN_KEYWORD_DEFAULT))
     {
