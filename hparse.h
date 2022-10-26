@@ -6876,9 +6876,9 @@ int MainWindow::hparse_f_unionize()
   bool is_intersect= false;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNION") == 1)
     is_union= true;
-  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCEPT") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0_31|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXCEPT") == 1)
     is_except= true;
-  else if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0_31|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
     is_intersect= true;
   if ((is_union == false) && (is_except == false) && (is_intersect == false))
     return 1;

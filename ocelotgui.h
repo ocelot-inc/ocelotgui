@@ -81,7 +81,7 @@ typedef struct
   These are related to ocelot_dbms values.
   --ocelot_dbms='mysql' is default.
   --ocelot_dbms='mariadb' is non-default but officially supported.
-  --ocelot_dbms='tarantool' is non-default and experimental.
+  --ocelot_dbms='tarantool' is non-default but should work.
   If we start as MySQL but then connect to MariaDB, or vice versa,
   it's okay because we change to what we connected to.
   If --ocelot_dbms='tarantool', connection must be to a Tarantool server.
@@ -90,14 +90,17 @@ typedef struct
   e.g. if it's MySQL 5.6 we set both FLAG_VERSION_MYSQL_5_5 and
   FLAG_VERSION_MYSQL_5_6.
   Todo: eventually FLAG_VERSION_TARANTOOL_2_2 etc. has to be part of FLAG_VERSION_ALL
+  Note: MySQL 5.5 reached end-of-life in 2018, says https://endoflife.software/applications/databases/mysql
+        so starting with ocelotgui 1.8 we treat it as the same as MySQL 5.6.
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
 #define DBMS_TARANTOOL 3
 #define FLAG_VERSION_MYSQL_5_5      1
-#define FLAG_VERSION_MYSQL_5_6      2
-#define FLAG_VERSION_MYSQL_5_7      4
-#define FLAG_VERSION_MYSQL_8_0      8
+#define FLAG_VERSION_MYSQL_5_6      1
+#define FLAG_VERSION_MYSQL_5_7      2
+#define FLAG_VERSION_MYSQL_8_0      4
+#define FLAG_VERSION_MYSQL_8_0_31   8
 #define FLAG_VERSION_MYSQL_ALL      (1 | 2 | 4 | 8)
 #define FLAG_VERSION_MARIADB_5_5    16
 #define FLAG_VERSION_MARIADB_10_0   32
@@ -123,7 +126,7 @@ typedef struct
 #define FLAG_VERSION_TARANTOOL_ALL    (262144 | 65536 | 32768 | 1024)
 #define FLAG_VERSION_DEFAULT FLAG_VERSION_MYSQL_OR_MARIADB_ALL
 #define FLAG_VERSION_CONDITIONAL 524288
-
+/* Note: If adding support for a new version of any server, check set_dbms_version_mask(). */
 
 #include <assert.h>
 #include <stdint.h>
@@ -1849,7 +1852,7 @@ static const keywords strvalues[]=
       {"INT8", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_INT8},
       {"INTEGER", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INTEGER},
       {"INTERIORRINGN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERIORRINGN}, /* deprecated in MySQL 5.7.6 */
-      {"INTERSECT", FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_INTERSECT},
+      {"INTERSECT", FLAG_VERSION_MYSQL_8_0_31|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_INTERSECT},
       {"INTERSECTS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERSECTS}, /* deprecated in MySQL 5.7.6 */
       {"INTERVAL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INTERVAL},
       {"INTO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_INTO},
@@ -1905,7 +1908,7 @@ static const keywords strvalues[]=
       {"LAST_DAY", FLAG_VERSION_MARIADB_10_0, FLAG_VERSION_MARIADB_10_0, TOKEN_KEYWORD_LAST_DAY},
       {"LAST_INSERT_ID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LAST_INSERT_ID},
       {"LAST_VALUE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_LAST_VALUE}, /* MariaDB 10.2 nonreserved */
-      {"LATERAL", 0, 0, TOKEN_KEYWORD_LATERAL}, /* MySQL 8.0.2 manual says reserved but it isn't */
+      {"LATERAL", FLAG_VERSION_MYSQL_8_0_31, 0, TOKEN_KEYWORD_LATERAL}, /* MySQL 8.0.2 manual said reserved, it wasn't, but is now */
       {"LCASE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LCASE},
         {"LD_RUN_PATH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_LD_RUN_PATH},
       {"LEAD", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_LEAD}, /* MariaDB 10.2 nonreserved -- or, maybe not in MariaDB 10.2 */
@@ -3621,6 +3624,7 @@ public:
 #if (OCELOT_EXPLORER == 1)
   int explorer_refresh_caller(char *);
   int explorer_refresh(char *);
+  void explorer_show_after_change();
   //int explorer_qsort_compare(const void * a, const void * b);
   void explorer_sort();
   bool explorer_query();
@@ -8326,8 +8330,8 @@ void prepare_for_display_html()
         strcpy(html_font_style, copy_of_parent->ocelot_grid_font_style.toUtf8());
         strcpy(html_font_weight, copy_of_parent->ocelot_grid_font_weight.toUtf8());
       }
-      char condition_div[512];
       QByteArray all_condition_divs;
+      char condition_div[512];
       all_condition_divs.clear(); /* probably unnecessary */
       /* Produce a "<div ...>" for each conditional setting (HTML only!) See whether we can change color at least */
       for (int condition_number= 0; condition_number < copy_of_parent->conditional_settings.count(); ++condition_number)

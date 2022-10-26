@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.7.0
-   Last modified: October 20 2022
+   Last modified: October 26 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -11563,8 +11563,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
           put_message_in_result(tmp_for_error);
           return 1;
         }
-        while (conditional_settings.count() > ocelot_max_conditions) /* remove existing in reverse order */
-          conditional_settings.removeAt(0);
+        if (conditional_settings.count() > ocelot_max_conditions)
+        {
+          while (conditional_settings.count() > ocelot_max_conditions) /* remove existing in reverse order */
+            conditional_settings.removeAt(0);
+          explorer_show_after_change();
+        }
         put_message_in_result("OK");
         return 1;
       }
@@ -11581,6 +11585,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         int er= conditional_settings_insert(text);
         if (er != ER_OVERFLOW)
         {
+          explorer_show_after_change();
           make_and_put_message_in_result(er, 0, (char*)"");
           return 1;
         }
@@ -14744,6 +14749,8 @@ void MainWindow::set_dbms_version_mask(QString version)
       else
         dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2);
     }
+    else if (version.contains("10.3.") == true)
+      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_MARIADB_10_3);
     else
     {
       dbms_version_mask= FLAG_VERSION_MARIADB_ALL;
@@ -14765,6 +14772,10 @@ void MainWindow::set_dbms_version_mask(QString version)
       {
         dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4);
       }
+      else if (version.contains("2.7.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4 | FLAG_VERSION_TARANTOOL_2_7);
+      }
       else
       {
         dbms_version_mask= FLAG_VERSION_TARANTOOL_ALL;
@@ -14775,8 +14786,7 @@ void MainWindow::set_dbms_version_mask(QString version)
   /* MySQL's version string might not contain 'mysql */
   else /* if (version.contains("mysql", Qt::CaseInsensitive) == true) */
   {
-    if ((version.contains("5.6") == true)
-     && (version.contains("5.5.6") == false))
+    if (version.contains("5.6") == true) /* including 5.5.6 since we don't differentiate 5.5 and 5.6 now */
     {
       dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6);
     }
@@ -14788,6 +14798,7 @@ void MainWindow::set_dbms_version_mask(QString version)
     else if (version.contains("8.0") == true)
     {
       dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0);
+      if (version.contains("8.0.31") == true) dbms_version_mask= (dbms_version_mask | FLAG_VERSION_MYSQL_8_0_31);
     }
     else if (version.contains("mysql", Qt::CaseInsensitive) == true)
     {
@@ -28037,6 +28048,21 @@ int MainWindow::explorer_refresh(char *error_or_ok_message)
   return ER_OK_REHASH;
 }
 
+/*
+  Call this if something has changed which might affect the look of an explorer, possibly including table header.
+  * condition changed so each "E%n" div must change
+  * ocelot_max_conditions changed to a smaller number
+  Todo: error is possible, something should be returned.
+  Todo: Consider calling from ocelot_variable_set() if font change, currently we change the font due to
+        style sheet change but not the widget width. On the other hand, that causes displaying twice.
+*/
+void MainWindow::explorer_show_after_change()
+{
+  explorer_widget->prepare_for_display_html();
+  if (explorer_widget->isVisible() == false) return;
+  int gvsbv= explorer_widget->grid_vertical_scroll_bar_value;
+  explorer_widget->explorer_display_html(gvsbv);
+}
 
 /*
   E.g.
