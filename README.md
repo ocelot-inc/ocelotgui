@@ -1,7 +1,7 @@
 
 ocelotgui
 
-<P>Version 1.7.0</P>
+<P>Version 1.8.0</P>
 
 <P>The ocelotgui GUI, a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -45,6 +45,7 @@ All rights reserved.</P>
 ... <A href="#menu">Menu</A>
 ... <A href="#debugger">Debugger</A>
 ... <A href="#special-effects">Special effects</A>
+... <A href="#explorer-widget">Explorer widget</A>
 ... <A href="#contact">Contact</A>
 <H4>Appendixes</H4>
 ... <A href="#Appendix-1">Appendix 1 Details about ocelotgui options</A>
@@ -120,21 +121,21 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui_1.7.0-1_i386.deb
-sudo apt install ./ocelotgui_1.7.0-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui_1.8.0-1_i386.deb
+sudo apt install ./ocelotgui_1.8.0-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui_1.7.0-1_amd64.deb
-sudo apt install ./ocelotgui_1.7.0-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui_1.8.0-1_amd64.deb
+sudo apt install ./ocelotgui_1.8.0-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui-1.7.0-1.x86_64.rpm
-sudo rpm -i ocelotgui-1.7.0-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui-1.8.0-1.x86_64.rpm
+sudo rpm -i ocelotgui-1.8.0-1.x86_64.rpm</PRE>
 For 64-bit, any Linux, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui-1.7.0.tar.gz
-tar zxvf ocelotgui-1.7.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui-1.8.0.tar.gz
+tar zxvf ocelotgui-1.8.0.tar.gz
 ocelotgui/ocelotgui-qt5</PRE>
 For 64-bit, any Linux, Qt4 (deprecated)<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui-1.7.0.tar.gz
-tar zxvf ocelotgui-1.7.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui-1.8.0.tar.gz
+tar zxvf ocelotgui-1.8.0.tar.gz
 ocelotgui/ocelotgui-qt4</PRE>
 </P>
 
@@ -165,10 +166,11 @@ Stop again with File|Exit or control-Q.
 <A href="shot9.jpg"><img src="shot9.jpg" alt="shot9.jpg" height="150"></A>
 <A href="shot10.jpg"><img src="shot10.jpg" alt="shot10.jpg" height="150"></A>
 <A href="shot11.png"><img src="shot11.png" alt="shot11.png" height="150"></A>
+<A href="explorer1.png"><img src="explorer1.png" alt="explorer1.png" height="150"></A>
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 1.7.0, June 8 2022</P>
+<P>Version 1.8.0, November 16 2022</P>
 
 <P>Copyright (c) 2022 by Peter Gulutzan. All rights reserved.</P>
   
@@ -263,6 +265,7 @@ menu <BR>
 history widget, where retired statements and diagnostics end up <BR>
 results widget, where SELECT result sets appear <BR>
 statement widget, where users can type in instructions.<BR>
+(And optionally, on the side, an explorer widget.)
 Initially, though, only the menu and statement widget will appear.
 </P>
 <P>
@@ -656,6 +659,192 @@ change how large the initial history can become with OCELOT_HISTSIZE=number.
 <P>RE: TARANTOOL. By default ocelotgui is a client for MySQL or MariaDB.
 To use it as a client for Tarantool, read
 <A HREF="#Appendix-3">Appendix 3 Tarantool</A>.<P>
+
+<H3 id="explorer-widget">Explorer widget</A></H3><HR>
+
+<P>EXPLORER NAME. Explorer.
+A similar feature in other GUI clients may be named "object explorer" or "navigator".
+Compare the name "Windows explorer".</P>
+
+<P>EXPLORER SETTINGS.
+To change some significant settings, click on the menu bar: Settings|Explorer.<br>
+<img src="explorer2.png" alt="explorer2.png" align="right" height="256">
+Visible: yes|no. Default no. So if you don't change this to 'yes', it is not visible.
+There must be a connection to the DBMS server before it can be made visible.<br>
+Sort alphabetically: yes|no. Default no. If 'yes', objects of the same type are sorted alphabetically.<br>
+Query: a long select with unions.
+The default query selects all databases.
+Users can change this query to add WHERE clauses (affects MySQL/MariaDB only).<br>
+Detached|Top|Left|Width|Height:
+As with other widgets, the explorer is detachable and the explorer's size + position are settable
+when it is detached.
+Unlike with other widgets, changing width may have an effect even if the explorer is not detached.
+The default width depends on the widths of the object names.
+</P>
+
+<P>
+Ordinarily the explorer widget appears on the left while the other main widgets
+(history, grid, statement) appear vertically on the right.
+</P>
+
+<P>EXPLORER STYLE. It is a result grid with text columns.
+Therefore users get some features without needing to learn anything new:<br>
+* ^Find works. (if the item is visible)<br>
+* Vertical scroll bar works.<br>
+* Settings | Explorer can be used to change colors and font.<br>
+* Example: SET ocelot_explorer_text_color='blue' WHERE value = '▶'; REFRESH;<br>
+</P>
+
+<P>EXPLORER COLUMNS. There are three text columns.<br>
+#1: Min. = Unicode Black Down-Pointing Triangle ▼ or Black Right-Pointing Triangle ▶ if database or table.
+If it's a database or table, click on the triangle to hide the parts e.g. columns, or to show them again.
+(This is "toggling".)
+It's treated as a header item, that is, Result Grid Settings for header affect it.
+So ordinarily it has a different background color.<br>
+#2: object_type. = S or T or V or C or P or I or E or t<br>
+#3: object_name. for example, if object_type='T', this is a table name.<br>
+If object_type='C', this is a column name and is taken from part_name.
+</P>
+
+<P>EXPLORER ROWS.
+Rows are in a hierarchy: S, T or V, C or I, etc.
+Within the hierarchy, rows are in order by creation time.
+</P>
+
+<P>EXPLORER POSSIBLE USER ACTIONS<br>
+Hover. This will show what type of object is under the cursor and contain some short advice.<br>
+DoubleClick: This will copy the cell contents to the end of the statement widget<br>
+Right Click: puts up a context menu.<br>
+Click on the leftmost (Min) column. This will "toggle".
+</P>
+
+<P>EXPLORER CONTEXT MENU.
+This is the menu that will appear when the user uses the right mouse button to click
+over a row in the explorer display.
+It is called a context menu because the menu is different for each object type.
+For example if it's over a table, then table-related menu items will appear.<br>
+Items for all types: Copy to clipboard, Send to SQL editor, Reset, Refresh.<br>
+Items for 'S' (Schema): Set as default schema, Filter to this schema, Schema inspector,
+Create schema, Alter schema, Drop schema.<br>
+Items for 'T' (Table): Select rows, Export dialog - Text, Export dialog - Table,
+Export dialog - Html, Import - Text, Create table, Create table like, Drop table, Truncate table.<br>
+For 'C' (Column): Show column, Drop column.<br>
+For 'I' (Index): Show index, Select index, drop index.<br>
+For 'P' (Procedure): Create procedure, Drop procedure.<br>
+Details for 'T':
+<pre>
+  Copy to Clipboard      Equivalent of "Copy"
+  Send to SQL editor     Copy, then put in statement widget, then execute
+  Select rows            Execute a statement to select 100 rows
+  Export Dialog - Text   Dialog box for export, then do the export if OK
+  Export Dialog - Table  Dialog box for export, then do the export if OK
+  Export Dialog - Html   Dialog box for export, then do the export if OK
+  Import - Text          Generate INSERTs for a file's contents, no options
+  Create table           Generate SHOW CREATE TABLE ...
+  Create table like      Generate CREATE TABLE ... LIKE ...
+  Drop table             Generate DROP TABLE
+  Truncate table         Generate TRUNCATE TABLE
+  Reset                  Back to default state with nothing expanded
+  Refresh                Big SELECT to recreate the widget (this can be slow)
+</pre>
+</P>
+
+<P>EXPLORER EXAMPLE.<br>
+<P>
+The user makes the explorer visible with Settings|Explorer Widget, it looks like this:<br>
+<img src="explorer3.png" alt="explorer3.png" width="300" height="256"><br>
+The user clicks the ▶ beside information_schema, it changes to ▼
+and the schema items appear:<br>
+<img src="explorer4.png" alt="explorer4.png" width="300" height="256"><br>
+The user right-clicks on COLLATIONS, and the context menu appears:<br>
+<img src="explorer5.png" alt="explorer5.png" width="300" height="256"><br>
+The user navigates (with the mouse or the down-arrow key) and selects
+(with Enter or Tab or click) the Export dialog - Text choice, and
+the export dialog appears:<br>
+<img src="explorer6.png" alt="explorer6.png" width="300"  height="256"><br>
+The user selects the OK button and the contents are dumped to STDOUT:<br>
+<img src="explorer7.png" alt="explorer7.png" width="400"  height="256"><br>
+</P>
+
+<P>EXPLORER SET STATEMENTS.
+The user can enter SET statements on the select widget.
+Or, some SET statements will be generated when the user clicks OK on the Settings menu.<br>
+Keywords are
+OCELOT_EXPLORER_ACTION,
+OCELOT_EXPLORER_APPLICABLE_DBMSS,
+OCELOT_EXPLORER_APPLICABLE_TYPES,
+OCELOT_EXPLORER_BACKGROUND_COLOR,
+OCELOT_EXPLORER_DETACHED,
+OCELOT_EXPLORER_ENABLED,
+OCELOT_EXPLORER_FONT_FAMILY,
+OCELOT_EXPLORER_FONT_SIZE,
+OCELOT_EXPLORER_FONT_STYLE,
+OCELOT_EXPLORER_FONT_WEIGHT,
+OCELOT_EXPLORER_HEIGHT,
+OCELOT_EXPLORER_LEFT,
+OCELOT_EXPLORER_SHORTCUT,
+OCELOT_EXPLORER_TEXT,
+OCELOT_EXPLORER_TEXT_COLOR,
+OCELOT_EXPLORER_TOP,
+OCELOT_EXPLORER_VISIBLE,
+OCELOT_EXPLORER_WIDTH.<br>
+The important one is SET ocelot_explorer_visible='yes';<br>
+Settings can also be done in the .cnf file or the command line,
+for example start ocelotgui with --ocelot_explorer_visible='yes'.<br>
+Such statements affect both the explorer widget and its context menu.
+Note: some settings changes do not take effect immediately, they are delayed until "Refresh" happens.<br>
+</P>
+
+<P>EXPLORER CONDITIONAL SET STATEMENTS.
+There is an optional clause ... WHERE VALUE operator 'literal' [{AND|OR} value operator 'literal' ...].
+Statements with WHERE clauses affect only rows which match the expression.
+Example:<br>
+SET ocelot_explorer_background_color='blue' WHERE value > 'p' OR value regexp '1';<br>
+<img src="explorer8.png" alt="explorer8.png" height="400"><br>
+</P>
+
+<P>EXPLORER REFRESH STATEMENT.
+REFRESH is a bit similar to REHASH, but it gets all schemas (databases)
+-- so has an effect on the server.
+REFRESH is necessary because we don't know when other users might change data definitions.
+And it's slow.
+Whenever users say REFRESH, the explorer tables are redone.
+</P>
+
+<P>EXPLORER IN OPTIONS MENU. Choosing Options|Detach explorer widget,
+and rearranging widgets, could result in something like this:<br>
+<img src="explorer9.png" alt="explorer9.png" height="400"><br>
+</P>
+
+<P>EXPLORER ADVANCED-LEVEL CUSTOMIZING.
+As explained earlier, customizing the appearance of the explorer widget
+and the context menu, or specific rows on them, is simple
+and somewhat like the customizing of the other widgets.
+However, one can do more with the context menu -- change the text and
+action and shortcut.<br>
+Here, for example, is a statement that says
+there will be a shortcut associated with the Refresh option:<br>
+SET ocelot_explorer_shortcut='Alt+G' WHERE value = 'Refresh';<br>
+Here, for example, is a statement that says
+"Instead of 'Create table', the 'T' menu choice will be
+'Select Count(*)' and the effect, if you click it,
+or type the shortcut key, will be that the
+statement "SELECT COUNT(*) FROM (table-name-in-context);" will appear on the statement widget,
+where it is executed, so the result count appears in the grid widget.<br>
+SET ocelot_explorer_action='SELECT COUNT(*) FROM ${object_name};',
+ ocelot_explorer_text='Customized Selection'
+WHERE value = 'Create table';<br>
+In other words, users can write their own explorer widgets.<br>
+Many of the possible actions can have "macros"
+-- strings enclosed inside ${...} that will be replaced when the statement is executed.
+Some macros are:
+... ${dialog-table} ${dialog_file} ${occurs_text} ${schema_name} ${object_name}
+'${object_name}' ${part_name} ${unqualified_part_name} '${part_name}'
+${part_type} ${cell} ${clipboard} ${action}.
+Since ocelotgui source code is supplied, users can
+download it and see the exact effects by reading the C++ statements in program ocelotgui.cpp,
+function Context_menu::replacer().<br>
+</P>
 
 <H3 id="contact">Contact</H3><HR>
 
@@ -1796,7 +1985,7 @@ On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.</P>
 
 <P>You need the latest ocelotgui client.
-The Release 1.7.0 version is okay at the time of release,
+The Release 1.8.0 version is okay at the time of release,
 but some things might not be up to date.
 It may be better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.</P>
@@ -1957,11 +2146,11 @@ How to get it:<br>
 * Download the ocelotgui zip file from github.
   Check https://github.com/ocelot-inc/ocelotgui/blob/master/README.md
   to see where the latest release is. For example it might be
-  https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui-1.7.0-1.ocelotgui.zip<br>
+  https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui-1.8.0-1.ocelotgui.zip<br>
 * Unzip. It was zipped with 7-zip from http://www.7-zip.org,
   but other utilities should work. For example, on Windows command prompt,
   if you have the PowerShell utility on your path:
-  PowerShell Expand-Archive ocelotgui-1.7.0-1.ocelotgui.zip c:\ocelotgui<br>
+  PowerShell Expand-Archive ocelotgui-1.8.0-1.ocelotgui.zip c:\ocelotgui<br>
 * Read the COPYING and LICENSE arrangements.
   On Windows ocelotgui is statically linked to Qt and MariaDB libraries,
   so the copyright and licensing is not the same as for Linux.<br>
@@ -2212,9 +2401,9 @@ release\ocelotgui.exe --ocelot_dbms=tarantool
 : Make sure you can unzip ocelotgui.zip with both 7-zip and winzip.
 copy release\ocelotgui.exe ocelotgui.exe
 del ocelotui.zip
-"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf     PKGBUILD        ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png
+"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf     PKGBUILD        ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png explorer1.png explorer2.png explorer3.png explorer4.png explorer5.png explorer6.png explorer7.png explorer8.png explorer9.png
 
-: What we actually put in the release looks like ocelotgui-1.7.0-1.ocelotgui.zip, so rename the .zip file at some point.
+: What we actually put in the release looks like ocelotgui-1.8.0-1.ocelotgui.zip, so rename the .zip file at some point.
 
 
 : (Dynamic linking)
@@ -2292,14 +2481,14 @@ A release file is highlighted in green
 by github and is named ocelotgui-[version].tar.gz.
 Since version 1.0.9, there is also a release file named ocelotgui_[version].orig.tar.gz
 which is preferable because it does not contain unnecessary executables.
-Thus release 1.7.0 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui_1.7.0.orig.tar.gz.
+Thus release 1.8.0 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui_1.8.0.orig.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.7.0/ocelotgui_1.7.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/1.8.0/ocelotgui_1.8.0.orig.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui_1.7.0.orig.tar.gz.</P>
+and click ocelotgui_1.8.0.orig.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
@@ -2338,8 +2527,8 @@ sudo pacman -S mariadb-clients</PRE></P>
 <P>(Package builds on ArchLinux-like systems can also be done with the PKGBUILD file in the ocelotgui github repository.)</P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui_1.7.0.orig.tar.gz
- cd ocelotgui-1.7.0</PRE>
+ tar -zxvf ocelotgui_1.8.0.orig.tar.gz
+ cd ocelotgui-1.8.0</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
@@ -2363,12 +2552,12 @@ Peter Gulutzan provides scripts that will create .deb or .rpm packages.
 Please read the comments in the scripts before using them.
 For Debian-like platforms say<PRE>
  ./deb_build.sh
- sudo apt install /tmp/debian3/ocelotgui_1.7.0-1_amd64.deb
- #or sudo apt install /tmp/debian3/ocelotgui_1.7.0-1_i386.deb</PRE>
+ sudo apt install /tmp/debian3/ocelotgui_1.8.0-1_amd64.deb
+ #or sudo apt install /tmp/debian3/ocelotgui_1.8.0-1_i386.deb</PRE>
 For RPM-like platforms say<PRE>
  ./rpm_build.sh
- sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.7.0-1.x86_64.rpm
- #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.7.0-1.i686.rpm</PRE>
+ sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.8.0-1.x86_64.rpm
+ #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-1.8.0-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
 </P>

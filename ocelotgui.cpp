@@ -1,8 +1,8 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 1.7.0
-   Last modified: October 26 2022
+   Version: 1.8.0
+   Last modified: November 16 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -415,7 +415,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.7.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.8.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -472,6 +472,7 @@
   static bool hparse_like_seen;
   static bool hparse_subquery_is_allowed;
   static bool hparse_variable_is_allowed;
+  static bool hparse_variable_must_be_int;
   static QString hparse_delimiter_str;
   static bool hparse_sql_mode_ansi_quotes= false;
   static unsigned int hparse_dbms_mask= FLAG_VERSION_DEFAULT;
@@ -697,7 +698,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     }
   }
 
-  set_dbms_version_mask(ocelot_dbms);
+  set_dbms_version_mask(ocelot_dbms, 0);
   for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
   make_style_strings();
@@ -5260,6 +5261,8 @@ void MainWindow::action_export_none()
     Method "hide + setGeometry + show" worked on only some distros, failed especially badly with Kaos.
     Possibly windows maximized flag was part of the problem, so showNormal() instead.
     Also the height was confusing because when a widget gets detached it increases by title bar size at least.
+  Major changes for version 1.8 November 2022:
+    Explorer.
   widget_type = TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED or TOKEN_KEYWORD_OCELOT_DEBUG_DETACHED or TOKEN_KEYWORD_OCELOT_GRID_DETACHED or TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED
   TODO: Don't shrink so much that you lose something major in main window
         (maybe expand main window to include title bar size?)
@@ -5763,7 +5766,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.7.0, June 8 2022  \
+  <BR>Version 1.8.0, November 16 2022  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2022 by Peter Gulutzan. All rights reserved.  \
@@ -14687,7 +14690,10 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   lmysql->ldbms_mysql_free_result(mysql_res_for_connect);
   get_sql_mode(TOKEN_KEYWORD_CONNECT, "", false, main_token_number);
   connect_init(connection_number);
-  set_dbms_version_mask(statement_edit_widget->dbms_version);
+  set_dbms_version_mask(statement_edit_widget->dbms_version, connection_number);
+#if (OCELOT_EXPLORER == 1)
+  if (connection_number == 0) initialize_widget_explorer_after_connect();
+#endif
   return 0;
 }
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
@@ -14728,8 +14734,9 @@ void MainWindow::connect_mysql_error_box(QString s1, unsigned int connection_num
  If we don't see a known version number, we tend to assume it's a later version.
  Todo: a message like "Don't recognize MySQL/MariaDB version" would be nice.
  Todo: if command line had a version number, don't let version() override it.
+ Warning: this may override setting of dbms_connections[0] done in connect_set_variable()
 */
-void MainWindow::set_dbms_version_mask(QString version)
+void MainWindow::set_dbms_version_mask(QString version, int connection_number)
 {
   if (version.contains("mariadb", Qt::CaseInsensitive) == true)
   {
@@ -14753,6 +14760,7 @@ void MainWindow::set_dbms_version_mask(QString version)
       dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_MARIADB_10_3);
     else
     {
+      /* 10.4 + 10.5 + 10.6 + 10.7 + 10.8 + 10.9 + 10.10 + 10.11 all get ... | FLAG_VERSION_MARIADB_10_10 */
       dbms_version_mask= FLAG_VERSION_MARIADB_ALL;
     }
   }
@@ -14805,6 +14813,16 @@ void MainWindow::set_dbms_version_mask(QString version)
       dbms_version_mask= FLAG_VERSION_MYSQL_ALL;
     }
     else dbms_version_mask= FLAG_VERSION_DEFAULT;
+  }
+  if (((dbms_version_mask&FLAG_VERSION_MYSQL_ALL) != 0)
+   && ((dbms_version_mask&FLAG_VERSION_MARIADB_ALL) == 0))
+  {
+    connections_dbms[connection_number]= DBMS_MYSQL;
+  }
+  if (((dbms_version_mask&FLAG_VERSION_MARIADB_ALL) != 0)
+   && ((dbms_version_mask&FLAG_VERSION_MYSQL_ALL) == 0))
+  {
+    connections_dbms[connection_number]= DBMS_MARIADB;
   }
 }
 
@@ -15322,7 +15340,13 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   statement_edit_widget->dbms_host= ocelot_host;
   //connect_init(connection_number);
   tarantool_initialize(connection_number);
-  if (connection_number == 0) set_dbms_version_mask("tarantool-" + version);
+  if (connection_number == 0)
+  {
+    set_dbms_version_mask("tarantool-" + version, connection_number);
+#if (OCELOT_EXPLORER == 1)
+    initialize_widget_explorer_after_connect();
+#endif
+  }
   return 0;
 }
 #endif
@@ -18480,6 +18504,27 @@ char * MainWindow::typer_to_keyword(unsigned int ocelot_type)
   return (char*)strvalues[TOKEN_KEYWORD_NULL].chars;
 }
 
+/* Return true iff keyword identified one of the integer data types. Currently only used during parse. */
+bool MainWindow::typer_is_int(int key)
+{
+  if ((key == TOKEN_KEYWORD_BIGINT)
+   || (key == TOKEN_KEYWORD_BIT)
+   || (key == TOKEN_KEYWORD_BOOL)
+   || (key == TOKEN_KEYWORD_BOOLEAN)
+   || (key == TOKEN_KEYWORD_INT)
+   || (key == TOKEN_KEYWORD_INT1)
+   || (key == TOKEN_KEYWORD_INT2)
+   || (key == TOKEN_KEYWORD_INT3)
+   || (key == TOKEN_KEYWORD_INT4)
+   || (key == TOKEN_KEYWORD_INT8)
+   || (key == TOKEN_KEYWORD_INTEGER)
+   || (key == TOKEN_KEYWORD_MEDIUMINT)
+   || (key == TOKEN_KEYWORD_SMALLINT)
+   || (key == TOKEN_KEYWORD_TINYINT))
+    return true;
+  return false;
+}
+
 /******************** typer end ***********************************************/
 
 #include "codeeditor.h"
@@ -19159,11 +19204,16 @@ void Completer_widget::timer_expired()
   hide_wrapper();
 }
 
+/*
+  Todo: generally (always?) autocomplete menu item is disabled when we're looking at explorer.
+  Note: "if (qk == Qt::Key_Tab)" was here before but on some Qt versions caused an error =
+        ambiguous overload of operand == (operand types are QKey::KeySequence and Qt::Key)
+*/
 bool Completer_widget::shortcut_override(QKeySequence qk)
 {
   if ((hasFocus() == true) && (associated_widget_type == EXPLORER_WIDGET))
   {
-    if (qk == Qt::Key_Tab)
+    if (qk.toString() == "Tab")
     {
       call_for_action();
       return true;
@@ -19637,7 +19687,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     int new_cell_width_as_int= result_grid->get_cell_width_or_height_as_int(new_cell_width, result_grid->character_count_to_pixel_count(MIN_WIDTH_IN_CHARS));
     if (new_cell_width_as_int > 0) width_i= new_cell_width_as_int;
   }
-
   {
     width_i-= result_grid->setting_ocelot_grid_cell_border_size_as_int * 2;
 //    width_i-= result_grid->setting_ocelot_grid_cell_drag_line_size_as_int;
@@ -19664,7 +19713,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     strcpy(tmp_pointer, tmp_td);
     tmp_pointer+= strlen(tmp_td);
   }
-
   if (result == true)
   {
     char tmp_div[32];
@@ -19697,8 +19745,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       }
       /* TEST!!!! end */
 
-
-
       strcpy(tmp_pointer, img_start);
       tmp_pointer+= strlen(img_start);
       memcpy(tmp_pointer, img_type, 3);
@@ -19717,10 +19763,10 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     }
     return tmp_pointer - original_tmp_pointer;
   }
-
   char c;
   QString s;
   int column_width_in_chars= (width_n / max_width_of_a_char); /* TEST!!!! */
+  if (column_width_in_chars < 1) column_width_in_chars= 1;
   for (int i= 0, j= 0; i < v_length; ++i)
   {
     c= *result_pointer;
@@ -19755,7 +19801,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     strcpy(tmp_pointer, "</div>");
     tmp_pointer+= strlen("</div>");
   }
-
   strcpy(tmp_pointer, ocelot_grid_detail_char_column_end);
   tmp_pointer+= strlen(ocelot_grid_detail_char_column_end);
   return tmp_pointer - original_tmp_pointer;
@@ -21004,11 +21049,18 @@ void Context_menu::construct()
   add_action("Refresh;", "*", "*", "", "", "Refresh");
 }
 
+/* Note: avoiding "warning: extended initializer lists only available with -std=c++11 or -std=gnu++11 ..." */
 int Context_menu::add_action(QString action, QString applicable_dbmss, QString applicable_types,
                               QString enabled, QString shortcut, QString text)
 {
   if (cmi_count >= MAX_CMI_COUNT) return -1; /* Fail. Increase MAX_CMI_COUNT if this happens. */
-  cmi[cmi_count]= {action, applicable_dbmss, applicable_types, enabled, shortcut, text, false};
+  cmi[cmi_count].action= action;
+  cmi[cmi_count].applicable_dbmss= applicable_dbmss;
+  cmi[cmi_count].applicable_types= applicable_types;
+  cmi[cmi_count].enabled= enabled;
+  cmi[cmi_count].shortcut= shortcut;
+  cmi[cmi_count].text= text;
+  cmi[cmi_count].is_visible= false;
   ++cmi_count;
   return 0;
 }
@@ -22577,6 +22629,7 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
 
   if (keyword_index == TOKEN_KEYWORD_OCELOT_DBMS)
   {
+    /* Warning: what we do here may be overridden after connection, by set_dbms_version_mask() */
     ocelot_dbms= token2;
     if (ocelot_dbms.contains("mysql", Qt::CaseInsensitive) == true)
     {
@@ -23243,9 +23296,6 @@ void MainWindow::connect_init(int connection_number)
   if (connection_number == 0)
   {
     menu_file_export->setEnabled(true);
-#if (OCELOT_EXPLORER == 1)
-    initialize_widget_explorer_after_connect();
-#endif
     if (ocelot_auto_rehash != 0)
     {
       char error_or_ok_message[ER_MAX_LENGTH];
@@ -25052,7 +25102,7 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
            + ","
            + QString::number(is_first_statement_in_a_declare_handler)
            + ");"  + debug_lf;
-  if (setup_determine_what_variables_are_in_scope(i_of_statement_start, text)) return 1; /* result=c_variables */
+  if (setup_determine_what_variables_are_in_scope(i_of_statement_start, text, false)) return 1; /* result=c_variables */
 
   for (int i= c_variable_names.count() - 1; i >= 0; --i)
   {
@@ -25370,10 +25420,13 @@ int MainWindow::setup_row_type(int i_of_variable)
    Todo: See what happens if it's in ""s or in ''s. */
 /* Todo: We plan to change hparse_f_variables() so variable_refer
          points to variable_define. If that's done, this may be easier. */
+/* Note: going backwards means for DEFINE x INT; we will see data_type INT before we see the name, good. */
 int MainWindow::setup_determine_what_variables_are_in_scope(
             int i_of_statement_start,
-            QString text)
+            QString text,
+            bool must_be_int)
 {
+  int data_type= -1;
   c_variable_names.clear();
   c_variable_tokens.clear();
   int v_token_number_of_declare= 0;
@@ -25388,11 +25441,15 @@ int MainWindow::setup_determine_what_variables_are_in_scope(
       continue;
     }
     QString v_variable_identifier= "";
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_DATA_TYPE) != 0) data_type= main_token_types[i];
+    is_identifier= false;
     if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
      || (main_token_types[i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
      || (main_token_types[i] == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE))
-      is_identifier= true;
-    else is_identifier= false;
+    {
+      if ((must_be_int == false) || (typer_is_int(data_type) == true))
+        is_identifier= true;
+    }
     if ((is_identifier)
      && (main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE))
     {
@@ -27074,13 +27131,14 @@ void MainWindow::clf_make_sql_execute_function(QString *clf_output)
   Todo: This was moved out of hparse.h because it depends on things that were defined after #include "hparse.h". Reorganize.
   Todo: setup_determine_what_variables_are_in_scope() returns a list that is in ``s and may be lower case.
         We simply strip the ``s and call upper() -- but what if the DECLARE actually had ``s or ""s?
+  Warning: hparse_variable_must_be_int is semi-global, ensure it's false if caller is not via hparse routine.
 */
 void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hparse_text_copy, unsigned char reftype)
 {
   if ((reftype != 0) && (hparse_variable_is_allowed == true))
   {
     int declared_variables_count= 0;
-    setup_determine_what_variables_are_in_scope(hparse_i_of_statement, hparse_text_copy);
+    setup_determine_what_variables_are_in_scope(hparse_i_of_statement, hparse_text_copy, hparse_variable_must_be_int);
     declared_variables_count= c_variable_names.count();
     for (int i= 0; i < declared_variables_count; ++i)
     {
@@ -27812,7 +27870,7 @@ void MainWindow::initialize_widget_explorer()
 void MainWindow::initialize_widget_explorer_after_connect()
 {
 #if (OCELOT_MYSQL_INCLUDE == 1)
-  if ((connections_dbms[0] == DBMS_MARIADB) || (connections_dbms[0] == DBMS_MARIADB))
+  if ((connections_dbms[0] == DBMS_MYSQL) || (connections_dbms[0] == DBMS_MARIADB))
   ocelot_explorer_query= "select 'S',schema_name,schema_name,default_character_set_name,default_collation_name\n"
                  "from information_schema.schemata\n"
                  "union all\n"

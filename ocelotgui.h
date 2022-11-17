@@ -92,6 +92,8 @@ typedef struct
   Todo: eventually FLAG_VERSION_TARANTOOL_2_2 etc. has to be part of FLAG_VERSION_ALL
   Note: MySQL 5.5 reached end-of-life in 2018, says https://endoflife.software/applications/databases/mysql
         so starting with ocelotgui 1.8 we treat it as the same as MySQL 5.6.
+  Note: MariaDB 5.5 reached end-of-life in 2018, says https://endoflife.date/mariadb
+        so starting with ocelotgui 1.8 we treat it as the same as MariaDB 10.0
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -103,11 +105,12 @@ typedef struct
 #define FLAG_VERSION_MYSQL_8_0_31   8
 #define FLAG_VERSION_MYSQL_ALL      (1 | 2 | 4 | 8)
 #define FLAG_VERSION_MARIADB_5_5    16
-#define FLAG_VERSION_MARIADB_10_0   32
-#define FLAG_VERSION_MARIADB_10_1   64
-#define FLAG_VERSION_MARIADB_10_2_2 128
-#define FLAG_VERSION_MARIADB_10_2_3 256
-#define FLAG_VERSION_MARIADB_10_3   512
+#define FLAG_VERSION_MARIADB_10_0   16
+#define FLAG_VERSION_MARIADB_10_1   32
+#define FLAG_VERSION_MARIADB_10_2_2 64
+#define FLAG_VERSION_MARIADB_10_2_3 128
+#define FLAG_VERSION_MARIADB_10_3   256
+#define FLAG_VERSION_MARIADB_10_10  512
 #define FLAG_VERSION_MARIADB_ALL    (16 | 32 | 64 | 128 | 256 | 512)
 #define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512)
 #define FLAG_VERSION_TARANTOOL      1024
@@ -453,6 +456,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_ESCAPE,
     TOKEN_KEYWORD_ESCAPED,
     TOKEN_KEYWORD_EVENT,
+    TOKEN_KEYWORD_EXAMINED,
     TOKEN_KEYWORD_EXCEPT,
     TOKEN_KEYWORD_EXCEPTION,
     TOKEN_KEYWORD_EXCHANGE,
@@ -744,6 +748,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_NCHAR,
         TOKEN_KEYWORD_NET_BUFFER_LENGTH,
     TOKEN_KEYWORD_NEWLINE,
+    TOKEN_KEYWORD_NEXT,
     TOKEN_KEYWORD_NEXTVAL,
     TOKEN_KEYWORD_NIL,
     TOKEN_KEYWORD_NO,
@@ -929,6 +934,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OLD_PASSWORD,
     TOKEN_KEYWORD_ON,
         TOKEN_KEYWORD_ONE_DATABASE,
+    TOKEN_KEYWORD_ONLY,
     TOKEN_KEYWORD_OPEN,
     TOKEN_KEYWORD_OPERATOR,
     TOKEN_KEYWORD_OPTIMIZE,
@@ -1254,6 +1260,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_TERMINATED,
     TOKEN_KEYWORD_TEXT,
     TOKEN_KEYWORD_THEN,
+    TOKEN_KEYWORD_TIES,
     TOKEN_KEYWORD_TIME,
     TOKEN_KEYWORD_TIMEDIFF,
     TOKEN_KEYWORD_TIMESTAMP,
@@ -1451,7 +1458,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1206
+#define KEYWORD_LIST_SIZE 1210
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1727,6 +1734,7 @@ static const keywords strvalues[]=
       {"ESCAPE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ESCAPE},
       {"ESCAPED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ESCAPED},
       {"EVENT", 0, 0, TOKEN_KEYWORD_EVENT},
+      {"EXAMINED", 0, 0, TOKEN_KEYWORD_EXAMINED},
       {"EXCEPT", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, 0, TOKEN_KEYWORD_EXCEPT},
       {"EXCEPTION", 0, 0, TOKEN_KEYWORD_EXCEPTION},
       {"EXCHANGE", 0, 0, TOKEN_KEYWORD_EXCHANGE},
@@ -2017,6 +2025,7 @@ static const keywords strvalues[]=
       {"NCHAR", 0, 0, TOKEN_KEYWORD_NCHAR},
         {"NET_BUFFER_LENGTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_NET_BUFFER_LENGTH},
       {"NEWLINE", 0, 0, TOKEN_KEYWORD_NEWLINE}, /* for format rule */
+      {"NEXT", 0, 0, TOKEN_KEYWORD_NEXT},
       {"NEXTVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_NEXTVAL},
       {"NIL", FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_NIL},
       {"NO", 0, 0, TOKEN_KEYWORD_NO},
@@ -2199,11 +2208,12 @@ static const keywords strvalues[]=
       {"OCTET_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OCTET_LENGTH},
       {"OF", FLAG_VERSION_MYSQL_8_0|FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_OF},
       {"OFF", 0, 0, TOKEN_KEYWORD_OFF},
-      {"OFFSET", 0, 0, TOKEN_KEYWORD_OFFSET},
+      {"OFFSET", FLAG_VERSION_MARIADB_10_1, 0, TOKEN_KEYWORD_OFFSET},
       {"OJ", 0, 0, TOKEN_KEYWORD_OJ},
       {"OLD_PASSWORD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_OLD_PASSWORD},
       {"ON", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ON},
         {"ONE_DATABASE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_ONE_DATABASE},
+      {"ONLY", 0, 0, TOKEN_KEYWORD_ONLY},
       {"OPEN", 0, 0, TOKEN_KEYWORD_OPEN},
       {"OPERATOR", 0, 0, TOKEN_KEYWORD_OPERATOR}, /* for format rule */
       {"OPTIMIZE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_OPTIMIZE},
@@ -2529,6 +2539,7 @@ static const keywords strvalues[]=
       {"TERMINATED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_TERMINATED},
       {"TEXT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_TEXT},
       {"THEN", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_THEN},
+      {"TIES", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TIES},
       {"TIME", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_TIME},
       {"TIMEDIFF", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMEDIFF},
       {"TIMESTAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TIMESTAMP},
@@ -3342,7 +3353,7 @@ public:
   QFont get_font_from_style_sheet(QString style_string);
   QString get_color_from_style_sheet(QString style_string);
   QString get_background_color_from_style_sheet(QString style_string);
-  void set_dbms_version_mask(QString);
+  void set_dbms_version_mask(QString, int);
   int next_i(int, int);
   int next_i_v(int, int, int token_types[], int token_lengths[]);
   bool get_sql_mode(int who_is_calling, QString text, bool is_in_hparse, int start_token_number);
@@ -3409,6 +3420,7 @@ public:
   void hparse_f_parenthesized_expression();
   void hparse_f_parenthesized_multi_expression(int*);
   void hparse_f_bracketed_multi_expression();
+  int hparse_f_simple_value(bool is_value_required, bool is_row_required);
   void hparse_f_like_or_where();
   void hparse_f_from_or_like_or_where();
   void hparse_f_infile_or_outfile();
@@ -3477,16 +3489,17 @@ public:
   int hparse_f_signal_or_resignal(int,int);
   int hparse_f_into();
   void hparse_f_with_clause(int,bool);
-  int hparse_f_values();
-  int hparse_f_unionize();
+  int hparse_f_values(bool);
+  int hparse_f_unionize(bool);
   bool hparse_f_is_query(bool);
   int hparse_f_query(int,bool,bool,bool);
   int hparse_f_select(bool,bool);
+  int hparse_f_late_select_clauses(bool,int);
   int hparse_f_deep_query(int,bool,bool);
   void hparse_f_where();
   void hparse_f_window_spec(bool);
   int hparse_f_order_by(int);
-  void hparse_f_limit(int);
+  int hparse_f_limit(int);
   void hparse_f_block(int, int);
   bool hparse_f_is_in_compound();
   int hparse_f_plsql_condition(int);
@@ -3851,7 +3864,8 @@ private:
   int setup_generate_statements_debuggable(int, int, int, QString, int, int);
   int setup_generate_label(int, QString, int);
   int setup_row_type(int);
-  int setup_determine_what_variables_are_in_scope(int, QString);
+  bool typer_is_int(int);
+  int setup_determine_what_variables_are_in_scope(int, QString, bool);
   int setup_generate_statement_text(int, QString, int, int);
   int setup_generate_statement_text_as_is(int, QString, int);
   void copy_options_to_main_window();
@@ -10004,6 +10018,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
 
 #if (OCELOT_IMPORT_EXPORT == 1)
   QByteArray escapers("");
+  escapers.resize(16); /* last-minute fix. actually initial max size is 4 but allowing more should be harmless */
   char escape_char= main_exports.columns_escaped_by[0];
   char null_string[64]; /* todo: should be variable length, in theory this could overflow but usually it's \N */
   char *pointer_to_null_string;

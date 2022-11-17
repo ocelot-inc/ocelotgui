@@ -1,11 +1,11 @@
-# deb_build.sh -- produce ocelotgui-1.7.0 .deb from ~/ocelotgui
+# deb_build.sh -- produce ocelotgui-1.8.0 .deb from ~/ocelotgui
 
 # The ocelotgui developer uses this script to produce a .deb file from a source directory ~/ocelotgui on Ubuntu xenial.
 # Only advanced users will want this, ordinary users will download the official-release .deb file or make with cmake.
 
 # An easy way to get ~/ocelotgui is "cd ~" + "git clone https://github.com/ocelot-inc/ocelotgui ocelotgui".
 # This script uses /tmp and cheerily deletes existing files in /tmp.
-# The result will be /tmp/debian3/ocelotgui_1.7.0-1_amd64.deb or /tmp/debian3/ocelotgui_1.7.0-1_i386.deb.
+# The result will be /tmp/debian3/ocelotgui_1.8.0-1_amd64.deb or /tmp/debian3/ocelotgui_1.8.0-1_i386.deb.
 # See also the comments in README.Debian.
 
 sudo apt-get install debhelper dpkg-dev devscripts
@@ -15,7 +15,7 @@ sudo apt-get install qtbase5-dev
 sudo apt-get install default-libmysqlclient-dev
 sudo apt-get install piuparts
 
-export VERSION=1.7.0
+export VERSION=1.8.0
 export SOURCE=$HOME/ocelotgui
 
 cd /tmp
@@ -79,6 +79,15 @@ cp -p $SOURCE/shot8.jpg /tmp/ocelotgui-$VERSION/shot8.jpg
 cp -p $SOURCE/shot9.jpg /tmp/ocelotgui-$VERSION/shot9.jpg
 cp -p $SOURCE/shot10.jpg /tmp/ocelotgui-$VERSION/shot10.jpg
 cp -p $SOURCE/shot11.png /tmp/ocelotgui-$VERSION/shot11.png
+cp -p $SOURCE/explorer1.png /tmp/ocelotgui-$VERSION/explorer1.png
+cp -p $SOURCE/explorer2.png /tmp/ocelotgui-$VERSION/explorer2.png
+cp -p $SOURCE/explorer3.png /tmp/ocelotgui-$VERSION/explorer3.png
+cp -p $SOURCE/explorer4.png /tmp/ocelotgui-$VERSION/explorer4.png
+cp -p $SOURCE/explorer5.png /tmp/ocelotgui-$VERSION/explorer5.png
+cp -p $SOURCE/explorer6.png /tmp/ocelotgui-$VERSION/explorer6.png
+cp -p $SOURCE/explorer7.png /tmp/ocelotgui-$VERSION/explorer7.png
+cp -p $SOURCE/explorer8.png /tmp/ocelotgui-$VERSION/explorer8.png
+cp -p $SOURCE/explorer9.png /tmp/ocelotgui-$VERSION/explorer9.png
 cp -p $SOURCE/ocelotgui-logo.png /tmp/ocelotgui-$VERSION/ocelotgui-logo.png
 cp -p $SOURCE/ocelotgui_logo.png /tmp/ocelotgui-$VERSION/ocelotgui_logo.png
 cp -p $SOURCE/CMakeLists.txt /tmp/ocelotgui-$VERSION/CMakeLists.txt
@@ -87,10 +96,7 @@ cp -p $SOURCE/COPYING.thirdparty /tmp/ocelotgui-$VERSION/COPYING.thirdparty
 cp -p $SOURCE/ocelotgui.1 /tmp/ocelotgui-$VERSION/ocelotgui.1
 cp -p $SOURCE/copyright /tmp/ocelotgui-$VERSION/copyright
 cp -p $SOURCE/changelog /tmp/ocelotgui-$VERSION/changelog
-cp -p $SOURCE/rpmchangelog /tmp/ocelotgui-$VERSION/rpmchangelog
 cp -p $SOURCE/ocelotgui.desktop /tmp/ocelotgui-$VERSION/ocelotgui.desktop
-cp -p $SOURCE/ocelotgui.spec /tmp/ocelotgui-$VERSION/ocelotgui.spec
-cp -p $SOURCE/rpm_build.sh /tmp/ocelotgui-$VERSION/rpm_build.sh
 cp -p $SOURCE/tarantool.txt /tmp/ocelotgui-$VERSION/tarantool.txt
 cp -p $SOURCE/third_party.h /tmp/ocelotgui-$VERSION/third_party.h
 cp -p $SOURCE/debian/README.Debian /tmp/ocelotgui-$VERSION/debian/README.Debian

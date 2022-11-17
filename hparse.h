@@ -511,7 +511,6 @@ void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype, 
 //      }
 //    }
 //  }
-
   hparse_f_variables_append(hparse_i, hparse_text_copy, reftype); /* this is in ocelotgui.cpp */
 
   /* If user has typed DROP TABLE " then possibilities should not include IF */
@@ -1299,6 +1298,9 @@ bool MainWindow::hparse_f_is_variable(int i, int keyword_row)
         ... Use it when you know you're looking at MySQL qualifier.
   TODO: Check: why do we call this, not hparse_f_qualified_name_of_object,
         when adding column etc. in CREATE|ALTER TABLE?
+  TODO: We avoid this when looking for some <simple value specification>s because searches for variables
+        are just asking for "[identifier]", I think it's because hparse_f_is_variables() returns false
+        even if a variable could follow. If/when this is fixed, hparse_f_simple_value() might be redundant.
 */
 int MainWindow::hparse_f_qualified_name_of_operand(unsigned int token_flags, bool v, bool f, bool s)
 {
@@ -1319,6 +1321,7 @@ int MainWindow::hparse_f_qualified_name_of_operand(unsigned int token_flags, boo
      || (hparse_statement_type == TOKEN_KEYWORD_ALTER)
      || (hparse_statement_type == TOKEN_KEYWORD_HANDLER)
      || (hparse_statement_type == TOKEN_KEYWORD_LOAD)
+     || (hparse_statement_type == TOKEN_KEYWORD_TABLE)
      || (hparse_statement_type == TOKEN_KEYWORD_SELECT)) {;}
     else s= false;
   }
@@ -6779,6 +6782,7 @@ int MainWindow::hparse_f_signal_or_resignal(int who_is_calling, int block_top)
 }
 
 /* An INTO clause may appear in two different places within a SELECT. */
+/* Todo: Use TOKEN_REFTYPE_VARIABLE with hparse_f_qualified_name_of_operand() when it works correctly again. */
 int MainWindow::hparse_f_into()
 {
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO"))
@@ -6830,7 +6834,7 @@ void MainWindow::hparse_f_with_clause(int block_top, bool is_statement)
   if (hparse_errno > 0) return;
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
   {
-    hparse_f_values();
+    hparse_f_values(false);
     if (hparse_errno > 0) return;
   }
   else
@@ -6861,15 +6865,21 @@ void MainWindow::hparse_f_with_clause(int block_top, bool is_statement)
   Todo: check VALUES(...) ORDER BY etc. again
   (last time I tried, it wasn't legal despite SQLite diagrams).
 */
-int MainWindow::hparse_f_values()
+int MainWindow::hparse_f_values(bool is_top)
 {
   hparse_statement_type= TOKEN_KEYWORD_VALUES;
   hparse_f_expression_list(TOKEN_KEYWORD_VALUES);
-  hparse_f_unionize();
+  int late_result= hparse_f_late_select_clauses(is_top, TOKEN_KEYWORD_VALUES);
+  if (hparse_errno != 0) return 0;
+  if (late_result == 0)
+  {
+    hparse_f_unionize(is_top);
+    if (hparse_errno > 0) return 0;
+  }
   return 0;
 }
 
-int MainWindow::hparse_f_unionize()
+int MainWindow::hparse_f_unionize(bool is_top)
 {
   bool is_union= false;
   bool is_except= false;
@@ -6881,8 +6891,13 @@ int MainWindow::hparse_f_unionize()
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0_31|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
     is_intersect= true;
   if ((is_union == false) && (is_except == false) && (is_intersect == false))
+  {
     return 1;
-  if (is_union == true)
+  }
+  main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+  if ((is_union == true)
+   || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_1) != 0)
+   || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0_31) != 0))
   {
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1)
       {;}
@@ -6894,12 +6909,13 @@ int MainWindow::hparse_f_unionize()
     if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)
       {;}
   }
-  if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
-  {
-    hparse_f_values();
-    if (hparse_errno > 0) return 0;
-  }
-  else if (hparse_f_query(0, false, false, false) == 0)
+//  if (hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VALUES") == 1)
+//  {
+//    hparse_f_values(false);
+//    if (hparse_errno > 0) return 0;
+//  }
+//  else
+  if (hparse_f_query(0, false, false, is_top) == 0)
   {
     hparse_f_error();
     return 0;
@@ -6911,10 +6927,11 @@ int MainWindow::hparse_f_unionize()
 /*
   Return true if following looks like start of query|subquery.
   If false, do accept() anyway so it appears in the expected list.
+  Warn: we only do the accept() anysay for keywords, not for (, so ... UNION ( looks error but UNION (WITH is ok
 */
 bool MainWindow::hparse_f_is_query(bool is_statement)
 {
-  /* Check if starts with (repeatedly) "(" | "SELECT" | "VALUES" | "WITH" */
+  /* Check if starts with (repeatedly) "(" | "SELECT" | "VALUES" | "WITH" | "TABLE" */
   QString s= hparse_token;
   int i= hparse_i;
   while (s == "(")
@@ -6925,6 +6942,11 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
   s= s.toUpper();
   bool is_query= false;
   if (s == "SELECT") is_query= true;
+  if (s == "TABLE")
+  {
+    if (hparse_dbms_mask & (FLAG_VERSION_TARANTOOL|FLAG_VERSION_MYSQL_8_0))
+      is_query= true;
+  }
   if (s == "VALUES")
   {
     if (is_statement == false) is_query= true;
@@ -6941,17 +6963,20 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
     /* guaranteed to fail */
     hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SELECT");
     /* guaranteed to fail */
+    if (s != "TABLE")
+      hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TABLE");
+    /* guaranteed to fail */
     if (s != "VALUES")
-      hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
+      hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
     /* guaranteed to fail */
     if (s != "WITH")
-      hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES");
+      hparse_f_accept(FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_2_2, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WITH");
   }
   return is_query;
 }
 
 /*
-  Queries | subqueries can start with SELECT or VALUES or WITH.
+  Queries | subqueries can start with SELECT or VALUES or WITH or TABLE.
   May be parenthesized. We don't distinguish table versus scalar.
   Return 1 if you ate a query. Return 0 if not-a-query or error.
   "SELECT ..." or "(SELECT ...)" -- ditto for VALUES + WITH
@@ -6992,6 +7017,17 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
     }
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return 0;
+    /* allow for (select ....) union select ... as opposed to (select ... union select ...) */
+    /* allow for (select ...) order by 1 */
+    /* so this allows too much too often after ) but might be better than allowing nothing */
+    int late_result= hparse_f_late_select_clauses(is_top, TOKEN_KEYWORD_VALUES);
+    if (hparse_errno != 0) return 0;
+    if (late_result == 0)
+    {
+      hparse_f_unionize(is_top);
+      if (hparse_errno > 0) return 0;
+    }
+    return 1;
   }
   /* todo: we aren't checking if VALUES is legal here */
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SELECT") == 1)
@@ -7000,10 +7036,31 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
     hparse_f_select(is_top, is_statement);
     if (hparse_errno > 0) return 0;
   }
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  /* Todo: TABLE statement is new in MySQL 8.0.19. I haven't checked it works in exotic situations. */
+  /* e.g. https://dev.mysql.com/doc/refman/8.0/en/table.html says it should work with UNION and INTO. */
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE, "TABLE"))
+  {
+    if (is_statement) hparse_statement_type= TOKEN_KEYWORD_TABLE;
+    main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+    if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0)
+    {
+      hparse_f_error();
+      return 0;
+    }
+    int late_result= hparse_f_late_select_clauses(is_top, TOKEN_KEYWORD_TABLE);
+    if (hparse_errno != 0) return 0;
+    if (late_result == 0)
+    {
+      hparse_f_unionize(is_top);
+      if (hparse_errno > 0) return 0;
+    }
+  }
+#endif
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "VALUES") == 1)
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_VALUES;
-    hparse_f_values();
+    hparse_f_values(is_top);
     if (hparse_errno > 0) return 0;
   }
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "WITH") == 1)
@@ -7018,25 +7075,25 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
   {
     hparse_statement_type= TOKEN_KEYWORD_SELECT;
   }
-  {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNION") == 1)
-    {
-      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
-      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)) {;}
-      int return_value= hparse_f_query(0, false, is_statement, false);
-      if (hparse_errno > 0) return 0;
-      if (return_value == 0)
-      {
-        hparse_f_error();
-        return 0;
-      }
-    }
-    hparse_f_order_by(0);
-    if (hparse_errno > 0) return 0;
-    hparse_f_limit(TOKEN_KEYWORD_SELECT);
-    if (hparse_errno > 0) return 0;
-    return 1;
-  }
+//  {
+//    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNION") == 1)
+//    {
+//      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+//      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTINCT") == 1)) {;}
+//      int return_value= hparse_f_query(0, false, is_statement, false);
+//      if (hparse_errno > 0) return 0;
+//      if (return_value == 0)
+//      {
+//        hparse_f_error();
+//        return 0;
+//      }
+//    }
+//    hparse_f_order_by(0);
+//    if (hparse_errno > 0) return 0;
+//    hparse_f_limit(TOKEN_KEYWORD_SELECT);
+//    if (hparse_errno > 0) return 0;
+//    return 1;
+//  }
   return 1;
 }
 int MainWindow::hparse_f_select(bool is_top, bool is_statement)
@@ -7130,19 +7187,63 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
       if (hparse_errno > 0) return 0;
     } while (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   }
-  hparse_f_order_by(TOKEN_KEYWORD_SELECT);
-  if (hparse_errno > 0) return 0;
-  hparse_f_limit(TOKEN_KEYWORD_SELECT);
-  if (hparse_errno > 0) return 0;
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PROCEDURE"))
+  int late_result= hparse_f_late_select_clauses(is_top, TOKEN_KEYWORD_SELECT);
+  if (late_result == 0)
   {
+    hparse_f_unionize(is_top);
+    if (hparse_errno > 0) return 0;
+  }
+  return 1;
+}
+
+/*
+  After SELECT ... WHERE clause we might have ORDER BY, LIMIT, PROCEDURE, INTO, FOR, LOCK
+  Some of these clauses might be in MariaDB VALUES or MySQL TABLE statements, though not always documented.
+  (We are accepting the syntax even when it's not documented, hoping that it will be supported in future.)
+  Tarantool allows SELECT ... ORDER BY, and SELECT ... LIMIT, and VALUES ... LIMIT, that's all.
+  In a subquery the INTO and FOR and LOCK won't be allowed.
+  Todo: For VALUES (...) ORDER BY args; the args must be ordinals
+  Todo: although all UNIONed statements can be is_top==true, only the last one can have INTO.
+        therefore "return 1" if INTO seen -- and if it's 1, unionize() won't be called
+  Todo: MySQL 8 allows INTO both before and after FOR
+  Todo: MySQL 8 allows ORDER BY ... WITH ROLLUP (?)
+  Todo: During "select * from (select * from t into dumpfile 'x') as x;" is_top==false but it's illegal.
+  Todo: MySQL 8 doesn't allow PROCEDURE, although MySQL 5.7 allowed it.
+  Todo: MariaDB disallows PROCEDURE not only before UNION but also after UNION.
+  Todo: PROCEDURE needs an argument list, even if empty.
+  Todo: Call for things other than SELECT and VALUES, e.g. DELETE, but in that case only a few things work
+        and probably not for Tarantool
+*/
+int MainWindow::hparse_f_late_select_clauses(bool is_top, int who_is_calling)
+{
+  if ((who_is_calling == TOKEN_KEYWORD_VALUES) && ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)) return 0;
+  bool is_union_illegal_later= false;
+  {
+    int order_by_result= hparse_f_order_by(TOKEN_KEYWORD_SELECT); /* even if who_is_calling is something else */
+    if (hparse_errno > 0) return 0;
+    if (order_by_result == 1) is_union_illegal_later= true;
+  }
+  {
+    int limit_result= hparse_f_limit(TOKEN_KEYWORD_SELECT); /* even if who_is_calling is something else */
+    if (hparse_errno > 0) return 0;
+    if (limit_result == 1) is_union_illegal_later= true;
+  }
+  if ((is_top == true)
+   && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PROCEDURE")))
+  {
+    is_union_illegal_later= true;
     hparse_f_call();
     if (hparse_errno > 0) return 0;
   }
-  hparse_f_into();
-  if (hparse_errno > 0) return 0;
+  if ((is_top == true)
+   && (hparse_f_into() == 1))
+  {
+    is_union_illegal_later= true;
+    if (hparse_errno > 0) return 0;
+  }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR") == 1)
   {
+    is_union_illegal_later= true;
     if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UPDATE") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SHARE") == 1))
     {
@@ -7180,6 +7281,7 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOCK") == 1)
   {
+    is_union_illegal_later= true;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN");
     if (hparse_errno > 0) return 0;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
@@ -7194,10 +7296,10 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
     }
     else hparse_f_accept(FLAG_VERSION_MARIADB_10_1, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOWAIT");
   }
-  hparse_f_unionize();
-  if (hparse_errno > 0) return 0;
-  return 1;
+  if (is_union_illegal_later == true) return 1;
+  return 0;
 }
+
 
 void MainWindow::hparse_f_where()
 {
@@ -7284,26 +7386,128 @@ int MainWindow::hparse_f_order_by(int who_is_calling)
 /* LIMIT 1 or LIMIT 1,0 or LIMIT 1 OFFSET 0 from SELECT, DELETE, UPDATE, SHOW, or GROUP_CONCAT() */
 /* Todo: disallow identifier unless we're inside a routine */
 /* Todo: allow '?' if someday you parse within a prepared statement */
-void MainWindow::hparse_f_limit(int who_is_calling)
+/* Iff MariaDB 10.6+ there can be a more standard OFFSET clause */
+/* Note: Although MariaDB manual has "[count] ROWS" it seems that count is not optional */
+int MainWindow::hparse_f_limit(int who_is_calling)
 {
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIMIT") == 1)
+  if ((who_is_calling == TOKEN_KEYWORD_SELECT) && ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_10) != 0))
   {
-    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0)
+    bool is_offset_seen= false;
+    bool is_fetch_seen= false;
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OFFSET, "OFFSET") == 1)
     {
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return;
+      is_offset_seen= true;
+      if (hparse_f_simple_value(true, true) == 0) return 0; /* expecting "integer {ROW|ROWS}" */
     }
-    if ((who_is_calling == TOKEN_KEYWORD_DELETE) || (who_is_calling == TOKEN_KEYWORD_UPDATE) || (who_is_calling == TOKEN_KEYWORD_GROUP_CONCAT)) return;
-    if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
-     || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OFFSET") == 1))
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FETCH, "FETCH") == 1)
     {
-      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0)
+      is_fetch_seen= true;
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FIRST, "FIRST") != 1)
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NEXT, "NEXT");
+      if (hparse_errno != 0) return 0;
+      hparse_f_simple_value(false, true); /* accepting "integer {ROW|ROWS}" */
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ONLY, "ONLY") != 1)
       {
-        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-        if (hparse_errno > 0) return;
+        /* WITH TIES is only valid if there was an earlier ORDER BY clause */
+        /* This could be fooled by a subquery in an ORDER BY, or an ORDER BY within a subquery or join */
+        bool is_order_by_in_select= false;
+        for (int i= hparse_i_of_last_accepted;;)
+        {
+          i= next_i(i, -1);
+          if (i == 0) break;
+          if ((main_token_flags[i]&TOKEN_FLAG_IS_START_STATEMENT) != 0) break;
+          if (main_token_types[i] == TOKEN_KEYWORD_ORDER) {is_order_by_in_select= true; break; }
+        }
+        if (is_order_by_in_select == false) hparse_f_error();
+        if (hparse_errno != 0) return 0;
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH");
+        if (hparse_errno != 0) return 0;
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TIES, "TIES");
+        if (hparse_errno != 0) return 0;
       }
     }
+    if ((is_offset_seen == true) || (is_fetch_seen == true)) return 1;
   }
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIMIT") == 1)
+  {
+    bool is_simple_value_seen= false;
+    if (hparse_f_simple_value(false, false) == 1) /* expecting "integer" */
+    {
+      is_simple_value_seen= true;
+      if ((who_is_calling == TOKEN_KEYWORD_DELETE) || (who_is_calling == TOKEN_KEYWORD_UPDATE) || (who_is_calling == TOKEN_KEYWORD_GROUP_CONCAT))
+        return 1;
+      if ((hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",") == 1)
+       || (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OFFSET") == 1))
+      {
+        if (hparse_f_simple_value(true, false) == 0) return 0; /* expecting "integer" */
+      }
+    }
+    bool is_rows_seen= false;
+    if (who_is_calling == TOKEN_KEYWORD_SELECT)
+    {
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROWS, "ROWS") == 1)
+      {
+        is_rows_seen= true;
+        hparse_f_expect(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXAMINED, "EXAMINED");
+        if (hparse_errno != 0) return 0;
+        if (hparse_f_simple_value(true, false) == 0) return 0; /* expecting "integer" */
+      }
+    }
+    if ((is_simple_value_seen == false) && (is_rows_seen == false)) hparse_f_error();
+    return 1; /* because limit seen */
+  }
+  return 0;
+}
+
+/*
+  Sometimes <simple value specification> might be an integer literal, or integer declared variable.
+  E.g. LIMIT <simple value specification>, OFFSET <simple value specification> {ROW|ROWS}
+  If error, say hparse_f_error() and return 0. If value seen, return 1.
+  Todo: using hparse_f_is_variable or something higher we could do better than ask if it's an identifier.
+  Todo: look for row|rows first before you look for an identifier
+  Todo: for literals, only accepted values are unsigned integer -- 1E0 or 1.0 or +1 won't do.
+  Todo: for variables, defined type must be integer or (dunno why) BIT. DECIMAL won't do.
+        -- probably you could somehow get the restriction into setup_determine_what_variables_are_in_scope()
+        -- also defined variables should not be among the choices if they're named ROW or ROWS
+  Todo: this should be called from several other places, search for cases where we pass
+        TOKEN_REFTYPE_VARIABLE_REFER to hparse_f_accept() and decide whether they require unsigned integers
+  Todo: we're using this because hparse_f_qualified_name_of_operand() isn't working properly for variables,
+        if or when that' fixed we can do otherwise
+  Warn: In standard SQL ROW and ROWS are reserved, in MariaDB they're not -- but would cause errors if used.
+        So act as if they are reserved.
+*/
+int MainWindow::hparse_f_simple_value(bool is_value_required, bool is_row_required)
+{
+  bool is_value_seen= false;
+  if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 1) is_value_seen= true;
+  if (is_value_seen == false)
+  {
+    if (hparse_f_is_in_compound() == true)
+    {
+      QString s= hparse_token.toUpper();
+      if ((s == "ROW") || (s == "ROWS")) main_token_flags[hparse_i] |= TOKEN_FLAG_IS_RESERVED;
+      hparse_variable_is_allowed= true;
+      hparse_variable_must_be_int= true;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_VARIABLE_REFER,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 1) is_value_seen= true;
+      hparse_variable_must_be_int= false;
+      hparse_variable_is_allowed= false;
+    }
+  }
+  if (is_value_seen == false)
+  {
+    if (is_value_required)
+    {
+      hparse_f_error();
+      return 0;
+    }
+  }
+  if (is_row_required == true)
+  {
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROW, "ROW") != 1)
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROWS, "ROWS");
+    if (hparse_errno != 0) return 0;
+  }
+  return 1;
 }
 
 void MainWindow::hparse_f_like_or_where()
@@ -9710,7 +9914,7 @@ void MainWindow::hparse_f_statement(int block_top)
     if (hparse_errno > 0) return;
     return;
   }
-  /* this checks for "SELECT" and "VALUES" and "WITH" */
+  /* this checks for "SELECT" and "VALUES" and "WITH" and "TABLE" */
   else if (hparse_f_query(block_top, false, true, true) == 1)
   {
     if (hparse_errno > 0) return;
@@ -9972,21 +10176,24 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINLOG") == 1) /* show binlog */
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EVENTS");
-      if (hparse_errno > 0) return;
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN") == 1)
-      {
-        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_10_1, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_STATUS, "STATUS") == 0)
+        {
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EVENTS");
+        if (hparse_errno > 0) return;
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IN") == 1)
+        {
+          main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+          if (hparse_errno > 0) return;
+        }
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1)
+        {
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+          if (hparse_errno > 0) return;
+        }
+        hparse_f_limit(TOKEN_KEYWORD_SHOW);
         if (hparse_errno > 0) return;
       }
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1)
-      {
-        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
-        if (hparse_errno > 0) return;
-      }
-      hparse_f_limit(TOKEN_KEYWORD_SHOW);
-      if (hparse_errno > 0) return;
     }
     else if (hparse_f_character_set() == 1) /* show character set */
     {
@@ -10615,21 +10822,7 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else hparse_f_error();
   }
-#if (OCELOT_MYSQL_INCLUDE == 1)
-  /* Todo: TABLE statement is new in MySQL 8.0.19. I haven't checked it works in exotic situations. */
-  /* e.g. https://dev.mysql.com/doc/refman/8.0/en/table.html says it should work with UNION and INTO. */
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE, "TABLE"))
-  {
-    hparse_statement_type= TOKEN_KEYWORD_TABLE;
-    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-    if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 0) hparse_f_error();
-    hparse_f_order_by(TOKEN_KEYWORD_SELECT);
-    if (hparse_errno > 0) return;
-    hparse_f_limit(TOKEN_KEYWORD_SELECT);
-    if (hparse_errno > 0) return;
-  }
-#endif
+  /* "TABLE" is covered by the earlier call to hparse_f_query(0, ) */
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TRUNCATE, "TRUNCATE"))
   {
     if (hparse_errno > 0) return; /* todo: check: why do I need this here and not for other statements? */
@@ -12826,6 +13019,7 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_prev_token= "";
     hparse_subquery_is_allowed= false;
     hparse_variable_is_allowed= false;
+    hparse_variable_must_be_int= false;
     hparse_count_of_accepts= 0;
     hparse_i_of_last_accepted= 0;
     if (hparse_i == -1) hparse_f_nexttoken();

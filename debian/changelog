@@ -1,3 +1,9 @@
+ocelotgui (1.8.0-1) UNRELEASED; urgency=low
+
+  * Explorer
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Wed, 16 Nov 2022 12:00:00 -0600
+
 ocelotgui (1.7.0-1) UNRELEASED; urgency=low
 
   * Rewrite of detach code

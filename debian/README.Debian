@@ -12,15 +12,15 @@ The ocelotgui source package includes a script deb_build.sh which builds a .deb 
 # Get the prerequisites for build: apt-get install git cmake g++ default-libmysqlclient-dev qtbase5-dev
 # Get the prerequisites for debuild:  apt-get install devscripts build-essential lintian
 
-# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.7.0.tar.gz.
+# Get the latest source, including the debian subdirectory, compressed into a file named ocelotgui-1.8.0.tar.gz.
 # (Internally Peter Gulutzan has a script for "Making a package" but we do not supply it, you must make your own tar.gz.) 
-# (Since release 1.0.9, you're able to simply download ocelotgui-1.7.0.tar.gz from the github release files.)
+# (Since release 1.0.9, you're able to simply download ocelotgui-1.8.0.tar.gz from the github release files.)
 cd ~
 rm -r -f ~/debian2
 mkdir ~/debian2
 cd ~/debian2
-cp ~/ocelotgui-1.7.0.tar.gz ocelotgui_1.7.0.orig.tar.gz
-tar -xvf ocelotgui_1.7.0.orig.tar.gz
+cp ~/ocelotgui-1.8.0.tar.gz ocelotgui_1.8.0.orig.tar.gz
+tar -xvf ocelotgui_1.8.0.orig.tar.gz
 cd ./ocelotgui/debian
 debuild
 
@@ -29,7 +29,7 @@ dpkg-genchanges: info: including full source code in upload ... but source isn't
 .png files were subjected to normalizing by "dh_strip_nondeterminism"
 
 # Lintian results
-After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.7.0_amd64.deb":
+After "debuild" and after "lintian -I ~/tmp/debian3/ocelotgui_1.8.0_amd64.deb":
   When we build: There are no errors. There are no warnings. There are no informative messages. Hurrah.
 But it depends on what the distro's version is. We deliberately build on an old version.
 This is how to get rid of warnings or informative messages that might appear on newer distros.
