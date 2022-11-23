@@ -634,6 +634,7 @@ int MainWindow::hparse_f_acceptf(int pass_number, QString replacee)
   Todo: this is okay for simple situations but wouldn't work for ... SET a=(x=y), x=z.
   The idea is that the caller will remove the matching item for tokens.
   An alternative is to search backward as far as the SET and not try to accept if it's seen before.
+  Actually we no longer call this for SET, but we do call for REQUIRE.
 */
 int MainWindow::hparse_f_accept_in_set(unsigned int flag_version, QStringList tokens, int *i_of_matched)
 {
@@ -4873,13 +4874,14 @@ void MainWindow::hparse_f_column_definition(int last_word)
   }
 }
 
-void MainWindow::hparse_f_comment()
+/* Actually this could take COMMENT 'x' or (if extra) ATTRIBUTE 'x', and allow for other such simple clauses */
+void MainWindow::hparse_f_comment(int extra)
 {
-  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COMMENT") == 1)
+  if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COMMENT") == 1)
+   || ((extra == TOKEN_KEYWORD_ATTRIBUTE) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ATTRIBUTE") == 1)))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
     if (hparse_f_literal(TOKEN_REFTYPE_COMMENT, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
   }
 }
 
@@ -5512,7 +5514,7 @@ void MainWindow::hparse_f_alter_or_create_event(int statement_type)
       if (hparse_errno > 0) return;
     }
   }
-  hparse_f_comment();
+  hparse_f_comment(0);
   if (hparse_errno > 0) return;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DO") == 1)
   {
@@ -6032,142 +6034,321 @@ void MainWindow::hparse_f_alter_or_create_server(int statement_type)
   REQUIRE tsl_option is allowed in GRANT, and in CREATE USER (+ALTER?) after MySQL 5.7.6 | MariaDB 10.2.
   WITH resource_option is allowed in GRANT, and in CREATE USER (+ALTER?) after MySQL 5.7.6 | MariaDB 10.2.
   password_option and lock_option are allowed in CREATE or ALTER after MySQL 5.7.6
+  CIPHER + ISSUER + SUBJECT can be combined, but not NONE | SSL | X509.
 */
 void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen, bool role_name_seen)
 {
+  bool is_grant_and_mysql_8= false;
+  if ((who_is_calling == TOKEN_KEYWORD_GRANT) && ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) != 0))
+    is_grant_and_mysql_8= true;
+
   if ((who_is_calling == TOKEN_KEYWORD_GRANT)
    || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2_2) != 0)
    || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_5_7) != 0))
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REQUIRE") == 1)
+    bool requirement_seen= false;
+    if ((is_grant_and_mysql_8 == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REQUIRE") == 1))
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NONE") == 1) {;}
+      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NONE") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SSL")== 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "X509")== 1))
+         requirement_seen= true;
       else
       {
-        bool and_seen= false;
+        /* Maybe we should be using something like hparse_from_list here. */
+        QStringList tokens= (QStringList() << "CIPHER" << "ISSUER" << "SUBJECT");
         for (;;)
         {
-          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SSL") == 1) {;}
-          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "X509") == 1) {;}
-          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CIPHER") == 1) {if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error(); }
-          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ISSUER") == 1) {if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error(); }
-          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SUBJECT") == 1) {if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error(); }
-          else
+          int i_of_matched;
+          if (hparse_f_accept_in_set(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, tokens, &i_of_matched) == 0) break;
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0)
           {
-            if (and_seen == true) hparse_f_error();
-            if (hparse_errno > 0) return;
-            break;
-          }
-          and_seen= false;
-          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AND") == 1) and_seen= true;
+            hparse_f_error();
+            return;
+           }
+          tokens.removeAt(i_of_matched);
+          requirement_seen= true;
+          if (tokens.size() == 0) break;
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AND") == 1)
+            requirement_seen= false;
         }
       }
+      if (requirement_seen == false) hparse_f_error();
+      if (hparse_errno > 0) return;
     }
   }
-
   if ((who_is_calling == TOKEN_KEYWORD_GRANT)
    || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2_2) != 0)
    || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_5_7) != 0))
   {
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1)
-     || (((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2_2) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIA") == 1)))
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1)
     {
-      for (;;)
+      bool option_seen= false;
+      if (who_is_calling == TOKEN_KEYWORD_GRANT)
       {
-        if ((who_is_calling == TOKEN_KEYWORD_GRANT)
-         && (role_name_seen == false)
-         && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GRANT") == 1))
+        int x= 0;
+        if (role_name_seen == false)
+          x= hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GRANT");
+        else
+          x= hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ADMIN");
+        if (x == 1)
         {
           hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPTION");
           if (hparse_errno > 0) return;
+          option_seen= true;
         }
-        else if ((who_is_calling == TOKEN_KEYWORD_GRANT)
-         && (role_name_seen == true)
-         && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ADMIN") == 1))
-        {
-          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPTION");
-          if (hparse_errno > 0) return;
-        }
-        else if (proxy_seen == true) {;}
-        else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MAX_QUERIES_PER_HOUR") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MAX_UPDATES_PER_HOUR") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MAX_CONNECTIONS_PER_HOUR") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MAX_USER_CONNECTIONS") == 1))
-        {
-          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
-
-          if (hparse_errno > 0) return;
-        }
-        else break;
       }
+
+      if ((option_seen == false) && (proxy_seen == false) && (is_grant_and_mysql_8 == false))
+      {
+        QStringList tokens;
+        tokens << "MAX_QUERIES_PER_HOUR" << "MAX_UPDATES_PER_HOUR" << "MAX_CONNECTIONS_PER_HOUR" << "MAX_USER_CONNECTIONS";
+        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2_2) != 0) tokens.append("MAX_STATEMENT_TIME");
+        for (;;)
+        {
+          int i_of_matched;
+          if (hparse_f_accept_in_set(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, tokens, &i_of_matched) == 0) break;
+          QString matched_value= tokens.at(i_of_matched);
+          if ((matched_value == "GRANT") || (matched_value == "ADMIN"))
+          {
+            option_seen= true;
+            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPTION");
+            break;
+          }
+          else
+          {
+            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+          }
+          if (hparse_errno > 0) return;
+          tokens.removeAt(i_of_matched);
+          option_seen= true;
+          if (tokens.size() == 0) break;
+        }
+      }
+      if (option_seen == false) hparse_f_error();
+      if (hparse_errno > 0) return;
     }
   }
-
-  if (((who_is_calling == TOKEN_KEYWORD_CREATE) || (who_is_calling == TOKEN_KEYWORD_ALTER))
-   && ((hparse_dbms_mask & FLAG_VERSION_MYSQL_5_7) != 0))
+  if ((who_is_calling == TOKEN_KEYWORD_CREATE) || (who_is_calling == TOKEN_KEYWORD_ALTER))
   {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PASSWORD") == 1)
+    if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_2_2) != 0)
+     || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_5_7) != 0))
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXPIRE");
-      if (hparse_errno > 0) return;
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT") == 1)
-        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NEVER") == 1) {;}
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERVAL") == 1)
+      /* password_option and lock_option can be mixed together and can be repeated, the MySQL manual is wrong */
+      bool is_password_expire_seen= false;       /* MariaDB, MySQL 5.7, MySQL 8 */
+      bool is_password_history_seen= false;      /* MySQL 8 */
+      bool is_password_reuse_seen= false;        /* MySQL 8 */
+      bool is_password_require_seen= false;      /* MySQL 8 */
+      bool is_failed_login_attempts_seen= false; /* MySQL 8 */
+      bool is_password_lock_time_seen= false;    /* MySQL 8 */
+      bool is_account_seen= false;               /* MariaDB, MySQL 5.7, MySQL 8 */
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) == 0)
       {
-        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
-
+        is_password_history_seen= is_password_reuse_seen= true; is_password_require_seen= true;
+        is_failed_login_attempts_seen= is_password_lock_time_seen= true;
+      }
+      for (;;)
+      {
         if (hparse_errno > 0) return;
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DAY");
-        if (hparse_errno > 0) return;
+        if ((is_password_expire_seen == false) || (is_password_history_seen == false)
+         || (is_password_reuse_seen == false) || (is_password_require_seen == false))
+        {
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PASSWORD, "PASSWORD") == 1)
+          {
+            if ((is_password_expire_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXPIRE") == 1))
+            {
+              is_password_expire_seen= true;
+              if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT") == 1)
+                main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+              else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NEVER") == 1) {;}
+              else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTERVAL, "INTERVAL") == 1)
+              {
+                if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+                if (hparse_errno > 0) return;
+                hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DAY, "DAY");
+              }
+              continue;
+            }
+            if ((is_password_history_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "HISTORY") == 1))
+            {
+              is_password_history_seen= true;
+              if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT") == 1)
+                main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+              else if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_8_0, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+              continue;
+            }
+            if ((is_password_reuse_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REUSE") == 1))
+            {
+              is_password_reuse_seen= true;
+              hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTERVAL, "INTERVAL");
+              if (hparse_errno > 0) return;
+              if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT") == 1)
+                main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+              else
+              {
+                if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_8_0, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+                if (hparse_errno > 0) return;
+                hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DAY, "DAY");
+              }
+              continue;
+            }
+            if ((is_password_require_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REQUIRE, "REQUIRE") == 1))
+            {
+              is_password_require_seen= true;
+              hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CURRENT, "CURRENT");
+              if (hparse_errno > 0) return;
+              if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT") == 1)
+                main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+              else hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OPTIONAL");
+              continue;
+            }
+            hparse_f_error(); /* because none of the password possibilities was accepted */
+            continue;
+          }
+        }
+        if ((is_failed_login_attempts_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FAILED_LOGIN_ATTEMPTS") == 1))
+        {
+          is_failed_login_attempts_seen= true;
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_8_0, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+          continue;
+        }
+        if ((is_password_lock_time_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PASSWORD_LOCK_TIME") == 1))
+        {
+          is_password_lock_time_seen= true;
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNBOUNDED, "UNBOUNDED") == 0)
+          {
+            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_8_0, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+          }
+          continue;
+        }
+        if ((is_account_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ACCOUNT") == 1))
+        {
+          is_account_seen= true;
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOCK, "LOCK") == 0)
+            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNLOCK, "UNLOCK");
+          continue;
+        }
+        break; /* because no new password_option was seen */
       }
     }
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ACCOUNT") == 1)
-    {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOCK") == 1) {;}
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNLOCK") == 1) {;}
-    }
+    if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) != 0) && (who_is_calling != TOKEN_KEYWORD_GRANT))
+      hparse_f_comment(TOKEN_KEYWORD_ATTRIBUTE);
   }
 }
 
 
-void MainWindow::hparse_f_user_specification_list()
+void MainWindow::hparse_f_user_specification_list(int who_is_calling)
 {
   do
   {
     if (hparse_f_user_or_role_name(TOKEN_REFTYPE_USER) == 0) hparse_f_error();
     if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IDENTIFIED") == 1)
+
+    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) != 0)
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY") == 1)
+      if (who_is_calling == TOKEN_KEYWORD_GRANT) continue;
+      for (int auth_option_number= 1;; ++auth_option_number)
       {
-        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PASSWORD") == 1)
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IDENTIFIED") == 1)
         {
-          if (hparse_f_literal(TOKEN_REFTYPE_PASSWORD, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+          if (hparse_f_identified() == TOKEN_KEYWORD_BY) {;}
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH") == 1)
+          {
+            hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+            if (hparse_errno > 0) return;
+            if (hparse_f_identified() == TOKEN_KEYWORD_BY) {;} /* [BY ...] */
+            else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
+            {
+              if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+              if (hparse_errno > 0) return;
+            }
+            else if ((auth_option_number == 1) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INITIAL") == 1))
+            {
+              hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTHENTICATION");
+              if (hparse_errno > 0) return;
+              hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IDENTIFIED");
+              if (hparse_errno > 0) return;
+              if (hparse_f_identified() == TOKEN_KEYWORD_BY) {;}
+              else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
+              {
+                if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+                if (hparse_errno > 0) return;
+              }
+              else hparse_f_error();
+            }
+          }
+          else hparse_f_error();
           if (hparse_errno > 0) return;
+          if ((auth_option_number < 3) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AND, "AND") == 1)) continue;
         }
-        else
-        {
-          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
-      }
-      else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WITH") == 1)
-        || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIA") == 1))
-      {
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-        if (hparse_errno > 0) return;
-        if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USING") == 1)
-         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY") == 1))
-        {
-          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
-          if (hparse_errno > 0) return;
-        }
+        break;
       }
     }
-    if (hparse_errno > 0) return;
+    else
+    {
+      /* The rest of this function is for anything that's not MySQL 8.0, i.e. MySQL 5.7 or MariaDB */
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IDENTIFIED") == 1)
+      {
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY") == 1)
+        {
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PASSWORD") == 1)
+          {
+            if (hparse_f_literal(TOKEN_REFTYPE_PASSWORD, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+            if (hparse_errno > 0) return;
+          }
+          else
+          {
+            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+            if (hparse_errno > 0) return;
+          }
+        }
+        else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WITH, "WITH") == 1)
+          || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VIA") == 1))
+        {
+          for (;;)
+          {
+            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+            if (hparse_errno > 0) return;
+            if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
+             || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USING, "USING") == 1)
+             || (hparse_f_accept(FLAG_VERSION_MYSQL_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BY, "BY") == 1))
+            {
+              if (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PASSWORD, "PASSWORD") == 1)
+              {
+                hparse_f_expect(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+                if (hparse_errno > 0) return;
+                if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+                hparse_f_expect(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+              }
+              else if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+            }
+            if (hparse_errno > 0) return;
+            if (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OR, "OR") == 1) continue;
+            break;
+          }
+        }
+        else hparse_f_error();
+      }
+      if (hparse_errno > 0) return;
+    }
   } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+}
+
+/* Called from hparse_f_user_specification_list() after IDENTIFIED for BY, which occurs a few times */
+int MainWindow::hparse_f_identified()
+{
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BY, "BY") == 1)
+  {
+    if (hparse_f_literal(TOKEN_REFTYPE_PASSWORD, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0)
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RANDOM, "RANDOM");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PASSWORD, "PASSWORD");
+      if (hparse_errno > 0) return 0;
+    }
+    return TOKEN_KEYWORD_BY;
+  }
+  return 0;
 }
 
 void MainWindow::hparse_f_alter_or_create_view()
@@ -7936,7 +8117,7 @@ void MainWindow::hparse_f_statement(int block_top)
         hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
         if (hparse_errno > 0) return;
       }
-      hparse_f_user_specification_list();
+      hparse_f_user_specification_list(TOKEN_KEYWORD_ALTER);
       if (hparse_errno > 0) return;
       hparse_f_require(TOKEN_KEYWORD_ALTER, false, false);
       if (hparse_errno > 0) return;
@@ -8689,8 +8870,23 @@ void MainWindow::hparse_f_statement(int block_top)
     {
       hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
-      hparse_f_user_specification_list();
+      hparse_f_user_specification_list(TOKEN_KEYWORD_CREATE);
       if (hparse_errno > 0) return;
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) != 0)
+      {
+        if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_CHARACTER_SET,TOKEN_KEYWORD_DEFAULT, "DEFAULT"))
+        {
+          main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+          hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROLE, "ROLE");
+          if (hparse_errno > 0) return;
+          /* This occurs more than once, should we have a function hparse_f_user_or_role_name_list? */
+          do
+          {
+            if (hparse_f_user_or_role_name(TOKEN_REFTYPE_ROLE) == 0) hparse_f_error();
+            if (hparse_errno > 0) return;
+          } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+        }
+      }
       hparse_f_require(TOKEN_KEYWORD_CREATE, false, false);
       if (hparse_errno > 0) return;
     }
@@ -9247,7 +9443,7 @@ void MainWindow::hparse_f_statement(int block_top)
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO");
     if (hparse_errno > 0) return;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
-    hparse_f_user_specification_list();
+    hparse_f_user_specification_list(TOKEN_KEYWORD_GRANT);
     if (hparse_errno > 0) return;
     hparse_f_require(TOKEN_KEYWORD_GRANT, proxy_seen, role_name_seen);
     if (hparse_errno > 0) return;

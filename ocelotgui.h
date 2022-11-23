@@ -243,6 +243,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_ATAN2,
     TOKEN_KEYWORD_ATOMIC,
     TOKEN_KEYWORD_ATTACH,
+    TOKEN_KEYWORD_ATTRIBUTE,
     TOKEN_KEYWORD_AUTOINCREMENT,
         TOKEN_KEYWORD_AUTO_REHASH,
         TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT,
@@ -1458,7 +1459,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1210
+#define KEYWORD_LIST_SIZE 1211
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1526,6 +1527,7 @@ static const keywords strvalues[]=
       {"ATAN2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ATAN2},
       {"ATOMIC", 0, 0, TOKEN_KEYWORD_ATOMIC},
       {"ATTACH", 0, 0, TOKEN_KEYWORD_ATTACH},
+      {"ATTRIBUTE", 0, 0, TOKEN_KEYWORD_ATTRIBUTE},
       {"AUTOINCREMENT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_AUTOINCREMENT},
         {"AUTO_REHASH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_AUTO_REHASH},
         {"AUTO_VERTICAL_OUTPUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT},
@@ -3451,7 +3453,7 @@ public:
   int hparse_f_default_clause(int);
   int hparse_f_current_timestamp();
   void hparse_f_column_definition(int last_word);
-  void hparse_f_comment();
+  void hparse_f_comment(int extra);
   void hparse_f_column_list(int,int);
   void hparse_f_engine();
   void hparse_f_table_or_partition_options(int);
@@ -3467,7 +3469,8 @@ public:
   void hparse_f_alter_or_create_sequence(int);
   void hparse_f_alter_or_create_server(int);
   void hparse_f_require(int,bool,bool);
-  void hparse_f_user_specification_list();
+  void hparse_f_user_specification_list(int who_is_calling);
+  int hparse_f_identified();
   void hparse_f_create_database();
   void hparse_f_create_package(bool);
   void hparse_f_create_function_clauses();
