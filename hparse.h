@@ -3907,6 +3907,7 @@ int MainWindow::hparse_f_analyze_or_optimize(int who_is_calling,int *table_or_vi
 void MainWindow::hparse_f_character_set_or_collate()
 {
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASCII") == 1) {;}
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY") == 1) {;}
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNICODE") == 1) {;}
   else if (hparse_f_character_set() == 1)
   {
@@ -3950,7 +3951,6 @@ int MainWindow::hparse_f_length(bool is_ok_if_decimal, bool is_ok_if_unsigned, b
   }
   if (is_ok_if_binary)
   {
-    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY");
     hparse_f_character_set_or_collate();
     if (hparse_errno > 0) return 0;
   }
@@ -4287,16 +4287,17 @@ int MainWindow::hparse_f_data_type(int context)
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LONG") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARBINARY") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MEDIUMTEXT") == 1))
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARBINARY") == 1)
     {
       main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-      hparse_f_length(false, false, false);
-      if (hparse_errno > 0) return 0;
+      return TOKEN_KEYWORD_MEDIUMBLOB;
     }
-    else hparse_f_error();
-    return TOKEN_KEYWORD_LONG;
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARCHAR") == 1)
+    {
+      main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+    }
+    hparse_f_character_set_or_collate();
+    return TOKEN_KEYWORD_MEDIUMTEXT; /* LONG and LONG VARCHAR are synonyms for MEDIUMTEXT */
   }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BINARY") == 1)
   {
@@ -4321,7 +4322,7 @@ int MainWindow::hparse_f_data_type(int context)
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LONGBLOB") == 1) return TOKEN_KEYWORD_LONGBLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TINYTEXT") == 1)
   {
-    hparse_f_length(false, false, true);
+    hparse_f_character_set_or_collate();
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_TINYTEXT;
   }
@@ -4346,19 +4347,19 @@ int MainWindow::hparse_f_data_type(int context)
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     hparse_f_length(false, false, true);
     if (hparse_errno > 0) return 0;
-    return TOKEN_KEYWORD_MEDIUMTEXT;
+    return TOKEN_KEYWORD_MEDIUMTEXT; /* todo: figure out: should this be TOKEN_KEYWORD_TEXT? */
   }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MEDIUMTEXT") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    hparse_f_length(false, false, true);
+    hparse_f_character_set_or_collate();
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_MEDIUMTEXT;
   }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LONGTEXT") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
-    hparse_f_length(false, false, true);
+    hparse_f_character_set_or_collate();
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_LONGTEXT;
   }
