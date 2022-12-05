@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.8.0
-   Last modified: November 28 2022
+   Last modified: December 5 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -18450,6 +18450,9 @@ static const typer typer_list[]=
     {OCELOT_DATA_TYPE_NEWDECIMAL, TOKEN_KEYWORD_DECIMAL},
     {OCELOT_DATA_TYPE_ENUM, TOKEN_KEYWORD_ENUM},
     {OCELOT_DATA_TYPE_SET, TOKEN_KEYWORD_SET},
+    {OCELOT_DATA_TYPE_TINY_BLOB, TOKEN_KEYWORD_BLOB},
+    {OCELOT_DATA_TYPE_MEDIUM_BLOB, TOKEN_KEYWORD_BLOB},
+    {OCELOT_DATA_TYPE_LONG_BLOB, TOKEN_KEYWORD_BLOB},
     {OCELOT_DATA_TYPE_BLOB, TOKEN_KEYWORD_BLOB},
     {OCELOT_DATA_TYPE_VAR_STRING, TOKEN_KEYWORD_STRING},
     {OCELOT_DATA_TYPE_STRING, TOKEN_KEYWORD_STRING},
@@ -20266,7 +20269,7 @@ void Result_qtextedit::keyPressEvent(QKeyEvent *event)
         fdrn= next_visible;
         int fdrid= result_grid->explorer_first_result_row;
         int fddid= result_grid->copy_of_parent->oei[fdrid].display_row_number;
-        unsigned int last_row_in_display=  fddid + result_grid->explorer_max_grid_rows;
+        unsigned int last_row_in_display=  fddid + result_grid->html_max_grid_rows;
         unsigned int this_row_in_display=  result_grid->copy_of_parent->oei[fdrn].display_row_number;
         if (this_row_in_display == last_row_in_display)
         {

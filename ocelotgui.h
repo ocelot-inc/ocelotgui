@@ -6712,7 +6712,7 @@ public:
   int grid_vertical_scroll_bar_value;                            /* Todo: find out why this isn't defined as long unsigned */
   QScrollArea *grid_scroll_area;
   int result_grid_type; /* 0 or EXPLORER_WIDGET */
-  unsigned int explorer_max_grid_rows;
+  unsigned long html_max_grid_rows;
   unsigned int explorer_max_name_width_in_chars;                 /* = EXPLORER_FIXED_NAME_WIDTH if default */
   QScrollBar *grid_vertical_scroll_bar;                          /* This might take over from the automatic scroll bar. */
   unsigned int result_column_count;
@@ -7018,7 +7018,7 @@ ResultGrid(
 
 /*
   Often an OCELOT_DATA_TYPE value is the same as a MYSQL_TYPE value, for example
-  MYSQL_TYPE_LONG_BLOB=251 in mysql_com.h and #define OCELOT_DATA_TYPE_LONG_BLOG 251 here.
+  MYSQL_TYPE_LONG_BLOB=251 in mysql_com.h and #define OCELOT_DATA_TYPE_LONG_BLOB 251 here.
   But we have additional TEXT and BINARY types because we distinguish when charsetnr=63.
   DECIMAL and NEWDECIMAL are both DECIMAL. LONG is INT. INT24 is MEDIUMINT. LONGLONG is BIGINT.
   STRING is CHAR (only). VAR_STRING is VARCHAR (only). BLOB is BLOB (only).
@@ -7045,9 +7045,9 @@ ResultGrid(
 #define OCELOT_DATA_TYPE_NEWDECIMAL  246
 #define OCELOT_DATA_TYPE_ENUM        247
 #define OCELOT_DATA_TYPE_SET         248
-//#define OCELOT_DATA_TYPE_TINY_BLOB   249
-//#define OCELOT_DATA_TYPE_MEDIUM_BLOB 250
-//#define OCELOT_DATA_TYPE_LONG_BLOB   251
+#define OCELOT_DATA_TYPE_TINY_BLOB   249
+#define OCELOT_DATA_TYPE_MEDIUM_BLOB 250
+#define OCELOT_DATA_TYPE_LONG_BLOB   251
 #define OCELOT_DATA_TYPE_BLOB        252
 #define OCELOT_DATA_TYPE_VAR_STRING  253       /* i.e. VARCHAR or VARBINARY */
 #define OCELOT_DATA_TYPE_STRING      254       /* i.e. CHAR or BINARY */
@@ -8527,32 +8527,23 @@ void get_row_height_and_max_display_height_and_max_grid_rows(int *row_height, in
 }
 
 /*
+  Display by producing an HTML table and calling setHtml() for it.
+  The per-row loop adds to the table and its height is greater than what's available on the widget.
+  For every cell (i.e. column instance in a row) we call copy_html_cell which might check for conditionals.
+  Todo: If we're producing for export, the height calculation shouldn't apply and dumping should be continuous.
   Todo: Ensure this isn't called for some irrelevant vertical scroll bar event.
         It seems that we're calling display_html multiple times, not once per select, find out why.
   Todo: We're calculating char[] size in advance and using strcpy() or memcpy().
-        It would be lots simpler and safer to use a QString, but might be slower.
-  Todo: Figure out how many rows you can fit. Straightforward but time-consuming. Mostly finished.
-        Calculate max_display_height =
-          viewport-height or widget height
-          - height of a potential horizontal scroll bar (but don't subtract this if width < widget width)
-            i.e. self.style().pixelMetric(qg.QStyle.PM_ScrollBarExtent)
-            and frame if you ever decide to have a frame
-            +3 say some folks in a forum
-          - n pixels for luck
-          -     width +=
-        Calculate table_height =
-          0
-          For each row:
-            + max_column_heights i.e. size of highest column as returned by column_height()
-          If total max_column_heights > max_display_height after X rows, you want X - 1 rows.
-          Exception: X cannot be 0, i.e. there is always at least 1 row. It can have its own scroll bar.
-        You might have a bit of trouble if there is a font-change within the column, otherwise you should be accurate.
-        Warning: if lineSpacing()==24 then max_height_of_a_char==26 and actual height seems to be 27
+        It would be lots simpler and safer to use a QString or QByteArray, but might be slower.
+  Todo: Bug but can't repeat: After (?) detach result grid, set ocelot_grid_background_color conditionally,
+        select * from information_schema, then scroll down (?) then scroll up to the top, only header is seen.
   Re result_grid_height_after_last_resize:
     It might be better to calculate height from Result_qtextedit::resizeEvent, it would probably be
     two pixels smaller than what comes out of ResultGrid::resizeEvent, but we don't change because there
     might be non-HTML stuff that depends on it. For some reason we might be calling display_html more than
     once, but we won't waste too much time if it's -1.
+  Todo: Some of the size calculations produce values that we don't end up using, because we found that the
+    setHtml() method is more reliable in odd situations. Eliminate what is no longer being used.
 */
 void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 {
@@ -8589,6 +8580,17 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   int row_height, max_display_height, max_grid_rows;
   get_row_height_and_max_display_height_and_max_grid_rows(&row_height, &max_display_height, &max_grid_rows);
 
+  int over_height;
+  {
+    /* over_height = what html_row_height() will overestimate = documentMargin + borders + something unknown */
+    /* (this seems to be wrong by 1, normally, but oh well ...) */
+    char one_row[]=   "<TR><TD>1</TD></TR>";
+    char two_row[]=   "<TR><TD>1</TD></TR><TR><TD>1</TD></TR>";
+    int height_1= html_row_height(one_row, one_row + strlen(one_row), 0);
+    int height_2= html_row_height(two_row, two_row + strlen(two_row), 0);
+    over_height= height_1 - (height_2 - height_1);
+  }
+
   is_paintable= 0;
 
   /* TODO: IS THIS NECESSARY? IS IT IN THE RIGHT PLACE? */
@@ -8623,20 +8625,19 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 
   unsigned int grid_row= 0;
   int local_ocelot_result_grid_column_names_copy;
-  unsigned long local_max_grid_rows;
   unsigned short local_copy_of_ocelot_xml;
   bool local_is_including_thin_image;
   if (situation == TOKEN_KEYWORD_OCELOT_EXPORT)
   {
     local_ocelot_result_grid_column_names_copy= main_exports.column_names;
-    local_max_grid_rows= main_exports.max_row_count;
+    html_max_grid_rows= main_exports.max_row_count;
     local_copy_of_ocelot_xml= 0;
     local_is_including_thin_image= false;
   }
   else
   {
     local_ocelot_result_grid_column_names_copy= ocelot_result_grid_column_names_copy;
-    local_max_grid_rows= max_grid_rows;
+    html_max_grid_rows= max_grid_rows;
     local_copy_of_ocelot_xml= copy_of_ocelot_xml;
     local_is_including_thin_image= true;
   }
@@ -8664,7 +8665,7 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 
   //for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value;
-       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) local_max_grid_rows);
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) html_max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
   {
     result_field_names_pointer= &result_field_names[0];
@@ -8711,9 +8712,12 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   tmp_size+= 1000000; /* image paste experiment */
 
   tmp= new char[tmp_size];
-  char *tmp_pointer= &tmp[0];
+
+  int total_html_row_height= setting_ocelot_grid_cell_border_size_as_int * 2;
 
   char *tmp_pointer_before_thin_image_call; /* For the first column. Includes height which may need changing. */
+  char *tmp_pointer= &tmp[0];
+
   int new_cell_height; /* If this becomes positive, we have to rewrite at tmp_pointer_before_thin_image_call */
 
   strcpy(tmp_pointer, ocelot_grid_table_start);
@@ -8722,6 +8726,7 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   {
     char *result_field_names_pointer;
     result_field_names_pointer= &result_field_names[0];
+    char *tmp_pointer_of_row_start= tmp_pointer;
     strcpy(tmp_pointer, ocelot_grid_header_row_start);
     tmp_pointer+= strlen(ocelot_grid_header_row_start);
     tmp_pointer_before_thin_image_call= tmp_pointer;
@@ -8753,15 +8758,18 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     }
     strcpy(tmp_pointer, ocelot_grid_header_row_end);
     tmp_pointer+= strlen(ocelot_grid_header_row_end);
+    /* Following is unnecessary if export */
+    total_html_row_height+= html_row_height(tmp_pointer_of_row_start, tmp_pointer, over_height);
   }
 
   result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
-       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) local_max_grid_rows);
+       (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) html_max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
 //  for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   {
+    char *tmp_pointer_of_row_start= tmp_pointer;
     result_field_names_pointer= &result_field_names[0];
     strcpy(tmp_pointer, ocelot_grid_detail_row_start);
     tmp_pointer+= strlen(ocelot_grid_detail_row_start);
@@ -8798,6 +8806,16 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     }
     strcpy(tmp_pointer, ocelot_grid_detail_row_end);
     tmp_pointer+= strlen(ocelot_grid_detail_row_end);
+
+    if (situation != TOKEN_KEYWORD_OCELOT_EXPORT)
+    {
+      total_html_row_height+= html_row_height(tmp_pointer_of_row_start, tmp_pointer, over_height);
+      if ((total_html_row_height >= max_display_height + 1) && (grid_row > 1))
+      {
+        tmp_pointer= tmp_pointer_of_row_start; /* We've gone too far. Back up and stop output. */
+        break;
+      }
+    }
   }
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
@@ -8822,6 +8840,51 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   delete [] tmp;
   is_paintable= 1;
   return;
+}
+
+/*
+  Pass the bytes of an HTML row, inside a <div>.
+  Return the row height.
+  So html_display() can stop looping when #-of-pixels >= size-of-widget, instead of using row count,
+  instead of repeating when there are too many rows (that could turn out to be slow).
+  But otherwise we have to track: # of <br>s, conditional change of font or height, image height
+  We calculate header height with this too.
+  Maybe it's not hard to decide if it would be a row with trouble:
+    If (there is more than one row) (not export)
+      If (row contains <img other than the initial <img) which would be due to image)
+      Or (row contains <br> though in theory we could then calculate number of <br>s per column
+         (i.e. each additional <br> adds qfontmetric lineSpacing() or (linespacing()-1) for the first row
+      Or (row contains <TD width=0><img width=0 height=N and N is a non-default value
+         (which would be due to conditional height change)
+      ... Otherwise it's an ordinary row so the height is the default height
+  If all rows are not ordinary, this could double the rendering time since display_html()
+    in the end will show all rows. However, speed isn't looking bad enough that speeding up is a priority now.
+  Once this is working, it should be impossible to overflow so "go to repeat_loop" is not necessary
+  Todo: We are calculating strlen(ocelot_grid_table_start|end) frequently, might as well store it
+  Todo: We are not checking whether there is only one row -- if so, calculation is unnecessary
+  Note: over_height is calculated early in display_html(), it is: QTextDocument.documentMargin() * 2
+        which we don't need because when outputting we say setDocumentMargin(0); table border size
+        because when we change cell border size we change table border size too and thus it is
+        setting_ocelot_grid_cell_border_size_as_int * 2; and ... something else, one or two pixels.
+        Todo: We could probably calculate over_height just once, when there is a fnt change
+  Note: The "+ 32" in the new statement is arbitrary, probably "+ 1" would be safe.
+*/
+int html_row_height(char *tmp_pointer_of_row_start, char *tmp_pointer, int over_height)
+{
+  QTextDocument text_document;
+  int ocelot_grid_table_start_length= strlen(ocelot_grid_table_start);
+  int ocelot_grid_table_end_length= strlen(ocelot_grid_table_end);
+  int tmp_row_length= tmp_pointer - tmp_pointer_of_row_start;
+  char *tmp_row= new char[ocelot_grid_table_start_length + tmp_row_length + ocelot_grid_table_end_length + 32];
+  memcpy(tmp_row, ocelot_grid_table_start, ocelot_grid_table_start_length);
+  char *tmp_row_pointer= tmp_row + ocelot_grid_table_start_length;
+  memcpy(tmp_row_pointer, tmp_pointer_of_row_start, tmp_row_length);
+  tmp_row_pointer+= tmp_row_length;
+  strcpy(tmp_row_pointer, ocelot_grid_table_end);
+  text_document.setHtml(tmp_row);
+  int height= text_document.size().height() - over_height;
+  delete [] tmp_row;
+  return height;
 }
 
 /*
@@ -9306,13 +9369,12 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
    pointer_to_font= &result_grid_font;
     QFontMetrics mm= QFontMetrics(*pointer_to_font);
     max_height_of_a_char= abs(mm.leading()) + abs(mm.ascent()) + abs(mm.descent());
-
   }
   int cell_height_as_int= get_cell_width_or_height_as_int(copy_of_parent->ocelot_grid_cell_height, max_height_of_a_char);
   unsigned int total_object_name_size= 0;
   /* Loop 2: Calculate how many rows will be in the current display and approximately how big they are. */
   /* TODO: MINIMUM = 1! */
-  explorer_max_grid_rows= 0;
+  html_max_grid_rows= 0;
   {
     unsigned int object_name_size;
     unsigned int total_grid_row_heights= 0;
@@ -9335,11 +9397,11 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
 //        row_height+= 9; /* This surely does not make sense but apparently corresponds with reality */
         if ((total_grid_row_heights + row_height) >= (unsigned int) this->height())
         {
-          if (explorer_max_grid_rows > 0) break; /* minimum number of rows to display is 1 */
+          if (html_max_grid_rows > 0) break; /* minimum number of rows to display is 1 */
         }
-        grid_row_heights[explorer_max_grid_rows]= row_height;
+        grid_row_heights[html_max_grid_rows]= row_height;
         total_grid_row_heights+= row_height;
-        ++explorer_max_grid_rows;
+        ++html_max_grid_rows;
       }
     }
   }
@@ -9348,20 +9410,20 @@ void explorer_display_html(int new_grid_vertical_scroll_bar_value) /* = 0 or wha
   /* "500" is a very vague guess about the per-display overhead */
   /* todo: fix so you've got a better estimate, or do a dummy pass first, or use byte array not char */
   /* todo: is 500 taking into account thin image? */
-  int tmp_size= explorer_max_grid_rows * 5
+  int tmp_size= html_max_grid_rows * 5
                + total_object_name_size * 5
-               + explorer_max_grid_rows * 500
+               + html_max_grid_rows * 500
                + 500;
   char *tmp;
 
   tmp= new char[tmp_size];
 
   char *tmp_pointer_before_thin_image_call; /* For the first column. Includes height which may need changing. */
-  QTextDocument d; /* will be used for height calculation */
-  d.setDocumentMargin(0); /* Default margin is 4 so if I don't do this html_text_edit_width will be off. */
+  QTextDocument text_document; /* will be used for height calculation */
+  text_document.setDocumentMargin(0); /* Default margin is 4 so if I don't do this html_text_edit_width will be off. */
   int html_text_edit_height, html_text_edit_width; /* result of height calculation */
 
-repeat_loop: /* go back to here and redo with smaller explorer_max_grid_rows if result won't fit well in widget */
+repeat_loop: /* go back to here and redo with smaller html_max_grid_rows if result won't fit well in widget */
   char *tmp_pointer= &tmp[0];
   strcpy(tmp_pointer, ocelot_grid_table_start);
   tmp_pointer+= strlen(ocelot_grid_table_start);
@@ -9370,7 +9432,7 @@ repeat_loop: /* go back to here and redo with smaller explorer_max_grid_rows if 
   //html_text_edit= new Result_qtextedit(this);
 
   for (tmp_result_row_number= explorer_first_result_row, grid_row= 0;
-       (tmp_result_row_number < copy_of_parent->oei_count) && (grid_row < explorer_max_grid_rows);
+       (tmp_result_row_number < copy_of_parent->oei_count) && (grid_row < html_max_grid_rows);
        ++tmp_result_row_number)
   {
     if (copy_of_parent->oei[tmp_result_row_number].display_row_number != -1) /* i.e. not skippable */
@@ -9482,21 +9544,21 @@ repeat_loop: /* go back to here and redo with smaller explorer_max_grid_rows if 
      Todo: Actually width only needs to be done initially, when font changes, or for detach resize.
      See also: https://stackoverflow.com/questions/32467079/update-qtextdocuments-size
   */
-  d.setHtml(tmp);
-  html_text_edit_height= d.size().height();
+  text_document.setHtml(tmp);
+  html_text_edit_height= text_document.size().height();
   /* When calculating widget width we assume there is always a vertical scroll bar */
   /* I don't know why "+ 2" but it won't do significant damage. Maybe "+ 3" would be even better. */
   if (copy_of_parent->ocelot_explorer_width == "default")
   {
-    html_text_edit_width= d.size().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent) + 2;
+    html_text_edit_width= text_document.size().width() + style()->pixelMetric(QStyle::PM_ScrollBarExtent) + 2;
     /* Extra width if detached so space for context menu, whose parent is explorer_widget if detached. */
     if (copy_of_parent->ocelot_explorer_detached == "yes") html_text_edit_width+= 300;
   }
   else html_text_edit_width= copy_of_parent->ocelot_explorer_width.toInt();
 
-  if ((html_text_edit_height > this->height()) && (explorer_max_grid_rows > 1))
+  if ((html_text_edit_height > this->height()) && (html_max_grid_rows > 1))
   {
-    --explorer_max_grid_rows;
+    --html_max_grid_rows;
     goto repeat_loop;
   }
   html_text_edit->setHtml(tmp);
@@ -9886,12 +9948,22 @@ void copy_result_to_gridx()
     /* todo: following depends on MySQL quirks, should be done earlier */
     if ((result_field_charsetnrs[i] == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_VAR_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_VARBINARY;
     if ((result_field_charsetnrs[i] == 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_STRING)) gridx_field_types[j]= OCELOT_DATA_TYPE_BINARY;
-    if ((result_field_charsetnrs[i] != 63) && (gridx_field_types[j] == OCELOT_DATA_TYPE_BLOB)) gridx_field_types[j]= OCELOT_DATA_TYPE_TEXT;
+    if ((result_field_charsetnrs[i] != 63) && (is_blob(gridx_field_types[j]))) gridx_field_types[j]= OCELOT_DATA_TYPE_TEXT;
     ++j;
   }
 
   //result_field_names,
   //result_original_field_names, result_original_table_names, result_original_database_names,
+}
+
+bool is_blob(int field_type)
+{
+  if ((field_type == OCELOT_DATA_TYPE_TINY_BLOB)
+   || (field_type == OCELOT_DATA_TYPE_MEDIUM_BLOB)
+   || (field_type == OCELOT_DATA_TYPE_LONG_BLOB)
+   || (field_type == OCELOT_DATA_TYPE_BLOB))
+    return true;
+  return false;
 }
 
 /*
@@ -9902,7 +9974,7 @@ bool is_extra_rule_1(int col)
   QString condition= copy_of_parent->ocelot_extra_rule_1_condition;
   if (condition == "data_type LIKE '%BLOB'")
   {
-    if (gridx_field_types[col] == OCELOT_DATA_TYPE_BLOB)
+    if (is_blob(gridx_field_types[col])) /* e.g. gridx_field_types[col] == OCELOT_DATA_TYPE_BLOB */
     {
       return true;
     }
