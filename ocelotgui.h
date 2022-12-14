@@ -79,7 +79,7 @@ typedef struct
 /*
   The possible DBMS values.
   These are related to ocelot_dbms values.
-  --ocelot_dbms='mysql' is default.
+  --ocelot_dbms='mysql' is default. (unless cmake . -DDEFAULT_OPTION=something else)
   --ocelot_dbms='mariadb' is non-default but officially supported.
   --ocelot_dbms='tarantool' is non-default but should work.
   If we start as MySQL but then connect to MariaDB, or vice versa,
@@ -3777,7 +3777,6 @@ public slots:
   void menu_context(const QPoint &);
 //  int typer_to_ocelot_data_type(char *s); /* exists in ocelotgui.cpp but is commented out */
   char *typer_to_keyword(unsigned int); /* todo: check: why are some things in "public slots" not "public"? */
-
   void initialize_after_main_window_show();
 
 protected:

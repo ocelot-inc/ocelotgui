@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.8.0
-   Last modified: December 5 2022
+   Last modified: December 7 2022
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -577,6 +577,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   mysql_res= 0;
   /* client variable defaults */
   /* Most settings done here might be overridden when connect_mysql_options_2 reads options. */
+  /* Todo: in fact connect_mysql_options_2 says ocelot_dbms= "" so check whether setting here is useful. */
 #if (OCELOT_MYSQL_INCLUDE == 1)
   ocelot_dbms= "mysql";
   connections_dbms[0]= DBMS_MYSQL;
@@ -584,6 +585,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_dbms= "tarantool";
   connections_dbms[0]= DBMS_TARANTOOL;
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
+
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
   ocelot_statement_prompt_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1]; /* set early because initialize_widget_statement() depends on this */
   ocelot_grid_focus_cell_background_color= s_color_list[COLOR_WHEAT*2 + 1];;
@@ -21482,6 +21484,17 @@ void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
 //#include <pwd.h>
 //#include <unistd.h>
 
+/*
+  Called from MainWindow, once, very early. So options get default values then may get user-set values.
+  The name suggests that the mysql client uses some options this way, but in fact we call for non-mysql-client.
+  Options are initialized in this order, with each step possibly overriding what was in the last step:
+  (1) any static variables defined with "= constant" outside MainWindow
+  (2) assignments in MainWindow() before calling this routine
+  (3) assignments at the start of this routine
+  (4) handling of anything set due to cmake . -DDEFAULT_OPTION=<string>, see CMakeLists.txt
+  (5) later, in connect_mysql_options_2(), --command-line options and configuration-file options
+  (6) getenv() comes up somewhere, and see the "Todo:" comment below.
+*/
 void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 {
   char *mysql_pwd;
@@ -21575,6 +21588,11 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
     if (pw != NULL) ocelot_user= pw->pw_name;
   }
 #endif
+#ifdef DEFAULT_OPTION
+  char *pseudo_argv[2];
+  pseudo_argv[1]= (char*) DEFAULT_OPTION;
+  connect_read_command_line(2, pseudo_argv);
+#endif  // DEFAULT_OPTION
   connect_read_command_line(argc, argv);               /* We're doing this twice, the first time won't count. */
   /*
     ocelotgui.pro variables
@@ -21778,7 +21796,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
 
 
 /*
-  Command line arguments i.e. argc + argv
+  Command line arguments i.e. argc + argv (or pseudo_argv if cmake .-DDEFAULT_OPTION=string)
   Some tokenizing has already been done.
   For example progname --a=b --c=d gives us argv[1]="--a=b" and argv[2]="--c=d".
   For example progname -a b -c d gives us argv[1]="-a" argv[2]="b" argv[3]="-c" argv[4]="d".
@@ -21923,6 +21941,15 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
 /* todo: check if we've already looked at the file (this is possible if !include or !includedir happens)
          if so, skip */
 /* todo: this might be okay for a Linux file that ends lines with \n, but what about Windows? */
+/*
+  Re MariaDB-specific groups [client-server] and [client-mariadb]:
+  The problem is that we don't know for sure we're connecting to a MariaB server until after we connect.
+  For [client-server] I'm going to assume that anything in the group is probably valid for a MySQL server too.
+  For [client-mariadb] we could depend on hints e.g. we actually opened mariadb.cnf file when asking for my.cnf,
+  or we saw [client-server], or we saw the comment line "# The MariaDB configuration file", or the link is to
+  a mariadb library,  but none of those things are certain proofs. Decision was: [client-mariadb] only matters
+  when earlier we saw a setting ocelot_dbms=%mariadb% via cmake . -DDEFAULT_OPTION | command-line | .cfg file.
+*/
 void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 {
   log("connect_read_my_cnf", 15);
@@ -22169,17 +22196,24 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     {
       /* Skip if it's not one of the groups that we care about i.e. client or mysql or ocelot */
       /* Todo: Consider: should our group be "ocelot", "ocelotgui", or both? */
+      bool is_client_mariadb= false;
+      if (QString::compare(group, "client-mariadb", Qt::CaseInsensitive) == 0)
+      {
+        if (ocelot_dbms.contains("mariadb", Qt::CaseInsensitive) == true) is_client_mariadb= true;
+      }
       if ((QString::compare(group, "client", Qt::CaseInsensitive) != 0)
+      &&  (QString::compare(group, "client-server", Qt::CaseInsensitive) != 0)
       &&  (QString::compare(group, "mysql", Qt::CaseInsensitive) != 0)
       &&  (QString::compare(group, "ocelot", Qt::CaseInsensitive) != 0)
       &&  (QString::compare(group, "client" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
+      &&  (QString::compare(group, "client-server" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
       &&  (QString::compare(group, "mysql" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "ocelot" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)) continue;
+      &&  (QString::compare(group, "ocelot" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
+      &&  (is_client_mariadb == false)) continue;
     }
     /* Remove ''s or ""s around the value, then strip lead or trail spaces. */
     token2= connect_stripper(token2, true);
     token2_length= token2.count();
-
     /* Convert escape sequences in the value \b backspace, \t tab, \n newline, \r carriage return, \\ \, \s space */
     token_for_value= "";
     for (i= 0; i < token2_length; ++i)

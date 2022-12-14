@@ -138,6 +138,12 @@
 # OCELOT_MYSQL_INCLUDE
 # By default this is 1. If it is 0, most code related to MySQL/MariaDB is not included.
 
+# DEFAULT_OPTION=<string>
+# The executable can read the <string> and set one default option before looking at the
+# command line or the options file. There is no check that the <string> makes sense.
+# A possibility is cmake . -DDEFAULT_OPTION="--ocelot_dbms=mariadb" which would
+# mean the default default ocelot_dbms value is mariadb rather than hard-coded mysql.
+
 # FILENAME_EXTRA
 # Default is blank. ocelotgui passes -DFILENAME_EXTRA="qt4" when building with qt4,
 # so the final package name will look like ocelotgui_1.8.0qt4-1_amd64.deb or
@@ -286,6 +292,11 @@ endif(DEFINED OCELOT_MYSQL_DEBUGGER)
 if (DEFINED OCELOT_MYSQL_INCLUDE)
 add_definitions(-DOCELOT_MYSQL_INCLUDE=${OCELOT_MYSQL_INCLUDE})
 endif(DEFINED OCELOT_MYSQL_INCLUDE)
+
+#if cmake . -DOCELOT_OPTION=string then ocelotgui will treat string like a command-line option
+if (DEFINED DEFAULT_OPTION)
+add_definitions(-DDEFAULT_OPTION="${DEFAULT_OPTION}")
+endif(DEFINED DEFAULT_OPTION)
 
 if (DEFINED QT_VERSION)
   message("-- QT_VERSION is defined")
