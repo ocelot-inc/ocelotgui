@@ -3430,6 +3430,27 @@ void MainWindow::hparse_f_alter_specification()
   }
   if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONVERT") == 1))
   {
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PARTITION, "PARTITION") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_PARTITION,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TO, "TO");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE, "TABLE");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+      return;
+    }
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TABLE, "TABLE") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TO, "TO");
+      if (hparse_errno > 0) return;
+      hparse_f_partition_or_subpartition_definition(TOKEN_KEYWORD_PARTITION);
+      return;
+    }
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO");
     if (hparse_errno > 0) return;
     hparse_f_character_set();
@@ -4443,7 +4464,7 @@ int MainWindow::hparse_f_data_type(int context)
     return TOKEN_KEYWORD_BOOLEAN;
   }
 
-  if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UUID") == 1)
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_10_7|FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UUID") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_UUID;
@@ -6929,7 +6950,8 @@ void MainWindow::hparse_f_condition_information_item_name()
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCHEMA_NAME") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE_NAME") == 1)
    || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN_NAME") == 1)
-   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURSOR_NAME") == 1)) {;}
+   || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURSOR_NAME") == 1)
+   || (hparse_f_accept(FLAG_VERSION_MARIADB_10_10, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ROW_NUMBER") == 1)) {;}
   else hparse_f_error();
 }
 
