@@ -94,7 +94,7 @@ typedef struct
         so starting with ocelotgui 1.8 we treat it as the same as MySQL 5.6.
   Note: MariaDB 5.5 reached end-of-life in 2018, says https://endoflife.date/mariadb
         so starting with ocelotgui 1.8 we treat it as the same as MariaDB 10.0
-  Note: We have a separate flag names for MariaDB 10.7 but the number is the same as for MariaDB 10.10
+  Note: We have a separate flag names for MariaDB 10.7 and 10.9 but the number is the same as for MariaDB 10.10
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -112,6 +112,7 @@ typedef struct
 #define FLAG_VERSION_MARIADB_10_2_3 128
 #define FLAG_VERSION_MARIADB_10_3   256
 #define FLAG_VERSION_MARIADB_10_7   512
+#define FLAG_VERSION_MARIADB_10_9   512
 #define FLAG_VERSION_MARIADB_10_10  512
 #define FLAG_VERSION_MARIADB_ALL    (16 | 32 | 64 | 128 | 256 | 512)
 #define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512)

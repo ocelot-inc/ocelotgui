@@ -7990,6 +7990,7 @@ int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
   if it is then call hparse_f_statement, if it's not then call
   hparse_f_accept which is guaranteed to fail.
   Return 1 if it was a statement, else return 0 (which might also mean error).
+  Note: Actually MariaDB accepts INSERT and REPLACE, but doesn't document, so we don't accept.
 */
 int MainWindow::hparse_f_explainable_statement(int block_top)
 {
@@ -10467,13 +10468,6 @@ void MainWindow::hparse_f_statement(int block_top)
         if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_EVENT, TOKEN_REFTYPE_EVENT) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       }
-      else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXPLAIN") == 1))
-      {
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
-        if (hparse_errno > 0) return;
-        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
-        if (hparse_errno > 0) return;
-      }
       else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FUNCTION") == 1)
       {
         if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION, TOKEN_REFTYPE_FUNCTION) == 0) hparse_f_error();
@@ -10552,9 +10546,15 @@ void MainWindow::hparse_f_statement(int block_top)
       hparse_f_from_or_like_or_where();
       if (hparse_errno > 0) return;
     }
-    /* Todo: Is this SHOW EXPLAIN? If so does it get checked twice? */
     else if (((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXPLAIN") == 1))
     {
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_10_9, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FORMAT") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_errno > 0) return;
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "JSON");
+        if (hparse_errno > 0) return;
+      }
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
       if (hparse_errno > 0) return;
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
