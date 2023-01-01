@@ -3501,7 +3501,7 @@ void MainWindow::hparse_f_alter_specification()
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
       if (hparse_errno > 0) return;
-      if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT) == 0) hparse_f_error(); /* fk_symbol */
+      if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT) == 0) hparse_f_error(); /* parse_f_symbol */
       if (hparse_errno > 0) return;
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PARTITION") == 1)
@@ -13818,6 +13818,24 @@ int MainWindow::hparse_f_client_set_rule()
   return 1;
 }
 
+/* Called from hparse_f_client_statement() for special handling of SET ocelot_query. */
+int MainWindow::hparse_f_client_set_query()
+{
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "=");
+  if (hparse_errno > 0) return 1;
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW");
+  if (hparse_errno > 0) return 1;
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "FOREIGN");
+  if (hparse_errno > 0) return 1;
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "KEYS");
+  if (hparse_errno > 0) return 1;
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "OF");
+  if (hparse_errno > 0) return 1;
+  if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
+    hparse_f_error();
+  return 1;
+}
+
 /*
   Called from hparse_f_client_statement() for special handling of SET ocelot_... = literal
   Return: 0 = not ocelot_ (with hparse_errno > 0), 1 = ocelot_ but no conditional possible,
@@ -13905,6 +13923,14 @@ int MainWindow::hparse_f_client_set()
   if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
   {
     return hparse_f_client_set_rule();
+  }
+
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+  {
+    if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_OCELOT_QUERY)
+    {
+      return hparse_f_client_set_query();
+    }
   }
   int last_accepted= main_token_types[hparse_i_of_last_accepted];
 

@@ -865,6 +865,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE,
     TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT,
     TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR,
+    TOKEN_KEYWORD_OCELOT_QUERY,
     TOKEN_KEYWORD_OCELOT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH,
@@ -1462,7 +1463,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1211
+#define KEYWORD_LIST_SIZE 1212
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2144,6 +2145,7 @@ static const keywords strvalues[]=
     {"OCELOT_MENU_FONT_STYLE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_STYLE},
     {"OCELOT_MENU_FONT_WEIGHT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT},
     {"OCELOT_MENU_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR},
+    {"OCELOT_QUERY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_QUERY},
     {"OCELOT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_RAW},
     {"OCELOT_SHORTCUT_AUTOCOMPLETE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
     {"OCELOT_SHORTCUT_BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
@@ -3571,6 +3573,7 @@ public:
   int hparse_f_client_set_export();
 #endif
   int hparse_f_client_set_rule();
+  int hparse_f_client_set_query();
   int hparse_pick_from_list(QStringList);
   int hparse_f_client_set();
   int hparse_f_client_statement();
@@ -3580,6 +3583,7 @@ public:
   void log(const char*,int);
   void extra_result_set(int, unsigned short int);
   int execute_real_query(QString, int, const QString *);
+  int execute_ocelot_query(QString, int, const QString *);
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
   void tparse_f_term();
@@ -3810,7 +3814,8 @@ private:
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
   void create_menu(); void fill_menu();
-  int rehash_scan(char *, bool is_explorer); int rehash_scan_for_tarantool(char *, bool is_explorer);
+  int rehash_scan(char *, QString alternate_query); int rehash_scan_for_tarantool(char *, QString alternate_query);
+  void rehash_garbage_collect();
   void rehash_scan_one_space(int space_number);
   QString rehash_search(QString table_name, char *search_string, int reftype,
                         QString hparse_token,
@@ -8490,7 +8495,9 @@ int column_height(unsigned int grid_row, int column_no, int v_length, char *valu
     }
   }
   int column_width_in_chars= (grid_column_widths[column_no] / setting_max_width_of_a_char);
-  int lines_in_cell= (v_length + (column_width_in_chars - 1)) / column_width_in_chars;
+  int lines_in_cell;
+  if (column_width_in_chars == 0) lines_in_cell= 1;
+  else lines_in_cell= (v_length + (column_width_in_chars - 1)) / column_width_in_chars;
   if (lines_in_cell == 0) lines_in_cell= 1;
   int this_column_height= (lines_in_cell * max_height_of_a_char) + (setting_ocelot_grid_cell_border_size_as_int * 2) + 1 + 1;
   if (this_column_height < (int) grid_row_heights[column_no]) this_column_height= grid_row_heights[column_no];
@@ -8568,7 +8575,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     }
     return;
   }
-
   if (situation != TOKEN_KEYWORD_OCELOT_EXPORT)
   {
     if (result_grid_height_after_last_resize < 0) return;
@@ -8581,7 +8587,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   }
   int row_height, max_display_height, max_grid_rows;
   get_row_height_and_max_display_height_and_max_grid_rows(&row_height, &max_display_height, &max_grid_rows);
-
   int over_height;
   {
     /* over_height = what html_row_height() will overestimate = documentMargin + borders + something unknown */
@@ -8594,7 +8599,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   }
 
   is_paintable= 0;
-
   /* TODO: IS THIS NECESSARY? IS IT IN THE RIGHT PLACE? */
 //  html_text_edit->show();
 
@@ -8620,7 +8624,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   unsigned int tmp_size= sizeof(char);
 
   unsigned int max_column_heights_total= 0;
-
   /* <TD></TD> might be replaced by <TD><div class="xx"></div></TD> which is 22 bytes */
   unsigned int extra_for_div= 0;
   if (copy_of_parent->conditional_settings.count() > 0) extra_for_div= 22;
@@ -8643,7 +8646,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     local_copy_of_ocelot_xml= copy_of_ocelot_xml;
     local_is_including_thin_image= true;
   }
-
   if ((local_ocelot_result_grid_column_names_copy == 1)
    && (local_copy_of_ocelot_xml == 0))
   {
@@ -8662,9 +8664,7 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     max_column_heights_total= row_height;
     ++grid_row;
   }
-
   tmp_size+= strlen(ocelot_grid_table_start);
-
   //for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value;
        (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) html_max_grid_rows);
@@ -8690,7 +8690,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     }
     tmp_size+= strlen(ocelot_grid_detail_row_end);
     max_column_heights_total+= max_column_height;
-
     if (situation == TOKEN_KEYWORD_OCELOT_EXPORT)
     {
       if ((max_column_heights_total) >= (unsigned int) max_display_height)
@@ -8705,14 +8704,12 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   }
   tmp_size+= strlen(ocelot_grid_table_end);
   char *tmp;
-
   /* *5 in case (a) we change & to &amp; (b) we add <br> (c) we use hex digits (d) we forgot something. */
   tmp_size= tmp_size * 5;
 
   /* +200 because thin_image */
 
   tmp_size+= 1000000; /* image paste experiment */
-
   tmp= new char[tmp_size];
 
   int total_html_row_height= setting_ocelot_grid_cell_border_size_as_int * 2;
@@ -8737,7 +8734,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     {
       memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
       result_field_names_pointer+= sizeof(unsigned int);
-
       //memcpy(tmp_pointer, result_field_names_pointer, v_length);
       //tmp_pointer+= v_length;
       tmp_pointer+= html_text_edit->copy_html_cell(ocelot_grid_header_char_column_start,
@@ -8763,7 +8759,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
     /* Following is unnecessary if export */
     total_html_row_height+= html_row_height(tmp_pointer_of_row_start, tmp_pointer, over_height);
   }
-
   result_set_pointer= result_set_copy_rows[new_grid_vertical_scroll_bar_value];
   //unsigned int grid_row;
   for (tmp_result_row_number= new_grid_vertical_scroll_bar_value, grid_row= 1;
@@ -8822,7 +8817,6 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
   *tmp_pointer= '\0';
-
   if (situation == TOKEN_KEYWORD_OCELOT_EXPORT)
   {
     copy_of_parent->history_file_write("TEE", tmp, false);
@@ -15069,6 +15063,7 @@ bool eventFilter(QObject *obj, QEvent *event)
   Select Rows                       done, we say SELECT * FROM table-name LIMIT 1000;
   Table Inspector                         apparently this just allows analyze etc.
   Copy name to Clipboard -->        done, for one cell
+  Foreign Keys                      done, we execute set ocelot_query = show foreign keys
   Table Data Export Wizard          done
   Table Data Import Wizard
   Send to SQL Editor                done, as send to statement edit widget. same as mousedoubleclickevent
