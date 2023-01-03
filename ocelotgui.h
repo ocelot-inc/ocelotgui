@@ -42,6 +42,11 @@
 #define OCELOT_EXPLORER 1
 #endif
 
+/* To remove most of the code related to erdiagram, #define OCELOT_ERDIAGRAM 0 */
+#ifndef OCELOT_ERDIAGRAM
+#define OCELOT_ERDIAGRAM 0
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -12459,13 +12464,127 @@ bool conditional_setting_evaluate_till_true(
   return false;
 }
 
-
 public slots:
 
 private:
+
 };
 #endif // RESULTGRID_H
 
+#if (OCELOT_ERDIAGRAM == 1)
+#ifndef ERDIAGRAM_H
+#define ERDIAGRAM_H
+
+/*
+  This took a ludicrous amount of time to code so I'm saving it.
+  Of course it's nowhere near an ER Diagram, but so far we've got:
+  * drawing of rectangle, ellipse, and text with different pens.
+  * Scrollable
+  * Cancellable with an OK button
+  ... But push with #define OCELOT_ERDIAGRAM 0 so it is disabled.
+  Todo: check that the erd widgets are properly destroyed after exec()
+*/
+
+class ERDiagram;
+
+class erd: public QWidget
+{
+  Q_OBJECT
+
+private:
+int placing;
+
+public:
+
+erd(ERDiagram *parent, int v)
+{
+  resize(800, 800);
+  placing= v;
+}
+
+void paintEvent(QPaintEvent *event)
+{
+  QPainter painter(this);
+
+  QPen green_pen;
+  QPen red_pen;
+  QPen blue_pen;
+
+  /* Draw a green Q. */
+  green_pen.setColor(Qt::green);
+  green_pen.setWidth(2);
+  painter.setPen(green_pen);
+  painter.setFont(QFont("Arial", 10));
+  painter.drawText(QRect(placing, placing, 12, 12), Qt::AlignCenter, "Q");
+
+  /* Draw a red rectangle. The text will be inside the rectangle. */
+  red_pen.setWidth(5);
+  red_pen.setColor(Qt::red);
+  painter.setPen(red_pen);
+  painter.drawRect(placing, placing, 25, 25);
+
+  painter.drawEllipse(50, 50, 25, 25);
+
+  blue_pen.setColor(Qt::blue);
+  painter.setPen(blue_pen);
+  painter.drawEllipse(150, 250, 25, 25);
+}
+
+~erd()
+{
+  ;
+}
+
+};
+
+class ERDiagram: public QDialog
+{
+  Q_OBJECT
+
+private:
+QPushButton *button_for_ok;
+
+public:
+
+ERDiagram(MainWindow *parent)
+{
+  setWindowTitle("ERDIAGRAM");
+  resize(300, 300);
+
+  erd *widget_erd;
+  widget_erd= new erd(this, 30);
+  QScrollArea *scroll_1= new QScrollArea();
+  scroll_1->setParent(this);
+  scroll_1->setVisible(true);
+  scroll_1->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  scroll_1->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  scroll_1->setWidget(widget_erd);
+  QVBoxLayout *layout_1= new QVBoxLayout();
+  button_for_ok= new QPushButton("OK");
+  button_for_ok->setParent(this);
+  connect(button_for_ok, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
+  layout_1->insertWidget(0, scroll_1);
+  layout_1->insertWidget(1, button_for_ok);
+  setLayout(layout_1);
+  return;
+}
+
+~ERDiagram()
+{
+  ;
+}
+
+private slots:
+
+void handle_button_for_ok()
+{
+  done(QDialog::Accepted); /* i.e. close() but return Accepted */
+}
+
+};
+
+#endif // #ifndef ERDIAGRAM_H
+#endif // #if (OCELOT_ERDIAGRAM == 1)
 
 /*********************************************************************************************************/
 

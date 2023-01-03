@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.8.0
-   Last modified: January 1 2023
+   Last modified: January 3 2023
 */
 /*
   Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
@@ -769,6 +769,11 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
 
   QTimer::singleShot(0, this, SLOT(initialize_after_main_window_show()));
+
+#if (OCELOT_ERDIAGRAM == 1)
+  ERDiagram *erdiagram_widget= new ERDiagram(this);
+  int result= erdiagram_widget->exec();
+#endif
 
   log("MainWindow end", 90);
 }
