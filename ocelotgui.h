@@ -44,7 +44,7 @@
 
 /* To remove most of the code related to erdiagram, #define OCELOT_ERDIAGRAM 0 */
 #ifndef OCELOT_ERDIAGRAM
-#define OCELOT_ERDIAGRAM 0
+#define OCELOT_ERDIAGRAM 1
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 0)
@@ -256,6 +256,7 @@ enum {                                        /* possible returns from token_typ
         TOKEN_KEYWORD_AUTO_REHASH,
         TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT,
     TOKEN_KEYWORD_AVG,
+    TOKEN_KEYWORD_BACKGROUND,
     TOKEN_KEYWORD_BACKUP_ADMIN,
     TOKEN_KEYWORD_BATCH,
     TOKEN_KEYWORD_BECOMES,
@@ -461,7 +462,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_ENUM,
     TOKEN_KEYWORD_ENVELOPE,
     TOKEN_KEYWORD_EQUALS,
-    TOKEN_KEYWORD_ERROR, /* no longer used */
+    TOKEN_KEYWORD_ERDIAGRAM, /* we used to have TOKEN_KEYWORD_ERROR here but no longer use it */
     TOKEN_KEYWORD_ESCAPE,
     TOKEN_KEYWORD_ESCAPED,
     TOKEN_KEYWORD_EVENT,
@@ -1261,6 +1262,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN,
     TOKEN_KEYWORD_TAB,
     TOKEN_KEYWORD_TABLE,
+    TOKEN_KEYWORD_TABLES,
     TOKEN_KEYWORD_TABLESPACE,
     TOKEN_KEYWORD_TABLE_INFO,
     TOKEN_KEYWORD_TAN,
@@ -1468,7 +1470,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1212
+#define KEYWORD_LIST_SIZE 1214
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1541,6 +1543,7 @@ static const keywords strvalues[]=
         {"AUTO_REHASH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_AUTO_REHASH},
         {"AUTO_VERTICAL_OUTPUT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT},
       {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
+      {"BACKGROUND", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BACKGROUND},
           {"BACKUP_ADMIN", 0, 0, TOKEN_KEYWORD_BACKUP_ADMIN},
         {"BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BATCH},
     {"BECOMES", 0, 0, TOKEN_KEYWORD_BECOMES},  /* for format rule */
@@ -1741,7 +1744,7 @@ static const keywords strvalues[]=
       {"ENUM", 0, 0, TOKEN_KEYWORD_ENUM},
       {"ENVELOPE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ENVELOPE}, /* deprecated in MySQL 5.7.6 */
       {"EQUALS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EQUALS}, /* deprecated in MySQL 5.7.6 */
-      {"ERROR", 0, 0, TOKEN_KEYWORD_ERROR},
+      {"ERDIAGRAM", 0, 0, TOKEN_KEYWORD_ERDIAGRAM},
       {"ESCAPE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_ESCAPE},
       {"ESCAPED", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ESCAPED},
       {"EVENT", 0, 0, TOKEN_KEYWORD_EVENT},
@@ -2542,6 +2545,7 @@ static const keywords strvalues[]=
           {"SYSTEM_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN},
       {"TAB", 0, 0, TOKEN_KEYWORD_TAB}, /* for format rule */
       {"TABLE", FLAG_VERSION_ALL | FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TABLE},
+      {"TABLES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TABLES},
       {"TABLESPACE", 0, 0, TOKEN_KEYWORD_TABLESPACE},
       {"TABLE_INFO", 0, 0, TOKEN_KEYWORD_TABLE_INFO},
       {"TAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TAN},
@@ -2859,8 +2863,18 @@ struct explorer_items {   /* This struct definition is for MainWindow and Result
   QByteArray object_name; /* e.g. table name */
   QByteArray part_name;   /* e.g. column name */
   QByteArray part_type;   /* e.g. column type */
+  QByteArray part_extra;  /* e.g. column_name of an index */ /* TODO: Not it isn't! Is it ever used? */
   char flags;             /* e.g. EXPLORER_FLAG_MIN != 0 if minimized "S" or "T" or "V" */
   int display_row_number; /* number within the display. equals -1 if skippable */
+};
+struct explorer_items_fk {   /* For ERDiagram */
+  QByteArray schema_name;
+  QByteArray table_name;
+  QByteArray column_name;
+  QByteArray ordinal_position;
+  QByteArray referenced_table_name;
+  QByteArray referenced_column_name;
+  QByteArray constraint_name;
 };
 #endif
 
@@ -3571,7 +3585,7 @@ public:
   void hparse_f_multi_block(QString text);
   int i_of_elementary_statement();
   QString hparse_f_pre_rehash_search(int reftype);
-  bool hparse_f_is_rehash_searchable();
+  bool hparse_f_is_rehash_searchable(int);
   int hparse_f_backslash_command(bool);
   void hparse_f_other(int);
 #if (OCELOT_IMPORT_EXPORT == 1)
@@ -3824,7 +3838,9 @@ private:
   void rehash_scan_one_space(int space_number);
   QString rehash_search(QString table_name, char *search_string, int reftype,
                         QString hparse_token,
-                        bool is_exact_required);
+                        bool is_exact_required,
+                        QString specific_schema,
+                        QStringList specified_list);
   void rehash_get_database_name(char *);
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
@@ -4012,6 +4028,8 @@ public:
   ResultGrid *explorer_widget;
   explorer_items *oei;
   unsigned oei_count;
+  explorer_items_fk *oei_fk;
+  unsigned oei_fk_count;
 private:
 #endif
   XSettings *xsettings_widget;
@@ -4142,6 +4160,9 @@ private:
   QStringList tarantool_index_table_names;
   QStringList tarantool_index_names;
   QStringList tarantool_trigger_names;
+  QStringList tarantool_fk_constraint_names; /* Version 1.9 addition for foreign keys */
+  QStringList tarantool_fk_constraint_child_ids;
+  QStringList tarantool_fk_constraint_parent_ids;
 #endif
 
   QKeySequence ocelot_shortcut_connect_keysequence;
@@ -10622,7 +10643,6 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
                            int connections_dbms)
 {
   unsigned int i;
-  /* unsigned int tmp_column_lengths[MAX_COLUMNS]; */
   unsigned int sum_tmp_column_lengths;
   unsigned int sum_amount_reduced;
   unsigned int necessary_reduction;
@@ -12476,13 +12496,109 @@ private:
 #define ERDIAGRAM_H
 
 /*
-  This took a ludicrous amount of time to code so I'm saving it.
-  Of course it's nowhere near an ER Diagram, but so far we've got:
-  * drawing of rectangle, ellipse, and text with different pens.
-  * Scrollable
-  * Cancellable with an OK button
-  ... But push with #define OCELOT_ERDIAGRAM 0 so it is disabled.
-  Todo: check that the erd widgets are properly destroyed after exec()
+  Draw all base tables in schema, and lines between them if there are foreign keys.
+  Widget is scrollable, cancellable with an OK button, sized appropriately if possible.
+  Statement:
+    SET ocelot_query = SHOW ERDIAGRAM OF schema-name
+    [COLUMNS PRIMARY]
+    [LINES IN BACKGROUND]
+    [TABLES (table-list)\;
+    Statement is rejected if explorer is not visible. And explorer might need to be refreshed.
+    COLUMNS PRIMARY means "only show columns of primary key". Not a great idea but others do it.
+    LINES IN BACKGROUND means "draw lines before drawing tables" so rects overwrite lines.
+    TABLES (table-list) means "draw these tables only" otherwise all tables appear.
+  Lines:
+    For each relationship there is a line between rects.
+    Line width = ocelot_grid_cell_border_size, or 1. That's too thin so we multiply a bit.
+    Lines contain marks.
+    Lines are straight.
+  Marks:
+    A "mark" is a circle, crow's foot, double bar, or single bar on a line. (Is there a better word?)
+    Marks take up a square area = erd_default_mark_length (line_width comes from the grid setting
+    ocelot_grid_cell_border_size, or 1), not counting external, which is erd_default_mark_length.
+    Saying "#define MARK_MULTIPLIER 5" looks okay, but 4 or >5 look okay too so it's arbitrary.
+    Todo: maybe it should depend on font size?
+    A line length has to be greater than the combined length of all marks.
+    In all functions: y = where line is on y axis, x = where line is on x axis
+    Todo: Reduce the multiplier if the resultant height would be more than the font's character height
+  Angles:
+    Bars, or side toes of a crow's foot, are at an angle from the main line. If the line is not pure horizontal
+    or vertical, this angle might need a slight adjustment.
+  Grid unconditionals:
+    This is not a grid widget (using grid widget directly was considered and might be reconsidered someday).
+    But grid settings affect it, including default font, background colour, cell border size.
+  Grid conditionals:
+    Some but not all conditional expressions should work. Theoretically I can affect background
+    colour etc. for a style sheet, see https://codeloop.org/how-to-draw-text-line-in-qt5-with-qpainter/
+    and https://stackoverflow.com/questions/30171022/qtextdocument-default-style-sheet. But I couldn't get
+    proper results. So call conditional_setting_evaluate_till_true() but only take the changes to background
+    and text (and border colour?). Interpret row and column as erd_table[].xpos and erd_table[].ypos.
+    Todo: Accept conditional changes of font size, tooltip, width, height.
+  Positions:
+    When looking whether a space is available we compare x,y as if the rectangles are points near the middle
+    of a (5000,5000) matrix i.e. #define FAKE_MIDPOINT 5000. Later we expand the rectangles, leave
+    spaces between, and subtract the smallest that's actually available.
+  Bend counting:
+    Routines whose names start with bend_count are for a late phase, after we've got something that might be OK
+    but might contain some rects whose position is not ideal. Actually we have no bends, but the principle is
+    the same as if we did: are our lines crossing rects, or (much less bad) diagonal? If so, try repositioning.
+    This phase involves arbitrary numbers and might not always result in improvement.
+  Additional information:
+    In MySQL/MariaDB a primary key will always (?) be named PRIMARY so you can determine which columns
+    are in primary keys just by looking at oei_fk[].constraint_name. Also you can determine which columns
+    are in foreign keys: if oei_fk[].referencing_table is not blank. Also you can determine which columns
+    are in unique keys: if they're not primary or foreign.
+  Todo: searching oei would be quicker if parts simply pointed to objects rather than contain object_name.
+  Todo: new option: zigzags instead of straight lines
+  Todo: new option: user can list the palette's line colours, or colours can be in conditional expressions
+        or palette can include dotted | transparent lines, e.g. setDashPattern for QPen
+        e.g. [LINE COLORS (color [, color ...] and ocelot_grid_cell_border_color is an acceptable color.
+  Todo: We're depending that in oei right after table "T" will come its parts including column "C".
+        But is this dependable? Is it working with Tarantool too? Will choosing to sort wreck it?
+        But this means oei is useless if we call explorer_sort() with user option 'yes' so disable that.
+        It should be disabled, or an error should appear if it was used and users try to get a diagram.
+  Todo: Export: could be done with this if you were satisfied with the part of the widget that is on the screen:
+        QPixmap main_pixmap(16000, 16000); ... after painter.end()
+        main_pixmap= erdiagram_widget->grab();
+        main_pixmap.save("/home/pgulutzan/tmp.png");
+        Maybe this could be a "Save" option, or maybe part of the SET ocelot_query statement.
+  Todo: oei_fk[] has duplicates if there are multi-column keys. We don't care about ordinal position but when
+        we add to relations we have to be sure we're not reflecting the duplication. Therefore:
+        struct relation_items must include ordinal number.
+  Todo: There might be references to nonexistent tables, due to user setting foreign_key_checks=0.
+        We will ignore them. But it might be possible to set up dummies, if they appear in
+        information_schema.key_column_usage.
+        See: "if ((i_of_referenced_table != -1) && (i_of_referencing_table != -1)".
+        Similarly, if there is a reference to a table in a different schema.
+  Todo: Extra pixel(s) after last column would be nice, but changing ERD_MARGIN_Y doesn't solve it.
+  Todo: if conditional causes italic, not wide enough. Actually we seem to have lost all the fixed margins.
+  Todo: How about it being the current default database if user doesn't specify a schema?
+  Todo: Notice lower case. Whether to compare case insensitive is a real trial depending on server settings.
+        I'm comparing caseInsensitive but that will be bad if there's both an X and an x.
+        Maybe say caseInsensitive if SHOW ERDIAGRAM SCHEMA "delimiated_name".
+  Todo: Lots of errors can occur and we should pass them to the caller to pass to the user.
+  Todo: Check that the erd widgets and other "new" items are properly destroyed after exec()
+  Todo: Reconsider whether we should require explorer or do our own seeking here.
+  Todo: We ignore when erd_mainwindow->oei_fk[i].ordinal_position <> "1" because with a multi-column foreign
+        key we don't want to see three relations. However, if we ever decide to describe the relation to the
+        user, e.g. via a tooltip, or by having lines coming out of each column with the non-first column
+        lines skinny or transparent, we'll find that we can't ignore forever.
+  Todo: (this is really a general todo but can apply for erdiagram as well as others) use
+        int *x = new(nothrow) int;
+        if (x == 0)) the new failed -- but all you can do is assert unless you can pass an error up the line
+  Todo: Although we have a way to specify where rects go, there are are other possible ways to specify.
+        There might be some semi-standard way to specify, so do some research first.
+  Todo: Catch right-click, give user a chance to delete or move a rect or a line.
+  Todo: Catch keyboard, some control keys on main menu e.g.^Q might be okay.
+  Todo: Probably this is a bug:
+        SET ocelot_grid_text_color='white' WHERE row_number = 2;
+        changes the second row, but tooltip says y (row) = 1
+  Todo: Help | ERDiagram
+  Todo: SET ocelot_grid_tooltip should affect what we do when mouseMoveEvent() happens
+  Todo: If (table-list) I think we follow the list order, maybe reference_count order would be better,
+        but (a) do not take into account a relation which relates a table to another table that we didn't list
+            (b) priority is by the order that you inserted, not the references count
+            (c) maybe we don't need to do the shift and exchange at the end
 */
 
 class ERDiagram;
@@ -12492,47 +12608,1645 @@ class erd: public QWidget
   Q_OBJECT
 
 private:
-int placing;
+ERDiagram *erd_erdiagram;
+MainWindow *erd_mainwindow;
+
+#define ERD_MARGIN_X 2
+#define ERD_MARGIN_Y 2
+#define MARK_MULTIPLIER 5
+#define ERD_BAR1 0
+#define ERD_BAR2 1
+#define ERD_CROWS_FOOT 2
+#define ERD_CIRCLE 4
+#define FAKE_MIDPOINT 5000
+/* Todo: We're preventing big rects because there were crashes. See whether there's a better solution, eh? */
+#define MAX_COLUMN_NAMES 500
+
+//#define PACKED /* If this is defined, rects are closer. But I think it doesn't look as nice. */
+
+QFont erd_default_font;
+
+QColor erd_default_text_color, erd_default_header_background_color, erd_default_detail_background_color;
+int erd_default_container_pen_width;
+int erd_default_mark_length;
+int erd_default_space_between_rects;
+QPen erd_default_container_pen, erd_default_text_pen;
+QBrush erd_default_header_brush, erd_default_detail_brush;
+
+qreal erd_main_line_angle;
+
+char erd_color_palette[16][16];
+int erd_color_palette_count;
+
+//QPixmap *main_pixmap;
+QString erd_schema_name;
+
+bool erd_is_lines_in_background;
+bool erd_is_primary;
+
+struct table_items {
+  unsigned int i_of_oei;  /* so we can get table name from oei[i_of_oei].object_name */
+  QRect erd_rect;      /* rectangle containing table + column names. outer, i.e. includes border */
+  QRect columns_rect;     /* rectangle containing column names */
+  int columns_count;
+  int xpos;
+  int ypos;
+  int w;
+  int l;
+  int references_count;
+  bool is_fixed; /* true iff user specified x and y in (table list) */
+  QRect pushed_rect; /* Filled in by bend_count_push() */
+};
+struct table_items *erd_tables;
+int erd_tables_count;
+
+/* Relations are what we will use to determine positions and lines */
+struct relation_items {
+  int i_of_referencing_table; /* should point to erd_tables of the table with the referencing key */
+  int i_of_referenced_table;  /* should point to erd_tables of the table with the primary|unique key */
+  bool done;
+  QPointF P1;
+  QPointF P2;
+  int i_of_explorer_items_fk;
+};
+struct relation_items *erd_relations;
+int erd_relations_count;
+
+QString erd_query;
+
+int erd_token_offsets[1000]; /* todo: this should be dynamic, table list could have > 1000 tokens */
+int erd_token_lengths[1000];
+
+/*
+  Set default fonts and colours based on grid settings.
+  Also set table rectangles for use by draw_table() during paintEvent.
+*/
+void default_settings()
+{
+  {
+    QPalette p= QPalette();
+    p.setColor(QPalette::Window, erd_mainwindow->ocelot_grid_background_color);
+    setAutoFillBackground(true); /* is this necessary, or is it default? */
+    setPalette(p);
+  }
+  set_color_palette();
+  erd_default_font= erd_mainwindow->get_font_from_style_sheet(erd_mainwindow->ocelot_grid_style_string);
+  setFont(erd_default_font); /* might be overridden by a grid conditional */
+  QFontMetrics fm= QFontMetrics(erd_default_font);
+  erd_default_text_color= erd_mainwindow->qt_color(erd_mainwindow->ocelot_grid_text_color);
+  erd_default_header_background_color= erd_mainwindow->qt_color(erd_mainwindow->ocelot_grid_header_background_color);
+  erd_default_detail_background_color= erd_mainwindow->qt_color(erd_mainwindow->ocelot_grid_background_color);
+  erd_default_container_pen_width= erd_mainwindow->ocelot_grid_cell_border_size.toInt();
+  if (erd_default_container_pen_width < 1) erd_default_container_pen_width= 1;
+  erd_default_container_pen.setColor(erd_mainwindow->qt_color(erd_mainwindow->ocelot_grid_cell_border_color));
+  erd_default_container_pen.setWidth(erd_default_container_pen_width);
+  erd_default_header_brush.setStyle(Qt::SolidPattern);
+  erd_default_header_brush.setColor(erd_default_header_background_color);
+  erd_default_detail_brush.setStyle(Qt::SolidPattern);
+  erd_default_detail_brush.setColor(erd_default_detail_background_color);
+  erd_default_text_pen.setColor(erd_default_text_color);
+  erd_default_mark_length= erd_default_container_pen_width * MARK_MULTIPLIER;
+  int w_width= fm.boundingRect("W").width();
+  erd_default_mark_length= w_width * erd_default_container_pen_width;
+  erd_default_space_between_rects= erd_default_mark_length * 3 + w_width;
+
+  /* A bit of "parsing" if non-default options. We haven't called tokens_to_keywords. */
+  erd_is_lines_in_background= false;
+  erd_is_primary= false;
+  for (int i_of_token= 0;; ++i_of_token)
+  {
+    if (erd_token_lengths[i_of_token] == 0) break;
+    QString token= erd_query.mid(erd_token_offsets[i_of_token], erd_token_lengths[i_of_token]);
+    if (token == "(") break;
+    if (QString::compare(token, "BACKGROUND", Qt::CaseInsensitive) == 0) erd_is_lines_in_background= true;
+    if (QString::compare(token, "PRIMARY", Qt::CaseInsensitive) == 0) erd_is_primary= true;
+  }
+
+  /* Fill erd_tables[]. table_items must be set up based on count of tables. Destroy when done. */
+  fill_tables();
+
+  /* Following allocation is much more than necessary. erd_relations_count will be all we really need. */
+  erd_relations= new relation_items[erd_mainwindow->oei_fk_count];
+  erd_relations_count= 0;
+
+  for (unsigned int i= 0; i < erd_mainwindow->oei_fk_count; ++i)
+  {
+    if (QString::compare(erd_mainwindow->oei_fk[i].schema_name, erd_schema_name, Qt::CaseInsensitive) != 0) continue;
+    if (erd_mainwindow->oei_fk[i].ordinal_position != "1") continue;
+    if (erd_mainwindow->oei_fk[i].referenced_table_name > "")
+    {
+      int i_of_referenced_table= -1;
+      int i_of_referencing_table= -1;
+      for (int j= 0; j < erd_tables_count; ++j)
+      {
+        unsigned int k= erd_tables[j].i_of_oei;
+        QString t= erd_mainwindow->oei[k].object_name;
+        if (t == erd_mainwindow->oei_fk[i].referenced_table_name)
+        {
+          i_of_referenced_table= j;
+          break;
+        }
+      }
+      for (int j= 0; j < erd_tables_count; ++j)
+      {
+        unsigned int k= erd_tables[j].i_of_oei;
+        QString t= erd_mainwindow->oei[k].object_name;
+        if (t == erd_mainwindow->oei_fk[i].table_name)
+        {
+          i_of_referencing_table= j;
+          break;
+        }
+      }
+
+      if ((i_of_referenced_table != -1) && (i_of_referencing_table != -1))
+      {
+        erd_relations[erd_relations_count].i_of_explorer_items_fk= i;
+        erd_relations[erd_relations_count].done= false;
+        erd_relations[erd_relations_count].i_of_referenced_table= i_of_referenced_table;
+        erd_relations[erd_relations_count++].i_of_referencing_table= i_of_referencing_table;
+      }
+    }
+  }
+
+  /*
+     Todo: Try doing each "cluster" separately, i.e. when you've gone through all related to #1, do for #2
+           (that's an alternative if sorting doesn't look nice)
+     Todo: maybe -1 isn't possible, if it isn't then don't bother to check for it
+     Todo: if I add "if (erd_tables[t].references_count >= N) continue;" where N is between 1 and 5, I get
+           interestingly-different results which aren't much worse. So maybe allow users to specify N?
+  */
+  /* Now references_count is really an indicator of "priority" = count*max + t */
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    int t= erd_relations[i].i_of_referenced_table;
+    if (t != -1) erd_tables[t].references_count+= 1;
+    t= erd_relations[i].i_of_referencing_table;
+    if (t != -1) erd_tables[t].references_count+= 1;
+  }
+  /* Put each related table in an available rect */
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if (erd_tables[i].is_fixed == false)
+      erd_tables[i].erd_rect= QRect(-1, -1, erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
+  }
+  QRect last_rect= QRect(FAKE_MIDPOINT, FAKE_MIDPOINT, 1, 1);
+  /* Following is temporary, just trying to get relative positions established, so only looking at x,y. */
+  /* Declare each rect to be deep in a big area */
+  /* Eventually there will be recursion! */
+  /* Initially every rect has x,y = -1, -1. */
+  {
+    int last_most_references= 999999;
+    for (;;)
+    {
+      int most_references= 0;
+      for (int i= 0; i < erd_tables_count; ++i)
+      {
+        if ((erd_tables[i].references_count > most_references)
+         && (erd_tables[i].references_count <= last_most_references))
+        {
+          most_references= erd_tables[i].references_count;
+        }
+      }
+      if (most_references == 0) break;
+      for (int i= 0; i < erd_relations_count; ++i)
+      {
+        if (erd_relations[i].done == false)
+        {
+          if ((erd_tables[erd_relations[i].i_of_referencing_table].references_count == most_references)
+           || (erd_tables[erd_relations[i].i_of_referenced_table].references_count == most_references))
+          {
+            {
+              int t1= erd_relations[i].i_of_referencing_table;
+              int t2= erd_relations[i].i_of_referenced_table;
+              int t_main;
+              if ((erd_tables[t1].erd_rect.y() == -1) || (erd_tables[t2].erd_rect.y() == -1))
+              {
+                if ((erd_tables[t1].erd_rect.y() != -1) && (erd_tables[t2].erd_rect.y() == -1)) t_main= t2;
+                else if ((erd_tables[t1].erd_rect.y() == -1) && (erd_tables[t2].erd_rect.y() != -1)) t_main= t1;
+                else if (erd_tables[t1].references_count > erd_tables[t2].references_count) t_main= t1;
+                else t_main= t2;
+                if (erd_tables[t_main].is_fixed == true)
+                {
+                  last_rect= erd_tables[t_main].erd_rect;
+                }
+                else last_rect= place_table_and_connected_tables(last_rect, t_main); /* recursive */
+              }
+            }
+            erd_relations[i].done= true;
+          }
+        }
+      }
+      last_most_references= most_references - 1;
+    }
+  }
+  bend_count_main();
+
+//  /* Get the limits of the whole set of rects in existing area */
+  int lowest_x= FAKE_MIDPOINT; int lowest_y= FAKE_MIDPOINT; int highest_x= FAKE_MIDPOINT; int highest_y= FAKE_MIDPOINT;
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if (erd_tables[i].erd_rect.x() != -1)
+    {
+      if (erd_tables[i].erd_rect.x() < lowest_x) lowest_x= erd_tables[i].erd_rect.x();
+      if (erd_tables[i].erd_rect.x() > highest_x) highest_x= erd_tables[i].erd_rect.x();
+    }
+    if (erd_tables[i].erd_rect.y() != -1)
+    {
+      if (erd_tables[i].erd_rect.y() < lowest_y) lowest_y= erd_tables[i].erd_rect.y();
+      if (erd_tables[i].erd_rect.y() > highest_y) highest_y= erd_tables[i].erd_rect.y();
+    }
+  }
+  /* For tables with no relations, try to fill gaps in existing area */
+  /* Todo: if you fail once, you always will, so do some skipping */
+  /* Todo: start by finding and counting available gaps */
+  /* Todo: don't try anything special, just next_available_rect() */
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+      if (erd_tables[i].erd_rect.y() == -1)
+    {
+      bool is_breaker= false;
+      for (int a_x= lowest_x; a_x <= highest_x; ++a_x)
+      {
+        if (is_breaker == true) break;
+        for (int a_y= lowest_y; a_y <= highest_y; ++a_y)
+        {
+          if (is_breaker == true) break;
+          if (is_available_rect(a_x, a_y) == true)
+          {
+            erd_tables[i].erd_rect= QRect(a_x, a_y, erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
+            is_breaker= true;
+          }
+        }
+      }
+    }
+  }
+
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if (erd_tables[i].erd_rect.y() == -1)
+    {
+      erd_tables[i].erd_rect= next_available_rect(last_rect, erd_tables[i].erd_rect, i);
+      last_rect= erd_tables[i].erd_rect;
+    }
+  }
+/* Get the limits of the whole set of rects in existing area */
+/* Todo: Now this is in the wrong place, and duplicated. */
+  lowest_x= FAKE_MIDPOINT; lowest_y= FAKE_MIDPOINT; highest_x= FAKE_MIDPOINT; highest_y= FAKE_MIDPOINT;
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if (erd_tables[i].erd_rect.x() != -1)
+    {
+      if (erd_tables[i].erd_rect.x() < lowest_x) lowest_x= erd_tables[i].erd_rect.x();
+      if (erd_tables[i].erd_rect.x() > highest_x) highest_x= erd_tables[i].erd_rect.x();
+    }
+    if (erd_tables[i].erd_rect.y() != -1)
+    {
+      if (erd_tables[i].erd_rect.y() < lowest_y) lowest_y= erd_tables[i].erd_rect.y();
+      if (erd_tables[i].erd_rect.y() > highest_y) highest_y= erd_tables[i].erd_rect.y();
+    }
+  }
+  /* Subtract the lowest x and the lowest y from all rects. */
+  {
+    for (int i= 0; i < erd_tables_count; ++i)
+    {
+      erd_tables[i].erd_rect=
+              QRect(erd_tables[i].erd_rect.x() - lowest_x, erd_tables[i].erd_rect.y() - lowest_y,
+                    erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
+    }
+  }
+#ifdef PACKED
+  set_table_rects(highest_x - lowest_x, highest_y - lowest_y); /* sizes and positions */
+#else
+  set_table_rects();
+#endif
+  set_lines();
+
+  /* resize to affect scroll area. might resize the widget. */
+  {
+    int x_plus_w= 0;
+    int y_plus_h= 0;
+    for (int i= 0; i < erd_tables_count; ++i)
+    {
+      int x_plus_w_candidate= erd_tables[i].erd_rect.x() + erd_tables[i].erd_rect.width();
+      if (x_plus_w_candidate > x_plus_w) x_plus_w= x_plus_w_candidate;
+      int y_plus_h_candidate= erd_tables[i].erd_rect.y() + erd_tables[i].erd_rect.height();
+      if (y_plus_h_candidate > y_plus_h) y_plus_h= y_plus_h_candidate;
+    }
+    resize(x_plus_w + erd_default_container_pen_width, y_plus_h + erd_default_container_pen_width);
+  }
+}
+
+/*
+  We want lines to have different colors so we rotate among the basic colors.
+  But exclude RGB values which are close to background RGB, +- 64 (64 is arbitrary but silver=grey).
+  Todo: would it be smarter to use one of Qt's 20 predefined color constants?
+  Todo: I think the sizing [16][16] is some sort of mistake.
+  Todo: Maybe if you just compared total(red+green+blue) to total(red+green+blue) it would work too.
+*/
+void set_color_palette()
+{
+  const char *palette[]= {
+    "#000000", /* black */
+    "#FFFFFF", /* white */
+    "#FF0000", /* red */
+    "#00FF00", /* lime */
+    "#0000FF", /* blue */
+    "#FFFF00", /* yellow */
+    "#00FFFF", /* cyan | aqua */
+    "#FF00FF", /* magenta | fuchsia */
+    "#C0C0C0", /* silver */
+    "#808080", /* gray */
+    "#800000", /* maroon */
+    "#808000", /* olive */
+    "#008000", /* green */
+    "#800080", /* purple */
+    "#008080", /* teal */
+    "#000080", /* navy */ };
+  QColor bcolor, ccolor;
+  char color_utf8[80];
+  strcpy(color_utf8, erd_mainwindow->ocelot_grid_background_color.toUtf8());
+  bcolor= QColor(color_utf8);
+  erd_color_palette_count= 0;
+  for (int i= 0; i < 16; ++i)
+  {
+    ccolor= QColor(palette[i]);
+    if ((ccolor.red() >= bcolor.red() - 64) && (ccolor.red() <= bcolor.red() + 64))
+    {
+      if ((ccolor.blue() >= bcolor.blue() - 64) && (ccolor.blue() <= bcolor.blue() + 64))
+      {
+        if ((ccolor.green() >= bcolor.green() - 64) && (ccolor.green() <= bcolor.green() + 64))
+        {
+          continue; /* too close */
+        }
+      }
+    }
+    strcpy(erd_color_palette[erd_color_palette_count++], palette[i]);
+  }
+}
+
+/*
+  Place table t in next available rect, relative to "last"
+  First we place t
+  Then we place whatever is directly connected to t, thus circling it if there multiple connections
+  Then we go RECURSIVE! for whatever is directly connected to t
+  Todo: "100" is rather arbitrary, eh? Saying "= new" could be better but could be slow due to the recursions.
+        The later comparison "offset < 50" is similarly arbitrary.
+*/
+QRect place_table_and_connected_tables(QRect last_rect, int t)
+{
+//  unsigned int k= erd_tables[t].i_of_oei;
+//QString object_name= erd_mainwindow->oei[k].object_name;
+  int new_t_list[100];
+  int new_t_count= 0;
+
+  QRect new_last_rect;
+  if (erd_tables[t].erd_rect.y() != -1) new_last_rect= erd_tables[t].erd_rect;
+  else
+  {
+    new_last_rect= next_available_rect(last_rect, erd_tables[t].erd_rect, t);
+    erd_tables[t].erd_rect= new_last_rect;
+  }
+  int new_t;
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    if (erd_relations[i].i_of_referenced_table == t) new_t= erd_relations[i].i_of_referencing_table;
+    else if (erd_relations[i].i_of_referencing_table == t) new_t= erd_relations[i].i_of_referenced_table;
+    else continue;
+    if (erd_tables[new_t].erd_rect.y() != -1) continue; /* already done this one */
+    new_t_list[new_t_count]= new_t;
+    ++new_t_count;
+  }
+  /* Bubble sort so preference is the next one with most connections. Not a good bubble sort. */
+  for (int i= 0; i < new_t_count - 1; ++i)
+  {
+    for (int j= 0; j < new_t_count - 1; ++j)
+    {
+      int t1= new_t_list[j];
+      int t2= new_t_list[j + 1];
+      if (erd_tables[t1].references_count < erd_tables[t2].references_count)
+      {
+        new_t_list[j + 1]= t1;
+        new_t_list[j]= t2;
+      }
+    }
+  }
+
+  /* The immediately-adjacent connections. Todo: assert if somehow next_available_rect() fails? */
+  for (int i= 0; i < new_t_count; ++i)
+  {
+    int new_t= new_t_list[i];
+    QRect close_last_rect= next_available_rect(new_last_rect, erd_tables[new_t].erd_rect, t);
+    erd_tables[new_t].erd_rect= close_last_rect;
+  }
+
+  /* The adjacent of the adjacent connections */
+  QRect close_last_rect= new_last_rect;
+  for (int i= 0; i < new_t_count; ++i)
+  {
+    new_t= new_t_list[i];
+    place_table_and_connected_tables(close_last_rect, new_t);
+    close_last_rect= erd_tables[new_t].erd_rect;
+  }
+  return new_last_rect;
+}
+
+/*
+  We try 4 points E W N S, then 4 points NE NW SE SW immediately beside x,y and then greater distances.
+  It might be quicker to do this:
+    Mark a 1000x1000 matrix as all "available"
+    When you find an available, fill it with what you want
+*/
+QRect next_available_rect(QRect last_rect, QRect this_rect, int t)
+{
+  int x= 0;
+  int y= 0;
+  int directions[4];
+  if ((t%4) == 0) {directions[0]= 1; directions[1]= 2; directions[2]= 3; directions[3]= 4; }
+  if ((t%4) == 1) {directions[0]= 2; directions[1]= 3; directions[2]= 4; directions[3]= 1; }
+  if ((t%4) == 2) {directions[0]= 3; directions[1]= 4; directions[2]= 1; directions[3]= 2; }
+  if ((t%4) == 3) {directions[0]= 4; directions[1]= 1; directions[2]= 2; directions[3]= 3; }
+  int offset;
+  for (offset= 1; offset < 50; ++offset)
+  {
+    for (int k= 0; k < 4; ++k)
+    {
+      if (directions[k] == 1) {x= last_rect.x() + offset; y= last_rect.y(); }
+      if (directions[k] == 2) {x= last_rect.x(); y= last_rect.y() + offset; }
+      if (directions[k] == 3) {x= last_rect.x() - offset; y= last_rect.y(); }
+      if (directions[k] == 4) {x= last_rect.x(); y= last_rect.y() - offset; }
+      if (is_available_rect(x, y)) goto returner;
+    }
+    for (int k= 0; k < 4; ++k)
+    {
+      if (directions[k] == 1) {x= last_rect.x() + offset; y= last_rect.y() + offset; }
+      if (directions[k] == 2) {x= last_rect.x() + offset; y= last_rect.y() - offset; }
+      if (directions[k] == 3) {x= last_rect.x() - offset; y= last_rect.y() + offset; }
+      if (directions[k] == 4) {x= last_rect.x() - offset; y= last_rect.y() - offset; }
+      if (is_available_rect(x, y)) goto returner;
+    }
+    if (offset > 2) {printf("**** 4 misses!\n"); exit(0); } /* sort of an assert */
+  }
+returner:
+  return QRect(x, y, this_rect.width(), this_rect.height());
+}
+
+/*
+  Variant of next_available_rect() which is not tried initially but might be tried for a shift.
+  The only offset is +1. All 8 directions are going to be tried.
+  Failure is possible, in which case we return a rect at -1,-1.
+*/
+QRect next_available_rect_2(QRect last_rect, QRect this_rect, int i_direction)
+{
+  int x= 0;
+  int y= 0;
+  if (i_direction == 0) {x= last_rect.x() + 1; y= last_rect.y(); }
+  if (i_direction == 1) {x= last_rect.x(); y= last_rect.y() + 1; }
+  if (i_direction == 2) {x= last_rect.x() - 1; y= last_rect.y(); }
+  if (i_direction == 3) {x= last_rect.x(); y= last_rect.y() - 1; }
+  if (i_direction == 4) {x= last_rect.x() + 1; y= last_rect.y() + 1; }
+  if (i_direction == 5) {x= last_rect.x() + 1; y= last_rect.y() - 1; }
+  if (i_direction == 6) {x= last_rect.x() - 1; y= last_rect.y() + 1; }
+  if (i_direction == 7) {x= last_rect.x() - 1; y= last_rect.y() - 1; }
+  if (is_available_rect(x, y)) return QRect(x, y, this_rect.width(), this_rect.height());
+  return QRect(-1, -1, 0, 0);
+}
+
+/* Todo: If schema has 10000 rows and we call this 10000 times, this could get slow. */
+bool is_available_rect(int x, int y)
+{
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if ((erd_tables[i].erd_rect.left() == x) && (erd_tables[i].erd_rect.y() == y))
+      return false;
+  }
+  return true;
+}
+
+/*
+  Fill erd_tables[].
+  Ordinarily we take all tables in the schema, but if query contains "(table-list)" we take that.
+  Re "I": If part_name = PRIMARY that means primary-key index (a MySQL/MariaDB convention).
+          So if we see it, and user asked to show only primary columns, this is the acceptable column name.
+  Todo: Return error if oei_count == 0. Return error if erd_tables_count == 0.
+  Warning: oei also has non-table items
+  Todo: there's probably a better way to skip stuff from other schemas, this is slow
+        e.g. if it's sorted by schema, you can stop when you've done one schema and you see "S"
+        ... or a linked list
+*/
+void fill_tables()
+{
+  QString required_schema_name= erd_schema_name;
+  erd_tables_count= 0;
+
+  int i_of_query_table= erd_query.indexOf("(");
+  for (unsigned int r= 0; r < erd_mainwindow->oei_count; ++r)
+  {
+    if ((erd_mainwindow->oei[r].object_type == "T")
+     && (QString::compare(erd_mainwindow->oei[r].schema_name, required_schema_name, Qt::CaseInsensitive) == 0))
+      ++erd_tables_count;
+  }
+  erd_tables= new table_items[erd_tables_count];
+  for (int i= 0; i < erd_tables_count; ++i) erd_tables[i].is_fixed= false;
+  int table_number= 0;
+  bool is_in_table= false;
+  for (unsigned int r= 0; r < erd_mainwindow->oei_count; ++r)
+  {
+    if (QString::compare(erd_mainwindow->oei[r].schema_name, required_schema_name, Qt::CaseInsensitive) == 0)
+    {
+      bool is_eligible_if_table= true;
+      int fixed_x= 0;
+      int fixed_y= 0;
+      if ((i_of_query_table != -1)
+       && (erd_mainwindow->oei[r].object_type == "T"))
+      {
+        int i_result= i_of_table_in_query_table(erd_mainwindow->oei[r].object_name, &fixed_x, &fixed_y);
+        if (i_result == -1) is_eligible_if_table= false;
+      }
+      if ((erd_mainwindow->oei[r].object_type == "T") && (is_eligible_if_table == true))
+      {
+        if ((i_of_query_table != -1) && (fixed_x != FAKE_MIDPOINT) && (fixed_y != FAKE_MIDPOINT))
+        {
+          erd_tables[table_number].xpos= fixed_x + FAKE_MIDPOINT;
+          erd_tables[table_number].ypos= fixed_y + FAKE_MIDPOINT;
+          erd_tables[table_number].erd_rect.setX(fixed_x + FAKE_MIDPOINT);
+          erd_tables[table_number].erd_rect.setY(fixed_y + FAKE_MIDPOINT);
+          erd_tables[table_number].is_fixed= true;
+        }
+        else erd_tables[table_number].is_fixed= false; /* unnecessary? I set all to false earlier */
+        erd_tables[table_number].columns_count= 0;
+        erd_tables[table_number++].i_of_oei= r;
+        is_in_table= true;
+      }
+      else if (is_in_table == true)
+      {
+        if (erd_mainwindow->oei[r].object_type == "C")
+        {
+          if (erd_is_primary == false)
+          {
+            ++erd_tables[table_number - 1].columns_count;
+            if (erd_tables[table_number - 1].columns_count >= MAX_COLUMN_NAMES) is_in_table= false;
+          }
+        }
+        else if (erd_mainwindow->oei[r].object_type == "I")
+        {
+          if ((erd_is_primary == true) && (erd_mainwindow->oei[r].part_name == "PRIMARY"))
+            ++erd_tables[table_number - 1].columns_count;
+        }
+        else is_in_table= false; /* F P E t R S */
+      }
+    }
+  }
+  erd_tables_count= table_number; /* might be smaller than what we allocated if some tables not eligible */
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+//    unsigned int r2= erd_tables[i].i_of_oei;
+//    QString content=  erd_mainwindow->oei[r2].object_name;
+    erd_tables[i].references_count= 0;
+  }
+}
 
 public:
 
-erd(ERDiagram *parent, int v)
+/* Todo: maybe merge this with ERDiagram */
+erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query)
 {
-  resize(800, 800);
-  placing= v;
+  erd_relations= NULL; /* because in ~erd() we don't want delete if e.g. we created nothing for empty schema */
+  erd_tables= NULL;
+  resize(100, 100); /* initial, there will be another resize after we find erd_table sizes */
+  erd_erdiagram= parent_erdiagram;
+  erd_mainwindow= parent_mainwindow;
+  erd_schema_name= passed_schema_name;
+  erd_query= passed_query;
+  erd_mainwindow->tokenize(erd_query.data(),
+           erd_query.size(),
+           &erd_token_lengths[0], &erd_token_offsets[0], 1000 - 1,
+          (QChar*)"33333", 2, "", 1);
+  default_settings();
+  setMouseTracking(true); /* maybe */
 }
 
+private:
+
+/*
+  Return # of table_name within query table if user supplied optional (query-table) e.g. 1 if second in list.
+  Todo: maybe find out at start whether there is a "(" in erd_query.
+*/
+int i_of_table_in_query_table(QString oei_table_name, int *x, int *y)
+{
+  int i_of_token;
+  for (i_of_token= 0;; ++i_of_token)
+  {
+    if (erd_token_lengths[i_of_token] == 0) return -1; /* there is no "(" so there is no (table list) */
+    QString token= erd_query.mid(erd_token_offsets[i_of_token], erd_token_lengths[i_of_token]);
+    if (token == "(") break;
+  }
+  int i_of_table= 0;
+  QString table_name= "";
+  QString last_token= "";
+  int specified_x= FAKE_MIDPOINT;
+  int specified_y= FAKE_MIDPOINT;
+  ++i_of_token;
+  for (;; ++i_of_token)
+  {
+    if (erd_token_lengths[i_of_token] == 0) break; /* actually we shouldn't see this if there is a ")" */
+    QString token= erd_query.mid(erd_token_offsets[i_of_token], erd_token_lengths[i_of_token]);
+    if ((token == ")") || (token == ","))
+    {
+      /* We have reached the end of a table_name [x y] specification */
+      if (QString::compare(oei_table_name, table_name, Qt::CaseInsensitive) == 0)
+      {
+        *x= specified_x;
+        *y= specified_y;
+        return i_of_table;
+      }
+      ++i_of_table;
+      if (token == ")") break;
+      specified_x= specified_y= FAKE_MIDPOINT;
+      continue;
+    }
+    bool is_numeric;
+    int num= token.toInt(&is_numeric);
+    if ((is_numeric == false) && (token != "-")) table_name= erd_mainwindow->connect_stripper(token, true);
+    if (is_numeric == true)
+    {
+      if (specified_x == FAKE_MIDPOINT) {specified_x= num; if (last_token == "-") specified_x= -specified_x; }
+      else {specified_y= num; if (last_token == "-") specified_y= -specified_y; }
+    }
+    last_token= token;
+  }
+  *x= *y= FAKE_MIDPOINT;
+  return -1; /* name is not in table list */
+}
+
+/*
+  Pass erd_type == ERD_BAR1 | ERD_BAR2 | ERD_CROWS_FOOT | ERD_CIRCLE
+  The pen should still be what we said for setPen during draw_line(), which is not erd_default_container_pen.
+  Note: if you have Qt 5.8+ you can say center() instead of multiplying by 0.5
+  Todo: For ERD_BAR2: Consider whether drawLines() would do the job as well
+  Todo: Return length?
+*/
+QPointF draw_mark(QPainter *painter, int erd_type, QPointF main_line_point)
+{
+  QLineF mark_line;
+  QPointF mark_line_p2;
+
+  mark_line.setP1(main_line_point);
+  mark_line.setAngle(erd_main_line_angle);
+  mark_line.setLength(erd_default_mark_length);
+
+  if ((erd_type == ERD_BAR1) || (erd_type == ERD_BAR2) || (erd_type == ERD_CROWS_FOOT))
+  {
+    /* Extend main line with mark line. */
+    /* The line continues for erd_default_mark_length which (?) was subtracted before the call */
+    /* ?? This might not get us to exactly the same as P2() */
+    painter->drawLine(mark_line);
+  }
+  mark_line_p2= mark_line.p2(); /* We will return this value eventually so don't change it */
+  QPointF mark_line_50_point= (mark_line.p1() + mark_line.p2()) * 0.5;
+
+  /* ERD_BAR1 -- Draw line through the main line at 90 degrees */
+  if (erd_type == ERD_BAR1)
+  {
+    QLineF bar_line;
+    bar_line.setP1(mark_line_50_point);
+    bar_line.setAngle(erd_main_line_angle + 90);
+    bar_line.setLength(erd_default_mark_length / 2);
+    painter->drawLine(bar_line);
+    bar_line.setP1(mark_line_50_point);
+    bar_line.setAngle(erd_main_line_angle - 90);
+    bar_line.setLength(erd_default_mark_length / 2);
+    painter->drawLine(bar_line);
+  }
+
+  /* ERD_BAR2 -- Draw two lines through the main line at 90 degrees */
+  /* Todo: This is only okay when line width = 1.
+           The separation should be line width -- but not if line width * 3 > erd_default_mark_length!
+  */
+  if (erd_type == ERD_BAR2)
+  {
+    QLineF bar2_line= mark_line;
+    bar2_line.setLength((erd_default_mark_length / 2) + 2);
+
+    QLineF bar2_line_cross= mark_line;
+    bar2_line_cross.setLength(erd_default_mark_length * 0.75);
+    QPointF mark_line_75_point= bar2_line_cross.p2();
+    QLineF bar_line;
+//    QPointF mark_line_75_point= (mark_line_50_point + mark_line.p2()) * 0.5;
+    bar_line.setP1(mark_line_75_point);
+    bar_line.setAngle(erd_main_line_angle + 90);
+    bar_line.setLength(erd_default_mark_length / 2);
+    painter->drawLine(bar_line);
+    bar_line.setP1(mark_line_75_point);
+    bar_line.setAngle(erd_main_line_angle - 90);
+    bar_line.setLength(erd_default_mark_length / 2);
+    painter->drawLine(bar_line);
+
+    bar2_line.setLength((erd_default_mark_length / 2) - 2);
+    //bar2_line.setLength(erd_default_mark_length * 0.25);
+    QPointF mark_line_25_point= bar2_line.p2();
+
+    bar2_line_cross.setLength(erd_default_mark_length * 0.25);
+    mark_line_25_point= bar2_line_cross.p2();
+
+    //QPointF mark_line_25_point= (mark_line_50_point + mark_line.p1()) * 0.5;
+    bar_line.setP1(mark_line_25_point);
+    bar_line.setAngle(erd_main_line_angle + 90);
+    bar_line.setLength(erd_default_mark_length / 2);
+    painter->drawLine(bar_line);
+    bar_line.setP1(mark_line_25_point);
+    bar_line.setAngle(erd_main_line_angle - 90);
+    bar_line.setLength(erd_default_mark_length / 2);
+    painter->drawLine(bar_line);
+  }
+
+  if (erd_type == ERD_CROWS_FOOT)
+  {
+    QLineF bar1_line;
+    bar1_line.setP1(main_line_point);        /* WAS: mark_line_p2 */              /* mark_line_p2 is end line */
+    bar1_line.setAngle(erd_main_line_angle - 90);       /* bar1_line_p1 = 90 degrees from line end */
+    bar1_line.setLength(erd_default_mark_length / 2);
+    QPointF bar1_line_p1= bar1_line.p2();
+    bar1_line.setAngle(erd_main_line_angle + 90);
+    bar1_line.setLength(erd_default_mark_length / 2);   /* ... for line-length / 2*/
+    QPointF bar1_line_p2= bar1_line.p2();
+    mark_line.setP1(mark_line_p2);       /* WAS: main_line_point */            /* main_line_point is start line */
+    mark_line.setP2(bar1_line_p1);
+    painter->drawLine(mark_line);
+    mark_line.setP2(bar1_line_p2);
+    painter->drawLine(mark_line);
+  }
+
+  if (erd_type == ERD_CIRCLE)
+  {
+    painter->drawEllipse(mark_line_50_point, erd_default_mark_length / 2, erd_default_mark_length / 2);
+  }
+
+  /* Restore because earlier we set the pen to thin and red (I think). */
+  painter->setPen(erd_default_container_pen);
+  return mark_line_p2;
+}
+
+/*
+  Draw line
+  Lines should always be away from top|left edge to allow for height|width of marks.
+  Todo: lines could have label = constraint name or tooltip = constraint name
+        dotted or solid
+  Option: do this first, so lines will seem to disappear underneath rects ("[lines in background]")
+  Todo: Line length decreases depending on number of mark flags, or each mark overwrites
+  Todo: When lines are thick, ERD_BAR2 looks like a single wider line
+  It seems that P1 will be referencing and P2 will be referenced.
+  Since referenced is a primary or unique key, it will always have two bars i.e. "one and only one".
+  If referencing is unique, it should have one bar + circle i.e. "one or none" (TODO: WE DON'T CHECK)
+  If referencing is not unique, it should have crow's foot + circle i.e. "many or none"
+  If X references Y and Y references X, it should have two bars and two bars (TODO: WE DON'T CHECK)
+  ... Almost always there are 3 markers in a line, all with same size, so minimum line length is known, eh?
+*/
+void draw_line(QPainter *painter, int x1, int y1, int x2, int y2, int i_of_relation)
+{
+  QPointF main_line_point;
+
+  /* Todo: This might be too big! */
+  erd_default_container_pen.setWidth(erd_default_container_pen_width * 3);
+
+  char new_color[8];
+  strcpy(new_color, erd_color_palette[i_of_relation % erd_color_palette_count]);
+  erd_default_container_pen.setColor(new_color);
+  painter->setPen(erd_default_container_pen);
+
+  /* Find point that is at center of mark line. Todo: Don't let line width affect the calculation. */
+  QLineF main_line;
+  main_line= QLineF(x1, y1, x2, y2);
+
+  erd_main_line_angle= main_line.angle();
+
+  /* Marks at line start */
+
+  /* TEST! But I think p1 is always referenced_table */
+  if (erd_relations[i_of_relation].i_of_referenced_table != -1)
+  {
+    main_line_point= main_line.p1();
+    main_line_point= draw_mark(painter, ERD_CROWS_FOOT, main_line_point);
+    main_line_point= draw_mark(painter, ERD_CIRCLE, main_line_point);
+  }
+
+  /* TODO: Reduce the length of main_line according to whatever the total mark sizes are */
+
+  main_line= QLineF(main_line_point, main_line.p2());
+
+  int line_length= main_line.length();
+  line_length-= erd_default_mark_length;
+  main_line.setLength(line_length);
+
+  painter->drawLine(main_line);
+
+  main_line_point= main_line.p2();
+  /* Test! But I think p2 is always referencing_table */
+  /* Marks at line end */
+  //if (bar1 > 0) main_line_point= draw_mark(painter, ERD_BAR1, main_line_point);
+  //if (bar2 > 0) main_line_point= draw_mark(painter, ERD_BAR2, main_line_point);
+  // if (crows_foot) main_line_point= draw_mark(painter, ERD_CROWS_FOOT, main_line_point);
+  main_line_point= draw_mark(painter, ERD_BAR2, main_line_point);
+  return;
+}
+
+/*
+  Calculate the rectangles of each table for placing in erd_tables, which draw_table() can use.
+  Called from default settings()
+  erd_rect should be outer i.e. include border width and border height
+  We calculated x, y earlier with the assumption that every rect is one point
+  Soon we will calculate positions too -- we want to place related items near each other
+  Todo: Something like this could be done for calculating line positions too
+        (the less that we need to do every paint event, the better)
+  Getting the column values might depend on whether said "... show erdiagram of schema_name columns PRIMARY".
+  initial x will be some small value
+  Warning: assumption that we never go up ... oh that isn't true. Bah. Won't be in order!
+
+  We should be saying: Loop: Anything with a HIGHER ypos and SAME xpos gets a bigger top.
+                       Wow, there are so many loops within loops in the ERDiagram routines.
+                       If we had fixed height and fixed width this would be loads faster.
+  Each ERdiagram row has height = height of highest in row.
+  Each ERdiagram column has width = width of widest in row.
+  There is a separation between rects which is fixed, or depends on longest line.
+  But we're starting with assumption that every rect is the same size.
+*/
+
+#ifdef PACKED
+void set_table_rects(int max_x, int max_y)
+#else
+void set_table_rects()
+#endif
+{
+//  int content_offset= ERD_MARGIN_X + ERD_MARGIN_Y + erd_default_container_pen_width;
+//  int container_margin= content_offset * 2;
+  int *erd_diagram_row_heights= NULL;
+  int *erd_diagram_column_widths= NULL;
+  int erd_diagram_row_count= -1;
+  int erd_diagram_column_count= -1;
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    erd_tables[i].xpos= erd_tables[i].erd_rect.x();
+    erd_tables[i].ypos= erd_tables[i].erd_rect.y();
+    erd_tables[i].w= 0;
+    erd_tables[i].l= 0;
+    if (erd_tables[i].xpos > erd_diagram_column_count) erd_diagram_column_count= erd_tables[i].xpos;
+    if (erd_tables[i].ypos > erd_diagram_row_count) erd_diagram_row_count= erd_tables[i].ypos;
+  }
+  ++erd_diagram_row_count;
+  ++erd_diagram_column_count;
+  /* Actual rect widths and heights based on table-name and column-name widths and heights */
+  /* Calculations must match what we do in draw_table() */
+  QFontMetrics fm= QFontMetrics(erd_default_font);
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    unsigned int i_of_oei= erd_tables[i].i_of_oei;
+    QString table_name= erd_mainwindow->oei[i_of_oei].object_name;
+    int content_width= fm.boundingRect(table_name).width();
+    int content_height= fm.boundingRect(table_name).height();
+    int column_name_count= 0;
+    QString column_name;
+    for (int j= i_of_oei + 1;; ++j)
+    {
+      if (column_name_count == erd_tables[i].columns_count) break;
+      if ((erd_is_primary == false) && (erd_mainwindow->oei[j].object_type == "C"))
+      {
+        column_name= erd_mainwindow->oei[j].part_name;
+      }
+      else if ((erd_is_primary == true)
+            && (erd_mainwindow->oei[j].object_type == "I")
+            && (erd_mainwindow->oei[j].part_name == "PRIMARY"))
+      {
+        column_name= erd_mainwindow->oei[j].part_type;
+      }
+      else continue;
+
+      int column_name_width= fm.boundingRect(column_name).width();
+      if (column_name_width > content_width) content_width= column_name_width;
+      content_height+= fm.boundingRect(column_name).height();
+      ++column_name_count;
+    }
+    int margin_count = 2 + column_name_count + 1; /* margin,tname,margin,line,margin,cnames+margins */
+    /* "+ 6" is a kludge */
+    erd_tables[i].erd_rect= QRect(erd_tables[i].erd_rect.x(),
+                                 erd_tables[i].erd_rect.y(),
+                                 content_width + erd_default_container_pen_width * 2 + ERD_MARGIN_X * 2,
+                                 content_height + erd_default_container_pen_width * 3 + margin_count * ERD_MARGIN_Y + 6);
+  }
+  /* There are "delete []" statements at the end of this function. */
+  erd_diagram_row_heights= new int[erd_diagram_row_count];
+  erd_diagram_column_widths= new int[erd_diagram_column_count];
+  for (int i= 0; i < erd_diagram_row_count; ++i) erd_diagram_row_heights[i]= -1;
+  for (int i= 0; i < erd_diagram_column_count; ++i) erd_diagram_column_widths[i]= -1;
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if (erd_tables[i].erd_rect.width() > erd_diagram_column_widths[erd_tables[i].xpos])
+      erd_diagram_column_widths[erd_tables[i].xpos]= erd_tables[i].erd_rect.width();
+    if (erd_tables[i].erd_rect.height() > erd_diagram_row_heights[erd_tables[i].ypos])
+      erd_diagram_row_heights[erd_tables[i].ypos]= erd_tables[i].erd_rect.height();
+  }
+
+  /* Positions based on maximum row heights and maximum column heights */
+
+#ifdef PACKED
+  /* This was an experiment so not every rect was in a fixed grid. It sort of works but would need more work. */
+  /* Make an array of what tables are at each x on each y -- TODO: THIS SHOULD BE VARIABLE SIZE! */
+  int xy[50][50];
+  for (int xx= 0; xx <= max_x; ++xx)
+  {
+    for (int yy= 0; yy <= max_y; ++yy)
+    {
+      xy[xx][yy]= -1;
+    }
+  }
+  for (int i= 0; i < erd_tables_count; ++i) xy[erd_tables[i].xpos][erd_tables[i].ypos]= i;
+
+
+  int x;
+  for (int yy= 0; yy <= max_y; ++yy)
+  {
+    x= 0;
+    for (int xx= 0; xx <= max_x; ++xx)
+    {
+      int t= xy[xx][yy];
+      if (t != -1)
+      {
+        erd_tables[t].erd_rect= QRect(x,
+                                      0,
+                                      erd_tables[t].erd_rect.width(),
+                                      erd_tables[t].erd_rect.height());
+        x+= erd_tables[t].erd_rect.width() + erd_default_space_between_rects;
+      }
+    }
+  }
+
+  int y;
+  for (int xx= 0; xx <= max_x; ++xx)
+  {
+    y= 0;
+    for (int yy= 0; yy <= max_y; ++yy)
+    {
+      int t= xy[xx][yy];
+      if (t != -1)
+      {
+        erd_tables[t].erd_rect= QRect(erd_tables[t].erd_rect.x(),
+                                      y,
+                                      erd_tables[t].erd_rect.width(),
+                                      erd_tables[t].erd_rect.height());
+        y+= erd_tables[t].erd_rect.height() + erd_default_space_between_rects;
+      }
+    }
+  }
+#else
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    int x= 0;
+    int y= 0;
+    for (int j= 0; j < erd_tables[i].xpos; ++j) x+= erd_diagram_column_widths[j] + erd_default_space_between_rects;
+    for (int j= 0; j < erd_tables[i].ypos; ++j) y+= erd_diagram_row_heights[j] + erd_default_space_between_rects;
+    erd_tables[i].erd_rect= QRect(x,
+                                  y,
+                                  erd_tables[i].erd_rect.width(),
+                                  erd_tables[i].erd_rect.height());
+  }
+#endif
+  if (erd_diagram_column_widths != NULL) delete [] erd_diagram_column_widths;
+  if (erd_diagram_row_heights != NULL) delete [] erd_diagram_row_heights;
+  return;
+}
+
+/* Warning: 20 is an arbitrary number */
+void bend_count_main()
+{
+  int count_via_tables= 0;
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    int count_1= bend_count_one_table(i);
+    count_via_tables+= count_1;
+    if (count_1 >= 20) bend_count_try_shift(i);
+  }
+ count_via_tables= 0;
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    int count_1= bend_count_one_table(i);
+    count_via_tables+= count_1;
+    if (count_1 >= 20) bend_count_try_exchange(i);
+  }
+}
+
+/* Return the total bend count for all relations */
+int bend_count_all()
+{
+  int count= 0;
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    count+= bend_count_one_relation(i);
+  }
+  return count;
+}
+
+/* Warning: doesn't take into account that we could be crossing blanks! */
+int bend_count_one_relation(int i_of_relation)
+{
+  int count= 0;
+  int t1= erd_relations[i_of_relation].i_of_referenced_table;
+  int t2= erd_relations[i_of_relation].i_of_referencing_table;
+  int distance_x= abs(erd_tables[t1].erd_rect.x() - erd_tables[t2].erd_rect.x());
+  int distance_y= abs(erd_tables[t1].erd_rect.y() - erd_tables[t2].erd_rect.y());
+  if ((distance_x <= 1) && (distance_y == 0)) {;} /* adjacent left|right, no bend */
+  else if ((distance_y <= 1) && (distance_x == 0)) {;} /* adjacent up|down, no bend */
+  else if ((distance_y <= 1) && (distance_x <= 1)) count+= 3; /* adjacent diagonal */
+  else count+= (distance_x + distance_y) * 10;
+  return count;
+}
+
+/* Return bend count for specified table, by looking at all relations that mention this table. */
+/* Very similar to bend_count_all(), perhaps we should merge. */
+int bend_count_one_table(int i_of_table)
+{
+  int count= 0;
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    if ((erd_relations[i].i_of_referenced_table == i_of_table)
+     || (erd_relations[i].i_of_referencing_table == i_of_table))
+      count+= bend_count_one_relation(i);
+  }
+  return count;
+}
+
+/* Copy i.e. "push" all rects. Reverse is bend_count_pop(). Warning: not xpos, ypos, w, l, or columns_rect. */
+void bend_count_push()
+{
+  for (int i= 0; i < erd_tables_count; ++i)
+    erd_tables[i].pushed_rect= erd_tables[i].erd_rect;
+}
+
+/* Copy i.e. "pop" all rects. Reverse is bend_count_push(). */
+void bend_count_pop()
+{
+  for (int i= 0; i < erd_tables_count; ++i)
+    erd_tables[i].erd_rect= erd_tables[i].pushed_rect;
+}
+
+/*
+  The table at erd_table[i_of_table] has a high bend count (>= 20) (arbitrary) (should be "greatest"?)
+  This is a tactic which might not do much good.
+  Pass: i_of_table that has a high bend count. Look for relations where bend_count > (arbitrary number) 20.
+  Push. Remove rect from current position. Add with prev = distant rect. Compare bend counts. Keep or pop.
+  Todo: Actually the push|pop calls are too much, you only need to push|pop i_of_table's rect, once.
+  Todo: We repeat next_available_rect() with 4 different direction indicators (left/right/up/down), why not 8?
+*/
+void bend_count_try_shift(int i_of_table)
+{
+  if (erd_tables[i_of_table].is_fixed == true) return;
+  int i_of_related_table;
+  int old_bend_count_all= bend_count_all();
+  int best_bend_count_all= old_bend_count_all;
+  int best_bend_count_all_related_table= 0;
+  int best_bend_count_all_direction= 0;
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    if (erd_relations[i].i_of_referencing_table == i_of_table)
+      i_of_related_table= erd_relations[i].i_of_referenced_table;
+    else if (erd_relations[i].i_of_referenced_table == i_of_table)
+      i_of_related_table= erd_relations[i].i_of_referencing_table;
+    else continue;
+    int bend_count_one= bend_count_one_relation(i);
+    if (bend_count_one >= 20)
+    {
+      bend_count_push();
+
+//      int i_of_oei= erd_tables[i_of_table].i_of_oei;
+//      QString table_name= erd_mainwindow->oei[i_of_oei].object_name;
+//      i_of_oei= erd_tables[i_of_related_table].i_of_oei;
+//      table_name= erd_mainwindow->oei[i_of_oei].object_name;
+      int trial_bend_count_all;
+      for (int i_direction= 0; i_direction < 8; ++i_direction)
+      {
+        QRect trial_rect= next_available_rect_2(erd_tables[i_of_related_table].erd_rect,
+                                                erd_tables[i_of_table].erd_rect,
+                                                i_direction);
+        if ((trial_rect.x() == -1) && (trial_rect.y() == -1)) continue;
+        erd_tables[i_of_table].erd_rect= trial_rect;
+        trial_bend_count_all= bend_count_all();
+        if (trial_bend_count_all < best_bend_count_all)
+        {
+          best_bend_count_all= trial_bend_count_all;
+          best_bend_count_all_related_table= i_of_related_table;
+          best_bend_count_all_direction= i_direction;
+        }
+      }
+      bend_count_pop();
+    }
+  }
+  if (best_bend_count_all < old_bend_count_all) /* shift if it would reduce bend count */
+  {
+    erd_tables[i_of_table].erd_rect= next_available_rect(erd_tables[best_bend_count_all_related_table].erd_rect,
+                                                         erd_tables[i_of_table].erd_rect,
+                                                         best_bend_count_all_direction);
+  }
+}
+
+/*
+  A bit like bend_count_try_shift() but bend count between two tables doesn't matter, all that matters
+  is whether there is a relation.
+  In fact, mere adjacency could be a criterion.
+*/
+void bend_count_try_exchange(int i_of_table)
+{
+  if (erd_tables[i_of_table].is_fixed == true) return;
+  int i_of_related_table;
+  int old_bend_count_all= bend_count_all();
+  int best_bend_count_all= old_bend_count_all;
+  QRect best_bend_count_all_rect_of_table;
+  QRect best_bend_count_all_rect_of_related_table;
+  int best_bend_count_all_i_of_related_table= 0;
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    if (erd_relations[i].i_of_referencing_table == i_of_table)
+      i_of_related_table= erd_relations[i].i_of_referenced_table;
+    else if (erd_relations[i].i_of_referenced_table == i_of_table)
+      i_of_related_table= erd_relations[i].i_of_referencing_table;
+    else continue;
+    {
+      bend_count_push();
+      QRect rect_of_table= erd_tables[i_of_table].erd_rect;
+      QRect rect_of_related_table= erd_tables[i_of_related_table].erd_rect;
+      erd_tables[i_of_table].erd_rect= rect_of_related_table;
+      erd_tables[i_of_related_table].erd_rect= rect_of_table;
+      int trial_bend_count_all= bend_count_all();
+      if (trial_bend_count_all < best_bend_count_all)
+      {
+        best_bend_count_all= trial_bend_count_all;
+        best_bend_count_all_i_of_related_table= i_of_related_table;
+        best_bend_count_all_rect_of_table= rect_of_table;
+        best_bend_count_all_rect_of_related_table= rect_of_related_table;
+      }
+      bend_count_pop();
+    }
+  }
+  if (best_bend_count_all < old_bend_count_all) /* exchange if it would reduce bend count */
+  {
+    erd_tables[i_of_table].erd_rect= best_bend_count_all_rect_of_related_table;
+    erd_tables[best_bend_count_all_i_of_related_table].erd_rect= best_bend_count_all_rect_of_table;
+  }
+}
+
+/*
+  Draw a table. Colors and widths from grid settings.
+  Todo: Option: Calculate size but do not draw.
+        We should calculate the sizes first, and draw later (in case we want to rearrange).
+        So some of the calculations are done in an earlier function as well.
+  What about height / width of brush?
+*/
+void draw_table(QPainter *painter, int table_number)
+{
+  int x= erd_tables[table_number].erd_rect.x();
+  int y= erd_tables[table_number].erd_rect.y();
+  unsigned int i_of_oei= erd_tables[table_number].i_of_oei;
+  int rect_table_name_height;
+  QFontMetrics fm= QFontMetrics(erd_default_font);
+  {
+    QString table_name= erd_mainwindow->oei[i_of_oei].object_name;
+    int table_name_height= fm.boundingRect(table_name).height();
+    /* "+ 6" is a kludge */
+    rect_table_name_height= erd_default_container_pen_width * 2 + ERD_MARGIN_Y * 2 + table_name_height + 6;
+
+    QString color_of_rect_border= erd_mainwindow->ocelot_grid_cell_border_color;
+    erd_default_container_pen.setColor(color_of_rect_border);
+
+    painter->setPen(erd_default_container_pen); /* This might be unnecessary. */
+
+    painter->setBrush(erd_default_header_brush);
+
+    QRect qr= QRect(x,
+                    y,
+                    erd_tables[table_number].erd_rect.width(),
+                    rect_table_name_height);
+
+    /* Unfortunately we cannot pass TEXTEDITFRAME_CELL_TYPE_HEADER which would be more appropriate. */
+    QRect qr_of_table= QRect(x + ERD_MARGIN_X + erd_default_container_pen_width,
+                               y + ERD_MARGIN_Y + erd_default_container_pen_width,
+                               fm.boundingRect(table_name).width() + 1,
+                               fm.boundingRect(table_name).height());
+    painter->drawRect(qr); /* draw rect with header background color */
+    painter->setPen(erd_default_text_pen);
+    draw_text_prepare(painter, table_number, table_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_table);
+
+    painter->drawText(qr_of_table, Qt::AlignLeft, table_name);
+    y+= rect_table_name_height - erd_default_container_pen_width;
+  }
+  /* And now the columns */
+  painter->setPen(erd_default_container_pen);
+  painter->setBrush(erd_default_detail_brush);
+  int cc= erd_tables[table_number].columns_count;
+  if (cc <= 0) return; /* A table with no columns is possible if option = primary-keys-only and there are none */
+  QRect qr= QRect(x,
+                  y,
+                  erd_tables[table_number].erd_rect.width(),
+                  (erd_tables[table_number].erd_rect.height() - rect_table_name_height) + erd_default_container_pen_width);
+  painter->drawRect(qr); /* draw rect with column background color */
+  y+= erd_default_container_pen_width + ERD_MARGIN_Y;
+  painter->setPen(erd_default_text_pen);
+  int column_name_count= 0;
+  for (unsigned int i= i_of_oei + 1;; ++i)
+  {
+    if (column_name_count == erd_tables[table_number].columns_count) break;
+    QString column_name;
+    if ((erd_is_primary == false) && (erd_mainwindow->oei[i].object_type == "C"))
+    {
+      column_name= erd_mainwindow->oei[i].part_name;
+    }
+    else if ((erd_is_primary == true)
+          && (erd_mainwindow->oei[i].object_type == "I")
+          && (erd_mainwindow->oei[i].part_name == "PRIMARY"))
+    {
+      column_name= erd_mainwindow->oei[i].part_type;
+    }
+    else continue;
+    int column_name_width= fm.boundingRect(column_name).width();
+    int column_name_height= fm.boundingRect(column_name).height();
+    QRect qr_of_column= QRect(x + ERD_MARGIN_X + erd_default_container_pen_width,
+                              y + ERD_MARGIN_Y,
+                              column_name_width,
+                              column_name_height);
+    draw_text_prepare(painter, table_number, column_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_column);
+    painter->drawText(qr_of_column, Qt::AlignLeft, column_name);
+    y+= column_name_height + ERD_MARGIN_Y;
+    ++column_name_count;
+  }
+  /* Conditional setting can affect brush, which can affect later drawEllipse() */
+  /* ... but this might be unnecessary since I reset before calling draw_line */
+  painter->setBrush(erd_default_header_brush);
+}
+
+/* Possible pen and brush change due to grid conditional */
+/* Todo: conditional with column_number=2 gets column 1 */
+/* Todo: conditional with row_number=2 gets row 2 but I don't understand, shouldn't column_names affect it? */
+void draw_text_prepare(QPainter *painter,
+               int table_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
+               QString content,     /* table_name | column_name */
+               int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
+               QRect qr_of_content)
+{
+  QString string= content.trimmed();
+  QByteArray string_utf8= string.toUtf8();
+  QString new_tooltip, new_style_sheet, new_cell_height, new_cell_width;
+  int cs_number;
+  bool result_of_evaluate;
+  result_of_evaluate= erd_mainwindow->explorer_widget->conditional_setting_evaluate_till_true(
+    erd_tables[table_number].xpos + 1, /* i.e. result set column number. dunno why +1, it's really off by 1 */
+    erd_tables[table_number].ypos + 1, /* e.g. text_frame->ancestor_grid_result_row_number */
+    string_utf8.data(), /* e.g. text_frame->content_pointer */
+    0, /* e.g. FIELD_VALUE_FLAG_IS_NULL */
+    string_utf8.size(), /* e.g. text_frame->content_length */
+    cell_type, /* e.g. text_frame->cell_type */
+    &new_tooltip, /* return */
+    &new_style_sheet, /* return */
+    &new_cell_height, /* return */
+    &new_cell_width, /* return */
+    &cs_number); /* return */
+  if (result_of_evaluate == true)
+  {
+    QString new_background_color= erd_mainwindow->get_background_color_from_style_sheet(new_style_sheet);
+    QBrush new_rect_brush= erd_default_header_brush;
+    new_rect_brush.setColor(new_background_color);
+    //QPen new_rect_pen;
+    //new_rect_pen.setWidth(0);
+    painter->setBrush(new_rect_brush);
+    painter->setPen(Qt::NoPen);
+    painter->drawRect(qr_of_content);
+
+    QString new_color= erd_mainwindow->get_color_from_style_sheet(new_style_sheet);
+    QPen new_text_pen= erd_default_text_pen;
+    new_text_pen.setColor(new_color);
+    painter->setPen(new_text_pen);
+
+    /* This changes weight and style but not size. Original setting was in points not pixels. */
+    QFont qf= erd_mainwindow->get_font_from_style_sheet(new_style_sheet);
+    int point_size= erd_default_font.pointSize();
+    qf.setPointSize(point_size);
+    painter->setFont(qf);
+  }
+  else
+  {
+    painter->setFont(erd_default_font);
+  }
+}
+
+/* Set the lines between the rects. Don't let lines start|end be the same point. */
+void set_lines()
+{
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    int r0= erd_relations[i].i_of_referencing_table;
+    int r1= erd_relations[i].i_of_referenced_table;
+    QPointF p1, p2;
+    QLineF l1, l2;
+    line_ends(r0, r1, &p1, &p2, &l1, &l2);
+    for (int j= 0; j < i; ++j)
+    {
+      if ((p1 == erd_relations[j].P1) || (p1 == erd_relations[j].P2)) /* P1 conflict? */
+      {
+        p1= point_near_point(p1, l1);
+      }
+      if ((p2 == erd_relations[j].P1) || (p2 == erd_relations[j].P2)) /* P2 cnflict? */
+      {
+        p2= point_near_point(p2, l2);
+      }
+    }
+    erd_relations[i].P1= p1;
+    erd_relations[i].P2= p2;
+  }
+}
+
+/*
+  Get a point which is near p, on the same line as l, and not in conflict with another point.
+  Do it by getting a line from p to line end or line start, shortening it, and returning the new end.
+*/
+QPointF point_near_point(QPointF p, QLineF l)
+{
+  QPointF line_end= l.p2();
+  QLineF line_to_be_shortened= QLineF(p, line_end);
+  if (line_to_be_shortened.length() < 3)
+  {
+    line_end= l.p1();
+    line_to_be_shortened= QLineF(p, line_end);
+    line_to_be_shortened.setLength(20);
+    return line_to_be_shortened.p2();
+  }
+  line_end= l.p2();
+  line_to_be_shortened= QLineF(p, line_end);
+  line_to_be_shortened.setLength(20);
+  return line_to_be_shortened.p2();
+}
+
+/*
+  Pass two QRects. Return the start and end of a line that we can draw between them.
+  I want the line to be reasonably short but if the QRects are at a bit of an angle then let the line be too.
+  So I can find the place where they intersect by:
+    LM = Qline(center#1 to center#2)
+    L1 = QLine(edge#1)
+    L2 = QLine(edge#2)
+    P1 = QPoint where LM and L1 intersect
+    P2 = QPoint where LM and L2 intersect
+    There are simpler ways, e.g. always go from center of rect1 edge to center of p2 edge, but I like this best.
+    ... Flaw: if there's a group #1 #2 #3 and we're point through #2 to #3, we get interference.
+    Special case: if rects in same column and not adjacent, line from corner to corner
+                  + do the same trick for rects in same row and not adjacent
+*/
+void line_ends(int r0, int r1, QPointF *p1, QPointF *p2, QLineF *line_at_rect_side_p1, QLineF *line_at_rect_side_p2)
+{
+  QRect rect1= erd_tables[r0].erd_rect;
+  QRect rect2= erd_tables[r1].erd_rect;
+  QPointF rect1_center, rect2_center;
+  if ((erd_tables[r0].xpos == erd_tables[r1].xpos) && (erd_tables[r0].ypos > erd_tables[r1].ypos + 1))
+  {
+    rect1_center= rect1.topRight();
+    rect2_center= rect2.bottomRight();
+  }
+  else if ((erd_tables[r0].xpos == erd_tables[r1].xpos) && (erd_tables[r0].ypos < erd_tables[r1].ypos - 1))
+  {
+    rect1_center= rect1.bottomRight();
+    rect2_center= rect2.topRight();
+  }
+  else if ((erd_tables[r0].ypos == erd_tables[r1].ypos) && (erd_tables[r0].xpos > erd_tables[r1].xpos + 1))
+  {
+    rect1_center= rect1.bottomLeft();
+    rect2_center= rect2.bottomRight();
+  }
+  else if ((erd_tables[r0].ypos == erd_tables[r1].ypos) && (erd_tables[r0].xpos < erd_tables[r1].xpos - 1))
+  {
+    rect1_center= rect1.bottomRight();
+    rect2_center= rect2.bottomLeft();
+  }
+  else
+  {
+    rect1_center= rect1.center();
+    rect2_center= rect2.center();
+  }
+  QLineF lm= QLineF(rect1_center, rect2_center);
+  QPointF l1;
+  QLineF line_at_rect_side;
+  *p1= line_rect_intersection(rect1, lm, &line_at_rect_side);
+  *line_at_rect_side_p1= line_at_rect_side;
+  *p2= line_rect_intersection(rect2, lm, &line_at_rect_side);
+  *line_at_rect_side_p2= line_at_rect_side;
+}
+
+/*
+  Pass: QRect and Line. Return: point where they intersect.
+  line_at_rect_side =top | left | bottom | right side of the rect where the intersecting point is
+  ... Flaw: Checking all four possible edges is a bit tedious, maybe there's a simpler way
+  ... Flaw: if intersect is exactly at a corner e.g. bottomLeft() then there are two possible answers
+  ... Flaw: if rectangles overlap you'll get UnboundedIntersection which is an error, maybe assertable,
+            but we'll pretend it's okay and the result I suppose will be that the line starts within rect
+            -- also user can specify the same x y position for different tables in "tables (table-list)"
+  ... Flaw: "no intersections" should be impossible and assertable, but we just return the line bottomright
+  Todo: We're using a deprecated function intersect(), we should check QT_VERSION and test with Qt 6!
+*/
+QPointF line_rect_intersection(QRect rect, QLineF line, QLineF *line_at_rect_side)
+{
+  QLineF side_line;
+  int it; /* enum QLineF::IntersectionType */
+  QPointF ip, ip_unbounded;
+  int i;
+  bool is_bounded= false;
+  bool is_unbounded= false;
+//  int j= -1;
+  for (i= 0; i < 4; ++i)
+  {
+    if (i == 0) side_line= QLineF(rect.bottomLeft(), rect.bottomRight());
+    if (i == 1) side_line= QLineF(rect.bottomLeft(), rect.topLeft());
+    if (i == 2) side_line= QLineF(rect.topLeft(), rect.topRight());
+    if (i == 3) side_line= QLineF(rect.topRight(), rect.bottomRight());
+    it= line.intersect(side_line, &ip);
+    if (it == QLineF::NoIntersection)
+    {
+      ;
+    }
+    if (it == QLineF::UnboundedIntersection)
+    {
+      ip_unbounded= ip;
+//      j= i;
+      is_unbounded= true;
+    }
+    if (it == QLineF::BoundedIntersection)
+    {
+      is_bounded= true;
+      break;
+    }
+  }
+  *line_at_rect_side= side_line;
+  if (is_bounded) { return ip; }
+  if (is_unbounded) { return ip_unbounded; }
+  return rect.bottomRight();
+}
+
+//void scrollEvent(QScrollEvent *event)
+//{
+//  ;
+//}
+
+/* Sizes and positions of rectangles were established earlier. */
 void paintEvent(QPaintEvent *event)
 {
+  (void) event;
+  erd_default_container_pen.setWidth(erd_default_container_pen_width);
+  erd_default_container_pen.setColor(erd_mainwindow->qt_color(erd_mainwindow->ocelot_grid_cell_border_color));
+
   QPainter painter(this);
 
-  QPen green_pen;
-  QPen red_pen;
-  QPen blue_pen;
+  if (erd_is_lines_in_background == false)
+  {
+    for (int i_of_erd_table= 0; i_of_erd_table < erd_tables_count; ++i_of_erd_table)
+    {
+      draw_table(&painter, i_of_erd_table);
+    }
+  }
+  painter.setBrush(erd_default_header_brush);
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    QPointF p1= erd_relations[i].P1;
+    QPointF p2= erd_relations[i].P2;
+    /* Todo: Converting to x, y shouldn't be necessary, try passing p1 and p2 directly to draw_line */
+    int x1= p1.rx();
+    int x2= p2.rx();
+    int y1= p1.ry();
+    int y2= p2.ry();
+    /* TODO: Find out whether there are marks. If so, draw with erd_default_mark_length, appropriately. */
+    draw_line(&painter, x1, y1, x2, y2, i);
+  }
 
-  /* Draw a green Q. */
-  green_pen.setColor(Qt::green);
-  green_pen.setWidth(2);
-  painter.setPen(green_pen);
-  painter.setFont(QFont("Arial", 10));
-  painter.drawText(QRect(placing, placing, 12, 12), Qt::AlignCenter, "Q");
+  if (erd_is_lines_in_background == true)
+  {
+    for (int i_of_erd_table= 0; i_of_erd_table < erd_tables_count; ++i_of_erd_table)
+    {
+      draw_table(&painter, i_of_erd_table);
+    }
+  }
 
-  /* Draw a red rectangle. The text will be inside the rectangle. */
-  red_pen.setWidth(5);
-  red_pen.setColor(Qt::red);
-  painter.setPen(red_pen);
-  painter.drawRect(placing, placing, 25, 25);
-
-  painter.drawEllipse(50, 50, 25, 25);
-
-  blue_pen.setColor(Qt::blue);
-  painter.setPen(blue_pen);
-  painter.drawEllipse(150, 250, 25, 25);
 }
 
+/*
+  Tooltip
+  I said setMouseTracking(true) earlier.
+  If mouse is within a line or quite close: show the name of the foreign-key constraint.
+  ELse if mouse are within a rect: show the QRect dimensions and x y.
+  Else there is no tooltip. Todo: maybe some general hint e.g. name of schema + number of tables? "blank spot"?
+  If user specified "lines in background", we check rects first.
+  I don't know whether it is better to declare mouseMoveEvent here rather than in ERDiagram parent.
+  I don't know whether to say private / protected / virtual.
+  I don't know about setToolTipDuration().
+  I don't know whether I need to call ERDiagram::mouseEvent() maybe it passes up the line anyway, eh?
+  Todo: Check the ways a relation won't be shown and therefore its main_line should not be checked.
+  To decide whether mouse is in a rect:
+    QRect.contains().
+  To decide whether mouse is on or close to a line:
+    As we do when drawing a bar, we create "bar lines" at 90-degree angles to the line defined by relation's
+    P1, P2. The bar line length is erd_default_mark_length / 2 which is affected by ocelot_grid_cell_border_size
+    (because line width is based on that) plus 5 (which is arbitrary but we want to accept "near" since lines
+    are typically quite thin).
+    The bar line P1 is mouse_point.
+    If success i.e. there is an intersection, get length of line from mouse_point to intersection_point --
+    we want to get the shortest distance out of all the relations, because two relation lines might be
+    within bar line length of each other.
+    WARNING: I'm using a deprecated function intersect() -- more than once.
+             See https://qthub.com/static/doc/qt5/qtcore/qlinef-obsolete.html#
+             So TODO: probably I should check: if QT_VERSION > xxx use intersects() instead.
+    (It's already been checked that mouse is not within a rect.)
+    Todo: Save time with a rough calculation: rect formed by relation line contains mouse_point? If not, skip.
+*/
+void mouseMoveEvent(QMouseEvent *event)
+{
+  QPoint mouse_point= event->pos();
+  QString tooltip_string;
+  if (erd_is_lines_in_background == true)
+  {
+    tooltip_string= tooltip_of_rect(mouse_point);
+    if (tooltip_string == "") tooltip_string= tooltip_of_line(mouse_point);
+  }
+  else
+  {
+    tooltip_string= tooltip_of_line(mouse_point);
+    if (tooltip_string == "") tooltip_string= tooltip_of_rect(mouse_point);
+  }
+  setToolTip(tooltip_string);
+}
+
+QString tooltip_of_rect(QPoint mouse_point) /* see comments for mouseMoveEvent */
+{
+  char tooltip_char_string[1024];
+  strcpy(tooltip_char_string,"");
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if (erd_tables[i].erd_rect.contains(mouse_point))
+    {
+      sprintf(tooltip_char_string,"x (column) = %d, y (row) = %d, x (pixel) = %d, y (pixel) = %d, width (pixel) = %d, height (pixel) = %d",
+             erd_tables[i].xpos,
+             erd_tables[i].ypos,
+             erd_tables[i].erd_rect.x(),
+             erd_tables[i].erd_rect.y(),
+             erd_tables[i].erd_rect.width(),
+             erd_tables[i].erd_rect.height());
+      if (erd_tables[i].is_fixed == true) strcat(tooltip_char_string, " (fixed)");
+      break;
+    }
+  }
+  return tooltip_char_string;
+}
+
+QString tooltip_of_line(QPoint mouse_point) /* see comments for mouseMoveEvent() */
+{
+  char tooltip_char_string[1024];
+  strcpy(tooltip_char_string, "");
+  int default_bar_line_length= erd_default_mark_length / 2 + 5;
+  int nearest_relation= -1;
+  qreal nearest_relation_distance= 999999;
+  for (int i= 0; i < erd_relations_count; ++i)
+  {
+    if (erd_relations[i].done == true)
+    {
+      bool is_near= false;
+      QLineF linef= QLineF(erd_relations[i].P1, erd_relations[i].P2);
+      qreal linef_angle= linef.angle();
+      QLineF bar_line;
+      bar_line.setP1(mouse_point);
+      bar_line.setLength(default_bar_line_length);
+      QPointF intersection_point;
+      bar_line.setAngle(linef_angle + 90);
+      if (linef.intersect(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
+      else
+      {
+        bar_line.setAngle(linef_angle - 90);
+        if (linef.intersect(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
+      }
+      if (is_near == true)
+      {
+        bar_line.setP2(intersection_point);
+        qreal distance= bar_line.length();
+        if (distance < nearest_relation_distance)
+        {
+          nearest_relation= i;
+          nearest_relation_distance= distance;
+        }
+      }
+    }
+  }
+  if (nearest_relation != -1)
+  {
+    int i_of_explorer_item= erd_relations[nearest_relation].i_of_explorer_items_fk;
+    QByteArray constraint_name= erd_mainwindow->oei_fk[i_of_explorer_item].constraint_name;
+    char constraint_name_as_char[256];
+    strcpy(constraint_name_as_char, constraint_name);
+    sprintf(tooltip_char_string,"constraint_name = %s", constraint_name_as_char);
+  }
+  return tooltip_char_string;
+}
+
+/* ?? Todo: Check if the deletes should actually be done with ~ERDiagram() */
 ~erd()
 {
-  ;
+  if (erd_relations != NULL) delete [] erd_relations;
+  if (erd_tables != NULL) delete [] erd_tables;
 }
 
 };
@@ -12543,29 +14257,34 @@ class ERDiagram: public QDialog
 
 private:
 QPushButton *button_for_ok;
+MainWindow *erdiagram_mainwindow;
+erd* erd_widget_erd;
 
 public:
 
-ERDiagram(MainWindow *parent)
+ERDiagram(MainWindow *parent_mainwindow, QString passed_schema_name, QString query)
 {
-  setWindowTitle("ERDIAGRAM");
-  resize(300, 300);
-
+  erdiagram_mainwindow= parent_mainwindow;
+  setWindowTitle("ERDIAGRAM OF " + passed_schema_name);
+  /* I think setWidget() will give widget_erd a parent so we won't need to delete it later, i.e. no leak? */
   erd *widget_erd;
-  widget_erd= new erd(this, 30);
+  widget_erd= new erd(this, parent_mainwindow, passed_schema_name, query);
   QScrollArea *scroll_1= new QScrollArea();
-  scroll_1->setParent(this);
+  scroll_1->setParent(this); /* unnecessary */
   scroll_1->setVisible(true);
-  scroll_1->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
-  scroll_1->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  //scroll_1->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded); /* this is the default anyway */
+  //scroll_1->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded); /* this is the default anywy */
   scroll_1->setWidget(widget_erd);
   QVBoxLayout *layout_1= new QVBoxLayout();
   button_for_ok= new QPushButton("OK");
-  button_for_ok->setParent(this);
+  button_for_ok->setParent(this); /* unnecessary */
   connect(button_for_ok, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
   layout_1->insertWidget(0, scroll_1);
   layout_1->insertWidget(1, button_for_ok);
   setLayout(layout_1);
+  /* Todo: really width + height should consider scroll bars + actual height|width of heading + OK button */
+  /* If we ask for too much, that should be okay, Qt will take over the screen for it */
+  resize(widget_erd->width() + 38, widget_erd->height() + 60);
   return;
 }
 
@@ -12918,7 +14637,7 @@ private:
     Todo: indicate if fixed pitch font
     Todo: SET statements match Settings
   Re sizes:
-    In our experience QFontDatabase returns the same list regardless of famile or style, around 18 options.
+    In our experience QFontDatabase returns the same list regardless of family or style, around 18 options.
     So we make the list once for all suggested sizes. If somehow (e.g. via SET) an unsuggested size comes up,
     we pick the nearest.
 
@@ -15282,6 +17001,7 @@ bool eventFilter(QObject *obj, QEvent *event)
         Given that we can get data type from oei[n].part_type when oei[n].object_type='C', this is poor.
   Todo: Since we might someday do import|export with data types + column names, the alphabetical order choice
         for explorer_widget is bad. We should keep column numbers, or we should not sort by column names.
+  Todo: For "I" we now have extra_type = index column name, we use it for erdiagram but not for explorer.
 */
 class Context_menu: public QWidget
 {

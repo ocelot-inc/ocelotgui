@@ -445,13 +445,15 @@ void MainWindow::hparse_f_expected_clear()
 */
 int MainWindow::hparse_f_expected_exact(int reftype)
 {
-  if (hparse_f_is_rehash_searchable() == false) return 1;
+  if (hparse_f_is_rehash_searchable(reftype) == false) return 1;
   if (main_token_lengths[hparse_i + 1] != 0) return 1;
   QByteArray ba= hparse_token.toUtf8();
   char *tmp= ba.data();
   QString rehash_search_result= rehash_search(hparse_f_pre_rehash_search(reftype), tmp, reftype,
                                               hparse_token,
-                                              true);
+                                              true,
+                                              hparse_specified_schema,
+                                              hparse_specified_list);
   if (rehash_search_result > "")
   {
     if ((hparse_token.left(1) == "\"") && (hparse_token.right(1) != "\""))
@@ -483,13 +485,15 @@ void MainWindow::hparse_f_expected_append(QString token, unsigned char reftype, 
       if (hparse_text_copy.mid(main_token_offsets[hparse_i - 1], main_token_lengths[hparse_i - 1]) == ";") return;
     }
   }
-  if (hparse_f_is_rehash_searchable() == true)
+  if (hparse_f_is_rehash_searchable(reftype) == true)
   {
     if (token.contains("identifier]") == true)
     {
       QString rehash_search_result= rehash_search(hparse_f_pre_rehash_search(reftype), (char*)"", reftype,
                                                   hparse_token,
-                                                  false);
+                                                  false,
+                                                  hparse_specified_schema,
+                                                  hparse_specified_list);
     }
   }
 //    {
@@ -6077,7 +6081,7 @@ void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen, bool role
          requirement_seen= true;
       else
       {
-        /* Maybe we should be using something like hparse_from_list here. */
+        /* Maybe we should be using something like hparse_pick_from_list here. */
         QStringList tokens= (QStringList() << "CIPHER" << "ISSUER" << "SUBJECT");
         for (;;)
         {
@@ -13215,6 +13219,8 @@ void MainWindow::hparse_f_multi_block(QString text)
   hparse_i= -1;
   hparse_delimiter_str= ocelot_delimiter_str;
   hparse_errno_count= 0;
+  hparse_specified_schema= ""; /* so far only "set ocelot_query = show erdiagram of schema_name ..." sets this */
+  hparse_specified_list.clear(); /* this too is associated with erdiagram */
   for (;;)
   {
     hparse_statement_type= -1;
@@ -13472,7 +13478,7 @@ int MainWindow::i_of_elementary_statement()
 */
 QString MainWindow::hparse_f_pre_rehash_search(int reftype)
 {
-  if (hparse_f_is_rehash_searchable() == false) return ""; /* If there has been no rehash return "" */
+  if (hparse_f_is_rehash_searchable(reftype) == false) return ""; /* If there has been no rehash return "" */
   //int reftype= main_token_reftypes[hparse_i];
   /* Similar checks are in rehash_search */
   if ((reftype != TOKEN_REFTYPE_COLUMN)
@@ -13521,10 +13527,14 @@ QString MainWindow::hparse_f_pre_rehash_search(int reftype)
     (not done!) DECLARE variable_name ... hmm, it would be pointless, variables aren't database objects.
   Todo: maybe a qualifier will be followed by "." in which case return true.
 */
-bool MainWindow::hparse_f_is_rehash_searchable()
+bool MainWindow::hparse_f_is_rehash_searchable(int reftype)
 {
   if ((main_token_flags[hparse_i] & TOKEN_FLAG_IS_NEW) != 0) return false;
-  if (rehash_result_row_count == 0) return false;
+  if (ocelot_explorer_visible == "yes")
+  {
+    if (reftype == TOKEN_REFTYPE_DATABASE) return true;
+    if ((reftype == TOKEN_REFTYPE_TABLE) && (hparse_specified_schema > "")) return true;
+  }
   return true;
 }
 
@@ -13825,14 +13835,72 @@ int MainWindow::hparse_f_client_set_query()
   if (hparse_errno > 0) return 1;
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW");
   if (hparse_errno > 0) return 1;
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "FOREIGN");
-  if (hparse_errno > 0) return 1;
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "KEYS");
-  if (hparse_errno > 0) return 1;
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "OF");
-  if (hparse_errno > 0) return 1;
-  if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
-    hparse_f_error();
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ERDIAGRAM, "ERDIAGRAM") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OF, "OF");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return 0;
+    hparse_specified_schema= hparse_text_copy.mid(main_token_offsets[hparse_i_of_last_accepted], main_token_lengths[hparse_i_of_last_accepted]);
+    hparse_specified_schema= connect_stripper(hparse_specified_schema, false);
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLUMNS, "COLUMNS") == 1)  /* option */
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PRIMARY, "PRIMARY");
+      if (hparse_errno > 0) return 0;
+    }
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LINES, "LINES") == 1)  /* option */
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IN, "IN");
+      if (hparse_errno > 0) return 0;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BACKGROUND, "BACKGROUND");
+      if (hparse_errno > 0) return 0;
+    }
+
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LINES, "TABLES") == 1)  /* option */
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+      if (hparse_errno > 0) return 0;
+      hparse_specified_list.clear(); /* unnecessary */
+      for (unsigned int i_of_oei= 0; i_of_oei < oei_count; ++i_of_oei)
+      {
+        if (oei[i_of_oei].object_type == "T")
+        {
+          if (QString::compare(oei[i_of_oei].schema_name, hparse_specified_schema, Qt::CaseInsensitive) == 0)
+          {
+            hparse_specified_list << oei[i_of_oei].object_name;
+          }
+        }
+      }
+      do
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        if (hparse_errno > 0) { hparse_specified_schema= ""; hparse_specified_list.clear(); return 0; }
+        QString s_match= hparse_text_copy.mid(main_token_offsets[hparse_i_of_last_accepted], main_token_lengths[hparse_i_of_last_accepted]);
+        int i_of_match= hparse_specified_list.indexOf(s_match, Qt::CaseInsensitive);
+        hparse_specified_list.removeAt(i_of_match);
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_INTEGER) != 0) /* [x y] */
+        {
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_INTEGER) == 0) hparse_f_error();
+        }
+        if (hparse_errno > 0) { hparse_specified_schema= ""; hparse_specified_list.clear(); return 0; }
+      } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+      if (hparse_errno > 0) { hparse_specified_schema= ""; hparse_specified_list.clear(); return 0; }
+    }
+    hparse_specified_schema= "";
+    hparse_specified_list.clear();
+  }
+  else
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOREIGN, "FOREIGN");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_KEYS, "KEYS");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OF, "OF");
+    if (hparse_errno > 0) return 1;
+    if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
+      hparse_f_error();
+  }
   return 1;
 }
 
@@ -13925,7 +13993,7 @@ int MainWindow::hparse_f_client_set()
     return hparse_f_client_set_rule();
   }
 
-  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+  //if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
     if (main_token_types[hparse_i_of_last_accepted] == TOKEN_KEYWORD_OCELOT_QUERY)
     {
