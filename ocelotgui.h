@@ -14041,7 +14041,7 @@ void line_ends(int r0, int r1, QPointF *p1, QPointF *p2, QLineF *line_at_rect_si
             but we'll pretend it's okay and the result I suppose will be that the line starts within rect
             -- also user can specify the same x y position for different tables in "tables (table-list)"
   ... Flaw: "no intersections" should be impossible and assertable, but we just return the line bottomright
-  Todo: We're using a deprecated function intersect(), we should check QT_VERSION and test with Qt 6!
+  Re QT_VERSION: intersects() was introduced in Qt 5.14, intersect() was later deprecated and removed.
 */
 QPointF line_rect_intersection(QRect rect, QLineF line, QLineF *line_at_rect_side)
 {
@@ -14058,7 +14058,11 @@ QPointF line_rect_intersection(QRect rect, QLineF line, QLineF *line_at_rect_sid
     if (i == 1) side_line= QLineF(rect.bottomLeft(), rect.topLeft());
     if (i == 2) side_line= QLineF(rect.topLeft(), rect.topRight());
     if (i == 3) side_line= QLineF(rect.topRight(), rect.bottomRight());
+#if (QT_VERSION >= 0x51500)
+    it= line.intersects(side_line, &ip);
+#else
     it= line.intersect(side_line, &ip);
+#endif
     if (it == QLineF::NoIntersection)
     {
       ;
@@ -14149,9 +14153,7 @@ void paintEvent(QPaintEvent *event)
     If success i.e. there is an intersection, get length of line from mouse_point to intersection_point --
     we want to get the shortest distance out of all the relations, because two relation lines might be
     within bar line length of each other.
-    WARNING: I'm using a deprecated function intersect() -- more than once.
-             See https://qthub.com/static/doc/qt5/qtcore/qlinef-obsolete.html#
-             So TODO: probably I should check: if QT_VERSION > xxx use intersects() instead.
+    Re QT_VERSION: intersects() was introduced in Qt 5.14, intersect() was later deprecated and removed.
     (It's already been checked that mouse is not within a rect.)
     Todo: Save time with a rough calculation: rect formed by relation line contains mouse_point? If not, skip.
 */
@@ -14213,11 +14215,19 @@ QString tooltip_of_line(QPoint mouse_point) /* see comments for mouseMoveEvent()
       bar_line.setLength(default_bar_line_length);
       QPointF intersection_point;
       bar_line.setAngle(linef_angle + 90);
+#if (QT_VERSION >= 0x51500)
+      if (linef.intersects(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
+#else
       if (linef.intersect(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
+#endif
       else
       {
         bar_line.setAngle(linef_angle - 90);
+#if (QT_VERSION >= 0x51500)
+        if (linef.intersects(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
+#else
         if (linef.intersect(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
+#endif
       }
       if (is_near == true)
       {

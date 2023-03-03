@@ -11105,7 +11105,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
   fks= fks + ";";
 
   /* If we wrecked the global rehash_scan result that's used ordinarily we'll have to call rehash_scan again. */
-  if (saved_rehash_result_row_count != 0) rehash_scan(error_or_ok_message, NULL);
+  if (saved_rehash_result_row_count != 0) rehash_scan(error_or_ok_message, "");
   else rehash_garbage_collect();
 
   int fks_query_len= fks.toUtf8().size();                  /* See comment "UTF8 Conversion" */
@@ -11429,7 +11429,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (ocelot_auto_rehash != 0)
       {
         char error_or_ok_message[ER_MAX_LENGTH];
-        int i= rehash_scan(error_or_ok_message, NULL);
+        int i= rehash_scan(error_or_ok_message, "");
         if (i == ER_OK_REHASH)
         {
           put_message_in_result(error_or_ok_message);
@@ -11586,7 +11586,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   if (statement_type == TOKEN_KEYWORD_REHASH)   /* Regardless whether ocelot_auto_rehash = 1 */
   {
     char error_or_ok_message[ER_MAX_LENGTH];
-    rehash_scan(error_or_ok_message, NULL); /* We don't check if return = ER_OK but if it failed then rehash_result_row_count = 0 */
+    rehash_scan(error_or_ok_message, ""); /* We don't check if return = ER_OK but if it failed then rehash_result_row_count = 0 */
     put_message_in_result(error_or_ok_message);
     return 1;
   }
@@ -12113,7 +12113,7 @@ int MainWindow::rehash_scan(char *error_or_ok_message, QString alternate_query)
 #if (OCELOT_MYSQL_INCLUDE == 1)
   /* Todo: Now 1024 isn't big enough if alternate_query <> NULL, because user can make up something big. */
   char query[1024];
-if (alternate_query == NULL)
+if (alternate_query == "")
   sprintf(query, "select 'D',database(),'','' "
                  "union all "
                  "select 'C',table_name,column_name,'' "
@@ -23610,7 +23610,7 @@ void MainWindow::connect_init(int connection_number)
     if (ocelot_auto_rehash != 0)
     {
       char error_or_ok_message[ER_MAX_LENGTH];
-      rehash_scan(error_or_ok_message, NULL); /* Todo: should we display the error/ok message that rehash_scan() produces? */
+      rehash_scan(error_or_ok_message, ""); /* Todo: should we display the error/ok message that rehash_scan() produces? */
     }
   }
 }
@@ -28296,7 +28296,7 @@ int MainWindow::explorer_refresh(char *error_or_ok_message)
   }
   int rehash_scan_result;
   unsigned int saved_rehash_result_row_count= result_row_count;
-  rehash_scan_result= rehash_scan(error_or_ok_message, ocelot_explorer_query); /* instead of NULL */
+  rehash_scan_result= rehash_scan(error_or_ok_message, ocelot_explorer_query); /* instead of "" */
   if (strncmp(error_or_ok_message, "OK", 2) != 0)
   {
     return rehash_scan_result;
@@ -28456,7 +28456,7 @@ int MainWindow::explorer_refresh(char *error_or_ok_message)
                  "FROM information_schema.key_column_usage \n"
                  "ORDER BY table_schema, table_name;"
     ;
-    rehash_scan_result= rehash_scan(error_or_ok_message, ocelot_explorer_query_fk); /* instead of NULL */
+    rehash_scan_result= rehash_scan(error_or_ok_message, ocelot_explorer_query_fk); /* instead of "" */
     if (strncmp(error_or_ok_message, "OK", 2) != 0)
     {
       return rehash_scan_result;
@@ -28489,7 +28489,7 @@ int MainWindow::explorer_refresh(char *error_or_ok_message)
       }
     }
     /* If we wrecked the global rehash_scan result that's used ordinarily we'll have to call rehash_scan again. */
-    if (saved_rehash_result_row_count != 0) rehash_scan(error_or_ok_message, NULL);
+    if (saved_rehash_result_row_count != 0) rehash_scan(error_or_ok_message, "");
     else rehash_garbage_collect();
   }
   log("explorer_refresh end", 65);
