@@ -1,4 +1,4 @@
-/* Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
+/* Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -7617,7 +7617,7 @@ void display_batch()
           tmp_pointer+= strlen(base64_tmp);
           memcpy(tmp_pointer, "\"/>", 3);
           tmp_pointer+= 3;
-          delete base64_tmp;
+          delete [] base64_tmp;
           is_image_written= true;
         }
       }
@@ -12599,6 +12599,8 @@ private:
         but (a) do not take into account a relation which relates a table to another table that we didn't list
             (b) priority is by the order that you inserted, not the references count
             (c) maybe we don't need to do the shift and exchange at the end
+  Todo: Unfortunately changing font size won't affect setWindowTitle(), at least on Linux.
+        Maybe I could hide the title and put in a (disabled) button but that would lack the Windows decoration.
 */
 
 class ERDiagram;
@@ -12922,6 +12924,7 @@ void default_settings()
   set_lines();
 
   /* resize to affect scroll area. might resize the widget. */
+  /* todo: we should allow for is width of a line mark if line is at edge but simply saying "+ n" won't do */
   {
     int x_plus_w= 0;
     int y_plus_h= 0;
@@ -13389,8 +13392,7 @@ QPointF draw_mark(QPainter *painter, int erd_type, QPointF main_line_point)
 /*
   Draw line
   Lines should always be away from top|left edge to allow for height|width of marks.
-  Todo: lines could have label = constraint name or tooltip = constraint name
-        dotted or solid
+  Lines do not have label = constraint but have tooltip = constraint name.
   Option: do this first, so lines will seem to disappear underneath rects ("[lines in background]")
   Todo: Line length decreases depending on number of mark flags, or each mark overwrites
   Todo: When lines are thick, ERD_BAR2 looks like a single wider line
@@ -13643,7 +13645,13 @@ int bend_count_all()
   return count;
 }
 
-/* Warning: doesn't take into account that we could be crossing blanks! */
+/*
+  Todo: take into account that we could be crossing blanks.
+  For example, with the sakila database on the Windows host, perhaps because tables were created in a different
+  order, we have a different diagram and a bend because line inventory <-> rental goes through some rects.
+  If inventory had been placed above rental then the film<->inventory would be going through blanks, and if
+  we didn't count blanks then the bend count might have been good for that.
+*/
 int bend_count_one_relation(int i_of_relation)
 {
   int count= 0;
@@ -13932,7 +13940,13 @@ void draw_text_prepare(QPainter *painter,
   }
 }
 
-/* Set the lines between the rects. Don't let lines start|end be the same point. */
+/*
+  Set the lines between the rects.
+  To avoid lines having the same start and end points, we check whether point has alread been assigned
+  for a different line.
+  Todo: if a rect side has multiple lines we could still have conflict
+  Todo: sometimes there could be an alternate line e.g. if rect#2 is both down and left of rect#1
+*/
 void set_lines()
 {
   for (int i= 0; i < erd_relations_count; ++i)
@@ -13961,12 +13975,15 @@ void set_lines()
 /*
   Get a point which is near p, on the same line as l, and not in conflict with another point.
   Do it by getting a line from p to line end or line start, shortening it, and returning the new end.
+  Todo: in order to avoid going past the end of the line (which is a side of a perpendicular rect),
+        we check whether we're within 5 points of the edge, and switch p1/p2 if so. But 5 is an arbitrary
+        number and we might still see lines which appear to not be connecting two rects.
 */
 QPointF point_near_point(QPointF p, QLineF l)
 {
   QPointF line_end= l.p2();
   QLineF line_to_be_shortened= QLineF(p, line_end);
-  if (line_to_be_shortened.length() < 3)
+  if (line_to_be_shortened.length() < 5) /* i.e. is p1-p2 distance short i.e. are we near end of line? */
   {
     line_end= l.p1();
     line_to_be_shortened= QLineF(p, line_end);
@@ -14023,6 +14040,7 @@ void line_ends(int r0, int r1, QPointF *p1, QPointF *p2, QLineF *line_at_rect_si
     rect1_center= rect1.center();
     rect2_center= rect2.center();
   }
+
   QLineF lm= QLineF(rect1_center, rect2_center);
   QPointF l1;
   QLineF line_at_rect_side;
@@ -14058,7 +14076,7 @@ QPointF line_rect_intersection(QRect rect, QLineF line, QLineF *line_at_rect_sid
     if (i == 1) side_line= QLineF(rect.bottomLeft(), rect.topLeft());
     if (i == 2) side_line= QLineF(rect.topLeft(), rect.topRight());
     if (i == 3) side_line= QLineF(rect.topRight(), rect.bottomRight());
-#if (QT_VERSION >= 0x51500)
+#if (QT_VERSION >= 0x50f00)
     it= line.intersects(side_line, &ip);
 #else
     it= line.intersect(side_line, &ip);
@@ -14215,7 +14233,7 @@ QString tooltip_of_line(QPoint mouse_point) /* see comments for mouseMoveEvent()
       bar_line.setLength(default_bar_line_length);
       QPointF intersection_point;
       bar_line.setAngle(linef_angle + 90);
-#if (QT_VERSION >= 0x51500)
+#if (QT_VERSION >= 0x50f00)
       if (linef.intersects(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
 #else
       if (linef.intersect(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
@@ -14223,7 +14241,7 @@ QString tooltip_of_line(QPoint mouse_point) /* see comments for mouseMoveEvent()
       else
       {
         bar_line.setAngle(linef_angle - 90);
-#if (QT_VERSION >= 0x51500)
+#if (QT_VERSION >= 0x50f00)
         if (linef.intersects(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;
 #else
         if (linef.intersect(bar_line, &intersection_point) == QLineF::BoundedIntersection) is_near= true;

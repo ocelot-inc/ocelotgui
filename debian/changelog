@@ -1,3 +1,9 @@
+ocelotgui (1.9.0-1) UNRELEASED; urgency=low
+
+  * ERDiagram
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Tue, 07 Mar 2023 12:00:00 -0600
+
 ocelotgui (1.8.0-1) UNRELEASED; urgency=low
 
   * Explorer

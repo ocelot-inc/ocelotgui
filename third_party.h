@@ -42,11 +42,14 @@
                        in about 100 places. But now we shouldn't need
                        #pragma GCC diagnostic warning "-fpermissive"
                        #pragma GCC diagnostic ignored "-pedantic"
+   Update March 2023: A warning is happening with -Wall and newish compiler on Fedora 37,
+                      I disable -Warray-bounds because I don't understand the problem. todo: revisit soon
 */
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wpointer-arith"
 #pragma GCC diagnostic ignored "-Wall"
 #pragma GCC diagnostic ignored "-Wwrite-strings"
+#pragma GCC diagnostic ignored "-Warray-bounds"
 #if defined(__GNUC__) && (__GNUC__ >= 7)
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
 #endif

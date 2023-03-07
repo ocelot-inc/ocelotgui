@@ -1,11 +1,11 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 1.8.0
-   Last modified: March 2 2023
+   Version: 1.9.0
+   Last modified: March 7 2023
 */
 /*
-  Copyright (c) 2022 by Peter Gulutzan. All rights reserved.
+  Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -415,7 +415,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.8.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="1.9.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -5686,7 +5686,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2022 by Peter Gulutzan.<br>\
+<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2023 by Peter Gulutzan.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -5768,10 +5768,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.8.0, November 16 2022  \
+  <BR>Version 1.9.0, March 7 2022  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2022 by Peter Gulutzan. All rights reserved.  \
+  <BR>Copyright (c) 2023 by Peter Gulutzan. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -22348,7 +22348,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         QByteArray qbline;
         qbline= file.readLine((sizeof line) - 1);
         int ii;
-        for (ii= 0; ii < qbline.count(); ++ii) line[ii]= qbline[ii];
+        for (ii= 0; ii < qbline.size(); ++ii) line[ii]= qbline[ii];
         line[ii]= '\0';
         //line= file.readLine(sizeof line);
         fgets_result=&line[0];
@@ -22487,7 +22487,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     }
     /* Remove ''s or ""s around the value, then strip lead or trail spaces. */
     token2= connect_stripper(token2, true);
-    token2_length= token2.count();
+    token2_length= token2.size();
     /* Convert escape sequences in the value \b backspace, \t tab, \n newline, \r carriage return, \\ \, \s space */
     token_for_value= "";
     for (i= 0; i < token2_length; ++i)
@@ -22534,7 +22534,7 @@ QString MainWindow::connect_stripper(QString value_to_strip, bool strip_doublets
   char c_grave_accent[2]; /* Grave Accent is the Unicode term for `. MySQL calls it backtick. */
 
   s= value_to_strip;
-  s_length= s.count();
+  s_length= s.size();
   if (s_length > 1)
   {
     c_singlequote[0]= 0x27; c_singlequote[1]= 0;
@@ -22546,14 +22546,14 @@ QString MainWindow::connect_stripper(QString value_to_strip, bool strip_doublets
     {
       QString strippable_char= s.mid(0, 1);                    /* strippable_char = " or ' or ` */
       s= s.mid(1, s_length - 2);
-      while ((s.count() > 0) && (s.mid(0, 1) == " "))
+      while ((s.size() > 0) && (s.mid(0, 1) == " "))
       {
-        s_length= s.count();
+        s_length= s.size();
         s= s.mid(1, s_length - 1);
       }
-      while ((s.count() > 0) && (s.mid(s.count() - 1, 1) == " "))
+      while ((s.size() > 0) && (s.mid(s.size() - 1, 1) == " "))
       {
-        s_length= s.count();
+        s_length= s.size();
         s= s.mid(0, s_length - 1);
       }
       if (strip_doublets_flag == true)
@@ -22593,7 +22593,7 @@ QString MainWindow::connect_unstripper(QString value_to_unstrip)
   QString c;
 
   s= "'";
-  for (int i= 0; i < value_to_unstrip.count(); ++i)
+  for (int i= 0; i < value_to_unstrip.size(); ++i)
   {
     c= value_to_unstrip.mid(i, 1);
     s.append(c);
@@ -22677,7 +22677,7 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
   unsigned int token0_length;
   char token0_as_utf8[80 + 1];
   unsigned short int is_enable;
-  token0_length= token0.count();
+  token0_length= token0.size();
   if (token0_length >= 64) return; /* no option name is ever longer than 80 bytes */
   strcpy(token0_as_utf8,token0.toUtf8());
   *(token0_as_utf8 + token0_length)= 0;
