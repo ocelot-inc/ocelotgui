@@ -119,6 +119,7 @@ typedef struct
 #define FLAG_VERSION_MARIADB_10_7   512
 #define FLAG_VERSION_MARIADB_10_9   512
 #define FLAG_VERSION_MARIADB_10_10  512
+#define FLAG_VERSION_MARIADB_10_11  512
 #define FLAG_VERSION_MARIADB_ALL    (16 | 32 | 64 | 128 | 256 | 512)
 #define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (1 | 2 | 4 | 8 | 16 | 32 | 64 | 128 | 256 | 512)
 #define FLAG_VERSION_TARANTOOL      1024
@@ -571,6 +572,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_INDEXED,
     TOKEN_KEYWORD_INDEX_INFO,
     TOKEN_KEYWORD_INDEX_LIST,
+    TOKEN_KEYWORD_INET4,
     TOKEN_KEYWORD_INET6_ATON,
     TOKEN_KEYWORD_INET6_NTOA,
     TOKEN_KEYWORD_INET_ATON,
@@ -755,6 +757,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_NAMES,
     TOKEN_KEYWORD_NAME_CONST,
     TOKEN_KEYWORD_NATURAL,
+    TOKEN_KEYWORD_NATURAL_SORT_KEY,
     TOKEN_KEYWORD_NCHAR,
         TOKEN_KEYWORD_NET_BUFFER_LENGTH,
     TOKEN_KEYWORD_NEWLINE,
@@ -1098,6 +1101,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SET,
     TOKEN_KEYWORD_SETVAL,
     TOKEN_KEYWORD_SET_USER_ID,
+    TOKEN_KEYWORD_SFORMAT,
     TOKEN_KEYWORD_SHA,
     TOKEN_KEYWORD_SHA1,
     TOKEN_KEYWORD_SHA2,
@@ -1470,7 +1474,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1214
+#define KEYWORD_LIST_SIZE 1217
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1852,6 +1856,7 @@ static const keywords strvalues[]=
       {"INDEXED", 0, 0, TOKEN_KEYWORD_INDEXED},
       {"INDEX_INFO", 0, 0, TOKEN_KEYWORD_INDEX_INFO},
       {"INDEX_LIST", 0, 0, TOKEN_KEYWORD_INDEX_LIST},
+      {"INET4", 0, 0, TOKEN_KEYWORD_INET4}, /* MariaDB 10.11 */
       {"INET6_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_ATON},
       {"INET6_NTOA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_NTOA},
       {"INET_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET_ATON},
@@ -2036,6 +2041,7 @@ static const keywords strvalues[]=
       {"NAMES", 0, 0, TOKEN_KEYWORD_NAMES},
       {"NAME_CONST", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_NAME_CONST},
       {"NATURAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_NATURAL},
+      {"NATURAL_SORT_KEY", 0, FLAG_VERSION_MARIADB_10_11, TOKEN_KEYWORD_NATURAL_SORT_KEY},
       {"NCHAR", 0, 0, TOKEN_KEYWORD_NCHAR},
         {"NET_BUFFER_LENGTH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_NET_BUFFER_LENGTH},
       {"NEWLINE", 0, 0, TOKEN_KEYWORD_NEWLINE}, /* for format rule */
@@ -2381,6 +2387,7 @@ static const keywords strvalues[]=
       {"SET", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SET},
       {"SETVAL", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_SETVAL},
           {"SET_USER_ID", 0, 0, TOKEN_KEYWORD_SET_USER_ID},
+      {"SFORMAT", 0, FLAG_VERSION_MARIADB_10_11, TOKEN_KEYWORD_SFORMAT},
       {"SHA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA},
       {"SHA1", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA1},
       {"SHA2", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SHA2},

@@ -4023,13 +4023,15 @@ int MainWindow::hparse_f_data_type(int context)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECIMAL, "DEC") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECIMAL, "DECIMAL") == 1)
      || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DOUBLE, "DOUBLE") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MARIADB_10_11, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INET4, "INET4") == 1)
      || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INT") == 1)
      || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INTEGER") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JSON, "JSON") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NCHAR, "NCHAR") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SIGNED, "SIGNED") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TIME, "TIME") == 1)
-     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNSIGNED, "UNSIGNED") == 1))
+     || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNSIGNED, "UNSIGNED") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MARIADB_10_11, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UUID, "UUID") == 1))
     {
       int k= main_token_types[hparse_i_of_last_accepted];
       main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
@@ -4472,6 +4474,12 @@ int MainWindow::hparse_f_data_type(int context)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_UUID;
+  }
+
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_10_11, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INET4") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+    return TOKEN_KEYWORD_INET4;
   }
 
   /*
