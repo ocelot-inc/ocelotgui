@@ -914,8 +914,9 @@ Option Files: The ocelotgui program will look in these option files:
 /etc/my.cnf, /etc/mysql/my.cnf, [SYSCONFDIR]/my.cnf,
 [defaults-extra-file], $HOME/.my.cnf, $HOME/.mylogin.cnf.
 Within option files, the ocelotgui program will look
-in these groups: [client] [mysql] [ocelot], as well
-as groups specified by MYSQL_GROUP_SUFFIX.
+in these groups: [client], [mysql], [client-server], [ocelot],
+as well as [client-mariadb] if --ocelot_dbms=mariadb is specified,
+as well as groups with those names plus suffix X if --default_groups_suffix=X is specified.
 On Windows, the order is different: %system, %windir,
 [application-directory], %MYSQL_HOME%, [defaults-extra-file].
 <br><br>

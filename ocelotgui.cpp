@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: March 10 2023
+   Last modified: March 14 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -22211,18 +22211,35 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
   }
 }
 
-
 /* todo: check if we've already looked at the file (this is possible if !include or !includedir happens)
          if so, skip */
 /* todo: this might be okay for a Linux file that ends lines with \n, but what about Windows? */
 /*
-  Re MariaDB-specific groups [client-server] and [client-mariadb]:
-  The problem is that we don't know for sure we're connecting to a MariaB server until after we connect.
-  For [client-server] I'm going to assume that anything in the group is probably valid for a MySQL server too.
-  For [client-mariadb] we could depend on hints e.g. we actually opened mariadb.cnf file when asking for my.cnf,
-  or we saw [client-server], or we saw the comment line "# The MariaDB configuration file", or the link is to
-  a mariadb library,  but none of those things are certain proofs. Decision was: [client-mariadb] only matters
-  when earlier we saw a setting ocelot_dbms=%mariadb% via cmake . -DDEFAULT_OPTION | command-line | .cfg file.
+  Re groups:
+    The MySQL mysql client looks for [client] and [mysql].
+    The MariaDB mysql client looks for [client] and [mysql] and [client-server] and [mariadb-client].
+    Re MariaDB-specific groups [client-server] and [client-mariadb]:
+    The problem is that we don't know for sure we're connecting to a MariaB server until after we connect.
+    For [client-server] I'm going to assume that anything in the group is probably valid for a MySQL server too.
+    For [client-mariadb] we could depend on hints e.g. we actually opened mariadb.cnf file when asking for my.cnf,
+    or we saw [client-server], or we saw the comment line "# The MariaDB configuration file", or the link is to
+    a mariadb library,  but none of those things are certain proofs. Decision was: [client-mariadb] only matters
+    when earlier we saw a setting ocelot_dbms=%mariadb% via cmake . -DDEFAULT_OPTION | command-line or on
+    command line i.e. --ocelot_dbms=mariadb or earlier in .cnf file.
+    Therefore ...
+    We look for [client] and [mysql] and [client-server] always i.e. even if ocelot_dbms=tarantool.
+    (There is no specific [tarantool] or [tarantool-client] group.)
+    We also look for [client-mariadb] iff ocelot_dbms=mariadb has been specified.
+    We allow cnf files to contain ocelot_dbms= and defaults_group_suffix= so anything after will depend on
+    those settings, therefore the order of file reading matters, and therefore the print should say
+    "(final settings)" which can be understood as "dbms or group suffix may have changed during my.cnf reading".
+    The initial assumption is mysql but see CMakeLists.txt comment re
+    cmake . -DDEFAULT_OPTION="--ocelot_dbms=mariadb".
+    Groups can also have a suffix due to MYSQL_GROUP_SUFFIX or --defaults-group-suffix or .cnf.
+    So if "ocelotgui" should be a group just say suffix is gui.
+    We get a list of readable groups via my_cnf_groups_list() based on these comments.
+    Todo: It would be faster to call my_cnf_groups_list() only at start or when we change dbms or suffix.
+    Todo: mysql client sees [] as an ignorable group, we don't see it at all, though I guess it's undocumented.
 */
 void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 {
@@ -22468,22 +22485,15 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     }
     else
     {
-      /* Skip if it's not one of the groups that we care about i.e. client or mysql or ocelot */
-      /* Todo: Consider: should our group be "ocelot", "ocelotgui", or both? */
-      bool is_client_mariadb= false;
-      if (QString::compare(group, "client-mariadb", Qt::CaseInsensitive) == 0)
+      /* Skip if it's not one of the groups that we care about, see comments preceding this function. */
+      /* QStringList::contains() or QStringList::indexOf() would work but require newish Qt versions. */
+      QStringList qs= my_cnf_groups_list();
+      bool is_match= false;
+      for (int i_in_group= 0; i_in_group < qs.size(); ++i_in_group)
       {
-        if (ocelot_dbms.contains("mariadb", Qt::CaseInsensitive) == true) is_client_mariadb= true;
+        if (QString::compare(group, qs.at(i_in_group), Qt::CaseInsensitive) == 0) is_match= true;
       }
-      if ((QString::compare(group, "client", Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "client-server", Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "mysql", Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "ocelot", Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "client" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "client-server" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "mysql" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
-      &&  (QString::compare(group, "ocelot" + ocelot_defaults_group_suffix, Qt::CaseInsensitive) != 0)
-      &&  (is_client_mariadb == false)) continue;
+      if (is_match == false) continue;
     }
     /* Remove ''s or ""s around the value, then strip lead or trail spaces. */
     token2= connect_stripper(token2, true);
@@ -22513,6 +22523,27 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
   //fclose(file);
 }
 
+/* Called by connect_read_my_cnf() + print_help(). See comments preceding connect_read_my_cnf(). */
+QStringList MainWindow::my_cnf_groups_list()
+{
+  QStringList qs;
+  qs.clear();
+  qs.append("client");
+  qs.append("mysql");
+  qs.append("client-server");
+  if (ocelot_dbms.contains("mariadb", Qt::CaseInsensitive) == true) qs.append("client-mariadb");
+  qs.append("ocelot");
+  if (ocelot_defaults_group_suffix > "")
+  {
+    int qs_size=qs.size();
+    for (int i= 0; i < qs_size; ++i)
+    {
+      QString s= qs.at(i);
+      qs.append(s + ocelot_defaults_group_suffix);
+    }
+  }
+  return qs;
+}
 
 /*
   Remove ''s or ""s or ``s around a QString, then remove lead or trail spaces.
@@ -23672,7 +23703,13 @@ void MainWindow::print_help()
   printf("Options files that were actually read:\n");
   strcpy(output_string, options_files_read.toUtf8());
   printf("%s\n", output_string);
-  printf("Options files groups that ocelotgui looks for: client mysql ocelot\n");
+  {
+    printf("Options files groups that ocelotgui looks for (changeable depending on user choices):");
+    QStringList qs= my_cnf_groups_list();
+    char tmp_group[256];
+    for (int i= 0; i < qs.size(); ++i) {strcpy(tmp_group, qs.at(i).toUtf8()); printf(" %s", tmp_group); }
+    printf("\n");
+  }
   printf("Possible option values: same as possible option values for mysql client\n");
   printf("Option values after reading options files and command-line arguments:\n");
   printf("Option                            Value\n");

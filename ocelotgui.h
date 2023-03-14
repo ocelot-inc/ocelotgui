@@ -3870,6 +3870,7 @@ private:
   void connect_mysql_options_2(int w_argc, char *argv[]);
   void connect_read_command_line(int argc, char *argv[]);
   void connect_read_my_cnf(const char *file_name, int is_mylogin_cnf);
+  QStringList my_cnf_groups_list();
   int connect_readmylogin(QFile&, unsigned char *);
   //int connect_readmylogin(FILE *, unsigned char *);
   void connect_set_variable(QString token0, QString token1, QString token2);
