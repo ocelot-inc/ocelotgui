@@ -211,7 +211,7 @@ enum {                                        /* possible returns from token_typ
   TOKEN_KEYWORDS_START= TOKEN_TYPE_OTHER + 1,
   TOKEN_KEYWORD_QUESTIONMARK= TOKEN_KEYWORDS_START, /* ocelotgui keyword */
     TOKEN_KEYWORD_ABORT,
-        TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR,
+    TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR,
     TOKEN_KEYWORD_ABS,
     TOKEN_KEYWORD_ACCESSIBLE,
     TOKEN_KEYWORD_ACOS,
@@ -3879,6 +3879,7 @@ private:
   QString get_version();
   void print_version();
   void print_help();
+  void print_defaults();
   int setup_mysql_real_query(char*,char*);
   int setup_routine_list(QString);
   int setup_find(QString,QString);
@@ -5348,7 +5349,8 @@ enum ocelot_option
   OCELOT_OPTION_42=42,  /* in MySQL 5.7.11+, opt_ssl_mode */
   OCELOT_OPTION_5999=5999,  /*unused. In MariaDB, progress_callback */
   OCELOT_OPTION_6000=6000,  /* unused. In MariaDB, nonblock */
-  OCELOT_OPTION_6001=6001  /* unused. in MariaDB, thread_specific_memory */
+  OCELOT_OPTION_6001=6001, /* unused. in MariaDB, thread_specific_memory */
+  OCELOT_OPTION_7019=7019  /* unused, in MariaDB, found_rows */
 };
 
 #ifndef HEADER_AES_H

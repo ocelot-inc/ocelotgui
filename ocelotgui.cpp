@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: March 14 2023
+   Last modified: March 17 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -689,6 +689,12 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   if (ocelot_help != 0)                              /* e.g. if user said "ocelotgui --help" */
   {
     print_help();
+    exit(0);
+  }
+
+  if (ocelot_print_defaults != 0)                    /* e.g. if user said "ocelotgui --print_defaults" */
+  {
+    print_defaults();
     exit(0);
   }
   for (int q_i= 0; strcmp(string_languages[q_i]," ") > 0; ++q_i)
@@ -4633,6 +4639,7 @@ void MainWindow::action_connect()
 /*
   If we're connecting, action_connect() calls action_connect_once with arg = "File|Connect".
   If we're printing for --help, print_help calls action_connect_once with arg = "Print".
+  If we're printing for --print_defaults, print_defaults should do something similar.
   Todo:
   If user types OK and there's an error, repeat the dialog box with a new message e.g. "Connect failed ...".
   This is called from program-start!
@@ -23034,7 +23041,7 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     ocelot_port= to_long(token2);
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_PRINT_DEFAULTS) { ocelot_print_defaults= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_PRINT_DEFAULTS) {ocelot_print_defaults= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PROMPT) { ocelot_prompt= token2; ocelot_prompt_is_default= false; return; }
   if (keyword_index == TOKEN_KEYWORD_PROTOCOL)
   {
@@ -23710,6 +23717,12 @@ void MainWindow::print_help()
     for (int i= 0; i < qs.size(); ++i) {strcpy(tmp_group, qs.at(i).toUtf8()); printf(" %s", tmp_group); }
     printf("\n");
   }
+  print_defaults();
+}
+
+/* --print_defaults */
+void MainWindow::print_defaults()
+{
   printf("Possible option values: same as possible option values for mysql client\n");
   printf("Option values after reading options files and command-line arguments:\n");
   printf("Option                            Value\n");
