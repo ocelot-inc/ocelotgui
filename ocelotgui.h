@@ -47,6 +47,11 @@
 #define OCELOT_ERDIAGRAM 1
 #endif
 
+/* To remove most of the code related to erdiagram, #define OCELOT_CHART 0 */
+#ifndef OCELOT_CHART
+#define OCELOT_CHART 1
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -259,6 +264,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_AVG,
     TOKEN_KEYWORD_BACKGROUND,
     TOKEN_KEYWORD_BACKUP_ADMIN,
+    TOKEN_KEYWORD_BAR,
     TOKEN_KEYWORD_BATCH,
     TOKEN_KEYWORD_BECOMES,
     TOKEN_KEYWORD_BEFORE,
@@ -308,6 +314,7 @@ enum {                                        /* possible returns from token_typ
 
 
     TOKEN_KEYWORD_CHARSET,
+    TOKEN_KEYWORD_CHART,
     TOKEN_KEYWORD_CHAR_LENGTH,
     TOKEN_KEYWORD_CHECK,
     TOKEN_KEYWORD_CLEAR,
@@ -663,6 +670,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_LEVEL,
     TOKEN_KEYWORD_LIKE,
     TOKEN_KEYWORD_LIMIT,
+    TOKEN_KEYWORD_LINE,
     TOKEN_KEYWORD_LINEAR,
     TOKEN_KEYWORD_LINEFROMTEXT,
     TOKEN_KEYWORD_LINEFROMWKB,
@@ -877,6 +885,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_QUERY,
     TOKEN_KEYWORD_OCELOT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR,
@@ -896,9 +905,11 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO,
@@ -980,6 +991,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_PERSIST_ONLY,
     TOKEN_KEYWORD_PERSIST_RO_VARIABLES_ADMIN,
     TOKEN_KEYWORD_PI,
+    TOKEN_KEYWORD_PIE,
     TOKEN_KEYWORD_PIPE,
     TOKEN_KEYWORD_PLAN,
         TOKEN_KEYWORD_PLUGIN_DIR,
@@ -1474,7 +1486,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1217
+#define KEYWORD_LIST_SIZE 1224
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -1549,6 +1561,7 @@ static const keywords strvalues[]=
       {"AVG", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_AVG},
       {"BACKGROUND", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BACKGROUND},
           {"BACKUP_ADMIN", 0, 0, TOKEN_KEYWORD_BACKUP_ADMIN},
+      {"BAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BAR},
         {"BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_BATCH},
     {"BECOMES", 0, 0, TOKEN_KEYWORD_BECOMES},  /* for format rule */
       {"BEFORE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_BEFORE},
@@ -1595,6 +1608,7 @@ static const keywords strvalues[]=
       {"CHARACTER_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARACTER_LENGTH},
         {"CHARACTER_SETS_DIR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_CHARACTER_SETS_DIR},
       {"CHARSET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHARSET},  /* + ocelotgui keyword */
+      {"CHART", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_CHART},
       {"CHAR_LENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CHAR_LENGTH},
       {"CHECK", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CHECK},
       {"CLEAR", 0, 0, TOKEN_KEYWORD_CLEAR}, /* ocelotgui keyword */
@@ -1947,6 +1961,7 @@ static const keywords strvalues[]=
       {"LEVEL", 0, 0, TOKEN_KEYWORD_LEVEL},
       {"LIKE", FLAG_VERSION_ALL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_LIKE},
       {"LIMIT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LIMIT},
+      {"LINE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_LINE},
       {"LINEAR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_LINEAR},
       {"LINEFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINEFROMTEXT}, /* deprecated in MySQL 5.7.6 */
       {"LINEFROMWKB", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LINEFROMWKB}, /* deprecated in MySQL 5.7.6 */
@@ -2162,6 +2177,7 @@ static const keywords strvalues[]=
     {"OCELOT_QUERY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_QUERY},
     {"OCELOT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_RAW},
     {"OCELOT_SHORTCUT_AUTOCOMPLETE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
+    {"OCELOT_SHORTCUT_BAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR},
     {"OCELOT_SHORTCUT_BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
     {"OCELOT_SHORTCUT_BREAKPOINT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
     {"OCELOT_SHORTCUT_CLEAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR},
@@ -2181,9 +2197,11 @@ static const keywords strvalues[]=
     {"OCELOT_SHORTCUT_HTMLRAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW},
     {"OCELOT_SHORTCUT_INFORMATION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION},
     {"OCELOT_SHORTCUT_KILL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL},
+    {"OCELOT_SHORTCUT_LINE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE},
     {"OCELOT_SHORTCUT_NEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT},
     {"OCELOT_SHORTCUT_NEXT_WINDOW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW},
     {"OCELOT_SHORTCUT_PASTE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE},
+    {"OCELOT_SHORTCUT_PIE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE},
     {"OCELOT_SHORTCUT_PREVIOUS_WINDOW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW},
     {"OCELOT_SHORTCUT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW},
     {"OCELOT_SHORTCUT_REDO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO},
@@ -2266,6 +2284,7 @@ static const keywords strvalues[]=
     {"PERSIST_ONLY", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_PERSIST_ONLY},
           {"PERSIST_RO_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_PERSIST_RO_VARIABLES_ADMIN},
       {"PI", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_PI},
+      {"PIE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PIE},
         {"PIPE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PIPE},
       {"PLAN", 0, 0, TOKEN_KEYWORD_PLAN},
         {"PLUGIN_DIR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PLUGIN_DIR},
@@ -3141,6 +3160,9 @@ class Result_changes;
 class Small_dialog_box;
 class Context_menu;
 #endif
+#if (OCELOT_CHART == 1)
+class Chart;
+#endif
 
 QT_END_NAMESPACE
 
@@ -3744,10 +3766,13 @@ public slots:
   void action_option_next_window();
   void action_option_previous_window();
   void action_option_change_result_display(QString);
+  void action_option_bar();
   void action_option_batch();
   void action_option_horizontal();
   void action_option_html();
   void action_option_htmlraw();
+  void action_option_line();
+  void action_option_pie();
   void action_option_raw();
   void action_option_vertical();
   void action_option_xml();
@@ -3923,7 +3948,6 @@ private:
 public:
   void make_style_strings();
   void make_one_style_string(QString *style_string, QString text_color, QString background_color, QString border_size, QString border_color, QString font_family, QString font_size, QString font_style, QString font_weight, bool is_menu);
-
 private:
   //void create_the_manual_widget();
   int get_next_statement_in_string(int passed_main_token_number, int *returned_begin_count, bool);
@@ -4095,10 +4119,13 @@ public:
     QAction *menu_options_action_option_detach_statement_widget;
     QAction *menu_options_action_next_window;
     QAction *menu_options_action_previous_window;
+    QAction *menu_options_action_bar;
     QAction *menu_options_action_batch;
     QAction *menu_options_action_horizontal;
     QAction *menu_options_action_html;
     QAction *menu_options_action_htmlraw;
+    QAction *menu_options_action_line;
+    QAction *menu_options_action_pie;
     QAction *menu_options_action_raw;
     QAction *menu_options_action_vertical;
     QAction *menu_options_action_xml;
@@ -4194,9 +4221,12 @@ private:
   QKeySequence ocelot_shortcut_next_window_keysequence;
   QKeySequence ocelot_shortcut_previous_window_keysequence;
   QKeySequence ocelot_shortcut_batch_keysequence;
+  QKeySequence ocelot_shortcut_bar_keysequence;
   QKeySequence ocelot_shortcut_horizontal_keysequence;
   QKeySequence ocelot_shortcut_html_keysequence;
   QKeySequence ocelot_shortcut_htmlraw_keysequence;
+  QKeySequence ocelot_shortcut_line_keysequence;
+  QKeySequence ocelot_shortcut_pie_keysequence;
   QKeySequence ocelot_shortcut_raw_keysequence;
   QKeySequence ocelot_shortcut_vertical_keysequence;
   QKeySequence ocelot_shortcut_xml_keysequence;
@@ -6658,6 +6688,207 @@ Result_qtextedit(ResultGrid *m)
 };
 #endif
 
+/*****************************************************************************************************************************/
+/* THE CHART WIDGET */
+
+#if (OCELOT_CHART == 1)
+#ifndef CHART_H
+#define CHART_H
+/*
+  CHART
+  It is a visible widget (not a dialog box).
+  Intercept display() in result grid if user picks bar|line|pie in Options menu or via shortcut.
+  Upon init, we call move() and resize() so it is on top of the result grid widget
+  Todo: Catch resize event
+  Todo: Catch detach
+  Todo: bar: allow horizontal. stack multiple columns vertical not side-by-side.
+  Todo: pie: do something with negatives. maybe only doughnut chart can handle properly. try saying = NULL.
+  Todo: bar|line: don't assume base is 0
+  Todo: line: Line chart could be like what we see on github.
+  Todo: this won't solve EXPORT, because the exporting will still be of the normal result grid
+        requires render() or grab()
+        Actually if we are thinking of shipping to a browser we'd probably need render() or grab() for that too
+  Todo: some way to be permanent and to repeat, so continuous monitoring becomes easy
+        e.g. SET ocelot_pie=1 (compare SET ocelot_html=1)
+  Todo: TOKEN_KEYWORD_BAR|LINE|PIE -- obsolete, never used.
+  Todo: Separate statement =  [REFRESH n TIMES EVERY n SECONDS] default is 1 TIMES EVERY 60 SECONDS.
+        Refreshing can be stopped by clicking OK or in extreme cases clicking Kill.
+        The query is only stored in history once and history does not have results.
+        If [REPEAT n] we replace completely, i.e. we don't shift|rotate the items. This is "monitoring".
+        Or "performance dashboard".
+  Todo: more general way to check if data type is string or number
+  Todo: add chart choices in grid settings menu, or make a chart settings menu
+  * #include <QtCharts> would have been great but might not be installed
+    and it is GPLv3 https://doc.qt.io/qt-5/qtcharts-index.html#licenses and ocelotgui is GPLv2.
+    See illustrations at https://doc.qt.io/qt-6/qtcharts-overview.html
+  * Expect that every row has at least one numeric column. (Todo: Make sure you're checking correctly.)
+    Usually there are also string columns, which we prefer for headings, but column names are okay.
+    So we can recognize these formats:
+      string-value, number-value [, number-value ...] or
+      string-value, number-value [, string-value, number-value ...] or
+      number-value [, number-value ...]
+    Try to handle all formats by saying: initially header=column-name but change it if you see string-value
+    #define CHART_MAX_VALUES 3 which is the same as max lines | max bars (ignore if more) (user supplied?)
+    I guess we could have a different heading line for each column, and heading colour = line colour.
+  * Flaw: not background.
+  * Suppose we have two rows:
+    "A",1,2,3
+    "A",2,NULL,4
+    Then we want
+             |
+        |    |
+       ||  | |
+      |||  | |
+      ---  ---
+      A    A
+    ... which could even be done in ASCII.
+    ... and the first item doesn't need to be CHAR/VARCHAR. However, if it's an image, yucko.
+  * Line width = ocelot_grid_cell_border_size. Bar width = width of a column in current (grid) font.
+    Line or bar colour = from the palette.
+    When a row has more than one column, there are multiple lines|bars with different colours.
+    But later lines can overwrite earlier lines.
+  * #define CHART_MAX_ROWS 10 (if more they're ignored) (but this might not be the default)
+    Recommend that SELECTs have LIMIT clauses, but anyway huge horizontal charts won't work.
+  * Todo: tooltip on a bar or line shows exact amount and column name.
+  * Maybe in theory we could do this as an advance setting for a second result-set grid.
+  * The result grid has what we want.
+    Or maybe this overlays result grid, i.e. has the same rect, but then detaching has to work better
+    Unfortunately when you're calling a procedure you don't know what the comments were.
+  * Todo: distinguishing for null, inf, nan -- maybe setAutoFillBackground() would help for bars?
+  * Todo: When numbers are negative, okay, but bars for positives shouldn't go past the 0 point.
+    And for pies, we could show abs(n), or invent a doughnut chart type, but we'e just saying = 0.
+  * Calculating bar heights
+    Range = Maximum value - Minimum Value
+            but if both < 0 then it's 0 - Minimum Value
+            but if both > 0 then it's Maximum Value - 0
+            (that means 0 is the base but maybe we should let user specify base?)
+    Minimum Pixels = Character height. (though maybe ocelot_grid_cell_height would be better?)
+    Maximum Pixels = ocelot_grid_height, or if that is 0 then (erd_mainwindow->height - size of "OK" button etc.)
+                     (though maybe result grid height would be better?)
+    Shrink_or_expand = Maximum Pixels / Maximum Value
+                       e.g. if Maximum Pixels = 100 and Maximum Value = 1000 then shrink_or_expand = 0.1,
+                       If Maximum Pixels = 1000 and Maximum Value = 100 then Shink = 10.
+                       Earlier I said "If Shrink_or_expand > 0 then Shrink)or_expand = 1", dunno why.
+    Multiply all heights * Maximum Pixels, then multiply * shrink_or_expand
+    Examples of heights:
+    Column Value   After * MIN     AFTER * SHRINK
+    1, 2, 3        10, 20, 30      10, 20, 30
+    1, 10000       10, 100000      0, 100
+  * Todo: After set ocelot_grid_background_color='greenyellow'; then display, I see it could be higher.
+    But I have to watch out for horizontal scroll bar.
+    In Chart() the resize() is for rg-width+rg-height, in cha() the resize() is for maximum-used+rg-height,
+    so we are not expecting vertical scroll bar to appear unless rg is very small but horizontal might appear.
+  * Todo: After set ocelot_grid_cell_border_size=8; notice that column values (max_pixels?) doesn't fit well
+  * Todo: A maximum column name width in characters might be okay, at least with #define
+  * Todo: I think a 10-row maximum is too small, changed to CHART_MAX_ROWS 50
+  * Todo: Check what happens if font is huge and widget is tiny
+  * Todo: We are doing nothing about font-change/colour-change/size-change.
+    It looks bizarre if we detach, but we'll pretend that's a feature, one can re-attach.
+    It means that minimize/maximize will cause normal resultgrid to appear, without destroying Chart,
+    although it will get destroyed by the next select.
+*/
+
+class cha: public QWidget
+{
+  Q_OBJECT
+
+#define CHART_MARGIN_X 2
+#define CHART_MARGIN_Y 2
+#define CHART_MAX_ROWS 50
+#define CHART_MAX_COLUMNS 3
+
+public:
+cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type);
+private:
+Chart *cha_chart;
+MainWindow *cha_mainwindow;
+
+unsigned int cha_result_column_count; /* Todo: check: why isn't this long unsigned int? */
+unsigned int cha_result_row_count;
+//char *cha_result_set_copy;       /* gets a copy of mysql_res contents, if necessary */
+char **cha_result_set_copy_rows; /* dynamic-sized list of result_set_copy row offsets, if necessary */
+char *cha_result_field_names;
+
+int cha_type; /* TOKEN_KEYWORD_BAR etc. */
+QFont cha_default_font;
+QColor cha_default_text_color, cha_default_header_background_color, cha_default_detail_background_color;
+int cha_default_container_pen_width;
+QPen cha_default_container_pen, cha_default_text_pen;
+QBrush cha_default_header_brush, cha_default_detail_brush;
+char cha_color_palette[16][16];
+int cha_color_palette_count;
+double cha_max_pixels;
+ResultGrid *cha_rg;
+
+QStringList cha_texts[CHART_MAX_COLUMNS];
+QList<double> cha_column_values[CHART_MAX_COLUMNS];
+QList<double> cha_heights[CHART_MAX_COLUMNS];
+int cha_numeric_column_count;
+int cha_max_column_width, cha_max_column_height;
+double cha_max_column_value;
+double cha_min_column_value;
+int cha_bar_width;
+int cha_chart_column_plus_margin_width;
+int cha_left_width;
+int cha_x;
+QString cha_max_column_value_as_utf8;
+
+void default_settings_all();
+void cha_setup();
+unsigned short int cha_result_data_type(unsigned short int field_data_type);
+void cha_draw(QPainter* painter);
+void set_color_palette();
+void cha_draw_text_prepare(QPainter *painter,
+               int column_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
+               QString content,     /* table_name | column_name */
+               int row_number,
+               int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
+               int text_lines,
+               int numeric_column_count);
+void paintEvent(QPaintEvent *event);
+void resizeEvent(QResizeEvent *event);
+void moveEvent(QMoveEvent *event);
+void mouseMoveEvent(QMouseEvent *even);
+
+~cha()
+{
+  ; /* should occur whenever Chart is deleted e.g. due to garbage collect or quit */
+  printf("**** ~cha\n");
+}
+
+};
+
+class Chart: public QWidget
+{
+  Q_OBJECT
+
+private:
+MainWindow *chart_mainwindow;
+public:
+int chart_width, chart_height;
+Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type);
+void chart_resize();
+void resizeEvent(QResizeEvent *event);
+void moveEvent(QMoveEvent *event);
+void mouseMoveEvent(QMouseEvent *even);
+
+~Chart()
+{
+  ; /* should occur e.g. due to garbage collect or quit */
+  printf("**** ~Chart\n");
+}
+
+//void paintEvent(QPaintEvent *event)
+//{
+//  (void) event;
+//  printf("**** Chart paintEvent\n");
+//}
+
+};
+
+#endif
+#endif //#if (OCELOT_CHART == 1)
+
 /*********************************************************************************************************/
 
 /* THE GRID WIDGET */
@@ -6859,6 +7090,9 @@ public:
   int result_grid_vertical_width_of_value;
 
   int focus_result_row_number, focus_column_number;
+#if (OCELOT_CHART == 1)
+  Chart *chart_widget;
+#endif
 
 /* How many rows can fit on the screen? Take a guess for initialization. */
 #define RESULT_GRID_WIDGET_INITIAL_HEIGHT 10
@@ -6942,7 +7176,9 @@ ResultGrid(
     batch_text_edit= NULL;
     return;
   }
-
+#if (OCELOT_CHART == 1)
+  chart_widget= NULL;
+#endif
 
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
@@ -7709,7 +7945,10 @@ void display(int due_to,
              unsigned short int ocelot_html,
              unsigned short int ocelot_raw,
              unsigned short int ocelot_xml,
-             unsigned short ocelot_result_grid_column_names)
+             unsigned short ocelot_result_grid_column_names,
+             unsigned short int ocelot_bar,
+             unsigned short int ocelot_line,
+             unsigned short int ocelot_pie)
 {
   (void)due_to;
 #ifdef OLD_STUFF
@@ -7717,7 +7956,21 @@ void display(int due_to,
   hide();
 #endif
 //  if ((due_to == 0) || (due_to == 1))
+
   {
+#if (OCELOT_CHART == 1)
+    if ((ocelot_bar == 1) || (ocelot_line == 1) || (ocelot_pie == 1))
+    {
+      if (chart_widget != NULL) { delete chart_widget; chart_widget= NULL; } /* as in display_garbage_collect */
+      int chart_type;
+      if (ocelot_bar == 1) chart_type= TOKEN_KEYWORD_BAR;
+      if (ocelot_line == 1) chart_type= TOKEN_KEYWORD_LINE;
+      if (ocelot_pie == 1) chart_type= TOKEN_KEYWORD_PIE;
+      chart_widget= new Chart(copy_of_parent, this, chart_type);
+      chart_widget->show();
+      return;
+    }
+#endif
     display_garbage_collect(false);
     copy_result_to_gridx();
     /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
@@ -11648,7 +11901,7 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
     result_grid_widget_max_height_in_lines= max_height_in_lines;
     if (result_set_copy != 0)  /* see fillup_garbage_collect() comment */
     {
-      display(2, 0, 0, 0, 0, 0, 0);
+      display(2, 0, 0, 0, 0, 0, 0, 0, 0, 0);
       this->show(); /* Todo: I think this is not necessary */
     }
   }
@@ -11762,7 +12015,6 @@ bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
   {
     return false;
   }
-
   new_value= grid_vertical_scroll_bar->value();
 
   if (new_value != grid_vertical_scroll_bar_value)
@@ -11912,6 +12164,9 @@ void display_garbage_collect(bool is_final)
 {
 #if (OCELOT_EXPLORER == 1)
   if (is_final == false) assert(result_grid_type != EXPLORER_WIDGET);
+#endif
+#if (OCELOT_CHART == 1)
+  if (chart_widget != NULL) { delete chart_widget; chart_widget= NULL; }
 #endif
   if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
@@ -12611,7 +12866,11 @@ private:
             (c) maybe we don't need to do the shift and exchange at the end
   Todo: Unfortunately changing font size won't affect setWindowTitle(), at least on Linux.
         Maybe I could hide the title and put in a (disabled) button but that would lack the Windows decoration.
+  Todo: I never see ~erd or ~ERDiagram
+        See https://stackoverflow.com/questions/47760937/call-destructor-when-closing-qdialog-started-from-q
+        See https://www.qtcentre.org/threads/21035-Destructor-not-being-called
 */
+
 
 class ERDiagram;
 
@@ -12689,11 +12948,12 @@ QString erd_query;
 int erd_token_offsets[1000]; /* todo: this should be dynamic, table list could have > 1000 tokens */
 int erd_token_lengths[1000];
 
+
 /*
   Set default fonts and colours based on grid settings.
   Also set table rectangles for use by draw_table() during paintEvent.
 */
-void default_settings()
+void default_settings_all()
 {
   {
     QPalette p= QPalette();
@@ -12721,7 +12981,10 @@ void default_settings()
   int w_width= fm.boundingRect("W").width();
   erd_default_mark_length= w_width * erd_default_container_pen_width;
   erd_default_space_between_rects= erd_default_mark_length * 3 + w_width;
+}
 
+void default_settings_erdiagram()
+{
   /* A bit of "parsing" if non-default options. We haven't called tokens_to_keywords. */
   erd_is_lines_in_background= false;
   erd_is_primary= false;
@@ -13220,7 +13483,7 @@ void fill_tables()
 
 public:
 
-/* Todo: maybe merge this with ERDiagram */
+/* Todo: maybe merge this with ERDiagram ... but no I guess it has to be within scroll area */
 erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query)
 {
   erd_relations= NULL; /* because in ~erd() we don't want delete if e.g. we created nothing for empty schema */
@@ -13234,7 +13497,8 @@ erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_s
            erd_query.size(),
            &erd_token_lengths[0], &erd_token_offsets[0], 1000 - 1,
           (QChar*)"33333", 2, "", 1);
-  default_settings();
+  default_settings_all();
+  default_settings_erdiagram();
   setMouseTracking(true); /* maybe */
 }
 
@@ -13847,7 +14111,7 @@ void draw_table(QPainter *painter, int table_number)
                                fm.boundingRect(table_name).height());
     painter->drawRect(qr); /* draw rect with header background color */
     painter->setPen(erd_default_text_pen);
-    draw_text_prepare(painter, table_number, table_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_table);
+    erd_draw_text_prepare(painter, table_number, table_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_table);
 
     painter->drawText(qr_of_table, Qt::AlignLeft, table_name);
     y+= rect_table_name_height - erd_default_container_pen_width;
@@ -13886,7 +14150,7 @@ void draw_table(QPainter *painter, int table_number)
                               y + ERD_MARGIN_Y,
                               column_name_width,
                               column_name_height);
-    draw_text_prepare(painter, table_number, column_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_column);
+    erd_draw_text_prepare(painter, table_number, column_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_column);
     painter->drawText(qr_of_column, Qt::AlignLeft, column_name);
     y+= column_name_height + ERD_MARGIN_Y;
     ++column_name_count;
@@ -13899,7 +14163,7 @@ void draw_table(QPainter *painter, int table_number)
 /* Possible pen and brush change due to grid conditional */
 /* Todo: conditional with column_number=2 gets column 1 */
 /* Todo: conditional with row_number=2 gets row 2 but I don't understand, shouldn't column_names affect it? */
-void draw_text_prepare(QPainter *painter,
+void erd_draw_text_prepare(QPainter *painter,
                int table_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
                QString content,     /* table_name | column_name */
                int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
@@ -14283,6 +14547,7 @@ QString tooltip_of_line(QPoint mouse_point) /* see comments for mouseMoveEvent()
 /* ?? Todo: Check if the deletes should actually be done with ~ERDiagram() */
 ~erd()
 {
+printf("**** ~erd\n");
   if (erd_relations != NULL) delete [] erd_relations;
   if (erd_tables != NULL) delete [] erd_tables;
 }
@@ -14302,6 +14567,7 @@ public:
 
 ERDiagram(MainWindow *parent_mainwindow, QString passed_schema_name, QString query)
 {
+printf("**** ERDiagram\n");
   erdiagram_mainwindow= parent_mainwindow;
   setWindowTitle("ERDIAGRAM OF " + passed_schema_name);
   /* I think setWidget() will give widget_erd a parent so we won't need to delete it later, i.e. no leak? */
@@ -14328,6 +14594,7 @@ ERDiagram(MainWindow *parent_mainwindow, QString passed_schema_name, QString que
 
 ~ERDiagram()
 {
+printf("**** ~ERDiagram\n");
   ;
 }
 
@@ -14935,7 +15202,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
     Change the assert in ocelotgui.cpp if MENU_FONT changes in ostrings.h.
   */
-  menu_strings_menu_font_copy= menu_strings[menu_off + 95];
+  menu_strings_menu_font_copy= menu_strings[menu_off + 98];
 
   int settings_width, settings_height;
 
@@ -16811,7 +17078,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER     7
-#define OCELOT_VARIABLES_SIZE 140
+#define OCELOT_VARIABLES_SIZE 143
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */

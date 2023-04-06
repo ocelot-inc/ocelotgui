@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: March 17 2023
+   Last modified: April 6 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -220,7 +220,7 @@
 #define STRING_LENGTH_512 512
 
 /* MAX_HPARSE_ERRMSG_LENGTH should be enough for all keywords that begin with "OCELOT_" */
-#define MAX_HPARSE_ERRMSG_LENGTH 4320
+#define MAX_HPARSE_ERRMSG_LENGTH 4330
 
 /* Connect arguments and options */
   static char* ocelot_host_as_utf8= 0;                  /* --host=s */
@@ -313,6 +313,10 @@
   static unsigned short ocelot_vertical= 0;               /* --vertical */
   static unsigned short ocelot_wait= 0;                   /* --wait ... actually this does nothing */
   static unsigned short ocelot_xml= 0;                    /* --xml */
+  static unsigned short ocelot_bar= 0;                    /* unused */
+  static unsigned short ocelot_line= 0;                   /* unused */
+  static unsigned short ocelot_pie= 0;                    /* unused */
+
 
   /*
     For MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS + --connect-expired-password.
@@ -367,10 +371,13 @@
   static char ocelot_shortcut_refresh_variables[80]= "default";
   static char ocelot_shortcut_refresh_call_stack[80]= "default";
 #endif
+  static char ocelot_shortcut_bar[80]= "default";
   static char ocelot_shortcut_batch[80]= "default";
   static char ocelot_shortcut_horizontal[80]= "default";
   static char ocelot_shortcut_html[80]= "default";
   static char ocelot_shortcut_htmlraw[80]= "default";
+  static char ocelot_shortcut_line[80]= "default";
+  static char ocelot_shortcut_pie[80]= "default";
   static char ocelot_shortcut_raw[80]= "default";
   static char ocelot_shortcut_vertical[80]= "default";
   static char ocelot_shortcut_xml[80]= "default";
@@ -707,7 +714,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
       menu_off= MENU_END * q_i;
     }
   }
-
   set_dbms_version_mask(ocelot_dbms, 0);
   for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
@@ -2225,11 +2231,14 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   }
   if (qk == ocelot_shortcut_next_window_keysequence){action_option_next_window(); return true; }
   if (qk == ocelot_shortcut_previous_window_keysequence){action_option_previous_window(); return true; }
+  if (qk == ocelot_shortcut_bar_keysequence){action_option_bar(); return true; }
   if (qk == ocelot_shortcut_batch_keysequence){action_option_batch(); return true; }
   if (qk == ocelot_shortcut_horizontal_keysequence){action_option_horizontal(); return true; }
   if (qk == ocelot_shortcut_html_keysequence){action_option_html(); return true; }
   if (qk == ocelot_shortcut_htmlraw_keysequence){action_option_htmlraw(); return true; }
   if (qk == ocelot_shortcut_raw_keysequence){action_option_raw(); return true; }
+  if (qk == ocelot_shortcut_line_keysequence){action_option_line(); return true; }
+  if (qk == ocelot_shortcut_pie_keysequence){action_option_pie(); return true; }
   if (qk == ocelot_shortcut_vertical_keysequence){action_option_vertical(); return true; }
   if (qk == ocelot_shortcut_xml_keysequence){action_option_xml(); return true; }
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -3240,10 +3249,13 @@ void MainWindow::create_menu()
 #endif
   menu_options_action_next_window= menu_options->addAction("");
   menu_options_action_previous_window= menu_options->addAction("");
+  menu_options_action_bar= menu_options->addAction("");
   menu_options_action_batch= menu_options->addAction("");
   menu_options_action_horizontal= menu_options->addAction("");
   menu_options_action_html= menu_options->addAction("");
   menu_options_action_htmlraw= menu_options->addAction("");
+  menu_options_action_line= menu_options->addAction("");
+  menu_options_action_pie= menu_options->addAction("");
   menu_options_action_raw= menu_options->addAction("");
   menu_options_action_vertical= menu_options->addAction("");
   menu_options_action_xml= menu_options->addAction("");
@@ -3403,6 +3415,9 @@ void MainWindow::fill_menu()
   menu_options_action_previous_window->setText(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
   connect(menu_options_action_previous_window, SIGNAL(triggered(bool)), this, SLOT(action_option_previous_window()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW, "", false, true);
+  menu_options_action_bar->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BAR]);
+  connect(menu_options_action_bar, SIGNAL(triggered(bool)), this, SLOT(action_option_bar()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR, "", false, true);
   menu_options_action_batch->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BATCH]);
   connect(menu_options_action_batch, SIGNAL(triggered(bool)), this, SLOT(action_option_batch()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH, "", false, true);
@@ -3415,6 +3430,12 @@ void MainWindow::fill_menu()
   menu_options_action_htmlraw->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW]);
   connect(menu_options_action_htmlraw, SIGNAL(triggered(bool)), this, SLOT(action_option_htmlraw()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW, "", false, true);
+  menu_options_action_line->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_LINE]);
+  connect(menu_options_action_line, SIGNAL(triggered(bool)), this, SLOT(action_option_line()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE, "", false, true);
+  menu_options_action_pie->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_PIE]);
+  connect(menu_options_action_pie, SIGNAL(triggered(bool)), this, SLOT(action_option_pie()));
+  shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE, "", false, true);
   menu_options_action_raw->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_RAW]);
   connect(menu_options_action_raw, SIGNAL(triggered(bool)), this, SLOT(action_option_raw()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW, "", false, true);
@@ -3802,19 +3823,6 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     }
     return 1;
   }
-  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW)
-  {
-    if (is_set) strcpy(ocelot_shortcut_next_window, source_as_utf8);
-    if (is_do)
-    {
-      if (strcmp(ocelot_shortcut_next_window, "default") == 0)
-        ocelot_shortcut_next_window_keysequence= QKeySequence::NextChild;
-      else
-        ocelot_shortcut_next_window_keysequence= QKeySequence(ocelot_shortcut_next_window);
-      menu_options_action_next_window->setShortcut(ocelot_shortcut_next_window_keysequence);
-    }
-    return 1;
-  }
   if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW)
   {
     if (is_set) strcpy(ocelot_shortcut_previous_window, source_as_utf8);
@@ -3828,7 +3836,19 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     }
     return 1;
   }
-
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR)
+  {
+    if (is_set) strcpy(ocelot_shortcut_bar, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_bar, "default") == 0)
+        ocelot_shortcut_bar_keysequence= QKeySequence("Alt+Shift+8");
+      else
+        ocelot_shortcut_bar_keysequence= QKeySequence(ocelot_shortcut_bar);
+      menu_options_action_bar->setShortcut(ocelot_shortcut_bar_keysequence);
+    }
+    return 1;
+  }
   if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH)
   {
     if (is_set) strcpy(ocelot_shortcut_batch, source_as_utf8);
@@ -3884,7 +3904,45 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     }
     return 1;
   }
-
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE)
+  {
+    if (is_set) strcpy(ocelot_shortcut_line, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_line, "default") == 0)
+        ocelot_shortcut_line_keysequence= QKeySequence("Alt+Shift+9");
+      else
+        ocelot_shortcut_line_keysequence= QKeySequence(ocelot_shortcut_line);
+      menu_options_action_line->setShortcut(ocelot_shortcut_line_keysequence);
+    }
+    return 1;
+  }
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW)
+  {
+    if (is_set) strcpy(ocelot_shortcut_next_window, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_next_window, "default") == 0)
+        ocelot_shortcut_next_window_keysequence= QKeySequence::NextChild;
+      else
+        ocelot_shortcut_next_window_keysequence= QKeySequence(ocelot_shortcut_next_window);
+      menu_options_action_next_window->setShortcut(ocelot_shortcut_next_window_keysequence);
+    }
+    return 1;
+  }
+  if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE)
+  {
+    if (is_set) strcpy(ocelot_shortcut_pie, source_as_utf8);
+    if (is_do)
+    {
+      if (strcmp(ocelot_shortcut_pie, "default") == 0)
+        ocelot_shortcut_pie_keysequence= QKeySequence("Alt+Shift+0");
+      else
+        ocelot_shortcut_autocomplete_keysequence= QKeySequence(ocelot_shortcut_pie);
+      menu_options_action_pie->setShortcut(ocelot_shortcut_pie_keysequence);
+    }
+    return 1;
+  }
   if (target == TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW)
   {
     if (is_set) strcpy(ocelot_shortcut_raw, source_as_utf8);
@@ -5581,8 +5639,11 @@ void MainWindow::action_option_change_result_display(QString next)
     rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(current_index));
     if ((rg != NULL) && (rg->isVisible()))
     {
+      unsigned short int new_ocelot_bar= 0;
       unsigned short int new_ocelot_batch= 0;
       unsigned short int new_ocelot_html= 0;
+      unsigned short int new_ocelot_line= 0;
+      unsigned short int new_ocelot_pie= 0;
       unsigned short int new_ocelot_raw= 0;
       unsigned short int new_ocelot_vertical= 0;
       unsigned short int new_ocelot_xml= 0;
@@ -5591,21 +5652,29 @@ void MainWindow::action_option_change_result_display(QString next)
       //unsigned short int old_ocelot_raw= rg->copy_of_ocelot_raw;
       //unsigned short int old_ocelot_vertical= rg->copy_of_ocelot_vertical;
       //unsigned short int old_ocelot_xml= rg->copy_of_ocelot_xml;
+      if (next == "bar") {new_ocelot_bar= 1; }
       if (next == "batch") {new_ocelot_batch= 1; }
       if (next == "horizontal") {;}
       if (next == "html") {new_ocelot_html= 1; }
       if (next == "htmlraw") {new_ocelot_html= 1; new_ocelot_raw= 1; }
+      if (next == "line") {new_ocelot_line= 1; }
+      if (next == "pie") {new_ocelot_pie= 1; }
       if (next == "raw") {new_ocelot_raw= 1; }
       if (next == "vertical") {new_ocelot_vertical= 1;  }
       if (next == "xml") {new_ocelot_xml= 1;  }
       rg->display(1,
                   new_ocelot_vertical,
-                  new_ocelot_batch, new_ocelot_html, new_ocelot_raw, new_ocelot_xml,
-                  ocelot_result_grid_column_names);
+                  new_ocelot_batch, new_ocelot_html,
+                  new_ocelot_raw, new_ocelot_xml,
+                  ocelot_result_grid_column_names, new_ocelot_bar, new_ocelot_line, new_ocelot_pie);
     }
   }
 }
 
+void MainWindow::action_option_bar()
+{
+  action_option_change_result_display("bar");
+}
 void MainWindow::action_option_batch()
 {
   action_option_change_result_display("batch");
@@ -5621,6 +5690,14 @@ void MainWindow::action_option_html()
 void MainWindow::action_option_htmlraw()
 {
       action_option_change_result_display("htmlraw");
+}
+void MainWindow::action_option_line()
+{
+  action_option_change_result_display("line");
+}
+void MainWindow::action_option_pie()
+{
+  action_option_change_result_display("pie");
 }
 void MainWindow::action_option_raw()
 {
@@ -10702,7 +10779,8 @@ int MainWindow::action_execute_one_statement(QString text)
             rg->display(0,
                         ocelot_vertical,
                         ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
-                        ocelot_result_grid_column_names);
+                        ocelot_result_grid_column_names,
+                        ocelot_bar, ocelot_line, ocelot_pie);
             result_grid_tab_widget->setCurrentWidget(rg);
             result_grid_tab_widget->tabBar()->hide();
             /* next line redundant? display() ends with show() */
@@ -10850,7 +10928,8 @@ void MainWindow::extra_result_set(int result_grid_table_widget_index, unsigned s
     r->display(0,
                 is_vertical,
                 ocelot_batch, ocelot_html, ocelot_raw, ocelot_xml,
-                ocelot_result_grid_column_names);
+                ocelot_result_grid_column_names,
+                ocelot_bar, ocelot_line, ocelot_pie);
     /* next line redundant? display() ends with show() */
     /* what is r? */
     /* TODO: REMOVE IT!!!! */
@@ -11024,6 +11103,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
     if (is_invalid_query == true) return -1;
     query_type= TOKEN_KEYWORD_ERDIAGRAM;
   }
+
   if (query_type == TOKEN_KEYWORD_ERDIAGRAM)
   {
     if (ocelot_explorer_visible == "no")
@@ -13798,9 +13878,9 @@ void MainWindow::initial_asserts()
 
   #ifdef OCELOT_OS_LINUX
   #if defined(NDEBUG)
-    if (MENU_FONT != 95) {printf("assert(MENU_FONT == 93);"); exit(1); }
+    if (MENU_FONT != 98) {printf("assert(MENU_FONT == 93);"); exit(1); }
   #else
-    assert(MENU_FONT == 95); /* See kludge alert in ocelotgui.h Settings() */
+    assert(MENU_FONT == 98); /* See kludge alert in ocelotgui.h Settings() */
   #endif
   #else
     assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
@@ -13819,11 +13899,11 @@ void MainWindow::initial_asserts()
   assert(TOKEN_KEYWORD__UTF8MB4 == KEYWORD_LIST_SIZE - 1);
 
   /* If the following assert happens, you inserted/removed an OCELOT_... item in strvalues. */
-  /* That is okay but you must change this occurrence of "147" to the new size */
+  /* That is okay but you must change this occurrence of "150" to the new size */
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 147);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 150);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -27603,7 +27683,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
-  so we switched to this. 140 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
+  so we switched to this. 143 is OCELOT_VARIABLES_SIZE and we could reduce some caller code.
   We don't have ocelot_export in the list, I don't think it's needed.
   Note: We don't get here for OCELOT_MAX_CONDITIONS and maybe other things if execute_client_statement()
         checks for them first. So there's no use having them in the table at this time.
@@ -27690,6 +27770,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_menu_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR},
     {NULL, &ocelot_raw,  1, 0, 0, TOKEN_KEYWORD_OCELOT_RAW},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
+    {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR},
@@ -27709,9 +27790,11 @@ int XSettings::ocelot_variables_create()
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL},
+    {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE},
+    {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW},
     {NULL, NULL, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO},
@@ -27753,7 +27836,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 140;
+  int i= 143;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;
@@ -28759,10 +28842,579 @@ void MainWindow::explorer_close()
 
 #endif //if (OCELOT_EXPLORER == 1)
 
+#if (OCELOT_CHART == 1)
+
+/*
+  The constructor includes: copying pointers to outer widgets, making copies of things that
+  came out of result_grid->scan_rows when the selection was made.
+  Assume these cannot be affected by later resize/move/font-change/colour-change.
+  Do not change anything assigned here in later cha:: functions.
+*/
+cha::cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type)
+{
+  cha_chart= parent_chart;
+  cha_mainwindow= parent_mainwindow;
+  cha_type= chart_type;
+  cha_rg= rg;
+  cha_result_column_count= cha_rg->result_column_count;
+  cha_result_row_count= cha_rg->result_row_count;
+  //cha_result_set_copy= cha_rg->result_set_copy;
+  cha_result_set_copy_rows= cha_rg->result_set_copy_rows;
+  cha_result_field_names= cha_rg->result_field_names;
+
+  /* TODO: We would already know cha_numeric_column_count if we would call cha_setup()?! */
+  cha_numeric_column_count= 0;
+  for (unsigned int i= 0; i < cha_result_column_count; ++i)
+  {
+    unsigned short int rft= cha_result_data_type(cha_rg->result_field_types[i]);
+    if (rft == OCELOT_DATA_TYPE_NUMBER)
+    {
+      ++cha_numeric_column_count;
+      if (cha_numeric_column_count == CHART_MAX_COLUMNS) break;
+    }
+  }
+
+  cha_max_column_height= 0;
+  cha_max_column_value= 0;  /* because base is always 0 even if all negative|positive */
+  cha_min_column_value= 0;
+  int numeric_column_count= 0; /* eventually becomes same as cha_numeric_column_count */
+
+  char *row_pointer;
+  int column_length;
+
+  for (long unsigned int r= 0; r < cha_result_row_count && r < CHART_MAX_ROWS; ++r)
+  {
+    row_pointer= cha_result_set_copy_rows[r];
+    QString column_name= "";
+    numeric_column_count= 0;
+    for (unsigned int i= 0; i < cha_result_column_count; ++i)
+    {
+      memcpy(&column_length, row_pointer, sizeof(unsigned int));
+      //char flag= *(row_pointer + sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int) + sizeof(char);
+      QByteArray m(row_pointer, column_length);
+      unsigned short int rft= cha_result_data_type(cha_rg->result_field_types[i]);
+      if (rft == OCELOT_DATA_TYPE_STRING)
+      {
+        column_name= QString(m);
+      }
+      else if (rft == OCELOT_DATA_TYPE_NUMBER)
+      {
+        int column_value= QString(m).toDouble();
+        if (column_value > cha_max_column_value) cha_max_column_value= column_value;
+        if (column_value < cha_min_column_value) cha_min_column_value= column_value;
+        QString this_column_name;
+        if (column_name == "")
+        {
+          char result_field_name[256];
+          {
+            char *result_field_names_pointer= &cha_result_field_names[0];
+            unsigned int v_length;
+            for (unsigned int j= 0; j <= i; ++j)
+            {
+              memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+              result_field_names_pointer+= sizeof(unsigned int);
+              memcpy(result_field_name, result_field_names_pointer, v_length);
+              result_field_name[v_length]= '\0';
+              result_field_names_pointer+= v_length;
+            }
+          }
+          this_column_name= result_field_name;
+        }
+        else this_column_name= column_name;
+
+        cha_texts[numeric_column_count].append(this_column_name);
+        cha_column_values[numeric_column_count].append(column_value);
+        ++numeric_column_count;
+        if (numeric_column_count == CHART_MAX_COLUMNS) break;
+      }
+      else
+      {
+        ; /* not string, not number, ignore */
+      }
+
+      row_pointer+= column_length;
+    }
+  }
+
+  default_settings_all();
+}
+
+void cha::default_settings_all()
+{
+  {
+    QPalette p= QPalette();
+    p.setColor(QPalette::Window, cha_mainwindow->ocelot_grid_background_color);
+    setAutoFillBackground(true); /* is this necessary, or is it default? */
+    setPalette(p);
+  }
+  set_color_palette();
+  cha_default_font= cha_mainwindow->get_font_from_style_sheet(cha_mainwindow->ocelot_grid_style_string);
+  setFont(cha_default_font); /* might be overridden by a grid conditional */
+  QFontMetrics fm= QFontMetrics(cha_default_font);
+  cha_default_text_color= cha_mainwindow->qt_color(cha_mainwindow->ocelot_grid_text_color);
+  cha_default_header_background_color= cha_mainwindow->qt_color(cha_mainwindow->ocelot_grid_header_background_color);
+  cha_default_detail_background_color= cha_mainwindow->qt_color(cha_mainwindow->ocelot_grid_background_color);
+  cha_default_container_pen_width= cha_mainwindow->ocelot_grid_cell_border_size.toInt();
+  if (cha_default_container_pen_width < 1) cha_default_container_pen_width= 1;
+  cha_default_container_pen.setColor(cha_mainwindow->qt_color(cha_mainwindow->ocelot_grid_cell_border_color));
+  cha_default_container_pen.setWidth(cha_default_container_pen_width);
+  cha_default_header_brush.setStyle(Qt::SolidPattern);
+  cha_default_header_brush.setColor(cha_default_header_background_color);
+  cha_default_detail_brush.setStyle(Qt::SolidPattern);
+  cha_default_detail_brush.setColor(cha_default_detail_background_color);
+  cha_default_text_pen.setColor(cha_default_text_color);
+
+  //double maximum_pixels= cha_mainwindow->ocelot_grid_height.toUtf8().toDouble();
+  //if (maximum_pixels < minimum_pixels) maximum_pixels= cha_mainwindow->height();
+
+  /* Following should actually be boundingRect of the words underneath the line */
+  /* Todo: figure out why height() + width wasn't enough */
+  int bottom_height= fm.boundingRect("W").height() + cha_default_container_pen_width + CHART_MARGIN_Y;
+  /* If there are multiple columns then bottom_height is lower */
+
+  if (cha_numeric_column_count > 1) bottom_height+= fm.boundingRect("W").height() * (cha_numeric_column_count - 1);
+  cha_max_pixels= cha_rg->height() - bottom_height;
+
+  cha_setup();
+
+  /* For some reason we must say this, and say show, else nothing appears */
+
+  int max_x= cha_x + cha_chart_column_plus_margin_width * cha_texts[0].size();
+
+  resize(max_x, cha_rg->height());
+  show();
+}
+
+/* Return general type i.e. STRING i.e. any string or NUMBER i.e. any number or BLOB i.e. other */
+/* Todo: since we might call this frequently we might want to save the result */
+/* Todo: there might be some generic function elsewhere that does something similar to this, look around */
+unsigned short int cha::cha_result_data_type(unsigned short int result_field_type)
+{
+  unsigned short int ft= result_field_type;
+  if ((ft == OCELOT_DATA_TYPE_DATE) || (ft == OCELOT_DATA_TYPE_TIME) || (ft == OCELOT_DATA_TYPE_DATETIME)
+   || (ft == OCELOT_DATA_TYPE_VAR_STRING) || (ft == OCELOT_DATA_TYPE_STRING) || (ft == OCELOT_DATA_TYPE_TEXT))
+    return OCELOT_DATA_TYPE_STRING;
+  if ((ft == OCELOT_DATA_TYPE_DECIMAL) || (ft == OCELOT_DATA_TYPE_TINY) || (ft == OCELOT_DATA_TYPE_SHORT)
+   || (ft == OCELOT_DATA_TYPE_LONG) || (ft == OCELOT_DATA_TYPE_FLOAT) || (ft == OCELOT_DATA_TYPE_DOUBLE)
+   || (ft == OCELOT_DATA_TYPE_LONGLONG) || (ft == OCELOT_DATA_TYPE_INT24)
+   || (ft == OCELOT_DATA_TYPE_NEWDECIMAL) || (ft == OCELOT_DATA_TYPE_INTEGER)
+   || (ft == OCELOT_DATA_TYPE_UNSIGNED) || (ft == OCELOT_DATA_TYPE_NUMBER))
+    return OCELOT_DATA_TYPE_NUMBER;
+  return OCELOT_DATA_TYPE_BLOB;
+}
+
+void cha::cha_setup()
+{
+  QFontMetrics fm= QFontMetrics(cha_default_font);
+
+  cha_max_column_width= 0;
+  for (unsigned int i= 0; i < cha_result_column_count; ++i)
+  {
+    for (int j= 0; j < cha_texts[i].size(); ++j)
+    {
+      QString this_column_name= cha_texts[i].at(j);
+      int this_column_name_width= fm.boundingRect(this_column_name).width() + CHART_MARGIN_X;
+      if (this_column_name_width > cha_max_column_width) cha_max_column_width= this_column_name_width;
+    }
+  }
+
+  double range_of_column_values= cha_max_column_value - cha_min_column_value;
+  double minimum_pixels= fm.boundingRect("W").height();
+
+  double shrink_or_expand= cha_max_pixels / (range_of_column_values * minimum_pixels);
+//  if (shrink_or_expand > 1) shrink_or_expand= 1;
+  int base= 0; /* this doesn't change, until users can declare base = minimum */
+
+  /* Todo: if numeric_column_count == 0, see what happens. */
+
+  for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+  {
+    for (int i= 0; i < cha_column_values[0].size(); ++i)
+    {
+      double cv;
+      cv= cha_column_values[text_lines].at(i);
+      cv= cv - cha_min_column_value;
+      if (base == 0) cv= cv + abs(cha_min_column_value);
+      int height= round(cv * minimum_pixels * shrink_or_expand);
+      cha_heights[text_lines].append(height);
+      if (height > cha_max_column_height) cha_max_column_height= height;
+    }
+  }
+  cha_bar_width= fm.boundingRect("W").width();
+  cha_chart_column_plus_margin_width= cha_max_column_width;            /* column of chart not column of result set */
+  if ((cha_type == TOKEN_KEYWORD_BAR) && (cha_bar_width * cha_numeric_column_count > cha_chart_column_plus_margin_width))
+    cha_chart_column_plus_margin_width= cha_bar_width * cha_numeric_column_count;
+  if ((cha_type == TOKEN_KEYWORD_PIE) && (cha_max_pixels > cha_chart_column_plus_margin_width))
+    cha_chart_column_plus_margin_width= cha_max_pixels; /* pies are round */
+  cha_chart_column_plus_margin_width+= CHART_MARGIN_X * 2;             /* "* 2" is arbitrary as extra margin */
+
+  /* todo: this could be too small, a minimum negative value could be wider */
+  cha_max_column_value_as_utf8= QString::number(cha_max_column_value);
+  cha_left_width= fm.boundingRect(cha_max_column_value_as_utf8).width();
+  cha_x= cha_left_width + cha_default_container_pen_width + 5; /* Well, should start just after the vertical line */
+}
+
+/*
+  Line width = ocelot_grid_border_size.
+  Todo: some of this could maybe be in default_settings_chart().
+  Maximum height = whatever's biggest, we adjust to widget's size
+  Range = Lowest to highest, can be negative, can be double precision, we use double
+          This is what we need for deciding height of object, and left-margin wording i.e. "range bar"
+*/
+void cha::cha_draw(QPainter* painter)
+{
+  /* Todo: inf? null? NaN? */
+  /*
+    In base=minimum i.e. anomaly charts heights are distance from minimum.
+    In base=0 charts heights are (distance from minimum) + (distance of minimum from 0)
+  */
+  QFontMetrics fm= QFontMetrics(cha_default_font);
+  int column_name_height= fm.boundingRect("W").height(); /* ? maybe should be used to state a max height */
+
+  painter->setBrush(cha_default_header_brush);
+  /* Huh? Isn't this already done? */
+  QString color_of_rect_border= cha_mainwindow->ocelot_grid_cell_border_color;
+  cha_default_container_pen.setColor(color_of_rect_border);
+
+  /* Numbers on the left of the vertical line */
+  painter->setPen(cha_default_text_pen);
+
+  QRect qr_of_left;
+  qr_of_left= QRect(CHART_MARGIN_X, 0 + CHART_MARGIN_Y, cha_left_width, column_name_height);
+  painter->drawText(qr_of_left, Qt::AlignRight, cha_max_column_value_as_utf8);
+  qr_of_left= QRect(CHART_MARGIN_X, (cha_max_column_height - column_name_height)  + CHART_MARGIN_Y, cha_left_width, column_name_height);
+  painter->drawText(qr_of_left, Qt::AlignRight, "0");
+  painter->setPen(cha_default_container_pen);
+  {
+    QLineF horizontal_line;
+    horizontal_line= QLineF(cha_left_width, cha_max_column_height, cha_numeric_column_count * cha_chart_column_plus_margin_width, cha_max_column_height);
+    painter->drawLine(horizontal_line);
+  }
+  {
+    QLineF vertical_line;
+    vertical_line= QLineF(cha_left_width, 0, cha_left_width, cha_max_column_height);
+    painter->drawLine(vertical_line);
+  }
+
+  painter->setPen(cha_default_text_pen);
+  int y_of_column_name= cha_default_container_pen_width + cha_max_column_height + 5; /* Well, should be below the horizontal line */
+  for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+  {
+    int x_of_column_name= cha_x;
+    for (int i= 0; i < cha_texts[0].size(); ++i) /* i = resultset-row-number, text_lines = resultset-column-number */
+    {
+      QString column_name= cha_texts[text_lines].at(i);
+      QRect qr_of_column= QRect(x_of_column_name + CHART_MARGIN_X + cha_default_container_pen_width,
+                                y_of_column_name + CHART_MARGIN_Y,
+                                x_of_column_name + cha_max_column_width,
+                                column_name_height);
+      cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                            text_lines, cha_numeric_column_count);
+      painter->drawText(qr_of_column, Qt::AlignLeft, column_name);
+      x_of_column_name+= cha_chart_column_plus_margin_width;
+    }
+    y_of_column_name+= column_name_height;
+  }
+//  painter->setPen(cha_default_container_pen);
+  if (cha_type == TOKEN_KEYWORD_BAR)
+  {
+    for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+    {
+      int x_of_bar= cha_x;
+      x_of_bar+= cha_bar_width * text_lines; /* So 2 numbers in the row cause 2 adjacent bars */
+      for (int i= 0; i < cha_texts[0].size(); ++i)
+      {
+        int column_height;
+        column_height= cha_heights[text_lines].at(i);
+        QString column_name= cha_texts[text_lines].at(i);
+        QRect qr_of_bar= QRect(x_of_bar + CHART_MARGIN_X + cha_default_container_pen_width,
+                             cha_max_column_height - column_height,
+                             cha_bar_width,
+                             column_height);
+        cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                              text_lines, cha_numeric_column_count);
+        painter->drawRect(qr_of_bar);
+        x_of_bar+= cha_chart_column_plus_margin_width; /* so next set of bars is right over column name */
+      }
+    }
+  }
+  if (cha_type == TOKEN_KEYWORD_LINE)
+  {
+    /* I think we don't need to setPen (width) since it's same as what we used for horizontal line */
+    painter->setPen(cha_default_text_pen);
+    
+    for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+    {
+      int x_of_line= cha_x;
+      int prev_x= cha_x;
+      int prev_column_height= 0;
+      for (int i= 0; i < cha_texts[0].size(); ++i)
+      {
+        int column_height= cha_heights[text_lines].at(i); /* todo: flaw: cha_heights is double. so round? */
+        if (i == 0) /* line to first position would be zero-length so we could skip it */
+        {
+          /* prev_column_height= column_height; will happen */
+          /* prev_x remains cha_x */
+        }
+        else
+        {
+          QLineF horizontal_line;
+          QString column_name= cha_texts[text_lines].at(i);
+          horizontal_line= QLineF(prev_x + CHART_MARGIN_X + cha_default_container_pen_width,
+                                cha_max_column_height - prev_column_height,
+                                x_of_line + cha_chart_column_plus_margin_width,
+                                cha_max_column_height - column_height);
+          cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                                text_lines, cha_numeric_column_count);
+          painter->drawLine(horizontal_line);
+          x_of_line+= cha_chart_column_plus_margin_width; /* so next set of lines is right over column name */
+          prev_x= x_of_line;
+        }
+        prev_column_height= column_height;
+      }
+    }
+  }
+  if (cha_type == TOKEN_KEYWORD_PIE)
+  {
+    /* A full circle is 16 * 360 = 5760 */
+    /* Todo: dunno what to do with negatives */
+    int x= cha_x;
+    for (int i= 0; i < cha_texts[0].size(); ++i)
+    {
+      int x_of_pie= x;
+      x_of_pie+= cha_max_pixels * i;
+      double total_height= 0;
+      for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+      {
+        total_height+= cha_heights[text_lines].at(i);
+      }
+      int start_angle= 0 * 180;
+      for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+      {
+        double fraction_of_total_height= cha_heights[text_lines].at(i) / total_height;
+        double adj= 5760 * fraction_of_total_height;
+        QString column_name= cha_texts[text_lines].at(i);
+        QRect qr_of_pie= QRect(x_of_pie + CHART_MARGIN_X + cha_default_container_pen_width,
+                             0,
+                             cha_max_pixels,
+                             cha_max_pixels);
+        cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
+                              text_lines, cha_numeric_column_count);
+        int span_angle= round(adj);
+        painter->drawPie(qr_of_pie, start_angle, span_angle);
+        start_angle+= span_angle;
+      }
+    }
+  }
+}
+
+void cha::paintEvent(QPaintEvent *event)
+{
+  (void) event;
+  cha_default_container_pen.setWidth(cha_default_container_pen_width);
+  cha_default_container_pen.setColor(cha_mainwindow->qt_color(cha_mainwindow->ocelot_grid_cell_border_color));
+  QPainter painter(this);
+  cha_draw(&painter);
+}
+
+void cha::resizeEvent(QResizeEvent *event)
+{
+  (void) event;
+}
+
+void cha::moveEvent(QMoveEvent *event)
+{
+  (void) event;
+}
+
+void cha::mouseMoveEvent(QMouseEvent *event)
+{
+  (void) event;
+}
+
+/* Possible pen and brush change due to grid conditional, very similar to erd_draw_text_prepare */
+/* Todo: conditional with column_number=2 gets column 1 */
+/* Todo: conditional with row_number=2 gets row 2 but I don't understand, shouldn't column_names affect it? */
+/* We don't use background_color because bar color should equal text color of column (header line) */
+void cha::cha_draw_text_prepare(QPainter *painter,
+               int column_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
+               QString content,     /* table_name | column_name */
+               int row_number,
+               int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
+               int text_lines,
+               int numeric_column_count)
+{
+  /* If there's only 1 num col, default color=grid color. Else default color=palette. Can be overridden. */
+  QColor this_color;
+  if (numeric_column_count < 2) this_color= cha_default_text_color;
+  else
+  {
+    char new_color[8];
+    strcpy(new_color, cha_color_palette[text_lines]);
+    this_color= QColor(new_color);
+  }
+  QBrush new_rect_brush= cha_default_detail_brush;
+  new_rect_brush.setColor(this_color);
+
+  QPen new_text_pen;
+  if (cha_type == TOKEN_KEYWORD_LINE) new_text_pen= cha_default_container_pen;
+  else new_text_pen= cha_default_text_pen;
+  new_text_pen.setColor(this_color);
+
+  QString string= content.trimmed();
+  QByteArray string_utf8= string.toUtf8();
+  QString new_tooltip, new_style_sheet, new_cell_height, new_cell_width;
+  int cs_number;
+  bool result_of_evaluate;
+  result_of_evaluate= cha_mainwindow->explorer_widget->conditional_setting_evaluate_till_true(
+    column_number + 0, /* i.e. result set column number. dunno why +1, it's really off by 1 */
+    row_number + 1, /* e.g. text_frame->ancestor_grid_result_row_number */
+    string_utf8.data(), /* e.g. text_frame->content_pointer */
+    0, /* e.g. FIELD_VALUE_FLAG_IS_NULL */
+    string_utf8.size(), /* e.g. text_frame->content_length */
+    cell_type, /* e.g. text_frame->cell_type */
+    &new_tooltip, /* return */
+    &new_style_sheet, /* return */
+    &new_cell_height, /* return */
+    &new_cell_width, /* return */
+    &cs_number); /* return */
+  if (result_of_evaluate == true)
+  {
+//    QString new_background_color= cha_mainwindow->get_background_color_from_style_sheet(new_style_sheet);
+//    new_rect_brush.setColor(new_background_color);
+//    //QPen new_rect_pen;
+//    //new_rect_pen.setWidth(0);
+//    painter->setBrush(new_rect_brush);
+//    painter->setPen(Qt::NoPen);
+//    painter->drawRect(qr_of_content);
+    QString new_color= cha_mainwindow->get_color_from_style_sheet(new_style_sheet);
+    new_rect_brush.setColor(new_color);
+    new_text_pen.setColor(new_color);
+    /* This changes weight and style but not size. Original setting was in points not pixels. */
+    QFont qf= cha_mainwindow->get_font_from_style_sheet(new_style_sheet);
+    int point_size= cha_default_font.pointSize();
+    qf.setPointSize(point_size);
+    painter->setFont(qf);
+  }
+  else
+  {
+    painter->setFont(cha_default_font);
+  }
+  painter->setBrush(new_rect_brush);
+  painter->setPen(new_text_pen);
+}
+
+/* Todo: This is a copy of set_color_palette() in class erd. Duplicate code should be merged. */
+void cha::set_color_palette()
+{
+  const char *palette[]= {
+    "#000000", /* black */
+    "#FFFFFF", /* white */
+    "#FF0000", /* red */
+    "#00FF00", /* lime */
+    "#0000FF", /* blue */
+    "#FFFF00", /* yellow */
+    "#00FFFF", /* cyan | aqua */
+    "#FF00FF", /* magenta | fuchsia */
+    "#C0C0C0", /* silver */
+    "#808080", /* gray */
+    "#800000", /* maroon */
+    "#808000", /* olive */
+    "#008000", /* green */
+    "#800080", /* purple */
+    "#008080", /* teal */
+    "#000080", /* navy */ };
+  QColor bcolor, ccolor;
+  char color_utf8[80];
+  strcpy(color_utf8, cha_mainwindow->ocelot_grid_background_color.toUtf8());
+  bcolor= QColor(color_utf8);
+  cha_color_palette_count= 0;
+  for (int i= 0; i < 16; ++i)
+  {
+    ccolor= QColor(palette[i]);
+    if ((ccolor.red() >= bcolor.red() - 64) && (ccolor.red() <= bcolor.red() + 64))
+    {
+      if ((ccolor.blue() >= bcolor.blue() - 64) && (ccolor.blue() <= bcolor.blue() + 64))
+      {
+        if ((ccolor.green() >= bcolor.green() - 64) && (ccolor.green() <= bcolor.green() + 64))
+        {
+          continue; /* too close */
+        }
+      }
+    }
+    strcpy(cha_color_palette[cha_color_palette_count++], palette[i]);
+  }
+}
+
+Chart::Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type)
+{
+  chart_mainwindow= parent_mainwindow;
+  chart_resize();
+  /* I think setWidget() will give widget_cha a parent so we won't need to delete it later, i.e. no leak? */
+  cha *widget_cha;
+  widget_cha= new cha(this, parent_mainwindow, rg, chart_type);
+  QScrollArea *scroll_1= new QScrollArea();
+  scroll_1->setParent(this); /* unnecessary */
+  scroll_1->setVisible(true);
+  //scroll_1->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded); /* this is the default anyway */
+  //scroll_1->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded); /* this is the default anywy */
+//  scroll_1->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn); /* TEST!!! */
+//  scroll_1->setWidgetResizable(true); /* Apparently this is a bad idea, scrolling won't work if this is true */
+  scroll_1->setWidget(widget_cha);
+  QVBoxLayout *layout_1= new QVBoxLayout();
+  setParent(parent_mainwindow); /* unnecessary */ /* or wrong? we call from rg */
+  layout_1->insertWidget(0, scroll_1);
+  setLayout(layout_1);
+  widget_cha->show(); /* For some reason this is necessary, though I thought it should already be visible */
+  show();
+}
+
+/*
+  Call this initially, and whenever result widget size changes e.g. due to detach.
+  We want the chart to cover the result widget.
+  Warning: result widget parent is not mainwindow it is result_grid_tab_widget so rg->pos() is always 0.
+  Warning: result widget width does not include scroll bar width
+  Todo: really width + height should consider scroll bars + actual height|width of heading + OK button
+  If we ask for too much, that should be okay, Qt will take over the screen for it
+*/
+void Chart::chart_resize()
+{
+  QRect fg= chart_mainwindow->result_grid_tab_widget->frameGeometry();
+  //QPoint p= chart_mainwindow->result_grid_tab_widget->pos();
+  //QRect ge= chart_mainwindow->result_grid_tab_widget->geometry();
+  QRect pfg= chart_mainwindow->frameGeometry();
+  QRect pge= chart_mainwindow->geometry();
+  int x_diff= pge.x() - pfg.x();
+  int y_diff= pge.y() - pfg.y();
+  int height_diff= pge.height() - pfg.height(); /* negative. and using this, we're off by a few pixels. */
+  move(fg.x() + x_diff, fg.y() + y_diff);
+  chart_width= chart_mainwindow->width();
+  chart_height= fg.height() - height_diff;
+  resize(chart_width, chart_height);
+}
+
+void Chart::resizeEvent(QResizeEvent *event)
+{
+  (void) event;
+}
+
+void Chart::moveEvent(QMoveEvent *event)
+{
+  (void) event;
+}
+
+void Chart::mouseMoveEvent(QMouseEvent *event)
+{
+  (void) event;
+}
+
+
+#endif //if (OCELOT_CHART == 1)
+
 #ifdef DBMS_TARANTOOL
 #if (OCELOT_THIRD_PARTY==1)
 #define OCELOT_THIRD_PARTY_CODE
   #include "third_party.h"
 #endif
 #endif
-
