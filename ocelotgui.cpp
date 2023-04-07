@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: April 6 2023
+   Last modified: April 7 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -5631,6 +5631,7 @@ void MainWindow::action_option_previous_window()
 */
 void MainWindow::action_option_change_result_display(QString next)
 {
+printf("**** action_option_change_result_display\n");
   int current_index= result_grid_tab_widget->currentIndex();
   if ((current_index >= 0)
    && (current_index <= (ocelot_grid_actual_tabs - 1)))
@@ -28873,7 +28874,6 @@ cha::cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int
       if (cha_numeric_column_count == CHART_MAX_COLUMNS) break;
     }
   }
-
   cha_max_column_height= 0;
   cha_max_column_value= 0;  /* because base is always 0 even if all negative|positive */
   cha_min_column_value= 0;
@@ -28936,7 +28936,6 @@ cha::cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int
       row_pointer+= column_length;
     }
   }
-
   default_settings_all();
 }
 
@@ -29009,7 +29008,7 @@ void cha::cha_setup()
   QFontMetrics fm= QFontMetrics(cha_default_font);
 
   cha_max_column_width= 0;
-  for (unsigned int i= 0; i < cha_result_column_count; ++i)
+  for (int i= 0; i < cha_numeric_column_count; ++i)
   {
     for (int j= 0; j < cha_texts[i].size(); ++j)
     {
@@ -29018,7 +29017,6 @@ void cha::cha_setup()
       if (this_column_name_width > cha_max_column_width) cha_max_column_width= this_column_name_width;
     }
   }
-
   double range_of_column_values= cha_max_column_value - cha_min_column_value;
   double minimum_pixels= fm.boundingRect("W").height();
 
@@ -29027,7 +29025,6 @@ void cha::cha_setup()
   int base= 0; /* this doesn't change, until users can declare base = minimum */
 
   /* Todo: if numeric_column_count == 0, see what happens. */
-
   for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
   {
     for (int i= 0; i < cha_column_values[0].size(); ++i)
@@ -29088,7 +29085,7 @@ void cha::cha_draw(QPainter* painter)
   painter->setPen(cha_default_container_pen);
   {
     QLineF horizontal_line;
-    horizontal_line= QLineF(cha_left_width, cha_max_column_height, cha_numeric_column_count * cha_chart_column_plus_margin_width, cha_max_column_height);
+    horizontal_line= QLineF(cha_left_width, cha_max_column_height, cha_x + cha_numeric_column_count * cha_chart_column_plus_margin_width, cha_max_column_height);
     painter->drawLine(horizontal_line);
   }
   {
@@ -29141,8 +29138,9 @@ void cha::cha_draw(QPainter* painter)
   }
   if (cha_type == TOKEN_KEYWORD_LINE)
   {
-    /* I think we don't need to setPen (width) since it's same as what we used for horizontal line */
-    painter->setPen(cha_default_text_pen);
+    /* We'll be using cha_default_container_pen */
+//    painter->setPen(cha_default_text_pen);
+//cha_default_container_pen.setWidth(12);
     
     for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
     {
@@ -29212,26 +29210,26 @@ void cha::cha_draw(QPainter* painter)
 void cha::paintEvent(QPaintEvent *event)
 {
   (void) event;
-  cha_default_container_pen.setWidth(cha_default_container_pen_width);
+//  cha_default_container_pen.setWidth(cha_default_container_pen_width);
   cha_default_container_pen.setColor(cha_mainwindow->qt_color(cha_mainwindow->ocelot_grid_cell_border_color));
   QPainter painter(this);
   cha_draw(&painter);
 }
 
-void cha::resizeEvent(QResizeEvent *event)
-{
-  (void) event;
-}
+//void cha::resizeEvent(QResizeEvent *event)
+//{
+//  (void) event;
+//}
 
-void cha::moveEvent(QMoveEvent *event)
-{
-  (void) event;
-}
+//void cha::moveEvent(QMoveEvent *event)
+//{
+//  (void) event;
+//}
 
-void cha::mouseMoveEvent(QMouseEvent *event)
-{
-  (void) event;
-}
+//void cha::mouseMoveEvent(QMouseEvent *event)
+//{
+//  (void) event;
+//}
 
 /* Possible pen and brush change due to grid conditional, very similar to erd_draw_text_prepare */
 /* Todo: conditional with column_number=2 gets column 1 */
@@ -29350,6 +29348,7 @@ void cha::set_color_palette()
 Chart::Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type)
 {
   chart_mainwindow= parent_mainwindow;
+  chart_rg= rg;
   chart_resize();
   /* I think setWidget() will give widget_cha a parent so we won't need to delete it later, i.e. no leak? */
   cha *widget_cha;
@@ -29363,7 +29362,6 @@ Chart::Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type)
 //  scroll_1->setWidgetResizable(true); /* Apparently this is a bad idea, scrolling won't work if this is true */
   scroll_1->setWidget(widget_cha);
   QVBoxLayout *layout_1= new QVBoxLayout();
-  setParent(parent_mainwindow); /* unnecessary */ /* or wrong? we call from rg */
   layout_1->insertWidget(0, scroll_1);
   setLayout(layout_1);
   widget_cha->show(); /* For some reason this is necessary, though I thought it should already be visible */
@@ -29380,18 +29378,31 @@ Chart::Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type)
 */
 void Chart::chart_resize()
 {
-  QRect fg= chart_mainwindow->result_grid_tab_widget->frameGeometry();
-  //QPoint p= chart_mainwindow->result_grid_tab_widget->pos();
-  //QRect ge= chart_mainwindow->result_grid_tab_widget->geometry();
-  QRect pfg= chart_mainwindow->frameGeometry();
-  QRect pge= chart_mainwindow->geometry();
-  int x_diff= pge.x() - pfg.x();
-  int y_diff= pge.y() - pfg.y();
-  int height_diff= pge.height() - pfg.height(); /* negative. and using this, we're off by a few pixels. */
-  move(fg.x() + x_diff, fg.y() + y_diff);
-  chart_width= chart_mainwindow->width();
-  chart_height= fg.height() - height_diff;
-  resize(chart_width, chart_height);
+  if (chart_mainwindow->ocelot_grid_detached == "yes")
+  {
+    setParent(chart_rg);
+    QRect fg= chart_rg->frameGeometry();
+    chart_width= chart_rg->width();
+    chart_height= chart_rg->height();
+    move(0, 0);
+    resize(chart_width, chart_height);
+  }
+  else
+  {
+    setParent(chart_mainwindow); /* unnecessary */ /* or wrong? we call from rg */ /* rg can be detached */
+    QRect fg= chart_mainwindow->result_grid_tab_widget->frameGeometry();
+    //QPoint p= chart_mainwindow->result_grid_tab_widget->pos();
+    //QRect ge= chart_mainwindow->result_grid_tab_widget->geometry();
+    QRect pfg= chart_mainwindow->frameGeometry();
+    QRect pge= chart_mainwindow->geometry();
+    int x_diff= pge.x() - pfg.x();
+    int y_diff= pge.y() - pfg.y();
+    int height_diff= pge.height() - pfg.height(); /* negative. and using this, we're off by a few pixels. */
+    move(fg.x() + x_diff, fg.y() + y_diff);
+    chart_width= chart_mainwindow->width();
+    chart_height= fg.height() - height_diff;
+    resize(chart_width, chart_height);
+  }
 }
 
 void Chart::resizeEvent(QResizeEvent *event)

@@ -6846,9 +6846,9 @@ void cha_draw_text_prepare(QPainter *painter,
                int text_lines,
                int numeric_column_count);
 void paintEvent(QPaintEvent *event);
-void resizeEvent(QResizeEvent *event);
-void moveEvent(QMoveEvent *event);
-void mouseMoveEvent(QMouseEvent *even);
+//void resizeEvent(QResizeEvent *event);
+//void moveEvent(QMoveEvent *event);
+//void mouseMoveEvent(QMouseEvent *even);
 
 ~cha()
 {
@@ -6864,6 +6864,7 @@ class Chart: public QWidget
 
 private:
 MainWindow *chart_mainwindow;
+ResultGrid *chart_rg;
 public:
 int chart_width, chart_height;
 Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type);
