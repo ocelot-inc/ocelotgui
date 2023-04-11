@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: April 7 2023
+   Last modified: April 11 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -2231,14 +2231,18 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   }
   if (qk == ocelot_shortcut_next_window_keysequence){action_option_next_window(); return true; }
   if (qk == ocelot_shortcut_previous_window_keysequence){action_option_previous_window(); return true; }
+#if (OCELOT_CHART == 1)
   if (qk == ocelot_shortcut_bar_keysequence){action_option_bar(); return true; }
+#endif
   if (qk == ocelot_shortcut_batch_keysequence){action_option_batch(); return true; }
   if (qk == ocelot_shortcut_horizontal_keysequence){action_option_horizontal(); return true; }
   if (qk == ocelot_shortcut_html_keysequence){action_option_html(); return true; }
   if (qk == ocelot_shortcut_htmlraw_keysequence){action_option_htmlraw(); return true; }
   if (qk == ocelot_shortcut_raw_keysequence){action_option_raw(); return true; }
+#if (OCELOT_CHART == 1)
   if (qk == ocelot_shortcut_line_keysequence){action_option_line(); return true; }
   if (qk == ocelot_shortcut_pie_keysequence){action_option_pie(); return true; }
+#endif
   if (qk == ocelot_shortcut_vertical_keysequence){action_option_vertical(); return true; }
   if (qk == ocelot_shortcut_xml_keysequence){action_option_xml(); return true; }
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -3415,9 +3419,11 @@ void MainWindow::fill_menu()
   menu_options_action_previous_window->setText(menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
   connect(menu_options_action_previous_window, SIGNAL(triggered(bool)), this, SLOT(action_option_previous_window()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW, "", false, true);
+#if (OCELOT_CHART == 1)
   menu_options_action_bar->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BAR]);
   connect(menu_options_action_bar, SIGNAL(triggered(bool)), this, SLOT(action_option_bar()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR, "", false, true);
+#endif
   menu_options_action_batch->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BATCH]);
   connect(menu_options_action_batch, SIGNAL(triggered(bool)), this, SLOT(action_option_batch()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH, "", false, true);
@@ -3430,12 +3436,14 @@ void MainWindow::fill_menu()
   menu_options_action_htmlraw->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW]);
   connect(menu_options_action_htmlraw, SIGNAL(triggered(bool)), this, SLOT(action_option_htmlraw()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW, "", false, true);
+#if (OCELOT_CHART == 1)
   menu_options_action_line->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_LINE]);
   connect(menu_options_action_line, SIGNAL(triggered(bool)), this, SLOT(action_option_line()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE, "", false, true);
   menu_options_action_pie->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_PIE]);
   connect(menu_options_action_pie, SIGNAL(triggered(bool)), this, SLOT(action_option_pie()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE, "", false, true);
+#endif
   menu_options_action_raw->setText(menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_RAW]);
   connect(menu_options_action_raw, SIGNAL(triggered(bool)), this, SLOT(action_option_raw()));
   shortcut(TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW, "", false, true);
@@ -3842,7 +3850,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     if (is_do)
     {
       if (strcmp(ocelot_shortcut_bar, "default") == 0)
-        ocelot_shortcut_bar_keysequence= QKeySequence("Alt+Shift+8");
+        ocelot_shortcut_bar_keysequence= QKeySequence("Alt+Shift+B");
       else
         ocelot_shortcut_bar_keysequence= QKeySequence(ocelot_shortcut_bar);
       menu_options_action_bar->setShortcut(ocelot_shortcut_bar_keysequence);
@@ -3910,7 +3918,7 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     if (is_do)
     {
       if (strcmp(ocelot_shortcut_line, "default") == 0)
-        ocelot_shortcut_line_keysequence= QKeySequence("Alt+Shift+9");
+        ocelot_shortcut_line_keysequence= QKeySequence("Alt+Shift+L");
       else
         ocelot_shortcut_line_keysequence= QKeySequence(ocelot_shortcut_line);
       menu_options_action_line->setShortcut(ocelot_shortcut_line_keysequence);
@@ -3936,9 +3944,9 @@ int MainWindow::shortcut(int target, QString token3, bool is_set, bool is_do)
     if (is_do)
     {
       if (strcmp(ocelot_shortcut_pie, "default") == 0)
-        ocelot_shortcut_pie_keysequence= QKeySequence("Alt+Shift+0");
+        ocelot_shortcut_pie_keysequence= QKeySequence("Alt+Shift+P");
       else
-        ocelot_shortcut_autocomplete_keysequence= QKeySequence(ocelot_shortcut_pie);
+        ocelot_shortcut_pie_keysequence= QKeySequence(ocelot_shortcut_pie);
       menu_options_action_pie->setShortcut(ocelot_shortcut_pie_keysequence);
     }
     return 1;
@@ -5631,7 +5639,6 @@ void MainWindow::action_option_previous_window()
 */
 void MainWindow::action_option_change_result_display(QString next)
 {
-printf("**** action_option_change_result_display\n");
   int current_index= result_grid_tab_widget->currentIndex();
   if ((current_index >= 0)
    && (current_index <= (ocelot_grid_actual_tabs - 1)))
@@ -28890,7 +28897,7 @@ cha::cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int
     for (unsigned int i= 0; i < cha_result_column_count; ++i)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
-      //char flag= *(row_pointer + sizeof(unsigned int));
+      char flag= *(row_pointer + sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
       QByteArray m(row_pointer, column_length);
       unsigned short int rft= cha_result_data_type(cha_rg->result_field_types[i]);
@@ -28925,6 +28932,7 @@ cha::cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int
 
         cha_texts[numeric_column_count].append(this_column_name);
         cha_column_values[numeric_column_count].append(column_value);
+        cha_flags[numeric_column_count].append(flag);
         ++numeric_column_count;
         if (numeric_column_count == CHART_MAX_COLUMNS) break;
       }
@@ -28937,6 +28945,7 @@ cha::cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int
     }
   }
   default_settings_all();
+  setMouseTracking(true);
 }
 
 void cha::default_settings_all()
@@ -28971,16 +28980,20 @@ void cha::default_settings_all()
   /* Todo: figure out why height() + width wasn't enough */
   int bottom_height= fm.boundingRect("W").height() + cha_default_container_pen_width + CHART_MARGIN_Y;
   /* If there are multiple columns then bottom_height is lower */
-
   if (cha_numeric_column_count > 1) bottom_height+= fm.boundingRect("W").height() * (cha_numeric_column_count - 1);
   cha_max_pixels= cha_rg->height() - bottom_height;
-
+  cha_max_pixels-= CHART_MARGIN_Y; /* TEST!!!! */
   cha_setup();
-
-  /* For some reason we must say this, and say show, else nothing appears */
-
   int max_x= cha_x + cha_chart_column_plus_margin_width * cha_texts[0].size();
-
+  /* if there will probably be a horizontal scroll bar, redo height (but I think we get this a bit wrong) */
+  if (max_x > cha_chart->chart_width)
+  {
+    cha_max_pixels-= QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines) cha_heights[text_lines].clear();
+    cha_max_column_height= 0;
+    cha_setup();
+  }
+  /* For some reason we must say this, and say show, else nothing appears */
   resize(max_x, cha_rg->height());
   show();
 }
@@ -29023,7 +29036,6 @@ void cha::cha_setup()
   double shrink_or_expand= cha_max_pixels / (range_of_column_values * minimum_pixels);
 //  if (shrink_or_expand > 1) shrink_or_expand= 1;
   int base= 0; /* this doesn't change, until users can declare base = minimum */
-
   /* Todo: if numeric_column_count == 0, see what happens. */
   for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
   {
@@ -29038,6 +29050,7 @@ void cha::cha_setup()
       if (height > cha_max_column_height) cha_max_column_height= height;
     }
   }
+
   cha_bar_width= fm.boundingRect("W").width();
   cha_chart_column_plus_margin_width= cha_max_column_width;            /* column of chart not column of result set */
   if ((cha_type == TOKEN_KEYWORD_BAR) && (cha_bar_width * cha_numeric_column_count > cha_chart_column_plus_margin_width))
@@ -29049,7 +29062,23 @@ void cha::cha_setup()
   /* todo: this could be too small, a minimum negative value could be wider */
   cha_max_column_value_as_utf8= QString::number(cha_max_column_value);
   cha_left_width= fm.boundingRect(cha_max_column_value_as_utf8).width();
-  cha_x= cha_left_width + cha_default_container_pen_width + 5; /* Well, should start just after the vertical line */
+  /* First bar or line or pie should start just after the vertical line */
+  cha_x= cha_left_width + cha_default_container_pen_width + CHART_MARGIN_X;
+
+  if (cha_type == TOKEN_KEYWORD_PIE) /* todo: maybe we should merge this with other totallers above */
+  {
+    /* Later when total_height / cha_max_total_height = 1 we fill the column, else we fill less. */
+    cha_max_total_height= 0;
+    for (int i= 0; i < cha_texts[0].size(); ++i)
+    {
+      double total_height= 0;
+      for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+      {
+        total_height+= cha_heights[text_lines].at(i);
+      }
+      if (total_height > cha_max_total_height) cha_max_total_height= total_height;
+    }
+  }
 }
 
 /*
@@ -29068,7 +29097,7 @@ void cha::cha_draw(QPainter* painter)
   */
   QFontMetrics fm= QFontMetrics(cha_default_font);
   int column_name_height= fm.boundingRect("W").height(); /* ? maybe should be used to state a max height */
-
+  /* Huh? Don't we change the brush later anyway? */
   painter->setBrush(cha_default_header_brush);
   /* Huh? Isn't this already done? */
   QString color_of_rect_border= cha_mainwindow->ocelot_grid_cell_border_color;
@@ -29078,19 +29107,20 @@ void cha::cha_draw(QPainter* painter)
   painter->setPen(cha_default_text_pen);
 
   QRect qr_of_left;
-  qr_of_left= QRect(CHART_MARGIN_X, 0 + CHART_MARGIN_Y, cha_left_width, column_name_height);
+  qr_of_left= QRect(0, 0 + CHART_MARGIN_Y, cha_left_width, column_name_height);
   painter->drawText(qr_of_left, Qt::AlignRight, cha_max_column_value_as_utf8);
-  qr_of_left= QRect(CHART_MARGIN_X, (cha_max_column_height - column_name_height)  + CHART_MARGIN_Y, cha_left_width, column_name_height);
+  qr_of_left= QRect(0, (cha_max_column_height - column_name_height)  + CHART_MARGIN_Y, cha_left_width, column_name_height);
   painter->drawText(qr_of_left, Qt::AlignRight, "0");
   painter->setPen(cha_default_container_pen);
   {
     QLineF horizontal_line;
-    horizontal_line= QLineF(cha_left_width, cha_max_column_height, cha_x + cha_numeric_column_count * cha_chart_column_plus_margin_width, cha_max_column_height);
+    horizontal_line= QLineF(cha_left_width, cha_max_column_height, cha_x + cha_texts[0].size() * cha_chart_column_plus_margin_width, cha_max_column_height);
     painter->drawLine(horizontal_line);
   }
   {
     QLineF vertical_line;
-    vertical_line= QLineF(cha_left_width, 0, cha_left_width, cha_max_column_height);
+    vertical_line= QLineF(cha_left_width + cha_default_container_pen_width / 2, 0,
+                          cha_left_width + cha_default_container_pen_width / 2, cha_max_column_height);
     painter->drawLine(vertical_line);
   }
 
@@ -29122,8 +29152,7 @@ void cha::cha_draw(QPainter* painter)
       x_of_bar+= cha_bar_width * text_lines; /* So 2 numbers in the row cause 2 adjacent bars */
       for (int i= 0; i < cha_texts[0].size(); ++i)
       {
-        int column_height;
-        column_height= cha_heights[text_lines].at(i);
+        int column_height= cha_heights[text_lines].at(i);
         QString column_name= cha_texts[text_lines].at(i);
         QRect qr_of_bar= QRect(x_of_bar + CHART_MARGIN_X + cha_default_container_pen_width,
                              cha_max_column_height - column_height,
@@ -29150,19 +29179,20 @@ void cha::cha_draw(QPainter* painter)
       for (int i= 0; i < cha_texts[0].size(); ++i)
       {
         int column_height= cha_heights[text_lines].at(i); /* todo: flaw: cha_heights is double. so round? */
-        if (i == 0) /* line to first position would be zero-length so we could skip it */
+        QLineF horizontal_line;
+        QString column_name= cha_texts[text_lines].at(i);
+        int x1= prev_x + CHART_MARGIN_X + cha_default_container_pen_width;
+        int y1= cha_max_column_height - prev_column_height;
+        int w1= x_of_line + cha_chart_column_plus_margin_width;
+        int l1= cha_max_column_height - column_height;
+        horizontal_line= QLineF(x1, y1, w1, l1);
+//        if (i == 0) /* line to first position would be zero-length so we could skip it */
+//        {
+//          /* prev_column_height= column_height; will happen */
+//          /* prev_x remains cha_x */
+//        }
+//        else
         {
-          /* prev_column_height= column_height; will happen */
-          /* prev_x remains cha_x */
-        }
-        else
-        {
-          QLineF horizontal_line;
-          QString column_name= cha_texts[text_lines].at(i);
-          horizontal_line= QLineF(prev_x + CHART_MARGIN_X + cha_default_container_pen_width,
-                                cha_max_column_height - prev_column_height,
-                                x_of_line + cha_chart_column_plus_margin_width,
-                                cha_max_column_height - column_height);
           cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
                                 text_lines, cha_numeric_column_count);
           painter->drawLine(horizontal_line);
@@ -29177,6 +29207,7 @@ void cha::cha_draw(QPainter* painter)
   {
     /* A full circle is 16 * 360 = 5760 */
     /* Todo: dunno what to do with negatives */
+
     int x= cha_x;
     for (int i= 0; i < cha_texts[0].size(); ++i)
     {
@@ -29187,6 +29218,11 @@ void cha::cha_draw(QPainter* painter)
       {
         total_height+= cha_heights[text_lines].at(i);
       }
+      double shrink= total_height / cha_max_total_height; /* if you want all pies equal size, let shrink be 1 */
+      double max_area= cha_max_pixels * cha_max_pixels; /* e.g. 10 x 10 = 100 */
+      double our_area= max_area * shrink;                           /* e.g. 100 * .5 = 50 */
+      double our_height= sqrt(our_area);                            /* e.g. sqrt(50) = 7.071 */
+      int our_height_rounded= round(our_height);                      /* e.g. round(7.071) = 7 */
       int start_angle= 0 * 180;
       for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
       {
@@ -29195,8 +29231,8 @@ void cha::cha_draw(QPainter* painter)
         QString column_name= cha_texts[text_lines].at(i);
         QRect qr_of_pie= QRect(x_of_pie + CHART_MARGIN_X + cha_default_container_pen_width,
                              0,
-                             cha_max_pixels,
-                             cha_max_pixels);
+                             our_height_rounded, /* = cha_max_pixels if total height = maximum */
+                             our_height_rounded);
         cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
                               text_lines, cha_numeric_column_count);
         int span_angle= round(adj);
@@ -29216,20 +29252,40 @@ void cha::paintEvent(QPaintEvent *event)
   cha_draw(&painter);
 }
 
-//void cha::resizeEvent(QResizeEvent *event)
-//{
-//  (void) event;
-//}
-
-//void cha::moveEvent(QMoveEvent *event)
-//{
-//  (void) event;
-//}
-
-//void cha::mouseMoveEvent(QMouseEvent *event)
-//{
-//  (void) event;
-//}
+void cha::mouseMoveEvent(QMouseEvent *event)
+{
+  QString tooltip;
+  if (cha_type == TOKEN_KEYWORD_BAR) tooltip= "Bar Chart";
+  if (cha_type == TOKEN_KEYWORD_LINE) tooltip= "Line Chart";
+  if (cha_type == TOKEN_KEYWORD_PIE) tooltip= "Pie Chart";
+  int x_of_chart_column= cha_x;
+  for (int i= 0; i < cha_texts[0].size(); ++i)
+  {
+    if (x_of_chart_column <= event->pos().x())
+    {
+      if (x_of_chart_column + cha_chart_column_plus_margin_width >= event->pos().x())
+      {
+        tooltip= tooltip + " row#" + QString::number(i + 1);
+        for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
+        {
+          QString column_name= cha_texts[text_lines].at(i);
+          char flag= cha_flags[text_lines].at(i);
+          QString column_value;
+          if ((flag & FIELD_VALUE_FLAG_IS_NULL) != 0) column_value= "NULL";
+          else
+          {
+            double column_value_as_double= cha_column_values[text_lines].at(i);
+            column_value=  QString::number(column_value_as_double);
+          }
+          tooltip= tooltip + " " + column_name + "=" + column_value;
+        }
+        break;
+      }
+    }
+    x_of_chart_column+= cha_chart_column_plus_margin_width;
+  }
+  setToolTip(tooltip);
+}
 
 /* Possible pen and brush change due to grid conditional, very similar to erd_draw_text_prepare */
 /* Todo: conditional with column_number=2 gets column 1 */
@@ -29345,24 +29401,26 @@ void cha::set_color_palette()
   }
 }
 
-Chart::Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type)
+Chart::Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_type)
 {
-  chart_mainwindow= parent_mainwindow;
+  chart_type= passed_chart_type;
   chart_rg= rg;
+  setParent(chart_rg); /* dunno why this seems necessary, we call from resultgrid */
+  chart_mainwindow= parent_mainwindow;
   chart_resize();
   /* I think setWidget() will give widget_cha a parent so we won't need to delete it later, i.e. no leak? */
   cha *widget_cha;
   widget_cha= new cha(this, parent_mainwindow, rg, chart_type);
   QScrollArea *scroll_1= new QScrollArea();
-  scroll_1->setParent(this); /* unnecessary */
-  scroll_1->setVisible(true);
+//  scroll_1->setParent(this); /* unnecessary */
+//  scroll_1->setVisible(true);
   //scroll_1->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded); /* this is the default anyway */
   //scroll_1->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded); /* this is the default anywy */
-//  scroll_1->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOn); /* TEST!!! */
 //  scroll_1->setWidgetResizable(true); /* Apparently this is a bad idea, scrolling won't work if this is true */
   scroll_1->setWidget(widget_cha);
   QVBoxLayout *layout_1= new QVBoxLayout();
   layout_1->insertWidget(0, scroll_1);
+  layout_1->setContentsMargins(0, 0, 0, 0); /* I wonder whether this does any good */
   setLayout(layout_1);
   widget_cha->show(); /* For some reason this is necessary, though I thought it should already be visible */
   show();
@@ -29370,56 +29428,23 @@ Chart::Chart(MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type)
 
 /*
   Call this initially, and whenever result widget size changes e.g. due to detach.
-  We want the chart to cover the result widget.
+  We want the chart to cover the result widget, and its accompanying vertical scroll bar.
   Warning: result widget parent is not mainwindow it is result_grid_tab_widget so rg->pos() is always 0.
-  Warning: result widget width does not include scroll bar width
-  Todo: really width + height should consider scroll bars + actual height|width of heading + OK button
+  Todo: really width + height should consider scroll bars
   If we ask for too much, that should be okay, Qt will take over the screen for it
+  TODO: dunno whether setContentsMargins() for both chart and layout_1 is really necessary
 */
 void Chart::chart_resize()
 {
-  if (chart_mainwindow->ocelot_grid_detached == "yes")
-  {
-    setParent(chart_rg);
-    QRect fg= chart_rg->frameGeometry();
-    chart_width= chart_rg->width();
-    chart_height= chart_rg->height();
-    move(0, 0);
-    resize(chart_width, chart_height);
-  }
-  else
-  {
-    setParent(chart_mainwindow); /* unnecessary */ /* or wrong? we call from rg */ /* rg can be detached */
-    QRect fg= chart_mainwindow->result_grid_tab_widget->frameGeometry();
-    //QPoint p= chart_mainwindow->result_grid_tab_widget->pos();
-    //QRect ge= chart_mainwindow->result_grid_tab_widget->geometry();
-    QRect pfg= chart_mainwindow->frameGeometry();
-    QRect pge= chart_mainwindow->geometry();
-    int x_diff= pge.x() - pfg.x();
-    int y_diff= pge.y() - pfg.y();
-    int height_diff= pge.height() - pfg.height(); /* negative. and using this, we're off by a few pixels. */
-    move(fg.x() + x_diff, fg.y() + y_diff);
-    chart_width= chart_mainwindow->width();
-    chart_height= fg.height() - height_diff;
-    resize(chart_width, chart_height);
-  }
+  setContentsMargins(0, 0, 0, 0); /* warning, this triggers a resize event */
+  QRect fg= chart_rg->frameGeometry();
+  chart_width= fg.width(); /* not rg->width() but maybe they're the same when margins = 0 */
+  chart_width+= chart_rg->grid_vertical_scroll_bar->width();
+  chart_height= fg.height();
+//  move(0, 0); /* this turns out to be default anyway */
+  resize(chart_width, chart_height);
+  return;
 }
-
-void Chart::resizeEvent(QResizeEvent *event)
-{
-  (void) event;
-}
-
-void Chart::moveEvent(QMoveEvent *event)
-{
-  (void) event;
-}
-
-void Chart::mouseMoveEvent(QMouseEvent *event)
-{
-  (void) event;
-}
-
 
 #endif //if (OCELOT_CHART == 1)
 
