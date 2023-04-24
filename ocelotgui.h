@@ -6696,14 +6696,12 @@ Result_qtextedit(ResultGrid *m)
 #define CHART_H
 /*
   CHART
-  It is a visible widget (not a dialog box).
+  It is an alternate display choice within result grid.
   Intercept display() in result grid if user picks bar|line|pie in Options menu or via shortcut.
-  Upon init, we call move() and resize() so it is on top of the result grid widget
+  It works only via display_html() and the result is HTML.
   Todo: bar: allow horizontal. stack multiple columns vertical not side-by-side.
   Todo: bar|line: don't assume base is 0
-  Todo: this won't solve EXPORT, because the exporting will still be of the normal result grid
-        requires render() or grab()
-        Actually if we are thinking of shipping to a browser we'd probably need render() or grab() for that too
+  Todo: this should be exportable, because the exporting will still be of the normal result grid. But check.
   Todo: some way to be permanent and to repeat, so continuous monitoring becomes easy
         e.g. SET ocelot_pie=1 (compare SET ocelot_html=1)
   Todo: TOKEN_KEYWORD_BAR|LINE|PIE -- obsolete, never used.
@@ -6718,14 +6716,8 @@ Result_qtextedit(ResultGrid *m)
   * #include <QtCharts> would have been great but might not be installed
     and it is GPLv3 https://doc.qt.io/qt-5/qtcharts-index.html#licenses and ocelotgui is GPLv2.
     See illustrations at https://doc.qt.io/qt-6/qtcharts-overview.html
-  * Expect that every row has at least one numeric column. (If not, the result is blank.)
-    Usually there are also string columns, which we prefer for headings, but column names are okay.
-    So we can recognize these formats:
-      string-value, number-value [, number-value ...] or
-      string-value, number-value [, string-value, number-value ...] or
-      number-value [, number-value ...]
-    Try to handle all formats by saying: initially header=column-name but change it if you see string-value
-    We have a different heading line for each column, and heading colour = line colour.
+  * A chartable column group is a series of numeric columns, bounded by start | end | non-numeric.
+    Strings or images will just be displayed as usual. So we can recognize these formats:
   * Suppose we have two rows:
     "A",1,2,3
     "A",2,NULL,4
@@ -6737,7 +6729,6 @@ Result_qtextedit(ResultGrid *m)
       ---  ---
       A    A
     ... which could even be done in ASCII.
-    ... and the first item doesn't need to be CHAR/VARCHAR. However, if it's an image, yucko.
   * Line width = ocelot_grid_cell_border_size. Bar width = width of a column in current (grid) font.
     Line or bar colour = from the palette.
     When a row has more than one column, there are multiple lines|bars with different colours.
@@ -6754,6 +6745,15 @@ Result_qtextedit(ResultGrid *m)
   * Todo: When numbers are negative, okay, but bars for positives shouldn't go past the 0 point.
     And for pies, we could show abs(n), or invent a doughnut chart type, but we don't even check,
     figuring that results wouldn't make sense anyway. Eventually maybe allow doughnut charts.
+  * Geometry: height in pixels. total = chart_pixmap_height, which = result grid height so max visible rows = 1
+      cell border ocelot_grid_cell_border_size
+      header      boundingRect("W") if there is a header
+      cell border ocelot_grid_cell_border_size if there is a header
+      margin      CHART_MARGIN_Y -- QPixmap starts
+      chart       chart_bar_line_pie_height
+      caption     boundingRect("W") maybe "list_of_values" is a better name?
+      margin      CHART_MARGIN_Y -- QPixmap ends
+      cell border ocelot_grid_cell_border_size
   * Calculating bar heights
     Range = Maximum value - Minimum Value
             but if both < 0 then it's 0 - Minimum Value
@@ -6773,13 +6773,12 @@ Result_qtextedit(ResultGrid *m)
     1, 10000       10, 100000      0, 100
     ... Pie heights are more complex because we want % of area, not % of height.
   * But I have to watch out for horizontal scroll bar.
-    In Chart() the resize() is for rg-width+rg-height, in cha() the resize() is for maximum-used+rg-height,
-    so we are not expecting vertical scroll bar to appear unless rg is very small but horizontal might appear.
+    In Chart() the resize() is for rg-width+rg-height.
+    So we are not expecting vertical scroll bar to appear unless rg is very small but horizontal might appear.
   * Todo: After set ocelot_grid_cell_border_size=8; notice that column values (max_pixels?) doesn't fit well
   * Todo: A maximum column name width in characters might be okay, at least with #define
   * Shortcuts are Alt+Shift+B Alt+Shift+L Alt+Shift+P. Alt+Shift+8/9/0 didn't work if detached.
-  * CHART_MAX_ROWS 50, if more they're ignored
-  * CHART_MAX_COLUMNS 3, if more they're ignored. Eventually allow user-supplied.
+  * CHART_MAX_GRID_ROWS 3, if more we start a new series. Eventually allow user-supplied.
   * Settings
     ocelot_shortcut_bar|line|pie
     ocelot_grid_cell_border_color+size affect frame lines, not immediate
@@ -6788,22 +6787,48 @@ Result_qtextedit(ResultGrid *m)
     ocelot_grid_text_color affects left text, not immediate
     ocelot_grid_detached affects whole display, immediate
     ... plus some settings can be conditional
+  * Todo: Check: what if there is no result grid?
 */
 
-class cha: public QWidget
+class Chart: public QWidget
 {
   Q_OBJECT
 
-#define CHART_MARGIN_X 2
-#define CHART_MARGIN_Y 2
-#define CHART_MAX_ROWS 50
-#define CHART_MAX_COLUMNS 3
-
 public:
-cha(Chart *parent_chart, MainWindow *parent_mainwindow, ResultGrid *rg, int chart_type);
+Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int chart_type);
+int chart_type; /* TOKEN_KEYWORD_BAR etc. */
+ResultGrid *chart_rg;
+QString group_header;
+int width_n_total;
+int height_n_total;
+int chart_first_column_in_group;
+int chart_last_column_in_group;
+void chart_row_setup(unsigned int tmp_result_row_number, int grid_row);
+int column_in_group(int grid_row, int result_column_no);
+int draw_group(long unsigned int tmp_result_row_number, int grid_row, int result_column_no, int width, char *output);
 private:
-Chart *cha_chart;
-MainWindow *cha_mainwindow;
+MainWindow *chart_mainwindow;
+
+int chart_pixmap_height;
+//public:
+int chart_width;
+int chart_bar_line_pie_width;
+int chart_pixmap_width;
+
+void set_chart_width();
+void set_chart_pixmap_height();
+
+#define CHART_MARGIN_LEFT 2
+#define CHART_MARGIN_RIGHT 2
+#define CHART_MARGIN_TOP 2
+#define CHART_MARGIN_BOTTOM 2
+#define CHART_MARGIN_BETWEEN_BARS 1
+#define CHART_MAX_GRID_ROWS 3
+#define CHART_ZERO_LINE_WIDTH 2
+
+//public:
+
+//public:
 
 unsigned int cha_result_column_count; /* Todo: check: why isn't this long unsigned int? */
 unsigned int cha_result_row_count;
@@ -6811,20 +6836,33 @@ unsigned int cha_result_row_count;
 char **cha_result_set_copy_rows; /* dynamic-sized list of result_set_copy row offsets, if necessary */
 char *cha_result_field_names;
 
-int cha_type; /* TOKEN_KEYWORD_BAR etc. */
+/* Todo: some of what follows should be private */
 QFont cha_default_font;
 QColor cha_default_text_color, cha_default_header_background_color, cha_default_detail_background_color;
+
 int cha_default_container_pen_width;
 QPen cha_default_container_pen, cha_default_text_pen;
 QBrush cha_default_header_brush, cha_default_detail_brush;
+
+QPen chart_new_container_pen, chart_new_text_pen;
+QBrush chart_new_rect_brush;
+
 char cha_color_palette[16][16];
 int cha_color_palette_count;
-double cha_max_pixels;
-ResultGrid *cha_rg;
-QStringList cha_texts[CHART_MAX_COLUMNS];
-QList<double> cha_column_values[CHART_MAX_COLUMNS];
-QList<double> cha_heights[CHART_MAX_COLUMNS];
-QList<char> cha_flags[CHART_MAX_COLUMNS];
+double chart_bar_line_pie_height;
+/* TODO: actually CHART_MAX_GRID_ROWS should be CHART_MAX_GRID_ROWS? */
+QStringList cha_texts[CHART_MAX_GRID_ROWS];
+QList<double> cha_column_values[CHART_MAX_GRID_ROWS];
+QStringList cha_column_values_as_strings[CHART_MAX_GRID_ROWS];
+QList<double> cha_heights[CHART_MAX_GRID_ROWS];
+QList<char> cha_flags[CHART_MAX_GRID_ROWS];
+QList<int> chart_column_types[CHART_MAX_GRID_ROWS];
+int chart_max_column_heights[CHART_MAX_GRID_ROWS];
+int chart_min_column_heights[CHART_MAX_GRID_ROWS];
+double chart_max_column_values[CHART_MAX_GRID_ROWS];
+double chart_min_column_values[CHART_MAX_GRID_ROWS];
+double chart_max_total_heights[CHART_MAX_GRID_ROWS];
+double chart_height_of_zero_line[CHART_MAX_GRID_ROWS];
 int cha_numeric_column_count;
 int cha_max_column_width, cha_max_column_height;
 double cha_max_column_value;
@@ -6836,10 +6874,13 @@ int cha_left_width;
 int cha_x;
 QString cha_max_column_value_as_utf8;
 
+
+
 void default_settings_all();
-void cha_setup();
+//void cha_setup();
+
 unsigned short int cha_result_data_type(unsigned short int field_data_type);
-void cha_draw(QPainter* painter);
+//void cha_draw(QPainter* painter);
 void set_color_palette();
 void cha_draw_text_prepare(QPainter *painter,
                int column_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
@@ -6848,31 +6889,11 @@ void cha_draw_text_prepare(QPainter *painter,
                int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
                int text_lines,
                int numeric_column_count);
-protected:
-void paintEvent(QPaintEvent *event);
-void mouseMoveEvent(QMouseEvent *even);
+//protected:
+//void paintEvent(QPaintEvent *event);
+//void mouseMoveEvent(QMouseEvent *even);
 
-~cha()
-{
-  ; /* should occur whenever Chart is deleted e.g. due to garbage collect or quit */
-}
-
-};
-
-class Chart: public QWidget
-{
-  Q_OBJECT
-
-private:
-MainWindow *chart_mainwindow;
-ResultGrid *chart_rg;
-int chart_height;
 public:
-int chart_width;
-int chart_type;
-
-Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int chart_type);
-void chart_resize();
 
 ~Chart()
 {
@@ -7098,7 +7119,7 @@ public:
 /* During scan_rows we might set a flag e.g. if a column value is null */
 #define FIELD_VALUE_FLAG_IS_ZERO 0
 #define FIELD_VALUE_FLAG_IS_NULL 1
-#define FIELD_VALUE_FLAG_IS_NUMBER 2
+                                #define FIELD_VALUE_FLAG_IS_NUMBER 2
 #define FIELD_VALUE_FLAG_IS_STRING 4
 #define FIELD_VALUE_FLAG_IS_OTHER 8
 #define FIELD_VALUE_FLAG_IS_IMAGE 16
@@ -7952,19 +7973,6 @@ void display(int due_to,
 #endif
 //  if ((due_to == 0) || (due_to == 1))
   {
-#if (OCELOT_CHART == 1)
-    if ((ocelot_bar == 1) || (ocelot_line == 1) || (ocelot_pie == 1))
-    {
-      if (chart_widget != NULL) { delete chart_widget; chart_widget= NULL; } /* as in display_garbage_collect */
-      int chart_type;
-      if (ocelot_bar == 1) chart_type= TOKEN_KEYWORD_BAR;
-      if (ocelot_line == 1) chart_type= TOKEN_KEYWORD_LINE;
-      if (ocelot_pie == 1) chart_type= TOKEN_KEYWORD_PIE;
-      chart_widget= new Chart(this, copy_of_parent, chart_type);
-      chart_widget->show();
-      return;
-    }
-#endif
     display_garbage_collect(false);
     copy_result_to_gridx();
     /* Todo: no more grid_result_row_count, and copy_result_to_gridx already
@@ -8004,6 +8012,18 @@ void display(int due_to,
   else
   /* Since it's not ocelot_batch or ocelot_xml it must be ocelot_html */
   {
+#if (OCELOT_CHART == 1)
+    if ((ocelot_bar == 1) || (ocelot_line == 1) || (ocelot_pie == 1))
+    {
+      /* we're hoping display_garbage_collect() deleted chart_widget earlier */
+      int chart_type;
+      if (ocelot_bar == 1) chart_type= TOKEN_KEYWORD_BAR;
+      if (ocelot_line == 1) chart_type= TOKEN_KEYWORD_LINE;
+      if (ocelot_pie == 1) chart_type= TOKEN_KEYWORD_PIE;
+      chart_widget= new Chart(this, copy_of_parent, chart_type);
+    }
+#endif
+
     grid_vertical_scroll_bar_value= -1; /* todo: check: is this alread in vertical_scroll_bar_initialize? */
     focus_result_row_number= focus_column_number= -1; /* i.e. no cell is in focus */
     prepare_for_display_html();
@@ -8953,6 +8973,11 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
        (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) html_max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
   {
+#if (OCELOT_CHART == 1)
+/* TMP!!!! WE SHOULD PASS GRID_ROW! NOT 0!!! */
+      if (chart_widget != NULL)
+      chart_widget->chart_row_setup(tmp_result_row_number, 0);
+#endif
     result_field_names_pointer= &result_field_names[0];
     tmp_size+= strlen(ocelot_grid_detail_row_start);
     int max_column_height= 0;
@@ -8993,6 +9018,10 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
   /* +200 because thin_image */
 
   tmp_size+= 1000000; /* image paste experiment */
+#if (OCELOT_CHART == 1)
+printf("**** +5000000\n");
+  tmp_size+= 5000000; /* yet more? */
+#endif
   tmp= new char[tmp_size];
 
   int total_html_row_height= setting_ocelot_grid_cell_border_size_as_int * 2;
@@ -11863,15 +11892,9 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
-printf("**** resize_or_font_change\n");
-if (is_resize == true) printf("**** is_resize\n");
-if (html_text_edit == NULL) printf("**** html_text_edit == NULL\n");
-printf("**** copy_of_ocelot_html=%d\n", copy_of_ocelot_html);
-
 #if (OCELOT_CHART == 1)
   if (chart_widget != NULL)
   {
-    printf("**** chart_widget->chart_type=%d %d %d %d\n", chart_widget->chart_type, TOKEN_KEYWORD_BAR, TOKEN_KEYWORD_LINE, TOKEN_KEYWORD_PIE);
     unsigned short int tmp_of_bar= 0;
     unsigned short int tmp_of_line= 0;
     unsigned short int tmp_of_pie= 0;
@@ -17037,7 +17060,6 @@ public:
 public:
 void detach_start()
 {
-printf("**** detach_start\n");
   installEventFilter(this);
 }
 void detach_stop()
