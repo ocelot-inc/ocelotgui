@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: April 24 2023
+   Last modified: April 28 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -19984,7 +19984,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
 {
   (void)ocelot_grid_detail_numeric_column_start;
   (void)font;
-
 #if (OCELOT_CHART == 1)
   QByteArray head(result_pointer, v_length);
   QString s_of_head(head);
@@ -19994,14 +19993,18 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
   int v_length_of_chart_header;
   if (result_grid->chart_widget != NULL)
   {
-    chart_column_in_group= result_grid->chart_widget->column_in_group(0, result_column_no);
+    chart_column_in_group= result_grid->chart_widget->column_in_group(result_column_no);
     if (chart_column_in_group >= 0)
     {
       if (chart_column_in_group == 0)
       {
         result_grid->chart_widget->width_n_total= 0;
         result_grid->chart_widget->height_n_total= 0;
-        if (cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER) result_grid->chart_widget->group_header= "";
+        if (cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
+        {
+          result_grid->chart_widget->group_header= "";
+          result_grid->chart_widget->width_of_header= 0;
+        }
       }
       result_grid->chart_widget->width_n_total+= width_n;
       result_grid->chart_widget->height_n_total+= height_n;
@@ -20019,8 +20022,9 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
           v_length_of_chart_header= strlen(result_pointer_of_chart_header);
           result_pointer= result_pointer_of_chart_header;
           v_length= v_length_of_chart_header;
-          width_n= result_grid->chart_widget->width_n_total + (result_grid->chart_widget->chart_last_column_in_group - result_grid->chart_widget->chart_first_column_in_group) + 1;
-          width_n+= 80; /* TODO: KLUDGE! CALCULATE THIS RIGHT! */
+          QFontMetrics chart_fm= QFontMetrics(result_grid->chart_widget->chart_default_font);
+          width_n= chart_fm.boundingRect(result_pointer_of_chart_header).width() + 10; /* why + 10? dunno */
+          result_grid->chart_widget->width_of_header= width_n;
         }
         is_chart= true;
       }
@@ -20158,7 +20162,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       if (is_chart == true)
       {
         width_i= 300; /* TMP!! TEST!! */
-        result_grid->chart_widget->draw_group(tmp_result_row_number, 0, result_column_no, width_i, base64_tmp);
+        result_grid->chart_widget->draw_group(tmp_result_row_number, result_column_no, width_i, base64_tmp);
       }
       else
 #endif
@@ -20178,7 +20182,11 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       else
         sprintf(img_start, "<img width=%d src=\"data:image/", width_i);
       /* IMAGE TEST!!!! What happens if I don't say what the width is? */
+#if (OCELOT_CHART == 1)
+      if ((grid_column_no > 0) || (is_chart == 1))
+#else
       if (grid_column_no > 0)
+#endif
       {
           sprintf(img_start, "<img src=\"data:image/");
       }
@@ -28948,7 +28956,7 @@ Chart::Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_typ
     if (rft == OCELOT_DATA_TYPE_NUMBER)
     {
       ++cha_numeric_column_count;
-      if (cha_numeric_column_count == CHART_MAX_GRID_ROWS) break;
+      /* if (cha_numeric_column_count == CHART_MAX_GRID_ROWS) break; */ /* todo: maybe a limit is good, though? */
     }
   }
   /* Following will be superseded because min and max are per-row  now */
@@ -28973,9 +28981,9 @@ void Chart::default_settings_all()
     setPalette(p);
   }
   set_color_palette();
-  cha_default_font= chart_mainwindow->get_font_from_style_sheet(chart_mainwindow->ocelot_grid_style_string);
-  setFont(cha_default_font); /* might be overridden by a grid conditional */
-  QFontMetrics fm= QFontMetrics(cha_default_font);
+  chart_default_font= chart_mainwindow->get_font_from_style_sheet(chart_mainwindow->ocelot_grid_style_string);
+  setFont(chart_default_font); /* might be overridden by a grid conditional */
+  QFontMetrics fm= QFontMetrics(chart_default_font);
   set_chart_pixmap_height();
   cha_default_text_color= chart_mainwindow->qt_color(chart_mainwindow->ocelot_grid_text_color);
   cha_default_header_background_color= chart_mainwindow->qt_color(chart_mainwindow->ocelot_grid_header_background_color);
@@ -29005,8 +29013,8 @@ void Chart::default_settings_all()
 //    cha_max_column_height= 0;
 //    cha_setup();
 //  }
-
-
+  group_header= "";
+  width_of_header= 0;
 }
 
 /*
@@ -29032,7 +29040,7 @@ unsigned short int Chart::cha_result_data_type(unsigned short int result_field_t
 
 //void Chart::cha_setup()
 //{
-//  QFontMetrics fm= QFontMetrics(cha_default_font);
+//  QFontMetrics fm= QFontMetrics(chart_default_font);
 //
 //  cha_max_column_width= 0;
 //  for (int i= 0; i < cha_numeric_column_count; ++i)
@@ -29065,10 +29073,10 @@ unsigned short int Chart::cha_result_data_type(unsigned short int result_field_t
 //    }
 //  }
 //
-//  cha_bar_width= fm.boundingRect("W").width();
+//  chart_bar_width= fm.boundingRect("W").width();
 //  cha_chart_column_plus_margin_width= cha_max_column_width;            /* column of chart not column of result set */
-//  if ((chart_type == TOKEN_KEYWORD_BAR) && (cha_bar_width * cha_numeric_column_count > cha_chart_column_plus_margin_width))
-//    cha_chart_column_plus_margin_width= cha_bar_width * cha_numeric_column_count;
+//  if ((chart_type == TOKEN_KEYWORD_BAR) && (chart_bar_width * cha_numeric_column_count > cha_chart_column_plus_margin_width))
+//    cha_chart_column_plus_margin_width= chart_bar_width * cha_numeric_column_count;
 //  if ((chart_type == TOKEN_KEYWORD_PIE) && (chart_bar_line_pie_height > cha_chart_column_plus_margin_width))
 //    cha_chart_column_plus_margin_width= chart_bar_line_pie_height; /* pies are round */
 //  cha_chart_column_plus_margin_width+= CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;             /* "* 2" is arbitrary as extra margin */
@@ -29097,18 +29105,17 @@ unsigned short int Chart::cha_result_data_type(unsigned short int result_field_t
 
 /*
   Supersede cha_setup. Per row.
-  We have QList<double> cha_column_values[CHART_MAX_GRID_ROWS];
+  We have QList<double> cha_column_values;
   cha_column_values[0].at(5) is for grid_row_number=0, column 5.
   Actually we could determine data type right at the start for all rows, dunno whether we should.
-  Warning: crash if grid_row_number > CHART_MAX_GRID_ROWS.
   WHAT ABOUT HEIGHTS????
+  NB: NOW THIS IS IN A LIST PER GRID ROW!
 */
-void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
+void Chart::chart_row_setup(unsigned int tmp_result_row_number)
 {
-  /* NB: NOW THIS IS IN A LIST PER GRID ROW! */
-  chart_max_column_heights[grid_row]= 0;
-  chart_max_column_values[grid_row]= 0;  /* because base is always 0 even if all negative|positive */
-  chart_min_column_values[grid_row]= 0;
+  chart_max_column_heights= 0;
+  chart_max_column_values= 0;  /* because base is always 0 even if all negative|positive */
+  chart_min_column_values= 0;
 
   char *row_pointer;
   int column_length;
@@ -29117,29 +29124,29 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
   {
     row_pointer= cha_result_set_copy_rows[r];
 //    numeric_column_count= 0;
-    chart_column_types[grid_row].clear();
-    cha_texts[grid_row].clear();
-    cha_column_values[grid_row].clear();
-    cha_column_values_as_strings[grid_row].clear();
+    chart_column_types.clear();
+    cha_texts.clear();
+    cha_column_values.clear();
+    cha_column_values_as_strings.clear();
     for (unsigned int i= 0; i < cha_result_column_count; ++i)
     {
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
       char flag= *(row_pointer + sizeof(unsigned int));
-      cha_flags[grid_row].append(flag);
+      cha_flags.append(flag);
       row_pointer+= sizeof(unsigned int) + sizeof(char);
       QByteArray m(row_pointer, column_length);
       unsigned short int chart_column_type= cha_result_data_type(chart_rg->result_field_types[i]);
-      chart_column_types[grid_row].append(chart_column_type);
+      chart_column_types.append(chart_column_type);
       QString column_value_as_string= QString(m);
       double column_value= column_value_as_string.toDouble();
       if (chart_column_type == OCELOT_DATA_TYPE_NUMBER)
       {
-        if (column_value > chart_max_column_values[grid_row]) chart_max_column_values[grid_row]= column_value;
-        if (column_value < chart_min_column_values[grid_row]) chart_min_column_values[grid_row]= column_value;
+        if (column_value > chart_max_column_values) chart_max_column_values= column_value;
+        if (column_value < chart_min_column_values) chart_min_column_values= column_value;
       }
       else column_value= 0;
-      cha_column_values[grid_row].append(column_value);
-      cha_column_values_as_strings[grid_row].append(column_value_as_string);
+      cha_column_values.append(column_value);
+      cha_column_values_as_strings.append(column_value_as_string);
       QString this_column_name;
       char result_field_name[256];
       char *result_field_names_pointer= &cha_result_field_names[0];
@@ -29153,16 +29160,16 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
         result_field_names_pointer+= v_length;
       }
       this_column_name= result_field_name;
-      cha_texts[grid_row].append(this_column_name);
+      cha_texts.append(this_column_name);
       row_pointer+= column_length;
     }
   }
 
   /* Phase 2 */
-  cha_heights[grid_row].clear();
-  chart_max_column_heights[grid_row]= 0;
+  cha_heights.clear();
+  chart_max_column_heights= 0;
 
-  QFontMetrics fm= QFontMetrics(cha_default_font);
+  QFontMetrics fm= QFontMetrics(chart_default_font);
 
 /* NO GOOD -- depend on cell width? */
 //  cha_max_column_width= 0;
@@ -29176,32 +29183,32 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
 //    }
 //  }
   double range_of_column_values;
-  if (chart_max_column_values[grid_row] >= 0)
-    range_of_column_values= chart_max_column_values[grid_row] - chart_min_column_values[grid_row];
+  if (chart_max_column_values >= 0)
+    range_of_column_values= chart_max_column_values - chart_min_column_values;
   else
-    range_of_column_values= 0 - chart_min_column_values[grid_row];
+    range_of_column_values= 0 - chart_min_column_values;
   double minimum_pixels= fm.boundingRect("W").height();
 
   double shrink_or_expand= chart_bar_line_pie_height / (range_of_column_values * minimum_pixels);
 //  if (shrink_or_expand > 1) shrink_or_expand= 1;
-  int base= 0; /* this doesn't change, until users can declare base = minimum */
+
   /* Todo: if numeric_column_count == 0, see what happens. */
 //  for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
 
   {
-    for (int i= 0; i < cha_column_values[grid_row].size(); ++i)
+    for (int i= 0; i < cha_column_values.size(); ++i)
     {
       int height;
-      if (chart_column_types[grid_row].at(i) == OCELOT_DATA_TYPE_NUMBER)
+      if (chart_column_types.at(i) == OCELOT_DATA_TYPE_NUMBER)
       {
         double cv;
-        cv= cha_column_values[grid_row].at(i);
+        cv= cha_column_values.at(i);
         height= round(cv * minimum_pixels * shrink_or_expand);
-        if (height > chart_max_column_heights[grid_row]) chart_max_column_heights[grid_row]= height;
+        if (height > chart_max_column_heights) chart_max_column_heights= height;
 
       }
       else height= 0;
-      cha_heights[grid_row].append(height);
+      cha_heights.append(height);
     }
   }
 
@@ -29210,24 +29217,24 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
      We'll need to take abs(height) from the zero line later.
   */
   double zero_value;
-  if (chart_min_column_values[grid_row] >= 0) zero_value= chart_max_column_values[grid_row];
+  if (chart_min_column_values >= 0) zero_value= chart_max_column_values;
   else
   {
-   if (chart_max_column_values[grid_row] > 0) zero_value= abs(chart_max_column_values[grid_row]);
+   if (chart_max_column_values > 0) zero_value= abs(chart_max_column_values);
    else zero_value= 0;
   }
-  chart_height_of_zero_line[grid_row]= abs(round(zero_value * minimum_pixels * shrink_or_expand));
+  chart_height_of_zero_line= abs(round(zero_value * minimum_pixels * shrink_or_expand));
 
-  cha_bar_width= fm.boundingRect("W").width();
+  chart_bar_width= fm.boundingRect("W").width();
   cha_chart_column_plus_margin_width= cha_max_column_width;            /* column of chart not column of result set */
-  if ((chart_type == TOKEN_KEYWORD_BAR) && (cha_bar_width * cha_numeric_column_count > cha_chart_column_plus_margin_width))
-    cha_chart_column_plus_margin_width= cha_bar_width * cha_numeric_column_count;
+  if ((chart_type == TOKEN_KEYWORD_BAR) && (chart_bar_width * cha_numeric_column_count > cha_chart_column_plus_margin_width))
+    cha_chart_column_plus_margin_width= chart_bar_width * cha_numeric_column_count;
   if ((chart_type == TOKEN_KEYWORD_PIE) && (chart_bar_line_pie_height > cha_chart_column_plus_margin_width))
     cha_chart_column_plus_margin_width= chart_bar_line_pie_height; /* pies are round */
   cha_chart_column_plus_margin_width+= CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;  /* "* 2" is arbitrary as extra margin */
 
   /* todo: this could be too small, a minimum negative value could be wider */
-  cha_max_column_value_as_utf8= QString::number(chart_max_column_values[grid_row]);
+  cha_max_column_value_as_utf8= QString::number(chart_max_column_values);
   cha_left_width= fm.boundingRect(cha_max_column_value_as_utf8).width();
   /* First bar or line or pie should start just after the vertical line */
   cha_x= cha_left_width + cha_default_container_pen_width + CHART_MARGIN_LEFT;
@@ -29236,20 +29243,20 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
   if (chart_type == TOKEN_KEYWORD_PIE) /* todo: maybe we should merge this with other totallers above */
   {
     /* Later when total_height / cha_max_total_height = 1 we fill the column, else we fill less. */
-    chart_max_total_heights[grid_row]= 0;
+    chart_max_total_heights= 0;
     double total_height;
-    for (int i= 0; i < cha_texts[grid_row].size(); ++i)
+    for (int i= 0; i < cha_texts.size(); ++i)
     {
-      if (chart_column_types[grid_row].at(i) == OCELOT_DATA_TYPE_NUMBER)
+      if (chart_column_types.at(i) == OCELOT_DATA_TYPE_NUMBER)
       {
-        if ((i == 0) || (chart_column_types[grid_row].at(i - 1) != OCELOT_DATA_TYPE_NUMBER))
+        if ((i == 0) || (chart_column_types.at(i - 1) != OCELOT_DATA_TYPE_NUMBER))
         {
           total_height= 0; /* series start */
         }
-        if (cha_heights[grid_row].at(i) > 0) total_height+= cha_heights[grid_row].at(i);
-        if ((i == cha_texts[grid_row].size()) - 1 || (chart_column_types[grid_row].at(i + 1) != OCELOT_DATA_TYPE_NUMBER))
+        if (cha_heights.at(i) > 0) total_height+= cha_heights.at(i);
+        if ((i == cha_texts.size()) - 1 || (chart_column_types.at(i + 1) != OCELOT_DATA_TYPE_NUMBER))
         {
-          if (total_height > chart_max_total_heights[grid_row]) chart_max_total_heights[grid_row]= total_height; /* series end */
+          if (total_height > chart_max_total_heights) chart_max_total_heights= total_height; /* series end */
         }
       }
     }
@@ -29270,7 +29277,7 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
 //    In base=minimum i.e. anomaly charts heights are distance from minimum.
 //    In base=0 charts heights are (distance from minimum) + (distance of minimum from 0)
 //  */
-//  QFontMetrics fm= QFontMetrics(cha_default_font);
+//  QFontMetrics fm= QFontMetrics(chart_default_font);
 //  int column_name_height= fm.boundingRect("W").height(); /* ? maybe should be used to state a max height */
 //  /* Huh? Don't we change the brush later anyway? */
 //  painter->setBrush(cha_default_header_brush);
@@ -29326,14 +29333,14 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number, int grid_row)
 //    for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
 //    {
 //      int x_of_bar= cha_x;
-//      x_of_bar+= cha_bar_width * text_lines; /* So 2 numbers in the row cause 2 adjacent bars */
+//      x_of_bar+= chart_bar_width * text_lines; /* So 2 numbers in the row cause 2 adjacent bars */
 //      for (int i= 0; i < cha_texts[0].size(); ++i)
 //      {
 //        int column_height= cha_heights[text_lines].at(i);
 //        QString column_name= cha_texts[text_lines].at(i);
 //        QRect qr_of_bar= QRect(x_of_bar + CHART_MARGIN_LEFT + cha_default_container_pen_width,
 //                             cha_max_column_height - column_height,
-//                             cha_bar_width,
+//                             chart_bar_width,
 //                             column_height);
 //        cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
 //                              text_lines, cha_numeric_column_count);
@@ -29526,13 +29533,13 @@ void Chart::cha_draw_text_prepare(QPainter *painter,
     chart_new_text_pen.setColor(new_color);
     /* This changes weight and style but not size. Original setting was in points not pixels. */
     QFont qf= chart_mainwindow->get_font_from_style_sheet(new_style_sheet);
-    int point_size= cha_default_font.pointSize();
+    int point_size= chart_default_font.pointSize();
     qf.setPointSize(point_size);
     painter->setFont(qf);
   }
   else
   {
-    painter->setFont(cha_default_font);
+    painter->setFont(chart_default_font);
   }
 }
 
@@ -29584,29 +29591,27 @@ void Chart::set_color_palette()
   Return -1 for "not a chartable column at all"
   We draw all columns in group when we see the last, so it's necessary to set both first and last.
 */
-int Chart::column_in_group(int grid_row, int result_column_no)
+int Chart::column_in_group(int result_column_no)
 {
   /* Compare to this test: if ((result_grid->result_field_flags[result_column_no] & NUM_FLAG) != 0) */
-  if (chart_column_types[grid_row].at(result_column_no) != OCELOT_DATA_TYPE_NUMBER) return -1; /* not even a number */
-
+  if (chart_column_types.at(result_column_no) != OCELOT_DATA_TYPE_NUMBER) return -1; /* not even a number */
   for (int i= result_column_no;; --i)
   {
-    if ((i == 0) || (chart_column_types[grid_row].at(i - 1) != OCELOT_DATA_TYPE_NUMBER))
+    if ((i == 0) || (chart_column_types.at(i - 1) != OCELOT_DATA_TYPE_NUMBER))
     {
       chart_first_column_in_group= i;
       break;
     }
   }
-
   chart_last_column_in_group= result_column_no;
   for (int i= result_column_no + 1; ; ++i)
   {
-    if (i >= chart_column_types[grid_row].size())
+    if (i >= chart_column_types.size())
     {
       chart_last_column_in_group= i - 1;
       break;
     }
-    int chart_column_type= chart_column_types[grid_row].at(i);
+    int chart_column_type= chart_column_types.at(i);
     if (chart_column_type != OCELOT_DATA_TYPE_NUMBER)
     {
       chart_last_column_in_group= i - 1;
@@ -29622,14 +29627,18 @@ int Chart::column_in_group(int grid_row, int result_column_no)
   A group is a series of numbers preceded by before-start or non-number, followed by after-end or non-number.
   Todo: Inefficiency: This ends up in base64_tmp. We could dump directly to tmp_pointer.
   Todo: Inefficiency: Surely the size can be figured out in advance so we could memcpy not strcpy.
+  Re bar width: minimum is chart_bar_width which is width of a char's boundingRect(), but if cell can fit wider
+                then stretch_bar_width = (bar_line_pie_width - margins) / number-of-columns-in-group,
+                reversing width_of_bars calculation in chart_set_width()
 */
 int Chart::draw_group(
         long unsigned int tmp_result_row_number,
-        int grid_row, /* TODO! CURRENTLY WE ALWAYS PASS 0! */
         int result_column_no, /* this might happen to = chart_last_column_in_group but we don't use it now */
         int width_i,
         char *output)
 {
+  (void)result_column_no;
+  (void)width_i;
   set_chart_width();
   /* Eventually rename numeric_column_count to number_of_columns_in_group */
   int numeric_column_count= (chart_last_column_in_group - chart_first_column_in_group) + 1;
@@ -29639,8 +29648,9 @@ int Chart::draw_group(
 //  printf("**** column_value=%f.\n", column_value);
 //  !! and it might be %f
   /* Actually we don't need this, we just use background */
-//  QPixmap pixmap(QPixmap(QSize(width, chart_max_column_heights[grid_row])));
+//  QPixmap pixmap(QPixmap(QSize(width, chart_max_column_heights)));
   QPixmap pixmap(QPixmap(QSize(chart_pixmap_width, chart_pixmap_height)));
+
   pixmap.fill(chart_mainwindow->ocelot_grid_background_color);
 
   //QPen pen;
@@ -29653,9 +29663,15 @@ int Chart::draw_group(
   {
     cha_x= CHART_MARGIN_LEFT;
     x_of_bar= cha_x;
-    cha_bar_width= 10;
-    cha_chart_column_plus_margin_width= cha_bar_width; /* OR SOMETHING! */
+//    chart_bar_width= 10; no, it depends on font size and should already be set
+    cha_chart_column_plus_margin_width= chart_bar_width; /* OR SOMETHING! */
   }
+
+  int xx= chart_bar_line_pie_width - ((numeric_column_count - 1) * CHART_MARGIN_BETWEEN_BARS);
+  int stretch_bar_width= xx / numeric_column_count;
+
+  if (stretch_bar_width < chart_bar_width) stretch_bar_width= chart_bar_width;
+
   int start_angle_of_pie;
   double height_of_pie;
   double total_height_of_pie= 0;
@@ -29667,19 +29683,20 @@ int Chart::draw_group(
 
   int caption_x= 0;
 
+
   if (chart_type == TOKEN_KEYWORD_PIE)
   {
-//    for (int i= 0; i < cha_texts[grid_row].size(); ++i)
+//    for (int i= 0; i < cha_texts.size(); ++i)
     {
 //      int x_of_pie= cha_x;
 //      x_of_pie+= chart_bar_line_pie_height * i;
       total_height_of_pie= 0;
       for (int column_number= chart_first_column_in_group; column_number <= chart_last_column_in_group; ++column_number)
       {
-        if (cha_heights[grid_row].at(column_number) >= 0)
-          total_height_of_pie+= cha_heights[grid_row].at(column_number); /* i.e. total height of this group */
+        if (cha_heights.at(column_number) >= 0)
+          total_height_of_pie+= cha_heights.at(column_number); /* i.e. total height of this group */
       }
-      shrink_of_pie= total_height_of_pie / chart_max_total_heights[grid_row]; /* if you want all pies equal size, let shrink be 1 */
+      shrink_of_pie= total_height_of_pie / chart_max_total_heights; /* if you want all pies equal size, let shrink be 1 */
       double max_area= chart_bar_line_pie_height * chart_bar_line_pie_height; /* e.g. 10 x 10 = 100 */
       double area_of_pie= max_area * shrink_of_pie;          /* e.g. 100 * .5 = 50 */
       height_of_pie= sqrt(area_of_pie);                            /* e.g. sqrt(50) = 7.071 */
@@ -29691,63 +29708,72 @@ int Chart::draw_group(
   for (int column_number= chart_first_column_in_group; column_number <= chart_last_column_in_group; ++column_number)
   {
     /* Set chart_new_rect_brush etc. to chart_default_rect_brush etc., maybe change if conditional setting */
-    QString column_name= cha_texts[grid_row].at(column_number); /* misnamed? isn't this content? */
+    QString column_name= cha_texts.at(column_number); /* misnamed? isn't this content? */
+
+    if ((cha_flags.at(column_number) & FIELD_VALUE_FLAG_IS_NULL) != 0)
+      chart_new_rect_brush.setColor(chart_mainwindow->ocelot_grid_background_color);
+
     cha_draw_text_prepare(&pixmap_painter, column_number, column_name, tmp_result_row_number, TEXTEDITFRAME_CELL_TYPE_DETAIL,
                           column_number, numeric_column_count);
+
     pixmap_painter.setBrush(chart_new_rect_brush);
     if (chart_type == TOKEN_KEYWORD_LINE) pixmap_painter.setPen(chart_new_container_pen);
     /* cha_draw_text_prepare also set chart_new_text_pen, for captions, below */
-    int bar_or_line_height= cha_heights[grid_row].at(column_number); /* i.e. bar height */
-    int bar_or_line_y= chart_max_column_heights[grid_row] - bar_or_line_height;
-    int bar_or_line_column_height= cha_heights[grid_row].at(column_number);
+    int bar_or_line_height= cha_heights.at(column_number); /* i.e. bar height */
+
+    if ((cha_flags.at(column_number) & FIELD_VALUE_FLAG_IS_NULL) != 0)
+      bar_or_line_height= chart_max_column_heights / 2;
+
+    int bar_or_line_y= chart_max_column_heights - bar_or_line_height;
+    int bar_or_line_column_height= cha_heights.at(column_number);
     /* TODO: Look at heights, not values? */
     {
-      if (cha_column_values[grid_row].at(column_number) >= 0)
+      if (cha_column_values.at(column_number) >= 0)
       {
-    //          column_height-= chart_height_of_zero_line[grid_row];
+    //          column_height-= chart_height_of_zero_line;
       }
       else
       {
-        bar_or_line_y= chart_max_column_heights[grid_row];
+        bar_or_line_y= chart_max_column_heights;
         bar_or_line_column_height= abs(bar_or_line_column_height);
       }
     }
 
     if (chart_type == TOKEN_KEYWORD_BAR)      /* So 2 numbers in the row cause 2 adjacent bars */
     {
-//      int height= cha_heights[grid_row].at(column_number); /* i.e. bar height */
-//      int y= chart_max_column_heights[grid_row] - height;
+//      int height= cha_heights.at(column_number); /* i.e. bar height */
+//      int y= chart_max_column_heights - height;
       x_of_bar= cha_x;
-      x_of_bar+= (cha_bar_width + CHART_MARGIN_BETWEEN_BARS) * (column_number - chart_first_column_in_group);
+      x_of_bar+= (stretch_bar_width + CHART_MARGIN_BETWEEN_BARS) * (column_number - chart_first_column_in_group);
 
       QRect qr_of_bar;
       qr_of_bar= QRect(x_of_bar,
                        CHART_MARGIN_TOP + bar_or_line_y,
-                       cha_bar_width,
+                       stretch_bar_width,
                        bar_or_line_column_height);
       pixmap_painter.drawRect(qr_of_bar);
     }
     if (chart_type == TOKEN_KEYWORD_LINE)
     {
-//      int height= cha_heights[grid_row].at(column_number); /* i.e. bar height */
-//      int y= chart_max_column_heights[grid_row] - height;
+//      int height= cha_heights.at(column_number); /* i.e. bar height */
+//      int y= chart_max_column_heights - height;
       x_of_bar= cha_x;
-      x_of_bar+= (cha_bar_width + CHART_MARGIN_BETWEEN_BARS) * (column_number - chart_first_column_in_group);
-//      int column_height= cha_heights[grid_row].at(column_number);
-      if (cha_column_values[grid_row].at(column_number) < 0)
+      x_of_bar+= (stretch_bar_width + CHART_MARGIN_BETWEEN_BARS) * (column_number - chart_first_column_in_group);
+//      int column_height= cha_heights.at(column_number);
+      if (cha_column_values.at(column_number) < 0)
         bar_or_line_y+= abs(bar_or_line_column_height);
 
-      QRect qr_of_bar= QRect(x_of_bar,
+      QRect qr_of_little_bar= QRect(x_of_bar,
                            CHART_MARGIN_TOP + bar_or_line_y,
-                           14,
-                           2);
-      pixmap_painter.drawRect(qr_of_bar);
+                           CHART_LITTLE_BAR_WIDTH,
+                           CHART_LITTLE_BAR_HEIGHT);
+      pixmap_painter.drawRect(qr_of_little_bar);
       if (column_number != chart_first_column_in_group)
       {
         QLineF line;
-        line= QLineF(x_of_bar + 14/2,
+        line= QLineF(x_of_bar + CHART_LITTLE_BAR_WIDTH/2,
                      CHART_MARGIN_TOP + bar_or_line_y,
-                     prev_x_of_bar + 14/2,
+                     prev_x_of_bar + CHART_LITTLE_BAR_WIDTH/2,
                      CHART_MARGIN_TOP + prev_y);
         pixmap_painter.drawLine(line);
       }
@@ -29762,11 +29788,11 @@ int Chart::draw_group(
       /* initially start_angle_of_pie == 0 * 180 */
 //      for (int column_number= 0; column_number < cha_numeric_column_count; ++column_number)
       {
-        if (cha_heights[grid_row].at(column_number) > 0)
+        if (cha_heights.at(column_number) > 0)
         {
-          double fraction_of_total_height= cha_heights[grid_row].at(column_number) / total_height_of_pie;
+          double fraction_of_total_height= cha_heights.at(column_number) / total_height_of_pie;
           double adj= 5760 * fraction_of_total_height;
-//          QString column_name= cha_texts[grid_row].at(column_number);
+//          QString column_name= cha_texts.at(column_number);
           QRect qr_of_pie= QRect(CHART_MARGIN_LEFT,
                                CHART_MARGIN_TOP,
                                height_of_pie_rounded, /* = chart_bar_line_pie_height if total height = maximum */
@@ -29783,8 +29809,8 @@ int Chart::draw_group(
     if ((chart_type == TOKEN_KEYWORD_BAR) || (chart_type == TOKEN_KEYWORD_LINE))
     {
       /* zero line. color=last in palette e.g. navy, size=fixed, length=max, position=where zero would be */
-      QLineF zero_line= QLineF(0, CHART_MARGIN_TOP + chart_height_of_zero_line[grid_row],
-                               chart_pixmap_width, CHART_MARGIN_TOP + chart_height_of_zero_line[grid_row]);
+      QLineF zero_line= QLineF(0, CHART_MARGIN_TOP + chart_height_of_zero_line,
+                               chart_pixmap_width, CHART_MARGIN_TOP + chart_height_of_zero_line);
       QPen zero_line_pen= cha_default_container_pen;
       char zero_line_color[8];
       strcpy(zero_line_color, cha_color_palette[cha_color_palette_count - 1]);
@@ -29795,8 +29821,8 @@ int Chart::draw_group(
     }
 
     /* caption i.e. text underneath chart at bottom of pixmap */ /* SHOULD BE COLUMN VALUES! */
-    QString cv_as_s= cha_column_values_as_strings[grid_row].at(column_number);
-    QFontMetrics fm= QFontMetrics(cha_default_font);
+    QString cv_as_s= cha_column_values_as_strings.at(column_number);
+    QFontMetrics fm= QFontMetrics(chart_default_font);
     int caption_width= fm.boundingRect(cv_as_s).width();
     int caption_height= fm.boundingRect("W").height(); /* should be same as what we get in set_chart_pixmap_height() */
     pixmap_painter.setPen(chart_new_text_pen);
@@ -29809,7 +29835,7 @@ int Chart::draw_group(
     caption_x+= caption_width;
   }
 //return_point:
-//  int y= chart_max_column_heights[grid_row] - height;
+//  int y= chart_max_column_heights - height;
 //  pixmap_painter.drawRect(QRect(0, y, width, height));
   pixmap_painter.end();
   QByteArray ba;
@@ -29839,7 +29865,8 @@ int Chart::draw_group(
 */
 void Chart::set_chart_pixmap_height()
 {
-  QFontMetrics fm= QFontMetrics(cha_default_font);
+
+  QFontMetrics fm= QFontMetrics(chart_default_font);
 
   int height_of_bar= fm.boundingRect("W").height();
 //  int height_of_bars= height_of_bar * group_columns_count;
@@ -29881,7 +29908,6 @@ void Chart::set_chart_pixmap_height()
   chart_bar_line_pie_height-= CHART_MARGIN_TOP + CHART_MARGIN_BOTTOM;
 
 //  chart_bar_line_pie_height-= 10; /* why 10? dunno */
-
 }
 
 /*
@@ -29902,19 +29928,21 @@ void Chart::set_chart_width()
   if (chart_type == TOKEN_KEYWORD_BAR)
   {
     int group_columns_count= (chart_last_column_in_group - chart_first_column_in_group) + 1;
-    int width_of_bars= cha_bar_width * group_columns_count;
+    int width_of_bars= chart_bar_width * group_columns_count;
     width_of_bars+= CHART_MARGIN_BETWEEN_BARS * (group_columns_count - 1);
-    chart_bar_line_pie_width= width_of_bars;
-    chart_pixmap_width= chart_bar_line_pie_width + CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;
+    chart_pixmap_width= width_of_bars + (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
     if (width_n_total > chart_pixmap_width) chart_pixmap_width= width_n_total;
+    if (width_of_header > chart_pixmap_width) chart_pixmap_width= width_of_header;
+    chart_bar_line_pie_width= chart_pixmap_width - (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
   }
-  if (chart_type == TOKEN_KEYWORD_LINE)
+  else if (chart_type == TOKEN_KEYWORD_LINE)
   {
     int group_columns_count= (chart_last_column_in_group - chart_first_column_in_group) + 1;
-    int width_of_bars= cha_bar_width * group_columns_count;
+    int width_of_bars= chart_bar_width * group_columns_count;
     chart_bar_line_pie_width= width_of_bars;
-    chart_pixmap_width= chart_bar_line_pie_width + CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;
+    chart_pixmap_width= width_of_bars + (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
     if (width_n_total > chart_pixmap_width) chart_pixmap_width= width_n_total;
+    chart_bar_line_pie_width= chart_pixmap_width - (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
   }
   else /* TOKEN_KEYWORD_PIE */
   {
