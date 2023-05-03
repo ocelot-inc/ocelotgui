@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: April 28 2023
+   Last modified: May 3 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -11834,7 +11834,8 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   /* See whether general format is SET ocelot_... = value ;". Read comment with label = "client variables" */
   if (i2 >= 4)
   {
-    if (sub_token_types[0] == TOKEN_KEYWORD_SET)
+    if ((sub_token_types[0] == TOKEN_KEYWORD_SET)
+      && (sub_token_types[1] >= TOKEN_KEYWORD_OCELOT_BATCH) && (sub_token_types[1] <= TOKEN_KEYWORD_OCELOT_XML))
     {
       if (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
       {
@@ -11871,8 +11872,29 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         put_message_in_result("OK");
         return 1;
       }
-      // todo: I think we won't get here if name doesn't start with ocelot_, but maybe make sure again
-      if ((sub_token_types[4] == TOKEN_KEYWORD_WHERE) || (text.mid(sub_token_offsets[4], sub_token_lengths[4]) == ","))
+      /* set ocelot_... can be followed by multiple assignments and a where clause */
+      /* warning: assignements can succeed and later statement can fail */
+      int er_of_set_statement= 0;
+      int i_of_set_statement= main_token_number; /* start at beginning and skip till after set */
+      while ((main_token_types[i_of_set_statement] < TOKEN_KEYWORD_OCELOT_BATCH)
+        || (main_token_types[i_of_set_statement] > TOKEN_KEYWORD_OCELOT_XML))
+      {
+        ++i_of_set_statement; /* it will skip at least once, but we know ocelot_ is in the statement */
+      }
+      for (;;)
+      {
+        int token_type= main_token_types[i_of_set_statement];
+        i_of_set_statement= next_token(i_of_set_statement); /* to "=" (if syntax ok) */
+        i_of_set_statement= next_token(i_of_set_statement); /* to operand (if syntax ok) */
+        er_of_set_statement= xsettings_widget->ocelot_variable_set(token_type,
+                text.mid(main_token_offsets[i_of_set_statement], main_token_lengths[i_of_set_statement]));
+        if (er_of_set_statement != ER_OK) break;
+        i_of_set_statement= next_token(i_of_set_statement); /* to , or where (if syntax ok) */
+        if (text.mid(main_token_offsets[i_of_set_statement], main_token_lengths[i_of_set_statement]) != ",")
+          break;
+        i_of_set_statement= next_token(i_of_set_statement); /* to next assignment (if syntax ok) */
+      }
+      if (main_token_types[i_of_set_statement] == TOKEN_KEYWORD_WHERE)
       {
         if (conditional_settings.count() >= ocelot_max_conditions)
         {
@@ -11881,26 +11903,15 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
           put_message_in_result(msg);
           return 1;
         }
-        int er= conditional_settings_insert(text);
-        if (er != ER_OVERFLOW)
-        {
-          explorer_show_after_change();
-          make_and_put_message_in_result(er, 0, (char*)"");
-          return 1;
-        }
+        er_of_set_statement= conditional_settings_insert(text);
+        if (er_of_set_statement == ER_OK) explorer_show_after_change();
       }
-      else
-      {
-        int er= xsettings_widget->ocelot_variable_set(sub_token_types[1], text.mid(sub_token_offsets[3], sub_token_lengths[3]));
-        if (er != ER_OVERFLOW)
-        {
-          make_and_put_message_in_result(er, 0, (char*)"");
-          return 1;
-        }
-      }
+      /* if there's junk after assignments and where, it's ignored */
+      make_and_put_message_in_result(er_of_set_statement, 0, (char*)"");
+      return 1;
     }
   }
-  return 0;
+  return 0; /* not client statement */
 }
 
 /*
@@ -20003,7 +20014,8 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
         if (cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
         {
           result_grid->chart_widget->group_header= "";
-          result_grid->chart_widget->width_of_header= 0;
+          int lcig= result_grid->chart_widget->chart_last_column_in_group;
+          result_grid->chart_widget->chart_header_widths[lcig]= 0;
         }
       }
       result_grid->chart_widget->width_n_total+= width_n;
@@ -20015,7 +20027,6 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       }
       if (result_grid->chart_widget->chart_last_column_in_group == (int) result_column_no)
       {
-        /* TEST!! TMP!! */
         if (cell_type == TEXTEDITFRAME_CELL_TYPE_HEADER)
         {
           strcpy(result_pointer_of_chart_header, result_grid->chart_widget->group_header.toUtf8());
@@ -20023,8 +20034,9 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
           result_pointer= result_pointer_of_chart_header;
           v_length= v_length_of_chart_header;
           QFontMetrics chart_fm= QFontMetrics(result_grid->chart_widget->chart_default_font);
-          width_n= chart_fm.boundingRect(result_pointer_of_chart_header).width() + 10; /* why + 10? dunno */
-          result_grid->chart_widget->width_of_header= width_n;
+          /* Why + 5? dunno. maybe it's something to do with QFontMetrics bearing with italics? */
+          width_n= chart_fm.boundingRect(result_pointer_of_chart_header).width() + 5;
+          result_grid->chart_widget->chart_header_widths[result_column_no]= width_n;
         }
         is_chart= true;
       }
@@ -20154,7 +20166,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
       char *base64_tmp;
 #if (OCELOT_CHART == 1)
       if (is_chart == true)
-        base64_tmp= new char[100000];
+        base64_tmp= new char[CHART_MAX_BYTE_SIZE];
       else
 #endif
       base64_tmp= new char[(v_length * 4) / 3 + 64];
@@ -28932,7 +28944,7 @@ void MainWindow::explorer_close()
   The constructor includes: copying pointers to outer widgets, making copies of things that
   came out of result_grid->scan_rows when the selection was made.
   Assume these cannot be affected by later resize/move/font-change/colour-change.
-  Do not change anything assigned here in later Chart:: functions.
+  Recommendation: Do not change anything assigned here in later Chart:: functions.
 */
 
 Chart::Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_type)
@@ -28944,32 +28956,42 @@ Chart::Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_typ
 
   cha_result_column_count= chart_rg->result_column_count;
   cha_result_row_count= chart_rg->result_row_count;
-  //cha_result_set_copy= chart_rg->result_set_copy;
   cha_result_set_copy_rows= chart_rg->result_set_copy_rows;
   cha_result_field_names= chart_rg->result_field_names;
-
+  chart_column_types.clear(); /* probably unnecessary, it should be clear initially, and we clear again later */
+  {
+    chart_column_names.clear();
+    QString this_column_name;
+    char result_field_name[256];
+    char *result_field_names_pointer= &cha_result_field_names[0];
+    unsigned int v_length;
+    for (unsigned int j= 0; j < cha_result_column_count; ++j)
+    {
+      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      result_field_names_pointer+= sizeof(unsigned int);
+      memcpy(result_field_name, result_field_names_pointer, v_length);
+      result_field_name[v_length]= '\0';
+      result_field_names_pointer+= v_length;
+      this_column_name= result_field_name;
+      chart_column_names.append(this_column_name);
+    }
+  }
   /* TODO: We would already know cha_numeric_column_count if we would call cha_setup()?! */
   cha_numeric_column_count= 0;
   for (unsigned int i= 0; i < cha_result_column_count; ++i)
   {
-    unsigned short int rft= cha_result_data_type(chart_rg->result_field_types[i]);
+    unsigned short int rft= cha_result_data_type(chart_rg->result_field_types[i], chart_column_names[i]);
     if (rft == OCELOT_DATA_TYPE_NUMBER)
     {
       ++cha_numeric_column_count;
-      /* if (cha_numeric_column_count == CHART_MAX_GRID_ROWS) break; */ /* todo: maybe a limit is good, though? */
+      /* if (cha_numeric_column_count == CHART_MAX_GROUP_SIZE) break; */ /* maybe a limit is good, though? */
     }
   }
   /* Following will be superseded because min and max are per-row  now */
   cha_max_column_height= 0;
   cha_max_column_value= 0;  /* because base is always 0 even if all negative|positive */
   cha_min_column_value= 0;
-//  int numeric_column_count= 0; /* eventually becomes same as cha_numeric_column_count */
-
-//  char *row_pointer;
-//  int column_length;
-
   default_settings_all();
-
 }
 
 void Chart::default_settings_all()
@@ -28997,24 +29019,9 @@ void Chart::default_settings_all()
   cha_default_detail_brush.setStyle(Qt::SolidPattern);
   cha_default_detail_brush.setColor(cha_default_detail_background_color);
   cha_default_text_pen.setColor(cha_default_text_color);
-
-  //double maximum_pixels= chart_mainwindow->ocelot_grid_height.toUtf8().toDouble();
-  //if (maximum_pixels < minimum_pixels) maximum_pixels= chart_mainwindow->height();
-
-
-//  cha_setup();
-//  int max_x= cha_x + cha_chart_column_plus_margin_width * cha_texts[0].size();
-  /* GOTTA FIGURE OUT SOMETHING RE HORIZONTAL SCROLL BAR! */
-  /* if there will probably be a horizontal scroll bar, redo height (but I think we get this a bit wrong) */
-//  if (max_x > chart_bar_line_pie_width)
-//  {
-//    chart_bar_line_pie_height-= QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent);
-//    for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines) cha_heights[text_lines].clear();
-//    cha_max_column_height= 0;
-//    cha_setup();
-//  }
-  group_header= "";
-  width_of_header= 0;
+  group_header= ""; /* not sure that we use this any more */
+  chart_header_widths.clear();
+  for (unsigned int i= 0; i < cha_result_column_count; ++i) chart_header_widths.append(0);
 }
 
 /*
@@ -29022,9 +29029,12 @@ void Chart::default_settings_all()
   Todo: since we might call this frequently we might want to save the result.
   Todo: there might be some generic function elsewhere that does something similar to this, look around.
   For example, maybe NUM_FLAG means something.
+  But some functions might say BOOL and BIT are numeric, which we don't want.
+  Special case: don't include columns whose names end with _id since by convention _id is for identifiers.
 */
-unsigned short int Chart::cha_result_data_type(unsigned short int result_field_type)
+unsigned short int Chart::cha_result_data_type(unsigned short int result_field_type, QString column_name)
 {
+  if (column_name.right(3).toUpper() == "_ID") return OCELOT_DATA_TYPE_BLOB;
   unsigned short int ft= result_field_type;
   if ((ft == OCELOT_DATA_TYPE_DATE) || (ft == OCELOT_DATA_TYPE_TIME) || (ft == OCELOT_DATA_TYPE_DATETIME)
    || (ft == OCELOT_DATA_TYPE_VAR_STRING) || (ft == OCELOT_DATA_TYPE_STRING) || (ft == OCELOT_DATA_TYPE_TEXT))
@@ -29038,78 +29048,11 @@ unsigned short int Chart::cha_result_data_type(unsigned short int result_field_t
   return OCELOT_DATA_TYPE_BLOB;
 }
 
-//void Chart::cha_setup()
-//{
-//  QFontMetrics fm= QFontMetrics(chart_default_font);
-//
-//  cha_max_column_width= 0;
-//  for (int i= 0; i < cha_numeric_column_count; ++i)
-//  {
-//    for (int j= 0; j < cha_texts[i].size(); ++j)
-//    {
-//      QString this_column_name= cha_texts[i].at(j);
-//      int this_column_name_width= fm.boundingRect(this_column_name).width() + CHART_MARGIN_LEFT;
-//      if (this_column_name_width > cha_max_column_width) cha_max_column_width= this_column_name_width;
-//    }
-//  }
-//  double range_of_column_values= cha_max_column_value - cha_min_column_value;
-//  double minimum_pixels= fm.boundingRect("W").height();
-//
-//  double shrink_or_expand= chart_bar_line_pie_height / (range_of_column_values * minimum_pixels);
-////  if (shrink_or_expand > 1) shrink_or_expand= 1;
-//  int base= 0; /* this doesn't change, until users can declare base = minimum */
-//  /* Todo: if numeric_column_count == 0, see what happens. */
-//  for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//  {
-//    for (int i= 0; i < cha_column_values[0].size(); ++i)
-//    {
-//      double cv;
-//      cv= cha_column_values[text_lines].at(i);
-//      cv= cv - cha_min_column_value;
-//      if (base == 0) cv= cv + abs(cha_min_column_value);
-//      int height= round(cv * minimum_pixels * shrink_or_expand);
-//      cha_heights[text_lines].append(height);
-//      if (height > cha_max_column_height) cha_max_column_height= height;
-//    }
-//  }
-//
-//  chart_bar_width= fm.boundingRect("W").width();
-//  cha_chart_column_plus_margin_width= cha_max_column_width;            /* column of chart not column of result set */
-//  if ((chart_type == TOKEN_KEYWORD_BAR) && (chart_bar_width * cha_numeric_column_count > cha_chart_column_plus_margin_width))
-//    cha_chart_column_plus_margin_width= chart_bar_width * cha_numeric_column_count;
-//  if ((chart_type == TOKEN_KEYWORD_PIE) && (chart_bar_line_pie_height > cha_chart_column_plus_margin_width))
-//    cha_chart_column_plus_margin_width= chart_bar_line_pie_height; /* pies are round */
-//  cha_chart_column_plus_margin_width+= CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;             /* "* 2" is arbitrary as extra margin */
-//
-//  /* todo: this could be too small, a minimum negative value could be wider */
-//  cha_max_column_value_as_utf8= QString::number(cha_max_column_value);
-//  cha_left_width= fm.boundingRect(cha_max_column_value_as_utf8).width();
-//  /* First bar or line or pie should start just after the vertical line */
-//  cha_x= cha_left_width + cha_default_container_pen_width + CHART_MARGIN_LEFT;
-//
-//  if (chart_type == TOKEN_KEYWORD_PIE) /* todo: maybe we should merge this with other totallers above */
-//  {
-//    /* Later when total_height / cha_max_total_height = 1 we fill the column, else we fill less. */
-//    cha_max_total_height= 0;
-//    for (int i= 0; i < cha_texts[0].size(); ++i)
-//    {
-//      double total_height= 0;
-//      for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//      {
-//        total_height+= cha_heights[text_lines].at(i);
-//      }
-//      if (total_height > cha_max_total_height) cha_max_total_height= total_height;
-//    }
-//  }
-//}
-
 /*
   Supersede cha_setup. Per row.
   We have QList<double> cha_column_values;
-  cha_column_values[0].at(5) is for grid_row_number=0, column 5.
+  cha_column_values[5].at(5) is for column 5.
   Actually we could determine data type right at the start for all rows, dunno whether we should.
-  WHAT ABOUT HEIGHTS????
-  NB: NOW THIS IS IN A LIST PER GRID ROW!
 */
 void Chart::chart_row_setup(unsigned int tmp_result_row_number)
 {
@@ -29123,9 +29066,7 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number)
   long unsigned int r= tmp_result_row_number;
   {
     row_pointer= cha_result_set_copy_rows[r];
-//    numeric_column_count= 0;
     chart_column_types.clear();
-    cha_texts.clear();
     cha_column_values.clear();
     cha_column_values_as_strings.clear();
     for (unsigned int i= 0; i < cha_result_column_count; ++i)
@@ -29135,7 +29076,7 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number)
       cha_flags.append(flag);
       row_pointer+= sizeof(unsigned int) + sizeof(char);
       QByteArray m(row_pointer, column_length);
-      unsigned short int chart_column_type= cha_result_data_type(chart_rg->result_field_types[i]);
+      unsigned short int chart_column_type= cha_result_data_type(chart_rg->result_field_types[i], chart_column_names[i]);
       chart_column_types.append(chart_column_type);
       QString column_value_as_string= QString(m);
       double column_value= column_value_as_string.toDouble();
@@ -29147,20 +29088,6 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number)
       else column_value= 0;
       cha_column_values.append(column_value);
       cha_column_values_as_strings.append(column_value_as_string);
-      QString this_column_name;
-      char result_field_name[256];
-      char *result_field_names_pointer= &cha_result_field_names[0];
-      unsigned int v_length;
-      for (unsigned int j= 0; j <= i; ++j)
-      {
-        memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
-        result_field_names_pointer+= sizeof(unsigned int);
-        memcpy(result_field_name, result_field_names_pointer, v_length);
-        result_field_name[v_length]= '\0';
-        result_field_names_pointer+= v_length;
-      }
-      this_column_name= result_field_name;
-      cha_texts.append(this_column_name);
       row_pointer+= column_length;
     }
   }
@@ -29171,17 +29098,6 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number)
 
   QFontMetrics fm= QFontMetrics(chart_default_font);
 
-/* NO GOOD -- depend on cell width? */
-//  cha_max_column_width= 0;
-//  for (int i= 0; i < cha_numeric_column_count; ++i)
-//  {
-//    for (int j= 0; j < cha_texts[i].size(); ++j)
-//    {
-//      QString this_column_name= cha_texts[i].at(j);
-//      int this_column_name_width= fm.boundingRect(this_column_name).width() + CHART_MARGIN_LEFT;
-//      if (this_column_name_width > cha_max_column_width) cha_max_column_width= this_column_name_width;
-//    }
-//  }
   double range_of_column_values;
   if (chart_max_column_values >= 0)
     range_of_column_values= chart_max_column_values - chart_min_column_values;
@@ -29245,7 +29161,7 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number)
     /* Later when total_height / cha_max_total_height = 1 we fill the column, else we fill less. */
     chart_max_total_heights= 0;
     double total_height;
-    for (int i= 0; i < cha_texts.size(); ++i)
+    for (int i= 0; i < chart_column_names.size(); ++i)
     {
       if (chart_column_types.at(i) == OCELOT_DATA_TYPE_NUMBER)
       {
@@ -29254,224 +29170,15 @@ void Chart::chart_row_setup(unsigned int tmp_result_row_number)
           total_height= 0; /* series start */
         }
         if (cha_heights.at(i) > 0) total_height+= cha_heights.at(i);
-        if ((i == cha_texts.size()) - 1 || (chart_column_types.at(i + 1) != OCELOT_DATA_TYPE_NUMBER))
+        if ((i == chart_column_names.size()) - 1 || (chart_column_types.at(i + 1) != OCELOT_DATA_TYPE_NUMBER))
         {
           if (total_height > chart_max_total_heights) chart_max_total_heights= total_height; /* series end */
         }
       }
     }
   }
+  set_byte_size();
 }
-
-/*
-  Line width = ocelot_grid_border_size.
-  Todo: some of this could maybe be in default_settings_chart().
-  Maximum height = whatever's biggest, we adjust to widget's size
-  Range = Lowest to highest, can be negative, can be double precision, we use double
-          This is what we need for deciding height of object, and left-margin wording i.e. "range bar"
-*/
-//void Chart::cha_draw(QPainter* painter)
-//{
-//  /* Todo: inf? null? NaN? */
-//  /*
-//    In base=minimum i.e. anomaly charts heights are distance from minimum.
-//    In base=0 charts heights are (distance from minimum) + (distance of minimum from 0)
-//  */
-//  QFontMetrics fm= QFontMetrics(chart_default_font);
-//  int column_name_height= fm.boundingRect("W").height(); /* ? maybe should be used to state a max height */
-//  /* Huh? Don't we change the brush later anyway? */
-//  painter->setBrush(cha_default_header_brush);
-//  /* Huh? Isn't this already done? */
-//  QString color_of_rect_border= chart_mainwindow->ocelot_grid_cell_border_color;
-//  cha_default_container_pen.setColor(color_of_rect_border);
-//
-//  /* Numbers on the left of the vertical line */
-//  painter->setPen(cha_default_text_pen);
-//
-//  QRect qr_of_left;
-//  qr_of_left= QRect(0, 0 + CHART_MARGIN_TOP, cha_left_width, column_name_height);
-//  painter->drawText(qr_of_left, Qt::AlignRight, cha_max_column_value_as_utf8);
-//  qr_of_left= QRect(0, (cha_max_column_height - column_name_height)  + CHART_MARGIN_TOP, cha_left_width, column_name_height);
-//  painter->drawText(qr_of_left, Qt::AlignRight, "0");
-//  painter->setPen(cha_default_container_pen);
-//  {
-//    QLineF horizontal_line;
-//    horizontal_line= QLineF(cha_left_width, cha_max_column_height, cha_x + cha_texts[0].size() * cha_chart_column_plus_margin_width, cha_max_column_height);
-//    painter->drawLine(horizontal_line);
-//  }
-//  {
-//    QLineF vertical_line;
-//    vertical_line= QLineF(cha_left_width + cha_default_container_pen_width / 2, 0,
-//                          cha_left_width + cha_default_container_pen_width / 2, cha_max_column_height);
-//    painter->drawLine(vertical_line);
-//  }
-//
-//  painter->setPen(cha_default_text_pen);
-//  int y_of_column_name= cha_default_container_pen_width + cha_max_column_height + 5; /* Well, should be below the horizontal line */
-//  for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//  {
-//    int x_of_column_name= cha_x;
-//    for (int i= 0; i < cha_texts[0].size(); ++i) /* i = resultset-row-number, text_lines = resultset-column-number */
-//    {
-//      QString column_name= cha_texts[text_lines].at(i);
-//      QRect qr_of_column= QRect(x_of_column_name + CHART_MARGIN_LEFT + cha_default_container_pen_width,
-//                                y_of_column_name + CHART_MARGIN_TOP,
-//                                x_of_column_name + cha_max_column_width,
-//                                column_name_height);
-//      cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
-//                            text_lines, cha_numeric_column_count);
-//      painter->drawText(qr_of_column, Qt::AlignLeft, column_name);
-//      x_of_column_name+= cha_chart_column_plus_margin_width;
-//    }
-//    y_of_column_name+= column_name_height;
-//  }
-//  painter->setPen(cha_default_container_pen);
-
-/* Following has been shifted */
-//  if (chart_type == TOKEN_KEYWORD_BAR)
-//  {
-//    for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//    {
-//      int x_of_bar= cha_x;
-//      x_of_bar+= chart_bar_width * text_lines; /* So 2 numbers in the row cause 2 adjacent bars */
-//      for (int i= 0; i < cha_texts[0].size(); ++i)
-//      {
-//        int column_height= cha_heights[text_lines].at(i);
-//        QString column_name= cha_texts[text_lines].at(i);
-//        QRect qr_of_bar= QRect(x_of_bar + CHART_MARGIN_LEFT + cha_default_container_pen_width,
-//                             cha_max_column_height - column_height,
-//                             chart_bar_width,
-//                             column_height);
-//        cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
-//                              text_lines, cha_numeric_column_count);
-//        painter->drawRect(qr_of_bar);
-//        x_of_bar+= cha_chart_column_plus_margin_width; /* so next set of bars is right over column name */
-//      }
-//    }
-//  }
-/* Following has been shifted */
-//  if (chart_type == TOKEN_KEYWORD_LINE)
-//  {
-//    /* We'll be using cha_default_container_pen */
-////    painter->setPen(cha_default_text_pen);
-////cha_default_container_pen.setWidth(12);
-//
-//    for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//    {
-//      int x_of_line= cha_x;
-//      int prev_x= cha_x;
-//      int prev_column_height= 0;
-//      for (int i= 0; i < cha_texts[0].size(); ++i)
-//      {
-//        int column_height= cha_heights[text_lines].at(i); /* todo: flaw: cha_heights is double. so round? */
-//        QLineF horizontal_line;
-//        QString column_name= cha_texts[text_lines].at(i);
-//        int x1= prev_x + CHART_MARGIN_LEFT + cha_default_container_pen_width;
-//        int y1= cha_max_column_height - prev_column_height;
-//        int w1= x_of_line + cha_chart_column_plus_margin_width;
-//        int l1= cha_max_column_height - column_height;
-//        horizontal_line= QLineF(x1, y1, w1, l1);
-////        if (i == 0) /* line to first position would be zero-length so we could skip it */
-////        {
-////          /* prev_column_height= column_height; will happen */
-////          /* prev_x remains cha_x */
-////        }
-////        else
-//        {
-//          cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
-//                                text_lines, cha_numeric_column_count);
-//          painter->drawLine(horizontal_line);
-//          x_of_line+= cha_chart_column_plus_margin_width; /* so next set of lines is right over column name */
-//          prev_x= x_of_line;
-//        }
-//        prev_column_height= column_height;
-//      }
-//    }
-//  }
-/* Following has been shifted */
-//  if (chart_type == TOKEN_KEYWORD_PIE)
-//  {
-//    /* A full circle is 16 * 360 = 5760 */
-//    /* Todo: dunno what to do with negatives */
-//
-//    int x= cha_x;
-//    for (int i= 0; i < cha_texts[0].size(); ++i)
-//    {
-//      int x_of_pie= x;
-//      x_of_pie+= chart_bar_line_pie_height * i;
-//      double total_height= 0;
-//      for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//      {
-//        total_height+= cha_heights[text_lines].at(i);
-//      }
-//      double shrink= total_height / cha_max_total_height; /* if you want all pies equal size, let shrink be 1 */
-//      double max_area= chart_bar_line_pie_height * chart_bar_line_pie_height; /* e.g. 10 x 10 = 100 */
-//      double our_area= max_area * shrink;                           /* e.g. 100 * .5 = 50 */
-//      double our_height= sqrt(our_area);                            /* e.g. sqrt(50) = 7.071 */
-//      int our_height_rounded= round(our_height);                      /* e.g. round(7.071) = 7 */
-//      int start_angle= 0 * 180;
-//      for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//      {
-//        double fraction_of_total_height= cha_heights[text_lines].at(i) / total_height;
-//        double adj= 5760 * fraction_of_total_height;
-//        QString column_name= cha_texts[text_lines].at(i);
-//        QRect qr_of_pie= QRect(x_of_pie + CHART_MARGIN_LEFT + cha_default_container_pen_width,
-//                             0,
-//                             our_height_rounded, /* = chart_bar_line_pie_height if total height = maximum */
-//                             our_height_rounded);
-//        cha_draw_text_prepare(painter, text_lines, column_name, i, TEXTEDITFRAME_CELL_TYPE_DETAIL,
-//                              text_lines, cha_numeric_column_count);
-//        int span_angle= round(adj);
-//        painter->drawPie(qr_of_pie, start_angle, span_angle);
-//        start_angle+= span_angle;
-//      }
-//    }
-//  }
-//}
-
-//void Chart::paintEvent(QPaintEvent *event)
-//{
-//  (void) event;
-////  cha_default_container_pen.setWidth(cha_default_container_pen_width);
-//  cha_default_container_pen.setColor(chart_mainwindow->qt_color(chart_mainwindow->ocelot_grid_cell_border_color));
-//  QPainter painter(this);
-//  cha_draw(&painter);
-//}
-
-//void Chart::mouseMoveEvent(QMouseEvent *event)
-//{
-//  QString tooltip;
-//  if (chart_type == TOKEN_KEYWORD_BAR) tooltip= "Bar Chart";
-//  if (chart_type == TOKEN_KEYWORD_LINE) tooltip= "Line Chart";
-//  if (chart_type == TOKEN_KEYWORD_PIE) tooltip= "Pie Chart";
-//  int x_of_chart_column= cha_x;
-//  for (int i= 0; i < cha_texts[0].size(); ++i)
-//  {
-//    if (x_of_chart_column <= event->pos().x())
-//    {
-//      if (x_of_chart_column + cha_chart_column_plus_margin_width >= event->pos().x())
-//      {
-//        tooltip= tooltip + " row#" + QString::number(i + 1);
-//        for (int text_lines= 0; text_lines < cha_numeric_column_count; ++text_lines)
-//        {
-//          QString column_name= cha_texts[text_lines].at(i);
-//          char flag= cha_flags[text_lines].at(i);
-//          QString column_value;
-//          if ((flag & FIELD_VALUE_FLAG_IS_NULL) != 0) column_value= "NULL";
-//          else
-//          {
-//            double column_value_as_double= cha_column_values[text_lines].at(i);
-//            column_value=  QString::number(column_value_as_double);
-//          }
-//          tooltip= tooltip + " " + column_name + "=" + column_value;
-//        }
-//        break;
-//      }
-//    }
-//    x_of_chart_column+= cha_chart_column_plus_margin_width;
-//  }
-//  setToolTip(tooltip);
-//}
 
 /* Possible pen and brush change due to grid conditional, very similar to erd_draw_text_prepare */
 /* Todo: conditional with column_number=2 gets column 1 */
@@ -29492,7 +29199,8 @@ void Chart::cha_draw_text_prepare(QPainter *painter,
   else
   {
     char new_color[8];
-    strcpy(new_color, cha_color_palette[text_lines - chart_first_column_in_group]);
+    int color_number= text_lines - chart_first_column_in_group;
+    strcpy(new_color, cha_color_palette[color_number % cha_color_palette_count]);
     this_color= QColor(new_color);
   }
   chart_new_rect_brush= cha_default_detail_brush;
@@ -29520,13 +29228,6 @@ void Chart::cha_draw_text_prepare(QPainter *painter,
     &cs_number); /* return */
   if (result_of_evaluate == true)
   {
-//    QString new_background_color= chart_mainwindow->get_background_color_from_style_sheet(new_style_sheet);
-//    chart_new_rect_brush.setColor(new_background_color);
-//    //QPen new_rect_pen;
-//    //new_rect_pen.setWidth(0);
-//    painter->setBrush(chart_new_rect_brush);
-//    painter->setPen(Qt::NoPen);
-//    painter->drawRect(qr_of_content);
     QString new_color= chart_mainwindow->get_color_from_style_sheet(new_style_sheet);
     chart_new_rect_brush.setColor(new_color);
     chart_new_container_pen.setColor(new_color);
@@ -29621,9 +29322,9 @@ int Chart::column_in_group(int result_column_no)
   return result_column_no - chart_first_column_in_group; /* so return will be >= 0 for a member of a group */
 }
 
-/* NEW PLAN
+/*
   Pass: number
-  Return: bar pixmap which can be displayed in result grid
+  Return: bar|line|pie pixmap which can be displayed in result grid
   A group is a series of numbers preceded by before-start or non-number, followed by after-end or non-number.
   Todo: Inefficiency: This ends up in base64_tmp. We could dump directly to tmp_pointer.
   Todo: Inefficiency: Surely the size can be figured out in advance so we could memcpy not strcpy.
@@ -29649,6 +29350,7 @@ int Chart::draw_group(
 //  !! and it might be %f
   /* Actually we don't need this, we just use background */
 //  QPixmap pixmap(QPixmap(QSize(width, chart_max_column_heights)));
+
   QPixmap pixmap(QPixmap(QSize(chart_pixmap_width, chart_pixmap_height)));
 
   pixmap.fill(chart_mainwindow->ocelot_grid_background_color);
@@ -29683,10 +29385,9 @@ int Chart::draw_group(
 
   int caption_x= 0;
 
-
   if (chart_type == TOKEN_KEYWORD_PIE)
   {
-//    for (int i= 0; i < cha_texts.size(); ++i)
+//    for (int i= 0; i < chart_column_names.size(); ++i)
     {
 //      int x_of_pie= cha_x;
 //      x_of_pie+= chart_bar_line_pie_height * i;
@@ -29704,23 +29405,19 @@ int Chart::draw_group(
     }
     start_angle_of_pie= 0 * 180;
   }
-
   for (int column_number= chart_first_column_in_group; column_number <= chart_last_column_in_group; ++column_number)
   {
     /* Set chart_new_rect_brush etc. to chart_default_rect_brush etc., maybe change if conditional setting */
-    QString column_name= cha_texts.at(column_number); /* misnamed? isn't this content? */
+    QString column_name= chart_column_names.at(column_number); /* misnamed? isn't this content? */
 
     if ((cha_flags.at(column_number) & FIELD_VALUE_FLAG_IS_NULL) != 0)
       chart_new_rect_brush.setColor(chart_mainwindow->ocelot_grid_background_color);
-
     cha_draw_text_prepare(&pixmap_painter, column_number, column_name, tmp_result_row_number, TEXTEDITFRAME_CELL_TYPE_DETAIL,
                           column_number, numeric_column_count);
-
     pixmap_painter.setBrush(chart_new_rect_brush);
     if (chart_type == TOKEN_KEYWORD_LINE) pixmap_painter.setPen(chart_new_container_pen);
     /* cha_draw_text_prepare also set chart_new_text_pen, for captions, below */
     int bar_or_line_height= cha_heights.at(column_number); /* i.e. bar height */
-
     if ((cha_flags.at(column_number) & FIELD_VALUE_FLAG_IS_NULL) != 0)
       bar_or_line_height= chart_max_column_heights / 2;
 
@@ -29738,7 +29435,6 @@ int Chart::draw_group(
         bar_or_line_column_height= abs(bar_or_line_column_height);
       }
     }
-
     if (chart_type == TOKEN_KEYWORD_BAR)      /* So 2 numbers in the row cause 2 adjacent bars */
     {
 //      int height= cha_heights.at(column_number); /* i.e. bar height */
@@ -29782,7 +29478,7 @@ int Chart::draw_group(
     }
     if (chart_type == TOKEN_KEYWORD_PIE)
     {
-        /* A full circle is 16 * 360 = 5760 */
+/* A full circle is 16 * 360 = 5760 */
       /* Todo: dunno what to do with negatives */
 //      int x= cha_x;
       /* initially start_angle_of_pie == 0 * 180 */
@@ -29792,7 +29488,7 @@ int Chart::draw_group(
         {
           double fraction_of_total_height= cha_heights.at(column_number) / total_height_of_pie;
           double adj= 5760 * fraction_of_total_height;
-//          QString column_name= cha_texts.at(column_number);
+//          QString column_name= chart_column_names.at(column_number);
           QRect qr_of_pie= QRect(CHART_MARGIN_LEFT,
                                CHART_MARGIN_TOP,
                                height_of_pie_rounded, /* = chart_bar_line_pie_height if total height = maximum */
@@ -29805,7 +29501,6 @@ int Chart::draw_group(
         }
       }
     }
-
     if ((chart_type == TOKEN_KEYWORD_BAR) || (chart_type == TOKEN_KEYWORD_LINE))
     {
       /* zero line. color=last in palette e.g. navy, size=fixed, length=max, position=where zero would be */
@@ -29819,7 +29514,6 @@ int Chart::draw_group(
       pixmap_painter.setPen(zero_line_pen);
       pixmap_painter.drawLine(zero_line);
     }
-
     /* caption i.e. text underneath chart at bottom of pixmap */ /* SHOULD BE COLUMN VALUES! */
     QString cv_as_s= cha_column_values_as_strings.at(column_number);
     QFontMetrics fm= QFontMetrics(chart_default_font);
@@ -29842,13 +29536,15 @@ int Chart::draw_group(
   QBuffer buffer(&ba);
   buffer.open(QIODevice::WriteOnly);
   bool save_result= pixmap.save(&buffer, "PNG");
-  if (save_result == false)
+  unsigned int expected_output_size= (ba.size() * 4) / 3 + 64;
+  if ((save_result == false)
+   || (pixmap.isNull() == true)
+   || (expected_output_size >= CHART_MAX_BYTE_SIZE - 1))
   {
-    printf("**** FALSE!\n");
-    exit(0);
+    printf("Error in Chart::draw_group. pixmap could not be saved, or was null, or was too big.\n");
+    strcpy(output, "");
+    return 0;
   }
-  if (pixmap.isNull() == true) printf("**** null\n");
-  //buffer.close();
   strcpy(output, ba.toBase64()); /* i.e. buffer.data() */
   return ba.size();
 }
@@ -29862,6 +29558,10 @@ int Chart::draw_group(
   TODO: WHAT ABOUT HORIZONTAL SCROLL BAR?
   TODO: WHAT ABOUT MARGINS WITHIN HEADER?
   Elsewhere I think we say result grid has no margins, but use contentsRect instead of frameGeometry anyway.
+  Todo: re horizontal scroll bar: If we're too wide, we want to say
+    chart_bar_line_pie_height-= QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    but the only way to know we're too wide is to look at the width of all columns in the result set,
+    and for pies the widths depend on the heights, so this might be hard.
 */
 void Chart::set_chart_pixmap_height()
 {
@@ -29920,8 +29620,7 @@ void Chart::set_chart_pixmap_height()
   We have width_n_total = total of width_n passed to copy_html_cell() for each column in group
   We'll get width_of_bars = margins + min-bar-widths * # of bars i.e. # of columns in group
   We'll get chart_bar_line_pie_width = greater of (width_n_total, width_of_bars).
-
-  TODO: For a pie, chart width should = chart height, approximately.
+  For a pie, chart width should = chart height, approximately. Ellipses are nice but wouldn't be expeced.
 */
 void Chart::set_chart_width()
 {
@@ -29932,7 +29631,8 @@ void Chart::set_chart_width()
     width_of_bars+= CHART_MARGIN_BETWEEN_BARS * (group_columns_count - 1);
     chart_pixmap_width= width_of_bars + (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
     if (width_n_total > chart_pixmap_width) chart_pixmap_width= width_n_total;
-    if (width_of_header > chart_pixmap_width) chart_pixmap_width= width_of_header;
+    if (chart_header_widths.at(chart_last_column_in_group) > chart_pixmap_width)
+      chart_pixmap_width= chart_header_widths.at(chart_last_column_in_group);
     chart_bar_line_pie_width= chart_pixmap_width - (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
   }
   else if (chart_type == TOKEN_KEYWORD_LINE)
@@ -29942,6 +29642,8 @@ void Chart::set_chart_width()
     chart_bar_line_pie_width= width_of_bars;
     chart_pixmap_width= width_of_bars + (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
     if (width_n_total > chart_pixmap_width) chart_pixmap_width= width_n_total;
+    if (chart_header_widths.at(chart_last_column_in_group) > chart_pixmap_width)
+      chart_pixmap_width= chart_header_widths.at(chart_last_column_in_group);
     chart_bar_line_pie_width= chart_pixmap_width - (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
   }
   else /* TOKEN_KEYWORD_PIE */
@@ -29949,6 +29651,23 @@ void Chart::set_chart_width()
     chart_bar_line_pie_width= chart_bar_line_pie_height; /* so it is in a square rect */
     chart_pixmap_width= chart_bar_line_pie_width + CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;
   }
+}
+
+/*
+  We'd like to know the number of bytes that will be added for all groups, during copy_html_cell().
+  That is: overhead per row.
+  CHART_MAX_BYTE_SIZE is an arbitrary number, I find that actual size is 2000 to 25000 with my small screen.
+  Todo: properly, we should find out what pixmap .png size is for each group, knowing width+height+content.
+*/
+void Chart::set_byte_size()
+{
+  int groups_count= 0; /* number of groups, which decides number of charts, in the row */
+  for (int i= 0; i < chart_column_names.size(); ++i)
+  {
+    if (chart_column_types.at(i) != OCELOT_DATA_TYPE_NUMBER) continue; /* not even a number */
+    if ((i == 0) || (chart_column_types.at(i - 1) != OCELOT_DATA_TYPE_NUMBER)) ++groups_count;
+  }
+  chart_alloc_byte_size= groups_count * CHART_MAX_BYTE_SIZE;
 }
 
 #endif //if (OCELOT_CHART == 1)

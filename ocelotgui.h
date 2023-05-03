@@ -6708,11 +6708,17 @@ Result_qtextedit(ResultGrid *m)
         Refreshing can be stopped by clicking OK or in extreme cases clicking Kill.
         The query is only stored in history once and history does not have results.
         If [REPEAT n] we replace completely, i.e. we don't shift|rotate the items. This is "monitoring".
-        Or "performance dashboard".
-  Todo: some way to be permanent and to repeat, so continuous monitoring becomes easy
-        e.g. SET ocelot_pie=1 (compare SET ocelot_html=1)
+        Or "performance dashboard" -- a way to repeat on the client makes monitoring easy
+  Todo: Allow charts always, not just via shortcut, but with finer control. "SET ocelot_extra_rule_1 = PIE"
+        is one way, "SELECT x AS PIE" is one way, "SELECT 'pie',x" is one way. "SET ocelot_pie=1 is one way.
+        Thus we'd be looking for signals in the output. At the moment I slightly lean toward
+         "SELECT / *O OCELOT_GRID_CHART=BAR|CHART|PIE|NONE * /" and it could have a WHERE clause e.g.
+         "SELECT / *O OCELOT_GRID_CHART=PIE WHERE COLUMN_NAME|COLUMN_NUMBER|COLUMN_TYPE|ROW_NUMBER|VLUE etc. * /"
+         That is, conditions could be embedded in statement comments and applicable for grid settings in general.
+         And the same WHERE clause could apply in a SET statement. (Sometimes comments are insufficient
+         because the server might not store them, and because we don't know where they are when we call a
+        stored procedure that returns a result set.) Con re SET statements: they're modal.
   Todo: more general way to check if data type is string or number
-  Todo: names ending in _id are probably not quantities so treat them like non-numeric
   Todo: add chart choices in grid settings menu, or make a chart settings menu
   * #include <QtCharts> would have been great but might not be installed
     and it is GPLv3 https://doc.qt.io/qt-5/qtcharts-index.html#licenses and ocelotgui is GPLv2.
@@ -6720,30 +6726,29 @@ Result_qtextedit(ResultGrid *m)
   * A chartable column group is a series of numeric columns, bounded by start | end | non-numeric.
     Strings or images will just be displayed as usual. So we can recognize these formats:
   * Suppose we have two rows:
-    "A",1,2,3
-    "A",2,NULL,4
+    "A",1,2,3,"",2,NULL,4
     Then we want
-
-     A         |
+     A         |         << bar with maximum height for 4
           |    |
          ||  | |
         |||  | |
-        ---  ---
-        captions
+        ---  ---          << zero line
+        123  2NULL4       << captions
     ... which could even be done in ASCII.
+    Column names ending in _id are probably not quantities so are treated as non-numeric.
   * Line width = ocelot_grid_cell_border_size. Bar width = width of a column in current (grid) font.
-    Line or bar colour = from the palette.
+    Line or bar or pie-part colour = from the palette.
     When a row has more than one column, there are multiple lines|bars with different colours.
     But later lines can overwrite earlier lines.
-  * Tooltip: We track mouseMoveEvent and show tooltip when mouse is over mouse column.
+  * Todo: Tooltip: We track mouseMoveEvent and show tooltip when mouse is over mouse column.
     We could detect when a mouse is over a bar, or near a line (the "intersects" trick we
     use in ERDiagram would work for this), or over a pie's colour (by grabbing the widget
     specific or line, or when we're over a pie's colour, but that would be unhelpful when height
-    is 0 or when lines cross. Todo: if user has a conditional expression to change the tooltip,
+    is 0 or when lines cross, or colors repeat. Todo: if user has a conditional expression to change the tooltip,
     think of a way to accept it, despite the fact that there might be more than one column.
   * Maybe in theory we could do this as an advance setting for a second result-set grid.
   * Todo: distinguishing for null, inf, nan -- maybe setAutoFillBackground() would help for bars?
-    Nulls are treated as 0 but tooltip will say NULL.
+    Nulls are treated as 0 but caption and tooltip should say NULL.
   * Todo: When numbers are negative, okay, but bars for positives don't go past the 0 point.
     And for pies, we could show abs(n), or invent a doughnut chart type, but we don't even check,
     figuring that results wouldn't make sense anyway. Eventually maybe allow doughnut charts.
@@ -6774,12 +6779,12 @@ Result_qtextedit(ResultGrid *m)
     1, 2, 3        10, 20, 30      10, 20, 30
     1, 10000       10, 100000      0, 100
     ... Pie heights are more complex because we want % of area, not % of height.
-  * But I have to watch out for horizontal scroll bar.
+  * Todo: watch out for horizontal scroll bar.
     In Chart() the resize() is for rg-width+rg-height.
     So we are not expecting vertical scroll bar to appear unless rg is very small but horizontal might appear.
   * Todo: A maximum column name width in characters might be okay, at least with #define
   * Shortcuts are Alt+Shift+B Alt+Shift+L Alt+Shift+P. Alt+Shift+8/9/0 didn't work if detached.
-  * Todo: allow CHART_MAX_GRID_ROWS 3, if more we start a new series. Eventually allow user-supplied.
+  * Todo: define CHART_MAX_GROUP_SIZE 3, if more we start a new group. Eventually allow user-supplied.
   * Settings
     ocelot_shortcut_bar|line|pie
     ocelot_grid_cell_border_color+size affect frame lines, not immediate
@@ -6789,6 +6794,10 @@ Result_qtextedit(ResultGrid *m)
     ocelot_grid_detached affects whole display, immediate
     ... plus some settings can be conditional
   * Todo: Check: what if there is no result grid
+  * Todo: since color_palette_count is always <= 16, we might repeat colors.
+  * Todo: the LINE chart is indented a lot, it should start at the left margin.
+  * TODO: html_max_grid_rows > 1, but we only display one
+  * BUG: after set ocelot_grid_font_size=40; ... we don't change the width so the header takes 2 rows!
 */
 
 class Chart: public QWidget
@@ -6803,6 +6812,7 @@ class Chart: public QWidget
 #define CHART_ZERO_LINE_WIDTH 2
 #define CHART_LITTLE_BAR_HEIGHT 2
 #define CHART_LITTLE_BAR_WIDTH 14
+#define CHART_MAX_BYTE_SIZE 100000
 
 public:
 Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int chart_type);
@@ -6810,11 +6820,12 @@ int chart_type; /* TOKEN_KEYWORD_BAR etc. */
 ResultGrid *chart_rg;
 QString group_header;
 int width_n_total;
-int height_n_total;
-int width_of_header;
+int height_n_total; /* we don't seem to be using this any more */
+QList<int>chart_header_widths;
 int chart_first_column_in_group;
 int chart_last_column_in_group;
 QFont chart_default_font;
+unsigned int chart_alloc_byte_size;
 void chart_row_setup(unsigned int tmp_result_row_number);
 int column_in_group(int result_column_no);
 int draw_group(long unsigned int tmp_result_row_number, int result_column_no, int width, char *output);
@@ -6827,12 +6838,12 @@ int chart_bar_line_pie_width;
 int chart_pixmap_width;
 void set_chart_width();
 void set_chart_pixmap_height();
+void set_byte_size();
 unsigned int cha_result_column_count; /* Todo: check: why isn't this long unsigned int? */
 unsigned int cha_result_row_count;
-//char *cha_result_set_copy;       /* gets a copy of mysql_res contents, if necessary */
 char **cha_result_set_copy_rows; /* dynamic-sized list of result_set_copy row offsets, if necessary */
 char *cha_result_field_names;
-/* Todo: some of what follows should be private */
+
 QColor cha_default_text_color, cha_default_header_background_color, cha_default_detail_background_color;
 int cha_default_container_pen_width;
 QPen cha_default_container_pen, cha_default_text_pen;
@@ -6842,7 +6853,7 @@ QBrush chart_new_rect_brush;
 char cha_color_palette[16][16];
 int cha_color_palette_count;
 double chart_bar_line_pie_height;
-QStringList cha_texts;
+QStringList chart_column_names;
 QList<double> cha_column_values;
 QStringList cha_column_values_as_strings;
 QList<double> cha_heights;
@@ -6868,7 +6879,7 @@ QString cha_max_column_value_as_utf8;
 void default_settings_all();
 //void cha_setup();
 
-unsigned short int cha_result_data_type(unsigned short int field_data_type);
+unsigned short int cha_result_data_type(unsigned short int field_data_type, QString column_name);
 //void cha_draw(QPainter* painter);
 void set_color_palette();
 void cha_draw_text_prepare(QPainter *painter,
@@ -6878,10 +6889,6 @@ void cha_draw_text_prepare(QPainter *painter,
                int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
                int text_lines,
                int numeric_column_count);
-//protected:
-//void paintEvent(QPaintEvent *event);
-//void mouseMoveEvent(QMouseEvent *even);
-
 
 //~Chart()
 //{
@@ -9006,8 +9013,10 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
 
   tmp_size+= 1000000; /* image paste experiment */
 #if (OCELOT_CHART == 1)
-printf("**** +5000000\n");
-  tmp_size+= 5000000; /* yet more? */
+  if (chart_widget != NULL)
+  {
+    tmp_size+= chart_widget->chart_alloc_byte_size; /* yet more? */
+  }
 #endif
   tmp= new char[tmp_size];
 
