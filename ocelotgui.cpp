@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 1.9.0
-   Last modified: May 3 2023
+   Last modified: May 26 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -463,6 +463,7 @@
   static int hparse_token_type;
   static int hparse_statement_type= -1;
   static bool sql_mode_ansi_quotes= false;
+  static bool sql_mode_no_backslash_escapes= false;
   /* hparse_f_accept can dump many expected tokens in hparse_errmsg */
   static char hparse_errmsg[MAX_HPARSE_ERRMSG_LENGTH];
   static QString hparse_next_token, hparse_next_next_token;
@@ -486,6 +487,7 @@
   static bool hparse_is_in_subquery= false;
   static QString hparse_specified_schema;
   static QStringList hparse_specified_list;
+  static bool is_in_source_statement= false;
 
 /* Variables used by kill thread, but which might be checked by debugger */
 #define KILL_STATE_CONNECT_THREAD_STARTED 0
@@ -1817,23 +1819,35 @@ void MainWindow::export_set_checked()
     We will recommend LOAD DATA because it is much much faster but import() may still be useful because:
     there are more options, every INSERT is loggable, special privilege is not required.
   Re TOKEN_KEYWORD_SOURCE:
-    Todo: allow for comments and ;
-    Todo: if we fill up the line, return an overflow message,
-       or make line[] bigger and re-read the file.
+    Todo: allow for MySQL-style or MariaDB-style comments since they may be followed by ; or may contain ;
     Executing the source-file statements is surprisingly easy: just put them in
        the statement widget. This should be activating action_statement_edit_widget_changed
        and that ultimately causes execution.
        Handling multiple statements per line is okay, but SOURCE may not be witin multi-line.
        Difference from mysql client: this puts source-file statements in history, mysql client puts "source" statement.
-    Todo: stop recursion i.e. source statement within source statement. That's an error.
-  TODO: Would it be good if we could abort source statements with ^C?
+  Re source containing INSERT:
+    Ordinarily we can depend on InsertPlainText() -- which appends, and appending to statement_edit_widget
+    triggers tokenize(), so the call to action_execute() has no difficulty seeing if statement is complete,
+    and if so returning 1 so the appending repeats until statement works. However, some .sql files contain
+    very long INSERTs, so the overhead of doing that gets noticeable. Therefore, if a line starts with
+    INSERT, we try to fast-track by appending to a non-trigger buffer instead until we see a delimiter.
+    This isn't perfect because we don't check for attempts to kill the statement, or for a result set.
+    It's possible that other non-client non-result-set statements would benefit slightly too.
+    We don't put the statement in history, though probably we should, if it's short.
+    Alternative idea: put the insert data in a tmp file and use
+  Todo: stop recursion i.e. source statement within source statement. That's an error.
+  TODO: Would it be good if we could abort source statements with ^C? (as oposed to menu item Kill)
   TODO: Check for io error / premature eof
   TODO: This is skipping comment lines and blank lines, that's probably unnecessary.
   Todo: progress bar showing far we've progressed compared to file size in bytes.
-  Todo: Kill should not just mean kill the last statement_widget sttement, it should mean kill the whole thing.
+  Todo: Kill should not just mean kill the last statement_widget statement, it should mean kill the whole thing.
   Todo: Find out why make_and_put_open_message_in_result doesn't show up.
         Would it show up if we said action_execute(1)?
   Todo: Optional initial pass just to check whether everything is valid.
+  Todo: Todo: This is still bad:
+        delimiter //
+        drop procedure p\G
+        select 5;
 */
 int MainWindow::read_file(int keyword, QString s, QString table_name)
 {
@@ -1848,25 +1862,71 @@ int MainWindow::read_file(int keyword, QString s, QString table_name)
   /* Todo: this gets rid of SOURCE statement, but maybe it should be a comment in history. */
   statement_edit_widget->clear();
   QByteArray source_line;
+
+  int last_action_execute_result= 0;
+
   for (;;)
   {
-    if (file.atEnd() == true) break;
+    if (file.atEnd() == true)
+    {
+       break;
+    }
     source_line= "";
     source_line= file.readLine();
-    QString s= source_line;
-    s= connect_stripper(s, false);
-    if ((s != "") && (s.mid(0,1) != "#") && (s.mid(0,2) != "--"))
+have_leftover:
     {
       if (keyword == TOKEN_KEYWORD_SOURCE)
-        statement_edit_widget->insertPlainText(s);
+      {
+        if (last_action_execute_result != 1) /* sending empty lines to server would slow it */
+        {
+          int sls;
+          for (;;)
+          {
+            sls= source_line.size();
+            if ((sls >= 1) && (source_line.left(1) <= " ")) source_line= source_line.right(sls - 1);
+            else if (source_line.left(2) == "\\G") source_line= source_line.right(sls - 2);
+            else if (source_line.left(2) == "\\g") source_line= source_line.right(sls - 2);
+            else if ((ocelot_delimiter_str.size() > 0) && (source_line.left(ocelot_delimiter_str.size()) == ocelot_delimiter_str)) source_line= source_line.right(sls - ocelot_delimiter_str.size());
+            else break;
+          }
+          if (sls == 0) continue;
+          if ((dbms_version_mask&FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+          {
+            if ((source_line.left(1) == "#") || (source_line.left(3) == "-- ")) continue; /* MySQL-MariaDB only? */
+            if (source_line.left(6).toUpper() == "INSERT")
+            {
+               char delimiter_str[64];
+               delimiter_str[63]= '\0';
+               strcpy(delimiter_str, ocelot_delimiter_str.toUtf8());
+               int delimiter_str_length= strlen(delimiter_str);
+               /* Todo: dunno why no_backslash_escapes isn't being checked by tokenizer() too, as far as I can tell */
+               /* make statement and execute it */
+               int result_length;
+               source_line= read_file_skip(source_line, source_line.length(),
+                                delimiter_str, delimiter_str_length,
+                              &file, &result_length);
+               if (result_length < 0) break; /* i.e. if read_file_skip hit eof */
+               if (source_line[0] != '\0')
+               {
+                 goto have_leftover; /* i.e. statement ended but line did not end */
+               }
+               continue;
+             }
+          }
+        }
+        statement_edit_widget->insertPlainText(source_line);
+      }
       else /* TOKEN_KEYWORD_IMPORT */
       {
+        QString s= source_line;
+        s= connect_stripper(s, false);
         if (s.right(1) == "\n") s= s.left(s.size() - 1);
         if (s.right(1) == "\r") s= s.left(s.size() - 1);
         QString insert_statement= "INSERT INTO " + table_name + " VALUES (" + s + ");";
         statement_edit_widget->insertPlainText(insert_statement);
       }
-      if (action_execute(0) == 2)
+      last_action_execute_result= action_execute(0);
+      if (last_action_execute_result == 2)
       {
         /*
           A DBMS-calling statement failed.
@@ -1881,6 +1941,167 @@ int MainWindow::read_file(int keyword, QString s, QString table_name)
   file.close();
   log("read_file end", 70);
   return 0;
+}
+
+/*
+  Pass: statement. Initially must be INSERT statement but any non-compound non-client statement might be okay.
+  Return: full statement and # of bytes left over after delimiter (-1 if eof)
+          statement ends e.g. where ; or \ is seen (so you'll have to skip the delimiter)
+  Although tokenize() would do the job well, this is faster.
+  Gotchas: string can contain \0, can end with \G or \g
+           can end with \ + something else i.e. mysql-client-style
+           can contain \" or '\
+           can contain "" or ''
+           can contain delimiter inside quotes or comments
+           can have \n while quote or comment is unfinished
+  mysql client behaviour:
+    See also: https://dev.mysql.com/doc/refman/8.0/en/string-literals.html
+    Legal, \dx is a separate command: INSERT INTO t VALUES (5)\dx
+    Legal, \ is thrown out: INSERT INTO t VALUES ('3 \dxrain')
+    Legal, \n is preserved: INSERT INTO t VALUES ('\n3 rain');
+    Legal, the usual: INSERT INTO t VALUES ('a' ' ' 'string');
+    Legal, both rows are inserted: INSERT INTO t VALUES ('a')\ginsert into t values ('b');
+    If NO_BACKSLASH_ESCAPES is false: \ escapes apply if in ''s, and if in ""s unless ansi_quotes.
+    ; ends a statement even if there is a delimiter -- but that's crazy, how will compounds work?
+      aha, they don't --- BEGIN NOT ATOMIC\nINSERT INTO t VALUES ('x');END; will fail
+    Todo: Check tokenize(), I fear it might be missing the rule re backslash.
+*/
+QByteArray MainWindow::read_file_skip(QByteArray source_line, int source_line_length,
+                   char *delimiter_str, int delimiter_str_length,
+                   QFile *file,
+                   int *result_length)
+{
+  QByteArray statement_result;
+  char passed_expected_char= '\0';
+  statement_result.clear(); /* unnecessary? */
+  int statement_result_offset= 0;
+  int k= 0;
+
+  for (;;) /* loop till eof or statement end */
+  {
+    int statement_delimiter_length= 0;
+    k= read_file_line_skip(source_line.data(), source_line_length, delimiter_str, delimiter_str_length,
+                      &passed_expected_char, &statement_delimiter_length);
+    if (k >= 0) /* i.e. did we reach a delimiter? */ /* actually k == 0) should be impossible */
+    {
+      statement_result.append(source_line, k - statement_delimiter_length);
+      statement_result.append(";");
+      if (source_line[k] == '\n') ++k; /* often line feed follows delimiter */
+//      statement_result_offset+= k;
+      source_line_length= source_line_length - k;
+      source_line= QByteArray(source_line.data() + k, source_line_length); /* remainder */
+//      statement_result[statement_result_offset - statement_delimiter_length]= '\0'; /* unnecessary? */
+      statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch();
+      int insert_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION],
+                                                        statement_result.data(), statement_result.size());
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      QString query_utf16_bak= query_utf16;
+      query_utf16= "/* INSERT statement */";
+      history_markup_append("", true);
+      query_utf16= query_utf16_bak;
+
+      statement_result_offset= 0;
+      source_line[source_line_length]= '\0';
+      *result_length= source_line_length;/* i.e. we finished statement, source_line might have "leftover" */
+      return source_line;
+    }
+    else /* k == -1 or k == -2 */
+    {
+      statement_result.append(source_line, source_line_length);
+      statement_result_offset+= source_line_length;
+      source_line_length= 0;
+    }
+    source_line= file->readLine();
+    source_line_length= source_line.size();
+    if ((source_line_length == 0) && (file->atEnd() == true))
+    {
+      break;
+    }
+//    if (fgets(source_line, 1024, *fp) == NULL) break;
+  }
+  *result_length= -1; /* i.e. let caller know we reached eof */
+  return QByteArray();
+}
+
+int MainWindow::read_file_line_skip(char *source_line, int source_line_length,
+                   char *delimiter_str, int delimiter_str_length,
+                   char *passed_expected_char,
+                   int *statement_delimiter_length)
+{
+  char c;
+  char c2;
+  char expected_char;
+  for (int k= 0; k < source_line_length; ++k)
+  {
+    if (*passed_expected_char != '\0') /* i.e. if previous line had unfinished comment or quote */
+    {
+      expected_char= *passed_expected_char;
+      *passed_expected_char= '\0';
+      goto skip_till_passed_expected_char;
+    }
+    /* we expect source_line ends with \0 and delimiter cannot contain \0 */
+    if ((delimiter_str_length != 0) && (memcmp(source_line + k, delimiter_str, delimiter_str_length) == 0))
+      {
+        *statement_delimiter_length= delimiter_str_length; return k + delimiter_str_length; }
+    c= source_line[k];
+    if ((c == ';') || (c == '\\'))
+    {
+      /* \ outside quotes normally will end a statement, though we don't do \dx etc. like mysql client. */
+      if (c == ';') { *statement_delimiter_length= 1; return k + 1; }
+      else if (source_line[k + 1] == 'G') { *statement_delimiter_length= 2; return k + 2; }
+      else if (source_line[k + 1] == 'g') { *statement_delimiter_length= 2; return k + 2; }
+      return k;
+    }
+    if ((c == '#') || ((c == '-') && (source_line[k + 1] == '-') && (source_line[k + 2] == ' ')))
+    {
+      /* '#' or '-- ' are comments as far as \n so line has no delimiter */
+      return -1;
+    }
+    if ((c == '/') && (source_line[k + 1] == '*'))
+    {
+      expected_char= '*';
+      goto skip_till_expected_char;
+    }
+    if ((c == '"') || (c == '`') || (c == '\x27'))
+    {
+      expected_char= c;
+      goto skip_till_expected_char;
+    }
+    continue;
+skip_till_expected_char:
+    ++k;
+skip_till_passed_expected_char:
+    /* if source_line ends before comment or quote ends, return signal to check in next line */
+    if (k >= source_line_length)
+    {
+      *passed_expected_char= expected_char;
+      return -2;
+    }
+    c2= source_line[k];
+/* Skip escaped \' or \" */
+    if ((c2 == '\\') && (sql_mode_no_backslash_escapes == false)) /* but check this only for within ''s or ""s */
+    {
+      /* skip any escaped char, including " or ', we'll let the server take care of it */
+      ++k;
+      goto skip_till_expected_char;
+    }
+    /* Skip if single-character non-match, or * match but not followed by / */
+    if ((c2 != expected_char)
+     || ((expected_char == '*') && (source_line[k + 1] != '/')))
+    {
+      goto skip_till_expected_char;
+    }
+    /* Two ''s or two ""s within a quoted string don't end the string */
+    if (((c2 == '\x27') && (source_line[k + 1] == '\x27'))
+     || ((c2 == '"') && (source_line[k + 1] == '"')))
+    {
+      ++k;
+      goto skip_till_expected_char;
+    }
+    /* end of a comment or quote so can continue in the main loop */
+  }
+  /* end of source_line, no delimiter seen */
+  return -1;
 }
 
 QString MainWindow::statement_format_rule_apply(QString main_token, int main_token_type, unsigned char main_token_reftype, unsigned int main_token_flag, int *rule_token_offsets, int *rule_token_lengths, int *rule_token_types)
@@ -2280,6 +2501,9 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
   We go backward to find the final non-comment token, the ; or delimiter -- or not.
   Using these, and knowing what is ocelot_delimiter_str, we can decide if it's complete.
   We also check for \G or \g.
+  We also check whether we're ultimately in "SOURCE file_name" because then ; may work even if not the delimiter.
+  And, although ; always ends a statement, if it's not a delimiter, we return false if no delimiter later.
+  Todo: after delimiter // then select 5; select 6\G should work, \G doesn't care about delimiters
 */
 
 bool MainWindow::is_statement_complete(QString text)
@@ -2341,9 +2565,13 @@ bool MainWindow::is_statement_complete(QString text)
       if (q != " ") break;
     }
   }
-
   /* if create-routine && count-of-ENDs == count-of-BEGINS then ; is the end else ; is not the end */
-  if (ocelot_delimiter_str != ";") returned_begin_count= 0;
+  bool is_semicolon_maybe_completer= false;
+  if ((is_in_source_statement == true) && (last_token == ";")) is_semicolon_maybe_completer= true;
+  if ((ocelot_delimiter_str != ";") && (is_semicolon_maybe_completer == false))
+  {
+    returned_begin_count= 0;
+  }
   else
   {
     int token_count= get_next_statement_in_string(0, &returned_begin_count, false);
@@ -2379,7 +2607,20 @@ bool MainWindow::is_statement_complete(QString text)
   }
   if (last_token != ocelot_delimiter_str)
   {
-    return false;
+    if (last_token == ";")
+    {
+      bool is_delimiter_later= false;
+      for (unsigned int j= 0; j < main_token_count_in_all; ++j)
+      {
+        if (main_token_lengths[j] == 0) break;
+        if (main_token_types[j] == TOKEN_TYPE_DELIMITER)
+        {
+          is_delimiter_later= true;
+        }
+      }
+      if (is_delimiter_later == false) return false;
+    }
+    else return false;
   }
 
   if (returned_begin_count > 0)
@@ -10423,7 +10664,6 @@ int MainWindow::action_execute(int force)
     if (main_token_count_in_statement == 0) break;
     /* If the next statement is unfinished, we usually want to ignore it. */
     if ((force == 0) && (is_statement_complete(text) == false)) return 1;
-
     /*
       We probably call hparse_f_multi_block continuously during statement edit,
       but this redundancy is harmless (we're not short of time, eh?).
@@ -11214,7 +11454,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
 /*
   We see "DELIMITER".
   If the thing that follows is 'literal' or "literal" or `identifier`: that's the delimiter.
-  Otherwise delimiter is what follows as far as next whitespace or eof or ;
+  Otherwise delimiter is what follows as far as next whitespace or eof
   DELIMITER ; means "go back to the default i.e. ;".
   This is called from hparse_f_client_statement() because it affects parse of later statements.
   This is called from execute_client_statement() because DELIMITER is a client statement.
@@ -11222,6 +11462,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
     If mysql client sees "DELIMITER <return>" or "DELIMITER ''" it's an error.
     But we consider that equivalent to "DELIMITER ;"
   We return ";" if nothing follows or quoted blank string follows; mysql client would say error.
+  2023-05-07: We no longer stop on ; because DELIMITER ;; is legal
 */
 QString MainWindow::get_delimiter(QString token, QString text, int offset)
 {
@@ -11237,11 +11478,11 @@ QString MainWindow::get_delimiter(QString token, QString text, int offset)
     {
       QString c= text.mid(i, 1);
       if (c <= " ") break;
-      if (c == ";")
-      {
-        if (token_to_return == "") token_to_return= ";";
-        break;
-      }
+//      if (c == ";")
+//      {
+//        if (token_to_return == "") token_to_return= ";";
+//        break;
+//      }
       token_to_return.append(c);
     }
   }
@@ -11550,7 +11791,9 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       return 1;
     }
     s= connect_stripper(s, true);
+    is_in_source_statement= true; /* So is_statement_complete() will say statement can end with ; */
     read_file(TOKEN_KEYWORD_SOURCE, s, "");
+    is_in_source_statement= false;
     /* Without the following, the final line of source would go into the history twice. */
     *additional_result= TOKEN_KEYWORD_SOURCE;
     return 1;
@@ -15470,7 +15713,7 @@ bool MainWindow::get_sql_mode(int who_is_calling,
         }
         if (is_ok == false) return false; /* SET will fail so this has no effect */
       }
-      if (is_in_hparse == false)  sql_mode_ansi_quotes= false;
+      if (is_in_hparse == false) sql_mode_ansi_quotes= false;
       hparse_sql_mode_ansi_quotes= false;
     }
     if ((sql_mode_string.contains("ORACLE", Qt::CaseInsensitive) == true)
@@ -15484,6 +15727,8 @@ bool MainWindow::get_sql_mode(int who_is_calling,
       if (is_in_hparse == false) dbms_version_mask &= (~FLAG_VERSION_PLSQL);
       hparse_dbms_mask &= (~FLAG_VERSION_PLSQL);
     }
+    if (sql_mode_string.contains("NO_BACKSLASH_ESCAPES", Qt::CaseInsensitive) == true) sql_mode_no_backslash_escapes= true;
+    else sql_mode_no_backslash_escapes= false;
   }
   if (hparse_sql_mode_ansi_quotes == old_hparse_sql_mode_ansi_quotes) return false;
   else return true;
@@ -23879,7 +24124,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2022 by Peter Gulutzan and others\n");
+  printf("Copyright (c) 2023 by Peter Gulutzan and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");

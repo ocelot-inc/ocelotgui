@@ -13620,6 +13620,8 @@ int MainWindow::hparse_f_backslash_command(bool eat_it)
     * first check for quoted string (if it is, then token #1 is quoted string)
     * if it's start of token#1, and token#0 is \d or "delimiter", skip till " " or <eof>
     The result is in effect for the next tokenize, not for subsequent statements on the line.
+    (Hmm, with 2023-05-07 change, there won't be subsequent statements on the line, I guess.)
+  Todo: after delimiter // then delimiter ;; the delimiter is ;; but statement widget has a ;
   If DELIMITER is not the first statement, rules are not documented and bizarre:
     The string that follows is the new delimiter, but the rest of the line is ignored.
   DELIMITER causes new rules! Everything following as far as " " is delimiter-string.
@@ -14126,8 +14128,9 @@ int MainWindow::hparse_f_client_statement()
     QString tmp_delimiter= get_delimiter(hparse_token, hparse_text_copy, main_token_offsets[hparse_i]);
     if (tmp_delimiter > " ")
     {
-      hparse_delimiter_str= ";";
-      hparse_f_other(1);
+      /* 2023-05-07: We no longer stop on ; because DELIMITER ;; is legal */
+      hparse_delimiter_str= "";
+      hparse_f_other(0);
       hparse_delimiter_str= tmp_delimiter;
       /* Redo tokenize because if delimiter changes then token ends change. */
       if ((main_token_lengths[hparse_i] != 0) && (main_token_offsets[hparse_i] != 0))

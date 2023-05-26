@@ -3691,6 +3691,8 @@ public:
   void export_set_checked();
 #endif
   int read_file(int keyword, QString file_name, QString table_name);
+  QByteArray read_file_skip(QByteArray, int, char *, int, QFile *, int *);
+  int read_file_line_skip(char *, int, char *, int, char *, int *);
 
 #if (OCELOT_EXPLORER == 1)
   int explorer_refresh_caller(char *);
