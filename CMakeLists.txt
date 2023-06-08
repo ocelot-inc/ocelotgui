@@ -79,6 +79,8 @@
 # MYSQL_INCLUDE_DIR=<string>
 # Directory to search first for mysql.h.
 # In debian/rules this is calculated by looking in the installed MySQL/MariaDB package.
+# Usually what we have by default seems okay. Alternatives worth studying:
+# find_path, find_package(MariaDB QUIET), find_library, pkg_check_modules(pkg_check_modules(LIBMYSQLCLIENT REQUIRED mysqlclient)
 
 # CMAKE_SKIP_RPATH=TRUE|FALSE and CMAKE_INSTALL_RPATH
 # By default we have rpath. But from debian/rules and ocelotgui.spec we pass -DCMAKE_SKIP_RPATH=TRUE.
@@ -146,8 +148,8 @@
 
 # FILENAME_EXTRA
 # Default is blank. ocelotgui passes -DFILENAME_EXTRA="qt4" when building with qt4,
-# so the final package name will look like ocelotgui_1.9.0qt4-1_amd64.deb or
-# ocelotgui-1.9.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
+# so the final package name will look like ocelotgui_2.0.0qt4-1_amd64.deb or
+# ocelotgui-2.0.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
 
 # FILENAME_RELEASE
 # Default is "1". Ordinarily it doesn't need to be changed.
@@ -159,13 +161,13 @@
 
 # e.g. to generate .deb file and install with dpkg:
 # deb_build.sh, which copies files and invokes debian/rules, which uses CMakeLists.txt
-# sudo dpkg -i ocelotgui_1.9.0-1_amd64.deb
+# sudo dpkg -i ocelotgui_2.0.0-1_amd64.deb
 # but see also comments in deb_build.sh and debian/README.Debian
 
 # e.g. to generate .rpm file and install with rpm:
 # rpm_build.sh, which copies files and invokes ocelotgui.spec, which uses CMakeLists.txt
-# rpmlint ocelotgui-1.9.0-1.x86_64.rpm
-# rpm -i ocelotgui-1.9.0-1.x86_64.rpm
+# rpmlint ocelotgui-2.0.0-1.x86_64.rpm
+# rpm -i ocelotgui-2.0.0-1.x86_64.rpm
 # but see also comments in rpm_build.sh
 
 # Todo: We only check if CMAKE_SYSTEM_PROCESSOR = x86_64. On FreeBSD 12, uname -p says amd64.
@@ -173,9 +175,10 @@
 # Todo: We do not install README_tarantool.htm or the *_tarantool.png files, though we put them on github.
 # Todo: We do not install ocelotgui-logo.png, we only install ocelotgui_logo.png.
 
-message("-- CmakeLists.txt for ocelotgui 1.9.0")
+message("-- CmakeLists.txt for ocelotgui 2.0.0")
 message("-- see comments in CMakeLists.txt for special instructions")
 message("-- see README.md for general instructions for building")
+
 
 if (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "")
@@ -517,14 +520,14 @@ if (PACKAGE_TYPE MATCHES "RPM")
   install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (PACKAGE_TYPE MATCHES "RPM")
 
-# version = 1.9.0
-set(CPACK_PACKAGE_VERSION_MAJOR "1")
-set(CPACK_PACKAGE_VERSION_MINOR "9")
+# version = 2.0.0
+set(CPACK_PACKAGE_VERSION_MAJOR "2")
+set(CPACK_PACKAGE_VERSION_MINOR "0")
 set(CPACK_PACKAGE_VERSION_PATCH "0")
 
-# I assume nobody wants package names like ocelotgui_1.9.0-Linux.deb
+# I assume nobody wants package names like ocelotgui_2.0.0-Linux.deb
 # but that's what I get if CMAKE_SYSTEM_NAME = "Linux".
-# I'd prefer ocelotgui_1.9.0-1_amd64.deb or ocelotgui-1.9.0.x86_64.rpm
+# I'd prefer ocelotgui_2.0.0-1_amd64.deb or ocelotgui-2.0.0.x86_64.rpm
 # If it's neither "DEB" nor "RPM", = default.
 set(FILENAME_PLATFORM_FOR_DEB "Linux")
 set(FILENAME_PLATFORM_FOR_RPM "Linux")

@@ -2909,6 +2909,7 @@ struct explorer_items_fk {   /* For ERDiagram */
 #if (OCELOT_THIRD_PARTY==1)
 #include "third_party.h"
 #else
+#include <math.h>
 /*
   Definitions of tnt_opt_type and tnt_reply are taken from tarantool-c.
   Although there is no copyright, there is a request for an AS IS notice (which is done)

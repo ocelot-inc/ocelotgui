@@ -1,8 +1,8 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 1.9.0
-   Last modified: May 26 2023
+   Version: 2.0.0
+   Last modified: June 7 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -422,7 +422,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="1.9.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="2.0.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -1992,7 +1992,8 @@ QByteArray MainWindow::read_file_skip(QByteArray source_line, int source_line_le
       source_line= QByteArray(source_line.data() + k, source_line_length); /* remainder */
 //      statement_result[statement_result_offset - statement_delimiter_length]= '\0'; /* unnecessary? */
       statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch();
-      int insert_result= lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION],
+      /* int insert_result= */
+      lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION],
                                                         statement_result.data(), statement_result.size());
       put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
       QString query_utf16_bak= query_utf16;
@@ -6101,7 +6102,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 1.9.0, March 7 2022  \
+  <BR>Version 2.0.0, June 7 2023  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2023 by Peter Gulutzan. All rights reserved.  \
@@ -29622,7 +29623,7 @@ int Chart::draw_group(
   int start_angle_of_pie;
   double height_of_pie;
   double total_height_of_pie= 0;
-  int height_of_pie_rounded;
+  int height_of_pie_rounded= 0;
   double shrink_of_pie;
 
   int prev_x_of_bar= 0;       /* for line */
