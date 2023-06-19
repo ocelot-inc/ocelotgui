@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.0.0
-   Last modified: June 7 2023
+   Last modified: June 19 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -14958,10 +14958,10 @@ int MainWindow::next_token(int i)
 */
 QString MainWindow::token_reftype(int i, bool is_hover, int token_type, char reftype_parameter)
 {
-#define MAX_REFTYPEWORD_LENGTH 64
+#define MAX_REFTYPEWORD_LENGTH 60
 struct reftypewords {
    char  chars[MAX_REFTYPEWORD_LENGTH];
-   unsigned short int reserved_flags;
+   unsigned int reserved_flags;
    unsigned short int built_in_function_flags;
    unsigned short int token_keyword;
 };
@@ -15361,27 +15361,35 @@ void MainWindow::set_dbms_version_mask(QString version, int connection_number)
 {
   if (version.contains("mariadb", Qt::CaseInsensitive) == true)
   {
-    if (version.contains("10.0.") == true)
+    if (version.startsWith("10.") == true)
     {
-      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0);
-    }
-    else if (version.contains("10.1.") == true)
-    {
-      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1);
-    }
-    else if (version.contains("10.2.") == true)
-    {
-      QString s= version.mid(version.indexOf("10.2.") + 5, 1);
-      if (s >= "3")
-        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2 | FLAG_VERSION_MARIADB_10_2_3);
-      else
+      if (version.startsWith("10.0.") == true)
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0);
+      else if (version.startsWith("10.1.") == true)
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1);
+      else if (version.startsWith("10.2.2") == true)
         dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2);
+      else if (version.startsWith("10.2.3") == true)
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2 | FLAG_VERSION_MARIADB_10_2_3);
+      else if (version.startsWith("10.3.") == true)
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_MARIADB_10_3);
+      else
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL);
     }
-    else if (version.contains("10.3.") == true)
-      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_MARIADB_10_3);
-    else
+    else if (version.startsWith("11.") == true)
     {
-      /* 10.4 + 10.5 + 10.6 + 10.7 + 10.8 + 10.9 + 10.10 + 10.11 all get ... | FLAG_VERSION_MARIADB_10_10 */
+      if (version.startsWith("11.0.") == true)
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_0);
+      else if (version.startsWith("11.1.") == true)
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1);
+      else if (version.startsWith("11.2.") == true)
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1 | FLAG_VERSION_MARIADB_11_2);
+      else
+        dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL);
+      }
+    else
+      /* 10.4 + 10.5 + 10.6 + 10.7 + 10.8 + 10.9 + 10.10 + 10.11 + 11.* all get the same value */
+    {
       dbms_version_mask= FLAG_VERSION_MARIADB_ALL;
     }
   }
