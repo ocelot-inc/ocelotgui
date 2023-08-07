@@ -383,6 +383,32 @@ endif (NOT UI_OCELOTGUI)
 
 add_executable(ocelotgui ${UI_OCELOTGUI} ocelotgui.cpp)
 
+#If cmake . -DOCELOT_QWT_INCLUDE=1 then code related to qwt will be included.
+#By default OCELOT_QWT_INCLUDE=0 while this is experimental.
+#On Ubuntu apt install libqwt-qt5-dev supplies /usr/include/qwt and /usr/lib/libqwt-qt5.so*
+#Maybe the rpm package is libqwt-qt5_6
+#CMAKE_FIND_LIBRARY_PREFIXES presumably is lib, and CMAKE_FIND_LIBRARY_SUFFIXES presumably is .so, so
+#we can ask for qwt-qt5 or qwt-qt6 depending on what we got for the qt searching above.
+if (DEFINED OCELOT_QWT_INCLUDE)
+  set(TMP_OCELOT_QWT_INCLUDE ${OCELOT_QWT_INCLUDE})
+else (DEFINED OCELOT_QWT_INCLUDE)
+  set(TMP_OCELOT_QWT_INCLUDE FALSE)
+endif (DEFINED OCELOT_QWT_INCLUDE)
+if (TMP_OCELOT_QWT_INCLUDE)
+  if (Qt5Widgets_FOUND)
+  find_library(QWT_LIBRARY_RESULT NAMES qwt-qt5 qwt PATHS /usr/lib /usr/local/lib REQUIRED)
+  endif (Qt5Widgets_FOUND)
+  if (Qt6Widgets_FOUND)
+  find_library(QWT_LIBRARY_RESULT NAMES qwt-qt6 qwt PATHS /usr/lib /usr/local/lib REQUIRED)
+  endif (Qt6Widgets_FOUND)
+  message("-- qwt library found in ${QWT_LIBRARY_RESULT}")
+  find_path(QWT_INCLUDE_DIR_RESULT qwt PATHS /usr/include /usr/local/include REQUIRED)
+  message("-- qwt include found in ${QWT_INCLUDE_DIR_RESULT}")
+  target_link_libraries(ocelotgui ${QWT_LIBRARY_RESULT})
+  include_directories(${QWT_INCLUDE_DIR_RESULT})
+  add_definitions(-DOCELOT_QWT_INCLUDE=${OCELOT_QWT_INCLUDE})
+endif (TMP_OCELOT_QWT_INCLUDE)
+
 if (NOT CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 # ocelotgui uses dlopen + dlsym. Some linkers might demand this.
 target_link_libraries(ocelotgui dl)

@@ -14044,6 +14044,13 @@ int MainWindow::hparse_f_client_set()
     QFontDatabase font_database;
     q= font_database.families();
   }
+  if (i_of_keyword == TOKEN_KEYWORD_OCELOT_GRID_CHART)
+  {
+    q.append("BAR"); q.append("LINE"); q.append("PIE");
+    q.append("BAR VERTICAL"); q.append("BAR STACKED"); q.append("BAR VERTICAL STACKED");
+    q.append("BAR SUBGROUP BY VALUE % 3"); q.append("LINE SUBGROUP BY VALUE % 3"); q.append("PIE SUBGROUP BY VALUE % 3");
+    q.append("BAR SUBGROUP BY LEFT(COLUMN_NAME, 2)"); q.append("LINE SUBGROUP BY LEFT(COLUMN_NAME, 2)"); q.append("PIE SUBGROUP BY LEFT(COLUMN_NAME, 2)");
+  }
   if (q.count() > 0)
   {
     if (hparse_pick_from_list(q) == -1)
@@ -14291,14 +14298,14 @@ int MainWindow::hparse_f_client_statement()
             if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NAME, "COLUMN_NAME") == 1) tlf= TOKEN_LITERAL_FLAG_STRING;
             else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_NUMBER, "COLUMN_NUMBER") == 1) tlf= TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER;
             else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_COLUMN_TYPE, "COLUMN_TYPE") == 1) tlf= TOKEN_LITERAL_FLAG_STRING;
-            else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_ROW_NUMBER, "ROW_NUMBER") == 1) tlf= TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER;
+            else if ((assignee_keyword != TOKEN_KEYWORD_OCELOT_GRID_CHART) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_ROW_NUMBER, "ROW_NUMBER") == 1)) tlf= TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER;
           }
           if (tlf == -1) /* for a comparison that is recommended for either grid or explorer */
           {
             //The following lines would be good if we could be sure we were looking at context menu
             //QStringList q= explorer_text_list();
             //if (hparse_pick_from_list(q) == -1) hparse_f_error();
-            if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_VALUE, "VALUE") == 1) tlf= TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT;
+            if ((assignee_keyword != TOKEN_KEYWORD_OCELOT_GRID_CHART) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_VALUE, "VALUE") == 1)) tlf= TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT;
           }
           if (tlf == -1) hparse_f_error(); /* for none of the recommended comparisons */
           if (hparse_errno > 0) return 0;

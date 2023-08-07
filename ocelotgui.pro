@@ -56,6 +56,10 @@ INCLUDEPATH+= /usr/local/mariadb/include/mariadb
 INCLUDEPATH+= /opt/local/include/mariadb
 INCLUDEPATH+= /sw/include/mariadb
 
+# TEST! Maybe this will help temporarily for Qwt tests
+# INCLUDEPATH+= /usr/include/qwt
+# INCLUDEPATH+= /usr/local/include/qwt
+
 # ocelotgui uses dlopen + dlsym. Some linkers might demand this.
 LIBS += -ldl
 

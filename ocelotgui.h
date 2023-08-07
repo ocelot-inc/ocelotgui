@@ -22,6 +22,19 @@
 #define OCELOT_MYSQL_INCLUDE 1
 #endif
 
+/* if you don't tell CMakeLists.txt -DOCELOT_QWT_INCLUDE=1, you can't access qwt. In this case default is 0. */
+/* TEST!! Temporarily say it is 1 */
+#ifndef OCELOT_QWT_INCLUDE
+#define OCELOT_QWT_INCLUDE 0
+#endif
+
+/* Chart and QChart don't coexist, at least for now. */
+#if (OCELOT_QWT_INCLUDE == 1)
+#define OCELOT_CHART 0
+#endif
+
+#define OCELOT_CHART_OR_QCHART (OCELOT_CHART | OCELOT_QWT_INCLUDE)
+
 /* The debugger is integrated now, but "if (OCELOT_MYSQL_DEBUGGER = 1)" directives help to delineate code that is debugger-specific. */
 #ifndef OCELOT_MYSQL_DEBUGGER
 #define OCELOT_MYSQL_DEBUGGER OCELOT_MYSQL_INCLUDE
@@ -842,6 +855,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT,
     TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH,
+    TOKEN_KEYWORD_OCELOT_GRID_CHART,
     TOKEN_KEYWORD_OCELOT_GRID_DETACHED,
     TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR,
     TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY,
@@ -891,9 +905,12 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_QUERY,
     TOKEN_KEYWORD_OCELOT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE,
-    TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_BAR,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_LINE,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_NONE,
+    TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_PIE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE,
@@ -911,11 +928,9 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL,
-    TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE,
-    TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO,
@@ -1492,7 +1507,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1224
+#define KEYWORD_LIST_SIZE 1226
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2134,6 +2149,7 @@ static const keywords strvalues[]=
     {"OCELOT_GRID_CELL_BORDER_SIZE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_BORDER_SIZE},
     {"OCELOT_GRID_CELL_HEIGHT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_HEIGHT},
     {"OCELOT_GRID_CELL_WIDTH", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_CELL_WIDTH},
+    {"OCELOT_GRID_CHART", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_CHART},
     {"OCELOT_GRID_DETACHED", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_GRID_DETACHED},
     {"OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_FOCUS_CELL_BACKGROUND_COLOR},
     {"OCELOT_GRID_FONT_FAMILY", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_GRID_FONT_FAMILY},
@@ -2183,9 +2199,12 @@ static const keywords strvalues[]=
     {"OCELOT_QUERY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_QUERY},
     {"OCELOT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_RAW},
     {"OCELOT_SHORTCUT_AUTOCOMPLETE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
-    {"OCELOT_SHORTCUT_BAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BAR},
     {"OCELOT_SHORTCUT_BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
     {"OCELOT_SHORTCUT_BREAKPOINT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
+    {"OCELOT_SHORTCUT_CHART_BAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_BAR},
+    {"OCELOT_SHORTCUT_CHART_LINE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_LINE},
+    {"OCELOT_SHORTCUT_CHART_NONE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_NONE},
+    {"OCELOT_SHORTCUT_CHART_PIE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CHART_PIE},
     {"OCELOT_SHORTCUT_CLEAR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CLEAR},
     {"OCELOT_SHORTCUT_CONNECT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT},
     {"OCELOT_SHORTCUT_CONTINUE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_CONTINUE},
@@ -2203,11 +2222,9 @@ static const keywords strvalues[]=
     {"OCELOT_SHORTCUT_HTMLRAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_HTMLRAW},
     {"OCELOT_SHORTCUT_INFORMATION", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_INFORMATION},
     {"OCELOT_SHORTCUT_KILL", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL},
-    {"OCELOT_SHORTCUT_LINE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_LINE},
     {"OCELOT_SHORTCUT_NEXT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT},
     {"OCELOT_SHORTCUT_NEXT_WINDOW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_NEXT_WINDOW},
     {"OCELOT_SHORTCUT_PASTE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PASTE},
-    {"OCELOT_SHORTCUT_PIE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PIE},
     {"OCELOT_SHORTCUT_PREVIOUS_WINDOW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_PREVIOUS_WINDOW},
     {"OCELOT_SHORTCUT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_RAW},
     {"OCELOT_SHORTCUT_REDO", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_REDO},
@@ -2864,6 +2881,20 @@ typedef char MY_BOOL;
 #include <sys/stat.h>
 #endif
 
+#if (OCELOT_QWT_INCLUDE == 1)
+#include <qwt/qwt_column_symbol.h>
+#include <qwt/qwt_legend.h>
+#include <qwt/qwt_painter.h>
+#include <qwt/qwt_plot.h>
+#include <qwt/qwt_plot_canvas.h>
+#include <qwt/qwt_plot_curve.h>
+#include <qwt/qwt_plot_layout.h>
+#include <qwt/qwt_plot_multi_barchart.h>
+#include <qwt/qwt_scale_widget.h>
+//A#include <qwt/qwt_symbol.h>
+//A#include <qwt/qwt_thermo.h>
+#endif
+
 #if (OCELOT_IMPORT_EXPORT == 1)
 struct export_settings {
   int type; /* e.g. 0 | TOKEN_KEYWORD_TEXT | TOKEN_KEYWORD_TABLE | TOKEN_KEYWORD_HTML etc. */
@@ -3170,6 +3201,9 @@ class Context_menu;
 #if (OCELOT_CHART == 1)
 class Chart;
 #endif
+#if (OCELOT_QWT_INCLUDE == 1)
+class QChart;
+#endif
 
 QT_END_NAMESPACE
 
@@ -3290,6 +3324,7 @@ public:
   QString ocelot_grid_width, new_ocelot_grid_width;
   QString ocelot_grid_html_effects, new_ocelot_grid_html_effects;
   QString ocelot_grid_detached, new_ocelot_grid_detached;
+  QString ocelot_grid_chart, new_ocelot_grid_chart;
   QString ocelot_extra_rule_1_background_color, new_ocelot_extra_rule_1_background_color;
   QString ocelot_extra_rule_1_text_color, new_ocelot_extra_rule_1_text_color;
   QString ocelot_extra_rule_1_condition, new_ocelot_extra_rule_1_condition;
@@ -3781,6 +3816,7 @@ public slots:
   void action_option_html();
   void action_option_htmlraw();
   void action_option_line();
+  void action_option_none();
   void action_option_pie();
   void action_option_raw();
   void action_option_vertical();
@@ -4000,7 +4036,6 @@ private:
   void clf_handler_end(int, QString*);
   bool clf_make_sql_execute_starter_and_ender(QString, QString*);
   void clf_make_sql_execute_function(QString*);
-
 /*
   ocelot_statement_syntax_checker is planned as a bunch of flags, e.g.
     0 = none
@@ -4134,6 +4169,7 @@ public:
     QAction *menu_options_action_html;
     QAction *menu_options_action_htmlraw;
     QAction *menu_options_action_line;
+    QAction *menu_options_action_none;
     QAction *menu_options_action_pie;
     QAction *menu_options_action_raw;
     QAction *menu_options_action_vertical;
@@ -4230,12 +4266,13 @@ private:
   QKeySequence ocelot_shortcut_next_window_keysequence;
   QKeySequence ocelot_shortcut_previous_window_keysequence;
   QKeySequence ocelot_shortcut_batch_keysequence;
-  QKeySequence ocelot_shortcut_bar_keysequence;
+  QKeySequence ocelot_shortcut_chart_bar_keysequence;
+  QKeySequence ocelot_shortcut_chart_line_keysequence;
+  QKeySequence ocelot_shortcut_chart_none_keysequence;
+  QKeySequence ocelot_shortcut_chart_pie_keysequence;
   QKeySequence ocelot_shortcut_horizontal_keysequence;
   QKeySequence ocelot_shortcut_html_keysequence;
   QKeySequence ocelot_shortcut_htmlraw_keysequence;
-  QKeySequence ocelot_shortcut_line_keysequence;
-  QKeySequence ocelot_shortcut_pie_keysequence;
   QKeySequence ocelot_shortcut_raw_keysequence;
   QKeySequence ocelot_shortcut_vertical_keysequence;
   QKeySequence ocelot_shortcut_xml_keysequence;
@@ -6795,7 +6832,7 @@ Result_qtextedit(ResultGrid *m)
   * Shortcuts are Alt+Shift+B Alt+Shift+L Alt+Shift+P. Alt+Shift+8/9/0 didn't work if detached.
   * Todo: define CHART_MAX_GROUP_SIZE 3, if more we start a new group. Eventually allow user-supplied.
   * Settings
-    ocelot_shortcut_bar|line|pie
+    ocelot_shortcut_chart_bar|line|null|pie
     ocelot_grid_cell_border_color+size affect frame lines, not immediate
     ocelot_grid_font_size+style+weight+family affects text, immediate
     ocelot_grid_background_color affects background color, not immediate
@@ -6866,7 +6903,8 @@ QStringList chart_column_names;
 QList<double> cha_column_values;
 QStringList cha_column_values_as_strings;
 QList<double> cha_heights;
-QList<char> cha_flags;
+QList<char> cha_column_flags;
+
 QList<int> chart_column_types;
 int chart_max_column_heights;
 int chart_min_column_heights;
@@ -6908,6 +6946,180 @@ void cha_draw_text_prepare(QPainter *painter,
 
 #endif
 #endif //#if (OCELOT_CHART == 1)
+
+/*****************************************************************************************************************************/
+/* THE QCHART WIDGET */
+
+#if (OCELOT_QWT_INCLUDE == 1)
+
+#ifndef QCHART_H
+#define QCHART_H
+
+class QMultiBarChart: public QwtPlotMultiBarChart
+{
+  //Q_OBJECT removed
+
+
+public:
+
+QChart *qchart;
+
+QMultiBarChart(QChart*passed_qchart): QwtPlotMultiBarChart("Top")
+{
+  qchart= passed_qchart;
+}
+
+void drawBar(QPainter *painter, int sampleIndex, int valueIndex, const QwtColumnRect &rect) const override;
+
+};
+
+class QChart: public QwtPlot
+{
+  Q_OBJECT
+
+/* Some of these #defines may be unnecessary */
+#define CHART_MARGIN_LEFT 2
+#define CHART_MARGIN_RIGHT 2
+#define CHART_MARGIN_TOP 2
+#define CHART_MARGIN_BOTTOM 2
+#define CHART_MARGIN_BETWEEN_BARS 1
+#define CHART_ZERO_LINE_WIDTH 2
+#define CHART_LITTLE_BAR_HEIGHT 2
+#define CHART_LITTLE_BAR_WIDTH 14
+#define CHART_MAX_BYTE_SIZE 100000
+#define CHART_MAX_TOKENS 20 /* we'll allow for more, or for dynamic, when possible # of tokens grows */
+
+public:
+QChart(ResultGrid *rg, MainWindow *parent_mainwindow, int chart_type);
+void chart_row_setup(unsigned int tmp_result_row_number);
+char cha_color_palette[16][16];
+int cha_color_palette_count;
+QFont chart_default_font;
+int draw_group(long unsigned int tmp_result_row_number, int result_column_no, int width, char *output);
+QList<char> chart_column_flags;
+int chart_bar_width;
+int column_number_from_sample_and_series(int sample_number, int sub_group_number);
+QString group_header;
+int chart_last_column_in_group;
+int width_n_total;
+int height_n_total; /* we don't seem to be using this any more */
+QList<int>chart_header_widths;
+int column_in_group(int result_column_no);
+int chart_chartable_columns_count; /* result of evaluate(). if it's 0, we'll delete chart and produce a normal result set */
+
+private:
+QString chart_spec;  /* if set ocelot_grid_chart= ... need to keep frozen copy while chart is up */
+int chart_token_offsets[CHART_MAX_TOKENS]; /* if set ocelot_grid_chart= */
+int chart_token_lengths[CHART_MAX_TOKENS]; /* if set ocelot_grid_chart= */
+//int chart_token_types[CHART_MAX_TOKENS]; /* if set ocelot_grid_chart= */
+
+ResultGrid *chart_rg;
+
+int chart_first_column_in_group;
+
+//unsigned int chart_alloc_byte_size;
+
+MainWindow *chart_mainwindow;
+int chart_pixmap_height;
+//int chart_width;
+int chart_bar_line_pie_width;
+int chart_pixmap_width;
+void set_chart_width();
+void set_chart_pixmap_height();
+//Avoid set_byte_size();
+unsigned int cha_result_column_count; /* Todo: check: why isn't this long unsigned int? */
+unsigned int cha_result_row_count;
+char **cha_result_set_copy_rows; /* dynamic-sized list of result_set_copy row offsets, if necessary */
+char *cha_result_field_names;
+QColor cha_default_text_color;
+QColor cha_default_header_background_color;
+QColor cha_default_detail_background_color;
+int cha_default_container_pen_width;
+QPen cha_default_container_pen;
+QPen cha_default_text_pen;
+QBrush cha_default_header_brush;
+QBrush cha_default_detail_brush;
+//QPen chart_new_container_pen,;
+//QPen chart_new_text_pen;
+//QBrush chart_new_rect_brush;
+
+double chart_bar_line_pie_height;
+QStringList chart_column_names;
+QStringList chart_column_specs;
+QList<double> cha_column_values;
+//QStringList cha_column_values_as_strings;
+//QList<double> cha_heights;
+
+QList<int> chart_column_types;
+
+int chart_sub_group_by; /* 0 or value or column_name */
+QList<int> chart_sub_group_list_sub_group_numbers;
+QList<int> chart_sub_group_list_column_numbers;
+int chart_sub_group_count;
+
+int chart_max_column_heights;
+//int chart_min_column_heights;
+double chart_max_column_values;
+double chart_min_column_values;
+//double chart_max_total_heights;
+//double chart_height_of_zero_line;
+int cha_numeric_column_count;
+//int cha_max_column_width;
+int cha_max_column_height;
+double cha_max_column_value;
+double cha_min_column_value;
+//double cha_max_total_height;
+int cha_chart_column_plus_margin_width;
+//int cha_left_width;
+int cha_x;
+//QString cha_max_column_value_as_utf8;
+unsigned short int cha_result_data_type(unsigned short int field_data_type, QString column_name);
+//void cha_draw(QPainter* painter);
+void set_color_palette();
+void cha_draw_text_prepare(
+               int column_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
+               QString content,     /* table_name | column_name */
+               int row_number,
+               int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
+               int text_lines,
+               int numeric_column_count);
+  int chart_type;
+  void set_orientation();
+  void set_mode();
+  void make_sub_group_list();
+  QColor get_color_from_palette(int sub_group_number);
+  //void exportChart();
+  void fill();
+  //bool is_grouped; /* probably obsolete */
+  //bool is_vertical; /* probably obsolete */
+  bool is_ticks;
+  void set_text_item(QString name, QString content);
+  void 	drawCanvas(QPainter *); /* overriding to draw pies */
+
+  int offset_of_keyword(QString keyword);
+  QMultiBarChart *chart_bar_chart;
+  void default_settings_all();
+  QSize chart_legend_icon_size;
+  //int chart_bar_width; /* guessed from font, activated with setLineWidth() */
+  /* NB: all QwtText items are affected by changes to font and text color but not text background color */
+  QwtText chart_title; bool chart_title_is_null; /* appears on top */
+  QwtText chart_left; bool chart_left_is_null; /* appears on left */
+  QwtText chart_bottom; bool chart_bottom_is_null; /* appears on bottom */
+  QwtText chart_legend; bool chart_legend_is_null; /* appears on right, once per color */
+  int chart_canvas_width;
+  int chart_canvas_height;
+  double null_value(int series, int chart_type, char *null_flag);
+  QwtPlotCurve *chart_curves[100];   /* todo: should be dynamic allocations or different method */
+};
+
+//#include<QPainter>
+
+
+
+
+
+#endif //#ifndef QCHART_H
+#endif //#if (OCELOT_QWT_INCLUDE == 1)
 
 /*********************************************************************************************************/
 
@@ -7113,6 +7325,9 @@ public:
 #if (OCELOT_CHART == 1)
   Chart *chart_widget;
 #endif
+#if (OCELOT_QWT_INCLUDE == 1)
+  QChart *chart_widget;
+#endif
 
 /* How many rows can fit on the screen? Take a guess for initialization. */
 #define RESULT_GRID_WIDGET_INITIAL_HEIGHT 10
@@ -7143,7 +7358,6 @@ ResultGrid(
 
   /* todo: see if we can get rid of client and go direct to resultgrid */
   client= new QWidget(this);
-
   lmysql= passed_lmysql;
 
   copy_of_parent= parent;
@@ -7196,14 +7410,13 @@ ResultGrid(
     batch_text_edit= NULL;
     return;
   }
-#if (OCELOT_CHART == 1)
+#if (OCELOT_CHART_OR_QCHART == 1)
   chart_widget= NULL;
 #endif
 
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
   /* We might say "new ResultGrid(0)" merely so we'd have ResultGrid in the middle spot in the layout-> */
-
   /* Create the cell pool. */
   /*
     Make the cells. Each cell is one QTextEdit (subclassed as TextEditWidget)
@@ -8027,7 +8240,19 @@ void display(int due_to,
       chart_widget= new Chart(this, copy_of_parent, chart_type);
     }
 #endif
-
+#if (OCELOT_QWT_INCLUDE == 1)
+    /* TODO: I guess this is obsolete now so get rid of it */
+    if ((ocelot_bar == 1) || (ocelot_line == 1) || (ocelot_pie == 1))
+    {
+      /* we're hoping display_garbage_collect() deleted chart_widget earlier */
+      int chart_type;
+      if (ocelot_bar == 1) chart_type= TOKEN_KEYWORD_BAR;
+      if (ocelot_line == 1) chart_type= TOKEN_KEYWORD_LINE;
+      if (ocelot_pie == 1) chart_type= TOKEN_KEYWORD_PIE;
+      chart_widget= new QChart(this, copy_of_parent, chart_type);
+    }
+    else evaluate_for_chart(false);
+#endif
     grid_vertical_scroll_bar_value= -1; /* todo: check: is this alread in vertical_scroll_bar_initialize? */
     focus_result_row_number= focus_column_number= -1; /* i.e. no cell is in focus */
     prepare_for_display_html();
@@ -8977,7 +9202,7 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
        (tmp_result_row_number < result_row_count) && (grid_row < (unsigned int) html_max_grid_rows);
        ++tmp_result_row_number, ++grid_row)
   {
-#if (OCELOT_CHART == 1)
+#if (OCELOT_CHART_OR_QCHART == 1)
        /* todo: check: it's header so is this pointless? we call chart_row_setup for detail too */
       if (chart_widget != NULL) chart_widget->chart_row_setup(tmp_result_row_number);
 #endif
@@ -11404,6 +11629,7 @@ int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, 
   QString new_style_sheet= copy_of_parent->ocelot_grid_style_string;
   QString new_cell_height= "";
   QString new_cell_width= "";
+  QString new_text= "";
   int returned_cs_number= 0;
   bool result= conditional_setting_evaluate_till_true(
        text_edit_frames[text_edit_frames_index]->ancestor_grid_column_number,
@@ -11411,7 +11637,7 @@ int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, 
        text_edit_frames[text_edit_frames_index]->content_pointer,
        text_edit_frames[text_edit_frames_index]->content_length,
        text_edit_frames[text_edit_frames_index]->cell_type,
-       &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number);
+       &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number, &new_text);
   if (result == true)
   {
     if (new_cell_width.toInt() > 0)
@@ -11901,7 +12127,7 @@ void fill_detail_widgets(int new_grid_vertical_scroll_bar_value, int connections
 */
 void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 {
-#if (OCELOT_CHART == 1)
+#if (OCELOT_CHART_OR_QCHART == 1)
   if (chart_widget != NULL)
   {
     prepare_for_display_html();
@@ -12206,7 +12432,7 @@ void display_garbage_collect(bool is_final)
 #if (OCELOT_EXPLORER == 1)
   if (is_final == false) assert(result_grid_type != EXPLORER_WIDGET);
 #endif
-#if (OCELOT_CHART == 1)
+#if (OCELOT_CHART_OR_QCHART == 1)
   if (chart_widget != NULL) { delete chart_widget; chart_widget= NULL; }
 #endif
   if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
@@ -12715,6 +12941,13 @@ bool conditional_setting_evaluate(int cs_number,
             *cs_new_text= setting_value; /* caller can change */
             continue;
           }
+#if (OCELOT_QWT_INCLUDE == 1)
+          else if (setting == "OCELOT_GRID_CHART")
+          {
+            *cs_new_text= setting_value; /* caller can change */
+            continue;
+          }
+#endif
           else break;
           int l;
 //          if (setting == "OCELOT_GRID_BORDER_SIZE") l= new_style_sheet.indexOf(" ", k + 1);
@@ -12748,7 +12981,8 @@ bool conditional_setting_evaluate_till_true(
                                   QString *cs_new_style_sheet,    /* return */
                                   QString *cs_new_cell_height,    /* return */
                                   QString *cs_new_cell_width,     /* return */
-                                  int *returned_cs_number)        /* return */
+                                  int *returned_cs_number,
+                                  QString *cs_new_text)           /* return */
 {
   ResultGrid *rg= this;
   MainWindow *mw= rg->copy_of_parent;
@@ -12762,7 +12996,7 @@ bool conditional_setting_evaluate_till_true(
   bool result;
   for (int i= 0; i < mw->conditional_settings.count(); ++i)
   {
-    QString cs_new_action, cs_new_enabled, cs_new_shortcut, cs_new_text;
+    QString cs_new_action, cs_new_enabled, cs_new_shortcut;
     result= conditional_setting_evaluate(i,
     cs_column_number,           /* e.g. text_frame->ancestor_grid_column_number */
     cs_result_row_number,              /* e.g. text_frame->ancestor_grid_result_row_number */
@@ -12779,7 +13013,7 @@ bool conditional_setting_evaluate_till_true(
     &cs_new_action,
     &cs_new_enabled,
     &cs_new_shortcut,
-    &cs_new_text);
+    cs_new_text);
     if (result == true)
     {
       *returned_cs_number= i;
@@ -12789,6 +13023,37 @@ bool conditional_setting_evaluate_till_true(
   *returned_cs_number= -1;
   return false;
 }
+
+#if (OCELOT_QWT_INCLUDE == 1)
+bool evaluate_for_chart(bool is_mainwindow_calling)
+{
+  bool is_chartable= false;
+  if (copy_of_parent->ocelot_grid_chart > "") is_chartable= true;
+  else
+  {
+    for (int i= 0; i < copy_of_parent->conditional_settings.count(); ++i)
+    {
+      if (copy_of_parent->conditional_settings.at(i).left(22) == "SET OCELOT_GRID_CHART ")
+      {
+        is_chartable= true;
+        break;
+      }
+    }
+  }
+  if (is_mainwindow_calling) return is_chartable; /* to help decide whether is_repeated_needed should become true */
+  if (is_chartable == true)
+  {
+    int chart_type= TOKEN_KEYWORD_BAR; /* todo: we won't need to pass chart_type */
+    chart_widget= new QChart(this, copy_of_parent, chart_type);
+    if (chart_widget->chart_chartable_columns_count == 0)
+    {
+      delete chart_widget; chart_widget= NULL;
+      is_chartable= false;
+    }
+  }
+  return is_chartable;
+}
+#endif
 
 public slots:
 
@@ -14212,7 +14477,7 @@ void erd_draw_text_prepare(QPainter *painter,
 {
   QString string= content.trimmed();
   QByteArray string_utf8= string.toUtf8();
-  QString new_tooltip, new_style_sheet, new_cell_height, new_cell_width;
+  QString new_tooltip, new_style_sheet, new_cell_height, new_cell_width, new_text;
   int cs_number;
   bool result_of_evaluate;
   result_of_evaluate= erd_mainwindow->explorer_widget->conditional_setting_evaluate_till_true(
@@ -14226,7 +14491,8 @@ void erd_draw_text_prepare(QPainter *painter,
     &new_style_sheet, /* return */
     &new_cell_height, /* return */
     &new_cell_width, /* return */
-    &cs_number); /* return */
+    &cs_number,
+    &new_text); /* return */
   if (result_of_evaluate == true)
   {
     QString new_background_color= erd_mainwindow->get_background_color_from_style_sheet(new_style_sheet);
@@ -15243,7 +15509,7 @@ Settings(int passed_widget_number, MainWindow *parent): QDialog(parent)
     in label_for_font_dialog_set_text, or if MENU_FONT is used at all.
     Change the assert in ocelotgui.cpp if MENU_FONT changes in ostrings.h.
   */
-  menu_strings_menu_font_copy= menu_strings[menu_off + 98];
+  menu_strings_menu_font_copy= menu_strings[menu_off + 99];
 
   int settings_width, settings_height;
 
@@ -17119,7 +17385,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER     7
-#define OCELOT_VARIABLES_SIZE 143
+#define OCELOT_VARIABLES_SIZE 145
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */

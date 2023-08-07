@@ -1,0 +1,108 @@
+More Chart Options
+------------------
+
+It is now possible to get more chart (bars / lines /pies) options
+inside ocelotgui. This is only in the github source code, not the
+releases. Anyone who wans to see it can build ocelotgui from source
+with a new cmake option, which so far has been tested on Linux only.
+
+Build
+-----
+
+One must bring in the Qwt library. For a description of it see
+https://en.wikipedia.org/wiki/Qwt
+... the library is available on many Linux distros,
+so just google for how to install on [your favourite].
+The only version that has been tested so far is 6.1.4 with Qt5,
+but there is no reason to expect that slight version change will cause a problem.
+
+The source code which has the feature is inside #if (OCELOT_QWT_INCLUDE = 1 ... #endif,
+and this is not the default, so either:
+one says cmake . -DOCELOT_QWT_INCLUDE=1 then make
+or
+one changes the relevant line in the ocelotgui.h source file to say #define OCELOT_QWT_INCLUDE 1
+... other than that, the instructions for building are as described for
+ocelotgui 2.0.0 in the README file.
+
+SET ocelot_grid_chart=
+----------------------
+
+There is a new client-side statement
+SET ocelot_grid_chart = 'literal' [WHERE clause];
+After you've typed SET ocelot_grid_chart= the prompt/autocomplete list wil be
+'BAR'
+'LINE'
+'PIE'
+'BAR VERTICAL'
+'BAR STACKED'
+'BAR VERTICAL STACKED'
+'BAR SUBGROUP BY VALUE % 3'
+'PIE SUBGROUP BY VALUE % 3'
+'BAR SUBGROUP BY LEFT(COLUMN_NAME, 2)'
+'LINE SUBGROUP BY LEFT(COLUMN_NAME, 2)'
+'PIE SUBGROUP BY LEFT(COLUMN_NAME, 2)'
+[string]
+and you can make your own combination for example
+SET ocelot_grid_chart = 'BAR STACKED' SUBGROUP BY VALUE % 5';
+
+The optional WHERE may include COLUMN_NAME | COLUMN_NUMBER | COLUMN_TYPE
+(relational operator) (literal value), along with AND|OR, as is usual for
+any client-side SET OCELOT_GRID_... statements. For example
+SET OCELOT_GRID_chart = 'PIE' WHERE column_name < 'k';
+
+SET ocelot_grid_chart=''; will cancel all previous uses of SET ocelot_chart_grid,
+that is, it turns the feature off.
+
+Shortcut key combinations
+-------------------------
+
+Alt+Shift+B causes SET ocelot_grid_chart='bar';
+Alt+Shift+L causes SET ocelot_grid_chart='line';
+Alt_Shift+P causes SET ocelot_grid_chart='pie';
+Alt+Shift+N causes SET ocelot_grid_chart='';
+
+Alt+Shift+B, Alt_Shift_L, Alt_Shift+P will also produce
+bar and line and pie charts in classic ocelotgui version 2.0.0,
+without the Qwt library.
+
+As usual, it is possible to change the key combinations with
+SET ocelot_shortcut... statements.
+
+Groups
+------
+
+Charts make sense when representing numbers.
+A "group" is any uninterrupted series of numbers in a result-set row.
+For example, in
+SELECT 'a',1,2,3.7,4,'b',5e1,6,'c';
+the first group is 1,2,3.7,4 and the second group is 5e1,6.
+(That is the default. to change the default, use a WHERE clause.)
+
+Subgroups
+---------
+
+A group may be divided into subgroups.
+Subgrouping is what decides how sampling is done within a group.
+Different methods of subgrouping are appropriate for different
+types of chart.
+
+There is automatic subgrouping of pies because otherwise all
+pie segments would have a single colour.
+(Different subgroups have different colours.)
+
+There is automatic subgrouping of lines because otherwise the
+points of all lines would be in the same axis and there would
+be no apparent movement. The automatic subgrouping in this case
+is SUBGROUP BY LEFT(COLUMN_NAME,2) so it need not be specified.
+
+Effects of other settings
+-------------------------
+
+SET ocelot_grid_font=... affects what font the chart captions have.
+SET ocelot_grid_cell_border_size=... affects the width of lines.
+And other ocelot_grid settings affect what 
+
+Illustrations
+-------------
+
+Pictures showing effects will be in a soon-to-appear blog post.
