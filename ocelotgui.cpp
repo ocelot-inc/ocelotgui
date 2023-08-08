@@ -30677,6 +30677,8 @@ int QChart::draw_group(
 
   if (chart_type == TOKEN_KEYWORD_LINE) { set_text_item("LEFT", "samples"); set_text_item("BOTTOM", "values"); }
 
+  if (chart_type == TOKEN_KEYWORD_PIE) { chart_left_is_null= chart_bottom_is_null= true; }
+
   if (chart_type == TOKEN_KEYWORD_BAR)
   {
     /* Following might be overridden by a kludge in set_orientation() */
@@ -30691,8 +30693,10 @@ int QChart::draw_group(
   insertLegend(new QwtLegend()); /* necessary, seems to affect whole plot */
   /* nb: if we want left|bottom text, set_text_item() calls must precede this. */
   //if (chart_title_is_null == false) setTitle(chart_title);
-  if (chart_left_is_null == false) setAxisTitle(QwtPlot::yLeft, chart_left);
-  if (chart_bottom_is_null == false) setAxisTitle(QwtPlot::xBottom, chart_bottom);
+  if (chart_left_is_null == false) { enableAxis(QwtPlot::yLeft, true); setAxisTitle(QwtPlot::yLeft, chart_left); }
+  else enableAxis(QwtPlot::yLeft, false);
+  if (chart_bottom_is_null == false) { enableAxis(QwtPlot::xBottom, true); setAxisTitle(QwtPlot::xBottom, chart_bottom); }
+  else enableAxis(QwtPlot::xBottom, false);
   /* Todo: if I change the order of the following things, I run into trouble. */
   //  set_mode();
   set_chart_width();
@@ -30927,7 +30931,7 @@ void QChart::default_settings_all()
   /* But will QwtText inherit the font? But will you look for a conditional? */
   chart_legend_icon_size= fm.boundingRect("W").size();
   chart_bar_width= fm.boundingRect("W").width();
-  chart_title_is_null= chart_left_is_null= false; /* spec doesn't include LEFT=NULL but we might per-group override this */
+  chart_title_is_null= false; /* this might be unnecessary */
 }
 
 /*
