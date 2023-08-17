@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.0.0
-   Last modified: August 6 2023
+   Last modified: August 17 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -29995,7 +29995,7 @@ void Chart::set_chart_width()
   }
   else /* TOKEN_KEYWORD_PIE */
   {
-    chart_bar_line_pie_width= chart_bar_line_pie_height; /* so it is in a square rect */
+    chart_bar_line_pie_width= chart_bar_line_pie_height; /* so canvas is in a square rect */
     chart_pixmap_width= chart_bar_line_pie_width + CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;
   }
 }
@@ -30645,9 +30645,7 @@ int QChart::column_number_from_sample_and_series(int sample_number, int sub_grou
   A group is a series of numbers preceded by before-start or non-number, followed by after-end or non-number.
   Todo: Inefficiency: This ends up in base64_tmp. We could dump directly to tmp_pointer.
   Todo: Inefficiency: Surely the size can be figured out in advance so we could memcpy not strcpy.
-  Re bar width: minimum is chart_bar_width which is width of a char's boundingRect(), but if cell can fit wider
-                then stretch_bar_width = (bar_line_pie_width - margins) / number-of-columns-in-group,
-                reversing width_of_bars calculation in chart_set_width()
+  Re bar width: If there's no subgrouping or stacking then setLayoutHint(0.9) gets rid of too-wide margins.
 */
 int QChart::draw_group(
         long unsigned int tmp_result_row_number,
@@ -30678,14 +30676,17 @@ int QChart::draw_group(
   if (chart_type == TOKEN_KEYWORD_LINE) { set_text_item("LEFT", "samples"); set_text_item("BOTTOM", "values"); }
 
   if (chart_type == TOKEN_KEYWORD_PIE) { chart_left_is_null= chart_bottom_is_null= true; }
-
   if (chart_type == TOKEN_KEYWORD_BAR)
   {
     /* Following might be overridden by a kludge in set_orientation() */
     if (offset_of_keyword("HORIZONTAL") < 0) { set_text_item("LEFT", "values"); set_text_item("BOTTOM", "samples"); }
     else { set_text_item("LEFT", "samples"); set_text_item("BOTTOM", "values"); }
     chart_bar_chart= new QMultiBarChart(this); /* I'm not sure what saying "Top" does */
-    chart_bar_chart->setLayoutPolicy(QwtPlotMultiBarChart::AutoAdjustSamples); /* useless if no layoutHint()? */
+    if ((offset_of_keyword("SUBGROUP") < 0) && (offset_of_keyword("STACKED") < 0))
+    {
+      chart_bar_chart->setLayoutPolicy(QwtPlotMultiBarChart::ScaleSampleToCanvas);
+      chart_bar_chart->setLayoutHint(0.9);
+    }
     chart_bar_chart->setSpacing(BAR_CHART_ITEM_SPACING);
     chart_bar_chart->setMargin(BAR_CHART_MARGIN);
     chart_bar_chart->attach(this); /* i.e. attach bar chart to plot. we only attach one chart to each plot. */
@@ -30703,69 +30704,16 @@ int QChart::draw_group(
   /* todo: check what happens if no header or very short header, that could ruin chart_bar_line_pie_width */
   resize(chart_bar_line_pie_width, chart_pixmap_height); /* todo: but that won't work on canvas width */
 
-  /* Eventually rename numeric_column_count to number_of_columns_in_group */
-  int numeric_column_count= (chart_last_column_in_group - chart_first_column_in_group) + 1;
-
-//  QString column_value_as_utf8= QString(ocelot_grid_detail_char_column_start, v_length);
-//  double column_value= QString::number(column_value_as_utf8);
-//  !! and it might be %f
-  /* Actually we don't need this, we just use background */
-//  QPixmap pixmap(QPixmap(QSize(width, chart_max_column_heights)));
-
- QPixmap pixmap(QPixmap(QSize(chart_pixmap_width, chart_pixmap_height)));
-
-//A  pixmap.fill(chart_mainwindow->ocelot_grid_background_color);
-
-  //QPen pen;
-  //pen.setColor(Qt::red); /* Todo: use usual background colour */
-  //pen.setWidth(5);
-  QPainter pixmap_painter(&pixmap); /* obsolete! */
-  int x_of_bar;
-
-//  if (chart_type == TOKEN_KEYWORD_BAR) /* actually, true for line too */
-  {
-    cha_x= CHART_MARGIN_LEFT;
-    x_of_bar= cha_x;
-//    chart_bar_width= 10; no, it depends on font size and should already be set
-    cha_chart_column_plus_margin_width= chart_bar_width; /* OR SOMETHING! */
-  }
-
-  int xx= chart_bar_line_pie_width - ((numeric_column_count - 1) * CHART_MARGIN_BETWEEN_BARS);
-  int stretch_bar_width= xx / numeric_column_count;
-
-  if (stretch_bar_width < chart_bar_width) stretch_bar_width= chart_bar_width;
-
-  int start_angle_of_pie;
-  double height_of_pie;
-  double total_height_of_pie= 0;
-  int height_of_pie_rounded= 0;
-  double shrink_of_pie;
-
-  int prev_x_of_bar= 0;       /* for line */
-  int prev_y= 0;
-
-  int caption_x= 0;
+  /* Finished setting, now populate */
   fill();
-//  show(); /* TEMPORARY */
-//  QMessageBox qm;
-//  qm.setText("OK");
-//  qm.exec();
 
-  //QPixmap new_pixmap(this->width(), this->height());
-  // this->print(new_pixmap); /* This fails. I guess it's obsolete. */
+  /* Finished chart, now make it a pixmap so copy_html_cell() will have a byte array to put in the HTML cell */
   QPixmap new_pixmap(this->size());
   new_pixmap= grab(this->rect());
-
   QByteArray ba;
   QBuffer buffer(&ba);
   buffer.open(QIODevice::WriteOnly);
   bool save_result= new_pixmap.save(&buffer, "PNG");
-
-  //show();
-  //QMessageBox mgb;
-  //mgb.setText("OK");
-  //mgb.exec();
-
   unsigned int expected_output_size= (ba.size() * 4) / 3 + 64;
   if ((save_result == false)
    || (new_pixmap.isNull() == true)
@@ -30777,7 +30725,7 @@ int QChart::draw_group(
   }
   strcpy(output, ba.toBase64()); /* i.e. buffer.data() */
 
-  /* If we don't clean up, we'll have multiple bar charts etc. */
+  /* Finished producing chart and making it a pixmap, now clean up. If we don't, we'll have multiple bar charts etc. */
   if (chart_type == TOKEN_KEYWORD_BAR)
   {
     chart_bar_chart->attach(NULL);
@@ -30870,6 +30818,9 @@ void QChart::set_chart_pixmap_height()
   We'll get chart_bar_line_pie_width = greater of (width_n_total, width_of_bars).
   For a pie, chart width should = chart height, approximately. Ellipses are nice but wouldn't be expeced.
   We can override with set ocelot_grid_cell_width, but I'm not sure what units that's using.
+  Re pie width: QwtAbstractLegend *legend= this->legend()'s QRect legend_rect= legend->contentsRect() width
+    is not valid yet so we try increase by font width * 2, but shouldn't if there's no legend
+  We should allow room for a scroll bar for the legend, it appears but clicking on it won't work
 */
 void QChart::set_chart_width()
 {
@@ -30886,7 +30837,8 @@ void QChart::set_chart_width()
   }
   else /* TOKEN_KEYWORD_PIE */
   {
-    chart_bar_line_pie_width= chart_bar_line_pie_height; /* so it is in a square rect */
+    chart_bar_line_pie_width= chart_bar_line_pie_height; /* so canvas is in a square rect */
+    chart_bar_line_pie_width+= chart_bar_width * 2;
     chart_pixmap_width= chart_bar_line_pie_width + CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;
   }
 }
@@ -31207,7 +31159,7 @@ void QChart::drawCanvas(QPainter *pixmap_painter)
   {
     int width_or_height= chart_canvas_height;
     if (chart_canvas_width < chart_canvas_height) width_or_height= chart_canvas_width;
-    canvas()->resize(chart_canvas_width, chart_canvas_height);
+//    canvas()->resize(chart_canvas_width, chart_canvas_height);
 //      QPixmap pixmap= QPixmap(QSize(width_or_height, width_or_height));
   //    pixmap.fill(Qt::red);
     //  pixmap_painter->drawPixmap(0, 0, pixmap);
@@ -31231,8 +31183,8 @@ void QChart::drawCanvas(QPainter *pixmap_painter)
 
     QwtAbstractLegend *legend= this->legend();
     QRect legend_rect= legend->contentsRect();
-
     int height_of_pie_rounded= width_or_height - legend_rect.width();
+    height_of_pie_rounded-= chart_bar_width;    /* Dunno why, but subtracting legend_rect.width() isn't enough */
 
     double total_height_of_pie= 0;
     // cha_heights.clear(); /* why? */

@@ -105,4 +105,6 @@ And other ocelot_grid settings affect what
 Illustrations
 -------------
 
-Pictures showing effects will be in a soon-to-appear blog post.
+Pictures showing effects are in a blog post:
+http://ocelot.ca/blog/blog/2023/08/08/charts/
+
