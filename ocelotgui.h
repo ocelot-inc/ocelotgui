@@ -7023,7 +7023,7 @@ MainWindow *chart_mainwindow;
 int chart_pixmap_height;
 //int chart_width;
 int chart_bar_line_pie_width;
-int chart_pixmap_width;
+//int chart_pixmap_width;
 void set_chart_width();
 void set_chart_pixmap_height();
 //Avoid set_byte_size();
@@ -7057,17 +7057,17 @@ QList<int> chart_sub_group_list_sub_group_numbers;
 QList<int> chart_sub_group_list_column_numbers;
 int chart_sub_group_count;
 
-int chart_max_column_heights;
+//int chart_max_column_heights;
 //int chart_min_column_heights;
 double chart_max_column_values;
 double chart_min_column_values;
 //double chart_max_total_heights;
 //double chart_height_of_zero_line;
-int cha_numeric_column_count;
+//int cha_numeric_column_count;
 //int cha_max_column_width;
-int cha_max_column_height;
-double cha_max_column_value;
-double cha_min_column_value;
+//int cha_max_column_height;
+//double cha_max_column_value;
+//double cha_min_column_value;
 //double cha_max_total_height;
 //int cha_chart_column_plus_margin_width;
 //int cha_left_width;
@@ -9203,8 +9203,11 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
        ++tmp_result_row_number, ++grid_row)
   {
 #if (OCELOT_CHART_OR_QCHART == 1)
-       /* todo: check: it's header so is this pointless? we call chart_row_setup for detail too */
-      if (chart_widget != NULL) chart_widget->chart_row_setup(tmp_result_row_number);
+       /* todo: check: is this pointless? I imagine chart size is always the same, eh? */
+      if (chart_widget != NULL)
+      {
+        chart_widget->chart_row_setup(tmp_result_row_number);
+      }
 #endif
     result_field_names_pointer= &result_field_names[0];
     tmp_size+= strlen(ocelot_grid_detail_row_start);
@@ -9237,6 +9240,13 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
         break;
       }
     }
+#if (OCELOT_CHART_OR_QCHART == 1)
+     /* todo: check: it's header so is this pointless? we call chart_row_setup for detail too */
+    if (chart_widget != NULL)
+    {
+      break; /* there's only 1 row per display */
+    }
+#endif
   }
   tmp_size+= strlen(ocelot_grid_table_end);
   char *tmp;
@@ -9308,9 +9318,12 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
        ++tmp_result_row_number, ++grid_row)
 //  for (tmp_result_row_number= 0; tmp_result_row_number < result_row_count; ++tmp_result_row_number)
   {
-#if (OCELOT_CHART == 1)
-       /* todo: we're calling this but only display 1 row so we ignore when grid_row > 0 */
-      if (chart_widget != NULL) chart_widget->chart_row_setup(tmp_result_row_number);
+#if (OCELOT_CHART_OR_QCHART == 1)
+     /* todo: we're calling this but only display 1 row so we ignore when grid_row > 0 */
+    if (chart_widget != NULL)
+    {
+      chart_widget->chart_row_setup(tmp_result_row_number);
+    }
 #endif
     char *tmp_pointer_of_row_start= tmp_pointer;
     result_field_names_pointer= &result_field_names[0];
@@ -9359,6 +9372,12 @@ void display_html(int new_grid_vertical_scroll_bar_value, int situation)
         break;
       }
     }
+#if (OCELOT_CHART_OR_QCHART == 1)
+    if (chart_widget != NULL)
+    {
+     break; /* there's only 1 row per display */
+    }
+#endif
   }
   strcpy(tmp_pointer, ocelot_grid_table_end);
   tmp_pointer+= strlen(ocelot_grid_table_end);
@@ -12283,7 +12302,6 @@ bool vertical_scroll_bar_event(QEvent *event, int connections_dbms)
     return false;
   }
   new_value= grid_vertical_scroll_bar->value();
-
   if (new_value != grid_vertical_scroll_bar_value)
   {
     /* Todo: See whether is_paintable is important for batch etc. */

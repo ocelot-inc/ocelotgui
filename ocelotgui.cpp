@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.0.0
-   Last modified: August 17 2023
+   Last modified: August 21 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -28506,7 +28506,7 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
 #if (OCELOT_QWT_INCLUDE == 1)
     if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_CHART)
     {
-      r->display(1, 0, 0, 1, 0, 0, ocelot_result_grid_column_names, 0, 0, 0);
+      if (r->isVisible() == true) r->display(1, 0, 0, 1, 0, 0, ocelot_result_grid_column_names, 0, 0, 0);
     }
     else
 #endif
@@ -30024,11 +30024,12 @@ void Chart::set_byte_size()
 #if (OCELOT_QWT_INCLUDE == 1)
 /*
   QChart
+  If OCELOT_QWT_INCLUDE == 1, we use QChart:: instead of Chart:: and we depend on the Qwt library.
   Re main_group_numbers: each group of numeric columns, corresponding to a result-set column, has a number
   Re sub_group_numbers: within main_group, determined by GROUP BY
   Todo: Legend:
         the legend can overflow when too many sub-bars, either have a working scroll bar or reduce font/icon size
-          ... but there is a working scroll bar at the moment
+          ... there is a scroll bar but it isn't working
         the legend can overflow if names are too wide
   Todo: > 1 sample, breaking up a series with some sort of group-by
 
@@ -30102,10 +30103,9 @@ void Chart::set_byte_size()
 /* Todo: Check, do we ever call it? yes */
 void QChart::chart_row_setup(unsigned int tmp_result_row_number)
 {
-  chart_max_column_heights= 0;
+  //chart_max_column_heights= 0;
   chart_max_column_values= 0;  /* because base is always 0 even if all negative|positive */
   chart_min_column_values= 0;
-
   char *row_pointer;
   int column_length;
 
@@ -30720,6 +30720,10 @@ int QChart::draw_group(
    || (expected_output_size >= CHART_MAX_BYTE_SIZE - 1))
   {
     printf("Error in Chart::draw_group. pixmap could not be saved, or was null, or was too big.\n");
+    if (save_result == false) printf("    save_result == false\n");
+    if (new_pixmap.isNull() == true) printf("    new_pixmap.isNull() == true\n");
+    printf("    expected_output_size=%d\n", expected_output_size);
+    printf("    CHART_MAX_BYTE_SIZE=%d\n", CHART_MAX_BYTE_SIZE);
     strcpy(output, "");
     return 0;
   }
@@ -30824,22 +30828,23 @@ void QChart::set_chart_pixmap_height()
 */
 void QChart::set_chart_width()
 {
+  int local_chart_pixmap_width;
   if ((chart_type == TOKEN_KEYWORD_BAR) || (chart_type == TOKEN_KEYWORD_LINE))
   {
     int group_columns_count= (chart_last_column_in_group - chart_first_column_in_group) + 1;
     int width_of_bars= (chart_bar_width * 2) * (group_columns_count + 7);
     width_of_bars+= CHART_MARGIN_BETWEEN_BARS * (group_columns_count - 1);
-    chart_pixmap_width= width_of_bars + (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
-    if (width_n_total > chart_pixmap_width) chart_pixmap_width= width_n_total;
-    if (chart_header_widths.at(chart_last_column_in_group) > chart_pixmap_width)
-      chart_pixmap_width= chart_header_widths.at(chart_last_column_in_group);
-    chart_bar_line_pie_width= chart_pixmap_width - (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
+    local_chart_pixmap_width= width_of_bars + (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
+    if (width_n_total > local_chart_pixmap_width) local_chart_pixmap_width= width_n_total;
+    if (chart_header_widths.at(chart_last_column_in_group) > local_chart_pixmap_width)
+      local_chart_pixmap_width= chart_header_widths.at(chart_last_column_in_group);
+    chart_bar_line_pie_width= local_chart_pixmap_width - (CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT);
   }
   else /* TOKEN_KEYWORD_PIE */
   {
     chart_bar_line_pie_width= chart_bar_line_pie_height; /* so canvas is in a square rect */
     chart_bar_line_pie_width+= chart_bar_width * 2;
-    chart_pixmap_width= chart_bar_line_pie_width + CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;
+    local_chart_pixmap_width= chart_bar_line_pie_width + CHART_MARGIN_LEFT + CHART_MARGIN_RIGHT;
   }
 }
 
@@ -30982,7 +30987,7 @@ if (result_of_evaluate == true)
 {
   chart_column_specs.append(new_text);
   ++chart_chartable_columns_count;
-  ++cha_numeric_column_count; /* though I think cha_numeric_column_count might be obsolete */
+//  ++cha_numeric_column_count; /* though I think cha_numeric_column_count might be obsolete */
 }
 else
 {
@@ -31020,7 +31025,6 @@ int QChart::offset_of_keyword(QString keyword)
 
 QChart::QChart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_type)
 {
-
 /* TEST ! */
 
 ///* TEST */
@@ -31076,7 +31080,7 @@ QChart::QChart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_t
     In result_grid->evaluate_for_chart() we found that there is a SET OCELOT_GRID_CHART statement.
     So we created a QChart. Check if it's applicable. If it is, each chartable column should have a spec != "".
   */
-  cha_numeric_column_count= 0;
+  //cha_numeric_column_count= 0;
   chart_chartable_columns_count= 0; /* # of chartable columns */
   chart_column_specs.clear(); /* probably unnecessary */
   
@@ -31095,7 +31099,7 @@ QChart::QChart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_t
        unsigned short int rft= cha_result_data_type(chart_rg->result_field_types[i], chart_column_names[i]);
        if (rft == OCELOT_DATA_TYPE_NUMBER)
        {
-         ++cha_numeric_column_count;
+         //++cha_numeric_column_count;
          ++chart_chartable_columns_count;
          chart_column_specs.append(spec);
        }
@@ -31109,7 +31113,7 @@ QChart::QChart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_t
       unsigned short int rft= cha_result_data_type(chart_rg->result_field_types[i], chart_column_names[i]);
       if (rft == OCELOT_DATA_TYPE_NUMBER)
       {
-        ++cha_numeric_column_count;
+        //++cha_numeric_column_count;
         /* if (cha_numeric_column_count == CHART_MAX_GROUP_SIZE) break; */ /* maybe a limit is good, though? */
         cha_draw_text_prepare(
                 i, /* column_number */
@@ -31128,9 +31132,9 @@ QChart::QChart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_t
   /* TODO: We would already know cha_numeric_column_count if we would call cha_setup()?! */
 
   /* Following will be superseded because min and max are per-row  now */
-  cha_max_column_height= 0;
-  cha_max_column_value= 0;  /* because base is always 0 even if all negative|positive */
-  cha_min_column_value= 0;
+  //cha_max_column_height= 0;
+  //cha_max_column_value= 0;  /* because base is always 0 even if all negative|positive */
+  //cha_min_column_value= 0;
   default_settings_all();
 //}
 
