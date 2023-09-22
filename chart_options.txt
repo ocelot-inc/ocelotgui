@@ -3,25 +3,19 @@ More Chart Options
 
 It is now possible to get more chart (bars / lines /pies) options
 inside ocelotgui. This is only in the github source code, not the
-releases. Anyone who wans to see it can build ocelotgui from source
-with a new cmake option, which so far has been tested on Linux only.
+releases. Anyone who wans to see it can build ocelotgui from source,
+which so far has been tested on Linux only.
 
 Build
 -----
 
-One must bring in the Qwt library. For a description of it see
-https://en.wikipedia.org/wiki/Qwt
-... the library is available on many Linux distros,
-so just google for how to install on [your favourite].
-The only version that has been tested so far is 6.1.4 with Qt5,
-but there is no reason to expect that slight version change will cause a problem.
+It is no longer necessary to bring in the Qwt library, although
+cmake . -DOCELOT_QWT_INCLUDE=1
+still will work. The same functionality is available without it.
 
-The source code which has the feature is inside #if (OCELOT_QWT_INCLUDE = 1 ... #endif,
-and this is not the default, so either:
-one says cmake . -DOCELOT_QWT_INCLUDE=1 then make
-or
-one changes the relevant line in the ocelotgui.h source file to say #define OCELOT_QWT_INCLUDE 1
-... other than that, the instructions for building are as described for
+The source code which has the feature is inside #if (OCELOT_CHART == 1) ... #endif,
+or #if (OCELOT_CHART_OR_QCHART == 1) ... #endif, and this is the default.
+Therefore the instructions for building are as described for
 ocelotgui 2.0.0 in the README file.
 
 SET ocelot_grid_chart=
@@ -95,16 +89,69 @@ points of all lines would be in the same axis and there would
 be no apparent movement. The automatic subgrouping in this case
 is SUBGROUP BY LEFT(COLUMN_NAME,2) so it need not be specified.
 
+Layout of a cell (copied from comments in the sourc code)
+----------------
+
+  These are the components of pixmap, which has whole chart (after header, not including cell border)
+  +--------------------------------------------------+
+  |    TOP                                           |
+  |L |                                              L|
+  |E |   CANVAS                                     E|
+  |F |                                              G|
+  |T |                                              E|
+  |  |                                              N|
+  |  |                                              D|
+  |   _____________________________________________  |
+  |   BOTTOM                                         |
+  +--------------------------------------------------+
+
+  But if pixmap size is small we might cancel everything except the canvas.
+
+  chart canvas: this is a non-optional component, it haa the actual bar/line/pie chart.
+
+  LEFT: For vertical-bar or line has "values axis", for horizontal-bar has "sample axis", for pie has nothing. Text, rotated 90 degrees.
+  BOTTOM: For horizontal-bar or line has "values axis", for vertical-bar has "values axis", for pie has nothing. Text.
+  LEGEND: This is on the RIGHT. Icons and very short text.
+  TOP: text (not shown by default)
+  LEFT: text (shown by default as "samples" or "values")
+  LEFT LINE: a straight line between LEFT and canvas
+  BOTTOM: text (shown by default as "values" or "samples")
+  BOTTOM LINE: a straight line between canvas and BOTTOM
+  Value axis: Becomes next to LEFT or BOTTOM in a bar or line.
+  Sample axis: Becomes next to LEFT or BOTTOM in a bar or line.
+
+  It is possible to cancel or change any item except the canvas.
+  So a fuller statement of the SET syntax can be
+  SET ocelot_grid_chart = '
+  {BAR|LINE|PIE}          currently default=bar if this is missing, but don't do it
+  [VERTICAL]                        default is horizontal
+  [STACKED]                         default is grouping
+  [TOP=value]                       default is null
+  [RIGHT=value|LEGEND|NULL]         default is LEGEND
+  [LEFT=value|DEFAULT|NULL]         default is DEFAULT
+  [BOTTOM=value|DEFAULT|NULL]       default is DEFAULT
+  [AXIS=NULL|ALL]                   default is ALL, anything but NULL will make axes appear
+                         '
+  WHERE condition];
+
+  For example, to supppress everything except the canvas with a vertical bar chart:
+  SET ocelot_grid_chart='BAR VERTICAL RIGHT=NULL LEFT=NULL BOTTOM=NULL AXIS=NULL';
+  For example, to add a top line along with the other components with a pie:
+  SET ocelot_grid_chart='PIE TOP=TOPPER';
+
+  Any item value might be truncated. An easy way to change width of a single chart
+  is to use long column names, that is, instead of saying SELECT 1, 2, 3; say
+  SELECT 1 AS really_long_column_name, 2, 3;
+
 Effects of other settings
 -------------------------
 
 SET ocelot_grid_font=... affects what font the chart captions have.
 SET ocelot_grid_cell_border_size=... affects the width of lines.
-And other ocelot_grid settings affect what 
+And other ocelot_grid settings may affect all cells including cells with charts.
 
 Illustrations
 -------------
 
 Pictures showing effects are in a blog post:
 http://ocelot.ca/blog/blog/2023/08/08/charts/
-
