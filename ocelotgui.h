@@ -23,12 +23,12 @@
 #endif
 
 /* if you don't tell CMakeLists.txt -DOCELOT_QWT_INCLUDE=1, you can't access qwt. In this case default is 0. */
-/* TEST!! Temporarily say it is 1 */
+/* Bringing in the Qwt library was an experiment, it worked, but it isn't necessary so 0 is recommended. */
 #ifndef OCELOT_QWT_INCLUDE
 #define OCELOT_QWT_INCLUDE 0
 #endif
 
-/* Chart and QChart don't coexist, at least for now. */
+/* Chart and QChart don't coexist. */
 #if (OCELOT_QWT_INCLUDE == 1)
 #define OCELOT_CHART 0
 #endif
@@ -6743,9 +6743,8 @@ Result_qtextedit(ResultGrid *m)
 /*
   CHART
   It is an alternate display choice within result grid.
-  Intercept display() in result grid if user picks bar|line|pie in Options menu or via shortcut.
+  Intercept display() in result grid if user picks bar|line|pie in Options menu or via shortcut or with SET.
   It works only via display_html() and the result is HTML.
-  Todo: bar: allow horizontal. stack multiple columns vertical not side-by-side.
   Todo: bar|line: don't assume base is 0
   Todo: this should be exportable, because the exporting will still be of the normal result grid. But check.
   Todo: TOKEN_KEYWORD_BAR|LINE|PIE keywords aren't used by hparse. But left in because maybe someday
@@ -6755,21 +6754,33 @@ Result_qtextedit(ResultGrid *m)
         The query is only stored in history once and history does not have results.
         If [REPEAT n] we replace completely, i.e. we don't shift|rotate the items. This is "monitoring".
         Or "performance dashboard" -- a way to repeat on the client makes monitoring easy
-  Todo: Allow charts always, not just via shortcut, but with finer control. "SET ocelot_extra_rule_1 = PIE"
+  Todo: Allow charts always, not just via shortcut, but with different control. "SET ocelot_extra_rule_1 = PIE"
         is one way, "SELECT x AS PIE" is one way, "SELECT 'pie',x" is one way. "SET ocelot_pie=1 is one way.
-        Thus we'd be looking for signals in the output. At the moment I slightly lean toward
+        Thus we'd be looking for signals in the output. For a while I was leaning toward
          "SELECT / *O OCELOT_GRID_CHART=BAR|CHART|PIE|NONE * /" and it could have a WHERE clause e.g.
          "SELECT / *O OCELOT_GRID_CHART=PIE WHERE COLUMN_NAME|COLUMN_NUMBER|COLUMN_TYPE|ROW_NUMBER|VLUE etc. * /"
          That is, conditions could be embedded in statement comments and applicable for grid settings in general.
          And the same WHERE clause could apply in a SET statement. (Sometimes comments are insufficient
          because the server might not store them, and because we don't know where they are when we call a
-        stored procedure that returns a result set.) Con re SET statements: they're modal.
+         stored procedure that returns a result set.) Con re SET statements: they're modal.
+         At the moment what's implemented is SET ocelot_grid_chart=... and maybe that will never change.
+         Syntax: currently any order:
+            SET ocelot_grid_chart = '{BAR|LINE|PIE}          currently default=bar if this is missing, but don't do it
+                           [VERTICAL]                        default is horizontal
+                           [STACKED]                         default is grouping
+                           [TOP=value]                       default is null
+                           [RIGHT=value|LEGEND|NULL]         default is LEGEND
+                           [LEFT=value|DEFAULT|NULL]         default is DEFAULT
+                           [BOTTOM=value|DEFAULT|NULL]       default is DEFAULT
+                           [AXIS=NULL|ALL]                   default is ALL, anything but NULL will make axes appear
+                          '
+            [WHERE condition];
   Todo: more general way to check if data type is string or number
   Todo: add chart choices in grid settings menu, or make a chart settings menu
   * #include <QtCharts> would have been great but might not be installed
     and it is GPLv3 https://doc.qt.io/qt-5/qtcharts-index.html#licenses and ocelotgui is GPLv2.
     See illustrations at https://doc.qt.io/qt-6/qtcharts-overview.html
-  * A chartable column group is a series of numeric columns, bounded by start | end | non-numeric.
+  * A chartable column group is a series of numeric columns, bounded by start | end | non-numeric | not-in-conditional.
     Strings or images will just be displayed as usual. So we can recognize these formats:
   * Suppose we have two rows:
     "A",1,2,3,"",2,NULL,4
@@ -6781,12 +6792,12 @@ Result_qtextedit(ResultGrid *m)
         ---  ---          << zero line
         123  2NULL4       << captions
     ... which could even be done in ASCII.
-    Column names ending in _id are probably not quantities so are treated as non-numeric.
+  * Todo: Column names ending in _id are probably not quantities so could be treated as non-numeric.
   * Line width = ocelot_grid_cell_border_size. Bar width = width of a column in current (grid) font.
     Line or bar or pie-part colour = from the palette.
     When a row has more than one column, there are multiple lines|bars with different colours.
     But later lines can overwrite earlier lines.
-  * Todo: Tooltip: We track mouseMoveEvent and show tooltip when mouse is over mouse column.
+  * Todo: Tooltip: We track mouseMoveEvent and show tooltip when mouse is over chart column.
     We could detect when a mouse is over a bar, or near a line (the "intersects" trick we
     use in ERDiagram would work for this), or over a pie's colour (by grabbing the widget
     specific or line, or when we're over a pie's colour, but that would be unhelpful when height
@@ -6794,7 +6805,7 @@ Result_qtextedit(ResultGrid *m)
     think of a way to accept it, despite the fact that there might be more than one column.
   * Maybe in theory we could do this as an advance setting for a second result-set grid.
   * Todo: distinguishing for null, inf, nan -- maybe setAutoFillBackground() would help for bars?
-    Nulls are treated as 0 but caption and tooltip should say NULL.
+    Nulls are treated as 0 (except for bars) but caption and tooltip should say NULL.
   * Todo: When numbers are negative, okay, but bars for positives don't go past the 0 point.
     And for pies, we could show abs(n), or invent a doughnut chart type, but we don't even check,
     figuring that results wouldn't make sense anyway. Eventually maybe allow doughnut charts.
@@ -6807,6 +6818,7 @@ Result_qtextedit(ResultGrid *m)
       caption     boundingRect("W") maybe "list_of_values" is a better name?
       margin      CHART_MARGIN_TOP, CHART_MARGIN_BOTTOM -- QPixmap ends
       cell border ocelot_grid_cell_border_size
+    ... but at this moment we're probably not looking at CHART_MARGIN values
   * Calculating bar heights
     Range = Maximum value - Minimum Value
             but if both < 0 then it's 0 - Minimum Value
@@ -6826,10 +6838,10 @@ Result_qtextedit(ResultGrid *m)
     1, 10000       10, 100000      0, 100
     ... Pie heights are more complex because we want % of area, not % of height.
   * Todo: watch out for horizontal scroll bar.
-    In Chart() the resize() is for rg-width+rg-height.
+    In Chart() there could be a resize() for rg-width+rg-height.
     So we are not expecting vertical scroll bar to appear unless rg is very small but horizontal might appear.
   * Todo: A maximum column name width in characters might be okay, at least with #define
-  * Shortcuts are Alt+Shift+B Alt+Shift+L Alt+Shift+P. Alt+Shift+8/9/0 didn't work if detached.
+  * Shortcuts are Alt+Shift+B Alt+Shift+L Alt+Shift+P Alt+Shift+N. Alt+Shift+8/9/0 didn't work if detached.
   * Todo: define CHART_MAX_GROUP_SIZE 3, if more we start a new group. Eventually allow user-supplied.
   * Settings
     ocelot_shortcut_chart_bar|line|null|pie
@@ -6852,13 +6864,17 @@ class Chart: public QWidget
 
 #define CHART_MARGIN_LEFT 2
 #define CHART_MARGIN_RIGHT 2
-#define CHART_MARGIN_TOP 2
-#define CHART_MARGIN_BOTTOM 2
+//#define CHART_MARGIN_TOP 2
+//#define CHART_MARGIN_BOTTOM 2
 #define CHART_MARGIN_BETWEEN_BARS 1
-#define CHART_ZERO_LINE_WIDTH 2
-#define CHART_LITTLE_BAR_HEIGHT 2
-#define CHART_LITTLE_BAR_WIDTH 14
+//#define CHART_ZERO_LINE_WIDTH 2
+//#define CHART_LITTLE_BAR_HEIGHT 2
+//#define CHART_LITTLE_BAR_WIDTH 14
 #define CHART_MAX_BYTE_SIZE 100000
+#define CHART_MAX_TOKENS 20 /* we'll allow for more, or for dynamic, when possible # of tokens grows */
+#define CHART_TICK_LENGTH 10 /* todo: this is too much  -- maybe should be multiple of line width? */
+#define CHART_VERTICAL_LINE_WIDTH 2
+#define CHART_HORIZONTAL_LINE_HEIGHT 2
 
 public:
 Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int chart_type);
@@ -6874,7 +6890,10 @@ QFont chart_default_font;
 unsigned int chart_alloc_byte_size;
 void chart_row_setup(unsigned int tmp_result_row_number);
 int column_in_group(int result_column_no);
+double null_value(double group_max_column_value, double group_min_column_value, int chart_type, bool is_stacked);
+void make_sub_group_list();
 int draw_group(long unsigned int tmp_result_row_number, int result_column_no, int width, char *output);
+//QList<char> chart_column_flags;
 
 private:
 MainWindow *chart_mainwindow;
@@ -6905,13 +6924,18 @@ QStringList cha_column_values_as_strings;
 QList<double> cha_heights;
 QList<char> cha_column_flags;
 
+int chart_sub_group_by; /* 0 or value or column_name */
+QList<int> chart_sub_group_list_sub_group_numbers;
+QList<int> chart_sub_group_list_column_numbers;
+int chart_sub_group_count;
+
 QList<int> chart_column_types;
 int chart_max_column_heights;
 int chart_min_column_heights;
 double chart_max_column_values;
 double chart_min_column_values;
 double chart_max_total_heights;
-double chart_height_of_zero_line;
+//double chart_height_of_zero_line;
 int cha_numeric_column_count;
 int cha_max_column_width, cha_max_column_height;
 double cha_max_column_value;
@@ -6936,6 +6960,21 @@ void cha_draw_text_prepare(QPainter *painter,
                int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
                int text_lines,
                int numeric_column_count);
+
+int offset_of_keyword(QString keyword);
+public:
+int chart_chartable_columns_count; /* result of evaluate(). if it's 0, we'll delete chart and produce a normal result set */
+
+private:
+QString chart_spec;  /* if set ocelot_grid_chart= ... need to keep frozen copy while chart is up */
+int chart_token_offsets[CHART_MAX_TOKENS]; /* if set ocelot_grid_chart= */
+int chart_token_lengths[CHART_MAX_TOKENS]; /* if set ocelot_grid_chart= */
+//int chart_token_types[CHART_MAX_TOKENS]; /* if set ocelot_grid_chart= */
+
+QStringList chart_column_specs;
+
+QRect chart_bottom_rect, chart_left_rect, chart_vertical_line_rect, chart_right_rect, chart_top_rect, chart_canvas_rect, chart_horizontal_line_rect;
+void set_chart_rects(int pixmap_width, int pixmap_height, int numeric_column_count, bool is_horizontal, QString top, QString bottom, QString left, QString right, QString axis, QString max_value);
 
 //~Chart()
 //{
@@ -7083,33 +7122,37 @@ void cha_draw_text_prepare(
                int cell_type,       /* TEXTEDITFRAME_CELL_TYPE_DETAIL | TEXTEDITFRAME_CELL_TYPE_HEADER */
                int text_lines,
                int numeric_column_count);
-  int chart_type;
-  void set_orientation();
-  void set_mode();
-  void make_sub_group_list();
-  QColor get_color_from_palette(int sub_group_number);
-  //void exportChart();
-  void fill();
-  //bool is_grouped; /* probably obsolete */
-  //bool is_vertical; /* probably obsolete */
-  bool is_ticks;
-  void set_text_item(QString name, QString content);
-  void 	drawCanvas(QPainter *); /* overriding to draw pies */
+int chart_type;
+void set_orientation();
+void set_mode();
+void make_sub_group_list();
+QColor get_color_from_palette(int sub_group_number);
+//void exportChart();
+void fill();
+//bool is_grouped; /* probably obsolete */
+//bool is_vertical; /* probably obsolete */
+bool is_ticks;
+void set_text_item(QString name, QString content);
+void 	drawCanvas(QPainter *); /* overriding to draw pies */
 
-  int offset_of_keyword(QString keyword);
-  QMultiBarChart *chart_bar_chart;
-  void default_settings_all();
-  QSize chart_legend_icon_size;
-  //int chart_bar_width; /* guessed from font, activated with setLineWidth() */
-  /* NB: all QwtText items are affected by changes to font and text color but not text background color */
-  QwtText chart_title; bool chart_title_is_null; /* appears on top */
-  QwtText chart_left; bool chart_left_is_null; /* appears on left */
-  QwtText chart_bottom; bool chart_bottom_is_null; /* appears on bottom */
-  QwtText chart_legend; bool chart_legend_is_null; /* appears on right, once per color */
-  int chart_canvas_width;
-  int chart_canvas_height;
-  double null_value(int series, int chart_type, char *null_flag);
-  QwtPlotCurve *chart_curves[100];   /* todo: should be dynamic allocations or different method */
+int offset_of_keyword(QString keyword);
+QMultiBarChart *chart_bar_chart;
+void default_settings_all();
+QSize chart_legend_icon_size;
+//int chart_bar_width; /* guessed from font, activated with setLineWidth() */
+/* NB: all QwtText items are affected by changes to font and text color but not text background color */
+QwtText chart_title; bool chart_title_is_null; /* appears on top */
+QwtText chart_left; bool chart_left_is_null; /* appears on left */
+QwtText chart_bottom; bool chart_bottom_is_null; /* appears on bottom */
+QwtText chart_legend; bool chart_legend_is_null; /* appears on right, once per color */
+int chart_canvas_width;
+int chart_canvas_height;
+double null_value(int series, int chart_type, char *null_flag);
+QwtPlotCurve *chart_curves[100];   /* todo: should be dynamic allocations or different method */
+QwtLegend *chart_qwtlegend;
+QScrollBar *chart_qwtlegend_scroll_bar;
+protected:
+//bool eventFilter(QObject *obj, QEvent *ev);
 };
 
 //#include<QPainter>
@@ -8229,18 +8272,18 @@ void display(int due_to,
   else
   /* Since it's not ocelot_batch or ocelot_xml it must be ocelot_html */
   {
-#if (OCELOT_CHART == 1)
-    if ((ocelot_bar == 1) || (ocelot_line == 1) || (ocelot_pie == 1))
-    {
-      /* we're hoping display_garbage_collect() deleted chart_widget earlier */
-      int chart_type;
-      if (ocelot_bar == 1) chart_type= TOKEN_KEYWORD_BAR;
-      if (ocelot_line == 1) chart_type= TOKEN_KEYWORD_LINE;
-      if (ocelot_pie == 1) chart_type= TOKEN_KEYWORD_PIE;
-      chart_widget= new Chart(this, copy_of_parent, chart_type);
-    }
-#endif
-#if (OCELOT_QWT_INCLUDE == 1)
+//#if (OCELOT_CHART == 1)
+//    if ((ocelot_bar == 1) || (ocelot_line == 1) || (ocelot_pie == 1))
+//    {
+//      /* we're hoping display_garbage_collect() deleted chart_widget earlier */
+//      int chart_type;
+//      if (ocelot_bar == 1) chart_type= TOKEN_KEYWORD_BAR;
+//      if (ocelot_line == 1) chart_type= TOKEN_KEYWORD_LINE;
+//      if (ocelot_pie == 1) chart_type= TOKEN_KEYWORD_PIE;
+//      chart_widget= new Chart(this, copy_of_parent, chart_type);
+//    }
+//#endif
+#if (OCELOT_CHART_OR_QCHART == 1)
     /* TODO: I guess this is obsolete now so get rid of it */
     if ((ocelot_bar == 1) || (ocelot_line == 1) || (ocelot_pie == 1))
     {
@@ -8249,7 +8292,11 @@ void display(int due_to,
       if (ocelot_bar == 1) chart_type= TOKEN_KEYWORD_BAR;
       if (ocelot_line == 1) chart_type= TOKEN_KEYWORD_LINE;
       if (ocelot_pie == 1) chart_type= TOKEN_KEYWORD_PIE;
+ #if (OCELOT_CHART == 1)
+      chart_widget= new Chart(this, copy_of_parent, chart_type);
+ #else
       chart_widget= new QChart(this, copy_of_parent, chart_type);
+ #endif
     }
     else evaluate_for_chart(false);
 #endif
@@ -8918,7 +8965,7 @@ void prepare_for_display_html()
              old_style_sheet,          /* old_style_sheet */
              true,        /* is_always_true */
              &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width,
-             &new_action, &new_enabled, &new_shortcut, &new_text);
+             &new_action, &new_enabled, &new_shortcut, &new_text, NULL);
         if (result == true) /* unnecessary, we passed always_true */
         {
           sprintf(condition_div, " .E%d {", condition_number);        /* so <div> label is E0, E1, etc. */
@@ -11656,7 +11703,7 @@ int set_alignment_and_height(int text_edit_frames_index, unsigned int grid_row, 
        text_edit_frames[text_edit_frames_index]->content_pointer,
        text_edit_frames[text_edit_frames_index]->content_length,
        text_edit_frames[text_edit_frames_index]->cell_type,
-       &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number, &new_text);
+       &new_tooltip, &new_style_sheet, &new_cell_height, &new_cell_width, &returned_cs_number, &new_text, NULL);
   if (result == true)
   {
     if (new_cell_width.toInt() > 0)
@@ -12451,7 +12498,8 @@ void display_garbage_collect(bool is_final)
   if (is_final == false) assert(result_grid_type != EXPLORER_WIDGET);
 #endif
 #if (OCELOT_CHART_OR_QCHART == 1)
-  if (chart_widget != NULL) { delete chart_widget; chart_widget= NULL; }
+  if (chart_widget != NULL) {
+      delete chart_widget; chart_widget= NULL; }
 #endif
   if (grid_column_widths != 0) { delete [] grid_column_widths; grid_column_widths= 0; }
   if (grid_column_heights != 0) { delete [] grid_column_heights; grid_column_heights= 0; }
@@ -12787,6 +12835,7 @@ bool comparer(
   Todo: SET ocelot_grid_background_color='blue', ocelot_grid_color='red' WHERE row = 5 AND column_name REGEX 'x';
   Todo: More comparands e.g. COLUMN_TYPE = 'binary'.
   Todo: font-family might have [foundry] in brackets, it should be in ''s, though I didn't notice a problem
+  Todo: I see that we're calling this frequently unnecessarily, maybe due to internal requests.
 */
 #define MAX_CONDITIONAL_STATEMENT_TOKENS 100 /* todo: this is a duplicate of what's defined in MainWindow */
 bool conditional_setting_evaluate(int cs_number,
@@ -12805,11 +12854,17 @@ bool conditional_setting_evaluate(int cs_number,
                                   QString *cs_new_action,         /* return */
                                   QString *cs_new_enabled,        /* return */
                                   QString *cs_new_shortcut,       /* return */
-                                  QString *cs_new_text)           /* return */
+                                  QString *cs_new_text,           /* return */
+                                  ResultGrid* upper_rg)
 {
   copy_of_parent->log("conditional_setting_evaluate", 15);
   if (cs_cell_type != TEXTEDITFRAME_CELL_TYPE_DETAIL) return false; /* Temporary till we handle headers */
   ResultGrid *rg= this;
+  if (upper_rg != NULL)
+  {
+    rg= upper_rg; /* because I don't understand how "this" works */
+  }
+
   MainWindow *mw= rg->copy_of_parent;
   if (mw->conditional_settings.count() <= cs_number) return false; /* unnecessary */
   {
@@ -12959,7 +13014,7 @@ bool conditional_setting_evaluate(int cs_number,
             *cs_new_text= setting_value; /* caller can change */
             continue;
           }
-#if (OCELOT_QWT_INCLUDE == 1)
+#if (OCELOT_CHART_OR_QCHART == 1)
           else if (setting == "OCELOT_GRID_CHART")
           {
             *cs_new_text= setting_value; /* caller can change */
@@ -13000,9 +13055,11 @@ bool conditional_setting_evaluate_till_true(
                                   QString *cs_new_cell_height,    /* return */
                                   QString *cs_new_cell_width,     /* return */
                                   int *returned_cs_number,
-                                  QString *cs_new_text)           /* return */
+                                  QString *cs_new_text,           /* return */
+                                  ResultGrid *upper_rg)           /* NULL unless we call from Chart */
 {
   ResultGrid *rg= this;
+  if (upper_rg != NULL) rg= upper_rg; /* because I don't understand how "this" works */
   MainWindow *mw= rg->copy_of_parent;
   QString old_style_sheet;
 #if (OCELOT_EXPLORER == 1)
@@ -13031,7 +13088,8 @@ bool conditional_setting_evaluate_till_true(
     &cs_new_action,
     &cs_new_enabled,
     &cs_new_shortcut,
-    cs_new_text);
+    cs_new_text,
+    upper_rg);
     if (result == true)
     {
       *returned_cs_number= i;
@@ -13042,7 +13100,7 @@ bool conditional_setting_evaluate_till_true(
   return false;
 }
 
-#if (OCELOT_QWT_INCLUDE == 1)
+#if (OCELOT_CHART_OR_QCHART == 1)
 bool evaluate_for_chart(bool is_mainwindow_calling)
 {
   bool is_chartable= false;
@@ -13062,7 +13120,11 @@ bool evaluate_for_chart(bool is_mainwindow_calling)
   if (is_chartable == true)
   {
     int chart_type= TOKEN_KEYWORD_BAR; /* todo: we won't need to pass chart_type */
+#if (OCELOT_CHART == 1)
+    chart_widget= new Chart(this, copy_of_parent, chart_type);
+#else
     chart_widget= new QChart(this, copy_of_parent, chart_type);
+#endif
     if (chart_widget->chart_chartable_columns_count == 0)
     {
       delete chart_widget; chart_widget= NULL;
@@ -14510,7 +14572,8 @@ void erd_draw_text_prepare(QPainter *painter,
     &new_cell_height, /* return */
     &new_cell_width, /* return */
     &cs_number,
-    &new_text); /* return */
+    &new_text, /* return */
+    NULL);
   if (result_of_evaluate == true)
   {
     QString new_background_color= erd_mainwindow->get_background_color_from_style_sheet(new_style_sheet);

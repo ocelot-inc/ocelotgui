@@ -384,7 +384,7 @@ endif (NOT UI_OCELOTGUI)
 add_executable(ocelotgui ${UI_OCELOTGUI} ocelotgui.cpp)
 
 #If cmake . -DOCELOT_QWT_INCLUDE=1 then code related to qwt will be included.
-#By default OCELOT_QWT_INCLUDE=0 while this is experimental.
+#By default OCELOT_QWT_INCLUDE=0, Qwt use was an experiment, it worked but wasn't needed.
 #On Ubuntu apt install libqwt-qt5-dev supplies /usr/include/qwt and /usr/lib/libqwt-qt5.so*
 #Maybe the rpm package is libqwt-qt5_6
 #CMAKE_FIND_LIBRARY_PREFIXES presumably is lib, and CMAKE_FIND_LIBRARY_SUFFIXES presumably is .so, so
