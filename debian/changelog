@@ -1,3 +1,9 @@
+ocelotgui (2.1.0-1) UNRELEASED; urgency=low
+
+  * Improved Charts
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Fri, 29 Sep 2023 12:00:00 -0600
+
 ocelotgui (2.0.0-1) UNRELEASED; urgency=low
 
   * Charts

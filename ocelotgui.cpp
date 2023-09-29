@@ -1,8 +1,8 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 2.0.0
-   Last modified: September 22 2023
+   Version: 2.1.0
+   Last modified: September 29 2023
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -423,7 +423,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="2.0.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="2.1.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -6144,7 +6144,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 2.0.0, June 7 2023  \
+  <BR>Version 2.1.0, September 29 2023  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2023 by Peter Gulutzan. All rights reserved.  \
@@ -20727,7 +20727,7 @@ QString Result_qtextedit::unstripper(QString value_to_unstrip)
   QString c;
 
   s= "'";
-  for (int i= 0; i < value_to_unstrip.count(); ++i)
+  for (int i= 0; i < value_to_unstrip.size(); ++i)
   {
     c= value_to_unstrip.mid(i, 1);
     s.append(c);
@@ -29446,6 +29446,9 @@ Chart::Chart(ResultGrid *rg, MainWindow *parent_mainwindow, int passed_chart_typ
   cha_max_column_value= 0;  /* because base is always 0 even if all negative|positive */
   cha_min_column_value= 0;
   default_settings_all();
+#if (OCELOT_CHART_EVENTFILTER == 1)
+  installEventFilter(this);
+#endif
 }
 
 void Chart::default_settings_all()
@@ -31031,10 +31034,10 @@ int Chart::draw_group(
 
   But if pixmap size is small we might cancel everything except the canvas.
   Components are painted with pixmap draw functions in draw_group().
-  chart canvas: this is a non-optional component, it haa teh actual bar/line/pie chart.
+  chart canvas: this is a non-optional component, it haa the actual bar/line/pie chart.
 
   LEFT: For vertical-bar or line has "values axis", for horizontal-bar has "sample axis", for pie has nothing.
-        Text, rotated 90. ... OR, no, numbers from low to high
+        Text, rotated 90 degrees.
   BOTTOM: For horizontal-bar or line has "values axis", for vertical-bar has "values axis", for pie has nothing.
           Text, rotated 90. ... OR, no, numbers from low to high
   LEGEND: If there are too many items:
@@ -31049,7 +31052,7 @@ int Chart::draw_group(
   LEFT LINE: a straight line between LEFT and canvas
   BOTTOM: text
   BOTTOM LINE: a straight line between canvas and BOTTOM
-  Value axis: Becomes next to LEFT or BOTTOM in a bar or line. Todo: need ticks.
+  Value axis: Becomes next to LEFT or BOTTOM in a bar or line.
   Sample axis: Becomes next to LEFT or BOTTOM in a bar or line.
 
   pixmap_rect = 0, 0, pixmap.width(), pixmap.height()
@@ -31261,6 +31264,41 @@ void Chart::set_byte_size()
   }
   chart_alloc_byte_size= groups_count * CHART_MAX_BYTE_SIZE;
 }
+
+#if (OCELOT_CHART_EVENTFILTER == 1)
+/* Sometimes for diagnostics it's useful to know what events are happening to charts but ordinarily this is disabled. */
+/* Ordinarily we'd try to track chart events as part of grid events */
+/* Currently the only events we see with this are polish and polishrequest, not much use */
+bool Chart::eventFilter(QObject *obj, QEvent *event)
+{
+  //return main_window->eventfilter_function(obj, event);
+  if (obj == this) printf("****     EVENT FILTER %d ", event->type());
+  if (event->type() == QEvent::Scroll) printf("****       SCROLL!\n");
+  else if (event->type() == QEvent::DragMove) printf("****       DRAGMOVE!\n");
+  else if (event->type() == QEvent::EnabledChange) printf("****       ENABLEDCHANGE!\n");
+  else if (event->type() == QEvent::Enter) printf("****       ENTER!\n");
+  else if (event->type() == QEvent::Leave) printf("****       LEAVE!\n");
+  else if (event->type() == QEvent::MouseButtonPress) printf("****       MOUSEBUTTONPRESS!\n");
+  else if (event->type() == QEvent::MouseMove) printf("****       MOUSEMOVE!\n");
+  else if (event->type() == QEvent::FocusIn) printf("****       FOCUSIN!\n");
+  else if (event->type() == QEvent::Paint) printf("****       PAINT!\n");
+  else if (event->type() == QEvent::UpdateLater) printf("****       UPDATELATER!\n");
+  else if (event->type() == QEvent::Timer) printf("****       TIMER!\n");
+  else if (event->type() == QEvent::HideToParent) printf("****       HIDETOPARENT!\n");
+  else if (event->type() == QEvent::LayoutRequest) printf("****       LAYOUTREQUEST!\n");
+  else if (event->type() == QEvent::Polish) printf("****       POLISH\n");
+  else if (event->type() == QEvent::ChildPolished) printf("****       CHILDPOLISHED!\n");
+  else if (event->type() == QEvent::Resize) printf("****       RESIZE!\n");
+  else if (event->type() == QEvent::ShowToParent) printf("****       SHOWTOPARENT!\n");
+  else if (event->type() == QEvent::Move) printf("****       MOVE!\n");
+  else if (event->type() == QEvent::FontChange) printf("****       FONTCHANGE!\n");
+  else if (event->type() == QEvent::ChildAdded) printf("****       CHILDADDED!\n");
+  else if (event->type() == QEvent::PolishRequest) printf("****       POLISHREQUEST!\n");
+  else printf("****       (unknown meaning)!\n");
+  //return false; /* we would only return true if we wanted to filter the event filter out */
+  return QObject::eventFilter(obj, event);
+}
+#endif
 
 #endif //if (OCELOT_CHART == 1)
 

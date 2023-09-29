@@ -60,9 +60,10 @@
 #define OCELOT_ERDIAGRAM 1
 #endif
 
-/* To remove most of the code related to erdiagram, #define OCELOT_CHART 0 */
+/* To remove most of the code related to chart, #define OCELOT_CHART 0 */
 #ifndef OCELOT_CHART
 #define OCELOT_CHART 1
+#define OCELOT_CHART_EVENTFILTER 0 /* for some diagnostics. normally 0. */
 #endif
 
 #if (OCELOT_MYSQL_INCLUDE == 0)
@@ -6775,6 +6776,12 @@ Result_qtextedit(ResultGrid *m)
                            [AXIS=NULL|ALL]                   default is ALL, anything but NULL will make axes appear
                           '
             [WHERE condition];
+
+          Someday we'll also think about other subgroups and
+          RIGHT=LEGEND(GROUP_NUMBER|COLUMN_NAMES, etc.)
+          PALETTE=DEFAULT (or COLOR_SCHEME?)
+          TICKS=NULL|MAJOR|MEDIUM|MINOR,                         default NULL
+          GROUP BY PREFIX | NAME(n) | TYPE | COUNT(n) | REGEXP(expression) | NULL (but we always break for non-numeric)
   Todo: more general way to check if data type is string or number
   Todo: add chart choices in grid settings menu, or make a chart settings menu
   * #include <QtCharts> would have been great but might not be installed
@@ -6803,6 +6810,15 @@ Result_qtextedit(ResultGrid *m)
     specific or line, or when we're over a pie's colour, but that would be unhelpful when height
     is 0 or when lines cross, or colors repeat. Todo: if user has a conditional expression to change the tooltip,
     think of a way to accept it, despite the fact that there might be more than one column.
+    Some thoughts about saving every relevant bit of information, that tooltip might care about, when drawing:
+      Define list of structs: [ column group ] [line or rect or chord] [ x, y, width, height ] [ value ] [ column-name ]
+      In Chart::Chart: set up list, blank
+      In Chart::draw_group: add to list every time you draw
+      In event filter: during mouseMove event: chane tooltip depending on what rect you're in
+      This assumes TOOLTIP=DEFAULT
+      What happens if you drag, resize, change font, etc.? do you draw again?
+      Warning: you don't want to add to this every time you call draw_group, that's why there's deleting at the start.
+      Alternative: make rects but do not paint, so you could recalculate 
   * Maybe in theory we could do this as an advance setting for a second result-set grid.
   * Todo: distinguishing for null, inf, nan -- maybe setAutoFillBackground() would help for bars?
     Nulls are treated as 0 (except for bars) but caption and tooltip should say NULL.
@@ -6856,6 +6872,7 @@ Result_qtextedit(ResultGrid *m)
   * Todo: the LINE chart is indented a lot, it should start at the left margin.
   * TODO: html_max_grid_rows > 1, but we only display one
   * BUG: after set ocelot_grid_font_size=40; ... we don't change the width so the header takes 2 rows!
+  * BUG: set_byte_size() checks not even a number, rather than is-chartable
 */
 
 class Chart: public QWidget
@@ -6975,6 +6992,11 @@ QStringList chart_column_specs;
 
 QRect chart_bottom_rect, chart_left_rect, chart_vertical_line_rect, chart_right_rect, chart_top_rect, chart_canvas_rect, chart_horizontal_line_rect;
 void set_chart_rects(int pixmap_width, int pixmap_height, int numeric_column_count, bool is_horizontal, QString top, QString bottom, QString left, QString right, QString axis, QString max_value);
+
+#if (OCELOT_CHART_EVENTFILTER == 1)
+protected:
+bool eventFilter(QObject *obj, QEvent *ev);
+#endif
 
 //~Chart()
 //{
