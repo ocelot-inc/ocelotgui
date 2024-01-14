@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.1.0
-   Last modified: September 29 2023
+   Last modified: January 14 2024
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -18157,7 +18157,8 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
     }
     if (field_type == MP_EXT)
     {
-      value_length= tarantool_fetch_row_ext(tarantool_tnt_reply_data, value_as_string);
+      unsigned char ext_field_type;
+      value_length= tarantool_fetch_row_ext(tarantool_tnt_reply_data, value_as_string, &ext_field_type);
       lmysql->ldbms_mp_next(&tarantool_tnt_reply_data);
     }
 
@@ -18197,9 +18198,13 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
 #define MP_ERROR_ERRNO 4
 #define MP_ERROR_CODE 5
 #define MP_ERROR_FIELDS 6
+#if (FLAG_VERSION_TARANTOOL_2_10 != 0)
+#define MP_DATETIME 4
+#endif
 
 int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
-                                            char *value_as_string)
+                                            char *value_as_string,
+                                            unsigned char *returned_ext_field_type)
 {
   const char *next_tarantool_tnt_reply_data;
   unsigned char ext_field_type;
@@ -18215,6 +18220,7 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
   else if (mp_ext_byte == 0xc7) { /* l= *(tarantool_tnt_reply_data + 1); */ tarantool_tnt_reply_data+= 2; }
   else {strcpy(value_as_string, "EXT"); return 3; }
   ext_field_type= *tarantool_tnt_reply_data;
+  *returned_ext_field_type= *tarantool_tnt_reply_data;
   ++tarantool_tnt_reply_data;
   if (ext_field_type == MP_DECIMAL)
   {
@@ -18309,6 +18315,115 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
     }
     return o - value_as_string;
   }
+#if (FLAG_VERSION_TARANTOOL_2_10 != 0)
+  else if (ext_field_type == MP_DATETIME)
+  {
+    int l= 0;
+    if (mp_ext_byte == 0xd7) l= 8;
+    else if (mp_ext_byte == 0xd8) l= 16;
+    else return 0; /* error */
+    int64_t seconds= *((int64_t*) tarantool_tnt_reply_data); /* # of seconds since 1970-01-01. can be negative. */
+    tarantool_tnt_reply_data+= 8;
+    int32_t nsecs= 0;
+    int16_t tzoffset= 0;
+    int16_t tzindex= 0;
+    if (l == 16)
+    {
+      /* nsec (4 bytes), tzoffset (2 bytes), and tzindex (2 bytes) */
+      nsecs= *((int32_t*) tarantool_tnt_reply_data); /* nanoseconds */
+      tarantool_tnt_reply_data+= 4;
+      tzoffset= *((int16_t*) tarantool_tnt_reply_data); /* offset in minutes as "+hh:mm". ignore if tzindex != 0 */
+      tarantool_tnt_reply_data+= 2;
+      tzindex= *((int16_t*) tarantool_tnt_reply_data); /* Olson timezone id */
+      tarantool_tnt_reply_data+= 2;
+      seconds+= tzoffset * 60; /* Despite Tarantool documentation, we don't ignore tzoffset even if tzindex != 0 */
+    }
+    QDateTime dt= QDateTime::fromSecsSinceEpoch(seconds, Qt::UTC);
+    QString s= dt.toString("yyyy-MM-ddThh:mm:ss"); /* Tarantool quirk: character after date is 'T' not ' ' */
+    if (s.left(1) == "-")
+    {
+      /* Tarantool quirk: the day before 0001-01-01 is 0000:12-31! Yuck! But we try to say what Tarantool client says. */
+      int years_bc= s.left(5).toInt();
+      QString s2;
+      if (years_bc == -1) s2= "0000";
+      else
+      {
+        char years_bc_as_string[32];
+        sprintf(years_bc_as_string, "%04d", years_bc + 1);
+        s2= years_bc_as_string;
+      }
+      s= s2 + s.right(s.length() - 5);
+    }
+    strcpy(value_as_string, s.toUtf8().data());
+    if (l == 8)
+    {
+      strcat(value_as_string, "Z"); /* Tarantool quirk: if no tzoffset or tzindex, add 'Z' */
+      return strlen(value_as_string); /* "return 20;" would be okay for AD dates */
+    }
+    int olength= strlen(value_as_string);  /* "olength= 19;" would be okay for AD dates */
+    if (nsecs > 0) /* tarantool quirk: display nanoseconds with additional '0's sometimes not always */
+    {
+      char nsecs_string[32];
+      int nsecs_length;
+      sprintf(nsecs_string, ".%09d", nsecs); nsecs_length= 10;
+      while (*(nsecs_string + nsecs_length - 1) == '0') { *(nsecs_string + nsecs_length - 1)= '\0'; --nsecs_length; }
+      if ((nsecs_length == 9) || (nsecs_length == 6) || (nsecs_length == 3)) { strcat(nsecs_string, "0"); ++nsecs_length; }
+      if ((nsecs_length == 8) || (nsecs_length == 5) || (nsecs_length == 2)) { strcat(nsecs_string, "00"); nsecs_length+= 2; }
+      strcat(value_as_string + olength, nsecs_string);
+      olength+= nsecs_length;
+    }
+    if (tzindex != 0)
+    {
+      unsigned int timezone_ids_offset= 0;
+      unsigned int strings_offset= 0;
+      char tzstring[MAX_TIMEZONE_NAME_LENGTH];
+      for (;;)
+      {
+        unsigned int string_length= timezone_olson[timezone_ids_offset].timezone_string_length;
+        short int timezone_id= timezone_olson[timezone_ids_offset].timezone_id;
+        memcpy(tzstring, timezone_strings + strings_offset, string_length);
+        tzstring[string_length]= '\0';
+        if (timezone_id == tzindex)
+        {
+          if (string_length > 1) /* Tarantool quirk: add space before zone unless it's one-letter A-Z */
+          {
+            strcat(value_as_string + olength, " ");
+            ++olength;
+          }
+          memcpy(value_as_string + olength, timezone_strings + strings_offset, string_length);
+          olength+= string_length;
+          value_as_string[olength]= '\0';
+          break;
+        }
+        if (timezone_id == 0)
+        {
+          strcat(value_as_string + olength, "?");
+          olength+= 1;
+          break;
+        }
+        strings_offset+= string_length;
+        ++timezone_ids_offset;
+      }
+    }
+    else if (tzoffset != 0)
+    {
+      if (tzoffset > 0) strcat(value_as_string + olength, "+");
+      else { strcat(value_as_string + olength, "-"); tzoffset= -tzoffset; }
+      int hours= tzoffset / 60;
+      int minutes= tzoffset % 60;
+      /* Tarantool quirk: sometimes I'm sure I've seen ':' separating hours:minutes, but it's disappeared now. */
+      sprintf(value_as_string + olength + 1, "%02d", hours);
+      sprintf(value_as_string + olength + 1 + 2, "%02d", minutes);
+      olength+= 5;
+    }
+    else
+    {
+      strcat(value_as_string, "Z");
+      ++olength;
+    }
+    return olength;
+  }
+#endif
   else if (ext_field_type == MP_ERROR)
   {
     unsigned char mp_ext_error_byte= *(tarantool_tnt_reply_data++);
@@ -18619,10 +18734,15 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
       }
       else if (field_type == MP_EXT)
       {
-        value_length= tarantool_fetch_row_ext(all_rows_address, value_as_string);
+        unsigned char ext_field_type;
+        value_length= tarantool_fetch_row_ext(all_rows_address, value_as_string, &ext_field_type);
         value= value_as_string;
         lmysql->ldbms_mp_next(&all_rows_address);
         *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
+#if (FLAG_VERSION_TARANTOOL_2_10 != 0)
+       /* This is to prevent right-justification of datetime display. */
+       if (ext_field_type == MP_DATETIME) *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
+#endif
       }
       else
       {

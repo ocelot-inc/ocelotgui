@@ -4485,12 +4485,13 @@ int MainWindow::hparse_f_data_type(int context)
   /*
     Todo: The idea here -- return main_token_types[hparse_i_of_last_accepted] instead of a TOKEN_KEYWORD
           literal -- is applicable to some other cases in hparse_f_data_type, and would make code a bit shorter.
-    Todo: these are really Tarantool 2.10 types, but I haven't gotten around to making a flag for 2.10 yet.
+    Todo: these are really Tarantool 2.10 types, but see comments before "#define FLAG_VERSION_TARANTOOL_2_10".
     Todo: currently this isn't just for CAST it can also be for column type, but check context again someday.
   */
-  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ANY, "MAP") == 1)
-   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ARRAY, "ARRAY") == 1)
-   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAP, "ANY") == 1))
+  if ((hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ANY, "MAP") == 1)
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ARRAY, "ARRAY") == 1)
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAP, "ANY") == 1)
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DATETIME, "DATETIME") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return main_token_types[hparse_i_of_last_accepted];
