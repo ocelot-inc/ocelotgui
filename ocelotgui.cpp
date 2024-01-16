@@ -16893,7 +16893,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
 
   if (statement_type == TOKEN_KEYWORD_SELECT)
   {
-    lmysql->ldbms_tnt_select(tnt[connection_number], spaceno, 0, (2^32) - 1, 0, iterator_type, tuple);
+    lmysql->ldbms_tnt_select(tnt[connection_number], spaceno, 0, UINT32_MAX, 0, iterator_type, tuple);
     tarantool_flush_and_save_reply(connection_number);
     if (tarantool_errno[connection_number] != 0) return tarantool_errno[connection_number];
     /* The return should be an array of arrays of scalars. */
