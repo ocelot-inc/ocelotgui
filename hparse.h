@@ -1736,6 +1736,7 @@ int MainWindow::hparse_f_table_reference(int who_is_calling)
 /* Undocumented detail: alias can be a literal instead of an identifier. Ugly. */
 int MainWindow::hparse_f_table_factor()
 {
+  if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_11, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SEQSCAN, "SEQSCAN") == 1) {;}
   if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 1)
   {
     hparse_f_partition_list(false, false);
@@ -4485,13 +4486,13 @@ int MainWindow::hparse_f_data_type(int context)
   /*
     Todo: The idea here -- return main_token_types[hparse_i_of_last_accepted] instead of a TOKEN_KEYWORD
           literal -- is applicable to some other cases in hparse_f_data_type, and would make code a bit shorter.
-    Todo: these are really Tarantool 2.10 types, but see comments before "#define FLAG_VERSION_TARANTOOL_2_10".
+    Todo: these are really Tarantool 2.10 types, but see comments before "#define TARANTOOL_DATETIMES".
     Todo: currently this isn't just for CAST it can also be for column type, but check context again someday.
   */
   if ((hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ANY, "MAP") == 1)
    || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ARRAY, "ARRAY") == 1)
    || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MAP, "ANY") == 1)
-   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DATETIME, "DATETIME") == 1))
+   || (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_10*TARANTOOL_DATETIMES, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DATETIME, "DATETIME") == 1))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return main_token_types[hparse_i_of_last_accepted];

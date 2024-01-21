@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.1.0
-   Last modified: January 14 2024
+   Last modified: January 19 2024
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -15507,9 +15507,21 @@ void MainWindow::set_dbms_version_mask(QString version, int connection_number)
       {
         dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4);
       }
-      else if (version.contains("2.7.") == true)
+      else if ((version.contains("2.7.") == true) || (version.contains("2.8.") == true) || (version.contains("2.9.") == true))
       {
         dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4 | FLAG_VERSION_TARANTOOL_2_7);
+      }
+      else if (version.contains("2.10.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4 | FLAG_VERSION_TARANTOOL_2_7 | FLAG_VERSION_TARANTOOL_2_10);
+      }
+      else if (version.contains("2.11.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4 | FLAG_VERSION_TARANTOOL_2_7 | FLAG_VERSION_TARANTOOL_2_10 | FLAG_VERSION_TARANTOOL_2_11);
+      }
+      else if (version.contains("-3.") == true)
+      {
+        dbms_version_mask= (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4 | FLAG_VERSION_TARANTOOL_2_7 | FLAG_VERSION_TARANTOOL_2_10 | FLAG_VERSION_TARANTOOL_2_11 | FLAG_VERSION_TARANTOOL_3_0);
       }
       else
       {
@@ -18198,7 +18210,7 @@ QString MainWindow::tarantool_fetch_row(const char *tarantool_tnt_reply_data,
 #define MP_ERROR_ERRNO 4
 #define MP_ERROR_CODE 5
 #define MP_ERROR_FIELDS 6
-#if (FLAG_VERSION_TARANTOOL_2_10 != 0)
+#if (TARANTOOL_DATETIMES != 0)
 #define MP_DATETIME 4
 #endif
 
@@ -18315,7 +18327,7 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
     }
     return o - value_as_string;
   }
-#if (FLAG_VERSION_TARANTOOL_2_10 != 0)
+#if (TARANTOOL_DATETIMES != 0)
   else if (ext_field_type == MP_DATETIME)
   {
     int l= 0;
@@ -18739,7 +18751,7 @@ QString MainWindow::tarantool_scan_rows(unsigned int p_result_column_count,
         value= value_as_string;
         lmysql->ldbms_mp_next(&all_rows_address);
         *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_NUMBER;
-#if (FLAG_VERSION_TARANTOOL_2_10 != 0)
+#if (TARANTOOL_DATETIMES != 0)
        /* This is to prevent right-justification of datetime display. */
        if (ext_field_type == MP_DATETIME) *(result_set_copy_pointer + sizeof(unsigned int))= FIELD_VALUE_FLAG_IS_STRING;
 #endif
@@ -21946,6 +21958,8 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
 /* Comments about Context_menu should be in ocelotgui.h before the words "class Context_menu: public QWidget" */
 void Context_menu::construct()
 {
+  bool is_seqscan_needed=false;
+  if ((dbms_version_mask & FLAG_VERSION_TARANTOOL_3_0) != 0) is_seqscan_needed= true;
   add_action("CLIPBOARD=${object_name}", "*", "S,T,P,F,E,R", "", "", "Copy to clipboard");
   add_action("CLIPBOARD=${part_name}", "*", "C,I", "", "", "Copy to clipboard");
   add_action("ACTION=${object_name}", "*", "S,T,P,F,E,R", "", "", "Send to SQL editor");
@@ -21965,7 +21979,10 @@ void Context_menu::construct()
            " collate=${part_type};", "M", "S", "", "", "Alter schema");
   add_action("Drop schema ${schema_name};", "M", "S", "", "", "Drop schema");
   add_action("SET ocelot_query = SHOW ERDIAGRAM OF ${schema_name};", "M", "S", "", "", "ER Diagram");
-  add_action("Select * from ${object_name} limit 100;", "*", "T,V", "", "", "Select rows");
+  if (is_seqscan_needed)
+    add_action("Select * from seqscan ${object_name} limit 100;", "*", "T,V", "", "", "Select rows");
+  else
+    add_action("Select * from ${object_name} limit 100;", "*", "T,V", "", "", "Select rows");
   add_action("SET ocelot_query = SHOW FOREIGN KEYS OF ${object_name};", "*", "T", "", "", "Foreign Keys");
 #ifdef OCELOT_IMPORT_EXPORT
   add_action("EXPORT_TEXT;", "*", "T,V", "", "", "Export dialog - Text");
@@ -21985,15 +22002,24 @@ void Context_menu::construct()
           "'${occurs_text}' as occurs_in_indexes;", "*", "C", "", "", "Show column");
   add_action("Alter table ${object_name} drop column ${part_name};", "M", "C", "", "", "Drop column");
   add_action("Show index from ${object_name};", "M", "I", "", "", "Show index");
-  add_action("Select * from \"_vindex\" where \"name\" = '${part_name}';", "T", "I", "", "", "Show index");
+  if (is_seqscan_needed)
+    add_action("Select * from seqscan \"_vindex\" where \"name\" = '${part_name}';", "T", "I", "", "", "Show index");
+  else
+    add_action("Select * from \"_vindex\" where \"name\" = '${part_name}';", "T", "I", "", "", "Show index");
   add_action("Select * from information_schema.statistics where index_name = '${part_name}';", "M", "I", "", "", "Select index");
-  add_action("select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '${object_name}');", "T", "I", "", "", "Select index");
+  if (is_seqscan_needed)
+    add_action("select * from seqscan \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '${object_name}');", "T", "I", "", "", "Select index");
+  else
+    add_action("select * from \"_vindex\" where \"id\" = (select \"id\" from \"_vspace\" where \"name\" = '${object_name}');", "T", "I", "", "", "Select index");
   add_action("Drop index ${unqualified_part_name} on ${object_name};", "*", "I", "", "", "Drop index");
   add_action("Show create procedure ${object_name};", "*", "P", "", "", "Create procedure");
   add_action("Drop procedure ${object_name};", "*", "P", "", "", "Drop procedure");
   add_action("Drop function ${object_name};", "*", "F", "", "", "Drop function");
   add_action("Select * from information_schema.triggers where trigger_name = ${object_name}", "M", "R", "", "", "Show trigger");
-  add_action("Select * from \"_trigger\" where \"name\" = '${object_name}';", "T", "R", "", "", "Show trigger");
+  if (is_seqscan_needed)
+    add_action("Select * from seqscan \"_trigger\" where \"name\" = '${object_name}';", "T", "R", "", "", "Show trigger");
+  else
+    add_action("Select * from \"_trigger\" where \"name\" = '${object_name}';", "T", "R", "", "", "Show trigger");
   add_action("Drop trigger ${object_name};", "*", "R", "", "", "Drop trigger");
   add_action("RESET;", "*", "*", "", "", "Reset");
   add_action("Refresh;", "*", "*", "", "", "Refresh");
@@ -28941,6 +28967,17 @@ void MainWindow::initialize_widget_explorer_after_connect()
          ;
 #endif
   if (connections_dbms[0] == DBMS_TARANTOOL)
+  {
+    if ((dbms_version_mask & FLAG_VERSION_TARANTOOL_3_0) != 0)
+    ocelot_explorer_query= "select 'S','main','','',//\n"
+                   "union all\n"
+                   "select 'C',table_schema,table_name,column_name,data_type\n"
+                   "from seqscan _columns\n"
+                   "union all\n"
+                   "select 'T',table_schema,table_name,table_type,''\n"
+                   "from seqscan _tables;"
+      ;
+    else
     ocelot_explorer_query= "select 'S','main','','',//\n"
                    "union all\n"
                    "select 'C',table_schema,table_name,column_name,data_type\n"
@@ -28948,7 +28985,9 @@ void MainWindow::initialize_widget_explorer_after_connect()
                    "union all\n"
                    "select 'T',table_schema,table_name,table_type,''\n"
                    "from _tables;"
-    ;
+     ;
+  }
+
   char error_or_ok_message[1024];
   if (ocelot_explorer_visible  == "yes") explorer_refresh_caller(error_or_ok_message);
 }

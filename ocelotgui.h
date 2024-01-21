@@ -120,6 +120,10 @@ typedef struct
   Note: MariaDB 5.5 reached end-of-life in 2018, says https://endoflife.date/mariadb
         so starting with ocelotgui 1.8 we treat it as the same as MariaDB 10.0
   Note: We have a separate flag names for MariaDB 10.7 and 10.9 but the number is the same as for MariaDB 10.10
+  Note: Tarantool 2.x + Tarantool 2.8 + Tarantool 2.9 all set FLAG_VERSION_TARANTOOL_2_7, we don't distinguish.
+  Note: Tarantool 2.10 + Tarantool 2.11 all set FLAG_VERSION_TARANTOOL_2_10, we don't distinguish.
+  Note: FLAG_VERSION_TARANTOOL_3_0 is currently the same as FLAG_VERSION_TARANTOOL_2_11 since our behaviour is the same.
+  Note: Tarantool 3. any kind sets VERSION_TARANTOOL_3_0, we don't distinguish.
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -158,7 +162,10 @@ typedef struct
 #define FLAG_VERSION_LUA_OUTPUT       131072
 #define FLAG_VERSION_TARANTOOL_2_4    262144
 #define FLAG_VERSION_TARANTOOL_2_7    262144
-#define FLAG_VERSION_TARANTOOL_ALL    (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4 | FLAG_VERSION_TARANTOOL_2_7)
+#define FLAG_VERSION_TARANTOOL_2_10   1048576
+#define FLAG_VERSION_TARANTOOL_2_11   2097152
+#define FLAG_VERSION_TARANTOOL_3_0    FLAG_VERSION_TARANTOOL_2_11
+#define FLAG_VERSION_TARANTOOL_ALL    (FLAG_VERSION_TARANTOOL | FLAG_VERSION_TARANTOOL_2_2 | FLAG_VERSION_TARANTOOL_2_3 | FLAG_VERSION_TARANTOOL_2_4 | FLAG_VERSION_TARANTOOL_2_7 | FLAG_VERSION_TARANTOOL_2_10  | FLAG_VERSION_TARANTOOL_2_11 | FLAG_VERSION_TARANTOOL_3_0)
 #define FLAG_VERSION_ALL (FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_MARIADB_ALL | FLAG_VERSION_TARANTOOL_ALL)
 #define FLAG_VERSION_ALL_OR_LUA (FLAG_VERSION_ALL | FLAG_VERSION_LUA)
 #define FLAG_VERSION_DEFAULT (FLAG_VERSION_MYSQL_OR_MARIADB_ALL)
@@ -166,14 +173,13 @@ typedef struct
 /* Note: If adding support for a new version of any server, check set_dbms_version_mask(). */
 
 /*
-  Todo: We don't have a detailed check for Tarantool 2.10 or later. We set "dbms_version_mask= FLAG_VERSION_TARANTOOL_ALL"
-  if we don't recognize a version so it always seems true when we're parsing.
-  If checking for datetime is unnecessary, change this line to #define FLAG_VERSION_TARANTOOL_2_10 0" to save space.
+  Tarantool datetime support will only matter if Tarantool version >= 2.10 and datetimes are actually in use.
+  If checking for datetime is unnecessary, change this line to #define TARANTOOL_DATETIMES 0" to save space.
 */
 #ifdef DBMS_TARANTOOL
-#define FLAG_VERSION_TARANTOOL_2_10 FLAG_VERSION_TARANTOOL_2_7
+#define TARANTOOL_DATETIMES 1
 #else
-#define FLAG_VERSION_TARANTOOL_2_10 0
+#define FLAG_VERSION_DATETIMES 0
 #endif
 
 #include <assert.h>
@@ -1137,6 +1143,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SEMICOLON,
     TOKEN_KEYWORD_SENSITIVE,
     TOKEN_KEYWORD_SEPARATOR,
+    TOKEN_KEYWORD_SEQSCAN,
     TOKEN_KEYWORD_SEQUENCE,
     TOKEN_KEYWORD_SERIAL,
     TOKEN_KEYWORD_SERVER,
@@ -1519,7 +1526,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1226
+#define KEYWORD_LIST_SIZE 1227
 
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
@@ -2432,6 +2439,7 @@ static const keywords strvalues[]=
       {"SEMICOLON", 0, 0, TOKEN_KEYWORD_SEMICOLON}, /* for format rule */
       {"SENSITIVE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SENSITIVE},
       {"SEPARATOR", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_SEPARATOR},
+      {"SEQSCAN", FLAG_VERSION_TARANTOOL_2_11, 0, TOKEN_KEYWORD_SEQSCAN},
       {"SEQUENCE", 0, 0, TOKEN_KEYWORD_SEQUENCE},
       {"SERIAL", 0, 0, TOKEN_KEYWORD_SERIAL},
       {"SERVER", 0, 0, TOKEN_KEYWORD_SERVER},
@@ -2787,7 +2795,7 @@ static const fontweights fontweightsvalues[]=
   };
 #define FONTWEIGHTSVALUES_SIZE 10 /* # of entries in fontweightsvalues */
 
-#if (FLAG_VERSION_TARANTOOL_2_10 != 0)
+#if (TARANTOOL_DATETIMES != 0)
 /*
   timezone_strings and timezone_ids are lists that we need if datetime tzindex != 0.
   Their values correspond to timezones.h but we ignore ZONE_ABBREV...TZ_AMBIGUOUS and ZONE_ALIAS.
