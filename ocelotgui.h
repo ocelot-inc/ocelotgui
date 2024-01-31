@@ -148,7 +148,8 @@ typedef struct
 #define FLAG_VERSION_MARIADB_11_0   512
 #define FLAG_VERSION_MARIADB_11_1   512
 #define FLAG_VERSION_MARIADB_11_2   512
-#define FLAG_VERSION_MARIADB_11_ALL (FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1 | FLAG_VERSION_MARIADB_11_2)
+#define FLAG_VERSION_MARIADB_11_4   512
+#define FLAG_VERSION_MARIADB_11_ALL (FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1 | FLAG_VERSION_MARIADB_11_2| FLAG_VERSION_MARIADB_11_4)
 #define FLAG_VERSION_MARIADB_ALL    (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL)
 #define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_MARIADB_ALL)
 #define FLAG_VERSION_TARANTOOL      1024
@@ -4769,7 +4770,7 @@ public:
   int hparse_f_character_set();
   void hparse_f_alter_database();
   void hparse_f_alter_specification();
-  void hparse_f_characteristics();
+  void hparse_f_characteristics(int object_type);
   int hparse_f_algorithm_or_lock();
   void hparse_f_definer();
   void hparse_f_character_set_or_collate();

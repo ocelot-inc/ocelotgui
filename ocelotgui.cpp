@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.1.0
-   Last modified: January 19 2024
+   Last modified: January 30 2024
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -7798,6 +7798,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
           {
             if ((create_package_seen)
              && (main_token_types[i] == TOKEN_KEYWORD_BEGIN)
+             && ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0) /* line added 2024-01-30, MariaDB 11.4 default won't have as|is */
              && (begin_count == 1))
             {
               int j= next_i(i, -1);
@@ -15482,7 +15483,7 @@ void MainWindow::set_dbms_version_mask(QString version, int connection_number)
         dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1);
       else if (version.startsWith("11.2.") == true)
         dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1 | FLAG_VERSION_MARIADB_11_2);
-      else
+      else /* 11.3 + 11.4 */
         dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL);
       }
     else
