@@ -234,6 +234,25 @@ typedef struct
 #endif
 #endif
 
+
+/*
+  When building Qt + libmariadb.a on Windows we have to exclude mysql_server_end + mysql_library_end + mysql_get_client_info.
+  We don't have Q_OS_WIN32 yet but this should establish we're calling from MinGW-64 with 32-bit.
+  If we can't call mysql_get-client_info then we don't really know Connector/C version number so we'll assume 3.3.8.
+   #I've seen a claim that this is unnecessary and I can use .lib as long as it's 32-bit, but I didn't try that.
+   #Read https://stackoverflow.com/questions/11793370/how-can-i-convert-a-vsts-lib-to-a-mingw-a
+   #Read "generating an import library for a dll"
+   #Read https://code.google.com/archive/p/lib2a/
+   #Read Ocelot's README.
+*/
+#define MINGW_MARIADB 0
+#ifdef _WIN32
+#if (OCELOT_STATIC_LIBRARY == 1)
+#undef MINGW_MARIADB
+#define MINGW_MARIADB 1
+#endif
+#endif
+
 enum {                                        /* possible returns from token_type() */
   TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE= 1, /* starts with ' or N' or X' or B' */
   TOKEN_TYPE_LITERAL_WITH_DOUBLE_QUOTE= 2, /* starts with " */
@@ -6688,11 +6707,15 @@ public:
   typedef unsigned long*  (*tmysql_fetch_lengths)(MYSQL_RES *);
   typedef MYSQL_ROW       (*tmysql_fetch_row)    (MYSQL_RES *);
   typedef void            (*tmysql_free_result)  (MYSQL_RES *);
+#if (MINGW_MARIADB == 0)
   typedef const char*     (*tmysql_get_client_info) (void);
+#endif
   typedef const char*     (*tmysql_get_host_info)(MYSQL *);
   typedef const char*     (*tmysql_info)         (MYSQL *);
   typedef MYSQL*          (*tmysql_init)         (MYSQL *);
+#if (MINGW_MARIADB == 0)
   typedef void            (*tmysql_library_end)  (void);
+#endif
   typedef int             (*tmysql_library_init) (int, char **, char **);
   typedef MY_BOOL         (*tmysql_more_results) (MYSQL *);
   typedef int             (*tmysql_next_result)  (MYSQL *);
@@ -6789,11 +6812,15 @@ public:
   tmysql_fetch_lengths t__mysql_fetch_lengths;
   tmysql_fetch_row t__mysql_fetch_row;
   tmysql_free_result t__mysql_free_result;
+#if (MINGW_MARIADB == 0)
   tmysql_get_client_info t__mysql_get_client_info;
+#endif
   tmysql_get_host_info t__mysql_get_host_info;
   tmysql_info t__mysql_info;
   tmysql_init t__mysql_init;
+#if (MINGW_MARIADB == 0)
   tmysql_library_end t__mysql_library_end;
+#endif
   tmysql_library_init t__mysql_library_init;
   tmysql_more_results t__mysql_more_results;
   tmysql_next_result t__mysql_next_result;
@@ -6908,11 +6935,15 @@ void ldbms_get_library(QString ocelot_ld_run_path,
       t__mysql_fetch_lengths= (tmysql_fetch_lengths) &mysql_fetch_lengths;
       t__mysql_fetch_row= (tmysql_fetch_row) &mysql_fetch_row;
       t__mysql_free_result= (tmysql_free_result) &mysql_free_result;
+#if (MINGW_MARIADB == 0)
       t__mysql_get_client_info= (tmysql_get_client_info) &mysql_get_client_info;
+#endif
       t__mysql_get_host_info= (tmysql_get_host_info) &mysql_get_host_info;
       t__mysql_info= (tmysql_info) &mysql_info;
       t__mysql_init= (tmysql_init) &mysql_init;
+#if (MINGW_MARIADB == 0)
       t__mysql_library_end= (tmysql_library_end) &mysql_library_end;
+#endif
       t__mysql_library_init= (tmysql_library_init) &mysql_library_init;
       t__mysql_more_results= (tmysql_more_results) &mysql_more_results;
       t__mysql_next_result= (tmysql_next_result) &mysql_next_result;
@@ -7304,10 +7335,13 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         if ((t__mysql_fetch_lengths= (tmysql_fetch_lengths) lib.resolve("mysql_fetch_lengths")) == 0) s.append("mysql_fetch_lengths ");
         if ((t__mysql_fetch_row= (tmysql_fetch_row) lib.resolve("mysql_fetch_row")) == 0) s.append("mysql_fetch_row ");
         if ((t__mysql_free_result= (tmysql_free_result) lib.resolve("mysql_free_result")) == 0) s.append("mysql_free_result ");
+#if (MINGW_MARIADB == 0)
         if ((t__mysql_get_client_info= (tmysql_get_client_info) lib.resolve("mysql_get_client_info")) == 0) s.append("mysql_get_client_info ");
+#endif
         if ((t__mysql_get_host_info= (tmysql_get_host_info) lib.resolve("mysql_get_host_info")) == 0) s.append("mysql_get_host_info ");
         if ((t__mysql_info= (tmysql_info) lib.resolve("mysql_info")) == 0) s.append("mysql_info ");
         if ((t__mysql_init= (tmysql_init) lib.resolve("mysql_init")) == 0) s.append("mysql_init ");
+#if (MINGW_MARIADB == 0)
         {
           t__mysql_library_end= (tmysql_library_end) lib.resolve("mysql_library_end");
           if (t__mysql_library_end == 0)
@@ -7316,6 +7350,7 @@ void ldbms_get_library(QString ocelot_ld_run_path,
             if (t__mysql_library_end == 0) s.append("mysql_library_end ");
           }
         }
+#endif
         {
           t__mysql_library_init= (tmysql_library_init) lib.resolve("mysql_library_init");
           if (t__mysql_library_init == 0)
@@ -7410,12 +7445,12 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     t__mysql_free_result(result);
   }
-
+#if (MINGW_MARIADB == 0)
   const char *ldbms_mysql_get_client_info(void)
   {
     return t__mysql_get_client_info();
   }
-
+#endif
   const char *ldbms_mysql_get_host_info(MYSQL *mysql)
   {
     return t__mysql_get_host_info(mysql);
@@ -7430,12 +7465,12 @@ void ldbms_get_library(QString ocelot_ld_run_path,
   {
     return t__mysql_init(mysql);
   }
-
+#if (MINGW_MARIADB == 0)
   void ldbms_mysql_library_end()
   {
     t__mysql_library_end();
   }
-
+#endif
   int ldbms_mysql_library_init(int argc, char **argv, char **groups)
   {
     return t__mysql_library_init(argc, argv, groups);

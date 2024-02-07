@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.1.0
-   Last modified: January 30 2024
+   Last modified: February 7 2024
 */
 /*
   Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
@@ -5272,7 +5272,9 @@ void MainWindow::action_exit()
         but we don't call mysql_thread_end() for the main thread (is that okay?).
         If we don't call mysql_library_end(), we'll get a few extra valgrind complaints.
       */
+#if (MINGW_MARIADB == 0)
       lmysql->ldbms_mysql_library_end();
+#endif
       is_mysql_library_init_done= false;
     }
     /* Some code added 2015-08-25 due to valgrind */
@@ -6081,7 +6083,11 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
   if (is_mysql_library_init_done == true)
   {
     the_text.append("<br>using DBMS client library version ");
+#if (MINGW_MARIADB == 0)
     the_text.append(lmysql->ldbms_mysql_get_client_info());
+#else
+     the_text.append("built_with_mingw_mariadb");
+#endif
 #ifdef OCELOT_OS_LINUX
 #if (OCELOT_STATIC_LIBRARY==0)
     /* RDLD_DI_ORIGIN gives only library. RDLD_DI_LINKMAP gives all but needs #include <link.h>. */
