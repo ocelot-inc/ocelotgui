@@ -1,4 +1,4 @@
-# ocelotgui.spec file for version 2.1.0 supplied by Peter Gulutzan as part of ocelotgui package
+# ocelotgui.spec file for version 2.2.0 supplied by Peter Gulutzan as part of ocelotgui package
 
 #How to Build an .rpm file
 #-------------------------
@@ -10,29 +10,29 @@
 # sudo yum install rpm rpm-build rpmlint
 # 2. Copy the ocelotgui tar.gz file to your $HOME directory.
 # It is available on github. You might have downloaded it already.
-# For example you might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.1.0/ocelotgui-2.1.0.tar.gz
+# For example you might say: wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.2.0/ocelotgui-2.2.0.tar.gz
 # (For this step, we assume you know where you downloaded to. See later explanation in section "Re: Source".)
-# You must copy it to $HOME/ocelotgui-2.1.0.tar.gz -- this is hard coded.
-# If CmakeLists.txt was updated since the release, which is true for 2.1.0, Step #2 will not work -- use Step #2a instead.
-# 2a. Alternative to step 2: make ocelotgui-2.1.0.tar.gz from a clone of the latest ocelotgui source.
+# You must copy it to $HOME/ocelotgui-2.2.0.tar.gz -- this is hard coded.
+# If CmakeLists.txt was updated since the release, which is true for 2.2.0, Step #2 will not work -- use Step #2a instead.
+# 2a. Alternative to step 2: make ocelotgui-2.2.0.tar.gz from a clone of the latest ocelotgui source.
 # This is approximately the way that the ocelotgui developer makes new tar.gz files when making new releases.
-# To produce $HOME/ocelotgui-2.1.0.tar.gz from the latest github source, say:
+# To produce $HOME/ocelotgui-2.2.0.tar.gz from the latest github source, say:
 # cd /tmp
 # rm -r -f ocelotgui
 # git clone https://github.com/ocelot-inc/ocelotgui ocelotgui
 # rm -r -f ocelotgui/.git
-# tar -zcvf $HOME/ocelotgui-2.1.0.tar.gz ocelotgui
+# tar -zcvf $HOME/ocelotgui-2.2.0.tar.gz ocelotgui
 # rm -r -f ocelotgui
-# 3. Remake ocelotgui-2.1.0.tar.gz so it will unpack to directory ocelotgui-2.1.0 rather than to ocelotgui.
-# This step is necessary because ocelotgui.spec will look for files in ocelotgui-2.1.0.
-# To change $HOME/ocelotgui-2.1.0.tar.gz to be ready for rpm, say:
+# 3. Remake ocelotgui-2.2.0.tar.gz so it will unpack to directory ocelotgui-2.2.0 rather than to ocelotgui.
+# This step is necessary because ocelotgui.spec will look for files in ocelotgui-2.2.0.
+# To change $HOME/ocelotgui-2.2.0.tar.gz to be ready for rpm, say:
 # cd /tmp
 # rm -r -f ocelotgui
-# rm -r -f ocelotgui-2.1.0
-# cp -p $HOME/ocelotgui-2.1.0.tar.gz ocelotgui-2.1.0.tar.gz
-# tar -xf ocelotgui-2.1.0.tar.gz
-# mv ocelotgui ocelotgui-2.1.0
-# tar -zcvf $HOME/ocelotgui-2.1.0.tar.gz ocelotgui-2.1.0
+# rm -r -f ocelotgui-2.2.0
+# cp -p $HOME/ocelotgui-2.2.0.tar.gz ocelotgui-2.2.0.tar.gz
+# tar -xf ocelotgui-2.2.0.tar.gz
+# mv ocelotgui ocelotgui-2.2.0
+# tar -zcvf $HOME/ocelotgui-2.2.0.tar.gz ocelotgui-2.2.0
 # 4. Copy the ocelotgui.spec file to your $HOME directory.
 # (For this step, we assume you know where the spec file is. After all, it is what you are reading now.)
 # You must copy it to $HOME/ocelotgui.spec -- this is hard coded.
@@ -43,11 +43,11 @@
 # 6. Run rpmbuild using the $HOME/ocelotgui_rpm directory. Notice that we don't bother with an .rpmmacros file.
 # rpmbuild -ba $HOME/ocelotgui.spec --define "_topdir $HOME/ocelotgui_rpm/rp/rpmbuild" --define "_sourcedir $HOME"
 # 7. Find the resulting rpm in the RPMS subdirectory and check it. Here we assume the platform is x86-64.
-# rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.1.0-1.x86_64.rpm
+# rpmlint ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.2.0-1.x86_64.rpm
 # If it says "0 errors, 0 warnings", you're done!
 # You can copy the .rpm file to a permanent location and remove the ~/ocelotgui_rpm directory.
 # 8. With the .rpm file you can say
-# sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.1.0-1.x86_64.rpm
+# sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.2.0-1.x86_64.rpm
 # Of course, the .rpm file name will be different on a 32-bit platform.
 # Todo: nowadays yum install or dnf install is probably better, we'll say that in the main README.
 
@@ -65,7 +65,7 @@
 #Re Source:
 #  The URL here is in fact the source of the ocelotgui release.
 #  However, we commented it out because setup doesn't download it
-#  and in any case it would unpack to ocelotgui not ocelotgui-2.1.0.
+#  and in any case it would unpack to ocelotgui not ocelotgui-2.2.0.
 #  The assumption is that Source0: is the file name and the directory
 #  is $HOME and the file needs pre-processing as described above.
 #  Todo: Consider that this is possible:
@@ -155,7 +155,7 @@
 #
 # spec file for package ocelotgui
 #
-# Copyright (c) 2023 by Peter Gulutzan
+# Copyright (c) 2024 by Peter Gulutzan
 #
 # All modifications and additions to the file contributed by third parties
 # remain the property of their copyright owners, unless otherwise agreed
@@ -180,7 +180,7 @@
 
 Summary:        GUI client for MySQL or MariaDB
 Name:           ocelotgui
-Version:        2.1.0
+Version:        2.2.0
 Release:        1
 
 %if %{?suse_version:1}%{!?suse_version:0}
@@ -200,8 +200,8 @@ Group:          Databases
 %endif
 Vendor:         Peter Gulutzan
 Url:            http://ocelot.ca
-#Source0:        ocelotgui-2.1.0.tar.gz
-Source:         https://github.com/ocelot-inc/%name/releases/download/2.1.0/%name-%{version}.tar.gz
+#Source0:        ocelotgui-2.2.0.tar.gz
+Source:         https://github.com/ocelot-inc/%name/releases/download/2.2.0/%name-%{version}.tar.gz
 
 %if %{?suse_version:1}%{!?suse_version:0}
 BuildRequires:  libqt5-qttools-devel
@@ -321,6 +321,8 @@ cd %{_builddir}/%{name}-%{version}/build
 %{_datadir}/pixmaps/ocelotgui-logo.png
 
 %changelog
+* Thu Feb 15 2024 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.2.0-1
+  New server syntax.
 * Fri Sep 29 2023 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.1.0-1
   Improved Chart.
 * Wed Jun 07 2023 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.0.0-1

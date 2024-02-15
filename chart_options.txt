@@ -16,7 +16,7 @@ still will work. The same functionality is available without it.
 The source code which has the feature is inside #if (OCELOT_CHART == 1) ... #endif,
 or #if (OCELOT_CHART_OR_QCHART == 1) ... #endif, and this is the default.
 Therefore the instructions for building are as described for
-ocelotgui 2.1.0 in the README file.
+ocelotgui 2.2.0 in the README file.
 
 SET ocelot_grid_chart=
 ----------------------

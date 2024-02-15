@@ -1,3 +1,15 @@
+ocelotgui (2.2.0-1) UNRELEASED; urgency=low
+
+  * New server syntax
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Thu, 15 Feb 2024 12:00:00 -0600
+
+ocelotgui (2.1.0-1) UNRELEASED; urgency=low
+
+  * Improved Chart
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Fri, 29 Sep 2023 12:00:00 -0600
+
 ocelotgui (2.0.0-1) UNRELEASED; urgency=low
 
   * Chart

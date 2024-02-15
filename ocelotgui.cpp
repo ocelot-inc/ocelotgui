@@ -1,11 +1,11 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 2.1.0
-   Last modified: February 7 2024
+   Version: 2.2.0
+   Last modified: February 15 2024
 */
 /*
-  Copyright (c) 2023 by Peter Gulutzan. All rights reserved.
+  Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -423,7 +423,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="2.1.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="2.2.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -6064,7 +6064,7 @@ void MainWindow::action_about()
 {
   QString the_text= "\
 <img src=\"./ocelotgui_logo.png\" alt=\"ocelotgui_logo.png\">\
-<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2023 by Peter Gulutzan.<br>\
+<b>ocelotgui -- Graphical User Interface</b><br>Copyright (c) 2024 by Peter Gulutzan.<br>\
 This program is free software: you can redistribute it and/or modify \
 it under the terms of the GNU General Public License as published by \
 the Free Software Foundation, version 2 of the License,<br>\
@@ -6150,10 +6150,10 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 2.1.0, September 29 2023  \
+  <BR>Version 2.2.0, February 15 2024  \
   <BR>  \
   <BR>  \
-  <BR>Copyright (c) 2023 by Peter Gulutzan. All rights reserved.  \
+  <BR>Copyright (c) 2024 by Peter Gulutzan. All rights reserved.  \
   <BR>  \
   <BR>This program is free software; you can redistribute it and/or modify  \
   <BR>it under the terms of the GNU General Public License as published by  \
@@ -18357,7 +18357,12 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
       tarantool_tnt_reply_data+= 2;
       seconds+= tzoffset * 60; /* Despite Tarantool documentation, we don't ignore tzoffset even if tzindex != 0 */
     }
+    /* fromSecsSinceEpoch was introduced in Qt 5.8 (2017) */
+#if (QT_VERSION <= 0x050800)
+    QDateTime dt= QDateTime::fromMSecsSinceEpoch(seconds * 1000);
+#else
     QDateTime dt= QDateTime::fromSecsSinceEpoch(seconds, Qt::UTC);
+#endif
     QString s= dt.toString("yyyy-MM-ddThh:mm:ss"); /* Tarantool quirk: character after date is 'T' not ' ' */
     if (s.left(1) == "-")
     {
@@ -24401,7 +24406,7 @@ void MainWindow::print_help()
   char output_string[5120];
 
   print_version();
-  printf("Copyright (c) 2023 by Peter Gulutzan and others\n");
+  printf("Copyright (c) 2024 by Peter Gulutzan and others\n");
   printf("\n");
   printf("Usage: ocelotgui [OPTIONS] [database]\n");
   printf("Options files that were actually read:\n");
@@ -30589,7 +30594,7 @@ int Chart::draw_group(
     {
       QVector<int> series_columns= series.at(i_of_series);
       int bar_y= chart_canvas_rect.height();
-      int bar_height;
+      int bar_height= 0;
       for (int i_of_series_columns= 0; i_of_series_columns < series_columns.size(); ++i_of_series_columns)
       {
         int series_column= series_columns.at(i_of_series_columns);
@@ -30632,7 +30637,7 @@ int Chart::draw_group(
     {
       QVector<int> series_columns= series.at(i_of_series);
       int bar_x= chart_canvas_rect.x();
-      int bar_width;
+      int bar_width= 0;
       for (int i_of_series_columns= 0; i_of_series_columns < series_columns.size(); ++i_of_series_columns)
       {
         int series_column= series_columns.at(i_of_series_columns);
