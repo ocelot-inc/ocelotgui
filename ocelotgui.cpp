@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.2.0
-   Last modified: February 15 2024
+   Last modified: February 29 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -473,6 +473,7 @@
   static int hparse_next_next_next_token_type, hparse_next_next_next_next_token_type;
   static int hparse_begin_count;
   static bool hparse_as_seen;
+  static int hparse_flow_count;
   static bool hparse_create_trigger_seen;
   static int hparse_count_of_accepts;
   static int hparse_i_of_statement;
@@ -10940,16 +10941,106 @@ int MainWindow::action_execute_one_statement(QString text)
 #endif
       if (is_create_table_server == false)
       {
-        ocelot_query_result= execute_ocelot_query(query_utf16, MYSQL_MAIN_CONNECTION, &text);
-        if (ocelot_query_result == ER_ERROR)
+        bool is_semiselect_seen= false;
+#if (OCELOT_EXTENDER == 1)
+        QString new_query= "";
+        int er_semiselect= ER_OK;
+        if ((ocelot_statement_syntax_checker.toInt() & 7) == 7)
         {
-          is_create_table_server= true; /* Fake. it's not create table server but should have same effect. */
-          dbms_long_query_result= ocelot_query_result;
+          if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
+          {
+            for (unsigned int i_of_s= main_token_number; i_of_s < main_token_number + main_token_count_in_statement; ++i_of_s)
+            {
+              if ((main_token_flags[i_of_s] & TOKEN_FLAG_IS_SEMISELECT_ALL) == TOKEN_FLAG_IS_SEMISELECT) { is_semiselect_seen= true; break; }
+            }
+            if (is_semiselect_seen == true)
+            {
+              for (unsigned int i_of_s= main_token_number; i_of_s < main_token_number + main_token_count_in_statement; ++i_of_s)
+              {
+                if ((main_token_flags[i_of_s] & TOKEN_FLAG_IS_SEMISELECT_ALL) != TOKEN_FLAG_IS_SEMISELECT)
+                {
+                  new_query= new_query + text.mid(main_token_offsets[i_of_s], main_token_lengths[i_of_s]) + " ";
+                }
+                else
+                {
+                  /* A semiselect will stretch as far as a closing ) or ; Or: till what's in hparse_f_select_part_2() */
+                  unsigned int j_of_s;
+                  int parentheses_count= 0; /* this might help with e.g. "(SHOW ERRORS);" */
+                  int i_of_mid= -1;
+                  int offset_of_into= -1;
+                  for (j_of_s= i_of_s + 1; j_of_s < main_token_number + main_token_count_in_statement; ++j_of_s)
+                  {
+                    if (main_token_types[j_of_s] == TOKEN_TYPE_OPERATOR)
+                    {
+                      QString s_of_j_of_s= text.mid(main_token_offsets[j_of_s], main_token_lengths[j_of_s]);
+                      if (s_of_j_of_s == ";") break; /* todo: check whether we actually ever get here */
+                      if (s_of_j_of_s == "(") ++parentheses_count;
+                      if (s_of_j_of_s == ")")
+                      {
+                        --parentheses_count;
+                        if (parentheses_count < 0) break;
+                      }
+                    }
+                    if ((main_token_flags[j_of_s]&TOKEN_FLAG_IS_SEMISELECT_ALL) == TOKEN_FLAG_IS_SEMISELECT_MID) /*e.g. "ORDER" */
+                      i_of_mid= j_of_s;
+                    if ((main_token_flags[j_of_s]&TOKEN_FLAG_IS_SEMISELECT_ALL) == TOKEN_FLAG_IS_SEMISELECT_END) /*e.g. ")" or ";" or "ORDER" */
+                    {
+                      break;
+                    }
+                    if (main_token_types[j_of_s] == TOKEN_KEYWORD_INTO)
+                    {
+                      if ((i_of_mid != -1) && ((unsigned int) i_of_mid <= j_of_s))
+                      {
+                        offset_of_into= main_token_offsets[j_of_s] - main_token_offsets[i_of_mid];
+                      }
+                    }
+                  }
+                  QString semiselect;
+                  QString semiselect_part_2;
+                  if ((i_of_mid == -1) || ((unsigned int) i_of_mid == j_of_s))
+                  {
+                    semiselect= text.mid(main_token_offsets[i_of_s], main_token_offsets[j_of_s] - main_token_offsets[i_of_s]);
+                    semiselect_part_2= "";
+                  }
+                  else
+                  {
+                    semiselect= text.mid(main_token_offsets[i_of_s], main_token_offsets[i_of_mid] - main_token_offsets[i_of_s]);
+                    semiselect_part_2= text.mid(main_token_offsets[i_of_mid], main_token_offsets[j_of_s] - main_token_offsets[i_of_mid]);
+                  }
+                  char error_or_ok_message[256]; /* todo: integrate */
+                  QString select_statement;
+                  er_semiselect= extender_scan(error_or_ok_message, semiselect, &select_statement, semiselect_part_2, offset_of_into);
+                  if ((er_semiselect != ER_OK) && (er_semiselect != ER_OK_PLUS) && (er_semiselect != ER_WARNING)) break;
+                  new_query= new_query + select_statement;
+                  /* Todo: CHECK IF ERROR_OR_OK_MESSAGE IS GOOD */
+                  i_of_s= j_of_s - 1;
+                }
+              }
+            }
+          }
         }
-        else
+        if (is_semiselect_seen == true)
         {
-          if (ocelot_query_result == -1) execute_real_query(query_utf16, MYSQL_MAIN_CONNECTION, &text);
-          else dbms_long_query_result= ocelot_query_result;
+          /* if the internal semiselect failed, we'll skip this, so that the error message has internal semiselect result */
+          if ((er_semiselect == ER_OK) || (er_semiselect == ER_OK_PLUS) || (er_semiselect == ER_WARNING))
+          {
+            execute_real_query(new_query, MYSQL_MAIN_CONNECTION, &text);
+          }
+        }
+#endif
+        if (is_semiselect_seen == false)
+        {
+          ocelot_query_result= execute_ocelot_query(query_utf16, MYSQL_MAIN_CONNECTION, &text);
+          if (ocelot_query_result == ER_ERROR)
+          {
+            is_create_table_server= true; /* Fake. it's not create table server but should have same effect. */
+            dbms_long_query_result= ocelot_query_result;
+          }
+          else
+          {
+            if (ocelot_query_result == -1) execute_real_query(query_utf16, MYSQL_MAIN_CONNECTION, &text);
+            else dbms_long_query_result= ocelot_query_result;
+          }
         }
       }
       if (dbms_long_query_result)
@@ -13392,6 +13483,199 @@ void MainWindow::rehash_get_database_name(char *database_name)
   strncpy(database_name, row_pointer, column_length);
   *(database_name + column_length)= '\0';
 }
+
+#if (OCELOT_EXTENDER == 1)
+/*
+  The code is a bit like rehash_scan().
+  The alternate_query value is what I call a "semiselect", i.e. ANALYZE, CHECK, CHECKSUM, DESC|DESCRIBE, EXPLAIN, HELP, SHOW.
+  Execute it, and convert the result set into SELECT ... UNION ALL SELECT ...
+  Example (simplified to show only one DESCRIBE column ('S1') and only two rows):
+    DESCRIBE t7 WHERE `Field` > '';
+    In hparse.h we established that the DESCRIBE is marked with TOKEN_FLAG_IS_SEMISELECT, the WHERE is marked with
+    TOKEN_FLAG_IS_SEMISELECT_MID, the ; is marked with TOKEN_FLAG_IS_SEMISELECT_END. So before calling here we were able
+    to figure out that there is an initial section "DESCRIBE t7" which we will pass to the server, and a trailing section
+    "WHERE `Field` > ''" which we will apply to the server results. What we'll do is
+    describe t7;                    << Send this to the server
+    (SELECT * FROM                   << Always produce this at start
+    (SELECT ... UNION SELECT ...)    << Produce SELECT ... UNION SELECT ... from the server results
+    AS ocelot_extender_result_set  << Always produce this after the SELECT ... UNION SELECT ...
+    where `Field` > ''               << Produce whatever hparse.h saw when doing hparse_f_select_part_2(), might be blank
+    )                                << Always produce this at end
+    So that we end up with
+    (select * from (SELECT 's1' AS `Field` union all select 's1') AS ocelot_extender_result_set WHERE `Field` > '')
+  Beware: Sometimes names can be reserved words, e.g. DESCRIBE table_name; emits a column named Null.
+          So I put within ``s. Alternatively I could use ""s if sql_mode allows, or check first if name is really reserved.
+*/
+int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query, QString *select_statement_out, QString semiselect_part_2, int offset_of_into)
+{
+  MYSQL_RES *res= NULL;
+  ResultGrid *rg= NULL;
+  int er;                                                  /* for errors e.g. ER_NOT_CONNECTED */
+  char *result_field_names_pointer;
+  unsigned int v_length;
+  QString fillup_result;
+  QString this_column_name;
+  char result_field_name[256];
+  unsigned int extender_result_column_count= 0; /* Todo: check: why isn't this long unsigned int? */
+  unsigned int extender_result_row_count= 0;
+  char **extender_result_set_copy_rows= 0; /* dynamic-sized list of result_set_copy row offsets, if necessary */
+  char *extender_result_field_names;
+
+  QStringList extender_column_names;
+  QList<int> extender_column_types;
+
+  QString select_statement= "";
+
+    long unsigned int r;
+
+  /* Todo: this isn't big enough if SHOW has a big WHERE clause */
+  char query[1024];
+  strcpy(query, alternate_query.toUtf8());
+
+  /* todo: add ";" */
+
+  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], query))
+  {
+    er= ER_SELECT_FAILED;
+    goto error_return;
+  }
+  /* Todo: say "false" instead of "true" after there's a fix for the apparent bug with is_displayable */
+  rg= new ResultGrid(lmysql, this, true, 0);
+
+  res= lmysql->ldbms_mysql_store_result(&mysql[MYSQL_MAIN_CONNECTION]);
+  if (res == NULL)
+  {
+    er= ER_MYSQL_STORE_RESULT_FAILED;
+    goto error_return;
+  }
+
+  fillup_result= rg->fillup(res,
+            //&tarantool_tnt_reply,
+            connections_dbms[0],
+            //this,
+            lmysql, ocelot_client_side_functions,
+            MYSQL_MAIN_CONNECTION,
+            false);
+  if (fillup_result != "OK")
+  {
+//    /* fillup() failure is unexpected so this is crude */
+//    put_message_in_result(fillup_result);
+//    return_value= 1;
+//    goto statement_is_aborted;
+      er= ER_ERROR;       /* Todo: this message doesn't capture what fillup_result actually says */
+      goto error_return;
+  }
+
+  extender_result_row_count= rg->result_row_count;
+  if (extender_result_row_count == 0)
+  {
+    er= ER_0_ROWS_RETURNED;
+    goto error_return;
+  }
+  extender_result_column_count= rg->result_column_count;
+  extender_result_set_copy_rows= rg->result_set_copy_rows;
+  extender_result_field_names= rg->result_field_names;
+
+  {
+    extender_column_names.clear(); /* unnecessary if by QStringList is initially clear */
+    extender_column_types.clear(); /* unnecessary if by QList is initially clear */
+
+    result_field_names_pointer= &extender_result_field_names[0];
+
+    for (unsigned int j= 0; j < extender_result_column_count; ++j)
+    {
+      memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
+      result_field_names_pointer+= sizeof(unsigned int);
+      memcpy(result_field_name, result_field_names_pointer, v_length);
+      result_field_name[v_length]= '\0';
+      result_field_names_pointer+= v_length;
+      this_column_name= result_field_name;
+      extender_column_names.append(this_column_name);
+      unsigned short int column_type= extender_result_data_type(rg->result_field_types[j]);
+      extender_column_types.append(column_type);
+    }
+  }
+
+  for (r= 0; r < extender_result_row_count; ++r)
+  {
+    char *row_pointer;
+    unsigned int column_length;
+    char column_value[512];
+    row_pointer= extender_result_set_copy_rows[r];
+    unsigned int col;
+    char field_value_flags;
+    if (r == 0) select_statement= "(SELECT * FROM (SELECT ";
+    else /* if (r > 0) */ select_statement= select_statement + " UNION ALL SELECT ";
+    for (col= 0; col < extender_result_column_count; ++col)
+    {
+      memcpy(&column_length, row_pointer, sizeof(unsigned int));
+      field_value_flags= *(row_pointer + sizeof(unsigned int));
+      row_pointer+= sizeof(unsigned int) + sizeof(char);
+      strncpy(column_value, row_pointer, column_length);
+      column_value[column_length]= '\0';
+      if (col > 0) select_statement= select_statement + ",";
+      /* todo: should I try to use NULL_STRING here? */
+      if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0) select_statement= select_statement + "NULL";
+      else if (extender_column_types.at(col) == OCELOT_DATA_TYPE_NUMBER) select_statement= select_statement + column_value;
+      else select_statement= select_statement + connect_unstripper(column_value);
+      if (r == 0)
+      {
+        select_statement= select_statement + " AS `" + extender_column_names.at(col) + "`";
+      }
+      row_pointer+= column_length;
+    }
+  }
+//  select_statement= select_statement + ";";
+  select_statement= select_statement + ") AS ocelot_extender_result_set ";
+  if (offset_of_into != -1)
+  {
+    select_statement= select_statement + semiselect_part_2.mid(0, offset_of_into);
+    select_statement= select_statement + ")";
+    select_statement= select_statement + semiselect_part_2.mid(offset_of_into, semiselect_part_2.length() - offset_of_into);
+  }
+  else
+  {
+    select_statement= select_statement + semiselect_part_2;
+    select_statement= select_statement + ")";
+  }
+
+  er= ER_OK;
+  //sprintf(error_or_ok_message, er_strings[er_off + er],
+  //        database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
+
+  /* fall through into error_return with er == ER_OK */
+
+error_return:
+  if (rg != NULL) delete rg; /* This caused an occasional crash but I think I have made a workaround for that. */
+  if (res != NULL) lmysql->ldbms_mysql_free_result(res);
+//  if (extender_result_set_copy != 0) { delete [] extender_result_set_copy; }
+//  if (extender_result_set_copy_rows != 0) { delete [] extender_result_set_copy_rows; }
+  /* any more garbage_collect to do? */
+
+  strcpy(error_or_ok_message, er_strings[er_off + er]);
+  *select_statement_out= select_statement;
+  return er;
+}
+
+/* nearly the same as cha_result_data_type() but I'm not sure whether Charts can be disabled */
+unsigned short int MainWindow::extender_result_data_type(unsigned short int result_field_type)
+{
+  unsigned short int ft= result_field_type;
+  if ((ft == OCELOT_DATA_TYPE_DATE) || (ft == OCELOT_DATA_TYPE_TIME) || (ft == OCELOT_DATA_TYPE_DATETIME)
+   || (ft == OCELOT_DATA_TYPE_VAR_STRING) || (ft == OCELOT_DATA_TYPE_STRING) || (ft == OCELOT_DATA_TYPE_TEXT))
+    return OCELOT_DATA_TYPE_STRING;
+  if ((ft == OCELOT_DATA_TYPE_DECIMAL) || (ft == OCELOT_DATA_TYPE_TINY) || (ft == OCELOT_DATA_TYPE_SHORT)
+   || (ft == OCELOT_DATA_TYPE_LONG) || (ft == OCELOT_DATA_TYPE_FLOAT) || (ft == OCELOT_DATA_TYPE_DOUBLE)
+   || (ft == OCELOT_DATA_TYPE_LONGLONG) || (ft == OCELOT_DATA_TYPE_INT24)
+   || (ft == OCELOT_DATA_TYPE_NEWDECIMAL) || (ft == OCELOT_DATA_TYPE_INTEGER)
+   || (ft == OCELOT_DATA_TYPE_UNSIGNED) || (ft == OCELOT_DATA_TYPE_NUMBER))
+    return OCELOT_DATA_TYPE_NUMBER;
+  if (ft == OCELOT_DATA_TYPE_NULL) return OCELOT_DATA_TYPE_NUMBER; /* But NULL isn't a number! Just for testing though. */
+  return OCELOT_DATA_TYPE_BLOB;
+}
+
+#endif // #if (OCELOT_EXTENDER == 1)
+
 
 /*
   Call widget_sizer() from action_execute() to resize the three
@@ -28453,7 +28737,7 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_statement_highlight_operator_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_HIGHLIGHT_OPERATOR_COLOR},
     {&main_window->ocelot_statement_left, NULL,  10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_LEFT},
     {&main_window->ocelot_statement_prompt_background_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_PROMPT_BACKGROUND_COLOR},
-    {&main_window->ocelot_statement_syntax_checker, NULL,  3, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER},
+    {&main_window->ocelot_statement_syntax_checker, NULL,  7, 0, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_SYNTAX_CHECKER}, /* assume OCELOT_EXTENDER == 1 */
     {&main_window->ocelot_statement_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT, TOKEN_KEYWORD_OCELOT_STATEMENT_TEXT_COLOR},
     {&main_window->ocelot_statement_top, NULL,  10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_TOP},
     {&main_window->ocelot_statement_width, NULL,  10000, OCELOT_VARIABLE_FLAG_SET_DEFAULTABLE, 0, TOKEN_KEYWORD_OCELOT_STATEMENT_WIDTH},

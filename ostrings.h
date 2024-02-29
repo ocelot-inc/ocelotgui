@@ -197,10 +197,10 @@ static const char *er_strings[]=
   "PAGER not implemented", /* ER_PAGER */
   "PRINT not implemented", /* ER_PRINT */
   "OK %s", /* ER_OK_PLUS */ /* For example with file-open show the full file name */
-  "Syntax checker value must be between 0 and 3", /* ER_SYNTAX */
+  "Syntax checker value must be between 0 and 7", /* ER_SYNTAX */ /* assume OCELOT_EXTENDER == 1 */
   "Format statement indent value must be between 0 and 8", /* ER_FORMAT_STATEMENT */
   "Format clause indent value must be between 0 and 8", /* ER_FORMAT_CLAUSE */
-  "Syntax checker value must be 1 or 3 (Menu item Settings | Statement widget)'", /* ER_FORMAT_RULE */
+  "Syntax checker value must be 1 or 3 or 7 (Menu item Settings | Statement widget)'", /* ER_FORMAT_RULE */ /* assume OCELOT_EXTENDER == 1 */
   "Unknown cell height", /* ER_UNKNOWN_CELL_HEIGHT */
   "Unknown cell border size", /* ER_UNKNOWN_CELL_BORDER_SIZE */
   "Unknown cell width", /* ER_UNKNOWN_CELL_WIDTH */
@@ -283,10 +283,10 @@ static const char *er_strings[]=
     "PAGER pas mis en oeuvre", /* ER_PAGER */
     "PRINT pas mis en oeuvre", /* ER_PRINT */
     "OK %s", /* ER_OK_PLUS */ /* For example this could show file name. Compare ER_OK_REHASH. */
-    "Syntaxe valeur (pour vérificateur de syntaxe) doit être comprise entre 0 et 3", /* ER_SYNTAX */
+    "Syntaxe valeur (pour vérificateur de syntaxe) doit être comprise entre 0 et 7", /* ER_SYNTAX */ /* assume OCELOT_EXTENDER == 1 */
     "Format déclaration  valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_STATEMENT */
     "Format clause valeur de retrait doit être comprise entre 0 et 8", /* ER_FORMAT_CLAUSE */
-    "Syntaxe valeur (pour vérificateur de syntaxe) doit être 1 ou 3", /* FORMAT_RULE */
+    "Syntaxe valeur (pour vérificateur de syntaxe) doit être 1 ou 3 ou 7", /* FORMAT_RULE */ /* assume OCELOT_EXTENDER == 1 */
     "Taille de hauteur cellulaire inconnu", /* ER_UNKNOWN_CELL_HEIGHT */
     "Taille de la bordure de la cellule inconnu ", /* ER_UNKNOWN_CELL_BORDER_SIZE */
     "Taille de largeur cellulaire inconnu", /* ER_UNKNOWN_CELL_WIDTH */
@@ -1033,7 +1033,7 @@ static const char *menu_strings[]=
     "Menu Border Color",
     "Font     ",
     "Max Row Count",
-    "Syntax Checker (1=highlight,3=highlight+error dialog)",
+    "Syntax Checker (1=highlight,3=highlight+error dialog,7=extender)", /* assume OCELOT_EXTENDER == 1 */
     "Detached",
     "Top",
     "Left",
@@ -1155,7 +1155,7 @@ static const char *menu_strings[]=
         "Menu Bordure Couleur",
         "Police   ",
         "Comte Max Line",
-        "Cértificateur de syntaxe (1=Surbrillance,3=Surbrillance+dialogue d'erreur)",
+        "Cértificateur de syntaxe (1=Surbrillance,3=Surbrillance+dialogue d'erreur)", /* assume OCELOT_EXTENDER == 1 */
         "Détaché",
         "Sommet",
         "Gauche",

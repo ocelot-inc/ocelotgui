@@ -66,6 +66,15 @@
 #define OCELOT_CHART_EVENTFILTER 0 /* for some diagnostics. normally 0. */
 #endif
 
+/* To remove most of the code related to extender, #define OCELOT_EXTENDER 0 */
+#ifndef OCELOT_EXTENDER
+#if (OCELOT_MYSQL_INCLUDE == 1)
+#define OCELOT_EXTENDER 1
+#else
+#define OCELOT_EXTENDER 0
+#endif
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -4843,9 +4852,13 @@ public:
   void hparse_f_with_clause(int,bool);
   int hparse_f_values(bool);
   int hparse_f_unionize(bool);
+#if (OCELOT_EXTENDER == 1)
+  bool hparse_f_is_extender_ok();
+#endif
   bool hparse_f_is_query(bool);
   int hparse_f_query(int,bool,bool,bool);
   int hparse_f_select(bool,bool);
+  int hparse_f_select_part_2(bool);
   int hparse_f_late_select_clauses(bool,int);
   int hparse_f_deep_query(int,bool,bool);
   void hparse_f_where();
@@ -5173,6 +5186,10 @@ private:
                         QString specific_schema,
                         QStringList specified_list);
   void rehash_get_database_name(char *);
+#if (OCELOT_EXTENDER == 1)
+  int extender_scan(char *error_or_ok_message, QString alternate_query, QString *select_statement, QString semiselect_part_2, int offset_of_into);
+  unsigned short int extender_result_data_type(unsigned short int result_field_type);
+#endif
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
   QString detached_value(QString);
@@ -5295,8 +5312,8 @@ private:
     0 = none
     1 = use for highlights
     2 = errors, i.e. pop up a dialog box if user tries to execute a bad-looking statement
-    4 = severe e.g. look whether declared variable is known
-    8 = severe e.g. look whether table is known (need to ask server)
+    4 = extender
+    8 = severe e.g. look whether declared variable is known, or severe e.g. look whether table is known (need to ask server)
    16 = tooltip
    32 = word-completion
    ... although so far the only thing being checked is 2 = errors
@@ -5620,6 +5637,15 @@ public:
   #define TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON 131072
   //#define TOKEN_FLAG_IS_ASSIGNEE 262144
   #define TOKEN_FLAG_IS_NEW 262144
+#if (OCELOT_EXTENDER == 1)
+  /* Todo: try to re-use flag values from above list, where you're sure there can never be ambiguity */
+  #define TOKEN_FLAG_SEMISELECT_1 524288
+  #define TOKEN_FLAG_SEMISELECT_2 1048576
+  #define TOKEN_FLAG_IS_SEMISELECT TOKEN_FLAG_SEMISELECT_1
+  #define TOKEN_FLAG_IS_SEMISELECT_MID TOKEN_FLAG_SEMISELECT_2
+  #define TOKEN_FLAG_IS_SEMISELECT_END (TOKEN_FLAG_SEMISELECT_1 | TOKEN_FLAG_SEMISELECT_2)
+  #define TOKEN_FLAG_IS_SEMISELECT_ALL (TOKEN_FLAG_SEMISELECT_1 | TOKEN_FLAG_SEMISELECT_2)
+#endif
 
 /* The enum for TOKEN_TYPE_LITERAL etc. was here, but moved outside MainWindow on 2019-02-26 */
 
@@ -17157,7 +17183,7 @@ if (current_widget != DEBUG_WIDGET)
     label_for_syntax_checker= new QLabel(menu_strings[menu_off + MENU_SYNTAX_CHECKER]);
     combo_box_for_syntax_checker= new QComboBox();
     combo_box_for_syntax_checker->setFixedWidth(label_for_color_width * 3);
-    for (int cj= 0; cj <= 3; ++cj) combo_box_for_syntax_checker->addItem(QString::number(cj));
+    for (int cj= 0; cj <= 7; ++cj) combo_box_for_syntax_checker->addItem(QString::number(cj)); /* assume OCELOT_EXTENDER == 1 */
     combo_box_for_syntax_checker->setCurrentIndex(copy_of_parent->new_ocelot_statement_syntax_checker.toInt());
     hbox_layout_for_syntax_checker= new QHBoxLayout();
     hbox_layout_for_syntax_checker->addWidget(label_for_syntax_checker);

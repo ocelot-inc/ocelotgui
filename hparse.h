@@ -5649,10 +5649,11 @@ void MainWindow::hparse_f_create_package(bool is_body)
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END_IN_CREATE_STATEMENT, "END") == 1)
     {
+      --hparse_flow_count;
       is_end_seen= true;
       break;
     }
-    else if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) == 0) && (is_body != 0)) /* statement in CREATE PAKAGE BODY? */
+    else if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) == 0) && (is_body != 0)) /* statement in CREATE PACKAGE BODY? */
     {
       hparse_f_statement(i_of_start_of_create_package); /* todo: check if this is the right block_top now */
       if (hparse_errno > 0) return;
@@ -7163,10 +7164,51 @@ int MainWindow::hparse_f_unionize(bool is_top)
   return 1;
 }
 
+#if (OCELOT_EXTENDER == 1)
+/*
+  Re hparse_flow_count: This should go up for compound-statement starters BEGIN CASE FOR IF LOOP REPEAT WHILE
+  (and CREATE PACKAGE because it has an END), and go down for END. Therefore if it's > 0 we're inside a compound statement.
+  Now we're only using hparse_flow_count within hparse_f_is_extender_ok() but it could be useful elsewhere too.
+  Alternatives hparse_begin_count and block_top are less dependable.
+*/
+/*
+  extender can't fix semiselects within statements if:
+  Within compound statement: simple if we've done the counting correctly for hparse_flow_count.
+  Within CREATE EVENT|FUNCTION|PROCEDURE|TRIGGER|VIEW: only a bit harder because of course we'll encounter start-of-statement,
+  but we have to go back before it check that it's preceded by a delimiter. It's assumed that it's enough to find EVENT etc.,
+  since (I think) anything before it will be CREATE or ALTER or SHOW. Todo: check that out.
+  Within a semiselect: this can only happen in a semiselect's WHERE clause, I could handle that but it would be hard.
+*/
+bool MainWindow::hparse_f_is_extender_ok()
+{
+  if ((ocelot_statement_syntax_checker.toInt() & 7) != 7) return false;
+  if (hparse_flow_count > 0) return false;
+  for (int i_of_statement= hparse_i - 1; i_of_statement >= 0; --i_of_statement)
+  {
+    int t= main_token_types[i_of_statement];
+    /* !!!! make sure we're within CREATE !!!! */
+    if ((t == TOKEN_KEYWORD_EVENT) || (t == TOKEN_KEYWORD_FUNCTION)
+     || (t == TOKEN_KEYWORD_PROCEDURE) || (t == TOKEN_KEYWORD_TRIGGER) || (t == TOKEN_KEYWORD_VIEW))
+       return false;
+    //if (main_token_types[i_of_statement] == TOKEN_KEYWORD_UNION) return true; /* todo: beware maybe UNION within subquery? */
+    if ((main_token_flags[i_of_statement]&TOKEN_FLAG_IS_START_STATEMENT) != 0)
+    {
+      if ((main_token_flags[i_of_statement]&TOKEN_FLAG_IS_SEMISELECT_ALL) == TOKEN_FLAG_IS_SEMISELECT) return false;
+      int i_of_prev= next_i(i_of_statement, -1);
+      if (i_of_prev == 0) break;
+      QString s_of_prev= hparse_text_copy.mid(main_token_offsets[i_of_prev], main_token_lengths[i_of_prev]);
+      if ((s_of_prev == ";") || (s_of_prev == hparse_delimiter_str) || (s_of_prev == "\\G")) break;
+    }
+  }
+  return true;
+}
+#endif
+
 /*
   Return true if following looks like start of query|subquery.
   If false, do accept() anyway so it appears in the expected list.
   Warn: we only do the accept() anysay for keywords, not for (, so ... UNION ( looks error but UNION (WITH is ok
+  Warn: sometimes block_top == -1 when we don't happen to know it, that should be fixed someday.
 */
 bool MainWindow::hparse_f_is_query(bool is_statement)
 {
@@ -7180,6 +7222,11 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
     s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
     ++parentheses_count;
   }
+  bool is_semiselect_ok= false;
+  if ((is_statement == true) && (parentheses_count == 0)) is_semiselect_ok= true;
+#if (OCELOT_EXTENDER == 1)
+  else is_semiselect_ok= hparse_f_is_extender_ok();
+#endif
   s= s.toUpper();
   bool is_query= false;
   if (s == "SELECT") is_query= true;
@@ -7209,12 +7256,13 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
   }
   if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
-    if ((is_statement == true) && (parentheses_count == 0))
+    if (is_semiselect_ok == true)
     {
        if ((s == "ANALYZE") || (s == "CHECK") || (s == "CHECKSUM") || (s == "DESC") || (s == "DESCRIBE")
            || (s == "EXPLAIN") || (s == "HELP") || (s == "SHOW"))
       {
         is_query= true;
+        main_token_flags[i] |= TOKEN_FLAG_IS_SEMISELECT;
       }
     }
   }
@@ -7241,7 +7289,7 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
     }
     if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
     {
-      if (is_statement == true)
+      if (is_semiselect_ok == true)
       {
         /* all guaranteed to fail */
         if (s != "ANALYZE")
@@ -7321,6 +7369,7 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
     return 1;
   }
   /* todo: we aren't checking if VALUES is legal here */
+int i_of_start_of_query= -1;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "SELECT") == 1)
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_SELECT;
@@ -7364,6 +7413,7 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_ANALYZE;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
+    i_of_start_of_query= hparse_i_of_last_accepted;
     if (((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
      && (hparse_token == ";"))
     {
@@ -7466,6 +7516,7 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_CHECK;
+    i_of_start_of_query= hparse_i_of_last_accepted;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE") == 1)
     {
@@ -7502,6 +7553,7 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
   {
     /* Todo: find out why this was commented out */
     //hparse_statement_type= TOKEN_KEYWORD_CHECKSUM;
+    i_of_start_of_query= hparse_i_of_last_accepted;
     //if (is_statement) hparse_statement_type= TOKEN_KEYWORD_CHECKSUM;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE");
@@ -7515,16 +7567,18 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
     else hparse_f_error();
     if (hparse_errno > 0) return 0;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "DESC") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DESC, "DESC") == 1)
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_DESC;
+    i_of_start_of_query= hparse_i_of_last_accepted;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
     hparse_f_explain_or_describe(block_top);
     if (hparse_errno > 0) return 0;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "DESCRIBE") == 1)
+  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DESCRIBE, "DESCRIBE"))
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_DESCRIBE;
+    i_of_start_of_query= hparse_i_of_last_accepted;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
     hparse_f_explain_or_describe(block_top);
     if (hparse_errno > 0) return 0;
@@ -7532,6 +7586,7 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXPLAIN, "EXPLAIN"))
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_EXPLAIN;
+    i_of_start_of_query= hparse_i_of_last_accepted;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
     if (hparse_f_accept(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXPLAIN, "QUERY") == 1)
     {
@@ -7550,6 +7605,7 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
       not documented, we would treat it as an error.
     */
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_HELP;
+    i_of_start_of_query= hparse_i_of_last_accepted;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();
     if (hparse_errno > 0) return 0;
@@ -7557,12 +7613,28 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW") == 1)
   {
     if (is_statement) hparse_statement_type= TOKEN_KEYWORD_SHOW;
+    i_of_start_of_query= hparse_i_of_last_accepted;
     /* main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE; */
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SLAVES");
       if (hparse_errno > 0) return 0;
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STATUS");
+      if (hparse_errno > 0) return 0;
+    }
+    else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_9, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ANALYZE") == 1)
+    {
+      /* Todo: this is duplicated for SHOW EXPLAIN. Merge. */
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FORMAT") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+        if (hparse_errno > 0) return 0;
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "JSON");
+        if (hparse_errno > 0) return 0;
+      }
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR");
+      if (hparse_errno > 0) return 0;
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
       if (hparse_errno > 0) return 0;
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AUTHORS") == 1) {;} /* removed in MySQL 5.6.8 */
@@ -7652,6 +7724,8 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
       }
       else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PACKAGE") == 1)
       {
+        /* There will be an END so consider this an implicit BEGIN. Todo: should mark TOKEN_FLAG_IS_FLOW_CONTROL too? */
+        ++hparse_flow_count;
         hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BODY, "BODY");
         if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_PACKAGE, TOKEN_REFTYPE_PACKAGE) == 0) hparse_f_error();
         if (hparse_errno > 0) return 0;
@@ -8081,6 +8155,39 @@ int MainWindow::hparse_f_deep_query(int block_top, bool is_statement, bool is_to
 //    return 1;
 //  }
 return_1:
+#if (OCELOT_EXTENDER == 1)
+/* TODO: !! MAKE SURE THIS IS ONLY FOR SEMISELECT! */
+  if (((ocelot_statement_syntax_checker.toInt() & 7) == 7)
+   && ((main_token_flags[i_of_start_of_query]&TOKEN_FLAG_IS_SEMISELECT_ALL) == TOKEN_FLAG_IS_SEMISELECT))
+  {
+    int i_of_select_part_2= hparse_i;
+    main_token_flags[hparse_i] |= TOKEN_FLAG_IS_SEMISELECT_MID;
+    int select_part_2_return= hparse_f_select_part_2(is_top);
+    main_token_flags[hparse_i]|= TOKEN_FLAG_IS_SEMISELECT_END;
+    if (select_part_2_return != 0)
+    {
+      if ((main_token_flags[i_of_start_of_query]&TOKEN_FLAG_IS_START_STATEMENT) != 0)
+      {
+        int i_of_prev= next_i(i_of_start_of_query, -1);
+        QString s_of_prev= hparse_text_copy.mid(main_token_offsets[i_of_prev], main_token_lengths[i_of_prev]);
+        if (s_of_prev != "(")
+        {
+          /* If it's a statement and we didn't add extra clauses, then server can do it all, so turn off semiselect. */
+          if (hparse_i == i_of_select_part_2)
+          {
+            main_token_flags[i_of_start_of_query] &= (~TOKEN_FLAG_IS_SEMISELECT_ALL);
+            main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_SEMISELECT_ALL);
+          }
+        }
+      }
+    }
+
+    //hparse_f_unionize(is_top);
+    if (hparse_errno > 0) return 0;
+    return select_part_2_return;;
+  }
+#endif
+
   return 1;
 }
 int MainWindow::hparse_f_select(bool is_top, bool is_statement)
@@ -8132,6 +8239,11 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
     }
     if (hparse_errno > 0) return 0;
   }
+  return hparse_f_select_part_2(is_top);
+}
+
+int MainWindow::hparse_f_select_part_2(bool is_top)
+{
   hparse_f_where();
   if (hparse_errno > 0) return 0;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GROUP"))
@@ -9496,6 +9608,7 @@ void MainWindow::hparse_f_statement(int block_top)
         }
         hparse_f_expect(FLAG_VERSION_TARANTOOL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BEGIN, "BEGIN");
         if (hparse_errno > 0) return;
+        ++hparse_flow_count;
         bool statement_is_seen= false;
         for (;;)
         {
@@ -9515,6 +9628,7 @@ void MainWindow::hparse_f_statement(int block_top)
           if (hparse_errno > 0) return;
           statement_is_seen= true;
         }
+        --hparse_flow_count;
       }
       else
       {
@@ -11440,7 +11554,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_statement_type= TOKEN_KEYWORD_BEGIN;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
-    ++hparse_begin_count;
+    ++hparse_begin_count; ++hparse_flow_count;
     if (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT") == 1)
     {
       hparse_f_expect(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ATOMIC, "ATOMIC");
@@ -11476,7 +11590,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
         if (hparse_errno > 0) return;
         if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1)
         {
-          --hparse_begin_count;
+          --hparse_begin_count; --hparse_flow_count;
           if (hparse_begin_count == 0) hparse_as_seen= false;
           break;
         }
@@ -11484,7 +11598,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     }
     else
     {
-      --hparse_begin_count;
+      --hparse_begin_count; --hparse_flow_count;
       if (hparse_begin_count == 0) hparse_as_seen= false;
     }
     if (((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
@@ -11522,6 +11636,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE, "CASE") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
+    ++hparse_flow_count;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     int when_count= 0;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "WHEN") == 0)
@@ -11577,6 +11692,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       }
       break;
     }
+    --hparse_flow_count;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CASE, "CASE");
@@ -11590,6 +11706,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     QString do_or_loop= "DO";
     if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0) do_or_loop= "LOOP";
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
+    ++hparse_flow_count;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     /* Todo: Find out later if integer-variable or record-variable" */
     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_VARIABLE_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -11630,6 +11747,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
+    --hparse_flow_count;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
@@ -11644,6 +11762,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
+    ++hparse_flow_count;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
     for (;;)
@@ -11694,6 +11813,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       }
       break;
     }
+    --hparse_flow_count;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF, "IF");
@@ -11705,6 +11825,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOOP, "LOOP") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
+    ++hparse_flow_count;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
@@ -11712,6 +11833,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
+    --hparse_flow_count;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_LOOP, "LOOP");
@@ -11723,6 +11845,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
   else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPEAT, "REPEAT") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
+    ++hparse_flow_count;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     for (;;)
     {
@@ -11737,6 +11860,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     hparse_subquery_is_allowed= false;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END");
     if (hparse_errno > 0) return;
+    --hparse_flow_count;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_LUA_OUTPUT, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPEAT, "REPEAT");
@@ -11846,6 +11970,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
     QString do_or_loop= "DO";
     if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0) do_or_loop= "LOOP";
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_FLOW_CONTROL;
+    ++hparse_flow_count;
     if (hparse_i_of_block == -1) hparse_i_of_block= hparse_i_of_last_accepted;
     hparse_subquery_is_allowed= true;
     hparse_f_opr_1(0, 0);
@@ -11860,6 +11985,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
       if (hparse_errno > 0) return;
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_END, "END") == 1) break;
     }
+    --hparse_flow_count;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
     main_token_pointers[hparse_i_of_last_accepted]= hparse_i_of_block;
     if ((hparse_dbms_mask & FLAG_VERSION_PLSQL) != 0)
@@ -11967,6 +12093,7 @@ void MainWindow::hparse_f_block(int calling_statement_type,
   So "begin_count > 00" means we're within BEGIN ... END.
   Warning: CREATE PROCEDURE p() WHILE 0 > 1 ... doesn't
            get counted, this only is for BEGIN ... END.
+           Use hparse_f_flow_count for knowing that.
   Knowing this is useful because if we're not within
   BEGIN ... END there can't be any relevant SQL/PSM DECLAREs.
   For plsql, we also flag IS|AS (but it goes off after the
@@ -13345,7 +13472,7 @@ void MainWindow::hparse_f_multi_block(QString text)
     hparse_statement_type= -1;
     hparse_errno= 0;
     hparse_text_copy= text;
-    hparse_begin_count= 0;
+    hparse_begin_count= 0; hparse_flow_count= 0;
     hparse_as_seen= false;
     hparse_like_seen= false;
     hparse_create_trigger_seen= false;
