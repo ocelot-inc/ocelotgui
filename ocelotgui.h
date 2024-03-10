@@ -6480,7 +6480,7 @@ int i_of_cmi_of_text(QString string);
 
 Completer_widget()
 {
-  ;
+  timer= NULL; main_window= NULL; current_row= associated_widget_type= 0; /* todo: move constructor() code to here */
 }
 
 ~Completer_widget()
@@ -6553,7 +6553,7 @@ public:
 
 Messagebox_flash()
 {
-  ;
+  timer= NULL;
 }
 
 ~Messagebox_flash()
@@ -6598,7 +6598,7 @@ private slots:
 public:
   void find_widget_activate();
 
-Find_widget(MainWindow *m)
+explicit Find_widget(MainWindow *m)
 {
   main_window= m;
   construct();
@@ -6925,6 +6925,95 @@ public:
 
 ldbms() : QWidget()
 {
+  /* Probably-unnecessary initializations done to pacify cppcheck */
+  dlopen_handle= 0;
+  t__mysql_affected_rows= 0;
+  t__mysql_close= NULL;
+  t__mysql_data_seek= NULL;
+  t__mysql_errno= 0;
+  t__mysql_error= 0;
+  t__mysql_fetch_fields= NULL;
+  t__mysql_fetch_lengths= NULL;
+  t__mysql_fetch_row= NULL;
+  t__mysql_free_result= NULL;
+  t__mysql_get_client_info= NULL;
+  t__mysql_get_host_info= NULL;
+  t__mysql_info= NULL;
+  t__mysql_init= NULL;
+  t__mysql_library_end= NULL;
+  t__mysql_library_init= NULL;
+  t__mysql_more_results= NULL;
+  t__mysql_num_rows= NULL;
+  t__mysql_options= NULL;
+  t__mysql_ping= NULL;
+  t__mysql_query= NULL;
+  t__mysql_select_db= NULL;
+  t__mysql_sqlstate= NULL;
+  t__mysql_ssl_set= NULL;
+  t__mysql_store_result= NULL;
+  t__mysql_thread_end= NULL;
+  t__mysql_warning_count= NULL;
+  t__AES_set_decrypt_key= NULL;
+  t__AES_decrypt= NULL;
+  t__mp_decode_array= NULL;
+  t__mp_decode_bin= NULL;
+  t__mp_decode_bool= NULL;
+  t__mp_decode_float= NULL;
+  t__mp_decode_double= NULL;
+  t__mp_decode_int= NULL;
+  t__mp_decode_map= NULL;
+  t__mp_decode_nil= NULL;
+  t__mp_decode_uint= NULL;
+  t__mp_decode_str= NULL;
+  t__mp_decode_strl= NULL;
+  t__mp_next= NULL;
+  t__mp_typeof= NULL;
+  t__tnt_auth= NULL;
+  t__tnt_call= NULL;
+  t__tnt_close= NULL;
+  t__tnt_connect= NULL;
+  t__tnt_delete= NULL;
+  t__tnt_eval= NULL;
+  t__tnt_flush= NULL;
+  t__tnt_execute= NULL;
+  t__tnt_get_indexno= NULL;
+  t__tnt_get_spaceno= NULL;
+  t__tnt_stream_free= NULL;
+  t__tnt_insert= NULL;
+  t__mysql_next_result= NULL;
+  t__mysql_num_fields= NULL;
+  t__mysql_real_connect= NULL;
+  t__mysql_real_query= NULL;
+  t__tnt_net= NULL;
+  t__tnt_object= NULL;
+  t__tnt_object_add_array= NULL;
+  t__tnt_object_add_nil= NULL;
+  t__tnt_object_add_int= NULL;
+  t__tnt_object_add_str= NULL;
+  t__tnt_object_add_bin= NULL;
+  t__tnt_object_add_bool= NULL;
+  t__tnt_object_add_float= NULL;
+  t__tnt_object_add_double= NULL;
+  t__tnt_object_container_close= NULL;
+  t__tnt_object_format= NULL;
+  t__tnt_object_reset= NULL;
+  t__tnt_reload_schema= NULL;
+  t__tnt_replace= NULL;
+  t__tnt_reply= NULL;
+  t__tnt_reply_init= NULL;
+  t__tnt_reply_free= NULL;
+  t__tnt_request_compile= NULL;
+  t__tnt_request_eval= NULL;
+  t__tnt_request_call= NULL;
+  t__tnt_request_set_exprz= NULL;
+  t__tnt_request_set_tuple= NULL;
+  t__tnt_select= NULL;
+  t__tnt_set= NULL;
+  t__tnt_update= NULL;
+  t__tnt_select= NULL;
+  t__tnt_error= NULL;
+  t__tnt_strerror= NULL;
+
   return;
 }
 
@@ -7849,7 +7938,7 @@ QList<Rows_and_columns> *rows_and_columns_list;
 
 public:
 
-Result_changes(Result_qtextedit *m)
+explicit Result_changes(Result_qtextedit *m)
 {
   result_qtextedit= m;
   rows_and_columns_list= new QList<Rows_and_columns>;
@@ -8009,7 +8098,7 @@ int copy_html_cell(char *ocelot_grid_detail_numeric_column_start, char *ocelot_g
                    int passed_i, long unsigned int tmp_xrow, char *ocelot_grid_detail_char_column_end,
                    int *new_cell_height, unsigned int result_column_no);
 
-Result_qtextedit(ResultGrid *m)
+explicit Result_qtextedit(ResultGrid *m)
 {
   result_grid= m;
   construct();
@@ -8763,6 +8852,9 @@ ResultGrid(
 #ifdef OLD_STUFF
   max_text_edit_frames_count= 0;
 #endif
+#if (OCELOT_CHART_OR_QCHART == 1)
+  chart_widget= NULL;
+#endif
   if (is_displayable == false)
   {
     grid_main_layout= 0;
@@ -8770,9 +8862,6 @@ ResultGrid(
     batch_text_edit= NULL;
     return;
   }
-#if (OCELOT_CHART_OR_QCHART == 1)
-  chart_widget= NULL;
-#endif
 
   result_grid_widget_max_height_in_lines= RESULT_GRID_WIDGET_INITIAL_HEIGHT;
 
@@ -11754,7 +11843,7 @@ int inserts(QString temporary_table_name)
   QString s;
   char ctmp[1024];
 
-  pointer= result_set_copy_rows[0];
+  /* pointer= result_set_copy_rows[0]; */
   for (tmp_xrow= 0; tmp_xrow < result_row_count; ++tmp_xrow)
   {
     tmp= "INSERT INTO ";
@@ -12136,7 +12225,7 @@ QString copy_to_history(long int ocelot_history_max_row_count,
     history_line= new char[HISTORY_MAX_VERTICAL_COLUMN_WIDTH + 256];
     for (r= 0; r < history_result_row_count; ++r)
     {
-      sprintf(history_line, "*************************** %ld. row ***************************\n", r + 1);
+      sprintf(history_line, "*************************** %lu. row ***************************\n", r + 1);
       s.append(history_line);
       char *row_pointer;
       unsigned int column_length;
@@ -12789,8 +12878,8 @@ void scan_rows(unsigned int p_result_column_count,
          && (strncasecmp(v_row[i], "row_number() over ()", v_lengths[i]) == 0))
         {
           total_size+= sizeof(unsigned int) + sizeof(char);
-          char tmp[16];
-          sprintf(tmp, "%ld", v_r + 1);
+          char tmp[24];
+          sprintf(tmp, "%lu", v_r + 1);
           total_size+= strlen(tmp);
         }
         else
@@ -12827,8 +12916,8 @@ void scan_rows(unsigned int p_result_column_count,
          && (v_lengths[i] == sizeof("row_number() over ()") - 1)
          && (strncasecmp(v_row[i], "row_number() over ()", v_lengths[i]) == 0))
         {
-          char tmp[16];
-          sprintf(tmp, "%ld", v_r + 1);
+          char tmp[24];
+          sprintf(tmp, "%lu", v_r + 1);
           unsigned int v_length= strlen(tmp);
           //if (v_length > (*p_result_max_column_widths)[i]) (*p_result_max_column_widths)[i]= v_length;
           set_max_column_width(v_length, tmp, (&(*p_result_max_column_widths)[i]));
@@ -13521,10 +13610,11 @@ void resize_or_font_change(int height_of_grid_widget, bool is_resize)
 
   if (html_text_edit == NULL) return; /* ?? this should be impossible */
   set_grid_max_column_height_in_pixels(this->height());
-  if ((copy_of_ocelot_batch != 0)
-   || (copy_of_ocelot_html != 0)
-   || (copy_of_ocelot_html == 0)
-   || (copy_of_ocelot_xml != 0))
+  /* Todo: the following set of conditions was always true, check what the real intent was */
+//  if ((copy_of_ocelot_batch != 0)
+//   || (copy_of_ocelot_html != 0)
+//   || (copy_of_ocelot_html == 0)
+//   || (copy_of_ocelot_xml != 0))
   {
     if ((copy_of_ocelot_batch != 0) || (copy_of_ocelot_xml != 0))
       html_text_edit->setStyleSheet(copy_of_parent->ocelot_grid_style_string);
@@ -15323,7 +15413,7 @@ QPointF draw_mark(QPainter *painter, int erd_type, QPointF main_line_point)
 
     bar2_line.setLength((erd_default_mark_length / 2) - 2);
     //bar2_line.setLength(erd_default_mark_length * 0.25);
-    QPointF mark_line_25_point= bar2_line.p2();
+    QPointF mark_line_25_point/*= bar2_line.p2()*/;
 
     bar2_line_cross.setLength(erd_default_mark_length * 0.25);
     mark_line_25_point= bar2_line_cross.p2();
@@ -16449,7 +16539,7 @@ void mouseMoveEvent(QMouseEvent *event)
 class prompt_class : public QWidget
 {
 public:
-  prompt_class(CodeEditor *editor) : QWidget(editor)
+explicit  prompt_class(CodeEditor *editor) : QWidget(editor)
   {
     codeEditor= editor;
   }
@@ -16805,6 +16895,7 @@ int combo_box_for_font_name_filler(QString actual_font_family, QString actual_fo
     }
     if ((font_families.at(i) == actual_font_family) && (is_match_found == false))
     {
+printf("**** if ((font_families.at(i) == actual_font_family) && (is_match_found == false))\n");
       /* family matches but weight|style. add a new entry if qfontinfo says it's possible. else use at(0) */
       bool italic= false;
       if (actual_font_style != "normal") italic= true;
@@ -17146,9 +17237,12 @@ if (current_widget != DEBUG_WIDGET)
 
       combo_box_for_font_name= new QComboBoxInSettings(); /* Should I say "this"? */
       combo_box_for_font_name->view()->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
-
-      int maximum_width= combo_box_for_font_name_filler(actual_font_family, actual_font_style, actual_font_weight);
-      QString maximum_value= QString("X").repeated(maximum_width);
+      /* todo: this used to be: */
+      /* int maximum_width= combo_box_for_font_name_filler(actual_font_family, actual_font_style, actual_font_weight); */
+      /* QString maximum_value= QString("X").repeated(maximum_width); */
+      /* ... changed because maximum_value is set later. But was there good reason for the pre-change code? */
+      combo_box_for_font_name_filler(actual_font_family, actual_font_style, actual_font_weight);
+      QString maximum_value;
       /* Todo: what you really need is width(maximum # of characters) + scroll bar width */
       //combo_box_for_font_name->setFixedWidth(this->fontMetrics().boundingRect(maximum_value).width());
 
@@ -18335,6 +18429,7 @@ void handle_combo_box_for_font_any_change()
     weight= &(copy_of_parent->new_ocelot_explorer_font_weight);
   }
 #endif
+  assert((family != NULL) && (style != NULL) && (weight != NULL) && (size != NULL));
   /* todo: just pass family, weight, style. no need for candidates */
   QString family_candidate, weight_candidate, style_candidate;
   combo_box_for_font_name_parse(combo_box_for_font_name->currentText(),
@@ -18714,7 +18809,7 @@ public:
 
   MainWindow *main_window;
 
-  TextEditHistory(MainWindow *parent) : QTextEdit(parent)
+explicit  TextEditHistory(MainWindow *parent) : QTextEdit(parent)
   {
     main_window= parent;
   }
@@ -18809,7 +18904,7 @@ int ocelot_variable_offset(int keyword_index)
 
 public:
 
-XSettings(MainWindow *parent)
+explicit XSettings(MainWindow *parent)
 {
   main_window= parent;
 #ifndef NDEBUG

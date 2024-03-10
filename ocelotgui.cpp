@@ -640,10 +640,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   create_widget_debug();
 #endif
   main_window= new QWidget(this);                  /* 2015-08-25 added "this" */
-
   completer_widget= new Completer_widget(); completer_widget->construct(this);
   c_widget= new C_widget(); c_widget->construct(this); c_widget->setFont(fixed_font); c_widget->hide();
-
   ocelot_grid_cell_height= "default";              /* todo: should be changeable with Settings menu item */
   ocelot_grid_cell_width= "default";               /* todo: should be changeable with Settings menu item */
   /*
@@ -1579,7 +1577,7 @@ void MainWindow::export_defaults(int passed_type, struct export_settings *export
 QString MainWindow::import_export_rule_set(QString text)
 {
   log("import_export_rule_set", 15);
-  struct export_settings local_exports;
+  struct export_settings local_exports= {0,"","","",false,"","","",0,false,false,false,0,false,false,false,"","","",""};
   export_defaults(0, &local_exports);
 
   QString error_message= "";
@@ -1872,7 +1870,7 @@ int MainWindow::read_file(int keyword, QString s, QString table_name)
     {
        break;
     }
-    source_line= "";
+    /* source_line= ""; */
     source_line= file.readLine();
 have_leftover:
     {
@@ -4728,12 +4726,12 @@ void MainWindow::main_token_new(int text_size)
 */
 void MainWindow::main_token_push()
 {
-  assert(sizeof(main_token_offsets[0] == sizeof(int)));
-  assert(sizeof(main_token_lengths[0] == sizeof(int)));
-  assert(sizeof(main_token_types[0] == sizeof(int)));
-  assert(sizeof(main_token_flags[0] == sizeof(unsigned int)));
-  assert(sizeof(main_token_pointers[0] == sizeof(int)));
-  assert(sizeof(main_token_reftypes[0] == sizeof(unsigned char)));
+  static_assert(sizeof(main_token_offsets[0]) == sizeof(int), "");
+  static_assert(sizeof(main_token_lengths[0]) == sizeof(int), "");
+  static_assert(sizeof(main_token_types[0]) == sizeof(int), "");
+  static_assert(sizeof(main_token_flags[0]) == sizeof(unsigned int), "");
+  static_assert(sizeof(main_token_pointers[0]) == sizeof(int), "");
+  static_assert(sizeof(main_token_reftypes[0]) == sizeof(unsigned char), "");
   saved_main_token_count_in_all= main_token_count_in_all;
   saved_main_token_count_in_statement= main_token_count_in_statement;
   saved_main_token_number= main_token_number;
@@ -4989,11 +4987,11 @@ void MainWindow::action_connect_once(QString message)
   QString row_form_message;
   int i;
   Row_form_box *co;
-  row_form_label= 0;
-  row_form_type= 0;
-  row_form_is_password= 0;
-  row_form_data= 0;
-  row_form_width= 0;
+  //row_form_label= 0; /* we don't use std::nothrow so we are assuming that 'new' will not fail */
+  //row_form_type= 0;
+  //row_form_is_password= 0;
+  //row_form_data= 0;
+  //row_form_width= 0;
   column_count= 85; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
@@ -5217,11 +5215,11 @@ void MainWindow::action_connect_once(QString message)
     delete(co);
   }
 
-  if (row_form_width != 0) delete [] row_form_width;
-  if (row_form_data != 0) delete [] row_form_data;
-  if (row_form_is_password != 0)  delete [] row_form_is_password;
-  if (row_form_type != 0) delete [] row_form_type;
-  if (row_form_label != 0) delete [] row_form_label;
+  /* if (row_form_width != 0) */ delete [] row_form_width;
+  /* if (row_form_data != 0) */ delete [] row_form_data;
+  /* if (row_form_is_password != 0)  */ delete [] row_form_is_password;
+  /* if (row_form_type != 0) */ delete [] row_form_type;
+  /* if (row_form_label != 0) */ delete [] row_form_label;
 }
 
 /*
@@ -5346,7 +5344,7 @@ QStringList MainWindow::fake_statement(QString fake_statement_text)
 int MainWindow::action_export_function(int export_or_import, int passed_type)
 {
   (void)export_or_import;
-  struct export_settings local_exports;
+  struct export_settings local_exports= {0,"","","",false,"","","",0,false,false,false,0,false,false,false,"","","",""};
   export_defaults(passed_type, &local_exports);
 
   QString message= "export";
@@ -5493,11 +5491,11 @@ int MainWindow::action_export_function(int export_or_import, int passed_type)
     delete(co);
   }
 
-  if (row_form_width != 0) delete [] row_form_width;
-  if (row_form_data != 0) delete [] row_form_data;
-  if (row_form_is_password != 0)  delete [] row_form_is_password;
-  if (row_form_type != 0) delete [] row_form_type;
-  if (row_form_label != 0) delete [] row_form_label;
+  delete [] row_form_width;
+  delete [] row_form_data;
+  delete [] row_form_is_password;
+  delete [] row_form_type;
+  delete [] row_form_label;
   return co_is_ok;
 }
 
@@ -7173,7 +7171,7 @@ QString MainWindow::canonical_font_weight(QString font_weight_string)
 int MainWindow::fontweights_index_via_chars(QString weight_string)
 {
   QString weight_lower= weight_string.toLower();
-  for (int i= 0; i <= FONTWEIGHTSVALUES_SIZE; ++i)
+  for (int i= 0; i < FONTWEIGHTSVALUES_SIZE; ++i)
   {
     if ((weight_lower == fontweightsvalues[i].chars)
      || (weight_lower == fontweightsvalues[i].alternate_chars))
@@ -7194,7 +7192,7 @@ int MainWindow::fontweights_index_via_chars(QString weight_string)
 int MainWindow::fontweights_index_via_qt_number(int qt_number)
 {
   int i;
-  for (i= 1; i <= FONTWEIGHTSVALUES_SIZE; ++i)
+  for (i= 1; i < FONTWEIGHTSVALUES_SIZE; ++i)
   {
     if (qt_number < (int)fontweightsvalues[i].qt_number) break;
   }
@@ -7209,7 +7207,7 @@ int MainWindow::fontweights_index_via_qt_number(int qt_number)
 int MainWindow::fontweights_index_via_css_number(int css_number)
 {
   int i;
-  for (i= 1; i <= FONTWEIGHTSVALUES_SIZE; ++i)
+  for (i= 1; i < FONTWEIGHTSVALUES_SIZE; ++i)
   {
     if (css_number < (int)fontweightsvalues[i].css_number) break;
   }
@@ -7594,7 +7592,7 @@ int MainWindow::get_next_statement_in_string(int passed_main_token_number,
   if ((client_statement_seen == true) && (check_if_client == true))
   {
     int client_statement_type= main_token_types[i];
-    for (i= i; main_token_lengths[i] != 0; ++i)
+    for (/* i= i*/; main_token_lengths[i] != 0; ++i)
     {
       /* Client statements can end with \n alone but SET (which is Ocelot-specific not defined by MySQL) needs ; */
       if ((main_token_lengths[i + 1] != 0) && (client_statement_type != TOKEN_KEYWORD_SET))
@@ -8005,10 +8003,6 @@ QString MainWindow::select_1_row(const char *select_statement)
   if (unexpected_error == NULL)
   {
     num_fields= lmysql->ldbms_mysql_num_fields(res);
-  }
-
-  if (unexpected_error == NULL)
-  {
     row= lmysql->ldbms_mysql_fetch_row(res);
     if (row == NULL)
     {
@@ -8603,7 +8597,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
     //{
     //  break;
     //}
-    if (res != NULL)
+    if (res != NULL) /* Actually this can't be true now but assume someday we'll revive the for loop */
     {
       lmysql->ldbms_mysql_free_result(res);
       res= NULL;
@@ -9005,7 +8999,7 @@ int MainWindow::debug_parse_statement(QString text,
   strcpy(command_string, "");
   int last_token= main_token_number + main_token_count_in_statement;
   for (i= main_token_number;
-       ((main_token_lengths[i] != 0) && (i < last_token));
+       ((i < last_token) && (main_token_lengths[i] != 0));
        ++i)
   {
     token_type= main_token_types[i];
@@ -9992,7 +9986,7 @@ void MainWindow::debug_highlight_line()
   {
     if (debug_timer_old_debug_widget_index != -1)
     {
-      if (debug_timer_old_debug_widget_index != -1)
+      /* if (debug_timer_old_debug_widget_index != -1) */ /* identicalInnerCondition */
       {
         QList<QTextEdit::ExtraSelection> old_extraSelections;
         debug_widget[debug_timer_old_debug_widget_index]->setExtraSelections(old_extraSelections);
@@ -12104,7 +12098,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       if (connections_dbms[0] == DBMS_TARANTOOL)
       {
         char tmp[32];
-        sprintf(tmp, " iproto_schema_version = %lu", (long) tarantool_tnt_reply.schema_id);
+        sprintf(tmp, " iproto_schema_version = %lu", (unsigned long) tarantool_tnt_reply.schema_id);
         strcat(buffer, tmp);
       }
 #endif
@@ -12306,18 +12300,36 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 
 
       int main_token_type_after_set= main_token_types[i_of_set_statement];
+
+      /* We do not want to call ocelot_variable_set() if there is a WHERE after the assignments */
+      int iossc= i_of_set_statement;
       for (;;)
       {
-        int token_type= main_token_types[i_of_set_statement];
-        i_of_set_statement= next_token(i_of_set_statement); /* to "=" (if syntax ok) */
-        i_of_set_statement= next_token(i_of_set_statement); /* to operand (if syntax ok) */
-        er_of_set_statement= xsettings_widget->ocelot_variable_set(token_type,
+        if ((main_token_types[iossc] == TOKEN_TYPE_OPERATOR) || (main_token_lengths[iossc] == 0)) break;
+        iossc= next_i(iossc, 1);
+        if (text.mid(main_token_offsets[iossc], main_token_lengths[iossc]) != "=") break;
+        iossc= next_i(iossc, 1);
+        if ((main_token_types[iossc] == TOKEN_TYPE_OPERATOR) || (main_token_lengths[iossc] == 0)) break;
+        iossc= next_i(iossc, 1);
+        if (text.mid(main_token_offsets[iossc], main_token_lengths[iossc]) != ",") break;
+        iossc= next_i(iossc, 1);
+      }
+      if (main_token_types[iossc] == TOKEN_KEYWORD_WHERE) i_of_set_statement= iossc; /* because we will skip */
+      else
+      {
+        for (;;)
+        {
+          int token_type= main_token_types[i_of_set_statement];
+          i_of_set_statement= next_token(i_of_set_statement); /* to "=" (if syntax ok) */
+          i_of_set_statement= next_token(i_of_set_statement); /* to operand (if syntax ok) */
+          er_of_set_statement= xsettings_widget->ocelot_variable_set(token_type,
                 text.mid(main_token_offsets[i_of_set_statement], main_token_lengths[i_of_set_statement]));
-        if (er_of_set_statement != ER_OK) break;
-        i_of_set_statement= next_token(i_of_set_statement); /* to , or where (if syntax ok) */
-        if (text.mid(main_token_offsets[i_of_set_statement], main_token_lengths[i_of_set_statement]) != ",")
-          break;
-        i_of_set_statement= next_token(i_of_set_statement); /* to next assignment (if syntax ok) */
+          if (er_of_set_statement != ER_OK) break;
+          i_of_set_statement= next_token(i_of_set_statement); /* to , or where (if syntax ok) */
+          if (text.mid(main_token_offsets[i_of_set_statement], main_token_lengths[i_of_set_statement]) != ",")
+            break;
+          i_of_set_statement= next_token(i_of_set_statement); /* to next assignment (if syntax ok) */
+        }
       }
       if (main_token_types[i_of_set_statement] == TOKEN_KEYWORD_WHERE)
       {
@@ -12968,7 +12980,7 @@ void MainWindow::rehash_scan_one_space(int space_number)
 #if (OCELOT_EXPLORER == 1)
     field_number_of_engine= 3;
     field_number_of_sql= 5;
-    field_number_of_columns= 6;
+    /* field_number_of_columns= 6; */
 #endif
   }
   if (space_number == 289) /* 289 is "_vindex" */
@@ -13816,7 +13828,7 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
   if (mysql_errno_result > 0)
   {
     s1= er_strings[er_off + ER_ERROR];
-    sprintf(mysql_error_and_state, "%d (%s) ", mysql_errno_result, lmysql->ldbms_mysql_sqlstate(&mysql[connection_number]));
+    sprintf(mysql_error_and_state, "%u (%s) ", mysql_errno_result, lmysql->ldbms_mysql_sqlstate(&mysql[connection_number]));
     s1.append(mysql_error_and_state);
     s2= lmysql->ldbms_mysql_error(&mysql[connection_number]);
     s1.append(s2);
@@ -15520,10 +15532,10 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     So try multiple combinations. e.g. if libmysqlclient.so.18 didn't
     get loaded, try libmysqlclient without a version number.
   */
-  for (int i= 1; i < 12; ++i)
+  for (int i= 1; i <= 12; ++i)
   {
     QString li_path;
-    int li_lib;
+    int li_lib= 0;
     if (i == 1) {if (connections_dbms[0] == DBMS_MARIADB) continue; li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT18; }
     if (i == 2) {if (connections_dbms[0] == DBMS_MARIADB) continue; li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT; }
     if (i == 3) {                                                   li_path= ocelot_ld_run_path; li_lib= WHICH_LIBRARY_LIBMARIADBCLIENT; }
@@ -18820,7 +18832,7 @@ QString MainWindow::tarantool_fetch_header_row()
     char what_to_search_for[TARANTOOL_MAX_FIELD_NAME_LENGTH];
     memcpy(what_to_search_for, TARANTOOL_FIELD_NAME_BASE, base_length);
     //char field_number_as_char[16];
-    sprintf(what_to_search_for, "%s_%d", TARANTOOL_FIELD_NAME_BASE, field_number + 1);
+    sprintf(what_to_search_for, "%s_%u", TARANTOOL_FIELD_NAME_BASE, field_number + 1);
     int what_to_search_for_length= strlen(what_to_search_for);
     for (unsigned int j= 0; j < tarantool_field_names_count; ++j)
     {
@@ -18847,7 +18859,7 @@ QString MainWindow::tarantool_fetch_header_row()
         *(new_name + TARANTOOL_MAX_FIELD_NAME_LENGTH)='\0';
         memcpy(what, new_name, TARANTOOL_MAX_FIELD_NAME_LENGTH);
       }
-      field_name_list_all_rows[j]= what;
+      field_name_list_all_rows[j]= QString::fromUtf8(what);
       value= tarantool_result_set_init_select(&r, field_number, 1);
       value_length= r;
       if (value == NULL) {;} /* I don't know whether we should care about null */
@@ -20931,13 +20943,13 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
     char tmp_td[128];
 
     if (memcmp(ocelot_grid_detail_char_column_start, "<TH", 3) == 0)
-      sprintf(tmp_td, "<TH align='left'; width=%d>", width_i);
+      sprintf(tmp_td, "<TH align='left'; width=%u>", width_i);
     else
     {
       if ((result_grid->result_field_flags[result_column_no] & NUM_FLAG) != 0)
-        sprintf(tmp_td, "<TD %salign='right'; width=%d>", bgcolor, width_i);
+        sprintf(tmp_td, "<TD %salign='right'; width=%u>", bgcolor, width_i);
       else
-        sprintf(tmp_td, "<TD %swidth=%d>", bgcolor, width_i);
+        sprintf(tmp_td, "<TD %swidth=%u>", bgcolor, width_i);
     }
 
     strcpy(tmp_pointer, tmp_td);
@@ -20987,9 +20999,9 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
 #else
       if (height_candidate > result_grid->max_height_of_a_char * 2)
 #endif
-        sprintf(img_start, "<img width=%d height=%d src=\"data:image/", width_i, height_candidate);
+        sprintf(img_start, "<img width=%u height=%u src=\"data:image/", width_i, height_candidate);
       else
-        sprintf(img_start, "<img width=%d src=\"data:image/", width_i);
+        sprintf(img_start, "<img width=%u src=\"data:image/", width_i);
       /* IMAGE TEST!!!! What happens if I don't say what the width is? */
 #if (OCELOT_CHART_OR_QCHART == 1)
       if ((grid_column_no > 0) || (is_chart == 1))
@@ -21015,7 +21027,7 @@ int Result_qtextedit::copy_html_cell(char *ocelot_grid_detail_numeric_column_sta
         /* TEST!! */
         *tmp_pointer= '\0';
       }
-      delete base64_tmp;
+      delete[] base64_tmp;
     }
     return tmp_pointer - original_tmp_pointer;
   }
@@ -22505,6 +22517,7 @@ void Context_menu::action(int current_row, int i_of_cmi)
       return;
     }
   }
+  if (i_of_cmi < 0) return; /* I think this is impossible beause if we pass i_of_cmi == -1 then we'll loop till current_row */
   if (cmi[i_of_cmi].enabled == "no")
   {
     return;
@@ -22528,7 +22541,7 @@ void Context_menu::action(int current_row, int i_of_cmi)
      || (s == "EXPORT_TABLE;")
      || (s == "EXPORT_HTML;"))
     {
-      int keyword;
+      int keyword= 0;
       if (s == "EXPORT_TEXT;") keyword= TOKEN_KEYWORD_TEXT;
       if (s == "EXPORT_TABLE;") keyword= TOKEN_KEYWORD_TABLE;
       if (s == "EXPORT_HTML;") keyword= TOKEN_KEYWORD_HTML;
@@ -24299,7 +24312,7 @@ int options_and_connect(
 #endif
   int opt= 0;
   if (ocelot_default_auth_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_23, ocelot_default_auth_as_utf8);
-  if (ocelot_enable_cleartext_plugin == true) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_36, (char *) &ocelot_enable_cleartext_plugin);
+  if (ocelot_enable_cleartext_plugin != 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_36, (char *) &ocelot_enable_cleartext_plugin);
   if (ocelot_init_command_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_3, ocelot_init_command_as_utf8);
   if (ocelot_opt_bind_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_24, ocelot_opt_bind_as_utf8);
   if (ocelot_opt_compress > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_1, NULL);
@@ -24822,7 +24835,7 @@ void MainWindow::debug_setup_go(QString text)
 
   int last_token= main_token_number + main_token_count_in_statement;
   for (int i= main_token_number;
-       ((main_token_lengths[i] != 0) && (i < last_token));
+       ((i < last_token) && (main_token_lengths[i] != 0));
        ++i)
   {
     QString s= text.mid(main_token_offsets[i], main_token_lengths[i]);
@@ -26607,7 +26620,7 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
     for (int i= i_of_statement_start + 1; main_token_lengths[i] != 0; ++i)
     {
       if ((main_token_types[i] >= TOKEN_TYPE_COMMENT_WITH_SLASH)
-       && (main_token_types[i] == TOKEN_TYPE_COMMENT_WITH_MINUS))
+       && (main_token_types[i] <= TOKEN_TYPE_COMMENT_WITH_MINUS))
         continue;
       QString n= text.mid(main_token_offsets[i], main_token_lengths[i]);
       if (v_value_of_second_token == "") v_value_of_second_token= n;
@@ -27104,7 +27117,7 @@ void MainWindow::clf(QString text)
   /* CREATE PROCEDURE|FUNCTION name () --> function name () */
   for (clfi= main_token_number;
        /* Todo: check: how reliable is clf_last_token? */
-       ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token));
+       ((clfi < clf_last_token) && (main_token_lengths[clfi] != 0));
        ++clfi)
   {
     if ((main_token_reftypes[clfi] == TOKEN_REFTYPE_PROCEDURE)
@@ -27188,8 +27201,8 @@ int MainWindow::clf_block(QString text, int i_of_end_of_handler, QString *clf_ou
   int token_type; /* warning: there is also a function named token_type() */
   int begin_count= 0;
 
-  for (clfi= clfi;
-       ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token));
+  for (/* clfi= clfi */;
+       ((clfi < clf_last_token) && (main_token_lengths[clfi] != 0));
        ++clfi)
   {
     if (clfi >= i_of_end_of_handler)
@@ -27315,7 +27328,7 @@ int MainWindow::clf_block(QString text, int i_of_end_of_handler, QString *clf_ou
         return 1;
       }
       /* It's not DECLARE ... CONDITION|CURSOR|HANDLER. So it must be DECLARE ... variable. */
-      while ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token))
+      while ((clfi < clf_last_token) && (main_token_lengths[clfi] != 0))
       {
         QString d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
         if (main_token_reftypes[clfi] == TOKEN_REFTYPE_VARIABLE_DEFINE)
@@ -27325,7 +27338,7 @@ int MainWindow::clf_block(QString text, int i_of_end_of_handler, QString *clf_ou
           *clf_output= *clf_output + variable_name;
           /* Look for DEFAULT clause. It might apply for multiple locals, e.g. DECLARE x,y,z INT DEFAULT 5; */
           int saved_clfi= clfi;
-          while ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token))
+          while ((clfi < clf_last_token) && (main_token_lengths[clfi] != 0))
           {
             QString d2= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]);
             if (d2 == ";") break;
@@ -27759,6 +27772,7 @@ bool MainWindow::clfds(QString text, int token_type, QString indent_string, QStr
   clf_parameter_list= "";
   /* Todo: you need to stop at last_token */
   while ((main_token_lengths[clfi] != 0) && (clfi < clf_last_token))
+  while ((clfi < clf_last_token) && (main_token_lengths[clfi] != 0))
   {
     d= text.mid(main_token_offsets[clfi], main_token_lengths[clfi]).toUpper();
     if (d == "(") ++parentheses_count;
@@ -28751,7 +28765,7 @@ int XSettings::ocelot_variables_create()
 }
 
 /*
-  Todo: We might be changing a grid setting without checking for a WHERE conditional as done in execute_client_statement().
+  Todo: in execute_client_statement() we make sure not to call this if WHERE follows, but we don't check during connect.
 */
 int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
 {

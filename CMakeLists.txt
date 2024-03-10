@@ -140,6 +140,9 @@
 # OCELOT_MYSQL_INCLUDE
 # By default this is 1. If it is 0, most code related to MySQL/MariaDB is not included.
 
+# OCELOT_CPPCHECK
+# By default this is not defined. If it is 1, the cppcheck program will be executed during make.
+
 # DEFAULT_OPTION=<string>
 # The executable can read the <string> and set one default option before looking at the
 # command line or the options file. There is no check that the <string> makes sense.
@@ -195,6 +198,9 @@ endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 cmake_minimum_required(VERSION 2.8.12)
 
 project(ocelotgui)
+
+
+
 
 if (DEFINED OCELOT_MYSQL_INCLUDE)
   set(TMP_OCELOT_MYSQL_INCLUDE ${OCELOT_MYSQL_INCLUDE})
@@ -263,6 +269,8 @@ endif (TMP_OCELOT_MYSQL_INCLUDE)
 if(CMAKE_COMPILER_IS_GNUCXX)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -s")
 endif(CMAKE_COMPILER_IS_GNUCXX)
+
+
 
 #rpmlint complained about position-independent-executable-suggested
 #This only happened with SUSE which didn't say -pie for the linker.
@@ -356,6 +364,25 @@ if (Qt6Widgets_FOUND)
   message("-- found Qt6")
   qt6_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
 endif(Qt6Widgets_FOUND)
+
+# -DOCELOT_CPPCHECK=1 is only occasionally used by the producer of ocelotgui. If it is on:
+#  Since third_party.h has errors that the producer won't fix, -DOCELOT_THIRD_PARTY=0 is necessary
+#  cppcheck must be installed, e.g. with sudo apt-get install cppcheck, otherwise make will fail
+#  The directory must contain a file named suppressions.txt, it must contain this line:  *:*_autogen/*
+#  Possibly the name on Windows is cppcheck.exe, this has not been tested on Windows.
+#  --enable=warning i.e. not style|performance|portability|information|all which would output lots more
+if (OCELOT_CPPCHECK EQUAL "1")
+  if (NOT OCELOT_THIRD_PARTY EQUAL "0")
+    message(FATAL_ERROR "When using -DOCELOT_CPPCHECK=1 you must also use -DOCELOT_THIRD_PARTY=0")
+  endif (NOT OCELOT_THIRD_PARTY EQUAL "0")
+  set(CMAKE_CXX_CPPCHECK "cppcheck")
+  find_program(CMAKE_CXX_CPPCHECK NAMES cppcheck)
+  list(
+      APPEND CMAKE_CXX_CPPCHECK 
+          "--enable=warning"
+          "--suppressions-list=${CMAKE_SOURCE_DIR}/suppressions.txt"
+  )
+endif (OCELOT_CPPCHECK EQUAL "1")
 
 #MinGW ignores #pragmas in third_party.h
 if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
