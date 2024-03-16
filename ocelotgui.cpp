@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.2.0
-   Last modified: February 29 2024
+   Last modified: March 15 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -10962,6 +10962,7 @@ int MainWindow::action_execute_one_statement(QString text)
                   int parentheses_count= 0; /* this might help with e.g. "(SHOW ERRORS);" */
                   int i_of_mid= -1;
                   int offset_of_into= -1;
+                  int innodb_status_count= 0;
                   for (j_of_s= i_of_s + 1; j_of_s < main_token_number + main_token_count_in_statement; ++j_of_s)
                   {
                     if (main_token_types[j_of_s] == TOKEN_TYPE_OPERATOR)
@@ -10975,6 +10976,11 @@ int MainWindow::action_execute_one_statement(QString text)
                         if (parentheses_count < 0) break;
                       }
                     }
+                    printf("**** j_of_s=%d\n", j_of_s);
+                    if ((main_token_types[j_of_s] == TOKEN_KEYWORD_ENGINE)
+                     || (text.mid(main_token_offsets[j_of_s], main_token_lengths[j_of_s]).toUpper() == "INNODB")
+                     || (main_token_types[j_of_s] == TOKEN_KEYWORD_STATUS))
+                      ++innodb_status_count;
                     if ((main_token_flags[j_of_s]&TOKEN_FLAG_IS_SEMISELECT_ALL) == TOKEN_FLAG_IS_SEMISELECT_MID) /*e.g. "ORDER" */
                       i_of_mid= j_of_s;
                     if ((main_token_flags[j_of_s]&TOKEN_FLAG_IS_SEMISELECT_ALL) == TOKEN_FLAG_IS_SEMISELECT_END) /*e.g. ")" or ";" or "ORDER" */
@@ -11003,7 +11009,7 @@ int MainWindow::action_execute_one_statement(QString text)
                   }
                   char error_or_ok_message[256]; /* todo: integrate */
                   QString select_statement;
-                  er_semiselect= extender_scan(error_or_ok_message, semiselect, &select_statement, semiselect_part_2, offset_of_into);
+                  er_semiselect= extender_scan(error_or_ok_message, semiselect, &select_statement, semiselect_part_2, offset_of_into, innodb_status_count);
                   if ((er_semiselect != ER_OK) && (er_semiselect != ER_OK_PLUS) && (er_semiselect != ER_WARNING)) break;
                   new_query= new_query + select_statement;
                   /* Todo: CHECK IF ERROR_OR_OK_MESSAGE IS GOOD */
@@ -12228,6 +12234,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   /* See whether general format is SET ocelot_... = value ;". Read comment with label = "client variables" */
   if (i2 >= 4)
   {
+    if ((sub_token_types[0] == TOKEN_KEYWORD_SET) && (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_QUERY)) return 0;
     if ((sub_token_types[0] == TOKEN_KEYWORD_SET)
       && (sub_token_types[1] >= TOKEN_KEYWORD_OCELOT_BATCH) && (sub_token_types[1] <= TOKEN_KEYWORD_OCELOT_XML))
     {
@@ -13518,7 +13525,7 @@ void MainWindow::rehash_get_database_name(char *database_name)
   Beware: Sometimes names can be reserved words, e.g. DESCRIBE table_name; emits a column named Null.
           So I put within ``s. Alternatively I could use ""s if sql_mode allows, or check first if name is really reserved.
 */
-int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query, QString *select_statement_out, QString semiselect_part_2, int offset_of_into)
+int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query, QString *select_statement_out, QString semiselect_part_2, int offset_of_into, int innodb_status_count)
 {
   MYSQL_RES *res= NULL;
   ResultGrid *rg= NULL;
@@ -13532,20 +13539,14 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
   unsigned int extender_result_row_count= 0;
   char **extender_result_set_copy_rows= 0; /* dynamic-sized list of result_set_copy row offsets, if necessary */
   char *extender_result_field_names;
-
   QStringList extender_column_names;
   QList<int> extender_column_types;
-
   QString select_statement= "";
-
-    long unsigned int r;
-
+  long unsigned int r;
   /* Todo: this isn't big enough if SHOW has a big WHERE clause */
-  char query[1024];
+  char query[2048];
   strcpy(query, alternate_query.toUtf8());
-
   /* todo: add ";" */
-
   if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], query))
   {
     er= ER_SELECT_FAILED;
@@ -13560,7 +13561,6 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
     er= ER_MYSQL_STORE_RESULT_FAILED;
     goto error_return;
   }
-
   fillup_result= rg->fillup(res,
             //&tarantool_tnt_reply,
             connections_dbms[0],
@@ -13577,7 +13577,6 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
       er= ER_ERROR;       /* Todo: this message doesn't capture what fillup_result actually says */
       goto error_return;
   }
-
   extender_result_row_count= rg->result_row_count;
   if (extender_result_row_count == 0)
   {
@@ -13587,13 +13586,10 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
   extender_result_column_count= rg->result_column_count;
   extender_result_set_copy_rows= rg->result_set_copy_rows;
   extender_result_field_names= rg->result_field_names;
-
   {
     extender_column_names.clear(); /* unnecessary if by QStringList is initially clear */
     extender_column_types.clear(); /* unnecessary if by QList is initially clear */
-
     result_field_names_pointer= &extender_result_field_names[0];
-
     for (unsigned int j= 0; j < extender_result_column_count; ++j)
     {
       memcpy(&v_length, result_field_names_pointer, sizeof(unsigned int));
@@ -13607,12 +13603,11 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
       extender_column_types.append(column_type);
     }
   }
-
   for (r= 0; r < extender_result_row_count; ++r)
   {
     char *row_pointer;
     unsigned int column_length;
-    char column_value[512];
+    QString column_value;
     row_pointer= extender_result_set_copy_rows[r];
     unsigned int col;
     char field_value_flags;
@@ -13623,8 +13618,13 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
       memcpy(&column_length, row_pointer, sizeof(unsigned int));
       field_value_flags= *(row_pointer + sizeof(unsigned int));
       row_pointer+= sizeof(unsigned int) + sizeof(char);
-      strncpy(column_value, row_pointer, column_length);
-      column_value[column_length]= '\0';
+      column_value= QString::fromUtf8(row_pointer, column_length);
+      if ((innodb_status_count == 3) && (extender_result_row_count == 1) && (extender_result_column_count == 3))
+      {
+        if (col < 2) { row_pointer+= column_length; continue; }
+        select_statement= select_statement + extender_flattener(column_value);
+        break;
+      }
       if (col > 0) select_statement= select_statement + ",";
       /* todo: should I try to use NULL_STRING here? */
       if ((field_value_flags & FIELD_VALUE_FLAG_IS_NULL) != 0) select_statement= select_statement + "NULL";
@@ -13637,7 +13637,6 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
       row_pointer+= column_length;
     }
   }
-//  select_statement= select_statement + ";";
   select_statement= select_statement + ") AS ocelot_extender_result_set ";
   if (offset_of_into != -1)
   {
@@ -13650,20 +13649,17 @@ int MainWindow::extender_scan(char *error_or_ok_message, QString alternate_query
     select_statement= select_statement + semiselect_part_2;
     select_statement= select_statement + ")";
   }
-
+  /* todo: ";" appropriate here? */
   er= ER_OK;
   //sprintf(error_or_ok_message, er_strings[er_off + er],
   //        database_name, count_of_tables, count_of_columns, count_of_functions, count_of_procedures, count_of_triggers, count_of_events, count_of_indexes);
-
   /* fall through into error_return with er == ER_OK */
-
 error_return:
   if (rg != NULL) delete rg; /* This caused an occasional crash but I think I have made a workaround for that. */
   if (res != NULL) lmysql->ldbms_mysql_free_result(res);
 //  if (extender_result_set_copy != 0) { delete [] extender_result_set_copy; }
 //  if (extender_result_set_copy_rows != 0) { delete [] extender_result_set_copy_rows; }
   /* any more garbage_collect to do? */
-
   strcpy(error_or_ok_message, er_strings[er_off + er]);
   *select_statement_out= select_statement;
   return er;
@@ -13684,6 +13680,152 @@ unsigned short int MainWindow::extender_result_data_type(unsigned short int resu
     return OCELOT_DATA_TYPE_NUMBER;
   if (ft == OCELOT_DATA_TYPE_NULL) return OCELOT_DATA_TYPE_NUMBER; /* But NULL isn't a number! Just for testing though. */
   return OCELOT_DATA_TYPE_BLOB;
+}
+
+/*
+  We've seen that (innodb_status_count == 3) that means we saw the words ENGINE and INNODB STATUS in the input,
+  and we've seen that there's 1 row and 3 columns (which is "certain") although we won't assume it).
+  We ignored the first two columns. We're passing the value of the third column. Flatten it.
+  We want a table with: HEADING | CATEGORY | SUBCATEGORY | COUNTER.
+  Rule #1: a line between ===============s is a heading.
+  Rule #2: a line between ---------------s is a category of the last-mentioned heading
+  Rule #3: a line after a category is a list of subcategories of the last-mentioned category
+  Rule #4: Commas delimit subcategories (if there are no commas then there is only one subcategory)
+  Rule #5: If a subcategory ends or starts with a number, break it up into: subcategory | number
+  Rulle #6: If the first subcategory in a line is a capitalized word, repeat it for other subcategories in the same line
+  Rule #7: Lines that bein with --- are subcategory prefixes. (This mainly applies for ---TRANSACTIONS)
+  Rule #8: The text "No buffer pool page gets since the last printout" should be interpreted as "0 buffer pool page gets since the last printout"
+  Rule #9: If a line ends with number "/s", that equals
+  Rule #A: If a heading is followed immediately by another heading, i.e. is blank, we put out heading ... 0
+  Rule #X: There are a few more ad-hoc adjustments, see the code
+  Known Flaws
+    "Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s"
+      we would repeat "Pages "
+    "table size 34679, node heap has 0 buffer(s)"
+      we won't see the 0
+    "Spin rounds per wait: 20.00 RW-shared, 0.00 RW-excl, 0.00 RW-sx"
+      "Spin rounds per wait:" should be a prefix
+    "Purge done for trx's n:o < 236 undo n:o < 0 state: running
+      looks hopeless
+    "I/O sum[0]:cur[0], unzip sum[0]:cur[0]"
+      looks hopeless
+    "LATEST FOREIGN KEY ERROR" or "LATEST DETECTED DEADLOCK"
+      we don't choke completely but the result looks pretty bad
+    "Buffer pool hit rate 1000 / 1000"
+      we see the second 1000
+*/
+QString MainWindow::extender_flattener(QString column_value)
+{
+  QString select_statement("");
+  QStringList ql= column_value.split("\n");
+  QString equals("=");
+  QString dash("-");
+  QString column_heading("");
+  QString column_category("");
+  QString subcategory_prefix("");
+  int line_count= 0;
+  for (int i= 0; i < ql.size(); ++i)
+  {
+    QString qline= ql.at(i);
+    if (qline.length() == 0) continue;
+    if (qline == equals.repeated(qline.length())) /* if =====s, the next line will be column_1 */
+    {
+      QString left_of_line= ql.at(i + 1).left(19);
+      column_heading= connect_unstripper(left_of_line);
+      i+= 2;
+      continue;
+    }
+    if (qline == dash.repeated(qline.length())) /* if -----s, the next line will be category */
+    {
+      column_category= connect_unstripper(ql.at(i + 1));
+      subcategory_prefix= "";
+      i+= 2;
+      if ((ql.at(i + 1) == dash.repeated(ql.at(i + 1).length())) && (line_count > 0)) /* empty category? */
+      {
+        select_statement= select_statement + " UNION ALL SELECT " + column_heading + "," + column_category + ", ''" + ", '0' ";
+      }
+      continue;
+    }
+    if (column_category == "") continue; /* no -------s yet */
+    if (qline.left(3) == "---") { subcategory_prefix= qline + " "; continue; }
+    QStringList subcategory_list= qline.split(u',');
+    for (int j=0; j < subcategory_list.size(); ++j) /* for each subcategory */
+    {
+      QString column_subcategory= subcategory_list.at(j).trimmed();
+      if (column_subcategory == "No buffer pool page gets since the last printout")
+        column_subcategory= "0 buffer pool page gets since the last printout";
+      bool is_number_solidus_s_seen= false;
+      if (column_subcategory.right(2) == "/s")
+      {
+        QString c= column_subcategory.mid(column_subcategory.length() - 3, 1);
+        if ((c >= "0") && (c <= "9"))
+        {
+          is_number_solidus_s_seen= true;
+          column_subcategory= column_subcategory.left(column_subcategory.length() - 2);
+        }
+      }
+      QString column_counter= "";
+      for (;;) /* subcategory ends with number? */
+      {
+        bool is_digit= false;
+        QString c= column_subcategory.right(1);
+        if ((c >= "0") && (c <= "9")) is_digit= true;
+        if ((c == ".") && (column_counter != "")) is_digit= true;
+        if (is_digit == true)
+        {
+          column_counter= c + column_counter;
+          column_subcategory= column_subcategory.left(column_subcategory.length() - 1);
+        }
+        else break;
+      }
+      if (is_number_solidus_s_seen == true) column_subcategory= column_subcategory + " (/s)";
+      if (column_counter == "")
+      {
+        for (;;) /* (else) subcategory starts with number? */
+        {
+          bool is_digit= false;
+          QString c= column_subcategory.left(1);
+          if ((c >= "0") && (c <= "9")) is_digit= true;
+          if ((c == ".") && (column_counter != "")) is_digit= true;
+          if (is_digit == true)
+          {
+            column_counter= c + column_counter;
+            column_subcategory= column_subcategory.right(column_subcategory.length() - 1);
+          }
+          else break;
+        }
+      }
+      if (subcategory_prefix > "") column_subcategory= subcategory_prefix + column_subcategory; /* e.g. ---TRANSACTIONS */
+
+      if (j > 0) /* this is not first subcategory in line and first word in first subcategory in line is Capitalized? */
+      {
+        QString first_subcategory= subcategory_list.at(0).trimmed();
+        QString first_word = first_subcategory.section(" ", 0, 0, QString::SectionIncludeTrailingSep);
+        if (first_word.right(1) == " ")
+        {
+          QChar first_word_first_char= first_word.at(0);
+          if (first_word_first_char.isUpper() == true)
+          {
+            column_subcategory= first_word + column_subcategory;
+          }
+        }
+      }
+      column_subcategory= connect_unstripper(column_subcategory);
+      column_counter= connect_unstripper(column_counter);
+      if ((line_count > 0) || (j > 0)) select_statement= select_statement + " UNION ALL SELECT ";
+      select_statement= select_statement + column_heading;
+      if ((line_count == 0) && (j == 0)) select_statement= select_statement + " AS HEADING ";
+      select_statement= select_statement + "," + column_category;
+      if ((line_count == 0) && (j == 0)) select_statement= select_statement + " AS CATEGORY ";
+      select_statement= select_statement + "," + column_subcategory;
+      if ((line_count == 0) && (j == 0)) select_statement= select_statement + " AS SUBCATEGORY ";
+      select_statement= select_statement + "," + column_counter;
+      if ((line_count == 0) && (j == 0)) select_statement= select_statement + " AS COUNTER ";
+    }
+
+    ++line_count;
+  }
+  return select_statement;
 }
 
 #endif // #if (OCELOT_EXTENDER == 1)

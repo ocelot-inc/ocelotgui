@@ -5187,8 +5187,9 @@ private:
                         QStringList specified_list);
   void rehash_get_database_name(char *);
 #if (OCELOT_EXTENDER == 1)
-  int extender_scan(char *error_or_ok_message, QString alternate_query, QString *select_statement, QString semiselect_part_2, int offset_of_into);
+  int extender_scan(char *error_or_ok_message, QString alternate_query, QString *select_statement, QString semiselect_part_2, int offset_of_into, int innodb_status_count);
   unsigned short int extender_result_data_type(unsigned short int result_field_type);
+  QString extender_flattener(QString column_value);
 #endif
   void widget_sizer();
   QString get_delimiter(QString,QString,int);
@@ -16342,7 +16343,6 @@ QString tooltip_of_line(QPoint mouse_point) /* see comments for mouseMoveEvent()
 /* ?? Todo: Check if the deletes should actually be done with ~ERDiagram() */
 ~erd()
 {
-printf("**** ~erd\n");
   if (erd_relations != NULL) delete [] erd_relations;
   if (erd_tables != NULL) delete [] erd_tables;
 }
@@ -16362,7 +16362,6 @@ public:
 
 ERDiagram(MainWindow *parent_mainwindow, QString passed_schema_name, QString query)
 {
-printf("**** ERDiagram\n");
   erdiagram_mainwindow= parent_mainwindow;
   setWindowTitle("ERDIAGRAM OF " + passed_schema_name);
   /* I think setWidget() will give widget_erd a parent so we won't need to delete it later, i.e. no leak? */
@@ -16389,7 +16388,6 @@ printf("**** ERDiagram\n");
 
 ~ERDiagram()
 {
-printf("**** ~ERDiagram\n");
   ;
 }
 
@@ -16895,7 +16893,6 @@ int combo_box_for_font_name_filler(QString actual_font_family, QString actual_fo
     }
     if ((font_families.at(i) == actual_font_family) && (is_match_found == false))
     {
-printf("**** if ((font_families.at(i) == actual_font_family) && (is_match_found == false))\n");
       /* family matches but weight|style. add a new entry if qfontinfo says it's possible. else use at(0) */
       bool italic= false;
       if (actual_font_style != "normal") italic= true;
