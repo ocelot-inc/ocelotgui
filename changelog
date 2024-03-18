@@ -1,3 +1,9 @@
+ocelotgui (2.3.0-1) UNRELEASED; urgency=low
+
+  * Make SHOW as good as SELECT
+
+ -- Peter Gulutzan <pgulutzan@ocelot.ca>  Mon, 18 Mar 2024 12:00:00 -0600
+
 ocelotgui (2.2.0-1) UNRELEASED; urgency=low
 
   * New server syntax

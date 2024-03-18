@@ -1,8 +1,8 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 2.2.0
-   Last modified: March 15 2024
+   Version: 2.3.0
+   Last modified: March 18 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -423,7 +423,7 @@
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="2.2.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="2.3.0"; /* For --version. Make sure it's in manual too. */
   unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -4726,12 +4726,14 @@ void MainWindow::main_token_new(int text_size)
 */
 void MainWindow::main_token_push()
 {
+#if (QT_VERSION >= 0x50c00) /* todo: actually it's the c++ version that should be checked not the Qt version */
   static_assert(sizeof(main_token_offsets[0]) == sizeof(int), "");
   static_assert(sizeof(main_token_lengths[0]) == sizeof(int), "");
   static_assert(sizeof(main_token_types[0]) == sizeof(int), "");
   static_assert(sizeof(main_token_flags[0]) == sizeof(unsigned int), "");
   static_assert(sizeof(main_token_pointers[0]) == sizeof(int), "");
   static_assert(sizeof(main_token_reftypes[0]) == sizeof(unsigned char), "");
+#endif
   saved_main_token_count_in_all= main_token_count_in_all;
   saved_main_token_count_in_statement= main_token_count_in_statement;
   saved_main_token_number= main_token_number;
@@ -6149,7 +6151,7 @@ void MainWindow::action_the_manual()
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 2.2.0, February 15 2024  \
+  <BR>Version 2.3.0, March 18 2024  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2024 by Peter Gulutzan. All rights reserved.  \
@@ -10976,7 +10978,6 @@ int MainWindow::action_execute_one_statement(QString text)
                         if (parentheses_count < 0) break;
                       }
                     }
-                    printf("**** j_of_s=%d\n", j_of_s);
                     if ((main_token_types[j_of_s] == TOKEN_KEYWORD_ENGINE)
                      || (text.mid(main_token_offsets[j_of_s], main_token_lengths[j_of_s]).toUpper() == "INNODB")
                      || (main_token_types[j_of_s] == TOKEN_KEYWORD_STATUS))
@@ -13699,6 +13700,7 @@ unsigned short int MainWindow::extender_result_data_type(unsigned short int resu
   Rule #A: If a heading is followed immediately by another heading, i.e. is blank, we put out heading ... 0
   Rule #X: There are a few more ad-hoc adjustments, see the code
   Known Flaws
+    COLUMN_COUNTER is string, if I made it numeric then the display would have post-decimal digits even for integers.
     "Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s"
       we would repeat "Pages "
     "table size 34679, node heap has 0 buffer(s)"
@@ -13742,13 +13744,13 @@ QString MainWindow::extender_flattener(QString column_value)
       i+= 2;
       if ((ql.at(i + 1) == dash.repeated(ql.at(i + 1).length())) && (line_count > 0)) /* empty category? */
       {
-        select_statement= select_statement + " UNION ALL SELECT " + column_heading + "," + column_category + ", ''" + ", '0' ";
+        select_statement= select_statement + " UNION ALL SELECT " + column_heading + "," + column_category + ", ''" + ", 0 ";
       }
       continue;
     }
     if (column_category == "") continue; /* no -------s yet */
     if (qline.left(3) == "---") { subcategory_prefix= qline + " "; continue; }
-    QStringList subcategory_list= qline.split(u',');
+    QStringList subcategory_list= qline.split(",");
     for (int j=0; j < subcategory_list.size(); ++j) /* for each subcategory */
     {
       QString column_subcategory= subcategory_list.at(j).trimmed();
@@ -13822,7 +13824,6 @@ QString MainWindow::extender_flattener(QString column_value)
       select_statement= select_statement + "," + column_counter;
       if ((line_count == 0) && (j == 0)) select_statement= select_statement + " AS COUNTER ";
     }
-
     ++line_count;
   }
   return select_statement;
