@@ -6926,6 +6926,7 @@ public:
 
 ldbms() : QWidget()
 {
+#if (MINGW_MARIADB == 0)
   /* Probably-unnecessary initializations done to pacify cppcheck */
   dlopen_handle= 0;
   t__mysql_affected_rows= 0;
@@ -7014,7 +7015,7 @@ ldbms() : QWidget()
   t__tnt_select= NULL;
   t__tnt_error= NULL;
   t__tnt_strerror= NULL;
-
+#endif
   return;
 }
 
@@ -18805,32 +18806,18 @@ class TextEditHistory : public QTextEdit
 public:
 
   MainWindow *main_window;
-
-explicit  TextEditHistory(MainWindow *parent) : QTextEdit(parent)
-  {
-    main_window= parent;
-  }
+  explicit  TextEditHistory(MainWindow *parent);
 
   /* TODO: Following line caused an incomprehensible error. Removed temporarily. */
   /* Hmm. Maybe because we can call it for widgets that aren't subclasses of QTextEdit? */
   /* Notice there are other classes in this file where we use ~ without problem. */
   /* Watch for other classes where we fail to specify a destructor. */
-  //~TextEditHistory();
+  ~TextEditHistory();
 
 public:
-void detach_start()
-{
-  installEventFilter(this);
-}
-void detach_stop()
-{
-  removeEventFilter(this);
-}
-
-bool eventFilter(QObject *obj, QEvent *event)
-{
-  return main_window->eventfilter_function(obj, event);
-}
+  void detach_start();
+  void detach_stop();
+  bool eventFilter(QObject *obj, QEvent *event);
 
 };
 #endif // TEXTEDITHISTORY_H
@@ -18889,31 +18876,10 @@ struct ocelot_variable_keywords {
 ocelot_variable_keywords *ocelot_variables;
 MainWindow *main_window;
 int ocelot_variables_create();
-
-int ocelot_variable_offset(int keyword_index)
-{
-  for (int i= 0; i < OCELOT_VARIABLES_SIZE; ++i)
-  {
-    if (ocelot_variables[i].k_i == keyword_index) return i;
-  }
-  return -1;
-}
+int ocelot_variable_offset(int keyword_index);
 
 public:
-
-explicit XSettings(MainWindow *parent)
-{
-  main_window= parent;
-#ifndef NDEBUG
-  int v_size;
-  ocelot_variables= new ocelot_variable_keywords[TOKEN_KEYWORD__UTF8MB4]; /* just to get ocelot_variables_size */
-  v_size= ocelot_variables_create();
-  delete[] ocelot_variables;
-  assert(v_size == OCELOT_VARIABLES_SIZE);
-#endif //NDEBUG
-  ocelot_variables= new ocelot_variable_keywords[OCELOT_VARIABLES_SIZE]; /* permanent */
-  ocelot_variables_create();
-}
+explicit XSettings(MainWindow *parent);
 
 int ocelot_variable_set(int keyword_index, QString new_value);
 bool ocelot_variable_is_color(int keyword);
@@ -18935,43 +18901,9 @@ class Small_dialog: public QDialog
 
 public:
 QLineEdit line_edit;
-
-/*
-  Input = title and label and default string. Output = what user entered.
-  This is only called from explorer at the moment, but maybe is useful for more in future.
-*/
-Small_dialog(QString passed_title, QString passed_label, QString passed_value)
-{
-  QLabel label;
-  QHBoxLayout layout;
-  setWindowTitle(passed_title);
-  label.setText(passed_label);
-  line_edit.setText(passed_value);
-  layout.addWidget(&label);
-  layout.addWidget(&line_edit);
-  setLayout(&layout);
-  installEventFilter(this);
-}
-
-bool eventFilter(QObject *obj, QEvent *event)
-{
-  (void)obj;
-  if (event->type() == QEvent::KeyPress)
-  {
-    QKeyEvent *key= static_cast<QKeyEvent *>(event);
-    if ((key->key() == Qt::Key_Enter) || (key->key() == Qt::Key_Return))
-    {
-      accept();
-      return false;
-    }
-  }
-  return false;
-}
-
-~Small_dialog()
-{
-  ;
-}
+Small_dialog(QString passed_title, QString passed_label, QString passed_value);
+bool eventFilter(QObject *obj, QEvent *event);
+~Small_dialog();
 
 };
 #endif // #ifndef SMALL_DIALOG_H
@@ -19137,25 +19069,13 @@ protected:
   void keyPressEvent(QKeyEvent *event);
 
 public:
+  Context_menu(ResultGrid *m, Result_qtextedit *passed_q);
   void menu_context_t_2_explorer(const QPoint & pos);
   context_menu_items cmi[MAX_CMI_COUNT];
   int cmi_count;
   void action(int current_row, int i_of_cmi);
   bool shortcutter(QKeySequence qk);
-
-Context_menu(ResultGrid *m, Result_qtextedit *passed_q)
-{
-  result_grid= m;
-  q= passed_q;
-  cmi_count= 0;
-  construct();
-}
-
-~Context_menu()
-{
-  ;
-}
-
+  ~Context_menu();
 };
 #endif // #ifndef CONTEXT_MENU_H
 #endif // #if (OCELOT_EXPLORER == 1)

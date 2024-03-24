@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.3.0
-   Last modified: March 18 2024
+   Last modified: March 24 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -22404,9 +22404,62 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
 
 /******************** Result_qtextedit end   ************************************/
 
+/******************** Small_dialog start   ************************************/
+
+#if (OCELOT_EXPLORER == 1)
+/*
+  Input = title and label and default string. Output = what user entered.
+  This is only called from explorer at the moment, but maybe is useful for more in future.
+*/
+Small_dialog::Small_dialog(QString passed_title, QString passed_label, QString passed_value) /* constructor */
+{
+  QLabel label;
+  QHBoxLayout layout;
+  setWindowTitle(passed_title);
+  label.setText(passed_label);
+  line_edit.setText(passed_value);
+  layout.addWidget(&label);
+  layout.addWidget(&line_edit);
+  setLayout(&layout);
+  installEventFilter(this);
+}
+
+bool Small_dialog::eventFilter(QObject *obj, QEvent *event)
+{
+(void)obj;
+  if (event->type() == QEvent::KeyPress)
+  {
+    QKeyEvent *key= static_cast<QKeyEvent *>(event);
+    if ((key->key() == Qt::Key_Enter) || (key->key() == Qt::Key_Return))
+    {
+      accept();
+      return false;
+    }
+  }
+  return false;
+}
+
+Small_dialog::~Small_dialog()
+{
+  ;
+}
+#endif //if (OCELOT_EXPLORER == 1)
+
+/******************** Small_dialog end   ************************************/
+
 /******************** Context_menu start   ************************************/
 
 /* Comments about Context_menu should be in ocelotgui.h before the words "class Context_menu: public QWidget" */
+
+#if (OCELOT_EXPLORER == 1)
+Context_menu::Context_menu(ResultGrid *m, Result_qtextedit *passed_q)
+{
+  result_grid= m;
+  q= passed_q;
+  cmi_count= 0;
+  construct();
+}
+
 void Context_menu::construct()
 {
   bool is_seqscan_needed=false;
@@ -22759,6 +22812,13 @@ bool Context_menu::shortcutter(QKeySequence qk)
   }
   return false;
 }
+
+/* todo: this isn't being called automatically, maybe because parent is QWidget (?) */
+Context_menu::~Context_menu()
+{
+  ;
+}
+#endif //if (OCELOT_EXPLORER == 1)
 
 /******************** Context_menu end   ************************************/
 
@@ -28740,9 +28800,48 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 #include "install_sql.cpp"
 #endif
 
+TextEditHistory::TextEditHistory(MainWindow *parent) : QTextEdit(parent) /* constructor */
+  {
+    main_window= parent;
+  }
+
+void TextEditHistory::detach_start()
+{
+  installEventFilter(this);
+}
+void TextEditHistory::detach_stop()
+{
+  removeEventFilter(this);
+}
+
+bool TextEditHistory::eventFilter(QObject *obj, QEvent *event)
+{
+  return main_window->eventfilter_function(obj, event);
+}
+
+TextEditHistory::~TextEditHistory()
+{
+  ;
+}
+
+
+
 #ifndef XSETTINGS
 #define XSETTINGS
 
+XSettings::XSettings(MainWindow *parent)
+{
+  main_window= parent;
+#ifndef NDEBUG
+  int v_size;
+  ocelot_variables= new ocelot_variable_keywords[TOKEN_KEYWORD__UTF8MB4]; /* just to get ocelot_variables_size */
+  v_size= ocelot_variables_create();
+  delete[] ocelot_variables;
+  assert(v_size == OCELOT_VARIABLES_SIZE);
+#endif //NDEBUG
+  ocelot_variables= new ocelot_variable_keywords[OCELOT_VARIABLES_SIZE]; /* permanent */
+  ocelot_variables_create();
+}
 /*
   We originally had a series of assignments here but in older distros there were warnings
   "Warning: extended initializer lists only available with -std=c++11 or -std=gnu++11"
@@ -29181,6 +29280,16 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
 
   return ER_OK;
 }
+
+int XSettings::ocelot_variable_offset(int keyword_index)
+{
+  for (int i= 0; i < OCELOT_VARIABLES_SIZE; ++i)
+  {
+    if (ocelot_variables[i].k_i == keyword_index) return i;
+  }
+  return -1;
+}
+
 
 /* Return true iff keyword_index is for an ocelot_ variable for a color setting */
 bool XSettings::ocelot_variable_is_color(int keyword_index)
