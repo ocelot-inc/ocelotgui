@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.3.0
-   Last modified: March 25 2024
+   Last modified: March 27 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -119,13 +119,14 @@
 
   The code files are:
     ocelotgui.pro       small. used by Qt qmake
-    ocelotgui.h         headers but also quite a lot of executable
+    ocelotgui.h         headers but no executable
     ocelotgui.cpp       executable
     install_sql.cpp     for creating debugger routines
     ocelotgui.ui        small. used to make ui_ocelotgui.h
     codeeditor.h        small. separated so license applicability is clear
     hparse.h            the recognizer
     ostrings.h          strings that contain English translatable text
+    third_party.h       from tarantool-c, If cmake . -DOCELOT_THIRD_PARTY=0 then #include third_party.h won't happen
 
   There are three main widgets, which generally appear top-to-bottom on
   the screen: history_edit_widget = an uncomplicated text edit which gets
@@ -424,7 +425,7 @@
 
   /* This should correspond to the version number in the comment at the start of this program. */
   static const char ocelotgui_version[]="2.3.0"; /* For --version. Make sure it's in manual too. */
-  unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
+  static unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -451,9 +452,11 @@
   unsigned int mysql_errno_result= 0;
 
 #if (OCELOT_IMPORT_EXPORT == 1)
-  /* Accessed both in ocelotgui.h and ocelotgui.cpp */
-  struct export_settings main_exports;
+  static struct export_settings main_exports;
 #endif
+  static unsigned int er_off= 0;    /* to offset er_strings language in ostrings.h */
+  static unsigned int color_off= 0; /* to offset color_strings language  in ostrings.h */
+  static unsigned int menu_off= 0;  /* to offset menu_strings language  in ostrings.h */
 
   static QString hparse_text_copy;
   static QString hparse_token;
@@ -11521,6 +11524,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
   if (oei_count != 0) /* Actually, since explorer is visible, we can be sure oei_count != 0, eh? */
   {
     schema_name= connect_stripper(schema_name, false);
+//    ERDiagram *erdiagram_widget= new ERDiagram(this, schema_name, query);
     ERDiagram *erdiagram_widget= new ERDiagram(this, schema_name, query);
     erdiagram_widget->exec(); /* or maybe I should say open() and setModal(false)? */
   }
@@ -19888,6 +19892,11 @@ bool MainWindow::typer_is_int(int key)
   Todo: Some inputs we don't handle well: right-click, select-all + copy, ctrl-+ ctrl--
 */
 
+Completer_widget::Completer_widget() /* constructor */
+{
+  timer= NULL; main_window= NULL; current_row= associated_widget_type= 0; /* todo: move constructor() code to here */
+}
+
 /* call from constructor */
 /* Todo: you could just put the constructor here, same as what you do with TextEditFrame::TextEditFrame */
 /*
@@ -20463,6 +20472,12 @@ void Completer_widget::mouseDoubleClickEvent(QMouseEvent *event)
   main_window->menu_edit_autocomplete();
 }
 
+/* First this should do an implicit call of Completer_widget::Completer_widget() but don't assume it. */
+C_widget::C_widget() /* constructor */
+{
+  ;
+}
+
 /* Probably focusInEvent will happen only when Context_menu calls Completer_widget. Else this is bad. */
 void C_widget::focusInEvent(QFocusEvent *event)
 {
@@ -20484,6 +20499,12 @@ void C_widget::focusOutEvent(QFocusEvent *event)
   }
 #endif
 }
+
+C_widget::~C_widget()
+{
+  ;
+}
+
 
 /*
   Ordinarily I expect keyPressEvent will be caught in eventfilter_function, and that seems to be the case
@@ -20550,9 +20571,20 @@ bool Completer_widget::shortcut_override(QKeySequence qk)
   return false;
 }
 
+Completer_widget::~Completer_widget()
+{
+  ;
+}
+
 /******************** completer_widget end   ************************************/
 
 /******************** Messagebox_flash start *************************************/
+
+Messagebox_flash::Messagebox_flash() /* constructor */
+{
+  timer= NULL;
+}
+
 void Messagebox_flash::showEvent( QShowEvent * event)
 {
   timer= new QTimer(this);
@@ -20568,7 +20600,80 @@ void Messagebox_flash::timer_expired()
   this->done(0); /* meaning = QDialog::done(int r) */
 }
 
+Messagebox_flash::~Messagebox_flash()
+{
+  ;
+}
+
 /******************** Messagebox_flash end *************************************/
+
+/******************** Message_box start *************************************/
+Message_box::Message_box(QString the_title, QString the_text, int minimum_width,
+            QString prompter, QString button_1_text, QString button_2_text, MainWindow *parent): QDialog(parent)
+{
+  result= 1;
+  this->setFont(parent->get_font_from_style_sheet(parent->ocelot_statement_style_string));
+  QScrollArea *scroll_area= new QScrollArea(this);
+  // scroll_area->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded); This is default anyway.
+  //scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded); This is default anyway.
+  QWidget *widget= new QWidget(this);
+  scroll_area->setWidget(widget);
+  scroll_area->setWidgetResizable(true);
+  QVBoxLayout *layout= new QVBoxLayout(widget);
+  TextEditWidget2 *text_edit= new TextEditWidget2(the_text, this, minimum_width);
+  text_edit->setReadOnly(true);
+  layout->addWidget(text_edit);
+  QVBoxLayout *prompter_and_buttons_layout= new QVBoxLayout(widget);
+  QWidget *prompter_and_buttons_widget= new QWidget(this);
+  if (prompter > "")
+  {
+    QLabel *prompter_label= new QLabel(prompter, this);
+    prompter_and_buttons_layout->addWidget(prompter_label);
+  }
+  QHBoxLayout *buttons_layout= new QHBoxLayout(widget);
+  QWidget *buttons_widget= new QWidget(this);
+  QPushButton *push_button_1= new QPushButton(this);
+  push_button_1->setText("&"+button_1_text);
+  buttons_layout->addWidget(push_button_1);
+  push_button_1->setAutoDefault(true);
+  connect(push_button_1, SIGNAL(clicked()), this, SLOT(handle_button_1()));
+  if (button_2_text > "")
+  {
+    QPushButton *push_button_2= new QPushButton(this);
+    push_button_2->setText("&"+button_2_text);
+    buttons_layout->addWidget(push_button_2);
+    push_button_2->setAutoDefault(false);
+    connect(push_button_2, SIGNAL(clicked()), this, SLOT(handle_button_2()));
+  }
+  buttons_widget->setLayout(buttons_layout);
+  prompter_and_buttons_layout->addWidget(buttons_widget);
+  prompter_and_buttons_widget->setLayout(prompter_and_buttons_layout);
+  layout->addWidget(prompter_and_buttons_widget);
+  widget->setLayout(layout);
+  this->setMinimumWidth(minimum_width);
+  this->setWindowTitle(the_title);
+  QHBoxLayout *dialog_layout= new QHBoxLayout(this);
+  this->setLayout(dialog_layout);
+  this->layout()->addWidget(scroll_area);
+}
+
+/* private slots: */
+void Message_box::handle_button_1()
+{
+  result= 1;
+  /* Skipping garbage collect this time. */
+  close();
+}
+
+void Message_box::handle_button_2()
+{
+  result= 2;
+  /* Skipping garbage collect this time. */
+  close();
+}
+
+
+/******************** Message_box end *************************************/
 
 /******************** find_widget start   ************************************/
 #if (OCELOT_FIND_WIDGET == 1)
@@ -20625,6 +20730,13 @@ void Messagebox_flash::timer_expired()
   Todo: Maybe save space by only loading components when activate, and deleting them when close
   Todo: bug: if a word goes over one line in HTML display, find fails (if I recall right, we added a line feed)
 */
+
+Find_widget::Find_widget(MainWindow *m) /* constructor */
+{
+  main_window= m;
+  construct();
+}
+
 
 /* called from new Find_widget() which is called just before main_window->setLayout(main_layout) */
 void Find_widget::construct()
@@ -20799,6 +20911,11 @@ void Find_widget::keyPressEvent(QKeyEvent *event)
   {
     return;
   }
+}
+
+Find_widget::~Find_widget()
+{
+  ;
 }
 
 #endif
@@ -22435,7 +22552,317 @@ void Result_qtextedit::menu_context_t_2_explorer(const QPoint & pos)
 
 /******************** Result_qtextedit end   ************************************/
 
-/******************** Small_dialog start   ************************************/
+/******************** TextEditWidget2 start ************************************/
+
+TextEditWidget2::TextEditWidget2(QString the_text, QWidget *parent, int minimum_width) :
+        QTextEdit(the_text, parent) /* constructor */
+{
+  passed_minimum_width= minimum_width;
+}
+
+QSize TextEditWidget2::sizeHint() const
+{
+  QRect text_edit_rect;
+  QFontMetrics fm= QFontMetrics(font());
+  text_edit_rect= fm.boundingRect(
+        0, /* int x = x coordinate within original rect */
+        0, /* int y = y coordinate within original rect */
+        passed_minimum_width, /* int width = r.width(), which we don't change */
+        2000, /* int height = height, which is arbitrary big maximum */
+        Qt::TextWordWrap + Qt::TextIncludeTrailingSpaces, /* int flags = (see comments before start of this routine) */
+        toPlainText()); /* QString & text= cell contents */
+  int n= text_edit_rect.height() + fm.lineSpacing();
+  if (n > 500) n= 500;
+  return QSize(passed_minimum_width, n);
+}
+
+TextEditWidget2::~TextEditWidget2()
+{
+}
+
+/******************** TextEditWidget2 end ************************************/
+
+/******************** Row_form_box start ************************************/
+
+Row_form_box::Row_form_box(int column_count, QString *row_form_label,
+             int *row_form_type,
+             int *row_form_is_password, QString *row_form_data,
+//             QString *row_form_width,
+             QString row_form_title, QString row_form_message,
+             MainWindow *parent): QDialog(parent) /* constructor */
+{
+  int i;
+  this_row_form_box= this;
+  copy_of_parent= parent;
+  column_count_copy= column_count;
+  row_form_is_password_copy= row_form_is_password;
+  row_form_data_copy= row_form_data;
+  main_layout= 0;
+  label_for_message= 0;
+  label= 0;
+  line_edit= 0;
+  text_edit= 0;
+  combo_box_edit= 0;
+  hbox_layout= 0;
+  widget= 0;
+  button_for_cancel= 0;
+  button_for_ok= 0;
+  hbox_layout_for_ok_and_cancel= 0;
+  widget_for_ok_and_cancel= 0;
+  scroll_area= 0;
+  widget_with_main_layout= 0;
+  upper_layout= 0;
+  widget_for_size_hint= 0;
+
+  label= new QLabel*[column_count];
+  line_edit= new QLineEdit*[column_count];
+  text_edit= new QTextEdit*[column_count];
+  combo_box_edit= new QComboBox*[column_count];
+  hbox_layout= new QHBoxLayout*[column_count];
+  widget= new QWidget*[column_count];
+
+  for (i= 0; i < column_count; ++i)
+  {
+    label[i]= 0;
+    line_edit[i]= 0;
+    text_edit[i]= 0;
+    combo_box_edit[i]= 0;
+    hbox_layout[i]= 0;
+    widget[i]= 0;
+  }
+  is_ok= 0;
+  int character_height, borders_height, component_height;
+
+  parent->component_size_calc(&character_height, &borders_height);
+  component_height= character_height + borders_height;
+  /*
+    Subsequently, for spacing between lines, I finally realized that it's not enough
+    to do setSpacing + setContentsMargins for the QVBoxLayout, I have to do them
+    for each QHBoxLayout as well.
+  */
+  main_layout= new QVBoxLayout();
+  main_layout->setSpacing(0);
+  main_layout->setContentsMargins(QMargins(0, 0, 0, 0));
+  main_layout->setSizeConstraint(QLayout::SetFixedSize);  /* necessary, but I don't know why */
+  label_for_message= new QLabel(row_form_message);
+  main_layout->addWidget(label_for_message);
+  for (i= 0; i < column_count; ++i)
+  {
+    hbox_layout[i]= new QHBoxLayout();
+    //hbox_layout[i]->setSpacing(0);
+    hbox_layout[i]->setContentsMargins(QMargins(2, 2, 2, 2));
+    hbox_layout[i]->setSizeConstraint(QLayout::SetFixedSize);  /* if not this then width = rest of dialog box */
+    label[i]= new QLabel();
+    label[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
+    label[i]->setMinimumHeight(component_height);
+    label[i]->setText(row_form_label[i]);
+    hbox_layout[i]->addWidget(label[i]);
+
+    if (row_form_is_password[i] == 1)
+    {
+      line_edit[i]= new QLineEdit();
+      line_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
+      line_edit[i]->insert(row_form_data[i]);
+      line_edit[i]->setEchoMode(QLineEdit::Password); /* maybe PasswordEchoOnEdit would be better */
+      line_edit[i]->setMaximumHeight(component_height);
+      line_edit[i]->setMinimumHeight(component_height);
+      line_edit[i]->setMinimumWidth(40); /* TEST!!!! */
+      hbox_layout[i]->addWidget(line_edit[i]);
+    }
+    else if (row_form_is_password[i] == 0)
+    {
+      text_edit[i]= new QTextEdit();
+
+      if ((row_form_type[i] & READONLY_FLAG) != 0)
+      {
+        text_edit[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
+        text_edit[i]->setReadOnly(true);
+      }
+      else
+      {
+        text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
+        text_edit[i]->setReadOnly(false);
+      }
+      text_edit[i]->setText(row_form_data[i]);
+      text_edit[i]->setMaximumHeight(component_height);
+      text_edit[i]->setMinimumHeight(component_height);
+      text_edit[i]->setTabChangesFocus(true);
+      /* The following line will work, but I'm undecided whether it's desirable. */
+      //if ((row_form_type[i] & NUM_FLAG) != 0) text_edit[i]->setAlignment(Qt::AlignRight);
+      hbox_layout[i]->addWidget(text_edit[i]);
+    }
+    else /* form_is_password[i] == 2 or 3 or 4 */
+    {
+      combo_box_edit[i]= new QComboBox();
+      combo_box_edit[i]->setMaximumHeight(component_height);
+      combo_box_edit[i]->setMinimumHeight(component_height);
+      if (row_form_is_password[i] == 2) /* this is not used yet */
+      {
+        QStringList qs= parent->fake_statement(row_form_data[i]);
+        for (int j= 0; j < qs.size(); ++j) combo_box_edit[i]->addItem(qs.at(j));
+      }
+      if (row_form_is_password[i] == 3)
+      {
+        combo_box_edit[i]->addItem("yes");
+        combo_box_edit[i]->addItem("no");
+        if (row_form_data[i] == "yes") combo_box_edit[i]->setCurrentIndex(0);
+        else combo_box_edit[i]->setCurrentIndex(1);
+      }
+      if (row_form_is_password[i] == 4)
+      {
+        combo_box_edit[i]->addItem("append");
+        combo_box_edit[i]->addItem("error");
+        combo_box_edit[i]->addItem("replace");
+        combo_box_edit[i]->setCurrentIndex(0);
+      }
+      hbox_layout[i]->addWidget(combo_box_edit[i]);
+    }
+    widget[i]= new QWidget();
+    widget[i]->setLayout(hbox_layout[i]);
+    main_layout->addWidget(widget[i]);
+  }
+  button_for_cancel= new QPushButton(menu_strings[menu_off + MENU_CANCEL], this);
+  button_for_ok= new QPushButton(menu_strings[menu_off + MENU_OK], this);
+  hbox_layout_for_ok_and_cancel= new QHBoxLayout();
+  hbox_layout_for_ok_and_cancel->addWidget(button_for_cancel);
+  hbox_layout_for_ok_and_cancel->addWidget(button_for_ok);
+  widget_for_ok_and_cancel= new QWidget();
+  widget_for_ok_and_cancel->setLayout(hbox_layout_for_ok_and_cancel);
+  connect(button_for_ok, SIGNAL(clicked()), this, SLOT(handle_button_for_ok()));
+  connect(button_for_cancel, SIGNAL(clicked()), this, SLOT(handle_button_for_cancel()));
+
+  widget_with_main_layout= new QWidget();
+  widget_with_main_layout->setLayout(main_layout);
+  widget_with_main_layout->setMaximumHeight(200);
+  scroll_area= new QScrollArea();
+  scroll_area->setWidget(widget_with_main_layout);
+  scroll_area->setWidgetResizable(true);
+
+  upper_layout= new QVBoxLayout;
+  upper_layout->addWidget(scroll_area);
+
+  upper_layout->addWidget(widget_for_ok_and_cancel);
+
+  /* Last-minute changes due to failure with Ubuntu 14.04 */
+  /* Removing widget_for_size_hint */
+  /* Removing QSize size_hint */
+  /* Instead we'll use scroll bar always on */
+  /* Todo: the height is a bit less than what we want if export/html. I added "+ 20" on 2021-10-20. */
+  scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+  scroll_area->show();
+  width_for_size_hint= scroll_area->width() + 25;
+  height_for_size_hint= scroll_area->height() + 20;
+
+
+  //{
+  //  widget_for_size_hint= new QDialog(this);
+  //  widget_for_size_hint->setLayout(upper_layout);
+  //  widget_for_size_hint->setWindowOpacity(0);                      /* perhaps unnecessary */
+  //  widget_for_size_hint->show();
+  //  width_for_size_hint= widget_for_size_hint->width()
+  //                     + scroll_area->verticalScrollBar()->width()
+  //                     + 5;
+  //  height_for_size_hint= widget_for_size_hint->height();
+  //  widget_for_size_hint->close();
+  //}
+
+  this->setLayout(upper_layout);
+  this->setWindowTitle(row_form_title);
+}
+
+/*
+  Row_form_box will have the wrong width if everything is default:
+  about 20 pixels too short, as if it didn't expect a vertical scroll bar.
+    I could make Qt do a better calculation by saying
+    scroll_area->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOn);
+    but someday I'll want to use Row_form_box for purposes besides connect.
+  Our solution is to make a not-to-be-really-used widget,
+  widget_for_size_hint, with the same layout, and use its width,
+  plus the width of the vertical scroll bar, plus 5 (5 is arbitrary).
+  We delete widget_for_size_hint during garbage_collect, but hope deletion is automatic.
+  Todo: setWindowOpacity(0) for widget_for_size_hint?
+*/
+QSize Row_form_box::sizeHint() const
+{
+  return QSize(width_for_size_hint, height_for_size_hint);
+}
+
+/* private slots: */
+void Row_form_box::handle_button_for_ok()
+{
+  for (int i= 0; i < column_count_copy; ++i)
+  {
+    if (this_row_form_box->row_form_is_password_copy[i] == 1) this_row_form_box->row_form_data_copy[i]= line_edit[i]->text();
+    else if (this_row_form_box->row_form_is_password_copy[i] == 0) this_row_form_box->row_form_data_copy[i]= text_edit[i]->toPlainText();
+    else
+    {
+      this_row_form_box->row_form_data_copy[i]= combo_box_edit[i]->currentText();
+    }
+  }
+  is_ok= 1;
+  garbage_collect();
+  close();
+}
+
+void Row_form_box::handle_button_for_cancel()
+{
+  garbage_collect();
+  close();
+}
+
+/*
+  I'm doing my own garbage collection. Maybe it's a bad idea but it's the way that I know.
+  Objective: anything set up with "new", without a "this", must be deleted explicitly.
+  Todo: fillup_garbage_collect+display_garbage_collect for result_grid aren't as well put together as this.
+*/
+void Row_form_box::garbage_collect ()
+{
+  int i;
+  if (label != 0)
+  {
+    for (i= 0; i < column_count_copy; ++i) if (label[i] != 0) delete label[i];
+    delete [] label;
+  }
+  if (line_edit != 0)
+  {
+    for (i= 0; i < column_count_copy; ++i) if (line_edit[i] != 0) delete line_edit[i];
+    delete [] line_edit;
+  }
+  if (text_edit != 0)
+  {
+    for (i= 0; i < column_count_copy; ++i) if (text_edit[i] != 0) delete text_edit[i];
+    delete [] text_edit;
+  }
+  if (combo_box_edit != 0)
+  {
+    for (i= 0; i < column_count_copy; ++i) if (combo_box_edit[i] != 0) delete combo_box_edit[i];
+    delete [] combo_box_edit;
+  }
+  if (hbox_layout != 0)
+  {
+    for (i= 0; i < column_count_copy; ++i) if (hbox_layout[i] != 0) delete hbox_layout[i];
+    delete [] hbox_layout;
+  }
+  if (widget != 0)
+  {
+    for (i= 0; i < column_count_copy; ++i) if (widget[i] != 0) delete widget[i];
+    delete [] widget;
+  }
+  if (button_for_cancel != 0) delete button_for_cancel;
+  if (button_for_ok != 0) delete button_for_ok;
+  if (hbox_layout_for_ok_and_cancel != 0) delete hbox_layout_for_ok_and_cancel;
+  if (widget_for_ok_and_cancel != 0) delete widget_for_ok_and_cancel;
+  if (label_for_message != 0) delete label_for_message;
+  if (main_layout != 0) delete main_layout;
+  if (widget_with_main_layout != 0) delete widget_with_main_layout;
+  if (upper_layout != 0) delete upper_layout;
+  if (scroll_area != 0) delete scroll_area;
+  if (widget_for_size_hint != 0) delete widget_for_size_hint;
+}
+
+/******************** Row_form_box end ************************************/
+
+/******************** Small_dialog start************************************/
 
 #if (OCELOT_EXPLORER == 1)
 /*
@@ -28831,6 +29258,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 #include "install_sql.cpp"
 #endif
 
+
 /******************** ldbms start ***********************************************/
 
 ldbms::ldbms() : QWidget()
@@ -28957,7 +29385,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
       t__mysql_data_seek= (tmysql_data_seek) &mysql_data_seek;
       t__mysql_errno= (tmysql_errno) &mysql_errno;
       t__mysql_error= (tmysql_error) &mysql_error;
-      t__mysql_fetch_fields= (tmysql_fetch_fields) &mysql_fetch_fields;
+      t__mysql_fetch_fields= (tmysql_fetch_fields) (&mysql_fetch_fields);
       t__mysql_fetch_lengths= (tmysql_fetch_lengths) &mysql_fetch_lengths;
       t__mysql_fetch_row= (tmysql_fetch_row) &mysql_fetch_row;
       t__mysql_free_result= (tmysql_free_result) &mysql_free_result;
@@ -28966,7 +29394,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
 #endif
       t__mysql_get_host_info= (tmysql_get_host_info) &mysql_get_host_info;
       t__mysql_info= (tmysql_info) &mysql_info;
-      t__mysql_init= (tmysql_init) &mysql_init;
+      t__mysql_init= (tmysql_init) (&mysql_init);
 #if (MINGW_MARIADB == 0)
       t__mysql_library_end= (tmysql_library_end) &mysql_library_end;
 #endif
@@ -28978,12 +29406,12 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
       t__mysql_options= (tmysql_options) &mysql_options;
       t__mysql_ping= (tmysql_ping) &mysql_ping;
       t__mysql_query= (tmysql_query) &mysql_query;
-      t__mysql_real_connect= (tmysql_real_connect) &mysql_real_connect;
+      t__mysql_real_connect= (tmysql_real_connect) (&mysql_real_connect);
       t__mysql_real_query= (tmysql_real_query) &mysql_real_query;
       t__mysql_select_db= (tmysql_select_db) &mysql_select_db;
       t__mysql_sqlstate= (tmysql_sqlstate) &mysql_sqlstate;
       t__mysql_ssl_set= (tmysql_ssl_set) &mysql_ssl_set;
-      t__mysql_store_result= (tmysql_store_result) &mysql_store_result;
+      t__mysql_store_result= (tmysql_store_result) (&mysql_store_result);
       t__mysql_thread_end= (tmysql_thread_end) &mysql_thread_end;
       t__mysql_warning_count= (tmysql_warning_count) &mysql_warning_count;
       *is_library_loaded= 1;
