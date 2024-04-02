@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.3.0
-   Last modified: March 27 2024
+   Last modified: April 2 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -11527,6 +11527,8 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
 //    ERDiagram *erdiagram_widget= new ERDiagram(this, schema_name, query);
     ERDiagram *erdiagram_widget= new ERDiagram(this, schema_name, query);
     erdiagram_widget->exec(); /* or maybe I should say open() and setModal(false)? */
+    delete erdiagram_widget;
+    return ER_OK;
   }
 #endif
     return 1;
@@ -35988,6 +35990,27 @@ bool ResultGrid::evaluate_for_chart(bool is_mainwindow_calling)
 
 #if (OCELOT_ERDIAGRAM == 1)
 
+/* Todo: maybe merge this with ERDiagram ... but no I guess it has to be within scroll area */ /* constructor */
+erd::erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query)
+    : QWidget(parent_erdiagram)
+{
+  erd_relations= NULL; /* because in ~erd() we don't want delete if e.g. we created nothing for empty schema */
+  erd_tables= NULL;
+  erd_xybits= NULL;
+  resize(100, 100); /* initial, there will be another resize after we find erd_table sizes */
+  erd_erdiagram= parent_erdiagram;
+  erd_mainwindow= parent_mainwindow;
+  erd_schema_name= passed_schema_name;
+  erd_query= passed_query;
+  erd_mainwindow->tokenize(erd_query.data(),
+           erd_query.size(),
+           &erd_token_lengths[0], &erd_token_offsets[0], 1000 - 1,
+          (QChar*)"33333", 2, "", 1);
+  default_settings_all();
+  default_settings_erdiagram();
+  setMouseTracking(true); /* maybe */
+}
+
 /*
   (Put general comments about ERDiagram in ocelotgui.h after words THE ERDIAGRAM WIDGET)
   Set default fonts and colours based on grid settings.
@@ -36104,7 +36127,7 @@ void erd::default_settings_erdiagram()
     if (erd_tables[i].is_fixed == false)
       erd_tables[i].erd_rect= QRect(-1, -1, erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
   }
-  QRect last_rect= QRect(FAKE_MIDPOINT, FAKE_MIDPOINT, 1, 1);
+  QRect last_rect= QRect(erd_midpoint, erd_midpoint, 1, 1);
   /* Following is temporary, just trying to get relative positions established, so only looking at x,y. */
   /* Declare each rect to be deep in a big area */
   /* Eventually there will be recursion! */
@@ -36157,7 +36180,7 @@ void erd::default_settings_erdiagram()
   bend_count_main();
 
 //  /* Get the limits of the whole set of rects in existing area */
-  int lowest_x= FAKE_MIDPOINT; int lowest_y= FAKE_MIDPOINT; int highest_x= FAKE_MIDPOINT; int highest_y= FAKE_MIDPOINT;
+  int lowest_x= erd_midpoint; int lowest_y= erd_midpoint; int highest_x= erd_midpoint; int highest_y= erd_midpoint;
   for (int i= 0; i < erd_tables_count; ++i)
   {
     if (erd_tables[i].erd_rect.x() != -1)
@@ -36171,42 +36194,48 @@ void erd::default_settings_erdiagram()
       if (erd_tables[i].erd_rect.y() > highest_y) highest_y= erd_tables[i].erd_rect.y();
     }
   }
-  /* For tables with no relations, try to fill gaps in existing area */
-  /* Todo: if you fail once, you always will, so do some skipping */
-  /* Todo: start by finding and counting available gaps */
-  /* Todo: don't try anything special, just next_available_rect() */
-  for (int i= 0; i < erd_tables_count; ++i)
-  {
-      if (erd_tables[i].erd_rect.y() == -1)
-    {
-      bool is_breaker= false;
-      for (int a_x= lowest_x; a_x <= highest_x; ++a_x)
-      {
-        if (is_breaker == true) break;
-        for (int a_y= lowest_y; a_y <= highest_y; ++a_y)
-        {
-          if (is_breaker == true) break;
-          if (is_available_rect(a_x, a_y) == true)
-          {
-            erd_tables[i].erd_rect= QRect(a_x, a_y, erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
-            is_breaker= true;
-          }
-        }
-      }
-    }
-  }
+//  /* For tables with no relations, try to fill gaps in existing area */
+//  /* Todo: if you fail once, you always will, so do some skipping */
+//  /* Todo: start by finding and counting available gaps */
+//  /* Todo: don't try anything special, just next_available_rect() */
+//  for (int i= 0; i < erd_tables_count; ++i)
+//  {
+//      if (erd_tables[i].erd_rect.y() == -1)
+//    {
+//      bool is_breaker= false;
+//      for (int a_x= lowest_x; a_x <= highest_x; ++a_x)
+//      {
+//        if (is_breaker == true) break;
+//        for (int a_y= lowest_y; a_y <= highest_y; ++a_y)
+//        {
+//          if (is_breaker == true) break;
+//          if (is_available_rect(a_x, a_y) == true)
+//          {
+//            xybits_off(i);
+//            erd_tables[i].erd_rect= QRect(a_x, a_y, erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
+//            xybits_on(i);
+//            is_breaker= true;
+//          }
+//        }
+//      }
+//    }
+//  }
 
   for (int i= 0; i < erd_tables_count; ++i)
   {
     if (erd_tables[i].erd_rect.y() == -1)
     {
-      erd_tables[i].erd_rect= next_available_rect(last_rect, erd_tables[i].erd_rect, i);
+      last_rect= QRect(erd_midpoint, erd_midpoint, 1, 1);
+      QRect new_rect= next_available_rect_3(last_rect, erd_tables[i].erd_rect, i);
+      xybits_off(i);
+      erd_tables[i].erd_rect= new_rect;
+      xybits_on(i);
       last_rect= erd_tables[i].erd_rect;
     }
   }
 /* Get the limits of the whole set of rects in existing area */
 /* Todo: Now this is in the wrong place, and duplicated. */
-  lowest_x= FAKE_MIDPOINT; lowest_y= FAKE_MIDPOINT; highest_x= FAKE_MIDPOINT; highest_y= FAKE_MIDPOINT;
+  lowest_x= erd_midpoint; lowest_y= erd_midpoint; highest_x= erd_midpoint; highest_y= erd_midpoint;
   for (int i= 0; i < erd_tables_count; ++i)
   {
     if (erd_tables[i].erd_rect.x() != -1)
@@ -36220,13 +36249,16 @@ void erd::default_settings_erdiagram()
       if (erd_tables[i].erd_rect.y() > highest_y) highest_y= erd_tables[i].erd_rect.y();
     }
   }
-  /* Subtract the lowest x and the lowest y from all rects. */
+  /* Subtract the lowest x and the lowest y from all rects. No real need to change erd_xybits from now on, but inertia. */
   {
     for (int i= 0; i < erd_tables_count; ++i)
     {
-      erd_tables[i].erd_rect=
+      QRect new_rect=
               QRect(erd_tables[i].erd_rect.x() - lowest_x, erd_tables[i].erd_rect.y() - lowest_y,
                     erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
+      xybits_off(i);
+      erd_tables[i].erd_rect= new_rect;
+      xybits_on(i);
     }
   }
 #ifdef PACKED
@@ -36320,7 +36352,9 @@ QRect erd::place_table_and_connected_tables(QRect last_rect, int t)
   else
   {
     new_last_rect= next_available_rect(last_rect, erd_tables[t].erd_rect, t);
+    xybits_off(t);
     erd_tables[t].erd_rect= new_last_rect;
+    xybits_on(t);
   }
   int new_t;
   for (int i= 0; i < erd_relations_count; ++i)
@@ -36352,7 +36386,9 @@ QRect erd::place_table_and_connected_tables(QRect last_rect, int t)
   {
     int new_t= new_t_list[i];
     QRect close_last_rect= next_available_rect(new_last_rect, erd_tables[new_t].erd_rect, t);
+    xybits_off(new_t);
     erd_tables[new_t].erd_rect= close_last_rect;
+    xybits_on(new_t);
   }
 
   /* The adjacent of the adjacent connections */
@@ -36368,9 +36404,8 @@ QRect erd::place_table_and_connected_tables(QRect last_rect, int t)
 
 /*
   We try 4 points E W N S, then 4 points NE NW SE SW immediately beside x,y and then greater distances.
-  It might be quicker to do this:
-    Mark a 1000x1000 matrix as all "available"
-    When you find an available, fill it with what you want
+  I compared with the different method in next_available_rect_3, for sakila this method looked nicer.
+  The number 50 is arbitrary, I just can't believe we'd go that far away from centre unless it's a bug.
 */
 QRect erd::next_available_rect(QRect last_rect, QRect this_rect, int t)
 {
@@ -36400,10 +36435,55 @@ QRect erd::next_available_rect(QRect last_rect, QRect this_rect, int t)
       if (directions[k] == 4) {x= last_rect.x() - offset; y= last_rect.y() - offset; }
       if (is_available_rect(x, y)) goto returner;
     }
-    if (offset > 2) {printf("**** 4 misses!\n"); exit(0); } /* sort of an assert */
   }
+  printf("**** 50 misses!\n"); exit(0);  /* sort of an assert */
 returner:
   return QRect(x, y, this_rect.width(), this_rect.height());
+}
+
+/*
+  This will I hope be an improvement over next_available_rect().
+  Check out the distances for up to 3 positions left / right / up / down from last_rect; pick the closest.
+  We say a distance is a line between rects, so diagonal (e.g. x+1, y+1) will beat a vertical (e.g. x+0, y+2).
+  Todo: Think -- can something 3 away ever be better than something 2 away? If not, we can go loop 2 at a time.
+  Todo: Often two distances will be equal, in that case we need a more even-distributing way than picking the latest.
+  Todo: Maybe we should save the last value of n and pass it again, if we're in a loop with the same last_rect.
+  Todo: is_available_rect() is slow, and this compounds the slowness, think of something when there are many tables.
+  TODO: Perhaps RESLIP could be a different number?
+  Todo: Since this is used with midpoint, worry that rects will be plunked in the middle of relation lines.
+*/
+QRect erd::next_available_rect_3(QRect last_rect, QRect this_rect, int t)
+{
+  QList<QRect> array_of_rects;
+  array_of_rects.clear(); /* unnecessary? */
+  int x, y;
+#define RESLIP 2
+  for (int n= 0; n < RESLIP * 10; n+= RESLIP) /* "< x" is arbitrary but I can't believe anything is separated by more */
+  {
+    for (x= -(n + RESLIP); x < (n + RESLIP); ++x)
+    {
+      for (y= -(n + RESLIP); y < (n + RESLIP); ++y)
+      {
+        if (is_available_rect(last_rect.x() + x, last_rect.y() + y))
+          array_of_rects << QRect(last_rect.x() + x, last_rect.y() + y, 1, 1);
+      }
+    }
+    if (array_of_rects.size() > 0) break;
+    /* Now you'll have to repeat with bigger x,y which is why n goes up */
+  }
+  qreal min_distance= 1000000;
+  int i_of_min_distance;
+  for (int i= 0; i < array_of_rects.size(); ++i)
+  {
+    QLineF qlf= QLineF(last_rect.x(), last_rect.y(), array_of_rects[i].x(), array_of_rects[i].y());
+    qreal curr_distance= qlf.length();
+    if (curr_distance > min_distance) continue;
+    if ((curr_distance == min_distance) && (i%2==t%2)) continue;
+    i_of_min_distance= i;
+    min_distance= curr_distance;
+  }
+  return QRect(array_of_rects[i_of_min_distance].x(), array_of_rects[i_of_min_distance].y(),
+              this_rect.width(), this_rect.height());
 }
 
 /*
@@ -36427,15 +36507,41 @@ QRect erd::next_available_rect_2(QRect last_rect, QRect this_rect, int i_directi
   return QRect(-1, -1, 0, 0);
 }
 
-/* Todo: If schema has 10000 rows and we call this 10000 times, this could get slow. */
+/* Available means we haven't set this bit already for a table, which means there's a hole in the bit list. */
+/* TODO: We don't want to go off the edge of the matrix by asking for x=-3, y=-3 !! */
 bool erd::is_available_rect(int x, int y)
 {
-  for (int i= 0; i < erd_tables_count; ++i)
-  {
-    if ((erd_tables[i].erd_rect.left() == x) && (erd_tables[i].erd_rect.y() == y))
-      return false;
-  }
-  return true;
+  if ((x < 0) || (y < 0)) return false; /* impossible */
+  unsigned int tmp_off= ((x) * erd_tables_count * 2) + (y);
+  unsigned int tmp_byte= tmp_off / 8;
+  unsigned int tmp_bit= tmp_off % 8;
+  tmp_bit= 1 << tmp_bit;
+  if ((erd_xybits[tmp_byte] & tmp_bit) == 0) return true;
+  return false;
+}
+
+void erd::xybits_off(int i_of_table)
+{
+  int x= erd_tables[i_of_table].erd_rect.x();
+  int y= erd_tables[i_of_table].erd_rect.y();
+  if ((x < 0) || (y < 0)) return;
+  unsigned int tmp_off= ((x) * erd_tables_count * 2) + (y);
+  unsigned int tmp_byte= tmp_off / 8;
+  unsigned int tmp_bit= tmp_off % 8;
+  tmp_bit= 1 << tmp_bit;
+  erd_xybits[tmp_byte]&= ~tmp_bit;
+}
+
+void erd::xybits_on(int i_of_table)
+{
+  int x= erd_tables[i_of_table].erd_rect.x();
+  int y= erd_tables[i_of_table].erd_rect.y()                                                                ;
+  if ((x < 0) || (y < 0)) return;
+  unsigned int tmp_off= ((x) * erd_tables_count * 2) + (y);
+  unsigned int tmp_byte= tmp_off / 8;
+  unsigned int tmp_bit= tmp_off % 8;
+  tmp_bit= 1 << tmp_bit;
+  erd_xybits[tmp_byte]|= tmp_bit;
 }
 
 /*
@@ -36461,6 +36567,13 @@ void erd::fill_tables()
      && (QString::compare(erd_mainwindow->oei[r].schema_name, required_schema_name, Qt::CaseInsensitive) == 0))
       ++erd_tables_count;
   }
+
+  /* Make the bit list. Might be a bit bigger than we need but that should be harmless. */
+  unsigned int xybits_size= ((erd_tables_count * erd_tables_count * 4) / 8) + 32;
+  erd_xybits= (unsigned char *) new char[xybits_size];
+  memset(erd_xybits, 0, xybits_size);
+  erd_midpoint= erd_tables_count + 1;
+
   erd_tables= new table_items[erd_tables_count];
   for (int i= 0; i < erd_tables_count; ++i) erd_tables[i].is_fixed= false;
   int table_number= 0;
@@ -36480,13 +36593,17 @@ void erd::fill_tables()
       }
       if ((erd_mainwindow->oei[r].object_type == "T") && (is_eligible_if_table == true))
       {
-        if ((i_of_query_table != -1) && (fixed_x != FAKE_MIDPOINT) && (fixed_y != FAKE_MIDPOINT))
+        if ((i_of_query_table != -1) && (fixed_x != erd_midpoint) && (fixed_y != erd_midpoint))
         {
-          erd_tables[table_number].xpos= fixed_x + FAKE_MIDPOINT;
-          erd_tables[table_number].ypos= fixed_y + FAKE_MIDPOINT;
-          erd_tables[table_number].erd_rect.setX(fixed_x + FAKE_MIDPOINT);
-          erd_tables[table_number].erd_rect.setY(fixed_y + FAKE_MIDPOINT);
+          xybits_off(table_number);
+          erd_tables[table_number].xpos= fixed_x + erd_midpoint;
+          erd_tables[table_number].ypos= fixed_y + erd_midpoint;
+          xybits_off(table_number);
+          erd_tables[table_number].erd_rect.setX(fixed_x + erd_midpoint);
+          erd_tables[table_number].erd_rect.setY(fixed_y + erd_midpoint);
+          xybits_on(table_number);
           erd_tables[table_number].is_fixed= true;
+          xybits_on(table_number);
         }
         else erd_tables[table_number].is_fixed= false; /* unnecessary? I set all to false earlier */
         erd_tables[table_number].columns_count= 0;
@@ -36513,31 +36630,13 @@ void erd::fill_tables()
     }
   }
   erd_tables_count= table_number; /* might be smaller than what we allocated if some tables not eligible */
+
   for (int i= 0; i < erd_tables_count; ++i)
   {
 //    unsigned int r2= erd_tables[i].i_of_oei;
 //    QString content=  erd_mainwindow->oei[r2].object_name;
     erd_tables[i].references_count= 0;
   }
-}
-
-/* Todo: maybe merge this with ERDiagram ... but no I guess it has to be within scroll area */ /* constructor */
-erd::erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query)
-{
-  erd_relations= NULL; /* because in ~erd() we don't want delete if e.g. we created nothing for empty schema */
-  erd_tables= NULL;
-  resize(100, 100); /* initial, there will be another resize after we find erd_table sizes */
-  erd_erdiagram= parent_erdiagram;
-  erd_mainwindow= parent_mainwindow;
-  erd_schema_name= passed_schema_name;
-  erd_query= passed_query;
-  erd_mainwindow->tokenize(erd_query.data(),
-           erd_query.size(),
-           &erd_token_lengths[0], &erd_token_offsets[0], 1000 - 1,
-          (QChar*)"33333", 2, "", 1);
-  default_settings_all();
-  default_settings_erdiagram();
-  setMouseTracking(true); /* maybe */
 }
 
 /*
@@ -36556,8 +36655,8 @@ int erd::i_of_table_in_query_table(QString oei_table_name, int *x, int *y)
   int i_of_table= 0;
   QString table_name= "";
   QString last_token= "";
-  int specified_x= FAKE_MIDPOINT;
-  int specified_y= FAKE_MIDPOINT;
+  int specified_x= erd_midpoint;
+  int specified_y= erd_midpoint;
   ++i_of_token;
   for (;; ++i_of_token)
   {
@@ -36574,7 +36673,7 @@ int erd::i_of_table_in_query_table(QString oei_table_name, int *x, int *y)
       }
       ++i_of_table;
       if (token == ")") break;
-      specified_x= specified_y= FAKE_MIDPOINT;
+      specified_x= specified_y= erd_midpoint;
       continue;
     }
     bool is_numeric;
@@ -36582,12 +36681,12 @@ int erd::i_of_table_in_query_table(QString oei_table_name, int *x, int *y)
     if ((is_numeric == false) && (token != "-")) table_name= erd_mainwindow->connect_stripper(token, true);
     if (is_numeric == true)
     {
-      if (specified_x == FAKE_MIDPOINT) {specified_x= num; if (last_token == "-") specified_x= -specified_x; }
+      if (specified_x == erd_midpoint) {specified_x= num; if (last_token == "-") specified_x= -specified_x; }
       else {specified_y= num; if (last_token == "-") specified_y= -specified_y; }
     }
     last_token= token;
   }
-  *x= *y= FAKE_MIDPOINT;
+  *x= *y= erd_midpoint;
   return -1; /* name is not in table list */
 }
 
@@ -36860,6 +36959,7 @@ void erd::set_table_rects()
 
 #ifdef PACKED
   /* This was an experiment so not every rect was in a fixed grid. It sort of works but would need more work. */
+  /* For example erd_xybits probably won't survive okay. */
   /* Make an array of what tables are at each x on each y -- TODO: THIS SHOULD BE VARIABLE SIZE! */
   int xy[50][50];
   for (int xx= 0; xx <= max_x; ++xx)
@@ -36902,7 +37002,7 @@ void erd::set_table_rects()
         erd_tables[t].erd_rect= QRect(erd_tables[t].erd_rect.x(),
                                       y,
                                       erd_tables[t].erd_rect.width(),
-                                      erd_tables[t].erd_rect.height());
+                                      erd_tables[t].erd_rect.height())
         y+= erd_tables[t].erd_rect.height() + erd_default_space_between_rects;
       }
     }
@@ -36914,6 +37014,7 @@ void erd::set_table_rects()
     int y= 0;
     for (int j= 0; j < erd_tables[i].xpos; ++j) x+= erd_diagram_column_widths[j] + erd_default_space_between_rects;
     for (int j= 0; j < erd_tables[i].ypos; ++j) y+= erd_diagram_row_heights[j] + erd_default_space_between_rects;
+    /* Saying every rect is at 0,0 looks odd, and I'm not doing anything with erd_xybits here. */
     erd_tables[i].erd_rect= QRect(x,
                                   y,
                                   erd_tables[i].erd_rect.width(),
@@ -37001,7 +37102,11 @@ void erd::bend_count_push()
 void erd::bend_count_pop()
 {
   for (int i= 0; i < erd_tables_count; ++i)
+  {
+    xybits_off(i);
     erd_tables[i].erd_rect= erd_tables[i].pushed_rect;
+    xybits_on(i);
+  }
 }
 
 /*
@@ -37043,7 +37148,9 @@ void erd::bend_count_try_shift(int i_of_table)
                                                 erd_tables[i_of_table].erd_rect,
                                                 i_direction);
         if ((trial_rect.x() == -1) && (trial_rect.y() == -1)) continue;
+        xybits_off(i_of_table);
         erd_tables[i_of_table].erd_rect= trial_rect;
+        xybits_on(i_of_table);
         trial_bend_count_all= bend_count_all();
         if (trial_bend_count_all < best_bend_count_all)
         {
@@ -37057,9 +37164,13 @@ void erd::bend_count_try_shift(int i_of_table)
   }
   if (best_bend_count_all < old_bend_count_all) /* shift if it would reduce bend count */
   {
-    erd_tables[i_of_table].erd_rect= next_available_rect(erd_tables[best_bend_count_all_related_table].erd_rect,
-                                                         erd_tables[i_of_table].erd_rect,
-                                                         best_bend_count_all_direction);
+    xybits_off(i_of_table);
+    QRect next_rect= next_available_rect(erd_tables[best_bend_count_all_related_table].erd_rect,
+                                        erd_tables[i_of_table].erd_rect,
+                                        best_bend_count_all_direction);
+    xybits_off(i_of_table);
+    erd_tables[i_of_table].erd_rect= next_rect;
+    xybits_on(i_of_table);
   }
 }
 
@@ -37088,8 +37199,12 @@ void erd::bend_count_try_exchange(int i_of_table)
       bend_count_push();
       QRect rect_of_table= erd_tables[i_of_table].erd_rect;
       QRect rect_of_related_table= erd_tables[i_of_related_table].erd_rect;
+      xybits_off(i_of_table);
       erd_tables[i_of_table].erd_rect= rect_of_related_table;
+      xybits_on(i_of_table);
+      xybits_off(i_of_related_table);
       erd_tables[i_of_related_table].erd_rect= rect_of_table;
+      xybits_on(i_of_related_table);
       int trial_bend_count_all= bend_count_all();
       if (trial_bend_count_all < best_bend_count_all)
       {
@@ -37103,8 +37218,12 @@ void erd::bend_count_try_exchange(int i_of_table)
   }
   if (best_bend_count_all < old_bend_count_all) /* exchange if it would reduce bend count */
   {
+    xybits_off(i_of_table);
     erd_tables[i_of_table].erd_rect= best_bend_count_all_rect_of_related_table;
+    xybits_on(i_of_table);
+    xybits_off(best_bend_count_all_i_of_related_table);
     erd_tables[best_bend_count_all_i_of_related_table].erd_rect= best_bend_count_all_rect_of_table;
+    xybits_on(best_bend_count_all_i_of_related_table);
   }
 }
 
@@ -37587,6 +37706,7 @@ erd::~erd()
 {
   if (erd_relations != NULL) delete [] erd_relations;
   if (erd_tables != NULL) delete [] erd_tables;
+  if (erd_xybits != NULL) delete [] erd_xybits;
 }
 
 
@@ -37616,7 +37736,7 @@ ERDiagram::ERDiagram(MainWindow *parent_mainwindow, QString passed_schema_name, 
   return;
 }
 
-ERDiagram::~ERDiagram()
+ERDiagram::~ERDiagram() /* This should also cause ~erd because erd has ERDiagram as a parent */
 {
   ;
 }

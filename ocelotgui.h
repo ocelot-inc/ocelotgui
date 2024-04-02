@@ -7749,8 +7749,15 @@ private:
     Todo: Accept conditional changes of font size, tooltip, width, height.
   Positions:
     When looking whether a space is available we compare x,y as if the rectangles are points near the middle
-    of a (5000,5000) matrix i.e. #define FAKE_MIDPOINT 5000. Later we expand the rectangles, leave
+    of a (midpoint, midpoint) matrix where midpoint= number of tables. Later we expand the rectangles, leave
     spaces between, and subtract the smallest that's actually available.
+    Re erd_xybits: We want to know where unocuppied spots in the diagram ("holes") are.
+    Make a list of bits (with 1 meaning occupied) which stretches from midpoint to midpoint +- max i.e. erd_tables_count
+    left or right or up or down. The calculations will be like:
+      tmp_off= ((erd_midpoint + tmp_x) * erd_tables_count * 2) + (erd_midpoint + tmp_y);
+      tmp_byte= tmp_off / 8;
+      tmp_bit= tmp_off % 8;
+    E.g. if midpoint = 5,5 and we're asking re (2,6): X=(5+(5-2)), Y=((5+5-6)),  byte=X*max/8, bit=1 shl X%8.
   Bend counting:
     Routines whose names start with bend_count are for a late phase, after we've got something that might be OK
     but might contain some rects whose position is not ideal. Actually we have no bends, but the principle is
@@ -7835,7 +7842,6 @@ MainWindow *erd_mainwindow;
 #define ERD_BAR2 1
 #define ERD_CROWS_FOOT 2
 #define ERD_CIRCLE 4
-#define FAKE_MIDPOINT 5000
 /* Todo: We're preventing big rects because there were crashes. See whether there's a better solution, eh? */
 #define MAX_COLUMN_NAMES 500
 
@@ -7871,6 +7877,8 @@ struct table_items {
 };
 struct table_items *erd_tables;
 int erd_tables_count;
+unsigned char *erd_xybits;
+int erd_midpoint;
 /* Relations are what we will use to determine positions and lines */
 struct relation_items {
   int i_of_referencing_table; /* should point to erd_tables of the table with the referencing key */
@@ -7891,6 +7899,9 @@ void set_color_palette();
 QRect place_table_and_connected_tables(QRect last_rect, int t);
 QRect next_available_rect(QRect last_rect, QRect this_rect, int t);
 QRect next_available_rect_2(QRect last_rect, QRect this_rect, int i_direction);
+QRect next_available_rect_3(QRect last_rect, QRect this_rect, int i_direction);
+void xybits_off(int i_of_table);
+void xybits_on(int i_of_table);
 bool is_available_rect(int x, int y);
 public:
 erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query);
