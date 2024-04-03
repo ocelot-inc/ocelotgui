@@ -7715,7 +7715,7 @@ private:
     SET ocelot_query = SHOW ERDIAGRAM OF schema-name
     [COLUMNS PRIMARY]
     [LINES IN BACKGROUND]
-    [TABLES (table-list)\;
+    [TABLES (table-list)];
     Statement is rejected if explorer is not visible. And explorer might need to be refreshed.
     COLUMNS PRIMARY means "only show columns of primary key". Not a great idea but others do it.
     LINES IN BACKGROUND means "draw lines before drawing tables" so rects overwrite lines.
@@ -7740,6 +7740,7 @@ private:
   Grid unconditionals:
     This is not a grid widget (using grid widget directly was considered and might be reconsidered someday).
     But grid settings affect it, including default font, background colour, cell border size.
+    Maybe explorer settings would have been better?
   Grid conditionals:
     Some but not all conditional expressions should work. Theoretically I can affect background
     colour etc. for a style sheet, see https://codeloop.org/how-to-draw-text-line-in-qt5-with-qpainter/
@@ -7747,17 +7748,12 @@ private:
     proper results. So call conditional_setting_evaluate_till_true() but only take the changes to background
     and text (and border colour?). Interpret row and column as erd_table[].xpos and erd_table[].ypos.
     Todo: Accept conditional changes of font size, tooltip, width, height.
+    Some conditional settings that affect ERDiagram are: ocelot_grid_text_color ocelot_grid_font_weight
+    ocelot_grid_font_style ocelot_grid_background_color.
   Positions:
     When looking whether a space is available we compare x,y as if the rectangles are points near the middle
     of a (midpoint, midpoint) matrix where midpoint= number of tables. Later we expand the rectangles, leave
     spaces between, and subtract the smallest that's actually available.
-    Re erd_xybits: We want to know where unocuppied spots in the diagram ("holes") are.
-    Make a list of bits (with 1 meaning occupied) which stretches from midpoint to midpoint +- max i.e. erd_tables_count
-    left or right or up or down. The calculations will be like:
-      tmp_off= ((erd_midpoint + tmp_x) * erd_tables_count * 2) + (erd_midpoint + tmp_y);
-      tmp_byte= tmp_off / 8;
-      tmp_bit= tmp_off % 8;
-    E.g. if midpoint = 5,5 and we're asking re (2,6): X=(5+(5-2)), Y=((5+5-6)),  byte=X*max/8, bit=1 shl X%8.
   Bend counting:
     Routines whose names start with bend_count are for a late phase, after we've got something that might be OK
     but might contain some rects whose position is not ideal. Actually we have no bends, but the principle is
@@ -7808,6 +7804,7 @@ private:
         if (x == 0)) the new failed -- but all you can do is assert unless you can pass an error up the line
   Todo: Although we have a way to specify where rects go, there are are other possible ways to specify.
         There might be some semi-standard way to specify, so do some research first.
+        Notice later comment re [TABLES (table-list)] clause.
   Todo: Catch right-click, give user a chance to delete or move a rect or a line.
   Todo: Catch keyboard, some control keys on main menu e.g.^Q might be okay.
   Todo: Probably this is a bug:
@@ -7815,15 +7812,12 @@ private:
         changes the second row, but tooltip says y (row) = 1
   Todo: Help | ERDiagram
   Todo: SET ocelot_grid_tooltip should affect what we do when mouseMoveEvent() happens
-  Todo: If (table-list) I think we follow the list order, maybe reference_count order would be better,
+  Todo: If [TABLES (table-list)] I think we follow the list order, maybe reference_count order would be better,
         but (a) do not take into account a relation which relates a table to another table that we didn't list
             (b) priority is by the order that you inserted, not the references count
             (c) maybe we don't need to do the shift and exchange at the end
   Todo: Unfortunately changing font size won't affect setWindowTitle(), at least on Linux.
         Maybe I could hide the title and put in a (disabled) button but that would lack the Windows decoration.
-  Todo: I never see ~erd or ~ERDiagram
-        See https://stackoverflow.com/questions/47760937/call-destructor-when-closing-qdialog-started-from-q
-        See https://www.qtcentre.org/threads/21035-Destructor-not-being-called
 */
 class ERDiagram;
 
@@ -7877,7 +7871,6 @@ struct table_items {
 };
 struct table_items *erd_tables;
 int erd_tables_count;
-unsigned char *erd_xybits;
 int erd_midpoint;
 /* Relations are what we will use to determine positions and lines */
 struct relation_items {
@@ -7893,15 +7886,13 @@ int erd_relations_count;
 QString erd_query;
 int erd_token_offsets[1000]; /* todo: this should be dynamic, table list could have > 1000 tokens */
 int erd_token_lengths[1000];
-void default_settings_all();
+void default_settings_erd();
 void default_settings_erdiagram();
 void set_color_palette();
 QRect place_table_and_connected_tables(QRect last_rect, int t);
 QRect next_available_rect(QRect last_rect, QRect this_rect, int t);
 QRect next_available_rect_2(QRect last_rect, QRect this_rect, int i_direction);
 QRect next_available_rect_3(QRect last_rect, QRect this_rect, int i_direction);
-void xybits_off(int i_of_table);
-void xybits_on(int i_of_table);
 bool is_available_rect(int x, int y);
 public:
 erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query);

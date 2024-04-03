@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.3.0
-   Last modified: April 2 2024
+   Last modified: April 3 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -35990,13 +35990,14 @@ bool ResultGrid::evaluate_for_chart(bool is_mainwindow_calling)
 
 #if (OCELOT_ERDIAGRAM == 1)
 
+/* Put general comments about ERDiagram in ocelotgui.h after words THE ERDIAGRAM WIDGET. */
+
 /* Todo: maybe merge this with ERDiagram ... but no I guess it has to be within scroll area */ /* constructor */
 erd::erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query)
     : QWidget(parent_erdiagram)
 {
   erd_relations= NULL; /* because in ~erd() we don't want delete if e.g. we created nothing for empty schema */
   erd_tables= NULL;
-  erd_xybits= NULL;
   resize(100, 100); /* initial, there will be another resize after we find erd_table sizes */
   erd_erdiagram= parent_erdiagram;
   erd_mainwindow= parent_mainwindow;
@@ -36006,17 +36007,16 @@ erd::erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString pas
            erd_query.size(),
            &erd_token_lengths[0], &erd_token_offsets[0], 1000 - 1,
           (QChar*)"33333", 2, "", 1);
-  default_settings_all();
+  default_settings_erd();
   default_settings_erdiagram();
   setMouseTracking(true); /* maybe */
 }
 
 /*
-  (Put general comments about ERDiagram in ocelotgui.h after words THE ERDIAGRAM WIDGET)
   Set default fonts and colours based on grid settings.
   Also set table rectangles for use by draw_table() during paintEvent.
 */
-void erd::default_settings_all()
+void erd::default_settings_erd()
 {
   {
     QPalette p= QPalette();
@@ -36178,7 +36178,6 @@ void erd::default_settings_erdiagram()
     }
   }
   bend_count_main();
-
 //  /* Get the limits of the whole set of rects in existing area */
   int lowest_x= erd_midpoint; int lowest_y= erd_midpoint; int highest_x= erd_midpoint; int highest_y= erd_midpoint;
   for (int i= 0; i < erd_tables_count; ++i)
@@ -36211,9 +36210,7 @@ void erd::default_settings_erdiagram()
 //          if (is_breaker == true) break;
 //          if (is_available_rect(a_x, a_y) == true)
 //          {
-//            xybits_off(i);
 //            erd_tables[i].erd_rect= QRect(a_x, a_y, erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
-//            xybits_on(i);
 //            is_breaker= true;
 //          }
 //        }
@@ -36227,9 +36224,7 @@ void erd::default_settings_erdiagram()
     {
       last_rect= QRect(erd_midpoint, erd_midpoint, 1, 1);
       QRect new_rect= next_available_rect_3(last_rect, erd_tables[i].erd_rect, i);
-      xybits_off(i);
       erd_tables[i].erd_rect= new_rect;
-      xybits_on(i);
       last_rect= erd_tables[i].erd_rect;
     }
   }
@@ -36249,16 +36244,14 @@ void erd::default_settings_erdiagram()
       if (erd_tables[i].erd_rect.y() > highest_y) highest_y= erd_tables[i].erd_rect.y();
     }
   }
-  /* Subtract the lowest x and the lowest y from all rects. No real need to change erd_xybits from now on, but inertia. */
+  /* Subtract the lowest x and the lowest y from all rects. */
   {
     for (int i= 0; i < erd_tables_count; ++i)
     {
       QRect new_rect=
               QRect(erd_tables[i].erd_rect.x() - lowest_x, erd_tables[i].erd_rect.y() - lowest_y,
                     erd_tables[i].erd_rect.width(), erd_tables[i].erd_rect.height());
-      xybits_off(i);
       erd_tables[i].erd_rect= new_rect;
-      xybits_on(i);
     }
   }
 #ifdef PACKED
@@ -36352,9 +36345,7 @@ QRect erd::place_table_and_connected_tables(QRect last_rect, int t)
   else
   {
     new_last_rect= next_available_rect(last_rect, erd_tables[t].erd_rect, t);
-    xybits_off(t);
     erd_tables[t].erd_rect= new_last_rect;
-    xybits_on(t);
   }
   int new_t;
   for (int i= 0; i < erd_relations_count; ++i)
@@ -36380,15 +36371,12 @@ QRect erd::place_table_and_connected_tables(QRect last_rect, int t)
       }
     }
   }
-
   /* The immediately-adjacent connections. Todo: assert if somehow next_available_rect() fails? */
   for (int i= 0; i < new_t_count; ++i)
   {
     int new_t= new_t_list[i];
     QRect close_last_rect= next_available_rect(new_last_rect, erd_tables[new_t].erd_rect, t);
-    xybits_off(new_t);
     erd_tables[new_t].erd_rect= close_last_rect;
-    xybits_on(new_t);
   }
 
   /* The adjacent of the adjacent connections */
@@ -36507,41 +36495,16 @@ QRect erd::next_available_rect_2(QRect last_rect, QRect this_rect, int i_directi
   return QRect(-1, -1, 0, 0);
 }
 
-/* Available means we haven't set this bit already for a table, which means there's a hole in the bit list. */
-/* TODO: We don't want to go off the edge of the matrix by asking for x=-3, y=-3 !! */
+/* Todo: If schema has 10000 rows and we call this 10000 times, this could get slow. But a bit-list experiment failed. */
 bool erd::is_available_rect(int x, int y)
 {
   if ((x < 0) || (y < 0)) return false; /* impossible */
-  unsigned int tmp_off= ((x) * erd_tables_count * 2) + (y);
-  unsigned int tmp_byte= tmp_off / 8;
-  unsigned int tmp_bit= tmp_off % 8;
-  tmp_bit= 1 << tmp_bit;
-  if ((erd_xybits[tmp_byte] & tmp_bit) == 0) return true;
-  return false;
-}
-
-void erd::xybits_off(int i_of_table)
-{
-  int x= erd_tables[i_of_table].erd_rect.x();
-  int y= erd_tables[i_of_table].erd_rect.y();
-  if ((x < 0) || (y < 0)) return;
-  unsigned int tmp_off= ((x) * erd_tables_count * 2) + (y);
-  unsigned int tmp_byte= tmp_off / 8;
-  unsigned int tmp_bit= tmp_off % 8;
-  tmp_bit= 1 << tmp_bit;
-  erd_xybits[tmp_byte]&= ~tmp_bit;
-}
-
-void erd::xybits_on(int i_of_table)
-{
-  int x= erd_tables[i_of_table].erd_rect.x();
-  int y= erd_tables[i_of_table].erd_rect.y()                                                                ;
-  if ((x < 0) || (y < 0)) return;
-  unsigned int tmp_off= ((x) * erd_tables_count * 2) + (y);
-  unsigned int tmp_byte= tmp_off / 8;
-  unsigned int tmp_bit= tmp_off % 8;
-  tmp_bit= 1 << tmp_bit;
-  erd_xybits[tmp_byte]|= tmp_bit;
+  for (int i= 0; i < erd_tables_count; ++i)
+  {
+    if ((erd_tables[i].erd_rect.x() == x) && (erd_tables[i].erd_rect.y() == y))
+      return false;
+  }
+  return true;
 }
 
 /*
@@ -36568,10 +36531,6 @@ void erd::fill_tables()
       ++erd_tables_count;
   }
 
-  /* Make the bit list. Might be a bit bigger than we need but that should be harmless. */
-  unsigned int xybits_size= ((erd_tables_count * erd_tables_count * 4) / 8) + 32;
-  erd_xybits= (unsigned char *) new char[xybits_size];
-  memset(erd_xybits, 0, xybits_size);
   erd_midpoint= erd_tables_count + 1;
 
   erd_tables= new table_items[erd_tables_count];
@@ -36595,15 +36554,11 @@ void erd::fill_tables()
       {
         if ((i_of_query_table != -1) && (fixed_x != erd_midpoint) && (fixed_y != erd_midpoint))
         {
-          xybits_off(table_number);
           erd_tables[table_number].xpos= fixed_x + erd_midpoint;
           erd_tables[table_number].ypos= fixed_y + erd_midpoint;
-          xybits_off(table_number);
           erd_tables[table_number].erd_rect.setX(fixed_x + erd_midpoint);
           erd_tables[table_number].erd_rect.setY(fixed_y + erd_midpoint);
-          xybits_on(table_number);
           erd_tables[table_number].is_fixed= true;
-          xybits_on(table_number);
         }
         else erd_tables[table_number].is_fixed= false; /* unnecessary? I set all to false earlier */
         erd_tables[table_number].columns_count= 0;
@@ -36959,7 +36914,6 @@ void erd::set_table_rects()
 
 #ifdef PACKED
   /* This was an experiment so not every rect was in a fixed grid. It sort of works but would need more work. */
-  /* For example erd_xybits probably won't survive okay. */
   /* Make an array of what tables are at each x on each y -- TODO: THIS SHOULD BE VARIABLE SIZE! */
   int xy[50][50];
   for (int xx= 0; xx <= max_x; ++xx)
@@ -37014,7 +36968,7 @@ void erd::set_table_rects()
     int y= 0;
     for (int j= 0; j < erd_tables[i].xpos; ++j) x+= erd_diagram_column_widths[j] + erd_default_space_between_rects;
     for (int j= 0; j < erd_tables[i].ypos; ++j) y+= erd_diagram_row_heights[j] + erd_default_space_between_rects;
-    /* Saying every rect is at 0,0 looks odd, and I'm not doing anything with erd_xybits here. */
+    /* Saying every rect is at 0,0 looks odd, eh? */
     erd_tables[i].erd_rect= QRect(x,
                                   y,
                                   erd_tables[i].erd_rect.width(),
@@ -37103,9 +37057,7 @@ void erd::bend_count_pop()
 {
   for (int i= 0; i < erd_tables_count; ++i)
   {
-    xybits_off(i);
     erd_tables[i].erd_rect= erd_tables[i].pushed_rect;
-    xybits_on(i);
   }
 }
 
@@ -37148,9 +37100,7 @@ void erd::bend_count_try_shift(int i_of_table)
                                                 erd_tables[i_of_table].erd_rect,
                                                 i_direction);
         if ((trial_rect.x() == -1) && (trial_rect.y() == -1)) continue;
-        xybits_off(i_of_table);
         erd_tables[i_of_table].erd_rect= trial_rect;
-        xybits_on(i_of_table);
         trial_bend_count_all= bend_count_all();
         if (trial_bend_count_all < best_bend_count_all)
         {
@@ -37164,13 +37114,10 @@ void erd::bend_count_try_shift(int i_of_table)
   }
   if (best_bend_count_all < old_bend_count_all) /* shift if it would reduce bend count */
   {
-    xybits_off(i_of_table);
     QRect next_rect= next_available_rect(erd_tables[best_bend_count_all_related_table].erd_rect,
                                         erd_tables[i_of_table].erd_rect,
                                         best_bend_count_all_direction);
-    xybits_off(i_of_table);
     erd_tables[i_of_table].erd_rect= next_rect;
-    xybits_on(i_of_table);
   }
 }
 
@@ -37199,12 +37146,8 @@ void erd::bend_count_try_exchange(int i_of_table)
       bend_count_push();
       QRect rect_of_table= erd_tables[i_of_table].erd_rect;
       QRect rect_of_related_table= erd_tables[i_of_related_table].erd_rect;
-      xybits_off(i_of_table);
       erd_tables[i_of_table].erd_rect= rect_of_related_table;
-      xybits_on(i_of_table);
-      xybits_off(i_of_related_table);
       erd_tables[i_of_related_table].erd_rect= rect_of_table;
-      xybits_on(i_of_related_table);
       int trial_bend_count_all= bend_count_all();
       if (trial_bend_count_all < best_bend_count_all)
       {
@@ -37218,12 +37161,8 @@ void erd::bend_count_try_exchange(int i_of_table)
   }
   if (best_bend_count_all < old_bend_count_all) /* exchange if it would reduce bend count */
   {
-    xybits_off(i_of_table);
     erd_tables[i_of_table].erd_rect= best_bend_count_all_rect_of_related_table;
-    xybits_on(i_of_table);
-    xybits_off(best_bend_count_all_i_of_related_table);
     erd_tables[best_bend_count_all_i_of_related_table].erd_rect= best_bend_count_all_rect_of_table;
-    xybits_on(best_bend_count_all_i_of_related_table);
   }
 }
 
@@ -37315,9 +37254,13 @@ void erd::draw_table(QPainter *painter, int table_number)
   painter->setBrush(erd_default_header_brush);
 }
 
-/* Possible pen and brush change due to grid conditional */
-/* Todo: conditional with column_number=2 gets column 1 */
-/* Todo: conditional with row_number=2 gets row 2 but I don't understand, shouldn't column_names affect it? */
+/*
+  Possible pen and brush change due to grid conditional
+  Oddness: conditional with column_number=2 was getting column 1, and with row_number=2 was getting row 1.
+           Perhaps we're doing an offset for grid because a grid has a fake starting column?
+           Shouldn't affect it?
+           Anyway, by passing xpos+0 and ypos+0, I persuade evaluate to return true for the right columns and rows.
+ */
 void erd::erd_draw_text_prepare(QPainter *painter,
                int table_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
                QString content,     /* table_name | column_name */
@@ -37330,8 +37273,8 @@ void erd::erd_draw_text_prepare(QPainter *painter,
   int cs_number;
   bool result_of_evaluate;
   result_of_evaluate= erd_mainwindow->explorer_widget->conditional_setting_evaluate_till_true(
-    erd_tables[table_number].xpos + 1, /* i.e. result set column number. dunno why +1, it's really off by 1 */
-    erd_tables[table_number].ypos + 1, /* e.g. text_frame->ancestor_grid_result_row_number */
+    erd_tables[table_number].xpos, /* i.e. column number of ERDiagram not column number of table */
+    erd_tables[table_number].ypos, /* i.e. row number of ERDiagram */
     string_utf8.data(), /* e.g. text_frame->content_pointer */
     0, /* e.g. FIELD_VALUE_FLAG_IS_NULL */
     string_utf8.size(), /* e.g. text_frame->content_length */
@@ -37367,6 +37310,8 @@ void erd::erd_draw_text_prepare(QPainter *painter,
   }
   else
   {
+    painter->setBrush(erd_default_header_brush); /* These settings are unnecessary if there are no conditionals */
+    painter->setPen(erd_default_text_pen);
     painter->setFont(erd_default_font);
   }
 }
@@ -37706,7 +37651,6 @@ erd::~erd()
 {
   if (erd_relations != NULL) delete [] erd_relations;
   if (erd_tables != NULL) delete [] erd_tables;
-  if (erd_xybits != NULL) delete [] erd_xybits;
 }
 
 
