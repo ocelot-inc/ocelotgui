@@ -4710,6 +4710,7 @@ public:
   int hparse_f_qualified_name_of_object_with_star(int,int);
   int hparse_f_e_to_reftype(int);
   int hparse_f_accept_qualifier(unsigned int,unsigned char,int,QString);
+  bool hparse_f_is_identifier(int);
   bool hparse_f_is_variable(int, int);
   int hparse_f_qualified_name_of_operand(unsigned int,bool,bool,bool);
   int hparse_f_table_references();

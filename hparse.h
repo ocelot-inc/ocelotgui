@@ -249,7 +249,7 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
       {
         main_token_flags[hparse_i] &= (~TOKEN_FLAG_IS_RESERVED);
         if ((hparse_token_type >= TOKEN_TYPE_OTHER)
-         || (hparse_token_type == TOKEN_TYPE_IDENTIFIER))
+         || (hparse_token_type == TOKEN_TYPE_IDENTIFIER)) /* specific, so don't use hparse_f_is_identifier() */
           equality= true;
       }
     }
@@ -384,7 +384,11 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
      && (main_token_types[hparse_i] >= TOKEN_KEYWORDS_START)) {;}
     else if ((proposed_type == TOKEN_TYPE_LITERAL)
      && (main_token_types[hparse_i] < TOKEN_TYPE_LITERAL)) {;}
-    else main_token_types[hparse_i]= proposed_type;
+    else
+    {
+      /* See comment preceding hparse_f_is_identifier */
+      if (hparse_f_is_identifier(main_token_types[hparse_i]) == false) main_token_types[hparse_i]= proposed_type;
+    }
     main_token_reftypes[hparse_i]= reftype;
     hparse_f_expected_clear();
     hparse_i_of_last_accepted= hparse_i;
@@ -1164,6 +1168,20 @@ int MainWindow::hparse_f_accept_qualifier(unsigned int flag_version, unsigned ch
     return 0;
   }
   return 1;
+}
+
+/*
+  Return true if passed token_type is any of TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK= 6,
+  TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE= 7, TOKEN_TYPE_IDENTIFIER_WITH_AT = 8, TOKEN_TYPE_IDENTIFIER = 8.
+  Reason: in hparse_f_accept() there was "else main_token_types[hparse_i]= proposed_type;" but passed proposed_type
+  could be TOKEN_TYPE_IDENTIFIER, so after SET OCELOT_EXPLORER_VISIBLE = 'yes'; USE `w` + control-E we didn't reach `w`
+  because it's not TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK.
+  Todo: Check whether there should be a similar check for the specific varieties of literals.
+*/
+bool MainWindow::hparse_f_is_identifier(int token_type)
+{
+  if ((token_type >= TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) && (token_type <= TOKEN_TYPE_IDENTIFIER)) return true;
+  return false;
 }
 
 /*
@@ -2986,7 +3004,7 @@ int MainWindow::hparse_f_expression_list(int who_is_calling)
           }
         }
       }
-      if (main_token_types[i_of_opd] == TOKEN_TYPE_IDENTIFIER)
+      if (hparse_f_is_identifier(main_token_types[i_of_opd]) == true)
       {
         if (hparse_text_copy.mid(main_token_offsets[i_of_opd], main_token_lengths[i_of_opd]) == "*")
           ++column_count;
@@ -13370,7 +13388,7 @@ int MainWindow::hparse_f_find_define(int block_top,
       i= main_token_pointers[i];
       continue;
     }
-    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+    if (hparse_f_is_identifier((main_token_types[i]) == true)
      && (main_token_reftypes[i] == reftype_define))
     {
       QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
@@ -13425,7 +13443,7 @@ int MainWindow::hparse_f_variables(int *i_of_define)
       i= main_token_pointers[i];
       continue;
     }
-    if (main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+    if (hparse_f_is_identifier(main_token_types[i]) == true)
     {
       if ((main_token_reftypes[i] == TOKEN_REFTYPE_VARIABLE_DEFINE)
        || (main_token_reftypes[i] == TOKEN_REFTYPE_PARAMETER_DEFINE))

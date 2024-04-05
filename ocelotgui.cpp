@@ -1185,7 +1185,7 @@ void MainWindow::statement_edit_widget_formatter()
             {
               ;
             }
-            else if (p_type == TOKEN_TYPE_IDENTIFIER)
+            else if (hparse_f_is_identifier(p_type) == true)
             {
               ;
             }
@@ -4937,7 +4937,7 @@ QTextCharFormat MainWindow::get_format_of_current_token(int token_type, int toke
   if (t == TOKEN_TYPE_LITERAL_WITH_DIGIT) format_of_current_token= format_of_literal;
   /* literal_with_brace == literal */
   if (t == TOKEN_TYPE_LITERAL_WITH_BRACE) format_of_current_token= format_of_literal; /* obsolete? */
-  if (t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) format_of_current_token= format_of_identifier;
+  if (t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) format_of_current_token= format_of_identifier; /* same check as in hparse_f_is_identifier()? */
   if (t == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE) format_of_current_token= format_of_identifier;
   if (t == TOKEN_TYPE_IDENTIFIER) format_of_current_token= format_of_identifier;
   if (t == TOKEN_TYPE_IDENTIFIER_WITH_AT) format_of_current_token= format_of_identifier;
@@ -9053,7 +9053,7 @@ int MainWindow::debug_parse_statement(QString text,
     if (name_is_expected)
     {
       if ((token_type == TOKEN_TYPE_OTHER)
-       || (token_type == TOKEN_TYPE_IDENTIFIER)
+       || (token_type == TOKEN_TYPE_IDENTIFIER) /* same check as in hparse_f_is_identifier()? */
        || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
        || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
       {
@@ -9066,8 +9066,8 @@ int MainWindow::debug_parse_statement(QString text,
         {
           /* schema-name . routine_name */
           if ((main_token_types[i + 2] == TOKEN_TYPE_OTHER)
-           || (main_token_types[i + 2] == TOKEN_TYPE_IDENTIFIER)
-           || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
+           || (main_token_types[i + 2] == TOKEN_TYPE_IDENTIFIER) /* same check as in hparse_f_is_identifier()? */
+           || (token_type == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE) /* todo: better check why this is "token_type" */
            || (main_token_types[i + 2] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK))
           {
             strcpy(tmp_schema_name, token);
@@ -16160,7 +16160,7 @@ bool MainWindow::get_sql_mode(int who_is_calling,
           /* is_simple_literal=true if e.g. set sql_mode=ansi */
           if (is_simple_literal == false)
           {
-            if ((t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
+            if ((t == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK) /* same check as in hparse_f_is_identifier()? */
              || (t == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE)
              || (t == TOKEN_TYPE_IDENTIFIER)
              || (t >= TOKEN_TYPE_OTHER))
@@ -17219,7 +17219,7 @@ int MainWindow::tarantool_real_query(const char *dbms_query,
   int offset_of_space_name= -1;
   for (unsigned int i= passed_main_token_number; i < passed_main_token_number + passed_main_token_count_in_statement; ++i)
   {
-    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+    if ((hparse_f_is_identifier(main_token_types[i]) == true)
      && (main_token_reftypes[i] == TOKEN_REFTYPE_TABLE))
     {
       offset_of_space_name= (int) i;
@@ -25507,7 +25507,7 @@ void MainWindow::debug_setup_go(QString text)
       is_switch= true;
       continue;
     }
-    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER) && (is_switch))
+    if ((hparse_f_is_identifier(main_token_types[i]) == true) && (is_switch))
     {
       switch_name= s;
       continue;
@@ -25642,7 +25642,7 @@ int MainWindow::setup_routine_list(QString text)
   int i;
   for (i= 0; main_token_lengths[i] != 0; ++i)
   {
-    if (main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+    if (hparse_f_is_identifier(main_token_types[i]) == true)
     {
       token= text.mid(main_token_offsets[i], main_token_lengths[i]);
       if (main_token_reftypes[i] == TOKEN_REFTYPE_DATABASE)
@@ -27466,7 +27466,7 @@ int MainWindow::setup_determine_what_variables_are_in_scope(
     QString v_variable_identifier= "";
     if ((main_token_flags[i] & TOKEN_FLAG_IS_DATA_TYPE) != 0) data_type= main_token_types[i];
     is_identifier= false;
-    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER)
+    if ((main_token_types[i] == TOKEN_TYPE_IDENTIFIER) /* same check as in hparse_f_is_identifier()? */
      || (main_token_types[i] == TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK)
      || (main_token_types[i] == TOKEN_TYPE_IDENTIFIER_WITH_DOUBLE_QUOTE))
     {
@@ -28107,7 +28107,7 @@ int MainWindow::clf_block(QString text, int i_of_end_of_handler, QString *clf_ou
       for (clfi= clfi + 1;; ++clfi)
       {
         if (main_token_types[clfi] == TOKEN_TYPE_OPERATOR) break; /* ";" ends FETCH, perhaps there is no INTO */
-        if (main_token_types[clfi] == TOKEN_TYPE_IDENTIFIER)
+        if (hparse_f_is_identifier(main_token_types[clfi]) == true)
         {
           if (clf_check_reference(text, clfi, TOKEN_REFTYPE_VARIABLE_DEFINE, clf_output) == false) return 1;
           QString variable_name= clf_v(text, main_token_pointers[clfi], TOKEN_REFTYPE_VARIABLE_DEFINE);
@@ -28955,7 +28955,7 @@ bool MainWindow::clf_handler_list(QString text, int main_token_number, int clf_l
        || (outer_condition_value == TOKEN_KEYWORD_SQLSTATE)
        ||(outer_condition_value == TOKEN_KEYWORD_VALUE))
         continue;
-      if ((outer_condition_value == TOKEN_TYPE_IDENTIFIER)
+      if ((hparse_f_is_identifier(outer_condition_value) == true)
        || (outer_condition_value == TOKEN_TYPE_LITERAL_WITH_DIGIT))
       {
         *clf_output= "Sorry, the only handler conditions we allow at this time are sqlstate 'xxxxx', sqlexception, not found, and sqlwarning.";
@@ -37260,6 +37260,7 @@ void erd::draw_table(QPainter *painter, int table_number)
            Perhaps we're doing an offset for grid because a grid has a fake starting column?
            Shouldn't affect it?
            Anyway, by passing xpos+0 and ypos+0, I persuade evaluate to return true for the right columns and rows.
+  Todo: test row_number = n when column_names = 0 (done, still no good)
  */
 void erd::erd_draw_text_prepare(QPainter *painter,
                int table_number,    /* so we can get xpos i.e. column_number and ypos i.e. row_number */
@@ -37274,7 +37275,7 @@ void erd::erd_draw_text_prepare(QPainter *painter,
   bool result_of_evaluate;
   result_of_evaluate= erd_mainwindow->explorer_widget->conditional_setting_evaluate_till_true(
     erd_tables[table_number].xpos, /* i.e. column number of ERDiagram not column number of table */
-    erd_tables[table_number].ypos, /* i.e. row number of ERDiagram */
+    erd_tables[table_number].ypos + 1, /* i.e. row number of ERDiagram */
     string_utf8.data(), /* e.g. text_frame->content_pointer */
     0, /* e.g. FIELD_VALUE_FLAG_IS_NULL */
     string_utf8.size(), /* e.g. text_frame->content_length */
