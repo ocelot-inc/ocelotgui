@@ -3952,6 +3952,44 @@ int MainWindow::hparse_f_analyze_or_optimize(int who_is_calling,int *table_or_vi
   return 1;
 }
 
+/*
+  INSTALL (in which case we know it's MySQL|MariaDB, or SET ocelot_query = SET (in which case it's local plugin install)
+*/
+void MainWindow::hparse_f_install(int set_or_install)
+{
+  if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) || (set_or_install == TOKEN_KEYWORD_SET))
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN");
+    if (hparse_errno > 0) return;
+#if (OCELOT_PLUGIN == 1)
+    if (set_or_install == TOKEN_KEYWORD_SET)
+    {
+      int i;  /* There's a limited number of possible plugin identifiers. todo: for uninstall, list could be shorter. */
+      for (i= 0; i <= PLUGIN_MAX; ++i)
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, plugin_strvalues[i].chars) == 1) break;
+      }
+      if (i > PLUGIN_MAX) hparse_f_error();
+    }
+    else
+#endif
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+    if (hparse_errno > 0) return;
+  }
+  else if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
+  {
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
+  }
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SONAME");
+  if (hparse_errno > 0) return;
+  if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+  if (hparse_errno > 0) return;
+}
+
 void MainWindow::hparse_f_character_set_or_collate()
 {
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ASCII") == 1) {;}
@@ -10288,24 +10326,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_INSTALL;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
-    {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN");
-      if (hparse_errno > 0) return;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return;
-    }
-    else if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
-    {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
-      {
-        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-        if (hparse_errno > 0) return;
-      }
-    }
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SONAME");
-    if (hparse_errno > 0) return;
-    if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+    hparse_f_install(TOKEN_KEYWORD_INSTALL);
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_KILL, "KILL"))
@@ -14117,8 +14138,28 @@ int MainWindow::hparse_f_client_set_query()
 {
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "=");
   if (hparse_errno > 0) return 1;
+
+#if (OCELOT_PLUGIN == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSTALL, "INSTALL") == 1)
+  {
+    hparse_f_install(TOKEN_KEYWORD_SET);
+    return 1;
+  }
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNINSTALL, "UNINSTALL") == 1)
+  {
+    hparse_f_install(TOKEN_KEYWORD_SET);
+    return 1;
+  }
+#endif
+
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW");
   if (hparse_errno > 0) return 1;
+#if (OCELOT_PLUGIN == 1)
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGINS") == 1)
+  {
+    return 1;
+  }
+#endif
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ERDIAGRAM, "ERDIAGRAM") == 1)
   {
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OF, "OF");

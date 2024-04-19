@@ -75,6 +75,11 @@
 #endif
 #endif
 
+/* To remove most of the code related to plugin, #define OCELOT_PLUGIN 0 */
+#ifndef OCELOT_PLUGIN
+#define OCELOT_PLUGIN 1
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -1556,7 +1561,6 @@ enum {                                        /* possible returns from token_typ
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
 #define KEYWORD_LIST_SIZE 1227
-
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -1564,7 +1568,7 @@ struct keywords {
    unsigned int built_in_function_flags;
    unsigned short int token_keyword;
 };
-static const keywords strvalues[]=
+static const struct keywords strvalues[]=
     {
       {"\ba", 0, 0, 0}, /* 0 placeholder */
       {"\bb", 0, 0, 0}, /* 1 placeholder */
@@ -2806,7 +2810,7 @@ struct fontweights {
    unsigned int qt_number;
    unsigned int css_number;
 };
-static const fontweights fontweightsvalues[]=
+static const struct fontweights fontweightsvalues[]=
   {
     {"thin", "", 0, 100}, /* QFont::Thin */
     {"extralight", "", 12, 200}, /* QFont::ExtraLight */ /* though an Internet site says extralight is 250 */
@@ -3439,7 +3443,7 @@ struct __attribute__((__packed__)) timezone_ids {
   short int timezone_id;
   unsigned char timezone_string_length;
 };
-static const timezone_ids timezone_olson[]=
+static const struct timezone_ids timezone_olson[]=
 {
 {947,sizeof("Europe/Moscow")-1},
 {937,sizeof("Europe/Kaliningrad")-1},
@@ -4040,6 +4044,514 @@ static const timezone_ids timezone_olson[]=
 };
 #endif
 
+/*
+  result_type values, determined by tarantool_get_result_type()
+  4 == result set of box.space.x:select() with signature = array+array
+  5 == result set of SQL select|values, with "metadata" signature
+  6 == result of SQL not select|values, with "row_count" signature
+  7 == error with "Error: " signature (but maybe RESULT_TYPE_0 is error as well?)
+  8 = result set from box.execute() so tarantool_tnt_reply.metadata != 0
+*/
+#define RESULT_TYPE_0 0
+#define RESULT_TYPE_1 1
+#define RESULT_TYPE_2 2
+#define RESULT_TYPE_3 3
+#define RESULT_TYPE_4 4
+#define RESULT_TYPE_5 5
+#define RESULT_TYPE_6 6
+#define RESULT_TYPE_7 7
+#define RESULT_TYPE_8 8
+
+/* main_token_flags[] values. so far there are only sixteen but we expect there will be more. */
+#define TOKEN_FLAG_IS_RESERVED 1
+#define TOKEN_FLAG_IS_BLOCK_END 2
+#define TOKEN_FLAG_IS_ERROR 4
+#define TOKEN_FLAG_IS_FUNCTION 8
+#define TOKEN_FLAG_IS_START_STATEMENT 16
+#define TOKEN_FLAG_IS_START_CLAUSE 32
+#define TOKEN_FLAG_IS_START_SUBCLAUSE 64
+#define TOKEN_FLAG_IS_DATA_TYPE 128
+#define TOKEN_FLAG_IS_START_IN_COLUMN_LIST 256
+#define TOKEN_FLAG_IS_END_IN_COLUMN_LIST 512
+#define TOKEN_FLAG_IS_BINARY_PLUS_OR_MINUS 1024
+#define TOKEN_FLAG_IS_NOT_AFTER_SPACE 2048
+#define TOKEN_FLAG_IS_MAYBE_LUA 4096
+#define TOKEN_FLAG_IS_LUA 8192
+#define TOKEN_FLAG_IS_FLOW_CONTROL 16384
+#define TOKEN_FLAG_IS_DEBUGGABLE 32768
+#define TOKEN_FLAG_IS_DECLARE 65536
+#define TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON 131072
+//#define TOKEN_FLAG_IS_ASSIGNEE 262144
+#define TOKEN_FLAG_IS_NEW 262144
+#if (OCELOT_EXTENDER == 1)
+/* Todo: try to re-use flag values from above list, where you're sure there can never be ambiguity */
+#define TOKEN_FLAG_SEMISELECT_1 524288
+#define TOKEN_FLAG_SEMISELECT_2 1048576
+#define TOKEN_FLAG_IS_SEMISELECT TOKEN_FLAG_SEMISELECT_1
+#define TOKEN_FLAG_IS_SEMISELECT_MID TOKEN_FLAG_SEMISELECT_2
+#define TOKEN_FLAG_IS_SEMISELECT_END (TOKEN_FLAG_SEMISELECT_1 | TOKEN_FLAG_SEMISELECT_2)
+#define TOKEN_FLAG_IS_SEMISELECT_ALL (TOKEN_FLAG_SEMISELECT_1 | TOKEN_FLAG_SEMISELECT_2)
+#endif
+
+/* The enum for TOKEN_TYPE_LITERAL etc. was here, but moved outside MainWindow on 2019-02-26 */
+
+/*
+TOKEN_LITERAL_FLAG is for passing required format to hparse_f_literal().
+Example: +5 is okay if we're looking for signed integer,
+but if we say hparse_f_literal(TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER)
+then the only acceptable literals are unsigned integers.
+Todo: The expected will still say "[literal]", more general than needed.
+Todo: We aren't specific enough, we don't use this enough.
+Todo: Some values aren't used.
+*/
+#define TOKEN_LITERAL_FLAG_STRING               1
+#define TOKEN_LITERAL_FLAG_SIGNED_INTEGER       2
+#define TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER     4
+#define TOKEN_LITERAL_FLAG_INTEGER              (2+4)
+#define TOKEN_LITERAL_FLAG_FLOAT                8
+#define TOKEN_LITERAL_FLAG_NUMBER               (2+4+8)
+#define TOKEN_LITERAL_FLAG_CONSTANT             16
+#define TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT (1+2+4+8+16)
+#define TOKEN_LITERAL_FLAG_INTRODUCER           32
+#define TOKEN_LITERAL_FLAG_INTRODUCEABLE_STRING (1+32)
+#define TOKEN_LITERAL_FLAG_USER                 64
+#define TOKEN_LITERAL_FLAG_USER_STRING          (1+64)
+#define TOKEN_LITERAL_FLAG_HOST                 128
+#define TOKEN_LITERAL_FLAG_HOST_STRING          (1+128)
+#define TOKEN_LITERAL_FLAG_ODBC                 256
+#define TOKEN_LITERAL_FLAG_ODBC_STRING          (1+256)
+#define TOKEN_LITERAL_FLAG_DATE                 512
+#define TOKEN_LITERAL_FLAG_DATE_STRING          (1+512)
+#define TOKEN_LITERAL_FLAG_UUID                 1024
+#define TOKEN_LITERAL_FLAG_MAP                  2048
+#define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512+1024+2048)
+
+/*
+TOKEN_TYPE_... shows "what kind of token is it?" e.g. TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK.
+TOKEN_REFTYPE_... shows "what kind of object does the token refer to?"
+e.g. if it's identifier, is it a database identifier?
+We only pass something specific if we are sure that is what must follow.
+Beware: A "user" might be qualified within 'user'@'host' I guess that's a form of qualifier.
+Beware: there are enum values for "x or y" e.g. "user or role", "database or table", etc.
+TOKEN_REFTYPE_... values and must be in the same order.
+Todo: store these in main_token_reftypes[] to help hovering.
+Todo: knowing it's "column" doesn't help us yet with knowing: column of what?
+      but eventually we can bring in lists of objects, and refer to them by number-within-the-list
+Todo: eventually we can be sure, after qualification is done, for a column (e.g. we've seen FROM)
+Todo: Get rid of enums that aren't actually used.
+... And my plan is:
+* Always pass reftype for hparse_f_accept and hparse_f_acceptn and hparse_f_expect
+* If the pass is "[identifier]" then the expected list gets "[table identifier]", etc.
+* Eventually, use this so we can auto-complete any object names
+(We'll have a local list of object names so we can store numbers.)
+* Eventually, have reftypes for literals too -- again, meaning "what they refer to", not format
+* Check: sometimes TOKEN_TYPE_IDENTIFIER_WITH_AT is not appropriate
+* For LIMIT and OFFSET, the only possibilities are @variable and declared variable and parameter
+* I'd also like to restrict what FETCH variable can be
+* Whenever it is specific, IDENTIFIER_WITH_AT is not appropriate,
+and a maximum length is applicable such as MYSQL_MAX_IDENTIFIER_LENGTH.
+* There is one case where we pass "[reserved function]" instead of "[identifier]".
+*/
+
+enum {
+  TOKEN_REFTYPE_ANY,                 /* any kind, or it's irrelevant, or we don't care */
+  TOKEN_REFTYPE_ALIAS_OF_COLUMN, /* or correlation */
+  TOKEN_REFTYPE_ALIAS_OF_TABLE, /* or correlation */
+  TOKEN_REFTYPE_ATTRIBUTE,
+  TOKEN_REFTYPE_AUTO_INCREMENT,
+  TOKEN_REFTYPE_CHANNEL,
+  TOKEN_REFTYPE_CHARACTER_SET,
+  TOKEN_REFTYPE_COLLATION,
+  TOKEN_REFTYPE_COLUMN,
+  TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE,
+  TOKEN_REFTYPE_COLUMN_OR_VARIABLE,
+  TOKEN_REFTYPE_COMMENT,
+  TOKEN_REFTYPE_CONDITION_DEFINE,
+  TOKEN_REFTYPE_CONDITION_REFER,
+  TOKEN_REFTYPE_CONDITION_OR_CURSOR,
+  TOKEN_REFTYPE_CONSTRAINT,
+  TOKEN_REFTYPE_CURSOR_DEFINE,
+  TOKEN_REFTYPE_CURSOR_REFER,
+  TOKEN_REFTYPE_DATABASE, /* or schema */
+  TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT,
+  TOKEN_REFTYPE_DATABASE_OR_EVENT,
+  TOKEN_REFTYPE_DATABASE_OR_FUNCTION,
+  TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE,
+  TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_VARIABLE,
+  TOKEN_REFTYPE_DATABASE_OR_PACKAGE,
+  TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
+  TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_VARIABLE_OR_FUNCTION,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_COLUMN,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_VARIABLE,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
+  TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
+  TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
+  TOKEN_REFTYPE_DATABASE_OR_VIEW,
+  TOKEN_REFTYPE_DIRECTORY,
+  TOKEN_REFTYPE_ENGINE,
+  TOKEN_REFTYPE_EVENT,
+  TOKEN_REFTYPE_FILE,
+  TOKEN_REFTYPE_FUNCTION,
+  TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE,
+  TOKEN_REFTYPE_FUNCTION_OR_VARIABLE,
+  TOKEN_REFTYPE_HANDLER_ALIAS,
+  TOKEN_REFTYPE_HOST,
+  TOKEN_REFTYPE_INDEX,
+  TOKEN_REFTYPE_INTRODUCER,
+  TOKEN_REFTYPE_KEY_CACHE,
+  TOKEN_REFTYPE_LABEL_DEFINE,
+  TOKEN_REFTYPE_LABEL_REFER,
+  TOKEN_REFTYPE_LENGTH,
+  TOKEN_REFTYPE_PACKAGE,
+  TOKEN_REFTYPE_PARAMETER_DEFINE,
+  TOKEN_REFTYPE_PARAMETER_REFER,
+  TOKEN_REFTYPE_PARSER,
+  TOKEN_REFTYPE_PLUGIN,
+  TOKEN_REFTYPE_PROCEDURE,
+  /* plus TOKEN_REFTYPE_RESERVED_FUNCTION */
+  TOKEN_REFTYPE_PARTITION,
+  TOKEN_REFTYPE_PARTITION_NUMBER,
+  TOKEN_REFTYPE_PASSWORD,
+  TOKEN_REFTYPE_ROLE,
+  TOKEN_REFTYPE_ROW,
+  TOKEN_REFTYPE_ROW_OR_VARIABLE,
+  TOKEN_REFTYPE_SAVEPOINT,
+  TOKEN_REFTYPE_SCALE,
+  TOKEN_REFTYPE_SEQUENCE,
+  TOKEN_REFTYPE_SERVER,
+  TOKEN_REFTYPE_SQLSTATE,
+  TOKEN_REFTYPE_STATEMENT,
+  TOKEN_REFTYPE_SUBPARTITION,
+  TOKEN_REFTYPE_SWITCH_NAME,
+  TOKEN_REFTYPE_TABLE,
+  TOKEN_REFTYPE_TABLE_OR_COLUMN,
+  TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,
+  TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
+  TOKEN_REFTYPE_TABLE_OR_ROW,
+  TOKEN_REFTYPE_TABLESPACE,
+  TOKEN_REFTYPE_TRANSACTION,
+  TOKEN_REFTYPE_TRIGGER,
+  TOKEN_REFTYPE_USER,
+  TOKEN_REFTYPE_USER_VARIABLE,
+  TOKEN_REFTYPE_VARIABLE,         /* i.e. either USER_VARIABLE or DECLARED VARIABLE */
+  TOKEN_REFTYPE_VARIABLE_DEFINE,
+  TOKEN_REFTYPE_VARIABLE_REFER,
+  TOKEN_REFTYPE_VIEW,
+  TOKEN_REFTYPE_WINDOW_DEFINE,
+  TOKEN_REFTYPE_WINDOW_REFER,
+  TOKEN_REFTYPE_WITH_TABLE,
+  TOKEN_REFTYPE_WRAPPER,
+  TOKEN_REFTYPE_MAX
+  /*
+    In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 91);".
+    If it blows, that means you changed the above enum list.
+    Which is okay, but before you change the assert, make sure
+    reftypewords list corresponds to the enum list!
+  */
+};
+
+/* Use NULL_STRING when displaying a column value which is null. Length is sizeof(NULL_STRING) - 1. */
+#define NULL_STRING "NULL"
+
+/* During scan_rows we might set a flag e.g. if a column value is null */
+#define FIELD_VALUE_FLAG_IS_ZERO 0
+#define FIELD_VALUE_FLAG_IS_NULL 1
+                                #define FIELD_VALUE_FLAG_IS_NUMBER 2
+#define FIELD_VALUE_FLAG_IS_STRING 4
+#define FIELD_VALUE_FLAG_IS_OTHER 8
+#define FIELD_VALUE_FLAG_IS_IMAGE 16
+
+/*
+  Often an OCELOT_DATA_TYPE value is the same as a MYSQL_TYPE value, for example
+  MYSQL_TYPE_LONG_BLOB=251 in mysql_com.h and #define OCELOT_DATA_TYPE_LONG_BLOB 251 here.
+  But we have additional TEXT and BINARY types because we distinguish when charsetnr=63.
+  DECIMAL and NEWDECIMAL are both DECIMAL. LONG is INT. INT24 is MEDIUMINT. LONGLONG is BIGINT.
+  STRING is CHAR (only). VAR_STRING is VARCHAR (only). BLOB is BLOB (only).
+  See also struct typer.
+*/
+#define OCELOT_DATA_TYPE_DECIMAL     0
+#define OCELOT_DATA_TYPE_TINY        1
+#define OCELOT_DATA_TYPE_SHORT       2
+#define OCELOT_DATA_TYPE_LONG        3
+#define OCELOT_DATA_TYPE_FLOAT       4
+#define OCELOT_DATA_TYPE_DOUBLE      5
+#define OCELOT_DATA_TYPE_NULL        6
+#define OCELOT_DATA_TYPE_TIMESTAMP   7
+#define OCELOT_DATA_TYPE_LONGLONG    8
+#define OCELOT_DATA_TYPE_INT24       9
+#define OCELOT_DATA_TYPE_DATE        10
+#define OCELOT_DATA_TYPE_TIME        11
+#define OCELOT_DATA_TYPE_DATETIME    12
+#define OCELOT_DATA_TYPE_YEAR        13
+//#define OCELOT_DATA_TYPE_NEWDATE     14
+//#define OCELOT_DATA_TYPE_VARCHAR     15
+#define OCELOT_DATA_TYPE_BIT         16
+#define OCELOT_DATA_TYPE_JSON        245       /* new in MySQL 5.7. todo: don't ignore it */
+#define OCELOT_DATA_TYPE_NEWDECIMAL  246
+#define OCELOT_DATA_TYPE_ENUM        247
+#define OCELOT_DATA_TYPE_SET         248
+#define OCELOT_DATA_TYPE_TINY_BLOB   249
+#define OCELOT_DATA_TYPE_MEDIUM_BLOB 250
+#define OCELOT_DATA_TYPE_LONG_BLOB   251
+#define OCELOT_DATA_TYPE_BLOB        252
+#define OCELOT_DATA_TYPE_VAR_STRING  253       /* i.e. VARCHAR or VARBINARY */
+#define OCELOT_DATA_TYPE_STRING      254       /* i.e. CHAR or BINARY */
+#define OCELOT_DATA_TYPE_GEOMETRY    255
+#define OCELOT_DATA_TYPE_BINARY      10001
+#define OCELOT_DATA_TYPE_VARBINARY   10002
+#define OCELOT_DATA_TYPE_TEXT        10003
+#define OCELOT_DATA_TYPE_SCALAR      12001     /* numbers > 12000 are Tarantool-specific */
+#define OCELOT_DATA_TYPE_BOOLEAN     12002
+#define OCELOT_DATA_TYPE_MAP         12003
+#define OCELOT_DATA_TYPE_ARRAY       12004
+#define OCELOT_DATA_TYPE_INTEGER     12005
+#define OCELOT_DATA_TYPE_UNSIGNED    12006
+#define OCELOT_DATA_TYPE_NUMBER      12007
+
+struct connect_arguments {
+  char * host_as_utf8;   /* --host=s */
+  /* Connect arguments and options */
+  //  char* ca.host_as_utf8;                  /* --host=s */
+  char* database_as_utf8;              /* --database=s */
+  char* user_as_utf8;                  /* --user=s */
+  char* password_as_utf8;              /* --password[=s] */
+  unsigned short port;        /* --port=n */
+  char* unix_socket_as_utf8;           /* --socket=s */
+  unsigned int protocol_as_int;        /* --protocol=s for MYSQL_OPT_PROTOCOL */
+  char* init_command_as_utf8;          /* --init_command=s for MYSQL_INIT_COMMAND */
+  /* Connect arguments below this point are minor and many are unsupported. */
+  unsigned short abort_source_on_error;   /* --abort_source_on_error (MariaDB) */
+  unsigned short auto_rehash;             /* --auto_rehash */
+  unsigned short auto_vertical_output;    /* --auto_vertical_output */
+  unsigned short batch;                   /* --batch */
+  unsigned short binary_mode;             /* --binary_mode */
+  /* QString bind_address */                        /* --bind_address=s */
+  char* set_charset_dir_as_utf8;         /* --character_sets_dir=s for MYSQL_SET_CHARSET_DIR */
+  unsigned short result_grid_column_names;/* --column_names */
+  unsigned short column_type_info;        /* --column_type_info */
+  unsigned short comments;               /* --comments */
+  unsigned short opt_compress;           /* --compress for MYSQL_OPT_COMPRESS */
+  unsigned long int opt_connect_timeout;  /* --connect_timeout = n for MYSQL_OPT_CONNECT_TIMEOUT */
+  /* QString debug */                               /* --debug[=s] */
+  unsigned short debug_check;             /* --debug_check */
+  unsigned short debug_info;              /* --debug_info */
+  char* default_auth_as_utf8;      /* --default_auth=s for MYSQL_DEFAULT_AUTH */
+  char* set_charset_name_as_utf8;  /* --default_character_set=s for MYSQL_SET_CHARSET_NAME */
+  /* exists as QString */                    /* --defaults_extra_file=s */
+  /* exists as QString */                    /* --defaults_file=s */
+  /* exists as QString */                    /* --defaults_group_suffix=s */
+  /* exists as QString */                    /* --delimiter=s */
+  unsigned short enable_cleartext_plugin;  /* --enable_cleartext_plugin for MYSQL_ENABLE_CLEARTEXT_PLUGIN */
+  /* QString execute */               /* --execute=s */
+  unsigned short force;     /* --force */
+  unsigned short help;      /* --help */
+  unsigned char history_hist_file_is_open; /* was bool */
+  unsigned char history_hist_file_is_copied; /* was bool */
+  /* exists as QString */                    /* --histfile=s */
+  /* exists as QString */                    /* --histignore=s */
+  unsigned short html;      /* --html */
+  unsigned short ignore_spaces;  /* --ignore_spaces */
+  /* QString ld_run_path */                /* --ld_run_path=s */
+  unsigned short line_numbers;   /* --line_numbers */
+  unsigned short opt_local_infile;    /* --local_infile[=n]  for MYSQL_OPT_LOCAL_INFILE */
+  /* QString login_path */            /* --login_path=s */
+  unsigned short int log_level;          /* --ocelot_log_level */
+  unsigned short int max_conditions;
+  unsigned long int max_allowed_packet; /* --max_allowed_packet=n */
+  unsigned long int max_join_size; /* --max_join_size = n */
+  unsigned short named_commands;         /* --named_commands */
+  unsigned long int net_buffer_length; /* --net_buffer_length=n */
+  unsigned short no_beep;                /* --no_beep */
+  unsigned short no_defaults;            /* --no_defaults */
+  /* QString dbms */
+  unsigned short one_database;           /* --one-database */
+  /* QString pager */                              /* --pager[=s] */
+  unsigned short pipe;                   /* --pipe */
+  char* plugin_dir_as_utf8;        /* --plugin_dir=s for MYSQL_PLUGIN_DIR */
+  unsigned short print_defaults;   /* --print_defaults */
+  /* QString prompt */                       /* --prompt=s */
+  unsigned char prompt_is_default; /* was bool */
+  unsigned short quick;            /* --quick */
+  unsigned short raw;              /* --raw */
+  unsigned int opt_reconnect;      /* --reconnect for MYSQL_OPT_RECONNECT */                                           /* --reconnect */
+  unsigned short safe_updates;           /* --safe-updates or --i-am-a-dummy */
+  unsigned short secure_auth;             /* --secure_auth for MYSQL_SECURE_AUTH (default=true if version >= 5.6.5) */
+  unsigned long int select_limit;  /* --select_limit = n */
+  char* server_public_key_as_utf8; /* --server_public_key=s for MYSQL_SERVER_PUBLIC_KEY */
+  char* shared_memory_base_name_as_utf8; /* --shared_memory_base_name=s for MYSQL_SHARED_MEMORY_BASE_NAME */
+  unsigned short history_includes_warnings; /* --show_warnings include warning(s) returned from statement? default = no. */
+  unsigned short sigint_ignore;          /* --sigint_ignore */
+  unsigned short silent;                 /* --silent */
+  char* opt_ssl_as_utf8;           /* --ssl for CONNECT */
+  char* opt_ssl_ca_as_utf8;        /* --ssl-ca for MYSQL_OPT_SSL_CA */
+  char* opt_ssl_capath_as_utf8;    /* --ssl-capath for MYSQL_OPT_SSL_CAPATH. */
+  char* opt_ssl_cert_as_utf8;      /* --ssl-cert for MYSQL_OPT_SSL_CERT */
+  char* opt_ssl_cipher_as_utf8;    /* --ssl-cipher for MYSQL_OPT_SSL_CIPHER */
+  char* opt_ssl_crl_as_utf8;       /*  --ssl-crl for MYSQL_OPT_SSL_CRL */
+  char* opt_ssl_crlpath_as_utf8;   /* --ssl-crlpath for MYSQL_OPT_SSL_CRLPATH */
+  char* opt_ssl_key_as_utf8;       /* --ssl-key for MYSQL_OPT_SSL_KEY */
+  char* opt_ssl_mode_as_utf8;      /* --ssl-mode for MYSQL_OPT_SSL_MODE */
+  unsigned short int opt_ssl_verify_server_cert;  /* --ssl-verify-server-cert for MYSQL_OPT_SSL_VERIFY_SERVER_CERT. --ssl-verify-server-cert (5.7) */
+  unsigned short syslog;           /* --syslog (5.7) */
+  unsigned short table;            /* --table */
+  unsigned char history_tee_file_is_open; /* was bool */     /* --tee for tee  ... arg=history_tee_file_name*/
+  unsigned short unbuffered;       /* --unbuffered */
+  unsigned short verbose;          /* --verbose */
+  unsigned short version;          /* --version */
+  unsigned short vertical;               /* --vertical */
+  unsigned short wait;                   /* --wait ... actually this does nothing */
+  unsigned short xml;                    /* --xml */
+  unsigned short bar;                    /* unused */
+  unsigned short line;                   /* unused */
+  unsigned short pie;                    /* unused */
+  /*
+    For MYSQL_OPT_CAN_HANDLE_EXPIRED_PASSWORDS + --connect-expired-password.
+    mysql client has this off by default, but ocelotgui has it on by default
+    so to turn it off say ocelotgui --skip_connect_expired_password
+  */
+  unsigned short opt_can_handle_expired_passwords;
+  /* Some items we allow, which are not available in mysql client */
+  char* opt_bind_as_utf8;              /* for MYSQL_OPT_BIND */
+  char* opt_connect_attr_delete_as_utf8;  /* for MYSQL_OPT_CONNECT_ATTR_DELETE */
+  unsigned short int opt_connect_attr_reset; /* for MYSQL_OPT_CONNECT_ATTR_RESET */
+  char* read_default_file_as_utf8; /* for MYSQL_READ_DEFAULT_FILE */
+  char* read_default_group_as_utf8;/* for MYSQL_READ_DEFAULT_GROUP */
+  unsigned int opt_read_timeout;          /* for MYSQL_OPT_READ_TIMEOUT */
+  unsigned short int report_data_truncation; /* for MYSQL_REPORT_DATA_TRUNCATION */
+  unsigned short int opt_use_result; /* for MYSQL_OPT_USE_RESULT */
+  /* It's easy to increase grid_tabs so more multi results are seen but don't make it ridiculous. */
+  unsigned short int grid_tabs;
+  unsigned short int grid_actual_tabs; /* Todo: move this, it's not an option. */
+  unsigned short int client_side_functions;
+  unsigned short int completer_timeout;
+  char shortcut_connect[80];
+  char shortcut_exit[80];
+  char shortcut_undo[80];
+  char shortcut_redo[80];
+  char shortcut_cut[80];
+  char shortcut_copy[80];
+  char shortcut_paste[80];
+  char shortcut_select_all[80];
+  char shortcut_history_markup_previous[80];
+  char shortcut_history_markup_next[80];
+  char shortcut_format[80];
+  char shortcut_zoomin[80];
+  char shortcut_zoomout[80];
+  char shortcut_autocomplete[80];
+  char shortcut_find[80];
+  char shortcut_execute[80];
+  char shortcut_kill[80];
+  char shortcut_next_window[80];
+  char shortcut_previous_window[80];
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  char shortcut_breakpoint[80];
+  char shortcut_continue[80];
+  char shortcut_next[80];
+  char shortcut_step[80];
+  char shortcut_clear[80];
+  char shortcut_debug_exit[80];
+  char shortcut_information[80];
+  char shortcut_refresh_server_variables[80];
+  char shortcut_refresh_user_variables[80];
+  char shortcut_refresh_variables[80];
+  char shortcut_refresh_call_stack[80];
+#endif
+  char shortcut_batch[80];
+  char shortcut_chart_bar[80];
+  char shortcut_chart_line[80];
+  char shortcut_chart_none[80];
+  char shortcut_chart_pie[80];
+  char shortcut_horizontal[80];
+  char shortcut_html[80];
+  char shortcut_htmlraw[80];
+  char shortcut_raw[80];
+  char shortcut_vertical[80];
+  char shortcut_xml[80];
+  /* Some items we allow, but the reasons we allow them are lost in the mists of time */
+  /* I gather that one is supposed to read the charset file. I don't think we do. */
+  unsigned short opt_named_pipe;          /* for MYSQL_OPT_NAMED_PIPE */
+  unsigned int opt_write_timeout; /* for MYSQL_OPT_WRITE_TIMEOUT */
+  unsigned char detach_history_widget; /* was bool */
+  unsigned char detach_result_grid_widget; /* was bool */
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  unsigned char detach_debug_widget; /* WAs bool */
+#endif
+  unsigned char detach_statement_edit_widget; /* was bool */
+#if (OCELOT_EXPLORER == 1)
+  unsigned char detach_explorer_widget; /* was bool */
+#endif
+};
+
+#if (OCELOT_PLUGIN == 1)
+/* Possible values of the name when calling a plugin. */
+#define PLUGIN_AT_PROGRAM_START 0
+#define PLUGIN_BEFORE_CONNECT 1
+#define PLUGIN_BEFORE_INSTALL 2
+#define PLUGIN_REAL_QUERY 3 /* almost immediately before passing (char*) dbms_query to the server */
+#define PLUGIN_ERROR_MESSAGE 4
+#define PLUGIN_ALL 5
+#define PLUGIN_EXECUTE_ONE_STATEMENT 6
+#define PLUGIN_TEXT_CHANGED 7
+#define PLUGIN_FILLUP 8
+#define PLUGIN_DISPLAY_HTML 9
+#define PLUGIN_MENU 10
+#define PLUGIN_MAX 10
+
+/* Possible values that a plugin can return */
+/* Todo: we might need more values for: skip, ignore, not-ok, not-ok-and-replaced */
+#define PLUGIN_RETURN_OK 0
+#define PLUGIN_RETURN_OK_AND_REPLACED 1 /* plugin returns this on if it has set a new value in replacer_buffer */
+#define PLUGIN_RETURN_SKIP 2
+
+#if (OCELOT_PLUGIN == 1)
+struct plugin_keywords {
+   char chars[24];
+   unsigned short int token_keyword;
+};
+
+static const struct plugin_keywords plugin_strvalues[]=
+   {
+     {"at_program_start",  PLUGIN_AT_PROGRAM_START},
+     {"before_connect",  PLUGIN_BEFORE_CONNECT},
+     {"before_install",  PLUGIN_BEFORE_INSTALL},
+     {"real_query", PLUGIN_REAL_QUERY},
+     {"error_message", PLUGIN_ERROR_MESSAGE},
+     {"all", PLUGIN_ALL},
+     {"execute_one_statement", PLUGIN_EXECUTE_ONE_STATEMENT},
+     {"text_changed", PLUGIN_TEXT_CHANGED},
+     {"fillup", PLUGIN_FILLUP},
+     {"display_html", PLUGIN_DISPLAY_HTML},
+     {"menu", PLUGIN_MENU}
+};
+#endif
+
+struct plugin_pass {
+  int type; /* e.g. PLUGIN_AT_PROGRAM_START */
+  struct connect_arguments *ca;
+  char name[32];
+  char *query;
+  char *error_message;
+  int replacer_buffer_length;
+  char *replacer_buffer;
+  /* Lots of room to add more! */
+  /* good idea to include plugin version number */
+  char *result_set_copy;
+  long unsigned int result_row_count;
+  unsigned int result_column_count;
+  char *display;
+  int subtype;
+};
+
+#endif
+
+/* Everything before this can be included in either a a .c or .cpp program. For everything after this, must be .cpp. */
+#ifdef __cplusplus
+
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
@@ -4432,6 +4944,9 @@ class Chart;
 #if (OCELOT_QWT_INCLUDE == 1)
 class QChart;
 #endif
+#if (OCELOT_PLUGIN == 1)
+class Plugin;
+#endif
 
 QT_END_NAMESPACE
 
@@ -4803,6 +5318,7 @@ public:
   void hparse_f_index_columns(int,bool,bool,bool);
   void hparse_f_alter_or_create_view();
   int hparse_f_analyze_or_optimize(int,int*);
+  void hparse_f_install(int);
   void hparse_f_call();
   void hparse_f_call_arguments();
   void hparse_f_commit_or_rollback();
@@ -5122,6 +5638,7 @@ protected:
 private:
 public:
   Ui::MainWindow *ui;
+  void put_message_in_result(QString);
 private:
   int history_markup_previous_or_next();
   void initialize_widget_history();
@@ -5142,7 +5659,8 @@ private:
   QString debug_privilege_check(int statement_type);
 #endif
   void main_token_new(int), main_token_push(), main_token_pop();
-  void create_menu(); void fill_menu();
+  void create_menu(); void fill_menu_1(); void fill_menu_2();
+  void menu_item(int key_of_menu_or_menu_item, QMenu* qmenu_of_menu, QAction *qaction_of_menu_item);
   int rehash_scan(char *, QString alternate_query); int rehash_scan_for_tarantool(char *, QString alternate_query);
   void rehash_garbage_collect();
   void rehash_scan_one_space(int space_number);
@@ -5167,7 +5685,6 @@ private:
   void prompt_default();
   int conditional_settings_insert(QString text);
   void put_diagnostics_in_result(unsigned int);
-  void put_message_in_result(QString);
   void make_and_put_message_in_result(unsigned int, int, char*);
   void make_and_put_open_message_in_result(unsigned int, int, QString);
   void make_and_append_message_in_result(unsigned int, int, char*);
@@ -5325,6 +5842,12 @@ private:
   QWidget *main_window;
 public:
   TextEditHistory *history_edit_widget;
+#if (OCELOT_PLUGIN == 1)
+  QList<Plugin *> plugin_widget_list;
+  int plugin_widget_list_caller(int type);
+  int show_plugins();
+  int install_or_uninstall_plugin(QString, QString, QString, const QString *);
+#endif
 private:
 
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -5565,217 +6088,9 @@ public:
   QString tarantool_table_name;
   QString tarantool_column_name;
 
-  /*
-    result_type values, determined by tarantool_get_result_type()
-    4 == result set of box.space.x:select() with signature = array+array
-    5 == result set of SQL select|values, with "metadata" signature
-    6 == result of SQL not select|values, with "row_count" signature
-    7 == error with "Error: " signature (but maybe RESULT_TYPE_0 is error as well?)
-    8 = result set from box.execute() so tarantool_tnt_reply.metadata != 0
-  */
-  #define RESULT_TYPE_0 0
-  #define RESULT_TYPE_1 1
-  #define RESULT_TYPE_2 2
-  #define RESULT_TYPE_3 3
-  #define RESULT_TYPE_4 4
-  #define RESULT_TYPE_5 5
-  #define RESULT_TYPE_6 6
-  #define RESULT_TYPE_7 7
-  #define RESULT_TYPE_8 8
-
-  /* main_token_flags[] values. so far there are only sixteen but we expect there will be more. */
-  #define TOKEN_FLAG_IS_RESERVED 1
-  #define TOKEN_FLAG_IS_BLOCK_END 2
-  #define TOKEN_FLAG_IS_ERROR 4
-  #define TOKEN_FLAG_IS_FUNCTION 8
-  #define TOKEN_FLAG_IS_START_STATEMENT 16
-  #define TOKEN_FLAG_IS_START_CLAUSE 32
-  #define TOKEN_FLAG_IS_START_SUBCLAUSE 64
-  #define TOKEN_FLAG_IS_DATA_TYPE 128
-  #define TOKEN_FLAG_IS_START_IN_COLUMN_LIST 256
-  #define TOKEN_FLAG_IS_END_IN_COLUMN_LIST 512
-  #define TOKEN_FLAG_IS_BINARY_PLUS_OR_MINUS 1024
-  #define TOKEN_FLAG_IS_NOT_AFTER_SPACE 2048
-  #define TOKEN_FLAG_IS_MAYBE_LUA 4096
-  #define TOKEN_FLAG_IS_LUA 8192
-  #define TOKEN_FLAG_IS_FLOW_CONTROL 16384
-  #define TOKEN_FLAG_IS_DEBUGGABLE 32768
-  #define TOKEN_FLAG_IS_DECLARE 65536
-  #define TOKEN_FLAG_IS_PLSQL_DECLARE_SEMICOLON 131072
-  //#define TOKEN_FLAG_IS_ASSIGNEE 262144
-  #define TOKEN_FLAG_IS_NEW 262144
-#if (OCELOT_EXTENDER == 1)
-  /* Todo: try to re-use flag values from above list, where you're sure there can never be ambiguity */
-  #define TOKEN_FLAG_SEMISELECT_1 524288
-  #define TOKEN_FLAG_SEMISELECT_2 1048576
-  #define TOKEN_FLAG_IS_SEMISELECT TOKEN_FLAG_SEMISELECT_1
-  #define TOKEN_FLAG_IS_SEMISELECT_MID TOKEN_FLAG_SEMISELECT_2
-  #define TOKEN_FLAG_IS_SEMISELECT_END (TOKEN_FLAG_SEMISELECT_1 | TOKEN_FLAG_SEMISELECT_2)
-  #define TOKEN_FLAG_IS_SEMISELECT_ALL (TOKEN_FLAG_SEMISELECT_1 | TOKEN_FLAG_SEMISELECT_2)
-#endif
-
-/* The enum for TOKEN_TYPE_LITERAL etc. was here, but moved outside MainWindow on 2019-02-26 */
-
-/*
-  TOKEN_LITERAL_FLAG is for passing required format to hparse_f_literal().
-  Example: +5 is okay if we're looking for signed integer,
-  but if we say hparse_f_literal(TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER)
-  then the only acceptable literals are unsigned integers.
-  Todo: The expected will still say "[literal]", more general than needed.
-  Todo: We aren't specific enough, we don't use this enough.
-  Todo: Some values aren't used.
-*/
-#define TOKEN_LITERAL_FLAG_STRING               1
-#define TOKEN_LITERAL_FLAG_SIGNED_INTEGER       2
-#define TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER     4
-#define TOKEN_LITERAL_FLAG_INTEGER              (2+4)
-#define TOKEN_LITERAL_FLAG_FLOAT                8
-#define TOKEN_LITERAL_FLAG_NUMBER               (2+4+8)
-#define TOKEN_LITERAL_FLAG_CONSTANT             16
-#define TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT (1+2+4+8+16)
-#define TOKEN_LITERAL_FLAG_INTRODUCER           32
-#define TOKEN_LITERAL_FLAG_INTRODUCEABLE_STRING (1+32)
-#define TOKEN_LITERAL_FLAG_USER                 64
-#define TOKEN_LITERAL_FLAG_USER_STRING          (1+64)
-#define TOKEN_LITERAL_FLAG_HOST                 128
-#define TOKEN_LITERAL_FLAG_HOST_STRING          (1+128)
-#define TOKEN_LITERAL_FLAG_ODBC                 256
-#define TOKEN_LITERAL_FLAG_ODBC_STRING          (1+256)
-#define TOKEN_LITERAL_FLAG_DATE                 512
-#define TOKEN_LITERAL_FLAG_DATE_STRING          (1+512)
-#define TOKEN_LITERAL_FLAG_UUID                 1024
-#define TOKEN_LITERAL_FLAG_MAP                  2048
-#define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512+1024+2048)
-
-/*
-  TOKEN_TYPE_... shows "what kind of token is it?" e.g. TOKEN_TYPE_IDENTIFIER_WITH_BACKTICK.
-  TOKEN_REFTYPE_... shows "what kind of object does the token refer to?"
-  e.g. if it's identifier, is it a database identifier?
-  We only pass something specific if we are sure that is what must follow.
-  Beware: A "user" might be qualified within 'user'@'host' I guess that's a form of qualifier.
-  Beware: there are enum values for "x or y" e.g. "user or role", "database or table", etc.
-  TOKEN_REFTYPE_... values and must be in the same order.
-  Todo: store these in main_token_reftypes[] to help hovering.
-  Todo: knowing it's "column" doesn't help us yet with knowing: column of what?
-        but eventually we can bring in lists of objects, and refer to them by number-within-the-list
-  Todo: eventually we can be sure, after qualification is done, for a column (e.g. we've seen FROM)
-  Todo: Get rid of enums that aren't actually used.
-... And my plan is:
-* Always pass reftype for hparse_f_accept and hparse_f_acceptn and hparse_f_expect
-* If the pass is "[identifier]" then the expected list gets "[table identifier]", etc.
-* Eventually, use this so we can auto-complete any object names
-  (We'll have a local list of object names so we can store numbers.)
-* Eventually, have reftypes for literals too -- again, meaning "what they refer to", not format
-* Check: sometimes TOKEN_TYPE_IDENTIFIER_WITH_AT is not appropriate
-* For LIMIT and OFFSET, the only possibilities are @variable and declared variable and parameter
-* I'd also like to restrict what FETCH variable can be
-* Whenever it is specific, IDENTIFIER_WITH_AT is not appropriate,
-  and a maximum length is applicable such as MYSQL_MAX_IDENTIFIER_LENGTH.
-* There is one case where we pass "[reserved function]" instead of "[identifier]".
-*/
-
-enum {
-    TOKEN_REFTYPE_ANY,                 /* any kind, or it's irrelevant, or we don't care */
-    TOKEN_REFTYPE_ALIAS_OF_COLUMN, /* or correlation */
-    TOKEN_REFTYPE_ALIAS_OF_TABLE, /* or correlation */
-    TOKEN_REFTYPE_ATTRIBUTE,
-    TOKEN_REFTYPE_AUTO_INCREMENT,
-    TOKEN_REFTYPE_CHANNEL,
-    TOKEN_REFTYPE_CHARACTER_SET,
-    TOKEN_REFTYPE_COLLATION,
-    TOKEN_REFTYPE_COLUMN,
-    TOKEN_REFTYPE_COLUMN_OR_USER_VARIABLE,
-    TOKEN_REFTYPE_COLUMN_OR_VARIABLE,
-    TOKEN_REFTYPE_COMMENT,
-    TOKEN_REFTYPE_CONDITION_DEFINE,
-    TOKEN_REFTYPE_CONDITION_REFER,
-    TOKEN_REFTYPE_CONDITION_OR_CURSOR,
-    TOKEN_REFTYPE_CONSTRAINT,
-    TOKEN_REFTYPE_CURSOR_DEFINE,
-    TOKEN_REFTYPE_CURSOR_REFER,
-    TOKEN_REFTYPE_DATABASE, /* or schema */
-    TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT,
-    TOKEN_REFTYPE_DATABASE_OR_EVENT,
-    TOKEN_REFTYPE_DATABASE_OR_FUNCTION,
-    TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_PROCEDURE,
-    TOKEN_REFTYPE_DATABASE_OR_FUNCTION_OR_VARIABLE,
-    TOKEN_REFTYPE_DATABASE_OR_PACKAGE,
-    TOKEN_REFTYPE_DATABASE_OR_PROCEDURE,
-    TOKEN_REFTYPE_DATABASE_OR_SEQUENCE,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_VARIABLE_OR_FUNCTION,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_COLUMN,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_FUNCTION_OR_VARIABLE,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
-    TOKEN_REFTYPE_DATABASE_OR_TABLE_OR_ROW_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
-    TOKEN_REFTYPE_DATABASE_OR_TRIGGER,
-    TOKEN_REFTYPE_DATABASE_OR_VIEW,
-    TOKEN_REFTYPE_DIRECTORY,
-    TOKEN_REFTYPE_ENGINE,
-    TOKEN_REFTYPE_EVENT,
-    TOKEN_REFTYPE_FILE,
-    TOKEN_REFTYPE_FUNCTION,
-    TOKEN_REFTYPE_FUNCTION_OR_PROCEDURE,
-    TOKEN_REFTYPE_FUNCTION_OR_VARIABLE,
-    TOKEN_REFTYPE_HANDLER_ALIAS,
-    TOKEN_REFTYPE_HOST,
-    TOKEN_REFTYPE_INDEX,
-    TOKEN_REFTYPE_INTRODUCER,
-    TOKEN_REFTYPE_KEY_CACHE,
-    TOKEN_REFTYPE_LABEL_DEFINE,
-    TOKEN_REFTYPE_LABEL_REFER,
-    TOKEN_REFTYPE_LENGTH,
-    TOKEN_REFTYPE_PACKAGE,
-    TOKEN_REFTYPE_PARAMETER_DEFINE,
-    TOKEN_REFTYPE_PARAMETER_REFER,
-    TOKEN_REFTYPE_PARSER,
-    TOKEN_REFTYPE_PLUGIN,
-    TOKEN_REFTYPE_PROCEDURE,
-    /* plus TOKEN_REFTYPE_RESERVED_FUNCTION */
-    TOKEN_REFTYPE_PARTITION,
-    TOKEN_REFTYPE_PARTITION_NUMBER,
-    TOKEN_REFTYPE_PASSWORD,
-    TOKEN_REFTYPE_ROLE,
-    TOKEN_REFTYPE_ROW,
-    TOKEN_REFTYPE_ROW_OR_VARIABLE,
-    TOKEN_REFTYPE_SAVEPOINT,
-    TOKEN_REFTYPE_SCALE,
-    TOKEN_REFTYPE_SEQUENCE,
-    TOKEN_REFTYPE_SERVER,
-    TOKEN_REFTYPE_SQLSTATE,
-    TOKEN_REFTYPE_STATEMENT,
-    TOKEN_REFTYPE_SUBPARTITION,
-    TOKEN_REFTYPE_SWITCH_NAME,
-    TOKEN_REFTYPE_TABLE,
-    TOKEN_REFTYPE_TABLE_OR_COLUMN,
-    TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,
-    TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION_OR_VARIABLE,
-    TOKEN_REFTYPE_TABLE_OR_ROW,
-    TOKEN_REFTYPE_TABLESPACE,
-    TOKEN_REFTYPE_TRANSACTION,
-    TOKEN_REFTYPE_TRIGGER,
-    TOKEN_REFTYPE_USER,
-    TOKEN_REFTYPE_USER_VARIABLE,
-    TOKEN_REFTYPE_VARIABLE,         /* i.e. either USER_VARIABLE or DECLARED VARIABLE */
-    TOKEN_REFTYPE_VARIABLE_DEFINE,
-    TOKEN_REFTYPE_VARIABLE_REFER,
-    TOKEN_REFTYPE_VIEW,
-    TOKEN_REFTYPE_WINDOW_DEFINE,
-    TOKEN_REFTYPE_WINDOW_REFER,
-    TOKEN_REFTYPE_WITH_TABLE,
-    TOKEN_REFTYPE_WRAPPER,
-    TOKEN_REFTYPE_MAX
-    /*
-      In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 91);".
-      If it blows, that means you changed the above enum list.
-      Which is okay, but before you change the assert, make sure
-      reftypewords list corresponds to the enum list!
-    */
-  };
 };
+
+
 
 #endif // MAINWINDOW_H
 
@@ -7428,16 +7743,6 @@ public:
 /* How many rows can fit on the screen? Take a guess for initialization. */
 #define RESULT_GRID_WIDGET_INITIAL_HEIGHT 10
 
-/* Use NULL_STRING when displaying a column value which is null. Length is sizeof(NULL_STRING) - 1. */
-#define NULL_STRING "NULL"
-
-/* During scan_rows we might set a flag e.g. if a column value is null */
-#define FIELD_VALUE_FLAG_IS_ZERO 0
-#define FIELD_VALUE_FLAG_IS_NULL 1
-                                #define FIELD_VALUE_FLAG_IS_NUMBER 2
-#define FIELD_VALUE_FLAG_IS_STRING 4
-#define FIELD_VALUE_FLAG_IS_OTHER 8
-#define FIELD_VALUE_FLAG_IS_IMAGE 16
 
 /* Todo: Maybe it would be better to depend on setting_min_width_of_a_column */
 #define MIN_WIDTH_IN_CHARS 3
@@ -7448,52 +7753,7 @@ ResultGrid(
         MainWindow *parent,
         bool is_displayable,
         int passed_result_grid_type);
-/*
-  Often an OCELOT_DATA_TYPE value is the same as a MYSQL_TYPE value, for example
-  MYSQL_TYPE_LONG_BLOB=251 in mysql_com.h and #define OCELOT_DATA_TYPE_LONG_BLOB 251 here.
-  But we have additional TEXT and BINARY types because we distinguish when charsetnr=63.
-  DECIMAL and NEWDECIMAL are both DECIMAL. LONG is INT. INT24 is MEDIUMINT. LONGLONG is BIGINT.
-  STRING is CHAR (only). VAR_STRING is VARCHAR (only). BLOB is BLOB (only).
-  See also struct typer.
-*/
-#define OCELOT_DATA_TYPE_DECIMAL     0
-#define OCELOT_DATA_TYPE_TINY        1
-#define OCELOT_DATA_TYPE_SHORT       2
-#define OCELOT_DATA_TYPE_LONG        3
-#define OCELOT_DATA_TYPE_FLOAT       4
-#define OCELOT_DATA_TYPE_DOUBLE      5
-#define OCELOT_DATA_TYPE_NULL        6
-#define OCELOT_DATA_TYPE_TIMESTAMP   7
-#define OCELOT_DATA_TYPE_LONGLONG    8
-#define OCELOT_DATA_TYPE_INT24       9
-#define OCELOT_DATA_TYPE_DATE        10
-#define OCELOT_DATA_TYPE_TIME        11
-#define OCELOT_DATA_TYPE_DATETIME    12
-#define OCELOT_DATA_TYPE_YEAR        13
-//#define OCELOT_DATA_TYPE_NEWDATE     14
-//#define OCELOT_DATA_TYPE_VARCHAR     15
-#define OCELOT_DATA_TYPE_BIT         16
-#define OCELOT_DATA_TYPE_JSON        245       /* new in MySQL 5.7. todo: don't ignore it */
-#define OCELOT_DATA_TYPE_NEWDECIMAL  246
-#define OCELOT_DATA_TYPE_ENUM        247
-#define OCELOT_DATA_TYPE_SET         248
-#define OCELOT_DATA_TYPE_TINY_BLOB   249
-#define OCELOT_DATA_TYPE_MEDIUM_BLOB 250
-#define OCELOT_DATA_TYPE_LONG_BLOB   251
-#define OCELOT_DATA_TYPE_BLOB        252
-#define OCELOT_DATA_TYPE_VAR_STRING  253       /* i.e. VARCHAR or VARBINARY */
-#define OCELOT_DATA_TYPE_STRING      254       /* i.e. CHAR or BINARY */
-#define OCELOT_DATA_TYPE_GEOMETRY    255
-#define OCELOT_DATA_TYPE_BINARY      10001
-#define OCELOT_DATA_TYPE_VARBINARY   10002
-#define OCELOT_DATA_TYPE_TEXT        10003
-#define OCELOT_DATA_TYPE_SCALAR      12001     /* numbers > 12000 are Tarantool-specific */
-#define OCELOT_DATA_TYPE_BOOLEAN     12002
-#define OCELOT_DATA_TYPE_MAP         12003
-#define OCELOT_DATA_TYPE_ARRAY       12004
-#define OCELOT_DATA_TYPE_INTEGER     12005
-#define OCELOT_DATA_TYPE_UNSIGNED    12006
-#define OCELOT_DATA_TYPE_NUMBER      12007
+
 bool is_image_format(int length, char* pointer);
 bool is_fancy();
 QString fillup(MYSQL_RES *mysql_res,
@@ -8618,5 +8878,134 @@ public:
 };
 #endif // #ifndef CONTEXT_MENU_H
 #endif // #if (OCELOT_EXPLORER == 1)
+
+#if (OCELOT_PLUGIN == 1)
+/*
+  Plugins
+  This class is not complete and the only documentation is this comment.
+  A plugin is a library with programs that can understand what ocelotgui passes,
+  It can do anything at all (including in some cases replacing what ocelotgui passes), displaying).
+  Writing the plugin
+    C or C++ (ocelotgui itself is built with gnu tools).
+    Any other language that can understand C/C++ structures would work but would be more trouble.
+    Must start with #include "ocelotgui.h" which happens to be this file.
+    Function names can be any of the names listed in static const struct plugin_keywords plugin_strvalues[]=, above.
+    (We use dlsym() to find function names.)
+    The ocelotgui.h header file has definitions that can be seen by C and more definitions that can be seen by C++.
+    So the front of ocelotgui.h works for either C or C++, and the back (after "#ifdef __cplusplus") works only for C++.
+    C definitions include some #define and struct items,
+    C++ definitions include class descriptions.
+  The plugin should be made into a library
+    Currently Plugin::plugin() uses dlopen() to look for a Linux .so file
+    The Windows equivalent would be GetModuleHandle() I guess, but we haven't added Windows support yet.
+    So the plugin should be compiled and turned into a library with (substitute your name preferences here):
+    gcc -shared -o libplugin.so -fPIC plugin.c
+    Currently if ocelotgui doesn't find the plugin it does nothing, there is a printf but no error return.
+    For security it is a good idea to protect the .so file from change, for example on Linux with chown and/or chmod.
+    LD_LIBRARY_PATH or --rpath or --plugin_dir do not affect where ocelotgui looks for the Ocelot plugin library.
+  The example file is plugin.c
+    See plugin.c, it will be included with the ocelotgui distribution.
+    Notice it has a copyright message and is GPLv2. GPLv2 plugins are compatible with ocelotgui.
+  Installing the plugin
+    SET ocelot_query = INSTALL PLUGIN plugin_name SONAME 'literal';
+    where literal has the full path of the library e.g.
+    set ocelot_query = install plugin all soname '/home/pgulutzan/ocelotgui/libplugin.so';
+    If the plugin has already been installed, there is no error message, the plugin is called twice.
+    It is legal to start ocelotgui --ocelot_query=install... or put ocelot_query=install... in a .cnf file.
+    The "set ocelot_query = install ..." statement is legal even if there is no connection to the server.
+* Call points i.e. places where ocelotgui can call the plugin:
+  "init" -- in response to "install plugin X" ... here the plugin should tell us what places to call from
+  fetch row -- we pass a row. if the plugin replaces it with something (having the same number of columns and column types!), fine
+            -- same thing when we allow edit row or insert row
+            -- can return multiple rows or 0 rows
+  statement -- any client statement, e.g. the plugin can return SET ocelot_grid_background_color='red'; (it won't be logged and it can appear during any call)
+  pre-all-rows-fetch, pre-row-fetch, pre-column-fetch
+  return    -- the point where we're about to tell user the result of a statement, which is a good place to change the error message
+  Add menu item (main menu, explorer menu) ... nah, this could better be done with a SET statement
+
+* Plugin action: execute server statement
+  This is only legal when ocelotgui is about to execute a statement ... hmm, the plugin can't execute it, it can only tell the server to execute it
+* Plugin calls (if activated)
+    At start / end of certain functions, in the same places where we
+    At start / end of statement execution -- notice that plugin can replace the statement text at start
+    When we acquire or remove a result set -- we pass the result set address, the plugin can replace it, but remember to free when the result set is obsolete
+    When we change any of the values mentioned in Connection Dialog Bo
+    When returning "OK" or returning an error -- again, the plugin can change the text or change the error number, or log it, or whatever (the user sees what the plugin returns)
+    Mouse click or other user action, including menu click but also statement-widget edit
+    Before / after -display of the result grid or any widget -- we'll pass the co-ordinates, the plugin can use the area for whatever it wants,
+    Program start / end
+    Change in something that a structure points to
+    Menu click -- either on the plugin menu or anywhere else -- maybe a shortcut
+    Statement execution start / end
+* Available structures
+  Anything visible in Connection Dialog Box (so this would include any --options on the command line)
+  Any OCELOT_* variable
+  Whatever you see in Help (notice that this includes server-DBMS version and Qt version) (changing the text can result will result in change in what Help sees)
+  Text of all menus (not just top menu, explorer menu too)
+  Error numbers and messages (in English or French) (go ahead and point to your own) (or, French can replace English when it's time to display the message)
+  Anything else in ostrings.h
+  Latest result of rehash
+  Latest result grid, usually as html -- there might be multiple result grids same as what we have in export -- but in that case, why not just have an event for export?
+  Latest result set
+  Where are we, i.e. what caused the call
+  Version
+  (If call is from start of a function) the values of the function parameters
+  List of call points (this would only be needed if we wanted to decide within ocelotgui whether to call) (it might be easier but less efficient to let the plugin decide to ignore)
+
+* Menu (whatever you say here will go in the ocelotgui main menu)
+* An equivalent to MySQL Workbench mforms: form, box, table, scrollview -- but do we actually need mforms if any idiot can call Qt?
+  "replace sql editor contents"
+  The called routine may: execute SQL (silently or showingly), replace widget contents,
+  ... So this is a good way to repetitive or timed operations
+  ... Dunno the difference between this and FILE statement
+* Since you can intercept the statement execution you can invent your own commands, but hparse won't help you with them unless you provide a BNF
+  (a BNF is easy if there's no branching) (or you can re-use hparse functions?)
+  ... The only thing you can do with your own commands is pass them to the plugin, I guess.
+* Todo: allow addding items to a plugin menu, with all the call points
+  So there will be a heap of plugin menu items, and clicking any of them will execute the plugin
+  But also you might have what's used for REHASH
+  The C plugin may:
+    Replace anything in the pointed-to stuff (permanently or until the value is going to be replaced)
+    Cancel the operation because it handled it itself
+    Add to the operation either before or after
+    Cause an error, either basic or customized
+  Todo: C++ plugin example plugin.cpp
+    What good is a C++ plugin? ... I suppose I cannot share the classes ... but the C++ routine has an easier time calling Qt
+    plugin.cpp, use gcc, the example can take advantage of the fact that Qt headers are already included, e.g. make messagebox
+    There are some functions I'd like to call, but they're all inside classes which makes it harder
+    Well, the function can call the plugin, and the plugin can replace the values (unless they're Qt?)
+  Todo: support Windows / FreeBSD. So far, everything non-Linux is no-op.
+  Todo: SET ocelot_query = SHOW PLUGINS; although there's only one
+  Todo: Bring in ostrings.h, I at least need to know what ER_OK is
+  Todo: make some names public and ocelotgui can decide whether to call them, rather than having switch in a main function.
+        With Linux I could use dladdr.
+  Todo: callbacks
+  Todo: more functions, systematic names.
+  Todo: menu item (but presumably the plugin itself can add to the menu)
+
+  Todo: Include version number. Announce that when there's a breaking change (as might happen often), there will be an
+        explanation here.
+*/
+#ifndef PLUGIN_H
+#define PLUGIN_H
+class Plugin: public QWidget /* why? do we intend to inherit something from QWidget? */
+{
+public:
+  Plugin(MainWindow *m);
+  int init(QString plugin_soname, QString plugin_name, int call_type);
+  ~Plugin();
+  int caller(int, struct plugin_pass *plugin_pass);
+  QString name; /* whatever was in plugin_name when we called plugin_init */
+  QString soname; /* whatever was in plugin_soname when we called plugin_init */
+  int plugin_type; /* One of the #define PLUGIN_... values */
+private:
+  MainWindow *plugin_main_window;
+  void *plugin_handle;
+  int (*plugin_function_pointer)(struct plugin_pass *arg);
+};
+#endif // #ifndef PLUGIN_H
+#endif // #if (OCELOT_PLUGIN == 1)
+
+#endif //__cplusplus
 
 #endif // OCELOTGUI_H
