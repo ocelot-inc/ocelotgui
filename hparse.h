@@ -14604,6 +14604,23 @@ int MainWindow::hparse_f_client_statement()
       }
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_WHERE, "WHERE"))
       {
+        if (assignee_keyword == TOKEN_KEYWORD_OCELOT_SHORTCUT)
+        {
+          /* for comparison that is recommended for shortcut SET ocelot_shortcut = 'literal' WHERE identifier = 'literal' */
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IDENTIFIER, "IDENTIFIER");
+          if (hparse_errno > 0) return 0;
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+          if (hparse_errno > 0) return 0;
+          QStringList q;
+          for (int i= 0; i < menu_spec_struct_list.size(); ++i)
+          {
+            if ((menu_spec_struct_list[i].type == 1) || (menu_spec_struct_list[i].type == 3))
+             q.append(menu_spec_struct_list[i].id);
+          }
+          if (hparse_pick_from_list(q) == -1) hparse_f_error();
+          if (hparse_errno > 0) return 0;
+          return TOKEN_KEYWORD_SET;
+        }
         for (;;)
         {
           int tlf= -1;
@@ -14651,7 +14668,8 @@ int MainWindow::hparse_f_client_statement()
         if ((assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION)
          || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED)
          || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT)
-         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT))
+         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT)
+         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_SHORTCUT))
         {
           hparse_f_error();
           return 0;
