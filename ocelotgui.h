@@ -956,7 +956,6 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_QUERY,
     TOKEN_KEYWORD_OCELOT_RAW,
-    TOKEN_KEYWORD_OCELOT_SHORTCUT,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE, /* KEYWORD_OCELOT_SHORTCUT_* items are obsolete, remove in next version */
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT,
@@ -1068,6 +1067,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_PIE,
     TOKEN_KEYWORD_PIPE,
     TOKEN_KEYWORD_PLAN,
+    TOKEN_KEYWORD_PLUGINS,
         TOKEN_KEYWORD_PLUGIN_DIR,
     TOKEN_KEYWORD_POINT,
     TOKEN_KEYWORD_POINTFROMTEXT,
@@ -2251,7 +2251,6 @@ static const struct keywords strvalues[]=
     {"OCELOT_MENU_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR},
     {"OCELOT_QUERY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_QUERY},
     {"OCELOT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_RAW},
-    {"OCELOT_SHORTCUT", FLAG_VERSION_OPTION|FLAG_VERSION_CONDITIONAL, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT},
     {"OCELOT_SHORTCUT_AUTOCOMPLETE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
     {"OCELOT_SHORTCUT_BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
     {"OCELOT_SHORTCUT_BREAKPOINT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
@@ -2364,6 +2363,7 @@ static const struct keywords strvalues[]=
       {"PIE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PIE},
         {"PIPE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PIPE},
       {"PLAN", 0, 0, TOKEN_KEYWORD_PLAN},
+      {"PLUGINS", 0, 0, TOKEN_KEYWORD_PLUGINS},
         {"PLUGIN_DIR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PLUGIN_DIR},
       {"POINT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POINT},
       {"POINTFROMTEXT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_POINTFROMTEXT}, /* deprecated in MySQL 5.7.6 */
@@ -4492,18 +4492,19 @@ struct connect_arguments {
 #if (OCELOT_PLUGIN == 1)
 /* Possible values of the name when calling a plugin. */
 #define PLUGIN_AT_PROGRAM_START 0
-#define PLUGIN_BEFORE_CONNECT 1
-#define PLUGIN_BEFORE_INSTALL 2
-#define PLUGIN_REAL_QUERY 3 /* almost immediately before passing (char*) dbms_query to the server */
-#define PLUGIN_ERROR_MESSAGE 4
-#define PLUGIN_ALL 5
-#define PLUGIN_EXECUTE_ONE_STATEMENT 6
-#define PLUGIN_TEXT_CHANGED 7
-#define PLUGIN_FILLUP 8
-#define PLUGIN_DISPLAY_HTML 9
-#define PLUGIN_MENU_NAME 10
-#define PLUGIN_MENU_ACTION 11
-#define PLUGIN_MAX 11
+#define PLUGIN_MAKE_MENU 1
+#define PLUGIN_BEFORE_CONNECT 2
+#define PLUGIN_BEFORE_INSERT 3
+#define PLUGIN_REAL_QUERY 4 /* almost immediately before passing (char*) dbms_query to the server */
+#define PLUGIN_ERROR_MESSAGE 5
+#define PLUGIN_ALL 6
+#define PLUGIN_EXECUTE_ONE_STATEMENT 7
+#define PLUGIN_TEXT_CHANGED 8
+#define PLUGIN_FILLUP 0
+#define PLUGIN_DISPLAY_HTML 10
+#define PLUGIN_MENU_ACTION 12
+#define PLUGIN_MAX 12
+#define PLUGIN_MENU_CHOICE -1
 
 /* Possible values that a plugin can return */
 /* Todo: we might need more values for: skip, ignore, not-ok, not-ok-and-replaced */
@@ -4520,8 +4521,9 @@ struct plugin_keywords {
 static const struct plugin_keywords plugin_strvalues[]=
    {
      {"at_program_start",  PLUGIN_AT_PROGRAM_START},
+     {"make_menu", PLUGIN_MAKE_MENU},
      {"before_connect",  PLUGIN_BEFORE_CONNECT},
-     {"before_install",  PLUGIN_BEFORE_INSTALL},
+     {"before_insert",  PLUGIN_BEFORE_INSERT},
      {"real_query", PLUGIN_REAL_QUERY},
      {"error_message", PLUGIN_ERROR_MESSAGE},
      {"all", PLUGIN_ALL},
@@ -4529,7 +4531,6 @@ static const struct plugin_keywords plugin_strvalues[]=
      {"text_changed", PLUGIN_TEXT_CHANGED},
      {"fillup", PLUGIN_FILLUP},
      {"display_html", PLUGIN_DISPLAY_HTML},
-     {"menu_name", PLUGIN_MENU_NAME},
      {"menu_action", PLUGIN_MENU_ACTION}
 };
 #endif
@@ -4537,7 +4538,7 @@ static const struct plugin_keywords plugin_strvalues[]=
 struct plugin_pass {
   int type; /* e.g. PLUGIN_AT_PROGRAM_START */
   struct connect_arguments *ca;
-  char name[32];
+  char id[32];
   char *query;
   char *error_message;
   int replacer_buffer_length;
@@ -5191,25 +5192,43 @@ public:
 
   QStringList tarantool_statements_in_begin;
 
+  struct menu_function_struct {
+    QString name;
+    bool is_plugin;
+    void (MainWindow::*p_method)(bool);/* e.g. &MainWindow::file_connect */
+    int *func; /* this presumably will be useful for a C plugin */
+  };
+#define MENU_SPEC_TYPE_MENU 0
+#define MENU_SPEC_TYPE_MENUITEM 1
+#define MENU_SPEC_TYPE_SUBMENU 2
+#define MENU_SPEC_TYPE_SUBMENU_ITEM 3
+#define MENU_SPEC_TYPE_SEPARATOR 4
   struct menu_spec_struct {
-      QString id; /* names an action e.g. "action_connect" (by convention it matches method name) */ /* or names a menu */
-      int type; /* 0=menu, 1=menu_item; 2=menu_item containing submenu; 3=submenu_item; 4=separator */
+      QString id; /* names an action e.g. "file_connect" (by convention it matches method name) */ /* or names a menu */
+      int menu_type; /* 0=menu, 1=menu_item; 2=menu_item containing submenu; 3=submenu_item; 4=separator */
       QString menu_title;  /* e.g. "File' */
       QString menu_item;   /* e.g. "Connect" */
       QString submenu_item;/* e.g. "" */
       QString shortcut;    /* e.g. "" */
-      QString menu_name;   /* e.g. "menu_file" */ /* better name = upper_id? */
+      QString menu_name;   /* e.g. "menu_file" */ /* better name = upper_id? or id_of_menu? */
       QMenu *qmenu;
       QAction *qaction;      /* filled in after qAction* new() */
-      void (MainWindow::*p_method)(bool);/* e.g. &MainWindow::action_connect */
+      QString function_name; /* = name associated with p_method void (MainWindow::*p_method)(bool);, can be / defaults to same as id */
       QString shortcut_default; /* what to use if user enters "default" */
-      int keyword; /* e.g. TOKEN_KEYWORD_SHORTCUT_UNDO, though that should eventually become obsolete */ 
+      int keyword; /* e.g. TOKEN_KEYWORD_SHORTCUT_UNDO, though that should eventually become obsolete */
+      QString reserved;
   };
+  QList<struct menu_function_struct> menu_function_struct_list;
   QList<struct menu_spec_struct> menu_spec_struct_list;
   QList<QMenu> menu_spec_menu_list;
-  void menu_spec_make_spec(); void menu_spec_make_menu(); void menu_spec_reset_menu();
+  void menu_spec_make_function(); void menu_spec_make_menu(); void menu_spec_reset_menu();
+  int menu_spec_insert_one(QString id, QString menu_name, QString menuitem_name, QString function);
+  QMenu* menu_spec_add_menu(int i); QAction *menu_spec_add_action(int i, QMenu *qmenu);
+  void menu_about_to_show();
   void menu_spec_set_addresses();
   QMenu* menu_spec_find_menu(QString menu_name);
+  int menu_spec_find_id(QString id);
+  int menu_spec_delete_via_id(QString id);
   QAction* menu_spec_find_action(QString action_name);
   void menu_set_enabled(QString menu_id, bool is_enable_or_disable);
   int main_window_maximum_width;
@@ -5282,6 +5301,7 @@ public:
   void hparse_f_function_arguments(QString);
   int hparse_f_expression_list(int);
   void hparse_f_parenthesized_value_list();
+  void hparse_f_parenthesized_string_list();
   void hparse_f_parameter_list(int);
   void hparse_f_parenthesized_expression();
   void hparse_f_parenthesized_multi_expression(int*);
@@ -5343,7 +5363,7 @@ public:
   void hparse_f_index_columns(int,bool,bool,bool);
   void hparse_f_alter_or_create_view();
   int hparse_f_analyze_or_optimize(int,int*);
-  void hparse_f_install(int);
+  void hparse_f_install();
   void hparse_f_call();
   void hparse_f_call_arguments();
   void hparse_f_commit_or_rollback();
@@ -5447,7 +5467,8 @@ public:
   void log(const char*,int);
   void extra_result_set(int, unsigned short int);
   int execute_real_query(QString, int, const QString *);
-  int execute_ocelot_query(QString, int, const QString *);
+  int execute_ocelot_query(QString, int, const QString *, bool *, QString *);
+  void fillup_prepare();
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
   void tparse_f_term();
@@ -5523,84 +5544,84 @@ public:
 #endif
 
 /* Crashing bug:
-  Following as far as action_option_xml were all moved out of slots on 2024-04-25
+  Following as far as action_options_xml were all moved out of slots on 2024-04-25
   then crashes were happening in places that didn't seem related e.g. hparse_f_accept().
-  I think I figured it out: it's because action_statement_edit_widget_text_changed is a slot.
+  I think I figured it out: it's because action_settings_statement_edit_widget_text_changed is a slot.
   Before moving again, I examines code to establish that there no other MainWindow things that are slots.
   But if it's seen again, it might be because something else is a slot.
 */
-  void action_connect(bool is_checked);
-  void action_connect_once(QString);
-  void action_exit(bool is_checked);
+  void action_file_connect(bool is_checked);
+  void action_file_connect_once(QString);
+  void action_file_exit(bool is_checked);
 #if (OCELOT_IMPORT_EXPORT == 1)
   QStringList fake_statement(QString fake_statement_text);
-  int action_export_function(int import_or_export, int);
+  int action_file_export_function(int import_or_export, int);
   const char *bool_to_string(bool input);
   bool string_to_bool(QString input);
-  QString action_export_function_value(QString input);
-  QString action_export_function_clause(QString,QString);
-  QString action_export_function_clause_i(QString,int);
-  QString action_export_function_clause_b(QString,bool);
-  void action_export_text(bool is_checked);
-  void action_export_table(bool is_checked);
-  void action_export_html(bool is_checked);
-  void action_export_none(bool is_checked);
+  QString action_file_export_function_value(QString input);
+  QString action_file_export_function_clause(QString,QString);
+  QString action_file_export_function_clause_i(QString,int);
+  QString action_file_export_function_clause_b(QString,bool);
+  void action_file_export_text(bool is_checked);
+  void action_file_export_table(bool is_checked);
+  void action_file_export_html(bool is_checked);
+  void action_file_export_none(bool is_checked);
 #endif
-  void action_execute_force(bool is_checked);
+  void action_run_execute(bool is_checked);
   int action_execute(int);
-  void action_kill(bool is_checked);
-  void action_about(bool is_checked);
-  void action_the_manual(bool is_checked);
+  void action_run_kill(bool is_checked);
+  void action_help_about(bool is_checked);
+  void action_help_the_manual(bool is_checked);
 #if (OCELOT_MYSQL_INCLUDE == 1)
-  void action_libmysqlclient(bool is_checked);
+  void action_help_libmysqlclient(bool is_checked);
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
-  void action_settings(bool is_checked);
+  void action_help_settings(bool is_checked);
 
   QTextCharFormat get_format_of_current_token(int token_type, int token_flags, QString mid_next_token);
   void action_undo();
   void action_redo();
   void menu_activations(QObject*, QEvent::Type);
-  void statement_edit_widget_formatter(bool is_checked);
+  void action_edit_format(bool is_checked);
   int statement_format_rule_set(QString text);
   QString statement_format_rule_apply(QString, int, unsigned char, unsigned int, int*, int*, int*);
   void action_change_one_setting(QString old_setting, QString new_setting, int keyword_index);
   void action_change_one_setting_execute(QString text);
-  void action_menu(bool is_checked);
-  void action_history(bool is_checked);
-  void action_grid(bool is_checked);
-  void action_statement(bool is_checked);
+  void action_settings_menu(bool is_checked);
+  void action_settings_history(bool is_checked);
+  void action_settings_grid(bool is_checked);
+  void action_settings_statement(bool is_checked);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
-  void action_debug(bool is_checked);
+  void action_settings_debug(bool is_checked);
 #endif
 #if (OCELOT_EXPLORER == 1)
-  void action_explorer(bool is_checked);
+  void action_settings_explorer(bool is_checked);
 #endif
-  void action_extra_rule_1(bool is_checked);
-  void history_markup_previous(bool is_checked);
-  void history_markup_next(bool is_checked);
-  void action_detach_history_widget(bool is_checked);
-  void action_detach_result_grid_widget(bool is_checked);
+  void action_settings_extra_rule_1(bool is_checked);
+  void action_edit_previous_statement(bool is_checked);
+  void action_edit_next_statement(bool is_checked);
+  void action_options_detach_history_widget(bool is_checked);
+  void action_options_detach_result_grid_widget(bool is_checked);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
-  void action_detach_debug_widget(bool is_checked);
+  void action_options_detach_debug_widget(bool is_checked);
 #endif
 #if (OCELOT_EXPLORER == 1)
-  void action_detach_explorer_widget(bool is_checked);
+  void action_options_detach_explorer_widget(bool is_checked);
 #endif
-  void action_detach_statement_widget(bool is_checked); void detach_widget(int widget_type, bool is_checked);
-  void action_option_next_window(bool is_checked);
-  void action_option_previous_window(bool is_checked);
-  void action_option_change_result_display(QString);
-  void action_option_bar(bool is_checked);
-  void action_option_batch(bool is_checked);
-  void action_option_horizontal(bool is_checked);
-  void action_option_html(bool is_checked);
-  void action_option_htmlraw(bool is_checked);
-  void action_option_line(bool is_checked);
-  void action_option_none(bool is_checked);
-  void action_option_pie(bool is_checked);
-  void action_option_raw(bool is_checked);
-  void action_option_vertical(bool is_checked);
-  void action_option_xml(bool is_checked);
+  void action_options_detach_statement_widget(bool is_checked); void detach_widget(int widget_type, bool is_checked);
+  void action_options_next_window(bool is_checked);
+  void action_options_previous_window(bool is_checked);
+  void action_options_change_result_display(QString);
+  void action_options_bar(bool is_checked);
+  void action_options_batch(bool is_checked);
+  void action_options_horizontal(bool is_checked);
+  void action_options_html(bool is_checked);
+  void action_options_htmlraw(bool is_checked);
+  void action_options_line(bool is_checked);
+  void action_options_none(bool is_checked);
+  void action_options_pie(bool is_checked);
+  void action_options_raw(bool is_checked);
+  void action_options_vertical(bool is_checked);
+  void action_options_xml(bool is_checked);
 
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   int debug_mdbug_install_sql(MYSQL *mysql, char *x); /* the only routine in install_sql.cpp */
@@ -5641,23 +5662,20 @@ public:
   void action_debug_refresh_variables(bool is_checked);
   void action_debug_refresh_call_stack(bool is_checked);
 #endif
-#ifdef SHORTCUT_OLD
-  int shortcut_old(int,QString,bool,bool);
-#endif
   int shortcut_set(int, QString);
-  int shortcut_set_via_id(QString, QString, bool, bool); int shortcut_set_via_keyword(int, QString, bool, bool);
-  void menu_edit_undo(bool is_checked);
-  void menu_edit_redo(bool is_checked);
-  void menu_edit_cut(bool is_checked);
-  void menu_edit_copy(bool is_checked);
-  void menu_edit_paste(bool is_checked);
-  void menu_edit_select_all(bool is_checked);
-  void menu_edit_zoomin(bool is_checked);
-  void menu_edit_zoomout(bool is_checked);
-  void menu_edit_autocomplete_via_menu(bool is_checked);
+  int shortcut_set_via_id(QString, QString); int shortcut_set_via_keyword(int, QString);
+  void action_edit_undo(bool is_checked);
+  void action_edit_redo(bool is_checked);
+  void action_edit_cut(bool is_checked);
+  void action_edit_copy(bool is_checked);
+  void action_edit_paste(bool is_checked);
+  void action_edit_select_all(bool is_checked);
+  void action_edit_zoomin(bool is_checked);
+  void action_edit_zoomout(bool is_checked);
+  void action_edit_autocomplete(bool is_checked);
   bool menu_edit_autocomplete();
 #if (OCELOT_FIND_WIDGET == 1)
-  void menu_edit_find(bool is_checked);
+  void action_edit_find(bool is_checked);
 #endif
   bool eventfilter_function(QObject *obj, QEvent *event);
 
@@ -5665,7 +5683,7 @@ public:
   char *typer_to_keyword(unsigned int); /* todo: check: why are some things in "public slots" not "public"? */
 
 public slots: /* todo: check if should be private */
-  void action_statement_edit_widget_text_changed(int,int,int);
+  void action_settings_statement_edit_widget_text_changed(int,int,int);
   void initialize_after_main_window_show();
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_debug_timer_status();
@@ -5690,7 +5708,7 @@ private:
   void initialize_widget_explorer();
   void initialize_widget_explorer_after_connect();
 #endif
-  void menu_edit_zoominorout(int);
+  void action_edit_zoominorout(int);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void debug_menu_enable_or_disable(int statement_type);
   void create_widget_debug();
@@ -5886,9 +5904,8 @@ public:
   TextEditHistory *history_edit_widget;
 #if (OCELOT_PLUGIN == 1)
   QList<Plugin *> plugin_widget_list;
-  int plugin_widget_list_caller(int type);
-  int show_plugins();
-  int install_or_uninstall_plugin(QString, QString, QString, const QString *);
+  int plugin_widget_list_caller(int type, QString menu_function_name);
+  int insert_plugin(QString, QString, const QString *); int delete_plugin(QString);
 #endif
 private:
 
@@ -5913,15 +5930,7 @@ public:
 private:
 #endif
   XSettings *xsettings_widget;
-//!  QMenu *menu_file;
-//!    QAction *menu_file_action_connect;
-//!    QAction *menu_file_action_exit;
 #if (OCELOT_IMPORT_EXPORT == 1)
-//!    QMenu *menu_file_export;
-//!    QAction *menu_file_export_text_action;
-//!    QAction *menu_file_export_table_action;
-//!    QAction *menu_file_export_html_action;
-//!    QAction *menu_file_export_none_action;
     QActionGroup *menu_file_export_group;
 #endif
 //!  QMenu *menu_edit;
@@ -5931,8 +5940,8 @@ private:
 //!    QAction *menu_edit_action_undo;
 //!    QAction *menu_edit_action_redo;
 //!    QAction *menu_edit_action_select_all;
-//!    QAction *menu_edit_action_history_markup_previous;
-//!    QAction *menu_edit_action_history_markup_next;
+//!    QAction *menu_edit_action_settings_history_markup_previous;
+//!    QAction *menu_edit_action_settings_history_markup_next;
 //!    QAction *menu_edit_action_formatter;
 //!    QAction *menu_edit_action_zoomin;
 //!    QAction *menu_edit_action_zoomout;
@@ -5942,28 +5951,28 @@ public:
 private:
 //!  QMenu *menu_run;
 //!    QAction *menu_run_action_execute;
-//!    QAction *menu_run_action_kill;
+//!    QAction *menu_run_action_run_kill;
 //!  QMenu *menu_settings;
-//!    QAction *menu_settings_action_menu;
-//!    QAction *menu_settings_action_history;
+//!    QAction *menu_settings_action_settings_menu;
+//!    QAction *menu_settings_action_settings_history;
 //!    QAction *menu_settings_action_grid;
-//!    QAction *menu_settings_action_statement;
+//!    QAction *menu_settings_action_settings_statement;
 //!    QAction *menu_settings_action_debug;
-//!    QAction *menu_settings_action_extra_rule_1;
+//!    QAction *menu_settings_action_settings_extra_rule_1;
 //!#if (OCELOT_EXPLORER == 1)
-//!    QAction *menu_settings_action_explorer;
+//!    QAction *menu_settings_action_settings_explorer;
 //!#endif
 public:
 //!  QMenu *menu_options;
-//!  QAction *menu_options_action_option_detach_history_widget;
-//!    QAction *menu_options_action_option_detach_result_grid_widget;
+//!  QAction *menu_options_action_options_detach_history_widget;
+//!    QAction *menu_options_action_options_detach_result_grid_widget;
 //!#if (OCELOT_MYSQL_DEBUGGER == 1)
-//!    QAction *menu_options_action_option_detach_debug_widget;
+//!    QAction *menu_options_action_options_detach_debug_widget;
 //!#endif
 //!#if (OCELOT_EXPLORER == 1)
-//!    QAction *menu_options_action_option_detach_explorer_widget;
+//!    QAction *menu_options_action_options_detach_explorer_widget;
 //!#endif
-//!    QAction *menu_options_action_option_detach_statement_widget;
+//!    QAction *menu_options_action_options_detach_statement_widget;
 //!    QAction *menu_options_action_next_window;
 //!    QAction *menu_options_action_previous_window;
 //!    QAction *menu_options_action_bar;
@@ -5980,29 +5989,29 @@ public:
 private:
 //!#if (OCELOT_MYSQL_DEBUGGER == 1)
 //!  QMenu *menu_debug;
-//!    QAction *menu_debug_action_install;
-//!//    QAction *menu_debug_action_setup;
-//!//    QAction *menu_debug_action_debug;
-//!    QAction *menu_debug_action_breakpoint;
-//!    QAction *menu_debug_action_continue;
-//!    QAction *menu_debug_action_leave;
-//!    QAction *menu_debug_action_next;
-//!//    QAction *menu_debug_action_skip;
-//!    QAction *menu_debug_action_step;
-//!    QAction *menu_debug_action_clear;
-//!//    QAction *menu_debug_action_delete;
-//!    QAction *menu_debug_action_exit;
-//!    QAction *menu_debug_action_information;
-//!    QAction *menu_debug_action_refresh_server_variables;
-//!    QAction *menu_debug_action_refresh_user_variables;
-//!    QAction *menu_debug_action_refresh_variables;
-//!    QAction *menu_debug_action_refresh_call_stack;
+//!    QAction *debug_install;
+//!//    QAction *debug_setup;
+//!//    QAction *debug_debug;
+//!    QAction *debug_breakpoint;
+//!    QAction *debug_continue;
+//!    QAction *debug_leave;
+//!    QAction *debug_next;
+//!//    QAction *debug_skip;
+//!    QAction *debug_step;
+//!    QAction *debug_clear;
+//!//    QAction *debug_delete;
+//!    QAction *debug_exit;
+//!    QAction *debug_information;
+//!    QAction *debug_refresh_server_variables;
+//!    QAction *debug_refresh_user_variables;
+//!    QAction *debug_refresh_variables;
+//!    QAction *debug_refresh_call_stack;
 //!#endif
 //!//!  QMenu *menu_help;
-//!    QAction *menu_help_action_about;
-//!    QAction *menu_help_action_the_manual;
+//!    QAction *menu_help_action_help_about;
+//!    QAction *menu_help_action_help_the_manual;
 //!if (OCELOT_MYSQL_INCLUDE == 1)
-//!    QAction *menu_help_action_libmysqlclient;
+//!    QAction *menu_help_action_help_libmysqlclient;
 //!#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 //!    QAction *menu_help_action_settings;
 
@@ -7011,7 +7020,7 @@ QByteArray find(unsigned int row_number, unsigned int column_number);
 #define RESULT_QTEXTEDIT_H
 
 /*
-  Do not change class name "Result_qtextedit" without checking its uses e.g. in menu_edit_paste().
+  Do not change class name "Result_qtextedit" without checking its uses e.g. in action_edit_paste().
 */
 
 class Result_qtextedit: public QTextEdit
@@ -7105,7 +7114,7 @@ void showEvent(QShowEvent *e);
 
 public:
 
-void copy();  /* via menu_edit_copy() */
+void copy();  /* via action_edit_copy() */
 void cut();
 void paste();
 void undo();
@@ -7806,6 +7815,7 @@ QString fillup(MYSQL_RES *mysql_res,
             int ocelot_client_side_functions,
             unsigned int connection_number,
             bool is_for_display);
+QString fillup_in_client(QString, int *main_token_lengths, int *main_token_offsets); /* temporary? */
 void switch_to_batch_text_edit();
 void switch_to_html_text_edit();
 void display_batch();
@@ -7898,6 +7908,12 @@ void grid_column_size_calc(int setting_ocelot_grid_cell_border_size_as_int,
 void grid_column_size_calc_vertical(
                            unsigned short int is_using_column_names,
                            int connections_dbms);
+QString client_scan_rows(unsigned int result_column_count, unsigned int result_row_count,
+                         /* MYSQL_RES *p_mysql_res, */
+                         char **p_result_set_copy,
+                         char ***p_result_set_copy_rows,
+                         unsigned int **p_result_max_column_widths, int query_size, QStringList values_list, QList<int>types_list);
+
 #if (OCELOT_MYSQL_INCLUDE == 1)
 void scan_rows(unsigned int p_result_column_count,
                unsigned int p_result_row_count,
@@ -8703,7 +8719,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER     7
-#define OCELOT_VARIABLES_SIZE 146
+#define OCELOT_VARIABLES_SIZE 145
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
@@ -9037,7 +9053,7 @@ public:
   int init(QString plugin_soname, QString plugin_name, int call_type);
   ~Plugin();
   int caller(int, struct plugin_pass *plugin_pass);
-  QString name; /* whatever was in plugin_name when we called plugin_init */
+  QString id; /* whatever was in plugin_id when we called plugin_init */
   QString soname; /* whatever was in plugin_soname when we called plugin_init */
   int plugin_type; /* One of the #define PLUGIN_... values */
 private:

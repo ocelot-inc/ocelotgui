@@ -3056,6 +3056,20 @@ void MainWindow::hparse_f_parenthesized_value_list()
   if (hparse_errno > 0) return;
 }
 
+/* e.g. for SET ocelot_query = INSERT INTO MENU VALUES ... */
+void MainWindow::hparse_f_parenthesized_string_list()
+{
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+  if (hparse_errno > 0) return;
+  do
+  {
+    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+    if (hparse_errno > 0) return;
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  if (hparse_errno > 0) return;
+}
+
 /*
   routine_type = procedure, function, lua, or row, or cursor
 */
@@ -3953,36 +3967,14 @@ int MainWindow::hparse_f_analyze_or_optimize(int who_is_calling,int *table_or_vi
 }
 
 /*
-  INSTALL (in which case we know it's MySQL|MariaDB, or SET ocelot_query = SET (in which case it's local plugin install)
+  INSTALL (in which case we know it's MySQL|MariaDB, because client install uses INSERT INTO plugins)
 */
-void MainWindow::hparse_f_install(int set_or_install)
+void MainWindow::hparse_f_install()
 {
-  if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0) || (set_or_install == TOKEN_KEYWORD_SET))
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
   {
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN");
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
-#if (OCELOT_PLUGIN == 1)
-    if (set_or_install == TOKEN_KEYWORD_SET)
-    {
-      int i;  /* There's a limited number of possible plugin identifiers. todo: for uninstall, list could be shorter. */
-      for (i= 0; i <= PLUGIN_MAX; ++i)
-      {
-        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, plugin_strvalues[i].chars) == 1) break;
-      }
-      if (i > PLUGIN_MAX) hparse_f_error();
-    }
-    else
-#endif
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
-  }
-  else if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
-  {
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGIN") == 1)
-    {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PLUGIN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-      if (hparse_errno > 0) return;
-    }
   }
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SONAME");
   if (hparse_errno > 0) return;
@@ -10326,7 +10318,7 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_INSTALL;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    hparse_f_install(TOKEN_KEYWORD_INSTALL);
+    hparse_f_install();
     if (hparse_errno > 0) return;
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_KILL, "KILL"))
@@ -14136,30 +14128,128 @@ int MainWindow::hparse_f_client_set_rule()
 /* Called from hparse_f_client_statement() for special handling of SET ocelot_query. */
 int MainWindow::hparse_f_client_set_query()
 {
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "=");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
   if (hparse_errno > 0) return 1;
 
+  /* INSERT INTO plugins|menus VALUES (string[,string...]) -- SQLish but so restricted we won't use the main INSERT routine */
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSERT, "INSERT") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO");
+    if (hparse_errno > 0) return 1;
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") != 1)
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES");
+    if (hparse_errno > 0) return 1;
+    hparse_f_parenthesized_string_list();
+    return 1;
+  }
+
+  /* SELECT * FROM plugins|menus; or SELECT lteral AS identifier; */
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SELECT, "SELECT") == 1)
+  {
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "*") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FROM, "FROM");
+      if (hparse_errno > 0) return 1;
 #if (OCELOT_PLUGIN == 1)
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSTALL, "INSTALL") == 1)
-  {
-    hparse_f_install(TOKEN_KEYWORD_SET);
-    return 1;
-  }
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNINSTALL, "UNINSTALL") == 1)
-  {
-    hparse_f_install(TOKEN_KEYWORD_SET);
-    return 1;
-  }
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") != 1)
 #endif
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "CONDITIONAL_SETTINGS") != 1)
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS");
+      }
+      if (hparse_errno > 0) return 1;
+    }
+    else
+    {
+      for (;;)
+      {
+        do
+        {
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0)
+          {
+            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+          }
+          if (hparse_errno > 0) return 1;
+          if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
+          {
+            hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+            if (hparse_errno > 0) return 1;
+          }
+        } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNION, "UNION") == 0) break;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ALL, "ALL");
+        if (hparse_errno > 0) return 1;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SELECT, "SELECT");
+        if (hparse_errno > 0) return 1;
+        /* continue */
+      }
+    }
+    return 1;
+  }
+
+  /* DELETE FROM menus|plugins WHERE id = '' -- SQLish but so restrictive we won't use the main DELETE routine */
+  /* Todo: the table list and WHERE clause are the same as in UPDATE, and WHERE for conditional_settings looks hard */
+  /* Todo: need pick_from_list as in UPDATE, and conditional_settings should have an id */
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELETE, "DELETE") == 1)
+  {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FROM, "FROM");
+      if (hparse_errno > 0) return 1;
+#if (OCELOT_PLUGIN == 1)
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") != 1)
+#endif
+      {
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "CONDITIONAL_SETTINGS") != 1)
+          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS");
+      }
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHERE, "WHERE");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "id");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+    if (hparse_errno > 0) return 1;
+    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+    if (hparse_errno > 0) return 1;
+     return TOKEN_KEYWORD_SET;
+  }
+
+  /* UPDATE menus SET shortcut = 'literal' WHERE id = '' -- SQLish but so restricted we won't use the main UPDATE routine */
+  /* todo: after this it's expecting another WHERE which isn't right */
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UPDATE, "UPDATE") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "MENUS");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "shortcut");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+    if (hparse_errno > 0) return 1;
+    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHERE, "WHERE");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "id");
+    if (hparse_errno > 0) return 1;
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+    if (hparse_errno > 0) return 1;
+    QStringList q;
+    for (int i= 0; i < menu_spec_struct_list.size(); ++i)
+    {
+      if ((menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
+       || (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_SUBMENU_ITEM))
+       q.append(menu_spec_struct_list[i].id);
+    }
+    if (hparse_pick_from_list(q) == -1) hparse_f_error();
+    if (hparse_errno > 0) return 0;
+    return TOKEN_KEYWORD_SET;
+    return 1;
+  }
 
   hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SHOW, "SHOW");
   if (hparse_errno > 0) return 1;
-#if (OCELOT_PLUGIN == 1)
-  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PLUGINS") == 1)
-  {
-    return 1;
-  }
-#endif
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ERDIAGRAM, "ERDIAGRAM") == 1)
   {
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_OF, "OF");
@@ -14604,23 +14694,6 @@ int MainWindow::hparse_f_client_statement()
       }
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_WHERE, "WHERE"))
       {
-        if (assignee_keyword == TOKEN_KEYWORD_OCELOT_SHORTCUT)
-        {
-          /* for comparison that is recommended for shortcut SET ocelot_shortcut = 'literal' WHERE identifier = 'literal' */
-          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IDENTIFIER, "IDENTIFIER");
-          if (hparse_errno > 0) return 0;
-          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
-          if (hparse_errno > 0) return 0;
-          QStringList q;
-          for (int i= 0; i < menu_spec_struct_list.size(); ++i)
-          {
-            if ((menu_spec_struct_list[i].type == 1) || (menu_spec_struct_list[i].type == 3))
-             q.append(menu_spec_struct_list[i].id);
-          }
-          if (hparse_pick_from_list(q) == -1) hparse_f_error();
-          if (hparse_errno > 0) return 0;
-          return TOKEN_KEYWORD_SET;
-        }
         for (;;)
         {
           int tlf= -1;
@@ -14668,8 +14741,7 @@ int MainWindow::hparse_f_client_statement()
         if ((assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_ACTION)
          || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_ENABLED)
          || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_SHORTCUT)
-         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT)
-         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_SHORTCUT))
+         || (assignee_keyword == TOKEN_KEYWORD_OCELOT_EXPLORER_TEXT))
         {
           hparse_f_error();
           return 0;
