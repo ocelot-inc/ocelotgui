@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.3.0
-   Last modified: May 17 2024
+   Last modified: May 20 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -3756,11 +3756,14 @@ int MainWindow::menu_spec_insert_one(QString id, QString menu_title, QString men
   }
   if (function_name == "[separator]")
   {
-if (qmenu == NULL) { printf("**** qmenu == NULL\n"); exit(0); }
+    if (qmenu == NULL) printf("qmenu == NULL\n"); /* this should not happen */
+    else
+    {
       menu_spec_struct_list.append(
      {id, MENU_SPEC_TYPE_SEPARATOR, menu_title, menu_item, "", "", id_of_menu, NULL, NULL,
       function_name, "", -1, ""}   );
-    qmenu->addSeparator();
+      qmenu->addSeparator();
+    }
   }
   else if (function_name == "[submenu]")
   {
@@ -3774,11 +3777,14 @@ if (qmenu == NULL) { printf("**** qmenu == NULL\n"); exit(0); }
   }
   else /* menuitem or submenuitem */
   {
-if (qmenu == NULL) { printf("**** QMENU NULL\n"); exit(0); }
-    menu_spec_struct_list.append(
+    if (qmenu == NULL) printf("qmenu == NULL\n"); /* this should not happen */
+    else
+    {
+      menu_spec_struct_list.append(
        {id, MENU_SPEC_TYPE_MENUITEM, menu_title, menu_item, "", "", id_of_menu, NULL, NULL,
         function_name, "", -1, ""}   );
-    menu_spec_add_action(i_of_new_item, qmenu);
+      menu_spec_add_action(i_of_new_item, qmenu);
+    }
   }
   return ER_OK;
 }
@@ -4087,7 +4093,6 @@ void MainWindow::menu_spec_make_menu()
 #if (OCELOT_PLUGIN == 1)
   if (plugin_widget_list.size() > 0)
   {
-printf("**** plugin_widget_list.size()=%d\n", plugin_widget_list.size());
     ocelot_plugin_pass.query= b;
     int return_code= plugin_widget_list_caller(PLUGIN_MAKE_MENU, "");
     if (return_code ==  PLUGIN_RETURN_OK_AND_REPLACED)
@@ -4425,7 +4430,7 @@ QAction* MainWindow::menu_spec_add_action(int i, QMenu *qmenu)
 */
 void MainWindow::menu_about_to_show()
 {
-  printf("**** menu_about_to_show!\n");
+  /* printf("**** menu_about_to_show!\n"); */
 }
 
 /*
@@ -4491,11 +4496,11 @@ QMenu* MainWindow::menu_spec_find_menu(QString menu_name)
   {
     if (menu_name == menu_spec_struct_list[i].menu_name)
     {
-if (menu_spec_struct_list[i].qmenu == NULL) printf("**** qmenu == NULL\n");
+      if (menu_spec_struct_list[i].qmenu == NULL) printf("qmenu == NULL\n"); /* this should not happen */
       return menu_spec_struct_list[i].qmenu;
     }
   }
-  printf("**** end menu_spec_find_menu -- FAIL!\n");
+  printf("end menu_spec_find_menu -- FAIL!\n"); /* this should not happen */
   return NULL;
 }
 
