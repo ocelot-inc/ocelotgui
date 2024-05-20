@@ -689,7 +689,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   {
     bool is_set_ocelot_query_select= false;
     QString tmp;
-    execute_ocelot_query("set ocelot_query = " + ocelot_query, 0, NULL, &is_set_ocelot_query_select, &tmp);
+    unsigned int diagnostic_signal; /* actually we don't use this here because we don't call put_diagnstics_in_result */
+    execute_ocelot_query("set ocelot_query = " + ocelot_query, 0, NULL, &is_set_ocelot_query_select, &tmp, &diagnostic_signal);
     /* todo: better to say, somehow, that we're calling the last thing we added */
     if (plugin_widget_list.size() != 0) plugin_widget_list[0]->caller(PLUGIN_AT_PROGRAM_START, &ocelot_plugin_pass);
   }
@@ -701,7 +702,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     exit(0);
   }
 
-  create_menu(); // SHIFTED!
   for (int q_i= 0; strcmp(string_languages[q_i]," ") > 0; ++q_i)
   {
     QString s= string_languages[q_i];
@@ -712,6 +712,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
       menu_off= MENU_END * q_i;
     }
   }
+  create_menu(); // SHIFTED!
   set_dbms_version_mask(ocelot_dbms, 0);
   for (int q_i= color_off; strcmp(s_color_list[q_i]," ") > 0; ++q_i) q_color_list.append(s_color_list[q_i]);
   assign_names_for_colors();
@@ -1989,7 +1990,7 @@ QByteArray MainWindow::read_file_skip(QByteArray source_line, int source_line_le
       /* int insert_result= */
       lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION],
                                                         statement_result.data(), statement_result.size());
-      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
       QString query_utf16_bak= query_utf16;
       query_utf16= "/* INSERT statement */";
       history_markup_append("", true);
@@ -3815,7 +3816,179 @@ void MainWindow::menu_spec_set_addresses()
 */
 void MainWindow::menu_spec_make_menu()
 {
-  char q[]=
+  char insert[]="INSERT INTO menus VALUES (";
+  char b[65536];
+  unsigned int blen= 0;
+  blen+= sprintf(b + blen, "%s'menu_file','%s','','[menu]');",
+               insert, menu_strings[menu_off + MENU_FILE]);
+  blen+= sprintf(b + blen, "%s'action_file_connect', '%s', '%s', 'action_file_connect');",
+               insert, menu_strings[menu_off + MENU_FILE], menu_strings[menu_off + MENU_FILE_CONNECT]);
+  blen+= sprintf(b + blen, "%s'action_file_exit', '%s', '%s', 'action_file_exit');",
+               insert, menu_strings[menu_off + MENU_FILE], menu_strings[menu_off + MENU_FILE_EXIT]);
+#if (OCELOT_IMPORT_EXPORT == 1)
+  blen+= sprintf(b + blen, "%s'separator_1', '%s', '%s', '[separator]');",
+               insert, menu_strings[menu_off + MENU_FILE], "");
+  blen+= sprintf(b + blen, "%s'menu_export', '%s', '%s', '[submenu]');",
+               insert, menu_strings[menu_off + MENU_FILE], "Export");
+  blen+= sprintf(b + blen, "%s'action_file_export_text', '%s', '%s', 'action_file_export_text');",
+               insert, "Export", "text");
+  blen+= sprintf(b + blen, "%s'action_file_export_table', '%s', '%s', 'action_file_export_table');",
+               insert, "Export", "table");
+  blen+= sprintf(b + blen, "%s'action_file_export_html', '%s', '%s', 'action_file_export_html');",
+               insert, "Export", "html");
+  blen+= sprintf(b + blen, "%s'action_file_export_none', '%s', '%s', 'action_file_export_none');",
+               insert, "Export", "none");
+#endif
+  blen+= sprintf(b + blen, "%s'menu_edit','%s','','[menu]');",
+               insert, menu_strings[menu_off + MENU_EDIT]);
+  blen+= sprintf(b + blen, "%s'action_edit_undo', '%s', '%s', 'action_edit_undo');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_UNDO]);
+  blen+= sprintf(b + blen, "%s'action_edit_redo', '%s', '%s', 'action_edit_redo');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_REDO]);
+  blen+= sprintf(b + blen, "%s'separator_2', '%s', '%s', '[separator]');",
+               insert, menu_strings[menu_off + MENU_EDIT], "");
+  blen+= sprintf(b + blen, "%s'action_edit_cut', '%s', '%s', 'action_edit_cut');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_CUT]);
+  blen+= sprintf(b + blen, "%s'action_edit_copy', '%s', '%s', 'action_edit_copy');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_COPY]);
+  blen+= sprintf(b + blen, "%s'action_edit_paste', '%s', '%s', 'action_edit_paste');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_PASTE]);
+  blen+= sprintf(b + blen, "%s'separator_3', '%s', '%s', '[separator]');",
+               insert, menu_strings[menu_off + MENU_EDIT], "");
+  blen+= sprintf(b + blen, "%s'action_edit_select_all', '%s', '%s', 'action_edit_select_all');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_SELECT_ALL]);
+  blen+= sprintf(b + blen, "%s'action_edit_previous_statement', '%s', '%s', 'action_edit_previous_statement');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_PREVIOUS_STATEMENT]);
+  blen+= sprintf(b + blen, "%s'action_edit_next_statement', '%s', '%s', 'action_edit_next_statement');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_NEXT_STATEMENT]);
+  blen+= sprintf(b + blen, "%s'action_edit_format', '%s', '%s', 'action_edit_formatl');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_FORMAT]);
+  blen+= sprintf(b + blen, "%s'action_edit_zoomin', '%s', '%s', 'action_edit_zoomin');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_ZOOMIN]);
+  blen+= sprintf(b + blen, "%s'action_edit_zoomout', '%s', '%s', 'action_edit_zoomout');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_ZOOMOUT]);
+  blen+= sprintf(b + blen, "%s'action_edit_autocomplete', '%s', '%s', 'action_edit_autocomplete');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_AUTOCOMPLETE]);
+#if (OCELOT_FIND_WIDGET == 1)
+  blen+= sprintf(b + blen, "%s'action_edit_find', '%s', '%s', 'action_edit_find');",
+               insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_FIND]);
+#endif
+  blen+= sprintf(b + blen, "%s'menu_run','%s','','[menu]');",
+               insert, menu_strings[menu_off + MENU_RUN]);
+  blen+= sprintf(b + blen, "%s'action_run_execute', '%s', '%s', 'action_run_execute');",
+               insert, menu_strings[menu_off + MENU_RUN], menu_strings[menu_off + MENU_RUN_EXECUTE]);
+  blen+= sprintf(b + blen, "%s'action_run_kill', '%s', '%s', 'action_run_kill');",
+               insert, menu_strings[menu_off + MENU_RUN], menu_strings[menu_off + MENU_RUN_KILL]);
+  blen+= sprintf(b + blen, "%s'menu_settings','%s','','[menu]');",
+               insert, menu_strings[menu_off + MENU_SETTINGS]);
+  blen+= sprintf(b + blen, "%s'action_settings_menu', '%s', '%s', 'action_settings_menu');",
+               insert, menu_strings[menu_off + MENU_SETTINGS], menu_strings[menu_off + MENU_SETTINGS_MENU]);
+  blen+= sprintf(b + blen, "%s'action_settings_history', '%s', '%s', 'action_settings_history');",
+               insert, menu_strings[menu_off + MENU_SETTINGS], menu_strings[menu_off + MENU_SETTINGS_HISTORY_WIDGET]);
+  blen+= sprintf(b + blen, "%s'action_settings_grid', '%s', '%s', 'action_settings_grid');",
+               insert, menu_strings[menu_off + MENU_SETTINGS], menu_strings[menu_off + MENU_SETTINGS_GRID_WIDGET]);
+  blen+= sprintf(b + blen, "%s'action_settings_statement', '%s', '%s', 'action_settings_statement');",
+               insert, menu_strings[menu_off + MENU_SETTINGS], menu_strings[menu_off + MENU_SETTINGS_STATEMENT_WIDGET]);
+ #if (OCELOT_MYSQL_DEBUGGER == 1)
+  blen+= sprintf(b + blen, "%s'action_settings_debug', '%s', '%s', 'action_settings_debug');",
+               insert, menu_strings[menu_off + MENU_SETTINGS], menu_strings[menu_off + MENU_SETTINGS_DEBUG_WIDGET]);
+#endif
+  blen+= sprintf(b + blen, "%s'action_settings_extra_rule_1', '%s', '%s', 'action_settings_extra_rule_1');",
+               insert, menu_strings[menu_off + MENU_SETTINGS], menu_strings[menu_off + MENU_SETTINGS_EXTRA_RULE_1]);
+ #if (OCELOT_EXPLORER == 1)
+  blen+= sprintf(b + blen, "%s'action_settings_explorer', '%s', '%s', 'action_settings_explorer');",
+               insert, menu_strings[menu_off + MENU_SETTINGS], menu_strings[menu_off + MENU_SETTINGS_EXPLORER_WIDGET]);
+#endif
+  blen+= sprintf(b + blen, "%s'menu_options','%s','','[menu]');",
+               insert, menu_strings[menu_off + MENU_OPTIONS]);
+  blen+= sprintf(b + blen, "%s'action_options_detach_history_widget', '%s', '%s', 'action_options_detach_history_widget');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
+  blen+= sprintf(b + blen, "%s'action_options_detach_result_grid_widget', '%s', '%s', 'action_options_detach_result_grid_widget');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  blen+= sprintf(b + blen, "%s'action_options_detach_debug_widget', '%s', '%s', 'action_options_detach_debug_widget');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_DETACH_DEBUG_WIDGET]);
+#endif
+  blen+= sprintf(b + blen, "%s'action_options_detach_statement_widget', '%s', '%s', 'action_options_detach_statement_widget');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_DETACH_STATEMENT_WIDGET]);
+#if (OCELOT_EXPLORER == 1)
+  blen+= sprintf(b + blen, "%s'action_options_detach_explorer_widget', '%s', '%s', 'action_options_detach_explorer_widget');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_DETACH_EXPLORER_WIDGET]);
+#endif
+  blen+= sprintf(b + blen, "%s'action_options_next_window', '%s', '%s', 'action_options_next_window');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_NEXT_WINDOW]);
+  blen+= sprintf(b + blen, "%s'action_options_previous_window', '%s', '%s', 'action_options_previous_window');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_PREVIOUS_WINDOW]);
+#if (OCELOT_CHART_OR_QCHART == 1)
+  blen+= sprintf(b + blen, "%s'action_options_bar', '%s', '%s', 'action_options_bar');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BAR]);
+#endif
+  blen+= sprintf(b + blen, "%s'action_options_batch', '%s', '%s', 'action_options_batch');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_BATCH]);
+  blen+= sprintf(b + blen, "%s'action_options_horizontal', '%s', '%s', 'action_options_horizontal');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL]);
+  blen+= sprintf(b + blen, "%s'action_options_html', '%s', '%s', 'action_options_html');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTML]);
+  blen+= sprintf(b + blen, "%s'action_options_htmlraw', '%s', '%s', 'action_options_htmlraw');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW]);
+#if (OCELOT_CHART_OR_QCHART == 1)
+  blen+= sprintf(b + blen, "%s'action_options_line', '%s', '%s', 'action_options_line');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_LINE]);
+  blen+= sprintf(b + blen, "%s'action_options_none', '%s', '%s', 'action_options_none');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_NONE]);
+  blen+= sprintf(b + blen, "%s'action_options_pie', '%s', '%s', 'action_options_pie');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_PIE]);
+#endif
+  blen+= sprintf(b + blen, "%s'action_options_raw', '%s', '%s', 'action_options_raw');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_RAW]);
+  blen+= sprintf(b + blen, "%s'action_options_vertical', '%s', '%s', 'action_options_vertical');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_VERTICAL]);
+  blen+= sprintf(b + blen, "%s'action_options_xml', '%s', '%s', 'action_options_xml');",
+               insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_RESULT_DISPLAY_XML]);
+#if (OCELOT_MYSQL_DEBUGGER == 1)
+  blen+= sprintf(b + blen, "%s'menu_debug','%s','','[menu]');",
+               insert, menu_strings[menu_off + MENU_DEBUG]);
+  blen+= sprintf(b + blen, "%s'action_debug_breakpoint', '%s', '%s', 'action_debug_breakpoint');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_BREAKPOINT]);
+  blen+= sprintf(b + blen, "%s'action_debug_continue', '%s', '%s', 'action_debug_continue');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_CONTINUE]);
+  blen+= sprintf(b + blen, "%s'action_debug_next', '%s', '%s', 'action_debug_next');",
+                insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_NEXT]);
+  blen+= sprintf(b + blen, "%s'action_debug_step', '%s', '%s', 'action_debug_step');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_STEP]);
+  blen+= sprintf(b + blen, "%s'action_debug_clear', '%s', '%s', 'action_debug_clear');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_CLEAR]);
+  blen+= sprintf(b + blen, "%s'action_debug_exit', '%s', '%s', 'action_debug_exit');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_EXIT]);
+  blen+= sprintf(b + blen, "%s'action_debug_information', '%s', '%s', 'action_debug_information');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_INFORMATION]);
+  blen+= sprintf(b + blen, "%s'action_debug_refresh_server_variables', '%s', '%s', 'action_debug_refresh_server_variables');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_REFRESH_SERVER_VARIABLES]);
+  blen+= sprintf(b + blen, "%s'action_debug_refresh_user_variables', '%s', '%s', 'action_debug_refresh_user_variables');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_REFRESH_USER_VARIABLES]);
+  blen+= sprintf(b + blen, "%s'action_debug_refresh_variables', '%s', '%s', 'action_debug_refresh_variables');",
+               insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_REFRESH_VARIABLES]);
+  blen+= sprintf(b + blen, "%s'action_debug_refresh_call_stack', '%s', '%s', 'action_debug_refresh_call_stack');",
+                insert, menu_strings[menu_off + MENU_DEBUG], menu_strings[menu_off + MENU_DEBUG_REFRESH_CALL_STACK]);
+#endif
+  blen+= sprintf(b + blen, "%s'menu_help','%s','','[menu]');",
+               insert, menu_strings[menu_off + MENU_HELP]);
+  blen+= sprintf(b + blen, "%s'action_help_about', '%s', '%s', 'action_help_about');",
+               insert, menu_strings[menu_off + MENU_HELP], menu_strings[menu_off + MENU_HELP_ABOUT]);
+  blen+= sprintf(b + blen, "%s'action_help_the_manual', '%s', '%s', 'action_help_the_manual');",
+               insert, menu_strings[menu_off + MENU_HELP], menu_strings[menu_off + MENU_HELP_THE_MANUAL]);
+  blen+= sprintf(b + blen, "%s'separator_4', '%s', '%s', '[separator]');",
+               insert, menu_strings[menu_off + MENU_HELP], "");
+#if (OCELOT_MYSQL_INCLUDE == 1)
+  blen+= sprintf(b + blen, "%s'action_help_libmysqlclient', '%s', '%s', 'action_help_libmysqlclient');",
+               insert, menu_strings[menu_off + MENU_HELP], menu_strings[menu_off + MENU_HELP_LIBMYSQLCLIENT]);
+#endif
+  blen+= sprintf(b + blen, "%s'action_help_settings', '%s', '%s', 'action_help_settings');",
+               insert, menu_strings[menu_off + MENU_HELP], menu_strings[menu_off + MENU_HELP_SETTINGS]);
+/*
+  Here is a slightly older version of b[], copied here to make the effect of the above sprintfs a bit more readable.
+  If ostrings.h didn't have an undocumented ption for --ocelot_languages, this would be all we'd need.
+  char b[]=
   "INSERT INTO menus VALUES ('menu_file', 'File', '', '[menu]');"
   "INSERT INTO menus VALUES ('action_file_connect', 'File', 'Connect', 'action_file_connect');"
   "INSERT INTO menus VALUES ('action_file_exit', 'File', 'Exit', 'action_file_exit');"
@@ -3908,21 +4081,22 @@ void MainWindow::menu_spec_make_menu()
   "INSERT INTO menus VALUES ('action_help_libmysqlclient', 'Help', 'libmysqlclient', 'action_help_libmysqlclient');"
 #endif
   "INSERT INTO menus VALUES ('action_help_settings', 'Help', 'settings', 'action_help_settings');"
-  ; /* end of q[] */
+  ;
+*/
   QString query;
 #if (OCELOT_PLUGIN == 1)
   if (plugin_widget_list.size() > 0)
   {
 printf("**** plugin_widget_list.size()=%d\n", plugin_widget_list.size());
-    ocelot_plugin_pass.query= q;
+    ocelot_plugin_pass.query= b;
     int return_code= plugin_widget_list_caller(PLUGIN_MAKE_MENU, "");
     if (return_code ==  PLUGIN_RETURN_OK_AND_REPLACED)
       query= QString::fromUtf8(ocelot_plugin_pass.replacer_buffer, ocelot_plugin_pass.replacer_buffer_length);
-    else query= q;
+    else query= b;
   }
-  else query= q;
+  else query= b;
 #else
-  query= q;
+  query= b;
 #endif
   /* Warning: following assumes query has only INSERTS with correct syntax, as above. */
   int desired_count= query.size() + 1;
@@ -3931,7 +4105,7 @@ printf("**** plugin_widget_list.size()=%d\n", plugin_widget_list.size());
   token_lengths[0]= 0;
   tokenize(query.data(),
            query.size(),
-           &token_lengths[0], &token_offsets[0], 1000,
+           &token_lengths[0], &token_offsets[0], desired_count,
           (QChar*)"33333", 2, ";", 1);
   /* Copying what's in execute_ocelot_query but fewer assumptions because this is called very early */
   QString id= ""; QString menu_title= ""; QString menuitem= ""; QString function= "";
@@ -4153,6 +4327,7 @@ printf("**** plugin_widget_list.size()=%d\n", plugin_widget_list.size());
       menu_spec_struct_list[k].shortcut_default= "Alt+Shift+7";
       menu_spec_struct_list[k].keyword= TOKEN_KEYWORD_OCELOT_SHORTCUT_XML;
     }
+#if (OCELOT_MYSQL_DEBUGGER == 1)
     if (menu_spec_struct_list[k].id == "action_debug_breakpoint")
     {
       menu_spec_struct_list[k].shortcut_default= "Alt+1";
@@ -4282,8 +4457,7 @@ void MainWindow::menu_spec_reset_menu()
         menu_spec_struct_list[i].qmenu= NULL;
       }
     }
-    if ((menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
-     || (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_SUBMENU_ITEM))
+    if (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
     {
       QAction *qaction= menu_spec_struct_list[i].qaction;
       if (qaction == NULL) printf("**** Error, qaction == NULL\n");
@@ -4361,18 +4535,9 @@ int MainWindow::menu_spec_find_id(QString id)
 int MainWindow::menu_spec_delete_via_id(QString id)
 {
   int i= menu_spec_find_id(id); /* same search + error check as for shortcut_set_via_id */
-  if (i == -1)
-  {
-    put_message_in_result("Error. id not found in menu list");
-    return ER_ERROR;
-  }
+  if (i == -1) return ER_0_ROWS_RETURNED;
   int menu_type= menu_spec_struct_list.at(i).menu_type;
-  if ((menu_type != MENU_SPEC_TYPE_MENUITEM) && (menu_type != MENU_SPEC_TYPE_SUBMENU_ITEM))
-  {
-    put_message_in_result("Error. id not found in menu list");
-    return ER_ERROR;
-  }
-  printf("**** DELETE %d\n", i);
+  if (menu_type != MENU_SPEC_TYPE_MENUITEM) return ER_0_ROWS_RETURNED;
   // QMenu *qmenu= menu_spec_struct_list.at(i).qmenu;
   QAction *qaction= menu_spec_struct_list.at(i).qaction;
   menu_spec_struct_list.removeAt(i);
@@ -4407,16 +4572,23 @@ void MainWindow::menu_spec_action_all(bool is_checked)
         int j;
         for (j= 0; j < menu_function_struct_list.size(); ++j)
         {
-          if (menu_spec_struct_list[i].function_name == menu_function_struct_list[j].name) break;
+          if (menu_spec_struct_list[i].function == menu_function_struct_list[j].name) break;
         }
         if (j == menu_function_struct_list.size())
         {
+          /* "If it ends with ; it is considered to be SQL, it will be put in statement widget ready to execute." */
+          QString menu_spec_function= menu_spec_struct_list[i].function;
+          if (menu_spec_function.right(1) == ";")
+          {
+            statement_edit_widget->setPlainText(menu_spec_function);
+            return;
+          }
 #if (OCELOT_PLUGIN == 1)
           if (plugin_widget_list.size() > 0)
           {
             QString text= statement_edit_widget->toPlainText();
             ocelot_plugin_pass.query= text.toUtf8().data();
-            int return_code= plugin_widget_list_caller(PLUGIN_MENU_CHOICE, menu_spec_struct_list[i].function_name);
+            int return_code= plugin_widget_list_caller(PLUGIN_MENU_CHOICE, menu_spec_function);
             if (return_code ==  PLUGIN_RETURN_OK_AND_REPLACED)
             {
               text= QString::fromUtf8(ocelot_plugin_pass.replacer_buffer, ocelot_plugin_pass.replacer_buffer_length);
@@ -4448,7 +4620,7 @@ void MainWindow::menu_spec_action_all(bool is_checked)
 int MainWindow::shortcut_set(int i, QString value)
 {
   QAction *qaction= menu_spec_struct_list[i].qaction;
-if (qaction == NULL) return ER_OK; /* menu? */
+  if (qaction == NULL) return ER_0_ROWS_RETURNED; /* menu? */
   value= connect_stripper(value, false);
   if (value == "default") value= menu_spec_struct_list[i].shortcut_default;
   if (value == "") qaction->setShortcut(QKeySequence());
@@ -4456,18 +4628,14 @@ if (qaction == NULL) return ER_OK; /* menu? */
   {
     QKeySequence k= QKeySequence(value);
     /* too many keys? too few? malformed string? todo: hmm, this doesn't seem to catch malformed strings*/
-    if ((k.count() < 1) || (k.isEmpty()) || (k.toString() < "")) return ER_ERROR;
+    if ((k.count() < 1) || (k.isEmpty()) || (k.toString() < "")) return ER_ILLEGAL_VALUE;
 
     for (int j= 0; j < menu_spec_struct_list.size(); ++j)
     {
       if (j == i) continue;
       if (menu_spec_struct_list[j].shortcut == "") continue;
       QKeySequence k2= QKeySequence(menu_spec_struct_list[j].shortcut);
-      if (k == k2)
-      {
-        printf("DUPLICATE\n");
-        exit(0);
-      }
+      if (k == k2) return ER_DUPLICATE;
     }
     qaction->setShortcut(k);
     }
@@ -4486,8 +4654,7 @@ int MainWindow::shortcut_set_via_id(QString id, QString value)
   int i= menu_spec_find_id(id);
   if (i == -1)
   {
-    put_message_in_result("Error. id not found in menu list");
-    return ER_ERROR;
+    return ER_0_ROWS_RETURNED;
   }
   return shortcut_set(i, value);
 }
@@ -4503,7 +4670,7 @@ int MainWindow::shortcut_set_via_keyword(int target, QString token3)
     if (target == menu_spec_struct_list[i].keyword)
       return shortcut_set(i, token3);
   }
-  return 0; /* actually this might be an error that the menu item doesn't exist (they can be deleted) */
+  return ER_0_ROWS_RETURNED; /* actually this might be an error that the menu item doesn't exist (they can be deleted) */
 }
 
 /*
@@ -8609,11 +8776,11 @@ void MainWindow::debug_install_go()
 
   if (debug_mdbug_install_sql(&mysql[MYSQL_MAIN_CONNECTION], x) < 0)
   {
-      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
       return;
     //if (debug_error((char*)"Install failed") != 0) return;
   }
-  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
 }
 
 /* For copyright and license notice of debug_mdbug_install function contents, see beginning of this program. */
@@ -8705,7 +8872,7 @@ void MainWindow::debug_setup_go(QString text)
 
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
-    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
     return;
     //if (debug_error((char*)"call xxxmdbug.setup() failed.") != 0) return;
   }
@@ -8910,7 +9077,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
                 if (it_is_ok_if_proc_is_already_there == 0)
                 {
                   unexpected_error= "create failed";
-                  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+                  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
                   //second_iteration_is_necessary= 1;
                   if (res != NULL)
                   {
@@ -8968,7 +9135,7 @@ void MainWindow::debug_setup_mysql_proc_insert()
     put_message_in_result(unexpected_error);
     return;
   }
-  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
 }
 
 
@@ -9659,7 +9826,7 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Attach failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
-    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
     debug_exit_go(1); /* This tries to tell the debuggee to stop, because we're giving up. */
     return;
   }
@@ -9685,11 +9852,11 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   if (debug_call_xxxmdbug_command(command_string) != 0)
   {
     /* Debug failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
-    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
     debug_exit_go(1); /* This tries to tell the debuggee to stop, because we're giving up. */
     return;
   }
-  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
   /* TODO: next line was removed TEMPORARILY. But maybe highlighting will occur due to temporary breakpoint? */
   //debug_highlight_line(); /* highlight the first line. todo: should be the first executable line, no? */
   debug_top_widget->show(); /* Is this necessary? I think so because initially debug_window should be hidden. */
@@ -9817,7 +9984,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
 
   if (debug_call_xxxmdbug_command(command_string) != 0)
   {
-    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
     return;
   }
 
@@ -9869,7 +10036,7 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
   */
   debug_widget[debug_widget_index]->repaint();
   debug_widget[debug_widget_index]->viewport()->update();
-  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
 }
 
 
@@ -10020,7 +10187,7 @@ void MainWindow::debug_set_go(QString text)
     return;
   }
   debug_call_xxxmdbug_command(command_string);
-  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
 }
 
 
@@ -10049,7 +10216,7 @@ void MainWindow::debug_execute_go()
 //  strcpy(command_string, s.toUtf8());
 //  printf("command_string=%s.\n", command_string);
 //  debug_call_xxxmdbug_command(s.toUtf8());
-//  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+//  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
 ////  put_message_in_result("This statement is not supported at this time");
 }
 
@@ -10079,7 +10246,7 @@ void MainWindow::debug_other_go(QString text)
   q_routine_name= debug_q_routine_name_in_statement;
   if (debug_error((char*)"") != 0) return;
   if (debug_call_xxxmdbug_command(command_string) != 0) return;
-  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
 }
 
 
@@ -10267,7 +10434,7 @@ void MainWindow::debug_exit_go(int flagger)
   {
     if (debug_call_xxxmdbug_command("exit") != 0)
     {
-      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
       return;
     }
     for (int kk= 0; kk < 10; ++kk) {QThread48::msleep(100); if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP) break; }
@@ -10317,7 +10484,7 @@ void MainWindow::debug_exit_go(int flagger)
 
   if (flagger == 0)
   {
-    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION); /* This should show the result of the final call or select, so it should be "ok" */
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0); /* This should show the result of the final call or select, so it should be "ok" */
   }
 }
 
@@ -10449,12 +10616,12 @@ int MainWindow::debug_call_xxxmdbug_command(const char *command)
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Initially this can happen because we start the timer immediately after we call 'attach'. */
-    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
     return 1;
   }
   debug_statement= command;
 
-  //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION)???
+  //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0)???
 
   /* We no longer try to get the debuggee response with debug_information_status(). */
   //if (strcmp(command, "information status") != 0)
@@ -11045,6 +11212,7 @@ int MainWindow::action_execute_one_statement(QString text)
   unsigned return_value= 0;
   int ocelot_query_result= 0;
   bool is_ocelot_query_in_client= false;
+  unsigned int diagnostic_signal= DIAGNOSTIC_0;
   QString fillup_result;
 
   ++statement_edit_widget->statement_count;
@@ -11238,7 +11406,7 @@ int MainWindow::action_execute_one_statement(QString text)
         if (is_semiselect_seen == false)
         {
           ocelot_query_result= execute_ocelot_query(query_utf16, MYSQL_MAIN_CONNECTION, &text, &is_ocelot_query_in_client,
-                                                    &fillup_result);
+                                                    &fillup_result, &diagnostic_signal);
           if (ocelot_query_result == ER_ERROR)
           {
             is_create_table_server= true; /* Fake. it's not create table server but should have same effect. */
@@ -11261,7 +11429,7 @@ int MainWindow::action_execute_one_statement(QString text)
         if (ocelot_ca.no_beep == 0) QApplication::beep();
         return_value= 1;
         if (is_create_table_server == false)
-          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, diagnostic_signal);
       }
       else {
         /*
@@ -11278,6 +11446,7 @@ int MainWindow::action_execute_one_statement(QString text)
         */
         /* TEMPORARY TEST!!!! */
         ResultGrid *rg;
+        if (diagnostic_signal == DIAGNOSTIC_1) goto statement_is_over;
         if (is_ocelot_query_in_client == true)
         {
           rg= qobject_cast<ResultGrid*>(result_grid_tab_widget->widget(0));
@@ -11325,7 +11494,7 @@ int MainWindow::action_execute_one_statement(QString text)
 #if (OCELOT_MYSQL_INCLUDE == 1)
           get_sql_mode(main_token_types[main_token_number], text, false, main_token_number);
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
-          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, diagnostic_signal);
         }
         else
         {
@@ -11418,7 +11587,7 @@ after_fillup:
           log("copy_to_history (after)", 80);
           /* Todo: small bug: elapsed_time calculation happens before lmysql->ldbms_mysql_next_result(). */
           /* You must call lmysql->ldbms_mysql_next_result() + lmysql->ldbms_mysql_free_result() if there are multiple sets */
-          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION); /* Do this while we still have number of rows */
+          put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, diagnostic_signal); /* Do this while we still have number of rows */
           //history_markup_append(result_set_for_history, true);
           int result_grid_table_widget_index= 1;
 #ifdef DBMS_TARANTOOL
@@ -11469,7 +11638,7 @@ after_fillup:
                 /* TODO: don't do this for SOURCE. Check for beep. */
                 if (dbms_long_query_result == 1)
                 {
-                  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+                  put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, diagnostic_signal);
                   //history_markup_append("", true);
                 }
                 break;
@@ -11486,14 +11655,14 @@ after_fillup:
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
         }
       }
-      //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, diagnostic_signal);
     }
   }
 statement_is_over:
   /* statement is over */
   /* todo: bug: start of session has an elapsed time */
   if ((ecs_return == 0) && (connections_dbms[0] == DBMS_TARANTOOL) && (ocelot_query_result != ER_ERROR))
-    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+    put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, diagnostic_signal);
 statement_is_aborted:
   log("action_execute_one_statement end", 80);
   if (additional_result != TOKEN_KEYWORD_SOURCE)
@@ -11685,7 +11854,7 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
 /* the late tokenize only does 10 words, which is enough since I think tokenize() will ignore comments */
 #define MAX_OCELOT_STATEMENT_TOKENS 20
 int MainWindow::execute_ocelot_query(QString query, int connection_number, const QString *alltext,
-                                     bool *is_ocelot_query_in_client, QString *fillup_result)
+                                     bool *is_ocelot_query_in_client, QString *fillup_result, unsigned int *diagnostic_signal)
 {
   log("execute_ocelot_query", 80);
 
@@ -11700,6 +11869,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
   int *token_lengths;
   int *token_types;
   int desired_count;
+  bool is_early_return= false;
 restart: /* jump back to here if SELECT * produces a new query */
   main_token_push();
   main_token_new(query.size() + 1); /* This might be needed if --ocelot_query = long statement */
@@ -11770,12 +11940,11 @@ restart: /* jump back to here if SELECT * produces a new query */
           ++j;
         }
       }
-      menu_spec_insert_one(id, menu_title, menuitem, function);
-      /* todo: if okay, should return # inserted = 1 */
-      delete [] token_types;
-      delete [] token_lengths;
-      delete [] token_offsets;
-      return ER_OK;
+      int er= menu_spec_insert_one(id, menu_title, menuitem, function);
+      if (er == ER_OK) put_message_in_result("OK, 1 row");
+      else put_message_in_result("Error");
+      *diagnostic_signal= DIAGNOSTIC_1;
+      is_early_return= true;
     }
     else
     {
@@ -11785,24 +11954,22 @@ restart: /* jump back to here if SELECT * produces a new query */
       plugin_id= connect_stripper(plugin_id, true);
       QString plugin_soname= query.mid(token_offsets[10], token_lengths[10]);
       int er= insert_plugin(plugin_id, plugin_soname, alltext);
-      delete [] token_types;
-      delete [] token_lengths;
-      delete [] token_offsets;
-      return er; /* with luck this is ER_OK */
-      ;
+      if (er == ER_OK) put_message_in_result("OK, 1 row");
+      else put_message_in_result("Error");
+      *diagnostic_signal= DIAGNOSTIC_1;
+      is_early_return= true;
     }
   }
   if (main_token_types[3] == TOKEN_KEYWORD_UPDATE)
   {
-    /* e.g. SET ocelot_query = UPDATE menu SET shortcut = 'a' WHERE id = 'b'; */
+    /* e.g. SET ocelot_query = UPDATE menus SET shortcut = 'a' WHERE id = 'action_options_line'; */
     QString id= query.mid(token_offsets[12], token_lengths[12]);
     QString value= query.mid(token_offsets[8], token_lengths[8]);
     int er= shortcut_set_via_id(id, value);
     /* We won't get here with er!=0 due to nonexistent id because that's considered a syntax error */
-    delete [] token_types;
-    delete [] token_lengths;
-    delete [] token_offsets;
-    return er;
+    put_message_in_result(er_strings[er_off + er]);
+    *diagnostic_signal= DIAGNOSTIC_1;
+    is_early_return= true;
   }
   if (main_token_types[3] == TOKEN_KEYWORD_DELETE)
   {
@@ -11813,11 +11980,9 @@ restart: /* jump back to here if SELECT * produces a new query */
     if (table == "MENUS") er= menu_spec_delete_via_id(id);
     else { id= connect_stripper(id, false); er= delete_plugin(id); }
     /* We won't get here with er!=0 due to nonexistent id because that's considered a syntax error */
-    put_message_in_result("OK");
-    delete [] token_types;
-    delete [] token_lengths;
-    delete [] token_offsets;
-    return er;
+    put_message_in_result(er_strings[er_off + er]);
+    *diagnostic_signal= DIAGNOSTIC_1;
+    is_early_return= true;
   }
   if (token_types[3] == TOKEN_KEYWORD_SELECT)
   {
@@ -11831,98 +11996,110 @@ restart: /* jump back to here if SELECT * produces a new query */
       *is_ocelot_query_in_client= true;
       result= rg->fillup_in_client(query, token_lengths, token_offsets);
       *fillup_result= result;
-      delete [] token_types;
-      delete [] token_lengths;
-      delete [] token_offsets;
-      return ER_OK;
-    }
-    /* e.g. SELECT * FROM menus; or SELECT * FROM plugins; or SELECT * FROM conditional_settings; */
-    if (query.mid(token_offsets[6], token_lengths[6]).toUpper() == "MENUS")
-    {
-      query= "";
-      for (int i= 0, ngc= 0; i < menu_spec_struct_list.size(); ++i)
-      {
-//        if ((menu_spec_struct_list[i].menu_type != MENU_SPEC_TYPE_MENUITEM)
-//         && (menu_spec_struct_list[i].menu_type != MENU_SPEC_TYPE_SEPARATOR)
-//         && (menu_spec_struct_list[i].menu_type != MENU_SPEC_TYPE_SUBMENU_ITEM )) continue;
-        if (ngc > 0) query= query + " UNION ALL ";
-        query= query + "SELECT " + connect_unstripper(menu_spec_struct_list[i].id);
-        if (ngc == 0) query= query + " AS id";
-        query= query + "," + connect_unstripper(menu_spec_struct_list[i].menu_title);
-        if (ngc == 0) query= query + " AS menu_title";
-        query= query + "," + connect_unstripper(menu_spec_struct_list[i].menu_item);
-        if (ngc == 0) query= query + " AS menu_item";
-        query= query + "," + connect_unstripper(menu_spec_struct_list[i].shortcut);
-        if (ngc == 0) query= query + " AS shortcut";
-        query= query + "," + connect_unstripper(menu_spec_struct_list[i].function_name);
-        if (ngc == 0) query= query + " AS function_name";
-        ++ngc;
-      }
-    }
-    else if (query.mid(token_offsets[6], token_lengths[6]).toUpper() == "PLUGINS")
-    {
-      if (plugin_widget_list.size() == 0)
-      {
-        query= "SELECT 'Empty result set' AS EMPTY_SET";
-      }
-      else /* plugins */
-      {
-        query= "";
-        for (int i= 0; i  < plugin_widget_list.size(); ++i)
-        {
-          if (i > 0) query= query + " UNION ALL ";
-          query= query + "SELECT ";
-          Plugin *plugin_widget= plugin_widget_list[i];
-          query= query + connect_unstripper(plugin_widget->id);
-          if (i == 0) query= query + " AS id";
-          query= query + "," + connect_unstripper(plugin_widget->soname);
-          if (i == 0) query= query + " AS soname";
-        }
-      }
+      unsigned long r= rg->result_row_count;
+      if (r == 1) put_message_in_result("OK, 1 row");
+      else put_message_in_result(QString::number(r) + " rows");
+      *diagnostic_signal= DIAGNOSTIC_2;
+      is_early_return= true;
     }
     else
     {
-      if (conditional_settings.count() == 0)
+      /* e.g. SELECT * FROM menus; or SELECT * FROM plugins; or SELECT * FROM conditional_settings; */
+      if (query.mid(token_offsets[6], token_lengths[6]).toUpper() == "MENUS")
       {
-        query= "SELECT 'Empty result set' AS EMPTY_SET";
+        query= "";
+        for (int i= 0, ngc= 0; i < menu_spec_struct_list.size(); ++i)
+        {
+//          if ((menu_spec_struct_list[i].menu_type != MENU_SPEC_TYPE_MENUITEM)
+//           && (menu_spec_struct_list[i].menu_type != MENU_SPEC_TYPE_SEPARATOR)) continue;
+          if (ngc > 0) query= query + " UNION ALL ";
+          query= query + "SELECT " + connect_unstripper(menu_spec_struct_list[i].id);
+          if (ngc == 0) query= query + " AS id";
+          query= query + "," + connect_unstripper(menu_spec_struct_list[i].menu_title);
+          if (ngc == 0) query= query + " AS menu_title";
+          query= query + "," + connect_unstripper(menu_spec_struct_list[i].menu_item);
+          if (ngc == 0) query= query + " AS menu_item";
+          query= query + "," + connect_unstripper(menu_spec_struct_list[i].shortcut);
+          if (ngc == 0) query= query + " AS shortcut";
+          query= query + "," + connect_unstripper(menu_spec_struct_list[i].function);
+          if (ngc == 0) query= query + " AS function";
+          ++ngc;
+        }
+      }
+      else if (query.mid(token_offsets[6], token_lengths[6]).toUpper() == "PLUGINS")
+      {
+        if (plugin_widget_list.size() == 0)
+        {
+          query= "SELECT 'Empty result set' AS EMPTY_SET";
+        }
+        else /* plugins */
+        {
+          query= "";
+          for (int i= 0; i  < plugin_widget_list.size(); ++i)
+          {
+            if (i > 0) query= query + " UNION ALL ";
+            query= query + "SELECT ";
+            Plugin *plugin_widget= plugin_widget_list[i];
+            query= query + connect_unstripper(plugin_widget->id);
+            if (i == 0) query= query + " AS id";
+            query= query + "," + connect_unstripper(plugin_widget->soname);
+            if (i == 0) query= query + " AS soname";
+          }
+        }
       }
       else
       {
-        query= "";
-        for (int i= 0; i  < conditional_settings.count(); ++i)
+        if (conditional_settings.count() == 0)
         {
-          if (i > 0) query= query + " UNION ALL ";
-          query= query + "SELECT ";
-          QString id= "C" + QString::number(i + 1);
-          query= query + connect_unstripper(id);
-          if (i == 0) query= query + " AS id";
-          query= query + "," + connect_unstripper(conditional_settings.at(i));
-          if (i == 0) query= query + " AS conditional_setting";
+          query= "SELECT 'Empty result set' AS EMPTY_SET";
+        }
+        else
+        {
+          query= "";
+          for (int i= 0; i  < conditional_settings.count(); ++i)
+          {
+            if (i > 0) query= query + " UNION ALL ";
+            query= query + "SELECT ";
+            QString id= "C" + QString::number(i + 1);
+            query= query + connect_unstripper(id);
+            if (i == 0) query= query + " AS id";
+            query= query + "," + connect_unstripper(conditional_settings.at(i));
+            if (i == 0) query= query + " AS conditional_setting";
+          }
         }
       }
-    }
-    query= query + ";";
-    delete [] token_types;
-    delete [] token_lengths;
-    delete [] token_offsets;
+      query= query + ";";
+      delete [] token_types;
+      delete [] token_lengths;
+      delete [] token_offsets;
 
-    desired_count= query.length() + 1; /* allocate as if every byte in query is a one-byte token */
-    token_offsets= new int[desired_count];
-    token_lengths= new int[desired_count];
-    token_types= new int[desired_count]; /* warning: actually we won't recall tokens_to_keywords */
-    main_token_lengths[0]= 0;
-    tokenize(query.data(),
-             query.size(),
-             &token_lengths[0], &token_offsets[0], desired_count,
-            (QChar*)"33333", 2, ocelot_delimiter_str, 1);
-    *is_ocelot_query_in_client= true;
-    result= rg->fillup_in_client(query, token_lengths, token_offsets);
-    *fillup_result= result;
+      desired_count= query.length() + 1; /* allocate as if every byte in query is a one-byte token */
+      token_offsets= new int[desired_count];
+      token_lengths= new int[desired_count];
+      token_types= new int[desired_count]; /* warning: actually we won't recall tokens_to_keywords */
+      main_token_lengths[0]= 0;
+      tokenize(query.data(),
+               query.size(),
+               &token_lengths[0], &token_offsets[0], desired_count,
+              (QChar*)"33333", 2, ocelot_delimiter_str, 1);
+      *is_ocelot_query_in_client= true;
+      result= rg->fillup_in_client(query, token_lengths, token_offsets);
+      *fillup_result= result;
+      unsigned long r= rg->result_row_count;
+      if (r == 1) put_message_in_result("OK, 1 row");
+      else put_message_in_result(QString::number(r) + " rows");
+      *diagnostic_signal= DIAGNOSTIC_2;
+      is_early_return= true;
+    }
+  }
+  if (is_early_return)
+  {
     delete [] token_types;
     delete [] token_lengths;
     delete [] token_offsets;
     return ER_OK;
   }
+
 /* TODO: The following was done before there was a way to make tiny changes for expressions. Do it the way it's done above. */
   char error_or_ok_message[ER_MAX_LENGTH];
 #ifdef DBMS_TARANTOOL
@@ -12418,7 +12595,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 
     mysql_select_db_result= lmysql->ldbms_mysql_select_db(&mysql[MYSQL_MAIN_CONNECTION], query);
     delete []query;
-    if (mysql_select_db_result != 0) put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+    if (mysql_select_db_result != 0) put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
     else
     {
       statement_edit_widget->dbms_database= s;
@@ -14392,7 +14569,7 @@ void MainWindow::widget_sizer()
   Todo: the elapsed-time calculation in the diagnostics is calculated at the wrong time,
   it includes the time to set up the widgets. Move it to just after statement-execution.
 */
-void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
+void MainWindow::put_diagnostics_in_result(unsigned int connection_number, unsigned int diagnostic_signal)
 {
 #if (OCELOT_MYSQL_INCLUDE == 1)
   unsigned int mysql_warning_count;
@@ -14407,6 +14584,11 @@ void MainWindow::put_diagnostics_in_result(unsigned int connection_number)
     long int elapsed_time_as_long_int= (long int) elapsed_time;
     float elapsed_time_as_float= (float) elapsed_time_as_long_int / 1000; /* todo: round */
     sprintf(elapsed_time_string, " (%.1f seconds)", elapsed_time_as_float);
+  }
+  if (diagnostic_signal != DIAGNOSTIC_0) /* If execute_ocelot_query already pasted a result without the server */
+  {
+    statement_edit_widget->result.append(elapsed_time_string);
+    return;
   }
 #ifdef DBMS_TARANTOOL
   if (connections_dbms[connection_number] == DBMS_TARANTOOL)
@@ -16280,7 +16462,7 @@ int MainWindow::connect_mysql(unsigned int connection_number)
   //lmysql->ldbms_mysql_init(&mysql[connection_number]);
   if (the_connect(connection_number))
   {
-    put_diagnostics_in_result(connection_number);
+    put_diagnostics_in_result(connection_number, DIAGNOSTIC_0);
     make_and_append_message_in_result(ER_FAILED_TO_CONNECT, 0, (char*)"");
     return 1;
   }
@@ -16987,7 +17169,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   {
     /* Kludge so put_diagnostics_in_result won't crash */
     connections_dbms[connection_number]= DBMS_TARANTOOL;
-    put_diagnostics_in_result(connection_number);
+    put_diagnostics_in_result(connection_number, DIAGNOSTIC_0);
     if (connection_number == MYSQL_MAIN_CONNECTION)
     {
       make_and_append_message_in_result(ER_FAILED_TO_CONNECT_TO_TARANTOOL, 0, (char*)"");
@@ -20005,7 +20187,7 @@ int MainWindow::create_table_server(QString text,
                          &q);
     if (result != 0)
     {
-      put_diagnostics_in_result(MYSQL_REMOTE_CONNECTION);
+      put_diagnostics_in_result(MYSQL_REMOTE_CONNECTION, DIAGNOSTIC_0);
       break;
     }
     /* CREATE TABLE y4 SERVER id LUA 'box.space._space:select()'; crashed */
@@ -20018,7 +20200,7 @@ int MainWindow::create_table_server(QString text,
         tarantool_errno[MYSQL_MAIN_CONNECTION]= 9999;
         result= 9999;
         strcpy(tarantool_errmsg, "No result set");
-        put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+        put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
         break;
       }
       if (r == 0)
@@ -20026,7 +20208,7 @@ int MainWindow::create_table_server(QString text,
         tarantool_errno[MYSQL_MAIN_CONNECTION]= 9999;
         result= 9999;
         strcpy(tarantool_errmsg, "Empty result set");
-        put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+        put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
         break;
       }
     }
@@ -20049,7 +20231,7 @@ int MainWindow::create_table_server(QString text,
     result= rg->creates(create_table_statement, connections_dbms[MYSQL_MAIN_CONNECTION], read_format_result);
     if (result != 0)
     {
-      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
       break;
     }
     QString temporary_table_name=
@@ -20059,7 +20241,7 @@ int MainWindow::create_table_server(QString text,
     result= rg->inserts(temporary_table_name);
     if (result != 0)
     {
-      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION);
+      put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0);
       break;
     }
     break;
@@ -45151,7 +45333,6 @@ int MainWindow::insert_plugin(QString plugin_id, QString plugin_soname, const QS
 */
 int MainWindow::delete_plugin(QString id)
 {
-  printf("**** insert_or_delete -- DELETE\n");
   for (int i= 0; i  < plugin_widget_list.size(); ++i)
   {
     Plugin *plugin_widget= plugin_widget_list[i];
@@ -45160,10 +45341,10 @@ int MainWindow::delete_plugin(QString id)
       /* todo: might be good to have  a call for uninstall here */
       delete plugin_widget;
       plugin_widget_list.removeAt(i);
-      break;
+      return ER_OK;
     }
   }
-  return ER_OK;
+  return ER_0_ROWS_RETURNED;
 }
 
 /* For general comments about the Plugin class see ocelotgui.h after the directive #ifndef PLUGIN_H */

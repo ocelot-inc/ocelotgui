@@ -4105,6 +4105,7 @@ then the only acceptable literals are unsigned integers.
 Todo: The expected will still say "[literal]", more general than needed.
 Todo: We aren't specific enough, we don't use this enough.
 Todo: Some values aren't used.
+Warning: Some things e.g. TOKEN_LITERAL_FLAG_STRING_ID are not included in TOKEN_LITERAL_FLAG_ANY
 */
 #define TOKEN_LITERAL_FLAG_STRING               1
 #define TOKEN_LITERAL_FLAG_SIGNED_INTEGER       2
@@ -4126,6 +4127,11 @@ Todo: Some values aren't used.
 #define TOKEN_LITERAL_FLAG_DATE_STRING          (1+512)
 #define TOKEN_LITERAL_FLAG_UUID                 1024
 #define TOKEN_LITERAL_FLAG_MAP                  2048
+#define TOKEN_LITERAL_FLAG_ID_STRING            4096
+#define TOKEN_LITERAL_FLAG_SONAME_STRING        8192
+#define TOKEN_LITERAL_FLAG_MENU_TITLE_STRING    16384
+#define TOKEN_LITERAL_FLAG_MENU_ITEM_STRING     32768
+#define TOKEN_LITERAL_FLAG_FUNCTION_STRING      65536
 #define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512+1024+2048)
 
 /*
@@ -5201,7 +5207,6 @@ public:
 #define MENU_SPEC_TYPE_MENU 0
 #define MENU_SPEC_TYPE_MENUITEM 1
 #define MENU_SPEC_TYPE_SUBMENU 2
-#define MENU_SPEC_TYPE_SUBMENU_ITEM 3
 #define MENU_SPEC_TYPE_SEPARATOR 4
   struct menu_spec_struct {
       QString id; /* names an action e.g. "file_connect" (by convention it matches method name) */ /* or names a menu */
@@ -5213,7 +5218,7 @@ public:
       QString menu_name;   /* e.g. "menu_file" */ /* better name = upper_id? or id_of_menu? */
       QMenu *qmenu;
       QAction *qaction;      /* filled in after qAction* new() */
-      QString function_name; /* = name associated with p_method void (MainWindow::*p_method)(bool);, can be / defaults to same as id */
+      QString function;      /* = name associated with p_method void (MainWindow::*p_method)(bool);, can be / defaults to same as id */
       QString shortcut_default; /* what to use if user enters "default" */
       int keyword; /* e.g. TOKEN_KEYWORD_SHORTCUT_UNDO, though that should eventually become obsolete */
       QString reserved;
@@ -5301,7 +5306,6 @@ public:
   void hparse_f_function_arguments(QString);
   int hparse_f_expression_list(int);
   void hparse_f_parenthesized_value_list();
-  void hparse_f_parenthesized_string_list();
   void hparse_f_parameter_list(int);
   void hparse_f_parenthesized_expression();
   void hparse_f_parenthesized_multi_expression(int*);
@@ -5467,7 +5471,7 @@ public:
   void log(const char*,int);
   void extra_result_set(int, unsigned short int);
   int execute_real_query(QString, int, const QString *);
-  int execute_ocelot_query(QString, int, const QString *, bool *, QString *);
+  int execute_ocelot_query(QString, int, const QString *, bool *, QString *, unsigned int *);
   void fillup_prepare();
 #ifdef DBMS_TARANTOOL
   void tparse_f_factor();
@@ -5744,7 +5748,13 @@ private:
   bool is_context_menu_name(int token_type);
   void prompt_default();
   int conditional_settings_insert(QString text);
-  void put_diagnostics_in_result(unsigned int);
+  void put_diagnostics_in_result(unsigned int, unsigned int);
+/* Signal passed to put_diagnostics_in_result, 0 unless execute_ocelot_query happened and added its own message */
+#define DIAGNOSTIC_0 0
+#define DIAGNOSTIC_1 1
+#define DIAGNOSTIC_2 2
+
+
   void make_and_put_message_in_result(unsigned int, int, char*);
   void make_and_put_open_message_in_result(unsigned int, int, QString);
   void make_and_append_message_in_result(unsigned int, int, char*);

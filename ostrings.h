@@ -159,7 +159,8 @@ static const char *string_languages[]=
 #define ER_START_OF_SESSION               82
 #define ER_CREATE_SERVER_SYNTAX           83
 #define ER_8372                           84
-#define ER_END                            85
+#define ER_DUPLICATE                      85
+#define ER_END                            86
 #define ER_MAX_LENGTH       1024
 static const char *er_strings[]=
 {
@@ -250,6 +251,7 @@ static const char *er_strings[]=
   "/* Start of Session */", /* ER_START_OF_SESSION */
   "CREATE SERVER syntax", /* ER_CREATE_SERVER_SYNTAX */
   "Deferred till commit/rollback", /* ER_8372 */
+  "Duplicate", /* ER_DUPLICATE */
   /* FRENCH */
     "OK",                           /* ER_OK */
     "Erreur non connecté",          /* ER_NOT_CONNECTED */
@@ -335,7 +337,8 @@ static const char *er_strings[]=
     "Vide constant", /* ER_EMPTY_LITERAL */
     "/* Début de Session */", /* ER_START_OF_SESSION */
     "CREATE SERVER syntaxe", /* ER_CREATE_SERVER_SYNTAX */
-    "Retardé jusqu'à commit/rollback"  /* ER_8372 */
+    "Retardé jusqu'à commit/rollback",  /* ER_8372 */
+    "Doublon", /* ER_DUPLICATE */
 };
 
 /*
@@ -971,17 +974,17 @@ static const char *menu_strings[]=
 "detach explorer widget", /* MENU_OPTIONS_DETACH_EXPLORER_WIDGET */
 "next window", /* MENU_OPTIONS_NEXT_WINDOW */
 "previous window", /* MENU_OPTIONS_PREVIOUS_WINDOW */
-"result display = 'horizontal'", /* MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL */
-"result display = 'vertical'", /* MENU_OPTIONS_RESULT_DISPLAY_VERTICAL */
-"result display = 'html'", /* MENU_OPTIONS_RESULT_DISPLAY_HTML */
-"result display = 'xml'", /* MENU_OPTIONS_RESULT_DISPLAY_XML */
-"result display = 'raw'", /* MENU_OPTIONS_RESULT_DISPLAY_RAW */
-"result display = 'batch'", /* MENU_OPTIONS_RESULT_DISPLAY_BATCH */
-"result display = 'htmlraw'", /* MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW */
-"result display = 'bar'", /* MENU_OPTIONS_RESULT_DISPLAY_BAR */
-"result display = 'line'", /* MENU_OPTIONS_RESULT_DISPLAY_LINE */
-"result display = 'pie'", /* MENU_OPTIONS_RESULT_DISPLAY_PIE */
-"result display = ''", /* MENU_OPTIONS_RESULT_DISPLAY_NONE */
+"result display = ''horizontal''", /* MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL */
+"result display = ''vertical''", /* MENU_OPTIONS_RESULT_DISPLAY_VERTICAL */
+"result display = ''html''", /* MENU_OPTIONS_RESULT_DISPLAY_HTML */
+"result display = ''xml''", /* MENU_OPTIONS_RESULT_DISPLAY_XML */
+"result display = ''raw''", /* MENU_OPTIONS_RESULT_DISPLAY_RAW */
+"result display = ''batch''", /* MENU_OPTIONS_RESULT_DISPLAY_BATCH */
+"result display = ''htmlraw''", /* MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW */
+"result display = ''bar''", /* MENU_OPTIONS_RESULT_DISPLAY_BAR */
+"result display = ''line''", /* MENU_OPTIONS_RESULT_DISPLAY_LINE */
+"result display = ''pie''", /* MENU_OPTIONS_RESULT_DISPLAY_PIE */
+"result display = ''''''", /* MENU_OPTIONS_RESULT_DISPLAY_NONE */
 "Debug", /* MENU_DEBUG */
 "Install", /* MENU_DEBUG_INSTALL */
 "Setup", /* MENU_DEBUG_SETUP */
@@ -1093,17 +1096,17 @@ static const char *menu_strings[]=
     "Détacher explorateur widget", /* MENU_OPTIONS_DETACH_EXPLORER_WIDGET */
     "Fenêtre prochaine ", /* MENU_OPTIONS_NEXT_WINDOW */
     "Fenêtre précédente", /* MENU_OPTIONS_PREVIOUS_WINDOW */
-    "affichage des résultats = 'horizontal'", /* MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL */
-    "affichage des résultats = 'vertical'", /* MENU_OPTIONS_RESULT_DISPLAY_VERTICAL */
-    "affichage des résultats = 'html'", /* MENU_OPTIONS_RESULT_DISPLAY_HTML */
-    "affichage des résultats = 'xml'", /* MENU_OPTIONS_RESULT_DISPLAY_XML */
-    "affichage des résultats = 'raw'", /* MENU_OPTIONS_RESULT_DISPLAY_RAW */
-    "affichage des résultats = 'batch'", /* MENU_OPTIONS_RESULT_DISPLAY_BATCH */
-    "affichage des résultats = 'htmlraw'", /* MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW */
-    "affichage des résultats = 'bandes'", /* MENU_OPTIONS_RESULT_DISPLAY_BAR */
-    "affichage des résultats = 'circulaire'", /* MENU_OPTIONS_RESULT_DISPLAY_LINE */
-    "affichage des résultats = 'linéaire'", /* MENU_OPTIONS_RESULT_DISPLAY_PIE */
-
+    "affichage des résultats = ''horizontal''", /* MENU_OPTIONS_RESULT_DISPLAY_HORIZONTAL */
+    "affichage des résultats = ''vertical''", /* MENU_OPTIONS_RESULT_DISPLAY_VERTICAL */
+    "affichage des résultats = ''html''", /* MENU_OPTIONS_RESULT_DISPLAY_HTML */
+    "affichage des résultats = ''xml''", /* MENU_OPTIONS_RESULT_DISPLAY_XML */
+    "affichage des résultats = ''raw''", /* MENU_OPTIONS_RESULT_DISPLAY_RAW */
+    "affichage des résultats = ''batch''", /* MENU_OPTIONS_RESULT_DISPLAY_BATCH */
+    "affichage des résultats = ''htmlraw''", /* MENU_OPTIONS_RESULT_DISPLAY_HTMLRAW */
+    "affichage des résultats = ''bandes''", /* MENU_OPTIONS_RESULT_DISPLAY_BAR */
+    "affichage des résultats = ''circulaire''", /* MENU_OPTIONS_RESULT_DISPLAY_LINE */
+    "affichage des résultats = ''linéaire''", /* MENU_OPTIONS_RESULT_DISPLAY_PIE */
+    "result display = ''''''", /* MENU_OPTIONS_RESULT_DISPLAY_NONE */
     "Debug", /* MENU_DEBUG */
     "Install", /* MENU_DEBUG_INSTALL */
     "Setup", /* MENU_DEBUG_SETUP */

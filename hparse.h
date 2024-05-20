@@ -809,6 +809,13 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned int flag_versio
       possible= true;
     }
   }
+  if ((token_literal_flags & TOKEN_LITERAL_FLAG_ID_STRING) || (token_literal_flags & TOKEN_LITERAL_FLAG_SONAME_STRING)
+   || (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_TITLE_STRING)
+   || (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_ITEM_STRING) || (token_literal_flags & TOKEN_LITERAL_FLAG_FUNCTION_STRING))
+  {
+    if (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
+      possible= true;
+  }
   if (possible)
   {
     if (hparse_f_accept(flag_version, reftype, TOKEN_TYPE_LITERAL, "[literal]") == 1) return 1;
@@ -832,6 +839,16 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned int flag_versio
       strcpy(expectation, "[user-string]");
     else if (token_literal_flags & TOKEN_LITERAL_FLAG_HOST_STRING)
       strcpy(expectation, "[host-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_ID_STRING)
+      strcpy(expectation, "[id-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_SONAME_STRING)
+      strcpy(expectation, "[soname-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_TITLE_STRING)
+      strcpy(expectation, "[menu_title-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_ITEM_STRING)
+      strcpy(expectation, "[menu_item-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_FUNCTION_STRING)
+      strcpy(expectation, "[function-string]");
     else
       strcpy(expectation, "[non-number/non-string]");
     if (hparse_f_accept(flag_version, reftype, TOKEN_TYPE_LITERAL, expectation) == 1) return 1;
@@ -3053,20 +3070,6 @@ void MainWindow::hparse_f_parenthesized_value_list()
     if (hparse_errno > 0) return;
   } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
   hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
-  if (hparse_errno > 0) return;
-}
-
-/* e.g. for SET ocelot_query = INSERT INTO MENU VALUES ... */
-void MainWindow::hparse_f_parenthesized_string_list()
-{
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
-  if (hparse_errno > 0) return;
-  do
-  {
-    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
-  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
-  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
   if (hparse_errno > 0) return;
 }
 
@@ -14134,14 +14137,47 @@ int MainWindow::hparse_f_client_set_query()
   /* INSERT INTO plugins|menus VALUES (string[,string...]) -- SQLish but so restricted we won't use the main INSERT routine */
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSERT, "INSERT") == 1)
   {
+    int table_type; /* 0 if menu, TOKEN_KEYWORD_PLUGINS if plugin */
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO");
     if (hparse_errno > 0) return 1;
-    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") != 1)
-      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS");
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") == 1)
+      table_type= TOKEN_KEYWORD_PLUGINS;
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS") == 1)
+      table_type= 0;
+    else hparse_f_error();
     if (hparse_errno > 0) return 1;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES");
     if (hparse_errno > 0) return 1;
-    hparse_f_parenthesized_string_list();
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+    if (hparse_errno > 0) return 1;
+    if (table_type == TOKEN_KEYWORD_PLUGINS)
+    {
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ID_STRING) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 1;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
+      if (hparse_errno > 0) return 1;
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_SONAME_STRING) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 1;
+    }
+    else /* MENUS */
+    {
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ID_STRING) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 1;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
+      if (hparse_errno > 0) return 1;
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_MENU_TITLE_STRING) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 1;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
+      if (hparse_errno > 0) return 1;
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_MENU_ITEM_STRING) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 1;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
+      if (hparse_errno > 0) return 1;
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_FUNCTION_STRING) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 1;
+    }
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+    if (hparse_errno > 0) return 1;
     return 1;
   }
 
@@ -14238,8 +14274,7 @@ int MainWindow::hparse_f_client_set_query()
     QStringList q;
     for (int i= 0; i < menu_spec_struct_list.size(); ++i)
     {
-      if ((menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
-       || (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_SUBMENU_ITEM))
+      if (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
        q.append(menu_spec_struct_list[i].id);
     }
     if (hparse_pick_from_list(q) == -1) hparse_f_error();
