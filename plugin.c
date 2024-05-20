@@ -29,7 +29,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /*
-  Last updated: 2024-05-17
+  Last updated: 2024-05-20
 
   The ocelotgui plugin feature
   ----------------------------
@@ -68,6 +68,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     SET ocelot_query = INSERT INTO plugins VALUES ('plugin', 'library');
     SET ocelot_query = DELETE FROM plugins WHERE id = 'id';
     SET ocelot_query = SELECT * FROM plugins;
+    (If 'function' ends with ; it is interpreted as an SQL statement, else if it is the name of an action defined
+    in ocelotgui code it is interpreted as a non-plugin function; else it is interpreted as a plugin function.)
   Notes about the "intercept" examples in this file
     All of the examples in this file, except menu_action, are public C routines which ocelotgui will call from
     certain places in the code (by convention the ID of the plugin is the name of the routine in ocelotgui source code).
@@ -170,11 +172,11 @@ int before_insert(struct plugin_pass *plugin_pass)
   Test as follows, after compiling this (plugin.c) and making plugin.so:
   (This examples says /home/pgulutzan/plugin/libplugin.so, but of course you should use your own directory.)
   ocelotgui --ocelot_query="INSERT INTO plugins VALUES ('make_menu', '/home/pgulutzan/plugin/libplugin.so');"
-  The effect will be: The options menu is moved to after the Help menu.
+  The effect will be: The File menu is moved to after the Help menu.
   (Warning: if translating to words that are not Latin1, make sure that the editor environment is UTF-8.)
   Warning: the example works at time of writing but there is no guarantee that all versions of ocelotgui will have this substring.
 */
-static char menu_buffer[10000]; /* arbitrary, current size of query is about 7500 */
+static char menu_buffer[10000]; /* arbitrary, current size of query is about 7500 for English */
 int make_menu(struct plugin_pass *plugin_pass)
 {
   printf("**** (plugin_= make_menu)\n");
@@ -182,7 +184,7 @@ int make_menu(struct plugin_pass *plugin_pass)
 
   printf("**** query=%s.\n", plugin_pass->query);
   if (plugin_pass->query == NULL) return PLUGIN_RETURN_OK; /* if this is the first call it's probably init so ignore it */
-  char *edit= strstr(plugin_pass->query, "INSERT INTO menus VALUES ('menu_edit', 'Edit', '', '[menu]');");
+  char *edit= strstr(plugin_pass->query, "INSERT INTO menus VALUES ('menu_edit',");
   if (edit == NULL) return PLUGIN_RETURN_OK; /* If ocelotgui no longer has this substring, nothing will happen */
   strcpy(menu_buffer, edit);
   strncat(menu_buffer, plugin_pass->query, edit - plugin_pass->query);
