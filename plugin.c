@@ -29,25 +29,31 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /*
-  Last updated: 2024-05-20
+  Any plugins that you distribute must be compatible with GPLv2.
+*/
+
+/*
+  Last updated: 2024-05-23
 
   The ocelotgui plugin feature
   ----------------------------
- 
+
   With simple C/C++ code you can monitor or modify ocelotgui.
   You can write "intercept" routines that ocelotgui calls at special points in its code,
   or you can write "menu" routines that users can add and pick.
   This file contains examples.
   It is not yet part of an official release.
-  It assumes the operating system is Linux.
+  It assumes the operating system is Linux or Windows.
   To try it out, you have to build ocelotgui from source at github.com/ocelot-inc/ocelotgui
   Making a C library:
     Copy plugin.c to your default directory.
     Copy ocelotgui.h and other .h files from the ocelotgui source to your default directory.
-    gcc -shared -o libplugin.so -fPIC plugin.c
+    On Linux:    gcc -shared -o libplugin.so -fPIC plugin.c
+    On Windows:  No tests have been done but it might work with MinGW 32-bit, thus:
+                 gcc -shared -Os -s -o plugin.dll plugin.c
   Persuading ocelotgui to install a plugin from a library:
     SET ocelot_query = INSERT INTO plugins ('name of plugin function', 'name of library');
-    Or start oocelotgui with --ocelot_query = INSERT INTO plugins VALUES ('name_of_plugin', 'name_of_library');
+    Or start with ocelotgui --ocelot_query = "INSERT INTO plugins VALUES ('name_of_plugin', 'name_of_library');"
     When ocelotgui encounters (for example)
     set ocelot_query = insert into plugins values ('real_query', '/home/pgulutzan/plugin/libplugin.so');
     it will seek and open libplugin.so which must be in the specified directory.
@@ -62,14 +68,17 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   New ocelotgui statements
     These SQL-like statements are new, they do not appear in the Help or in the README, slight changes are possible.
     They are "client" statements, that is, they are not passed on to the server and in fact you don't need to be connected.
-    SET ocelot_query = INSERT INTO menus VALUES ('id','menu_title','menu_item', 'function');
-    SET ocelot_query = UPDATE menus SET shortcut = 'keysequence';
+    SET ocelot_query = INSERT INTO menus VALUES ('id','menu_title','menu_item', 'action');
+    SET ocelot_query = UPDATE menus SET menu_item | action | shortcut = 'keysequence' WHERE id = 'id';
     SET ocelot_query = SELECT * FROM menus;
     SET ocelot_query = INSERT INTO plugins VALUES ('plugin', 'library');
     SET ocelot_query = DELETE FROM plugins WHERE id = 'id';
     SET ocelot_query = SELECT * FROM plugins;
-    (If 'function' ends with ; it is interpreted as an SQL statement, else if it is the name of an action defined
+    SET ocelot_query = SELECT * FROM conditional_settings;
+    SET ocelot_query = SELECT 'literal' as identifier [,...];
+    (If 'action' ends with ; it is interpreted as an SQL statement, else if it is the name of an action defined
     in ocelotgui code it is interpreted as a non-plugin function; else it is interpreted as a plugin function.)
+    (Most comparisons are case sensitive.)
   Notes about the "intercept" examples in this file
     All of the examples in this file, except menu_action, are public C routines which ocelotgui will call from
     certain places in the code (by convention the ID of the plugin is the name of the routine in ocelotgui source code).
@@ -100,7 +109,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     cmake .
     make
     ... and now you should have a libplugin.so library. One or more examples here might require C++, they will
-    have code between #ifdef __cplusplus ... #endif.
+    have code between #ifdef __cplusplus ... #endif. They will require extern "C" definition.
 */
 
 #include "stdio.h"
@@ -120,25 +129,13 @@ int fillup(struct plugin_pass *plugin_pass);
 int display_html(struct plugin_pass *plugin_pass);
 int menu_action(struct plugin_pass *plugin_pass);
 
-/*static struct connect_arguments *ca; */ /* copy of pointer to an important structure, which should be made by plugin_init( */
-/* obsolete? */
-int plugin_init(struct plugin_pass *plugin_pass)
-{
-//  struct connect_arguments *ca= (struct connect_arguments *)arg2; /* passed argument is not really void, so cast */
-//  printf("(plugin) arg1=PLUGIN_INIT. arg2.host=%s.\n", ca->host_as_utf8);
-//  return 0;
-  printf("**** (plugin) init)\n");
-  return PLUGIN_RETURN_OK;
-}
-
-
 /*
   PLUGIN_BEFORE_INSERT is always called during ocelot_query= INSERT INTO plugins ...
   This is automatically one of the items in the program_widgets list (implicitly) because of its importance.
-  The argument arg is a pointer to struct plugin_pass ocelot_plugin_pass,
+  The argument is a pointer to struct plugin_pass ocelot_plugin_pass,
   which has a pointer to struct connect_arguments ocelot_ca.
   It never moves. Therefore the plugin can safely take a copy of the address for later use.
-  In this example, the plugin decides whether it is okay to install.
+  In this example, the plugin decides whether it is okay to install, that is, it approves this INSERT.
   The arbitrary criteria will be: if the plugin name is "real_query" and the port (in ocelot_ca) is 3307,
   then return PLUGIN_RETURN_SKIP which means "do not install", and INSERT will be cancelled.
   Otherwise return PLUGIN_RETURN_OK.
@@ -204,6 +201,7 @@ int before_connect(struct plugin_pass *plugin_pass)
   printf("**** (plugin_= before_connect)l\n");
   return PLUGIN_RETURN_OK;
 }
+*/
 
 /*
   PLUGIN_ERROR_MESSAGE is what ocelotgui calls just before it puts out an error or warning or okay message.
@@ -250,6 +248,7 @@ int real_query(struct plugin_pass *plugin_pass)
 
 /*
   PLUGIN_ALL is what ocelotgui calls for all plugin types. (Well, all "intercept" types.)
+  That is, if a plugin has been inserted, ocelotgui will call it even if it's not at the interception point.
   To activate:
     SET ocelot_query = INSERT INTO plugins VALUES ('all', '/home/pgulutzan/plugin/libplugin.so');
   For this example, we'll just display the type and the name that corresponds to the type.
@@ -272,7 +271,10 @@ int all(struct plugin_pass *plugin_pass)
   PLUGIN_EXECUTE_ONE_STATEMENT is what ocelotgui calls when it is about to execute one statement.
   The statement is probably going to be executed by the server, in which case PLUGIN_REAL_QUERY will
   also be called.
+  To activate:
+    SET ocelot_query = INSERT INTO plugins VALUES ('execute_one_statement', '/home/pgulutzan/plugin/libplugin.so');
   In this example, if the statement is SELECT 5; then the plugin does its own action and then tells the server to skip execution.
+  Notice the comparison is case sensitive. Most comparisons for plugins are case sensitive.
 */
 int execute_one_statement(struct plugin_pass *plugin_pass)
 {
@@ -332,9 +334,9 @@ int fillup(struct plugin_pass *plugin_pass)
 }
 
 /*
-  PLUGIN_DISPLAY_HTML is what ocelotgui calls after it has converted result set to HTML and is ready to display one screenful
-  (or to display the whole result if it's exporting).
-  a result set from any sort of query (including internal queries that usres don't see).
+  PLUGIN_DISPLAY_HTML is what ocelotgui calls after it has converted result set to HTML and is ready to display
+  one screenful  (or to display the whole result if it's exporting). of
+  a result set from any sort of query (including internal queries that users don't see).
   ocelot_plugin_pass has result_set_copy, result_row_count, result_column_count.
   The column format is always: (unsigned int) length, (char) flags e.g. whether it's NULL, (length chars) value
   Replace will not be ignored, but is very tricky -- it must be null-terminated because result_buffer_length is ignored,

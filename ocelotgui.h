@@ -4128,10 +4128,11 @@ Warning: Some things e.g. TOKEN_LITERAL_FLAG_STRING_ID are not included in TOKEN
 #define TOKEN_LITERAL_FLAG_UUID                 1024
 #define TOKEN_LITERAL_FLAG_MAP                  2048
 #define TOKEN_LITERAL_FLAG_ID_STRING            4096
-#define TOKEN_LITERAL_FLAG_SONAME_STRING        8192
+#define TOKEN_LITERAL_FLAG_LIBRARY_STRING        8192
 #define TOKEN_LITERAL_FLAG_MENU_TITLE_STRING    16384
 #define TOKEN_LITERAL_FLAG_MENU_ITEM_STRING     32768
-#define TOKEN_LITERAL_FLAG_FUNCTION_STRING      65536
+#define TOKEN_LITERAL_FLAG_ACTION_STRING        65536
+#define TOKEN_LITERAL_FLAG_KEYSEQUENCE_STRING   131072
 #define TOKEN_LITERAL_FLAG_ANY                  (1+2+4+8+16+32+64+128+256+512+1024+2048)
 
 /*
@@ -5213,24 +5214,24 @@ public:
       int menu_type; /* 0=menu, 1=menu_item; 2=menu_item containing submenu; 3=submenu_item; 4=separator */
       QString menu_title;  /* e.g. "File' */
       QString menu_item;   /* e.g. "Connect" */
-      QString submenu_item;/* e.g. "" */
+      QString submenu_item;/* unused */
       QString shortcut;    /* e.g. "" */
       QString menu_name;   /* e.g. "menu_file" */ /* better name = upper_id? or id_of_menu? */
       QMenu *qmenu;
       QAction *qaction;      /* filled in after qAction* new() */
-      QString function;      /* = name associated with p_method void (MainWindow::*p_method)(bool);, can be / defaults to same as id */
+      QString action;      /* = name associated with p_method void (MainWindow::*p_method)(bool);, can be / defaults to same as id */
       QString shortcut_default; /* what to use if user enters "default" */
       int keyword; /* e.g. TOKEN_KEYWORD_SHORTCUT_UNDO, though that should eventually become obsolete */
-      QString reserved;
+      QString reserved; /* unused */
   };
   QList<struct menu_function_struct> menu_function_struct_list;
   QList<struct menu_spec_struct> menu_spec_struct_list;
   QList<QMenu> menu_spec_menu_list;
   void menu_spec_make_function(); void menu_spec_make_menu(); void menu_spec_reset_menu();
-  int menu_spec_insert_one(QString id, QString menu_name, QString menuitem_name, QString function);
+  int menu_spec_insert_one(QString id, QString menu_name, QString menuitem_name, QString action);
   QMenu* menu_spec_add_menu(int i); QAction *menu_spec_add_action(int i, QMenu *qmenu);
   void menu_about_to_show();
-  void menu_spec_set_addresses();
+//  void menu_spec_set_addresses();
   QMenu* menu_spec_find_menu(QString menu_name);
   int menu_spec_find_id(QString id);
   int menu_spec_delete_via_id(QString id);
@@ -5604,7 +5605,7 @@ public:
   void action_edit_previous_statement(bool is_checked);
   void action_edit_next_statement(bool is_checked);
   void action_options_detach_history_widget(bool is_checked);
-  void action_options_detach_result_grid_widget(bool is_checked);
+  void action_options_detach_grid_widget(bool is_checked);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_options_detach_debug_widget(bool is_checked);
 #endif
@@ -5667,7 +5668,7 @@ public:
   void action_debug_refresh_call_stack(bool is_checked);
 #endif
   int shortcut_set(int, QString);
-  int shortcut_set_via_id(QString, QString); int shortcut_set_via_keyword(int, QString);
+  int menu_set_via_id(QString, QString, QString); int shortcut_set_via_keyword(int, QString);
   void action_edit_undo(bool is_checked);
   void action_edit_redo(bool is_checked);
   void action_edit_cut(bool is_checked);
@@ -5692,7 +5693,8 @@ public slots: /* todo: check if should be private */
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   void action_debug_timer_status();
 #endif
-  void menu_spec_action_all(bool is_checked); /* Eventually this will be the slot for every menu item */
+  void menu_spec_action_all(bool is_checked); /* the slot for every menu item */
+  void action_i(int i, bool is_checked);
   void menu_context(const QPoint &);
 
 protected:
@@ -5943,87 +5945,10 @@ private:
 #if (OCELOT_IMPORT_EXPORT == 1)
     QActionGroup *menu_file_export_group;
 #endif
-//!  QMenu *menu_edit;
-//!    QAction *menu_edit_action_cut;
-//!    QAction *menu_edit_action_copy;
-//!    QAction *menu_edit_action_paste;
-//!    QAction *menu_edit_action_undo;
-//!    QAction *menu_edit_action_redo;
-//!    QAction *menu_edit_action_select_all;
-//!    QAction *menu_edit_action_settings_history_markup_previous;
-//!    QAction *menu_edit_action_settings_history_markup_next;
-//!    QAction *menu_edit_action_formatter;
-//!    QAction *menu_edit_action_zoomin;
-//!    QAction *menu_edit_action_zoomout;
-//!    QAction *menu_edit_action_find;
 public:
-//!    QAction *menu_edit_action_autocomplete;
 private:
-//!  QMenu *menu_run;
-//!    QAction *menu_run_action_execute;
-//!    QAction *menu_run_action_run_kill;
-//!  QMenu *menu_settings;
-//!    QAction *menu_settings_action_settings_menu;
-//!    QAction *menu_settings_action_settings_history;
-//!    QAction *menu_settings_action_grid;
-//!    QAction *menu_settings_action_settings_statement;
-//!    QAction *menu_settings_action_debug;
-//!    QAction *menu_settings_action_settings_extra_rule_1;
-//!#if (OCELOT_EXPLORER == 1)
-//!    QAction *menu_settings_action_settings_explorer;
-//!#endif
 public:
-//!  QMenu *menu_options;
-//!  QAction *menu_options_action_options_detach_history_widget;
-//!    QAction *menu_options_action_options_detach_result_grid_widget;
-//!#if (OCELOT_MYSQL_DEBUGGER == 1)
-//!    QAction *menu_options_action_options_detach_debug_widget;
-//!#endif
-//!#if (OCELOT_EXPLORER == 1)
-//!    QAction *menu_options_action_options_detach_explorer_widget;
-//!#endif
-//!    QAction *menu_options_action_options_detach_statement_widget;
-//!    QAction *menu_options_action_next_window;
-//!    QAction *menu_options_action_previous_window;
-//!    QAction *menu_options_action_bar;
-//!    QAction *menu_options_action_batch;
-//!    QAction *menu_options_action_horizontal;
-//!    QAction *menu_options_action_html;
-//!    QAction *menu_options_action_htmlraw;
-//!    QAction *menu_options_action_line;
-//!    QAction *menu_options_action_none;
-//!    QAction *menu_options_action_pie;
-//!    QAction *menu_options_action_raw;
-//!    QAction *menu_options_action_vertical;
-//!    QAction *menu_options_action_xml;
 private:
-//!#if (OCELOT_MYSQL_DEBUGGER == 1)
-//!  QMenu *menu_debug;
-//!    QAction *debug_install;
-//!//    QAction *debug_setup;
-//!//    QAction *debug_debug;
-//!    QAction *debug_breakpoint;
-//!    QAction *debug_continue;
-//!    QAction *debug_leave;
-//!    QAction *debug_next;
-//!//    QAction *debug_skip;
-//!    QAction *debug_step;
-//!    QAction *debug_clear;
-//!//    QAction *debug_delete;
-//!    QAction *debug_exit;
-//!    QAction *debug_information;
-//!    QAction *debug_refresh_server_variables;
-//!    QAction *debug_refresh_user_variables;
-//!    QAction *debug_refresh_variables;
-//!    QAction *debug_refresh_call_stack;
-//!#endif
-//!//!  QMenu *menu_help;
-//!    QAction *menu_help_action_help_about;
-//!    QAction *menu_help_action_help_the_manual;
-//!if (OCELOT_MYSQL_INCLUDE == 1)
-//!    QAction *menu_help_action_help_libmysqlclient;
-//!#endif //#if (OCELOT_MYSQL_INCLUDE == 1)
-//!    QAction *menu_help_action_settings;
 
   //QWidget *the_manual_widget;
   //  QVBoxLayout *the_manual_layout;
@@ -6068,55 +5993,11 @@ private:
   QStringList tarantool_fk_constraint_parent_ids;
 #endif
 
-  QKeySequence ocelot_shortcut_connect_keysequence;
-  QKeySequence ocelot_shortcut_exit_keysequence;
-  QKeySequence ocelot_shortcut_undo_keysequence;
-  QKeySequence ocelot_shortcut_redo_keysequence;
-  QKeySequence ocelot_shortcut_cut_keysequence;
-  QKeySequence ocelot_shortcut_copy_keysequence;
-  QKeySequence ocelot_shortcut_paste_keysequence;
-  QKeySequence ocelot_shortcut_select_all_keysequence;
-  QKeySequence ocelot_shortcut_history_markup_previous_keysequence;
-  QKeySequence ocelot_shortcut_history_markup_next_keysequence;
-  QKeySequence ocelot_shortcut_format_keysequence;
-  QKeySequence ocelot_shortcut_zoomin_keysequence;
-  QKeySequence ocelot_shortcut_zoomout_keysequence;
-  QKeySequence ocelot_shortcut_autocomplete_keysequence;
-  QKeySequence ocelot_shortcut_find_keysequence;
-  QKeySequence ocelot_shortcut_execute_keysequence;
-  QKeySequence ocelot_shortcut_kill_keysequence;
-  QKeySequence ocelot_shortcut_next_window_keysequence;
-  QKeySequence ocelot_shortcut_previous_window_keysequence;
-  QKeySequence ocelot_shortcut_batch_keysequence;
-  QKeySequence ocelot_shortcut_chart_bar_keysequence;
-  QKeySequence ocelot_shortcut_chart_line_keysequence;
-  QKeySequence ocelot_shortcut_chart_none_keysequence;
-  QKeySequence ocelot_shortcut_chart_pie_keysequence;
-  QKeySequence ocelot_shortcut_horizontal_keysequence;
-  QKeySequence ocelot_shortcut_html_keysequence;
-  QKeySequence ocelot_shortcut_htmlraw_keysequence;
-  QKeySequence ocelot_shortcut_raw_keysequence;
-  QKeySequence ocelot_shortcut_vertical_keysequence;
-  QKeySequence ocelot_shortcut_xml_keysequence;
-#if (OCELOT_MYSQL_DEBUGGER == 1)
-  QKeySequence ocelot_shortcut_breakpoint_keysequence;
-  QKeySequence ocelot_shortcut_continue_keysequence;
-  QKeySequence ocelot_shortcut_next_keysequence;
-  QKeySequence ocelot_shortcut_step_keysequence;
-  QKeySequence ocelot_shortcut_clear_keysequence;
-  QKeySequence ocelot_shortcut_debug_exit_keysequence;
-  QKeySequence ocelot_shortcut_information_keysequence;
-  QKeySequence ocelot_shortcut_refresh_server_variables_keysequence;
-  QKeySequence ocelot_shortcut_refresh_user_variables_keysequence;
-  QKeySequence ocelot_shortcut_refresh_variables_keysequence;
-  QKeySequence ocelot_shortcut_refresh_call_stack_keysequence;
-#endif
-
 public:
 #if (OCELOT_FIND_WIDGET == 1)
   QObject *last_focus_widget;
 #endif
-  bool keypress_shortcut_handler(QKeyEvent *, bool);
+  bool keypress_shortcut_handler(QKeyEvent *);
   int tarantool_execute_sql(const char *, unsigned int, int);
   int tarantool_execute_lua(const char *, unsigned int, int);
   int tarantool_execute_lua_select(int, int);
@@ -8950,7 +8831,7 @@ public:
 #if (OCELOT_PLUGIN == 1)
 /*
   Plugins
-  This class is not complete and the only documentation is this comment.
+  This class is not complete and the only documentation is this comment and the comments in plugin.c.
   A plugin is a library with programs that can understand what ocelotgui passes,
   It can do anything at all (including in some cases replacing what ocelotgui passes), displaying).
   Writing the plugin
@@ -8958,16 +8839,16 @@ public:
     Any other language that can understand C/C++ structures would work but would be more trouble.
     Must start with #include "ocelotgui.h" which happens to be this file.
     Function names can be any of the names listed in static const struct plugin_keywords plugin_strvalues[]=, above.
-    (We use dlsym() to find function names.)
+    (We use dlsym() to find function names.) (Or, on Windows, GetProcAddress.)
     The ocelotgui.h header file has definitions that can be seen by C and more definitions that can be seen by C++.
     So the front of ocelotgui.h works for either C or C++, and the back (after "#ifdef __cplusplus") works only for C++.
     C definitions include some #define and struct items,
     C++ definitions include class descriptions.
   The plugin should be made into a library
     Currently Plugin::plugin() uses dlopen() to look for a Linux .so file
-    The Windows equivalent would be GetModuleHandle() I guess, but we haven't added Windows support yet.
+    The Windows equivalent is LoadLibrary(), there's untested code for enclosed by #ifdef _WIN32.
     So the plugin should be compiled and turned into a library with (substitute your name preferences here):
-    gcc -shared -o libplugin.so -fPIC plugin.c
+    (Linux) gcc -shared -o libplugin.so -fPIC plugin.c, or Windows equivalent mentioned in plugin.c
     Currently if ocelotgui doesn't find the plugin it does nothing, there is a printf but no error return.
     For security it is a good idea to protect the .so file from change, for example on Linux with chown and/or chmod.
     LD_LIBRARY_PATH or --rpath or --plugin_dir do not affect where ocelotgui looks for the Ocelot plugin library.
@@ -8975,12 +8856,12 @@ public:
     See plugin.c, it will be included with the ocelotgui distribution.
     Notice it has a copyright message and is GPLv2. GPLv2 plugins are compatible with ocelotgui.
   Installing the plugin
-    SET ocelot_query = INSTALL PLUGIN plugin_name SONAME 'literal';
-    where literal has the full path of the library e.g.
-    set ocelot_query = install plugin all soname '/home/pgulutzan/ocelotgui/libplugin.so';
+    SET ocelot_query = INSERT INTO plugins VALUES ('plugin_name', 'library literal');
+    where library literal has the full path of the library e.g.
+    set ocelot_query = insert into plugins values ('all', '/home/pgulutzan/ocelotgui/libplugin.so');
     If the plugin has already been installed, there is no error message, the plugin is called twice.
-    It is legal to start ocelotgui --ocelot_query=install... or put ocelot_query=install... in a .cnf file.
-    The "set ocelot_query = install ..." statement is legal even if there is no connection to the server.
+    It is legal to start ocelotgui --ocelot_query=insert... or put ocelot_query=insert... in a .cnf file.
+    The "set ocelot_query = insert ..." statement is legal even if there is no connection to the server.
 * Call points i.e. places where ocelotgui can call the plugin:
   "init" -- in response to "install plugin X" ... here the plugin should tell us what places to call from
   fetch row -- we pass a row. if the plugin replaces it with something (having the same number of columns and column types!), fine
@@ -8989,7 +8870,7 @@ public:
   statement -- any client statement, e.g. the plugin can return SET ocelot_grid_background_color='red'; (it won't be logged and it can appear during any call)
   pre-all-rows-fetch, pre-row-fetch, pre-column-fetch
   return    -- the point where we're about to tell user the result of a statement, which is a good place to change the error message
-  Add menu item (main menu, explorer menu) ... nah, this could better be done with a SET statement
+  If the call point is for when the user clicks a menu item, INSERT INTO menus is responsible for connecting.
 
 * Plugin action: execute server statement
   This is only legal when ocelotgui is about to execute a statement ... hmm, the plugin can't execute it, it can only tell the server to execute it
@@ -9042,15 +8923,12 @@ public:
     plugin.cpp, use gcc, the example can take advantage of the fact that Qt headers are already included, e.g. make messagebox
     There are some functions I'd like to call, but they're all inside classes which makes it harder
     Well, the function can call the plugin, and the plugin can replace the values (unless they're Qt?)
-  Todo: support Windows / FreeBSD. So far, everything non-Linux is no-op.
-  Todo: SET ocelot_query = SHOW PLUGINS; although there's only one
+  SET ocelot_query = SELECT * FROM plugins; works now.
   Todo: Bring in ostrings.h, I at least need to know what ER_OK is
   Todo: make some names public and ocelotgui can decide whether to call them, rather than having switch in a main function.
         With Linux I could use dladdr.
   Todo: callbacks
   Todo: more functions, systematic names.
-  Todo: menu item (but presumably the plugin itself can add to the menu)
-
   Todo: Include version number. Announce that when there's a breaking change (as might happen often), there will be an
         explanation here.
 */
@@ -9060,7 +8938,7 @@ class Plugin: public QWidget /* why? do we intend to inherit something from QWid
 {
 public:
   Plugin(MainWindow *m);
-  int init(QString plugin_soname, QString plugin_name, int call_type);
+  int init(QString plugin_library_soname, QString plugin_name, int call_type);
   ~Plugin();
   int caller(int, struct plugin_pass *plugin_pass);
   QString id; /* whatever was in plugin_id when we called plugin_init */
@@ -9068,7 +8946,11 @@ public:
   int plugin_type; /* One of the #define PLUGIN_... values */
 private:
   MainWindow *plugin_main_window;
+#ifdef _WIN32
+  HANDLE plugin_handle;
+#else
   void *plugin_handle;
+#endif
   int (*plugin_function_pointer)(struct plugin_pass *arg);
 };
 #endif // #ifndef PLUGIN_H

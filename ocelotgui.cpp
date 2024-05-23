@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.3.0
-   Last modified: May 20 2024
+   Last modified: May 23 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -373,8 +373,18 @@ static struct connect_arguments ocelot_ca {
 
 #if (OCELOT_PLUGIN == 1)
 static struct plugin_pass ocelot_plugin_pass {
+  .type= 0,
   .ca= &ocelot_ca,
-  .query= NULL
+  .id= {0},
+  .query= NULL,
+  .error_message= NULL,
+  .replacer_buffer_length= 0,
+  .replacer_buffer= NULL,
+  .result_set_copy= NULL,
+  .result_row_count= 0,
+  .result_column_count= 0,
+  .display= NULL,
+  .subtype= 0
 };
 #endif
 
@@ -811,7 +821,7 @@ void MainWindow::initialize_after_main_window_show()
     msgbox.exec(); /* This should display for 1 second then disappear. */
   }
   if (ocelot_history_detached == "yes") action_options_detach_history_widget(true);
-  if (ocelot_grid_detached == "yes") action_options_detach_result_grid_widget(true);
+  if (ocelot_grid_detached == "yes") action_options_detach_grid_widget(true);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   if (ocelot_debug_detached == "yes") action_options_detach_debug_widget(true);
 #endif
@@ -2351,7 +2361,7 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   QKeyEvent *key= static_cast<QKeyEvent *>(event);
   /* See comment with label "Shortcut Duplication" */
 
-  if (keypress_shortcut_handler(key, false) == true) return true;
+  if (keypress_shortcut_handler(key) == true) return true;
   if (obj != statement_edit_widget) return false;
   if ((key->key() == Qt::Key_Down) && (completer_widget->key_up_or_down(+1))) return true;
   if ((key->key() == Qt::Key_Up) && (completer_widget->key_up_or_down(-1))) return true;
@@ -2388,13 +2398,14 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
      but also from TextEditWidget::keyPressEvent().
   If the keypress is a shortcut, we handle it and return true.
   If it's not, then it's probably text input, we return false.
-  There is one situation that we do not handle:
-    TextEditWidget handles ocelot_shortcut_copy_keysequence separately.
+  There was one situation that we did not handle:
+    TextEditWidget handled ocelot_shortcut_copy_keysequence separately.
+    Maybe it's due to the duplication of shortcuts (we use ^C for kill too but it's disabled unless we're executing)
   Todo: Maybe event->matches() is a more standard way to compare.
-  Todo: Now there's useless code -- we have setShortcut() for most of
-        these combinations, but keypress_shortcut_handler() happens
-        first (?? I think), so they're useless. But a few things are
-        still handled by shortcuts, maybe, and if one fails try the other.
+  Todo: Now there's redundancy -- we have setShortcut() for most of these combinations,
+        and it seems to happen first, so probably we will only get here if the shortcut connection fails,
+        which can happen for a disabled menu item or due to some Qt confusion or there was a case,
+        I think it was Puppy Linux, where shortcuts were failing but keypresses were working.
   Todo: can we get here for a disabled menu item? I think it's possible
         if we're coming not from edit filter but from textedit key press
         event, so we should check "isenabled()" for more things.
@@ -2404,20 +2415,15 @@ bool MainWindow::eventfilter_function(QObject *obj, QEvent *event)
   Todo: the system hasn't been tested with detached debugger widgets
         for which we've said SET ocelot_shortcut_...='something odd'.
   Todo: I'm not sure whether I want Qt's "nativeText" or "portbleText" for string conversion in this
-  Update: this doesn't seem to be working at all any more, what setShortcut() says is all that matters
+  Re isEnabled:
+    Probably menu_spec_action_all() will ignore menu items whose qaction->isEnabled() is false, so probably
+    we'd get matches here. That's okay but we will still ignore them here, except for autocomplete.
+  todo: for action_i(i, false) -- why false? this has something to do with options and check marks
+  Todo: there was special checking for 'action_edit_copy' so copy() happened, it's gone now, but why was it there?
 */
-bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_copy)
+bool MainWindow::keypress_shortcut_handler(QKeyEvent *key)
 {
-
-  /* trying some more to get a match ... */
-  ////QKeyEvent keyEvent = static_cast<QKeyEvent>(event);
-  QKeyEvent keyEvent= *key;
-  if (keyEvent.matches(QKeySequence::Open)) { printf("**** OPEN!\n"); exit(0); }
-  ////QKeySequence kee= KeySequence::fromString("Ctrl+Q");
-  ////if (keyEvent.matches(QKeySequence("Ctrl+Q"))) { printf("**** CTRL+Q!\n"); exit(0); }
-
   Qt::KeyboardModifiers modifiers= key->modifiers();
-
   int qki= 0;
   if ((modifiers & Qt::ControlModifier) != 0) qki= (qki | Qt::CTRL);
   if ((modifiers & Qt::ShiftModifier) != 0) qki= (qki | Qt::SHIFT);
@@ -2430,102 +2436,23 @@ bool MainWindow::keypress_shortcut_handler(QKeyEvent *key, bool return_true_if_c
     if (explorer_widget->html_text_edit->explorer_context_menu->shortcutter(qk) == true) return true;
   }
 #endif
-  if ((qk == ocelot_shortcut_copy_keysequence)
-   && (return_true_if_copy)) return true;
-
-//QKeySequence::toString(nativeText);
-
-//  for (int i= 0; i < menu_spec_struct_list.size(); ++i)
-//  {
-//    if (menu_spec_struct_list[i].shortcut != "")
-//    {
-//      if (qk == qk_in_menu) printf("**** qk == qk_in_menu!\n");
-//    }
-//  }
-
-
-
-  if (qk == ocelot_shortcut_connect_keysequence) { action_file_connect(false); return true; }
-  if (qk == ocelot_shortcut_exit_keysequence) { action_file_exit(false); return true; }
-  if (qk == ocelot_shortcut_undo_keysequence) { action_edit_undo(false); return true; }
-  if (qk == ocelot_shortcut_redo_keysequence) { action_edit_redo(false); return true; }
-  if (qk == ocelot_shortcut_cut_keysequence) { action_edit_cut(false); return true; }
-  if (qk == ocelot_shortcut_copy_keysequence) { action_edit_copy(false); return true; }
-  if (qk == ocelot_shortcut_paste_keysequence) { action_edit_paste(false); return true; }
-  if (qk == ocelot_shortcut_select_all_keysequence) { action_edit_select_all(false); return true; }
-  if (qk == ocelot_shortcut_history_markup_previous_keysequence) { action_edit_previous_statement(false); return true; }
-  if (qk == ocelot_shortcut_history_markup_next_keysequence) { action_edit_next_statement(false); return true; }
-  if (qk == ocelot_shortcut_execute_keysequence){ action_execute(1); return true; }
-  if (qk == ocelot_shortcut_format_keysequence){ action_edit_format(false); return true; }
-  if (qk == ocelot_shortcut_zoomin_keysequence){action_edit_zoomin(false); return true; }
-  if (qk == ocelot_shortcut_zoomout_keysequence){action_edit_zoomout(false); return true; }
-  if (qk == ocelot_shortcut_autocomplete_keysequence)
-  {
-    return menu_edit_autocomplete();  /* even if menu_edit_action_autocomplete->isEnabled() == false */
-  }
-#if (OCELOT_FIND_WIDGET == 1)
-  if (qk == ocelot_shortcut_find_keysequence){action_edit_find(false); return true; }
-#endif
-  QAction *menu_run_action_run_kill= menu_spec_find_action("action_run_kill");
-  if ((menu_run_action_run_kill != NULL) && (menu_run_action_run_kill->isEnabled() == true))
-  {
-    if (qk == ocelot_shortcut_kill_keysequence) { action_run_kill(false); return true; }
-  }
-  if (qk == ocelot_shortcut_next_window_keysequence){action_options_next_window(false); return true; }
-  if (qk == ocelot_shortcut_previous_window_keysequence){action_options_previous_window(false); return true; }
-#if (OCELOT_CHART_OR_QCHART == 1)
-  if (qk == ocelot_shortcut_chart_bar_keysequence){action_options_bar(false); return true; }
-  if (qk == ocelot_shortcut_chart_line_keysequence){action_options_line(false); return true; }
-  if (qk == ocelot_shortcut_chart_none_keysequence){action_options_none(false); return true; }
-  if (qk == ocelot_shortcut_chart_pie_keysequence){action_options_pie(false); return true; }
-#endif
-  if (qk == ocelot_shortcut_batch_keysequence){action_options_batch(false); return true; }
-  if (qk == ocelot_shortcut_horizontal_keysequence){action_options_horizontal(false); return true; }
-  if (qk == ocelot_shortcut_html_keysequence){action_options_html(false); return true; }
-  if (qk == ocelot_shortcut_htmlraw_keysequence){action_options_htmlraw(false); return true; }
-  if (qk == ocelot_shortcut_raw_keysequence){action_options_raw(false); return true; }
-  if (qk == ocelot_shortcut_vertical_keysequence){action_options_vertical(false); return true; }
-  if (qk == ocelot_shortcut_xml_keysequence){action_options_xml(false); return true; }
-#if (OCELOT_MYSQL_DEBUGGER == 1)
-  /* TODO: NO NO! It's supposed to be: compare to shortcut, then call to the function associated with function_name! */
+  /* Compare the QKeySequence that user typed, as QString, to menu_spec_struct_list[].shortcut; */
+  QString qk_string= qk.toString(QKeySequence::NativeText);
   for (int i= 0; i < menu_spec_struct_list.size(); ++i)
   {
-    if ((menu_spec_struct_list.at(i).menu_name == "menu_debug")
-     && (menu_spec_struct_list.at(i).menu_type == MENU_SPEC_TYPE_MENUITEM))
+    if (qk_string == menu_spec_struct_list[i].shortcut)
     {
-      QAction *qaction= menu_spec_struct_list.at(i).qaction;
-      if ((qaction != NULL) && (qaction->isEnabled()))
+      QAction *qaction= menu_spec_struct_list[i].qaction;
+      if ((qaction != NULL) && (qaction->isEnabled() == false))
       {
-        QString id= menu_spec_struct_list.at(i).id;
-        if (id == "action_debug_breakpoint")
-          if (qk == ocelot_shortcut_breakpoint_keysequence) { action_debug_breakpoint(false); return true; }
-        if (id == "action_debug_continue")
-          if (qk == ocelot_shortcut_continue_keysequence) { action_debug_continue(false); return true; }
-        if (id == "action_debug_next")
-          if (qk == ocelot_shortcut_next_keysequence) { action_debug_next(false); return true; }
-        if (id == "action_debug_step")
-          if (qk == ocelot_shortcut_step_keysequence) { action_debug_step(false); return true; }
-        if (id == "action_debug_clear")
-          if (qk == ocelot_shortcut_clear_keysequence) { action_debug_clear(false); return true; }
-        if (id == "action_debug_exit")
-          if (qk == ocelot_shortcut_debug_exit_keysequence) { action_debug_exit(false); return true; }
-        if (id == "action_debug_information")
-          if (qk == ocelot_shortcut_information_keysequence) { action_debug_information(false); return true; }
-        if (id == "action_debug_refresh_server_variables")
-          if (qk == ocelot_shortcut_refresh_server_variables_keysequence) { action_debug_refresh_server_variables(false); return true; }
-        if (id == "action_debug_refresh_user_variables")
-          if (qk == ocelot_shortcut_refresh_user_variables_keysequence) { action_debug_refresh_user_variables(false); return true; }
-        if (id == "action_debug_refresh_variables")
-          if (qk == ocelot_shortcut_refresh_variables_keysequence) { action_debug_refresh_variables(false); return true; }
-        if (id == "action_debug_refresh_call_stack")
-          if (qk == ocelot_shortcut_refresh_call_stack_keysequence) { action_debug_refresh_call_stack(false); return true; }
+        if (menu_spec_struct_list[i].id != "action_edit_autocomplete") continue;
       }
+      action_i(i, false);
+      return true; /* so we only do the first enabled item, if there was no break then we'd do them all */
     }
   }
-#endif
   return false;
 }
-
 
 /*
   We want to know: do we have a complete statement at the string start.
@@ -3565,7 +3492,7 @@ void MainWindow::fill_menu_2()
     if (qaction == NULL) continue; /* unlikely */
     if (id == "action_run_kill") qaction->setEnabled(false);
     if (id == "action_options_detach_history_widget") qaction->setChecked(ocelot_ca.detach_history_widget);
-    if (id == "action_options_detach_result_grid_widget") qaction->setChecked(ocelot_ca.detach_result_grid_widget);
+    if (id == "action_options_detach_grid_widget") qaction->setChecked(ocelot_ca.detach_result_grid_widget);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
     if (id == "action_options_detach_debug_widget") qaction->setChecked(ocelot_ca.detach_debug_widget);
 #endif
@@ -3586,7 +3513,7 @@ void MainWindow::fill_menu_2()
   QList<struct menu_spec_struct> menu_spec_struct_list;
   Construct menu_spec_struct_list for first time
   todo: some way of putting submenu items in QActionGroup as before
-  todo: shouldn't names come from ostrings.h? Is setup before or after possible switch to French?
+  The setup comes after the switch to French if ocelotgui --ocelot_language='french'
   Warning: titles that start & can surprise, e.g. "&Options" would means that Alt+O takes the menu
   Todo: maybe separators should have qmenu != NULL
   Re .shortcut_default
@@ -3595,12 +3522,12 @@ void MainWindow::fill_menu_2()
     is native rather than portable. Also QKeySequence::Undo QKeySequence::Redo QKeySequence::Cut QKeySequence::Copy
     QKeySequence::Paste QKeySequence::SelectAll QKeySequence::Zoomout QKeySequence::Cancel QKeySequence::NextChild
     QKeySequence::PreviousChild.
-    Until ocelotgui version 2.3 "Kill" was "Ctrl+C", it was changed to QKeySequence::Cancel which is probably "Esc"
-    because there seemed to be occasional problems although "Copy" should be disabled whenever "Kill" is enabled.
     With Puppy Linux --non-KDE non-Gnome -- QKeySequence::Quit fails so there's hardcoding: "Ctrl+Q".
     Todo: Consider using QKeySequence::Find for "Find".
     Todo: Consider using something other than "Tab" for autocomplete, it's only there to be like mysql. Ctrl+Space?
-    Todo: Maybe instead of "Execute ctrl+E" I should be using "Run ctrl+R"
+    Todo: Consider using "Run Ctrl+R" rather than "Execute ctrl+E"
+    Todo: Consider using "Cancel Esc" rather than "Kill Ctrl+C" which is imitating mysql client
+          because there seemed to be occasional problems although "Copy" should be disabled whenever "Kill" is enabled.
   Warning: be careful about changing id for menu, there may be routines that specifically look for that id.
 */
 
@@ -3640,7 +3567,7 @@ void MainWindow::menu_spec_make_function()
   menu_function_struct_list.append({"action_settings_extra_rule_1", false, &MainWindow::action_settings_extra_rule_1, NULL});
   menu_function_struct_list.append({"action_settings_explorer", false, &MainWindow::action_settings_explorer, NULL});
   menu_function_struct_list.append({"action_options_detach_history_widget", false, &MainWindow::action_options_detach_history_widget, NULL});
-  menu_function_struct_list.append({"action_options_detach_result_grid_widget", false, &MainWindow::action_options_detach_result_grid_widget, NULL});
+  menu_function_struct_list.append({"action_options_detach_grid_widget", false, &MainWindow::action_options_detach_grid_widget, NULL});
 #if (OCELOT_CHART_OR_QCHART == 1)
   menu_function_struct_list.append({"action_options_detach_debug_widget", false, &MainWindow::action_options_detach_debug_widget, NULL});
 #endif
@@ -3687,23 +3614,21 @@ void MainWindow::menu_spec_make_function()
 }
 
 /*
-  Make action -- that's done by new QAction(). (todo: icon someday) (todo: figure out how to delete it someday)
-  Connect action to menu -- that's done by addMenu() (todo: figure out how to remove it someday)
+  Make action -- that's done by new QAction().
+  Connect action to menu -- that's done by addMenu()
   Connect action to function -- done by having the action and the function pointer in the same menu_spec_struct_list row.
   Todo: QGroupAction for the submenus, used to be there.
 */
 
-
 /*
-  Called due to SET ocelot_query = INSERT INTO MENUS VALUES (string[, string, string, string]);
+  Called due to SET ocelot_query = INSERT INTO MENUS VALUES (id, menu_title, menu_item, action);
   In menu_spec_make_menu() we have append()s for all the initial items, this can happen later for a single item.
-  ??? implication: menu_title = menu_id
-  We pass id = id of action, and will make id of menu = menu_title + menuitem (todo: must be unique).
-  function_name: for a menuitem or submenuitem this is the name of the function that's called when user clicks
-                 or [menu] or [submenu] or [separator]
-  shortcut: todo: check if there's a problem when names begin with &E etc. and whether that makes two shortcuts
+  We pass id = id of action, and will make id of menu = menu_title + menuitem (todo: should be unique).
+  action: for a menuitem or submenuitem this is the name of the function that's called when user clicks
+          or [menu] or [submenu] or [separator] -- or it's an SQL statement ending with ;
+  todo: check if there's a problem when names begin with &E etc. and whether that makes two shortcuts
 */
-int MainWindow::menu_spec_insert_one(QString id, QString menu_title, QString menu_item, QString function_name)
+int MainWindow::menu_spec_insert_one(QString id, QString menu_title, QString menu_item, QString action)
 {
   QString id_of_menu= "";
   int i_of_new_item= menu_spec_struct_list.size();
@@ -3719,7 +3644,7 @@ int MainWindow::menu_spec_insert_one(QString id, QString menu_title, QString men
     if ((menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_SUBMENU) && (menu_title == menu_spec_struct_list[i].menu_item))
       i_of_upper_submenu= i;
   }
-  if (function_name == "[menu]")
+  if (action == "[menu]")
   {
     /* todo: if menu_title already exists, skip */
     /* assume menu_title is okay e.g. not blank */
@@ -3727,7 +3652,7 @@ int MainWindow::menu_spec_insert_one(QString id, QString menu_title, QString men
     if (i_of_upper_menu != -1) return ER_OK; /* there's already a menu with the same menu_title so skip it */
     menu_spec_struct_list.append(
          {id, MENU_SPEC_TYPE_MENU, menu_title, menu_item, "", "", id, NULL, NULL,
-          function_name, "", -1, ""}   );
+          action, "", -1, ""}   );
     qmenu= menu_spec_add_menu(i_of_new_item);
     return ER_OK;
   }
@@ -3754,25 +3679,25 @@ int MainWindow::menu_spec_insert_one(QString id, QString menu_title, QString men
       id_of_menu= menu_spec_struct_list[i_of_upper_submenu].id;
     }
   }
-  if (function_name == "[separator]")
+  if (action == "[separator]")
   {
     if (qmenu == NULL) printf("qmenu == NULL\n"); /* this should not happen */
     else
     {
       menu_spec_struct_list.append(
      {id, MENU_SPEC_TYPE_SEPARATOR, menu_title, menu_item, "", "", id_of_menu, NULL, NULL,
-      function_name, "", -1, ""}   );
+      action, "", -1, ""}   );
       qmenu->addSeparator();
     }
   }
-  else if (function_name == "[submenu]")
+  else if (action == "[submenu]")
   {
     /* todo: menu must exist */
     if (i_of_upper_submenu != -1) return ER_OK; /* there's already a submenu with the same menu_title so skip it */
     QMenu *qmenu_of_this= qmenu->addMenu(menu_item);
     menu_spec_struct_list.append(
        {id, MENU_SPEC_TYPE_SUBMENU, menu_title, menu_item, "", "", id_of_menu, qmenu_of_this, NULL,
-        function_name, "", -1, ""}   );
+        action, "", -1, ""}   );
     /* Flaw: we do not store the menu that the submenu belongs to, I guess we depend on id_of_menu */
   }
   else /* menuitem or submenuitem */
@@ -3782,39 +3707,40 @@ int MainWindow::menu_spec_insert_one(QString id, QString menu_title, QString men
     {
       menu_spec_struct_list.append(
        {id, MENU_SPEC_TYPE_MENUITEM, menu_title, menu_item, "", "", id_of_menu, NULL, NULL,
-        function_name, "", -1, ""}   );
+        action, "", -1, ""}   );
       menu_spec_add_action(i_of_new_item, qmenu);
     }
   }
   return ER_OK;
 }
 
+
 /* This is not needed just after menu_spec_make_menu() because for the initial setup the addresses are pre-set. */
 /* todo: needs work before it works */
-void MainWindow::menu_spec_set_addresses()
-{
-  for (int i= 0; i < menu_spec_struct_list.size();++i)
-  {
-    if ((menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENU)
-     || (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM))
-    {
-      QMenu *qmenu_pointer= menu_spec_find_menu(menu_spec_struct_list[i].menu_name);
-      if (qmenu_pointer != NULL) menu_spec_struct_list[i].qmenu= qmenu_pointer;
-    }
-    if (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
-    {
-      QAction *qaction_pointer= menu_spec_find_action(menu_spec_struct_list[i].id);
-      if (qaction_pointer != NULL) menu_spec_struct_list[i].qaction= qaction_pointer;
-    }
-  }
-}
+//void MainWindow::menu_spec_set_addresses()
+//{
+//  for (int i= 0; i < menu_spec_struct_list.size();++i)
+//  {
+//    if ((menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENU)
+//     || (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM))
+//    {
+//      QMenu *qmenu_pointer= menu_spec_find_menu(menu_spec_struct_list[i].menu_name);
+//      if (qmenu_pointer != NULL) menu_spec_struct_list[i].qmenu= qmenu_pointer;
+//    }
+//    if (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
+//    {
+//      QAction *qaction_pointer= menu_spec_find_action(menu_spec_struct_list[i].id);
+//      if (qaction_pointer != NULL) menu_spec_struct_list[i].qaction= qaction_pointer;
+//    }
+//  }
+//}
 
 /*
   Construct menu. This happens before connect or setup of most widgets.
   Re qmenu: We look for "does it already exist in menu_spec_struct_list earlier". (It must, unless it is itself a menu.)
             If it does, we copy .qmenu from the earlier qmenu.
             This is why, although order is important, it's possible to add to File menu, then Edit menu, then File menu again.
-  Todo: You must get rid of the exit(0)s. Failure to match is an error, but you need to clear i.e. remove anything you've
+  Todo: Failure to match is an error, but you need to clear i.e. remove anything you've
         done already, and then return an error message. Also maybe addMenu() or addAction() can fail.
   It's a big single string which a C plugin can replace (see example in plugin.c).
   Re the separator before 'libmysqlclient':  Qt says I should also do "addSeparator" if Motif style. Harmless.
@@ -3909,7 +3835,7 @@ void MainWindow::menu_spec_make_menu()
                insert, menu_strings[menu_off + MENU_OPTIONS]);
   blen+= sprintf(b + blen, "%s'action_options_detach_history_widget', '%s', '%s', 'action_options_detach_history_widget');",
                insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_DETACH_HISTORY_WIDGET]);
-  blen+= sprintf(b + blen, "%s'action_options_detach_result_grid_widget', '%s', '%s', 'action_options_detach_result_grid_widget');",
+  blen+= sprintf(b + blen, "%s'action_options_detach_grid_widget', '%s', '%s', 'action_options_detach_grid_widget');",
                insert, menu_strings[menu_off + MENU_OPTIONS], menu_strings[menu_off + MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET]);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   blen+= sprintf(b + blen, "%s'action_options_detach_debug_widget', '%s', '%s', 'action_options_detach_debug_widget');",
@@ -4041,7 +3967,7 @@ void MainWindow::menu_spec_make_menu()
 #endif
   "INSERT INTO menus VALUES ('menu_options', 'Options', '', '[menu]');"
   "INSERT INTO menus VALUES ('action_options_detach_history_widget', 'Options', 'detach history widget', 'action_options_detach_history_widget');"
-  "INSERT INTO menus VALUES ('action_options_detach_result_grid_widget', 'Options', 'detach result grid widget', 'action_options_detach_result_grid_widget');"
+  "INSERT INTO menus VALUES ('action_options_detach_grid_widget', 'Options', 'detach grid widget', 'action_options_detach_grid_widget');"
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   "INSERT INTO menus VALUES ('action_options_detach_debug_widget', 'Options', 'detach debug widget', 'action_options_detach_debug_widget');"
 #endif
@@ -4113,7 +4039,7 @@ void MainWindow::menu_spec_make_menu()
            &token_lengths[0], &token_offsets[0], desired_count,
           (QChar*)"33333", 2, ";", 1);
   /* Copying what's in execute_ocelot_query but fewer assumptions because this is called very early */
-  QString id= ""; QString menu_title= ""; QString menuitem= ""; QString function= "";
+  QString id= ""; QString menu_title= ""; QString menuitem= ""; QString action= "";
   int j= 0;
   for (int i_of_q= 0; token_lengths[i_of_q] != 0; ++i_of_q)
   {
@@ -4124,13 +4050,13 @@ void MainWindow::menu_spec_make_menu()
       if (j == 0) id= q_token;
       if (j == 1) menu_title= q_token;
       if (j == 2) menuitem= q_token;
-      if (j == 3) function= q_token;
+      if (j == 3) action= q_token;
       ++j;
     }
     if (q_token == ";") /* i.e. is it end of INSERT */
     {
-      menu_spec_insert_one(id, menu_title, menuitem, function);
-      id= ""; menu_title= ""; menuitem= ""; function= "";
+      menu_spec_insert_one(id, menu_title, menuitem, action);
+      id= ""; menu_title= ""; menuitem= ""; action= "";
       j= 0;
     }
   }
@@ -4140,14 +4066,14 @@ void MainWindow::menu_spec_make_menu()
   /* default shortcuts and keywords (initially fixed, no-ops if plugin changes id) */
 
   /* Following should probably be in a separate proc because one might delete a menuitem then insert it again */
+
   for (int k= 0; k < menu_spec_struct_list.size(); ++k)
   {
     if (menu_spec_struct_list[k].id == "action_file_connect")
     {
-      /* TEST!!!! remove qks_open_string temporarily to see whether keypress_shortcut_handler sees it */
       QKeySequence qks_open= QKeySequence::Open; QString qks_open_string= qks_open.toString();
       menu_spec_struct_list[k].shortcut_default= qks_open_string;
-      menu_spec_struct_list[k].keyword= TOKEN_KEYWORD_OCELOT_SHORTCUT_EXIT;
+      menu_spec_struct_list[k].keyword= TOKEN_KEYWORD_OCELOT_SHORTCUT_CONNECT;
     }
     if (menu_spec_struct_list[k].id == "action_file_exit")
     {
@@ -4233,10 +4159,9 @@ void MainWindow::menu_spec_make_menu()
       menu_spec_struct_list[k].shortcut_default= "Ctrl+E";
       menu_spec_struct_list[k].keyword= TOKEN_KEYWORD_OCELOT_SHORTCUT_EXECUTE;
     }
-    if (menu_spec_struct_list[k].id == "action_run_kill") /* was "Ctrl+C" now is "Esc" **/
+    if (menu_spec_struct_list[k].id == "action_run_kill")
     {
-      QKeySequence qks_cancel= QKeySequence::Cancel; QString qks_cancel_string= qks_cancel.toString();
-      menu_spec_struct_list[k].shortcut_default= qks_cancel_string;
+      menu_spec_struct_list[k].shortcut_default= "Ctrl+C";;
       menu_spec_struct_list[k].keyword= TOKEN_KEYWORD_OCELOT_SHORTCUT_KILL;
     }
     if (menu_spec_struct_list[k].id == "action_options_detach_history_widget")
@@ -4391,8 +4316,6 @@ void MainWindow::menu_spec_make_menu()
     }
 #endif
   }
-//menu_spec_reset_menu(); /* TEST!!! */
-
 }
 
 /* Pass: i = offset in menu_spec_struct_list. Do: addMenu(), connct menu to menu_about_to_show(). */
@@ -4407,7 +4330,7 @@ QMenu* MainWindow::menu_spec_add_menu(int i)
 /* Pass: i = offset in menu_spec_struct_list. Do: addAction(), connect action to menu_spec_action_all(). For type = 1. */
 QAction* MainWindow::menu_spec_add_action(int i, QMenu *qmenu)
 {
-  if (qmenu == NULL) { printf("qmenu == NULL\n"); exit(0); }
+  if (qmenu == NULL) { printf("qmenu == NULL\n"); return NULL; }
   menu_spec_struct_list[i].qmenu= qmenu; /* Hmm, this is assuming that qactions are all after qmenus */
   QAction* new_action = new QAction(menu_spec_struct_list[i].menu_item, this);
   qmenu->addAction(new_action);
@@ -4487,8 +4410,6 @@ if (qmenu == NULL) printf("**** qmenu == NULL\n");
 }
 #endif //#ifdef MENU_SPEC_RESET_MENU
 
-/* Todo: if the list of names were sorted, it would go a bit quicker. */
-/* And it might be easier to check for duplicate names */
 /* Warning: "Export" is a menu so we assume it's unique, even though it's a component of "menu_file" */
 QMenu* MainWindow::menu_spec_find_menu(QString menu_name)
 {
@@ -4504,7 +4425,6 @@ QMenu* MainWindow::menu_spec_find_menu(QString menu_name)
   return NULL;
 }
 
-/* Todo: if the list of names were sorted and started with something unique, it would go a bit quicker. */
 /* Todo: is it right that we're comparing with id not action? I think so. */
 QAction* MainWindow::menu_spec_find_action(QString action_name)
 {
@@ -4558,69 +4478,78 @@ void MainWindow::menu_set_enabled(QString menu_id, bool is_enable_or_disable)
 }
 
 /*
-  This has to be the slot for all menus and menu items.
-  It's in public slots. Connect it with every menu item!
-  Look for the menuitem's function in menu_function_struct_list the fixed list of MainWindow:: functions that are
-  there for all the initial menus. If it's not there, look in the plugins list because menuitems can refer to plugins.
+  This has to be the slot for all menus and menu items. It's in public slots.
+  Use sender() to find what the qaction is, call action_all to find the action and do something about it
+  Todo: check: I'm pretty sure we won't get here for a disabled menu item, but probably should make sure.
 */
 void MainWindow::menu_spec_action_all(bool is_checked)
 {
   QAction *qaction_pointer= qobject_cast<QAction*>(sender());
-  int er= ER_OK;
   for (int i= 0; i < menu_spec_struct_list.size();++i)
   {
     if (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM) /* ?? Huh? what if it's menu or it's got a sub? */
     {
       if (qaction_pointer == menu_spec_struct_list[i].qaction) /* Should this only be if menu item? */
       {
-        /* find the routine that matches this */
-        int j;
-        for (j= 0; j < menu_function_struct_list.size(); ++j)
-        {
-          if (menu_spec_struct_list[i].function == menu_function_struct_list[j].name) break;
-        }
-        if (j == menu_function_struct_list.size())
-        {
-          /* "If it ends with ; it is considered to be SQL, it will be put in statement widget ready to execute." */
-          QString menu_spec_function= menu_spec_struct_list[i].function;
-          if (menu_spec_function.right(1) == ";")
-          {
-            statement_edit_widget->setPlainText(menu_spec_function);
-            return;
-          }
-#if (OCELOT_PLUGIN == 1)
-          if (plugin_widget_list.size() > 0)
-          {
-            QString text= statement_edit_widget->toPlainText();
-            ocelot_plugin_pass.query= text.toUtf8().data();
-            int return_code= plugin_widget_list_caller(PLUGIN_MENU_CHOICE, menu_spec_function);
-            if (return_code ==  PLUGIN_RETURN_OK_AND_REPLACED)
-            {
-              text= QString::fromUtf8(ocelot_plugin_pass.replacer_buffer, ocelot_plugin_pass.replacer_buffer_length);
-              statement_edit_widget->setPlainText(text);
-            }
-          }
-#endif
-        }
-        else
-        {
-          void (MainWindow::*method_pointer)(bool)= menu_function_struct_list[j].p_method;
-          //void (MainWindow::*method_pointer)(bool)= menu_spec_struct_list[i].p_method;
-          //menu_spec_struct_list[i].p_function; /* BUT THIS DOES NOT CALL! */
-          (this->*method_pointer)(is_checked); /* This is how I call a pointer to a method in MainWindow */
-        }
+        action_i(i, is_checked);
+        break;
       }
     }
   }
 }
 
 /*
+  Called from menu_spec_action_all or keypress_shortcut_handler
+  We know that menu_spec_struct_list[i] is the menu item that we want to act on.
+  If action ends with ";" then it's an SQL query that just needs to be dumped in the statement widget.
+  Else: look for the menuitem's function in menu_function_struct_list the fixed list of MainWindow:: functions that are
+  there for all the initial menus. If it's not there, look in the plugins list because menuitem actions can be plugin names.
+*/
+void MainWindow::action_i(int i, bool is_checked)
+{
+  int j;
+  for (j= 0; j < menu_function_struct_list.size(); ++j)
+  {
+    if (menu_spec_struct_list[i].action == menu_function_struct_list[j].name) break;
+  }
+  if (j == menu_function_struct_list.size())
+  {
+    /* "If it ends with ; it is considered to be SQL, it will be put in statement widget ready to execute." */
+    QString menu_spec_action= menu_spec_struct_list[i].action;
+    if (menu_spec_action.right(1) == ";")
+    {
+      statement_edit_widget->setPlainText(menu_spec_action);
+      return;
+    }
+#if (OCELOT_PLUGIN == 1)
+    if (plugin_widget_list.size() > 0)
+    {
+      QString text= statement_edit_widget->toPlainText();
+      ocelot_plugin_pass.query= text.toUtf8().data();
+      int return_code= plugin_widget_list_caller(PLUGIN_MENU_CHOICE, menu_spec_action);
+      if (return_code ==  PLUGIN_RETURN_OK_AND_REPLACED)
+      {
+        text= QString::fromUtf8(ocelot_plugin_pass.replacer_buffer, ocelot_plugin_pass.replacer_buffer_length);
+        statement_edit_widget->setPlainText(text);
+      }
+    }
+#endif
+  }
+  else /* action is in the official list */
+  {
+    void (MainWindow::*method_pointer)(bool)= menu_function_struct_list[j].p_method;
+    //void (MainWindow::*method_pointer)(bool)= menu_spec_struct_list[i].p_method;
+    //menu_spec_struct_list[i].p_function; /* BUT THIS DOES NOT CALL! */
+    (this->*method_pointer)(is_checked); /* This is how I call a pointer to a method in MainWindow */
+  }
+}
+
+/*
   Called from shortcut_set_via_id(), shortcut_set_via_keyword(), fill_menu_2() -- we already know menu_spec_struct_list index.
-  Actually shortcut ordinarily is triggered due to setShortcut, call keypress_shortcut_handler() but it isn't working now.
-  But it will be displayed.
-  If it already exists, we will cancel the existing one.
-  TODO: We want to warn for duplicates, rather than exit(0). When checking, also note whether a menu name starts with &
+  Actually shortcut ordinarily is triggered due to setShortcut, keypress_shortcut_handler() is more like a backup.
+  Todo: We allow duplicate shortcuts. When checking, also note whether a menu name starts with &
         because e.g. if menu name is &Options then Alt+O wants to go to the Options menu, it conflicts with the shortcut.
+  Tip: remove qaction->setShortcut(k) if you want shortcuts to be handled via keypress_shortcut_handler and be not displayed.
 */
 int MainWindow::shortcut_set(int i, QString value)
 {
@@ -4628,40 +4557,57 @@ int MainWindow::shortcut_set(int i, QString value)
   if (qaction == NULL) return ER_0_ROWS_RETURNED; /* menu? */
   value= connect_stripper(value, false);
   if (value == "default") value= menu_spec_struct_list[i].shortcut_default;
+  int er= ER_OK;
   if (value == "") qaction->setShortcut(QKeySequence());
   else
   {
     QKeySequence k= QKeySequence(value);
     /* too many keys? too few? malformed string? todo: hmm, this doesn't seem to catch malformed strings*/
     if ((k.count() < 1) || (k.isEmpty()) || (k.toString() < "")) return ER_ILLEGAL_VALUE;
-
+    value= k.toString(QKeySequence::NativeText); /* converting back to string should make it canonical? */
+    if (value == "") return ER_ILLEGAL_VALUE;
     for (int j= 0; j < menu_spec_struct_list.size(); ++j)
     {
       if (j == i) continue;
       if (menu_spec_struct_list[j].shortcut == "") continue;
       QKeySequence k2= QKeySequence(menu_spec_struct_list[j].shortcut);
-      if (k == k2) return ER_DUPLICATE;
+      if (k == k2) er= ER_DUPLICATE;
     }
     qaction->setShortcut(k);
     }
   menu_spec_struct_list[i].shortcut= value;
-  return ER_OK;
+  return er;
 }
 
 /*
-  Todo: error if different QAction has the same shortcut (but beware, if we used a QKeySequence:: default
-        and it turns out that in a different environment that default is not what it is on Windows or Linux)
-  Todo: think of a default for a plugin
-  Todo: Test that the sequence would work
+  Some todos related to shortcuts:
+    Todo: error if different QAction has the same shortcut (but beware, if we used a QKeySequence:: default
+          and it turns out that in a different environment that default is not what it is on Windows or Linux)
+    Todo: think of a default for a plugin
+    Todo: Test that the sequence would work
+  Todo: Change menu_title, but it's trickier, qmenu will change if it's old or will be created if it's new.
 */
-int MainWindow::shortcut_set_via_id(QString id, QString value)
+int MainWindow::menu_set_via_id(QString target, QString id, QString value)
 {
   int i= menu_spec_find_id(id);
   if (i == -1)
   {
     return ER_0_ROWS_RETURNED;
   }
-  return shortcut_set(i, value);
+  value= connect_stripper(value, false);
+  if (target == "MENU_ITEM")
+  {
+    menu_spec_struct_list[i].menu_item= value;
+    QAction *qaction= menu_spec_struct_list[i].qaction;
+    if (qaction != NULL) qaction->setText(value);
+  }
+  else if (target == "SHORTCUT")
+  {
+    /* i.e. this is shortcut_set_via_id */
+    return shortcut_set(i, value);
+  }
+  else /* target == "ACTION" */ menu_spec_struct_list[i].action= value;
+  return ER_OK;
 }
 
 /*
@@ -5979,7 +5925,7 @@ void MainWindow::action_options_detach_history_widget(bool is_checked)
   action_change_one_setting(ocelot_history_detached, new_ocelot_history_detached, TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED);
 }
 
-void MainWindow::action_options_detach_result_grid_widget(bool is_checked)
+void MainWindow::action_options_detach_grid_widget(bool is_checked)
 {
   if (is_checked)
   {
@@ -6090,8 +6036,8 @@ void MainWindow::detach_widget(int widget_type, bool checked)
   else if (widget_type == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
   {
     widget= (QWidget*) result_grid_tab_widget;
-    QAction *action_options_detach_result_grid_widget= menu_spec_find_action("action_options_detach_result_grid_widget");
-    menu_options_action_options_detach_widget= action_options_detach_result_grid_widget;
+    QAction *action_options_detach_grid_widget= menu_spec_find_action("action_options_detach_grid_widget");
+    menu_options_action_options_detach_widget= action_options_detach_grid_widget;
     widget_text= "result grid widget";
     menu_options_detach_widget= MENU_OPTIONS_DETACH_RESULT_GRID_WIDGET;
     widget_left= ocelot_grid_left; widget_top= ocelot_grid_top; widget_width= ocelot_grid_width; widget_height= ocelot_grid_height;
@@ -10529,6 +10475,7 @@ void MainWindow::action_debug_information(bool is_checked)
 */
 void MainWindow::action_debug_refresh_server_variables(bool is_checked)
 {
+  (void)is_checked;
   log("action_debug_refresh_server_variables", 90);
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
@@ -11288,12 +11235,15 @@ int MainWindow::action_execute_one_statement(QString text)
 
     bool do_something= true;
 
-    /* If DBMS is not (yet) connected, except for certain SET ocelot_... statements, this is an error. */
-    if ((connections_is_connected[0] == 0) && (ecs_return != 0))
+    if (is_ocelot_query_in_client == false)
     {
-      if (ecs_return == 2) make_and_put_message_in_result(ER_OK, 0, (char*)"");
-      else make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
-      do_something= false;
+      /* If DBMS is not (yet) connected, except for certain SET ocelot_... statements, this is an error. */
+      if ((connections_is_connected[0] == 0) && (ecs_return != 0))
+      {
+        if (ecs_return == 2) make_and_put_message_in_result(ER_OK, 0, (char*)"");
+        else make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
+        do_something= false;
+      }
     }
     /* If --one-database, and USE caused default database to change, error */
     if ((ocelot_ca.one_database > 0) && (ocelot_database != statement_edit_widget->dbms_database))
@@ -11818,7 +11768,23 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
 }
 
 /*
-  Called from ocelot_execute_one_statement(), check for "SET ocelot_query =" before calling execute_real_query.
+  Called from ocelot_execute_one_statement()
+  SCENARIO 1: done entirely in client, we don't even need to be connected. Preceded by SET ocelot_query:
+    INSERT INTO plugins VALUES ('id', 'library'); library might be called soname in some contexts
+    DELETE FROM plugins WHERE id = 'value';
+    INSERT INTO menus VALUES ('id', 'menu_title', 'menu_item', 'action');
+    UPDATE menus SET menu_item | action | shortcut = 'value' WHERE id = 'value';
+    DELETE FROM menus WHERE id = 'value';
+    SELECT * FROM plugins | menus | conditional_settings;
+    SELECT 'literal' [AS id] [, 'literal' [AS id] ...] UNION ALL SELECT 'literal'[, 'literal' ...
+  Re INSERT: Blanks are OK. If thing in menu field already exists and is a menuitem, this will be a submenuitem.
+             Special actions, really non-actions
+  Todo: There's no UPDATE menus SET menu_title ... which would affect multiple places and might require a new menu.
+        There's no way to update a separator.
+  Todo: UPDATE menus SET visible='yes|no' ... or SET icon='value' or enabled or other things that affect menu looks
+  Todo: BEGIN ... END so there's one big statement that we parse entirely before executing each part
+  Todo: CALL plugin-name
+  SCENARIO 2: check for "SET ocelot_query =" before calling execute_real_query.
   At the last moment, hijack what's intended for execute_real_query, do whatever is in the string after "=",
   and return something that will look as if we did execute_real_query with the query that the user asked for
   (we actually return a union of selects of literals thus avoiding need for create privileges).
@@ -11843,18 +11809,11 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
         hparse_f_multi, instead of doing the specific parsing in this function.
         (Update: now we call hparse_f_multi.)
   Todo: This is a bit obsolete now because when we make explorer visible we permanently set up oei_fk[]
-  Additions for version 2.4: SET ocelot_query = INSERT INTO plugins VALUES ('id','soname');
-                             + we call this if --ocelot_query=...", with alltext==NULL so we only look for INSERT
   Warning: the push+pop here will not work if something else pushed and then called here, also some testing is needed
            and push+pop might be slow if there are lots of statements in the input
   Sometimes we might replace query_in_client so that fillup_in_client() will do something local.
-  Todo: Check: will we call this even if not connected to a server? For menu changes that should be possible.
-  Todo: Sometimes connect_unstripper() will be needed
-  Todo: Allow more operand types including NULL, and all operators. In fact wouldn't it be nice to have a fuller set of
-        SQL-in-client statements including CREATE PROCEDURE, CREATE TABLE? At least BEGIN DECLARE x INT DEFAULT CLIPBOARD;
-        All the SET ocelot_* statements could be in the ocelot_query BEGIN ... END and handle expressions the same way.
-        If it grows, hparse should treat DBMS_VERSCLIENT as another flag like DBMS_MYSQL or FLAG_VERSION_TARANTOOL.
-  Re INSERT: Blanks are OK. If thing in menu field already exists and is a menuitem, this will be a submenuitem.
+  Sometimes connect_unstripper() will be needed
+
 */
 /* the late tokenize only does 10 words, which is enough since I think tokenize() will ignore comments */
 #define MAX_OCELOT_STATEMENT_TOKENS 20
@@ -11862,8 +11821,6 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
                                      bool *is_ocelot_query_in_client, QString *fillup_result, unsigned int *diagnostic_signal)
 {
   log("execute_ocelot_query", 80);
-
-  /* If I moved everything to the top I'd be able to say "goto returner;" where returner has all the delete []s */
   char *fks_query;
   int fks_query_len;
   int counter;
@@ -11875,7 +11832,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
   int *token_types;
   int desired_count;
   bool is_early_return= false;
-restart: /* jump back to here if SELECT * produces a new query */
+/* restart: */ /* jump back to here if SELECT * produces a new query */
   main_token_push();
   main_token_new(query.size() + 1); /* This might be needed if --ocelot_query = long statement */
   main_token_lengths[0]= 0;
@@ -11960,7 +11917,7 @@ restart: /* jump back to here if SELECT * produces a new query */
       QString plugin_soname= query.mid(token_offsets[10], token_lengths[10]);
       int er= insert_plugin(plugin_id, plugin_soname, alltext);
       if (er == ER_OK) put_message_in_result("OK, 1 row");
-      else put_message_in_result("Error");
+//      else put_message_in_result("Error");
       *diagnostic_signal= DIAGNOSTIC_1;
       is_early_return= true;
     }
@@ -11968,9 +11925,10 @@ restart: /* jump back to here if SELECT * produces a new query */
   if (main_token_types[3] == TOKEN_KEYWORD_UPDATE)
   {
     /* e.g. SET ocelot_query = UPDATE menus SET shortcut = 'a' WHERE id = 'action_options_line'; */
+    QString target= query.mid(token_offsets[6], token_lengths[6]).toUpper();
     QString id= query.mid(token_offsets[12], token_lengths[12]);
     QString value= query.mid(token_offsets[8], token_lengths[8]);
-    int er= shortcut_set_via_id(id, value);
+    int er= menu_set_via_id(target, id, value);
     /* We won't get here with er!=0 due to nonexistent id because that's considered a syntax error */
     put_message_in_result(er_strings[er_off + er]);
     *diagnostic_signal= DIAGNOSTIC_1;
@@ -12024,10 +11982,10 @@ restart: /* jump back to here if SELECT * produces a new query */
           if (ngc == 0) query= query + " AS menu_title";
           query= query + "," + connect_unstripper(menu_spec_struct_list[i].menu_item);
           if (ngc == 0) query= query + " AS menu_item";
+          query= query + "," + connect_unstripper(menu_spec_struct_list[i].action);
+          if (ngc == 0) query= query + " AS action";
           query= query + "," + connect_unstripper(menu_spec_struct_list[i].shortcut);
           if (ngc == 0) query= query + " AS shortcut";
-          query= query + "," + connect_unstripper(menu_spec_struct_list[i].function);
-          if (ngc == 0) query= query + " AS function";
           ++ngc;
         }
       }
@@ -21224,7 +21182,7 @@ C_widget::~C_widget()
 void Completer_widget::keyPressEvent(QKeyEvent *event)
 {
   QKeyEvent *key= event;
-  if (main_window->keypress_shortcut_handler(key, false) == true)
+  if (main_window->keypress_shortcut_handler(key) == true)
   {
     call_for_action();
   } /* todo: this isn't seen */
@@ -21615,7 +21573,7 @@ void Find_widget::keyPressEvent(QKeyEvent *event)
     hide();
     return;
   }
-  if (main_window->keypress_shortcut_handler(event, false) == true)
+  if (main_window->keypress_shortcut_handler(event) == true)
   {
     return;
   }
@@ -22552,14 +22510,14 @@ void Result_qtextedit::keyPressEvent(QKeyEvent *event)
   MainWindow *m= result_grid->copy_of_parent;
 
   /* TEXT!!!! TODO: I DO NOT KNOW WHAT THIS WAS FOR. MAYBE IT SHOULD BE RESTORED. */
-  // if (m->keypress_shortcut_handler(event, true) == true)
+  // if (m->keypress_shortcut_handler(event) == true)
   //{
   //  printf("**** keypress_shortcut_handler(true) returned true\n");
   //  copy();
   //  return;
   //}
 
-  if (m->keypress_shortcut_handler(event, false) == true)
+  if (m->keypress_shortcut_handler(event) == true)
   {
     /* Todo: shortcut but not ignore. Am I supposed to accept? */
     return;
@@ -31379,7 +31337,7 @@ QString ResultGrid::fillup(MYSQL_RES *mysql_res,
     ocelot_plugin_pass.result_set_copy= result_set_copy;
     ocelot_plugin_pass.result_row_count= result_row_count;
     ocelot_plugin_pass.result_column_count= result_column_count;
-    int return_code= copy_of_parent->plugin_widget_list_caller(PLUGIN_FILLUP, "");
+    /* int return_code= */ copy_of_parent->plugin_widget_list_caller(PLUGIN_FILLUP, "");
     //if (return_code ==  PLUGIN_RETURN_OK_AND_REPLACED)
     //  text= QString::fromUtf8(ocelot_plugin_pass.replacer_buffer, ocelot_plugin_pass.replacer_buffer_length);
     // ! we'd need to re-allocate result_set_copy_rows!
@@ -31435,11 +31393,11 @@ QString ResultGrid::fillup_in_client(QString query, int *token_lengths, int *tok
   QString return_value= "OK"; /* if all is well this will stay "OK" */
   char *result_field_names_pointer;
   int result_field_names_size;
-  int query_len= query.size(); /* or toUtf8().size()? */
+//  int query_len= query.size(); /* or toUtf8().size()? */
 //  int  *token_offsets;
 //  int  *token_lengths;
-  int desired_count;
-  desired_count= query_len + 1; /* usually far more than necessary */
+//  int desired_count;
+//  desired_count= query_len + 1; /* usually far more than necessary */
 //  token_offsets= new int[desired_count];
 //  token_lengths= new int[desired_count];
 //  token_lengths[0]= 0;
@@ -32913,7 +32871,7 @@ void ResultGrid::get_row_height_and_max_display_height_and_max_grid_rows(int *ro
         It seems that we're calling display_html multiple times, not once per select, find out why.
   Todo: We're calculating char[] size in advance and using strcpy() or memcpy().
         It would be lots simpler and safer to use a QString or QByteArray, but might be slower.
-  Todo: Bug but can't repeat: After (?) detach result grid, set ocelot_grid_background_color conditionally,
+  Todo: Bug but can't repeat: After (?) detach grid widget, set ocelot_grid_background_color conditionally,
         select * from information_schema, then scroll down (?) then scroll up to the top, only header is seen.
   Re result_grid_height_after_last_resize:
     It might be better to calculate height from Result_qtextedit::resizeEvent, it would probably be
@@ -35568,7 +35526,7 @@ int ResultGrid::set_alignment_and_height(int text_edit_frames_index, unsigned in
       has not enough height by 1 or 2 pixels, if family = Chandas | Jamrul | Khmer OS | Umpush.
       And has missing drag lines if Abyssinica SIL | Carlito | DejaVu Math Tex Gyre.
       The hight problem happens because height within result grid is too high.
-      It disappears if you detach result grid and make result grid larger.
+      It disappears if you detach grid widget and make result grid larger.
   Re italic|oblique: As the Qt manual says, boundingRect() can ignore a font's
      leftBearing and rightBearing, so it might calculate that there are N characters on a
      line but at display time there are N-minus-1 characters on a line. Therefore, add "W"
@@ -41008,11 +40966,11 @@ if (qv == "no") printf("action_options_detach_statement_widget no\n"); else prin
 #endif
       if (keyword_index == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
       {
-        QAction *action_options_detach_result_grid_widget= main_window->menu_spec_find_action("action_options_detach_result_grid_widget");
-        if (action_options_detach_result_grid_widget != NULL)
+        QAction *action_options_detach_grid_widget= main_window->menu_spec_find_action("action_options_detach_grid_widget");
+        if (action_options_detach_grid_widget != NULL)
         {
-          if (qv == "no") { action_options_detach_result_grid_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_GRID_DETACHED, false); }
-          else { action_options_detach_result_grid_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_GRID_DETACHED, true); }
+          if (qv == "no") { action_options_detach_grid_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_GRID_DETACHED, false); }
+          else { action_options_detach_grid_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_GRID_DETACHED, true); }
         }
       }
       if (keyword_index == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
@@ -45362,21 +45320,24 @@ Plugin::Plugin(MainWindow *m) /* constructor */
 }
 
 /* Warning: assume statement_edit_widget exists but error messages won't appear until display happens. printf()? */
-/* Expect plugin_id = what we call (so dlsym should work), soname = library (so dlopen should work) */
-int Plugin::init(QString plugin_id, QString plugin_soname, int call_type)
+/* Expect plugin_id = what we call (so dlsym should work), plugin_library_name = soname (so dlopen should work) */
+int Plugin::init(QString plugin_id, QString plugin_library_name, int call_type)
 {
   int result= 0;
-#ifdef OCELOT_OS_LINUX
   char message[256];
   /* TODO: actually these are items you should allocate as char[] ! */
   id= plugin_main_window->connect_stripper(plugin_id, true);
-  soname= plugin_main_window->connect_stripper(plugin_soname, true);
+  soname= plugin_main_window->connect_stripper(plugin_library_name, true);
   char plugin_soname_as_utf8[1024];
   strcpy(plugin_soname_as_utf8, soname.toUtf8()); /* e.g. /home/pgulutzan/ocelotgui/libplugin.so */
+#ifdef _WIN32
+  plugin_handle= LoadLibrary(plugin_soname_as_utf8);
+#else  /* i.e. not Windows, probably OCELOT_OS_LINUX */
   plugin_handle= dlopen(plugin_soname_as_utf8, RTLD_NOW);
+#endif
   if (plugin_handle == NULL)
   {
-    strcpy(message, "dlopen failed for ");
+    strcpy(message, "dlopen or LoadLibrary failed for ");
     strcat(message, plugin_soname_as_utf8);
     goto error_return;
   }
@@ -45384,7 +45345,11 @@ int Plugin::init(QString plugin_id, QString plugin_soname, int call_type)
   strcpy(ocelot_plugin_pass.id, id.toUtf8());
   char plugin_id_as_utf8[1024];
   strcpy(plugin_id_as_utf8, id.toUtf8()); /* e.g. the name of a function in the library */
+#ifdef _WIN32
+  plugin_function_pointer= (int (*)(struct plugin_pass *))GetProcAddress(plugin_handle, "plugin_before_insert");
+#else  /* i.e. not Windows, probably OCELOT_OS_LINUX */
   plugin_function_pointer= (int (*)(struct plugin_pass *))dlsym(plugin_handle, "plugin_before_insert");
+#endif
   if (plugin_function_pointer != NULL)
   {
     int install_result= (*plugin_function_pointer)(&ocelot_plugin_pass);
@@ -45394,12 +45359,15 @@ int Plugin::init(QString plugin_id, QString plugin_soname, int call_type)
       goto error_return;
     }
   }
-
   /* todo: the name should be for a function that we will call, we're not checking for that. check in hparse too */
+#ifdef _WIN32
+  plugin_function_pointer= (int (*)(struct plugin_pass *))GetProcAddress(plugin_handle, plugin_id_as_utf8);
+#else  /* i.e. not Windows, probably OCELOT_OS_LINUX */
   plugin_function_pointer= (int (*)(struct plugin_pass *))dlsym(plugin_handle, plugin_id_as_utf8);
+#endif
   if (plugin_function_pointer == NULL)
   {
-    strcpy(message, "dlsym failed for ");
+    strcpy(message, "dlsym or GetProcAddress failed for ");
     strcat(message, plugin_id_as_utf8);
     goto error_return;
   }
@@ -45407,7 +45375,6 @@ int Plugin::init(QString plugin_id, QString plugin_soname, int call_type)
   /* ... but we don't call the function, this is just an illustration */
   /* result= (*plugin_function_pointer)(&ocelot_plugin_pass); */    /* Pass struct connect_arguments */
   /* if result != 0, it means error, and so the install should fail */
-#endif
   return result;
 error_return:
   if (call_type == 0) printf("%s\n", message);

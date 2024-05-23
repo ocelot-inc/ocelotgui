@@ -809,9 +809,10 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned int flag_versio
       possible= true;
     }
   }
-  if ((token_literal_flags & TOKEN_LITERAL_FLAG_ID_STRING) || (token_literal_flags & TOKEN_LITERAL_FLAG_SONAME_STRING)
+  if ((token_literal_flags & TOKEN_LITERAL_FLAG_ID_STRING) || (token_literal_flags & TOKEN_LITERAL_FLAG_LIBRARY_STRING)
    || (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_TITLE_STRING)
-   || (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_ITEM_STRING) || (token_literal_flags & TOKEN_LITERAL_FLAG_FUNCTION_STRING))
+   || (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_ITEM_STRING) || (token_literal_flags & TOKEN_LITERAL_FLAG_ACTION_STRING)
+   || (token_literal_flags & TOKEN_LITERAL_FLAG_KEYSEQUENCE_STRING))
   {
     if (hparse_token_type == TOKEN_TYPE_LITERAL_WITH_SINGLE_QUOTE)
       possible= true;
@@ -841,14 +842,16 @@ int MainWindow::hparse_f_literal(unsigned char reftype, unsigned int flag_versio
       strcpy(expectation, "[host-string]");
     else if (token_literal_flags & TOKEN_LITERAL_FLAG_ID_STRING)
       strcpy(expectation, "[id-string]");
-    else if (token_literal_flags & TOKEN_LITERAL_FLAG_SONAME_STRING)
-      strcpy(expectation, "[soname-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_LIBRARY_STRING)
+      strcpy(expectation, "[library-string]");
     else if (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_TITLE_STRING)
       strcpy(expectation, "[menu_title-string]");
     else if (token_literal_flags & TOKEN_LITERAL_FLAG_MENU_ITEM_STRING)
       strcpy(expectation, "[menu_item-string]");
-    else if (token_literal_flags & TOKEN_LITERAL_FLAG_FUNCTION_STRING)
-      strcpy(expectation, "[function-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_ACTION_STRING)
+      strcpy(expectation, "[action-string]");
+    else if (token_literal_flags & TOKEN_LITERAL_FLAG_KEYSEQUENCE_STRING)
+      strcpy(expectation, "[keysequence-string]");
     else
       strcpy(expectation, "[non-number/non-string]");
     if (hparse_f_accept(flag_version, reftype, TOKEN_TYPE_LITERAL, expectation) == 1) return 1;
@@ -14156,7 +14159,7 @@ int MainWindow::hparse_f_client_set_query()
       if (hparse_errno > 0) return 1;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
       if (hparse_errno > 0) return 1;
-      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_SONAME_STRING) == 0) hparse_f_error();
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_LIBRARY_STRING) == 0) hparse_f_error();
       if (hparse_errno > 0) return 1;
     }
     else /* MENUS */
@@ -14173,7 +14176,7 @@ int MainWindow::hparse_f_client_set_query()
       if (hparse_errno > 0) return 1;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
       if (hparse_errno > 0) return 1;
-      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_FUNCTION_STRING) == 0) hparse_f_error();
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ACTION_STRING) == 0) hparse_f_error();
       if (hparse_errno > 0) return 1;
     }
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
@@ -14259,11 +14262,18 @@ int MainWindow::hparse_f_client_set_query()
     if (hparse_errno > 0) return 1;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SET, "SET");
     if (hparse_errno > 0) return 1;
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "shortcut");
+    int token_literal_flag= TOKEN_LITERAL_FLAG_STRING;
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "MENU_ITEM") == 1)
+      token_literal_flag= TOKEN_LITERAL_FLAG_MENU_ITEM_STRING;
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "SHORTCUT") == 1)
+      token_literal_flag= TOKEN_LITERAL_FLAG_KEYSEQUENCE_STRING;
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "ACTION") == 1)
+      token_literal_flag= TOKEN_LITERAL_FLAG_ACTION_STRING;
+    else hparse_f_error();
     if (hparse_errno > 0) return 1;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
     if (hparse_errno > 0) return 1;
-    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+    if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, token_literal_flag) == 0) hparse_f_error();
     if (hparse_errno > 0) return 1;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHERE, "WHERE");
     if (hparse_errno > 0) return 1;
