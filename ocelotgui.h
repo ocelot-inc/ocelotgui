@@ -4500,17 +4500,16 @@ struct connect_arguments {
 /* Possible values of the name when calling a plugin. */
 #define PLUGIN_AT_PROGRAM_START 0
 #define PLUGIN_MAKE_MENU 1
-#define PLUGIN_BEFORE_CONNECT 2
-#define PLUGIN_BEFORE_INSERT 3
-#define PLUGIN_REAL_QUERY 4 /* almost immediately before passing (char*) dbms_query to the server */
-#define PLUGIN_ERROR_MESSAGE 5
-#define PLUGIN_ALL 6
-#define PLUGIN_EXECUTE_ONE_STATEMENT 7
-#define PLUGIN_TEXT_CHANGED 8
-#define PLUGIN_FILLUP 0
-#define PLUGIN_DISPLAY_HTML 10
-#define PLUGIN_MENU_ACTION 12
-#define PLUGIN_MAX 12
+#define PLUGIN_BEFORE_INSERT 2
+#define PLUGIN_REAL_QUERY 3 /* almost immediately before passing (char*) dbms_query to the server */
+#define PLUGIN_ERROR_MESSAGE 4
+#define PLUGIN_EXECUTE_ONE_STATEMENT 5
+#define PLUGIN_TEXT_CHANGED 6
+#define PLUGIN_FILLUP 7
+#define PLUGIN_DISPLAY_HTML 8
+#define PLUGIN_MENU_ACTION 9
+#define PLUGIN_ALL 10
+#define PLUGIN_MAX 10
 #define PLUGIN_MENU_CHOICE -1
 
 /* Possible values that a plugin can return */
@@ -4529,16 +4528,15 @@ static const struct plugin_keywords plugin_strvalues[]=
    {
      {"at_program_start",  PLUGIN_AT_PROGRAM_START},
      {"make_menu", PLUGIN_MAKE_MENU},
-     {"before_connect",  PLUGIN_BEFORE_CONNECT},
      {"before_insert",  PLUGIN_BEFORE_INSERT},
      {"real_query", PLUGIN_REAL_QUERY},
      {"error_message", PLUGIN_ERROR_MESSAGE},
-     {"all", PLUGIN_ALL},
      {"execute_one_statement", PLUGIN_EXECUTE_ONE_STATEMENT},
      {"text_changed", PLUGIN_TEXT_CHANGED},
      {"fillup", PLUGIN_FILLUP},
      {"display_html", PLUGIN_DISPLAY_HTML},
-     {"menu_action", PLUGIN_MENU_ACTION}
+     {"menu_action", PLUGIN_MENU_ACTION},
+     {"all", PLUGIN_ALL}
 };
 #endif
 
@@ -8856,9 +8854,9 @@ public:
     See plugin.c, it will be included with the ocelotgui distribution.
     Notice it has a copyright message and is GPLv2. GPLv2 plugins are compatible with ocelotgui.
   Installing the plugin
-    SET ocelot_query = INSERT INTO plugins VALUES ('plugin_name', 'library literal');
+    SET ocelot_query = INSERT INTO plugins VALUES ('library literal', 'action');
     where library literal has the full path of the library e.g.
-    set ocelot_query = insert into plugins values ('all', '/home/pgulutzan/ocelotgui/libplugin.so');
+    set ocelot_query = insert into plugins values ('/home/pgulutzan/ocelotgui/libplugin.so', 'x');
     If the plugin has already been installed, there is no error message, the plugin is called twice.
     It is legal to start ocelotgui --ocelot_query=insert... or put ocelot_query=insert... in a .cnf file.
     The "set ocelot_query = insert ..." statement is legal even if there is no connection to the server.
@@ -8947,10 +8945,11 @@ public:
 private:
   MainWindow *plugin_main_window;
 #ifdef _WIN32
-  HANDLE plugin_handle;
+  QLibrary plugin_library;
 #else
   void *plugin_handle;
 #endif
+
   int (*plugin_function_pointer)(struct plugin_pass *arg);
 };
 #endif // #ifndef PLUGIN_H

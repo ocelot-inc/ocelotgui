@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.3.0
-   Last modified: May 23 2024
+   Last modified: May 30 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -6404,7 +6404,6 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
   }
 
   the_text.append("<br> app path "); the_text.append(QCoreApplication::applicationDirPath());
-  the_text.append("<br> wrk path "); the_text.append(QFileInfo(".").absolutePath());
 
   Message_box *message_box;
   message_box= new Message_box("Help|About", the_text, 500, "", er_strings[er_off + ER_OK], "", this);
@@ -9589,7 +9588,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   {
     if (debug_error((char*)er_strings[er_off + ER_SURROGATE_NOT_FOUND]) != 0) return;
   }
-
   //QString routine_schema_name_for_search= select_1_row_result_1;
   QString routine_name_for_search= select_1_row_result_2;
   /*
@@ -9626,7 +9624,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
       ++j;
     }
   }
-
   /* Todo: check: can this crash if there are DEBUG_TAB_WIDGET_MAX routines? Is this unnecessary if there are DEBUG_TAB_WIDGET_MAX routines? */
   debug_routine_name[j]= "";
 
@@ -9672,7 +9669,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
       return;
     }
     routine_definition= select_1_row_result_1;             /* = information_schema.routines.routine_definition */
-
     if (routine_definition == "")
     {
       debug_delete_tab_widgets();
@@ -9701,7 +9697,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
     debug_widget[debug_widget_index]->setReadOnly(false);                 /* if debug shouldn't be editable, set to "true" here */
     debug_widget[debug_widget_index]->installEventFilter(this);           /* is this necessary? */
     debug_tab_widget->addTab(debug_widget[debug_widget_index], debug_routine_name[debug_widget_index]);
-
     if ((QString::compare(debug_routine_name[debug_widget_index], q_routine_name, Qt::CaseInsensitive) == 0)
     &&  (QString::compare(debug_routine_schema_name[debug_widget_index], q_routine_schema, Qt::CaseInsensitive) == 0))
     {
@@ -9720,7 +9715,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   char error_message[512];
 
   debuggee_state= DEBUGGEE_STATE_0;
-
   /*
     We want the debuggee default database to be the main default
     database, but that's not necessarily ocelot_ca.database_as_utf8
@@ -9737,7 +9731,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
     Todo: this could be moved so it doesn't happen every time $debug happens. */
 
   sprintf(debuggee_channel_name, "ch#%d", statement_edit_widget->dbms_connection_id);
-
   /* Create a debuggee thread. */
   /* Todo: consider whether it would have been better to use the Qt QThread function */
   int pthread_create_result= pthread_create(&debug_thread_id, NULL, &debuggee_thread, NULL);
@@ -9789,7 +9782,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   debug_timer_old_icc_count= -1;
   debug_timer_old_debug_widget_index= -1;
   debug_timer->start(DEBUG_TIMER_INTERVAL);
-
   /* By the way, we fill in [schema.] if it's missing, because otherwise default would be 'test'. */
 
   //  strcpy(call_statement, "debug ");
@@ -10564,7 +10556,6 @@ int MainWindow::debug_call_xxxmdbug_command(const char *command)
   strcat(call_statement, "', ");
   strcat(call_statement, command_unstripped);
   strcat(call_statement, ");\n");
-
   if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement, strlen(call_statement)))
   {
     /* Initially this can happen because we start the timer immediately after we call 'attach'. */
@@ -11770,8 +11761,8 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
 /*
   Called from ocelot_execute_one_statement()
   SCENARIO 1: done entirely in client, we don't even need to be connected. Preceded by SET ocelot_query:
-    INSERT INTO plugins VALUES ('id', 'library'); library might be called soname in some contexts
-    DELETE FROM plugins WHERE id = 'value';
+    INSERT INTO plugins VALUES ('library','action'); library might be called soname in some contexts
+    DELETE FROM plugins WHERE action = 'value';
     INSERT INTO menus VALUES ('id', 'menu_title', 'menu_item', 'action');
     UPDATE menus SET menu_item | action | shortcut = 'value' WHERE id = 'value';
     DELETE FROM menus WHERE id = 'value';
@@ -11910,11 +11901,11 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
     }
     else
     {
-      /* e.g. INSERT INTO plugins VALUES ('plugin','soname'); */
+      /* e.g. INSERT INTO plugins VALUES ('soname','plugin'); */
       /* todo: error message */
-      QString plugin_id= query.mid(token_offsets[8], token_lengths[8]);
+      QString plugin_id= query.mid(token_offsets[10], token_lengths[10]);
       plugin_id= connect_stripper(plugin_id, true);
-      QString plugin_soname= query.mid(token_offsets[10], token_lengths[10]);
+      QString plugin_soname= query.mid(token_offsets[8], token_lengths[8]);
       int er= insert_plugin(plugin_id, plugin_soname, alltext);
       if (er == ER_OK) put_message_in_result("OK, 1 row");
 //      else put_message_in_result("Error");
@@ -11936,7 +11927,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
   }
   if (main_token_types[3] == TOKEN_KEYWORD_DELETE)
   {
-    /* e.g. SET ocelot_query = DELETE FROM plugins|menus WHERE id = 'b'; */
+    /* e.g. SET ocelot_query = DELETE FROM plugins|menus WHERE action = 'b'; */
     QString table= query.mid(token_offsets[5], token_lengths[5]).toUpper();
     QString id= query.mid(token_offsets[9], token_lengths[9]);
     int er;
@@ -12003,10 +11994,10 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
             if (i > 0) query= query + " UNION ALL ";
             query= query + "SELECT ";
             Plugin *plugin_widget= plugin_widget_list[i];
-            query= query + connect_unstripper(plugin_widget->id);
-            if (i == 0) query= query + " AS id";
-            query= query + "," + connect_unstripper(plugin_widget->soname);
-            if (i == 0) query= query + " AS soname";
+            query= query + connect_unstripper(plugin_widget->soname);
+            if (i == 0) query= query + " AS library";
+            query= query + "," + connect_unstripper(plugin_widget->id);
+            if (i == 0) query= query + " AS action";
           }
         }
       }
@@ -25637,7 +25628,7 @@ int options_and_connect(
 #ifdef _WIN32
   /* Actually this has no effect in my tests. Maybe just superstition. */
   /* But it's harmless. See https://bugs.mysql.com/bug.php?id=8059 */
-  int padding= 42;
+  /* int padding= 42; */
   mysql_init(&mysql[connection_number]);
 #else
   lmysql->ldbms_mysql_init(&mysql[connection_number]);
@@ -27134,7 +27125,6 @@ int MainWindow::setup_internal(QString command_string)
     else
       debug_xxxmdbug_icc_core_surrogate_name= "icc_core";
   }
-
   if (setup_routine_list(command_string)) return 1;
   debug_v_statement_number= 0;
   for (int i= 0; i < debug_routine_list_names.count(); ++i)
@@ -27180,7 +27170,6 @@ int MainWindow::setup_internal(QString command_string)
           generated icc_core back to the regular icc_core, it's a
           simple search-and-replace now.
   */
-
   if (setup_drop_routines() == 1) return 1;
   /* Create all the routines that are to be created. */
   /* If one of the creates fails, undo all previous creates. */
@@ -45245,8 +45234,11 @@ int MainWindow::plugin_widget_list_caller(int plugin_type, QString menu_function
     }
     if ((plugin_widget->plugin_type == plugin_type) || (plugin_widget->plugin_type == PLUGIN_ALL))
     {
-      return_value= plugin_widget->caller(plugin_type, &ocelot_plugin_pass);
-      /* Check: error return? */
+      if (plugin_type != PLUGIN_MENU_CHOICE) /* ALL only means all trigger plugins not menu plugins */
+      {
+        return_value= plugin_widget->caller(plugin_type, &ocelot_plugin_pass);
+        /* Check: error return? */
+      }
     }
   }
   return return_value;
@@ -45268,12 +45260,7 @@ int MainWindow::insert_plugin(QString plugin_id, QString plugin_soname, const QS
         break;
       }
     }
-/* Todo: this check is temporarily disabled while experiments continue with new menu plugins */
-//    if (i > PLUGIN_MAX)
-//    {
-//      put_message_in_result("plugin name is not valid");
-//      return ER_ERROR;
-//    }
+    /* Now if i > PLUGIN_MAX this name is not pre-assigned i.e. cannot be a trigger plugin but might be a menu plugin */
   }
   int return_code;
   {
@@ -45314,7 +45301,11 @@ int MainWindow::delete_plugin(QString id)
 Plugin::Plugin(MainWindow *m) /* constructor */
 {
   /* Error if plugin_widget_list cannot be increased! */
+#ifdef _WIN32
+  plugin_library.setFileName("");
+#else
   plugin_handle= NULL;
+#endif
   plugin_function_pointer= NULL;
   plugin_main_window= m;
 }
@@ -45331,37 +45322,55 @@ int Plugin::init(QString plugin_id, QString plugin_library_name, int call_type)
   char plugin_soname_as_utf8[1024];
   strcpy(plugin_soname_as_utf8, soname.toUtf8()); /* e.g. /home/pgulutzan/ocelotgui/libplugin.so */
 #ifdef _WIN32
-  plugin_handle= LoadLibrary(plugin_soname_as_utf8);
+  plugin_library.setFileName(soname);
+  bool is_library_loaded= plugin_library.load();
+  if (is_library_loaded == false)
+  {
+    /* load failed, plugin_library.errorString()) should have more info */
+    strcpy(message, "dlopen or LoadLibrary failed for ");
+    strcat(message, plugin_soname_as_utf8);
+    plugin_library.setFileName("");
+    goto error_return;
+  }
 #else  /* i.e. not Windows, probably OCELOT_OS_LINUX */
   plugin_handle= dlopen(plugin_soname_as_utf8, RTLD_NOW);
-#endif
   if (plugin_handle == NULL)
   {
     strcpy(message, "dlopen or LoadLibrary failed for ");
     strcat(message, plugin_soname_as_utf8);
     goto error_return;
   }
-  //int (*plugin_function_pointer)(int, void *) = (int (*)(int, void *))dlsym(plugin_handle, "plugin");
+#endif
   strcpy(ocelot_plugin_pass.id, id.toUtf8());
   char plugin_id_as_utf8[1024];
   strcpy(plugin_id_as_utf8, id.toUtf8()); /* e.g. the name of a function in the library */
 #ifdef _WIN32
-  plugin_function_pointer= (int (*)(struct plugin_pass *))GetProcAddress(plugin_handle, "plugin_before_insert");
+  /* test only */
+//  typedef void (*MyPrototype)();
+//  MyPrototype myFunction = (MyPrototype) plugin_library.resolve("W");
+//  if (myFunction == NULL) printf("**** myFuncion = NULL\n");
+//  if (myFunction)
+//      myFunction();
+//  mbox.setText(plugin_library.errorString());
+//  mbox.exec();
+//  plugin_function_pointer= (int (*)(struct plugin_pass *))GetProcAddress(plugin_handle, "before_insert");
+  plugin_function_pointer= (int (*)(struct plugin_pass *))plugin_library.resolve("before_insert");
 #else  /* i.e. not Windows, probably OCELOT_OS_LINUX */
-  plugin_function_pointer= (int (*)(struct plugin_pass *))dlsym(plugin_handle, "plugin_before_insert");
+  plugin_function_pointer= (int (*)(struct plugin_pass *))dlsym(plugin_handle, "before_insert");
 #endif
   if (plugin_function_pointer != NULL)
   {
     int install_result= (*plugin_function_pointer)(&ocelot_plugin_pass);
     if (install_result != 0)
     {
-      strcpy(message, "The plugin's plugin_before_insert returned a non-zero value so install fails");
+      strcpy(message, "The before_insert plugin returned a non-zero value so install fails");
       goto error_return;
     }
   }
   /* todo: the name should be for a function that we will call, we're not checking for that. check in hparse too */
 #ifdef _WIN32
-  plugin_function_pointer= (int (*)(struct plugin_pass *))GetProcAddress(plugin_handle, plugin_id_as_utf8);
+//  plugin_function_pointer= (int (*)(struct plugin_pass *))GetProcAddress(plugin_handle, plugin_id_as_utf8);
+  plugin_function_pointer= (int (*)(struct plugin_pass *))plugin_library.resolve(plugin_id_as_utf8);
 #else  /* i.e. not Windows, probably OCELOT_OS_LINUX */
   plugin_function_pointer= (int (*)(struct plugin_pass *))dlsym(plugin_handle, plugin_id_as_utf8);
 #endif
@@ -45392,11 +45401,13 @@ int Plugin::caller(int type, struct plugin_pass *plugin_pass)
 
 Plugin::~Plugin()
 {
+#ifdef _WIN32
+  if ((plugin_library.fileName() != "") && (plugin_library.isLoaded())) plugin_library.unload();
+#endif
 #ifdef OCELOT_OS_LINUX
   if (plugin_handle != NULL) dlclose(plugin_handle);
 #endif
 }
-
 #endif // #if (OCELOT_PLUGIN == 1)
 
 #ifdef DBMS_TARANTOOL

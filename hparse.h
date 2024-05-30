@@ -14155,11 +14155,11 @@ int MainWindow::hparse_f_client_set_query()
     if (hparse_errno > 0) return 1;
     if (table_type == TOKEN_KEYWORD_PLUGINS)
     {
-      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ID_STRING) == 0) hparse_f_error();
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_LIBRARY_STRING) == 0) hparse_f_error();
       if (hparse_errno > 0) return 1;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
       if (hparse_errno > 0) return 1;
-      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_LIBRARY_STRING) == 0) hparse_f_error();
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ACTION_STRING) == 0) hparse_f_error();
       if (hparse_errno > 0) return 1;
     }
     else /* MENUS */
@@ -14228,27 +14228,34 @@ int MainWindow::hparse_f_client_set_query()
     return 1;
   }
 
-  /* DELETE FROM menus|plugins WHERE id = '' -- SQLish but so restrictive we won't use the main DELETE routine */
+  /* DELETE FROM menus WHERE id = '' -- SQLish but so restrictive we won't use the main DELETE routine */
+  /* or DELETE FROM plugins WHERE action = '' */
   /* Todo: the table list and WHERE clause are the same as in UPDATE, and WHERE for conditional_settings looks hard */
   /* Todo: need pick_from_list as in UPDATE, and conditional_settings should have an id */
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DELETE, "DELETE") == 1)
   {
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FROM, "FROM");
       if (hparse_errno > 0) return 1;
+      int table_type= -1;
 #if (OCELOT_PLUGIN == 1)
-      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") != 1)
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") == 1)
+        table_type= TOKEN_KEYWORD_PLUGINS;
+      else
 #endif
       {
+        table_type= 0;
         if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "CONDITIONAL_SETTINGS") != 1)
           hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS");
       }
     if (hparse_errno > 0) return 1;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_WHERE, "WHERE");
     if (hparse_errno > 0) return 1;
-    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "id");
+    if (table_type == TOKEN_KEYWORD_PLUGINS) hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "action");
+    else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "id");
     if (hparse_errno > 0) return 1;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
     if (hparse_errno > 0) return 1;
+    /* todo: distinguish action literal | id literal */
     if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     if (hparse_errno > 0) return 1;
      return TOKEN_KEYWORD_SET;
