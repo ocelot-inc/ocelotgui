@@ -1,7 +1,7 @@
 
 ocelotgui
 
-<P>Version 2.3.0</P>
+<P>Version 2.4.0</P>
 
 <P>The ocelotgui GUI, a database client, allows users to connect to
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
@@ -48,6 +48,8 @@ All rights reserved.</P>
 ... <A href="#explorer-widget">Explorer widget</A>
 ... <A href="#ERDiagram">ERDiagram</A>
 ... <A href="#charts">Charts</A>
+... <A href="#make-menus">Make your own menus</A>
+... <A href="#plugins">Make your own plugins/A>
 ... <A href="#contact">Contact</A>
 <H4>Appendixes</H4>
 ... <A href="#Appendix-1">Appendix 1 Details about ocelotgui options</A>
@@ -123,21 +125,21 @@ If one of the following ocelotgui binary packages is compatible with your platfo
 cut and paste the corresponding pair of instructions onto your computer and
 you can be up and running in about 15 seconds.<BR><BR>
 For 32-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui_2.3.0-1_i386.deb
-sudo apt install ./ocelotgui_2.3.0-1_i386.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui_2.4.0-1_i386.deb
+sudo apt install ./ocelotgui_2.4.0-1_i386.deb</PRE>
 For 64-bit, Debian-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui_2.3.0-1_amd64.deb
-sudo apt install ./ocelotgui_2.3.0-1_amd64.deb</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui_2.4.0-1_amd64.deb
+sudo apt install ./ocelotgui_2.4.0-1_amd64.deb</PRE>
 For 64-bit, RPM-like, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui-2.3.0-1.x86_64.rpm
-sudo rpm -i ocelotgui-2.3.0-1.x86_64.rpm</PRE>
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.4.0-1.x86_64.rpm
+sudo rpm -i ocelotgui-2.4.0-1.x86_64.rpm</PRE>
 For 64-bit, any Linux, Qt5<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui-2.3.0.tar.gz
-tar zxvf ocelotgui-2.3.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.4.0.tar.gz
+tar zxvf ocelotgui-2.4.0.tar.gz
 ocelotgui/ocelotgui-qt5</PRE>
 For 64-bit, any Linux, Qt4 (deprecated)<PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui-2.3.0.tar.gz
-tar zxvf ocelotgui-2.3.0.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.4.0.tar.gz
+tar zxvf ocelotgui-2.4.0.tar.gz
 ocelotgui/ocelotgui-qt4</PRE>
 </P>
 
@@ -172,7 +174,7 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 2.3.0, March 18 2024</P>
+<P>Version 2.4.0, March 18 2024</P>
 
 <P>Copyright (c) 2024 by Peter Gulutzan. All rights reserved.</P>
   
@@ -196,7 +198,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA</P>
 a MySQL or MariaDB DBMS server, enter SQL statements, and receive results.
 Some of its features are: syntax highlighting, user-settable colors
 and fonts for each part of the screen, and result-set displays
-with multi-line rows and resizable columns, and a debugger.</P>
+with multi-line rows and resizable columns, plugins, and a debugger.</P>
 
 <H3 id="the-developer-the-product-and-the-status">The developer, the product, and the status</H3><HR>
 
@@ -995,6 +997,99 @@ The current output may look slightly different from the illustrations there,
 and the Qwt library is no longer necessary.
 </P>
 
+<H3 id="make-menus">Make your own menus</H3><HR>
+<P>
+There are SQL-like statements for manipulating the main menus.
+They all begin with SET ocelot_query =, and they are all client statements.
+You can execute them without being connected to a DBMS server.<pre>
+SET ocelot_query =
+  SELECT * FROM menus;
+SET ocelot_query =
+  DELETE FROM menus WHERE id = 'id';
+SET ocelot_query =
+  UPDATE menus SET menuitem | shortcut | action = 'literal' WHERE id = 'id';
+SET ocelot_query =
+  INSERT INTO menus VALUES ('id', 'menu-title', 'menu-item', 'action');</pre>
+</P>
+<P>
+SELECT result columns are ID (a unique value which you need to know for the WHERE clause in
+other menu statements), MENU_TITLE (the name of a menu), MENU_ITEM (the name of a menu item
+within a menu), ACTION (what happens when you select a menu item), SHORTCUT (a keysequence
+that does the same thing as selecting the menu item). Initially the ACTION column will have
+"[menu]" for a menu, "[separator]" for a line that sometimes is drawn between menu items,
+and function names for every menu item. (You would see the same function names if you looked
+at the ocelotgui source code.) 
+</P>
+<P>
+Suppose you want to remove the File|Exit menu item. You would first use SELECT to see that
+the ID is action_file_exit. Then SET ocelot_query = DELETE FROM menus WHERE id = 'action_file_exit';
+will remove it. But you could put it back later with SET ocelot_query = INSERT INTO menus
+VALUES ('action_file_exit', 'File', 'Exit', 'action_file_exit');.
+</P>
+<P>
+Suppose you want to change the Edit|Cut menu item to Edit|Couper. You would first use SELECT
+to find that the ID is action_edit_cut. Then SET ocelot_query = UPDATE menus SET menu_item
+= 'Couper' WHERE id = 'action_edit_cut'; will change it. Then you can change the shortcut,
+with SET ocelot_query = UPDATE menus SET shortcut = 'Ctrl+Shift+X' WHERE id = 'action_edit_cut';
+as described earlier.
+</P>
+<P>
+Suppose you want to make a completely new menu with your own names and actions.
+You don't need to insert a "[menu]" row, that will happen automatically when you insert a menu item.
+So SET ocelot_query = INSERT INTO menus VALUES ('new_cut', 'NEW', 'Cut!', 'action_edit_cut'); will
+make a new menu and a new menu item NEW|Cut! with an action that does the same thing as Edit|cut.
+Then SET ocelot_query = INSERT INTO menus VALUES ('new_sql', 'NEW', 'SQL!', 'SELECT 5 AS five, 6 AS six UNION ALL  SELECT 5, 6;'); will make a new menu item NEW|SQL! that causes an SQL statement.
+So now the menu looks like this:<br>
+<img src="menunew.png" alt="menunew.png" width="300" height="140"><br>
+So whenever you have stock SQL statements, or a series of SQL statements, that you might want to
+repeat frequently, you don't have to store them in a file and read the file with SOURCE. You can
+have them in the menu. Just remember: they must end with a semicolon.
+</P>
+<P>
+You can also make a menu whose action is a plugin. Plugins are described in the next section.
+</P>
+<H3 id="plugins">Make your own plugins</H3><HR>
+<P>
+A plugin is a routine in a library.
+There are SQL-like statements for manipulating the plugins.
+They all begin with SET ocelot_query =, and they are all client statements.
+You can execute them without being connected to a DBMS server.<pre>
+SET ocelot_query =
+  SELECT * FROM plugins;
+SET ocelot_query =
+  DELETE FROM plugins WHERE action = 'action';
+SET ocelot_query =
+  INSERT INTO plugins VALUES ('library', 'action');</pre>
+... where ACTION is the name of the routine in the library.
+What the routine does is up to you, you have to write it, in C or C++.
+The description here is only about the SQL-like statements.
+</P>
+Again, SELECT is useful for seeing what plugins have been inserted, and DELETE is useful for undoing.
+The INSERT will cause ocelotgui to search for a library (called a .so with Linux or a .dll with Windows),
+and within that to search for a routine. There are two kinds of plugins: "trigger plugins" and "menu plugins".
+<P>
+When ocelotgui reaches one of a certain set of preset points in its code, it calls a
+trigger plugin with a structured parameter that contains a lot of information about
+state, values of current variables, and permanent settings. The trigger plugin can
+act on the information, and in some cases can change it. For example, ocelotgui can call a trigger
+plugin whenever it is about to pass an SQL statement to the server, and the plugin can log the
+request then change the SQL statement to something completely different.
+</P>
+<P>
+When a menu item has an action that is not one of the 'action_*' routines within the ocelotgui code,
+and is not an SQL statement ending with ';', it looks for a menu plugin and calls it. For example,
+after SET ocelot_query = INSERT INTO plugins VALUES ('/home/pgulutzan/plugin/libplugin.so', 'menu_action');
+and after SET ocelot_query = INSERT INTO menus VALUES ('menu_action', 'NEW', 'The Example', 'menu_action');
+and after SET ocelot_query = UPDATE menus SET shortcut = 'Shift+F12' WHERE id = 'menu_action';
+and after the user either clicks the NEW/The Example menu item or types Shift+F12, the menu_action
+function in libplugin.so will run.
+</P>
+<P>
+This is not a manual about C/C++ coding so the rest is up to you.
+But to make it as simple as possible, ocelotgui is packaged with a file named plugin.c.
+It contains several example functions and several hundred words of commentary.
+</P>
+
 <H3 id="contact">Contact</H3><HR>
 
 <P>We need feedback!</P>
@@ -1421,7 +1516,10 @@ will appear. The default is 1.</td>
 <td valign="top">ocelot_shortcut_connect, ocelot_shortcut_exit, etc. ...
 You can change what the shortcut is, for any menu
 item, by specifying its name and a new keysequence.
-For example: SET ocelot_shortcut_paste = 'Ctrl+Shift+K';</td>
+For example: SET ocelot_shortcut_paste = 'Ctrl+Shift+K';
+but since verson 2.4 it is better to say
+SET ocelot_query = UPDATE menus SET shortcut='Ctrl+Shift+K'
+WHERE id = 'action_edit_paste';</td>
 </tr>
 
 <tr>
@@ -2141,7 +2239,7 @@ On Windows you do not need to install a
 Tarantool library, its code is embedded in ocelotgui.exe.</P>
 
 <P>You need the latest ocelotgui client.
-The Release 2.3.0 version is okay at the time of release,
+The Release 2.4.0 version is okay at the time of release,
 but some things might not be up to date.
 It may be better to build it from source.
 Download from github.com/ocelot-inc/ocelotgui.</P>
@@ -2302,11 +2400,11 @@ How to get it:<br>
 * Download the ocelotgui zip file from github.
   Check https://github.com/ocelot-inc/ocelotgui/blob/master/README.md
   to see where the latest release is. For example it might be
-  https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui-2.3.0-1.ocelotgui.zip<br>
+  https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.4.0-1.ocelotgui.zip<br>
 * Unzip. It was zipped with 7-zip from http://www.7-zip.org,
   but other utilities should work. For example, on Windows command prompt,
   if you have the PowerShell utility on your path:
-  PowerShell Expand-Archive ocelotgui-2.3.0-1.ocelotgui.zip c:\ocelotgui<br>
+  PowerShell Expand-Archive ocelotgui-2.4.0-1.ocelotgui.zip c:\ocelotgui<br>
 * Read the COPYING and LICENSE arrangements.
   On Windows ocelotgui is statically linked to Qt and MariaDB libraries,
   so the copyright and licensing is not the same as for Linux.<br>
@@ -2550,7 +2648,7 @@ copy release\ocelotgui.exe ocelotgui.exe
 del ocelotui.zip
 "C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf     PKGBUILD        ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png explorer1.png explorer2.png explorer3.png explorer4.png explorer5.png explorer6.png explorer7.png explorer8.png explorer9.png
 
-: What we actually put in the release looks like ocelotgui-2.3.0-1.ocelotgui.zip, so rename the .zip file at some point.
+: What we actually put in the release looks like ocelotgui-2.4.0-1.ocelotgui.zip, so rename the .zip file at some point.
 
 
 : (Dynamic linking)
@@ -2628,14 +2726,14 @@ A release file is highlighted in green
 by github and is named ocelotgui-[version].tar.gz.
 Since version 1.0.9, there is also a release file named ocelotgui_[version].orig.tar.gz
 which is preferable because it does not contain unnecessary executables.
-Thus release 2.3.0 is at
-https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui_2.3.0.orig.tar.gz.
+Thus release 2.4.0 is at
+https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui_2.4.0.orig.tar.gz.
 Typically, to get it, one would cd to a download directory, then
 <PRE>
-wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.3.0/ocelotgui_2.3.0.orig.tar.gz
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui_2.4.0.orig.tar.gz
 </PRE>
 or use a browser to go to <A HREF="https://github.com/ocelot-inc/ocelotgui/releases">https://github.com/ocelot-inc/ocelotgui/releases</A>
-and click ocelotgui_2.3.0.orig.tar.gz.</P>
+and click ocelotgui_2.4.0.orig.tar.gz.</P>
 
 <P>On Debian-like systems some packages must be installed first.
 For example on Ubuntu:<PRE>
@@ -2649,7 +2747,8 @@ For example on Ubuntu:<PRE>
  #It is okay if qt5-default is absent
  sudo apt-get install qt5-default qtbase5-dev qt5-qmake qtbase5-dev-tools
  #Do the following if and only if build is for use with Qt6
- sudo apt-get install qt-6-base-dev qt-6-base-dev-tools</PRE></P>
+ #It might be qt-6-base-dev and qt-6-base-dev-tools
+ sudo apt-get install qt6-base-dev qt6-base-dev-tools</PRE></P>
 
 <P>On RPM-like systems some packages must be installed first with
 "yum install" or "dnf install" or "urpmi".
@@ -2676,8 +2775,8 @@ sudo pacman -S mariadb-clients</PRE></P>
 <P>(Package builds on ArchLinux-like systems can also be done with the PKGBUILD file in the ocelotgui github repository.)</P>
 
 <P>Unpack all the source files by saying:<PRE>
- tar -zxvf ocelotgui_2.3.0.orig.tar.gz
- cd ocelotgui-2.3.0</PRE>
+ tar -zxvf ocelotgui_2.4.0.orig.tar.gz
+ cd ocelotgui-2.4.0</PRE>
 At this point it is a good idea to examine the file CMakeLists.txt.
 This file has comments about options which are available to
 customize the build process: CMAKE_PREFIX_PATH, CMAKE_INSTALL_PREFIX,
@@ -2701,12 +2800,12 @@ Peter Gulutzan provides scripts that will create .deb or .rpm packages.
 Please read the comments in the scripts before using them.
 For Debian-like platforms say<PRE>
  ./deb_build.sh
- sudo apt install /tmp/debian3/ocelotgui_2.3.0-1_amd64.deb
- #or sudo apt install /tmp/debian3/ocelotgui_2.3.0-1_i386.deb</PRE>
+ sudo apt install /tmp/debian3/ocelotgui_2.4.0-1_amd64.deb
+ #or sudo apt install /tmp/debian3/ocelotgui_2.4.0-1_i386.deb</PRE>
 For RPM-like platforms say<PRE>
  ./rpm_build.sh
- sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.3.0-1.x86_64.rpm
- #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.3.0-1.i686.rpm</PRE>
+ sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.4.0-1.x86_64.rpm
+ #or sudo rpm -i ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-2.4.0-1.i686.rpm</PRE>
 Usually the result will go to subdirectories of /usr, in which case,
 if /usr/bin is on your PATH, then saying ocelotgui will start the program.
 </P>

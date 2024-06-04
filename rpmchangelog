@@ -1,3 +1,5 @@
+* Tue Jun 04 2024 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.4.0-1
+- Plugins
 * Mon Mar 18 2024 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.3.0-1
 - Make SHOW as good as SELECT
 * Thu Feb 15 2024 Peter Gulutzan <pgulutzan at ocelot.ca> - 2.2.0-1

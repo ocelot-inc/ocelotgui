@@ -4371,10 +4371,10 @@ struct connect_arguments {
   /* QString login_path */            /* --login_path=s */
   unsigned short int log_level;          /* --ocelot_log_level */
   unsigned short int max_conditions;
-  unsigned long int max_allowed_packet; /* --max_allowed_packet=n */
+  unsigned long int max_allowed_packet_arg; /* --max_allowed_packet=n */
   unsigned long int max_join_size; /* --max_join_size = n */
   unsigned short named_commands;         /* --named_commands */
-  unsigned long int net_buffer_length; /* --net_buffer_length=n */
+  unsigned long int net_buffer_length_arg; /* --net_buffer_length=n */
   unsigned short no_beep;                /* --no_beep */
   unsigned short no_defaults;            /* --no_defaults */
   /* QString dbms */
@@ -5228,7 +5228,9 @@ public:
   void menu_spec_make_function(); void menu_spec_make_menu(); void menu_spec_reset_menu();
   int menu_spec_insert_one(QString id, QString menu_name, QString menuitem_name, QString action);
   QMenu* menu_spec_add_menu(int i); QAction *menu_spec_add_action(int i, QMenu *qmenu);
+#if (QT_VERSION >= 0x50000)
   void menu_about_to_show();
+#endif
 //  void menu_spec_set_addresses();
   QMenu* menu_spec_find_menu(QString menu_name);
   int menu_spec_find_id(QString id);

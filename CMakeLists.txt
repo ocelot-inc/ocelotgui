@@ -151,8 +151,8 @@
 
 # FILENAME_EXTRA
 # Default is blank. ocelotgui passes -DFILENAME_EXTRA="qt4" when building with qt4,
-# so the final package name will look like ocelotgui_2.3.0qt4-1_amd64.deb or
-# ocelotgui-2.3.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
+# so the final package name will look like ocelotgui_2.4.0qt4-1_amd64.deb or
+# ocelotgui-2.4.0qt4-1.x86_64.rpm. Ordinarily it should not be specified.
 
 # FILENAME_RELEASE
 # Default is "1". Ordinarily it doesn't need to be changed.
@@ -164,13 +164,13 @@
 
 # e.g. to generate .deb file and install with dpkg:
 # deb_build.sh, which copies files and invokes debian/rules, which uses CMakeLists.txt
-# sudo dpkg -i ocelotgui_2.3.0-1_amd64.deb
+# sudo dpkg -i ocelotgui_2.4.0-1_amd64.deb
 # but see also comments in deb_build.sh and debian/README.Debian
 
 # e.g. to generate .rpm file and install with rpm:
 # rpm_build.sh, which copies files and invokes ocelotgui.spec, which uses CMakeLists.txt
-# rpmlint ocelotgui-2.3.0-1.x86_64.rpm
-# rpm -i ocelotgui-2.3.0-1.x86_64.rpm
+# rpmlint ocelotgui-2.4.0-1.x86_64.rpm
+# rpm -i ocelotgui-2.4.0-1.x86_64.rpm
 # but see also comments in rpm_build.sh
 
 # Todo: We only check if CMAKE_SYSTEM_PROCESSOR = x86_64. On FreeBSD 12, uname -p says amd64.
@@ -178,7 +178,7 @@
 # Todo: We do not install README_tarantool.htm or the *_tarantool.png files, though we put them on github.
 # Todo: We do not install ocelotgui-logo.png, we only install ocelotgui_logo.png.
 
-message("-- CmakeLists.txt for ocelotgui 2.3.0")
+message("-- CmakeLists.txt for ocelotgui 2.4.0")
 message("-- see comments in CMakeLists.txt for special instructions")
 message("-- see README.md for general instructions for building")
 
@@ -528,6 +528,8 @@ install(FILES special-vertical.png DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES starting-dialog.png DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES starting.png DESTINATION ${CMAKE_INSTALL_DOCDIR})
 install(FILES statement-widget-example.png DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES menunew.png DESTINATION ${CMAKE_INSTALL_DOCDIR})
+install(FILES plugin.c DESTINATION ${CMAKE_INSTALL_DOCDIR})
 # Debian packages would gzip .txt and .md files anyway.
 if (NOT PACKAGE_TYPE MATCHES "DEB")
 if (NOT PACKAGE_TYPE MATCHES "RPM")
@@ -573,14 +575,14 @@ if (PACKAGE_TYPE MATCHES "RPM")
   install(FILES ocelotgui.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif (PACKAGE_TYPE MATCHES "RPM")
 
-# version = 2.3.0
+# version = 2.4.0
 set(CPACK_PACKAGE_VERSION_MAJOR "2")
 set(CPACK_PACKAGE_VERSION_MINOR "3")
 set(CPACK_PACKAGE_VERSION_PATCH "0")
 
-# I assume nobody wants package names like ocelotgui_2.3.0-Linux.deb
+# I assume nobody wants package names like ocelotgui_2.4.0-Linux.deb
 # but that's what I get if CMAKE_SYSTEM_NAME = "Linux".
-# I'd prefer ocelotgui_2.3.0-1_amd64.deb or ocelotgui-2.3.0.x86_64.rpm
+# I'd prefer ocelotgui_2.4.0-1_amd64.deb or ocelotgui-2.4.0.x86_64.rpm
 # If it's neither "DEB" nor "RPM", = default.
 set(FILENAME_PLATFORM_FOR_DEB "Linux")
 set(FILENAME_PLATFORM_FOR_RPM "Linux")

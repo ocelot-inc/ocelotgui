@@ -14140,7 +14140,7 @@ int MainWindow::hparse_f_client_set_query()
   /* INSERT INTO plugins|menus VALUES (string[,string...]) -- SQLish but so restricted we won't use the main INSERT routine */
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSERT, "INSERT") == 1)
   {
-    int table_type; /* 0 if menu, TOKEN_KEYWORD_PLUGINS if plugin */
+    int table_type= 0; /* 0 if menu, TOKEN_KEYWORD_PLUGINS if plugin */
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO");
     if (hparse_errno > 0) return 1;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") == 1)

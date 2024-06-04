@@ -1,8 +1,8 @@
 /*
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
-   Version: 2.3.0
-   Last modified: May 30 2024
+   Version: 2.4.0
+   Last modified: June 4 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -258,10 +258,10 @@ static struct connect_arguments ocelot_ca {
   .opt_local_infile= 0,
   .log_level= 100,
   .max_conditions= 5,
-  .max_allowed_packet= 16777216,
+  .max_allowed_packet_arg= 16777216,
   .max_join_size= 1000000,
   .named_commands= 0,
-  .net_buffer_length= 16384,
+  .net_buffer_length_arg= 16384,
   .no_beep= 0,
   .no_defaults= 0,
   .one_database= 0,
@@ -413,7 +413,7 @@ static struct plugin_pass ocelot_plugin_pass {
   int options_and_connect(unsigned int connection_number, char *database_as_utf8);
 
   /* This should correspond to the version number in the comment at the start of this program. */
-  static const char ocelotgui_version[]="2.3.0"; /* For --version. Make sure it's in manual too. */
+  static const char ocelotgui_version[]="2.4.0"; /* For --version. Make sure it's in manual too. */
   static unsigned int dbms_version_mask= FLAG_VERSION_DEFAULT;
 
 /* Global mysql definitions */
@@ -1809,7 +1809,7 @@ ok_ok_return:
 */
 void MainWindow::export_set_checked()
 {
-  QAction *q;
+  QAction *q= NULL;
   if (main_exports.type == TOKEN_KEYWORD_TEXT) q= menu_spec_find_action("action_file_export_text");
   if (main_exports.type == TOKEN_KEYWORD_TABLE) q= menu_spec_find_action("action_file_export_table");
   if (main_exports.type == TOKEN_KEYWORD_HTML) q= menu_spec_find_action("action_file_export_html");
@@ -4323,7 +4323,9 @@ QMenu* MainWindow::menu_spec_add_menu(int i)
 {
   QMenu *qmenu= ui->menuBar->addMenu(menu_spec_struct_list[i].menu_title);
   menu_spec_struct_list[i].qmenu= qmenu;
+#if (QT_VERSION >= 0x50000)
   connect(menu_spec_struct_list[i].qmenu,&QMenu::aboutToShow,this,&MainWindow::menu_about_to_show);
+#endif
   return qmenu;
 }
 
@@ -4351,10 +4353,12 @@ QAction* MainWindow::menu_spec_add_action(int i, QMenu *qmenu)
   Warning: if all that's happening is that the user is shifting the mouse around the top of the menu bar,
            menu_about_to_show will happen multiple times
 */
+#if (QT_VERSION >= 0x50000)
 void MainWindow::menu_about_to_show()
 {
   /* printf("**** menu_about_to_show!\n"); */
 }
+#endif
 
 /*
   menu_spec_reset cancels that menu_spec_make_menu made new QActions + QMenus + separators, and connected to slots.
@@ -5285,10 +5289,10 @@ void MainWindow::action_file_connect_once(QString message)
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LINE_NUMBERS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.line_numbers); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LOCAL_INFILE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.opt_local_infile); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_LOGIN_PATH].chars).toLower();; row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_login_path; row_form_width[i]= '\x05';
-  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ALLOWED_PACKET].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.max_allowed_packet); row_form_width[i]= '\x05';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_ALLOWED_PACKET].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.max_allowed_packet_arg); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_MAX_JOIN_SIZE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.max_join_size); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NAMED_COMMANDS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.named_commands); row_form_width[i]= '\x05';
-  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NET_BUFFER_LENGTH].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.net_buffer_length); row_form_width[i]= '\x05';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NET_BUFFER_LENGTH].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.net_buffer_length_arg); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NO_BEEP].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.no_beep); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_NO_DEFAULTS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.no_defaults); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_OCELOT_DBMS].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_dbms; row_form_width[i]= '\x09';
@@ -5402,10 +5406,10 @@ void MainWindow::action_file_connect_once(QString message)
       ocelot_ca.line_numbers= to_long(row_form_data[i++].trimmed());
       ocelot_ca.opt_local_infile= to_long(row_form_data[i++].trimmed());
       ocelot_login_path= row_form_data[i++].trimmed();
-      ocelot_ca.max_allowed_packet= to_long(row_form_data[i++].trimmed());
+      ocelot_ca.max_allowed_packet_arg= to_long(row_form_data[i++].trimmed());
       ocelot_ca.max_join_size= to_long(row_form_data[i++].trimmed());
       ocelot_ca.named_commands= to_long(row_form_data[i++].trimmed());
-      ocelot_ca.net_buffer_length= to_long(row_form_data[i++].trimmed());
+      ocelot_ca.net_buffer_length_arg= to_long(row_form_data[i++].trimmed());
       ocelot_ca.no_beep= to_long(row_form_data[i++].trimmed());
       ocelot_ca.no_defaults= to_long(row_form_data[i++].trimmed());
       connect_set_variable("ocelot_dbms", "=", row_form_data[i++].trimmed());
@@ -6426,7 +6430,7 @@ void MainWindow::action_help_the_manual(bool is_checked)
   QString the_text="\
   <BR><h1>ocelotgui</h1>  \
   <BR>  \
-  <BR>Version 2.3.0, April 19 2024  \
+  <BR>Version 2.4.0, June 4 2024  \
   <BR>  \
   <BR>  \
   <BR>Copyright (c) 2024 by Peter Gulutzan. All rights reserved.  \
@@ -11030,7 +11034,7 @@ int MainWindow::action_execute(int force)
     /* This makes the menu seem to blink. If that's not OK, turn off sub-items not main menu items. */
     /* Todo: maybe other things should be disabled|enabled as we do with is_can_copy. */
     QAction *menu_edit_action_copy= menu_spec_find_action("action_edit_copy");
-    bool is_can_copy; if (menu_edit_action_copy != NULL) is_can_copy= menu_edit_action_copy->isEnabled();
+    bool is_can_copy= false; if (menu_edit_action_copy != NULL) is_can_copy= menu_edit_action_copy->isEnabled();
 QMenu *menu_file= menu_spec_find_menu("menu_file");
     if (menu_file != NULL) menu_file->setEnabled(false);
 QMenu *menu_edit= menu_spec_find_menu("menu_edit");
@@ -17057,12 +17061,12 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   }
   {
     /* Todo:
-       I was setting TNT_OPT_SEND_BUF and TNT_OPT_RECV_BUF to (char*)ocelot_ca.net_buffer_length in
+       I was setting TNT_OPT_SEND_BUF and TNT_OPT_RECV_BUF to (char*)ocelot_ca.net_buffer_length_arg in
        ocelotgui.h. I said third arg is char*, so casting was goofy. The greater problem was that
        the default on startup is 16384 which is MySQL's default, not Tarantool's. The true solution
        is to change the default if --ocelot_dbms=tarantool, perhaps. But 0 turns buffering off, and
        I think that is convenient for sending or receiving images.
-       Warning: ocelot_ca.net_buffer_length is long.
+       Warning: ocelot_ca.net_buffer_length_arg is long.
     */
     lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_SEND_BUF, 0);
     lmysql->ldbms_tnt_set(tnt[connection_number], TNT_OPT_RECV_BUF, 0);
@@ -25271,14 +25275,14 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_LOGIN_PATH) { ocelot_login_path= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_MAX_ALLOWED_PACKET) { ocelot_ca.max_allowed_packet= to_long(token2); return; }
+  if (keyword_index == TOKEN_KEYWORD_MAX_ALLOWED_PACKET) { ocelot_ca.max_allowed_packet_arg= to_long(token2); return; }
   if (keyword_index == TOKEN_KEYWORD_MAX_JOIN_SIZE)
   {
     ocelot_ca.max_join_size= to_long(token2);
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_NAMED_COMMANDS) { ocelot_ca.named_commands= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_NET_BUFFER_LENGTH) { ocelot_ca.net_buffer_length= to_long(token2); return; }
+  if (keyword_index == TOKEN_KEYWORD_NET_BUFFER_LENGTH) { ocelot_ca.net_buffer_length_arg= to_long(token2); return; }
   if (keyword_index == TOKEN_KEYWORD_NO_AUTO_REHASH) { ocelot_ca.auto_rehash= 0; return; }
   if (keyword_index == TOKEN_KEYWORD_NO_BEEP)
   {
@@ -42674,11 +42678,9 @@ int Chart::draw_group(
   }
 
   set_chart_width();
-
   /* Eventually rename numeric_column_count to number_of_columns_in_group */
   /* Todo: maybe we can remove this */
   int numeric_column_count= (chart_last_column_in_group - chart_first_column_in_group) + 1;
-
 //  QString column_value_as_utf8= QString(ocelot_grid_detail_char_column_start, v_length);
 //  double column_value= QString::number(column_value_as_utf8);
 //  printf("**** column_value=%f.\n", column_value);
@@ -42766,7 +42768,6 @@ int Chart::draw_group(
 //   }
 
 /* Now we have a series. One series entry per sub_group. Each series entry has one or more series_columns. One per column. */
-
   int max_series_column_count= 0; /* used for line and pie, might be obvious from some already-calculated item though */
   for (int i_of_series= 0; i_of_series < series.size(); ++i_of_series)
   {
@@ -42816,7 +42817,6 @@ int Chart::draw_group(
   QPainter pixmap_painter(&pixmap);
 
   pixmap_painter.setFont(chart_default_font); /* todo: a conditional setting might change this */
-
 /* Now set_chart_rects() might work, since we know series and series_columns. */
 
 //  bool is_horizontal= true;
@@ -42898,7 +42898,6 @@ int Chart::draw_group(
     }
   }
   vertical_bar_count+= series.size() - 1;
-
   /* So 2 numbers in the row cause 2 adjacent bars */
   /* todo: consider looking at CHART_MARGIN_BETWEEN_BARS */
   /* BAR, VERTICAL, GROUPED */
@@ -43073,6 +43072,7 @@ int Chart::draw_group(
   /* Paste the line "point" for each series */
   if (chart_type == TOKEN_KEYWORD_LINE)
   {
+    if (vertical_bar_count <= 0) vertical_bar_count= 1; /* only one thing in the series? todo: line_width will be 0 too! */
     int line_width= chart_canvas_rect.width() / vertical_bar_count;
 
     /* !!!! SHOULD BE LINE_WIDTH BUT WAIT TILL WE KNOW LINE_WIDTH !!!! set_chart_rects() is wrong now */
@@ -43083,7 +43083,6 @@ int Chart::draw_group(
     int line_point_height= 13; /* arbitrary */
 
     QRect qr_of_last[100]; /* todo: dynamic allocation please */
-
     for (int i_of_series= 0; i_of_series < series.size(); ++i_of_series)
     {
       QVector<int> series_columns= series.at(i_of_series);
