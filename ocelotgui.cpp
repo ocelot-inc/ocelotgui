@@ -7113,6 +7113,14 @@ void MainWindow::assign_names_for_colors()
   Possibly I'd need to get a QFrame with a lineWidth() and frameWidth()?
   Possibly I should just assume that border width = 0px except for main window, and
   take out any mention of border in the Settings dialogs.
+  Re QPushButtons:
+    With Manjaro 21 + Gnome + Qt 5.15.4 the default background-color of QPushButton, and therefore of QComboBox
+    which has a component like a QPushButton, is dark and cannot be cahnged with ordinary setStyleSheet().
+    It can be "fixed" here in set_current_colors_and_font() with a one-line patch:
+    this->setStyleSheet("QPushButton, QComboBox {"border: 1px solid black}");
+    However, the result is that buttons look slightly different in other environments and there is no distinction
+    between :pressed and other subsets of QPushButton. And with Manjaro 24 + kde + Qt 5.15.13, or any other combo
+    I know of, the problem does not occur. So I won't add the one-line patch.
 */
 void MainWindow::set_current_colors_and_font(QFont fixed_font)
 {

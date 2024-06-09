@@ -1,9 +1,13 @@
 /*
-plugin.c An example program which demonstrates the ocelotgui plugin feature.
+  plugin.c -- A set of example routines which demonstrate the ocelotgui plugin feature.
 
-Copyright (c) 2024 by Peter Gulutzan.
+  Version: 2.4.0
+  Last modified: June 9 2024
 
-All rights reserved.
+*/
+
+/*
+Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are met:
@@ -29,7 +33,6 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /*
-  Last updated: 2024-05-30
 
   The ocelotgui plugin feature
   ----------------------------
@@ -45,7 +48,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
     Copy plugin.c to your default directory.
     Copy ocelotgui.h and other .h files from the ocelotgui source to your default directory.
     On Linux:    gcc -shared -o libplugin.so -fPIC plugin.c
-    On Windows:  No tests have been done but it might work with MinGW 32-bit, thus:
+    On Windows:  No good tests have been done but it seems to work with MinGW 32-bit, thus:
                  gcc -shared -Os -s -o plugin.dll plugin.c
   Persuading ocelotgui to install a plugin from a library:
     SET ocelot_query = INSERT INTO plugins ('name of library', 'name of plugin function');
@@ -159,7 +162,7 @@ int before_insert(struct plugin_pass *plugin_pass)
   ocelotgui --ocelot_query="INSERT INTO plugins VALUES ('/home/pgulutzan/plugin/libplugin.so', 'make_menu');"
   The effect will be: The File menu is moved to after the Help menu.
   (Warning: if translating to words that are not Latin1, make sure that the editor environment is UTF-8.)
-  Warning: the example works at time of writing but there is no guarantee that all versions of ocelotgui will have this substring.
+  Warning: the example works at time of writing with ocelotgui 2.4.0 but there is no guarantee that all versions of ocelotgui will have this substring.
 */
 static char menu_buffer[10000]; /* arbitrary, current size of query is about 7500 for English */
 int make_menu(struct plugin_pass *plugin_pass)

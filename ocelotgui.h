@@ -8839,37 +8839,31 @@ public:
     Any other language that can understand C/C++ structures would work but would be more trouble.
     Must start with #include "ocelotgui.h" which happens to be this file.
     Function names can be any of the names listed in static const struct plugin_keywords plugin_strvalues[]=, above.
-    (We use dlsym() to find function names.) (Or, on Windows, GetProcAddress.)
+    (We use dlsym() to find function names.) (Or, on Windows, a plugin_library function.)
     The ocelotgui.h header file has definitions that can be seen by C and more definitions that can be seen by C++.
     So the front of ocelotgui.h works for either C or C++, and the back (after "#ifdef __cplusplus") works only for C++.
     C definitions include some #define and struct items,
     C++ definitions include class descriptions.
   The plugin should be made into a library
     Currently Plugin::plugin() uses dlopen() to look for a Linux .so file
-    The Windows equivalent is LoadLibrary(), there's untested code for enclosed by #ifdef _WIN32.
+    The Windows equivalent is with Qt's QLibrary functions, there's poorly tested code for it enclosed by #ifdef _WIN32.
     So the plugin should be compiled and turned into a library with (substitute your name preferences here):
     (Linux) gcc -shared -o libplugin.so -fPIC plugin.c, or Windows equivalent mentioned in plugin.c
     Currently if ocelotgui doesn't find the plugin it does nothing, there is a printf but no error return.
     For security it is a good idea to protect the .so file from change, for example on Linux with chown and/or chmod.
     LD_LIBRARY_PATH or --rpath or --plugin_dir do not affect where ocelotgui looks for the Ocelot plugin library.
   The example file is plugin.c
-    See plugin.c, it will be included with the ocelotgui distribution.
+    See plugin.c, it is included with the ocelotgui distribution.
     Notice it has a copyright message and is GPLv2. GPLv2 plugins are compatible with ocelotgui.
   Installing the plugin
     SET ocelot_query = INSERT INTO plugins VALUES ('library literal', 'action');
     where library literal has the full path of the library e.g.
-    set ocelot_query = insert into plugins values ('/home/pgulutzan/ocelotgui/libplugin.so', 'x');
+    set ocelot_query = insert into plugins values ('/home/pgulutzan/ocelotgui/libplugin.so', 'real_query');
     If the plugin has already been installed, there is no error message, the plugin is called twice.
     It is legal to start ocelotgui --ocelot_query=insert... or put ocelot_query=insert... in a .cnf file.
     The "set ocelot_query = insert ..." statement is legal even if there is no connection to the server.
-* Call points i.e. places where ocelotgui can call the plugin:
-  "init" -- in response to "install plugin X" ... here the plugin should tell us what places to call from
-  fetch row -- we pass a row. if the plugin replaces it with something (having the same number of columns and column types!), fine
-            -- same thing when we allow edit row or insert row
-            -- can return multiple rows or 0 rows
-  statement -- any client statement, e.g. the plugin can return SET ocelot_grid_background_color='red'; (it won't be logged and it can appear during any call)
-  pre-all-rows-fetch, pre-row-fetch, pre-column-fetch
-  return    -- the point where we're about to tell user the result of a statement, which is a good place to change the error message
+* Triggers i.e. places where ocelotgui can call the plugin:
+  See "#define PLUGIN_..." declarations above.
   If the call point is for when the user clicks a menu item, INSERT INTO menus is responsible for connecting.
 
 * Plugin action: execute server statement
