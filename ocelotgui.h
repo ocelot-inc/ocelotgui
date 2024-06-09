@@ -101,7 +101,7 @@ typedef struct
   e.g. OCELOT_OS_OPENBSD.
   With OCELOT_OS_FREEBSD we can build but haven't checked all the places
   where we check if it's nonlinux (which is also true if FreeBSD is true),
-  so runtime failures are likely.
+  so runtime failures are likely. Update: some fixes were tried on 2024-06-09.
   "__linux" and "linux" are obsolete, someday we'll stop looking for them
   Todo: we also check Q_OS_LINUX or Q_OS_FREEBSD Qt macros. Stop doing so?
 */
@@ -4567,7 +4567,7 @@ struct plugin_pass {
 
 /* All Qt includes go here. Most of them could be handled by just saying "#include <QtWidgets>". */
 #include <QAbstractItemView>
-#ifdef OCELOT_OS_NONLINUX
+#ifdef _WIN32
 #include <QApplication>
 #endif
 #include <QBuffer>             /* only needed for pasting pixmaps to QByteArray */
@@ -4581,7 +4581,7 @@ struct plugin_pass {
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QSpinBox>
-#ifdef OCELOT_OS_NONLINUX
+#ifdef _WIN32
 #include <QLibrary>
 #endif
 //#include <QLibraryInfo>

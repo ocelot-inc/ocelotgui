@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: June 4 2024
+   Last modified: June 9 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -571,7 +571,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   But QT_QPA_PLATFORMTHEME= did not solve.
   So insist that the menu goes in MainWindow.
 */
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
   ui->menuBar->setNativeMenuBar(false);
 #endif
 //SHIFTED!!  create_menu();
@@ -6364,7 +6364,7 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 #else
      the_text.append("built_with_mingw_mariadb");
 #endif
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
 #if (OCELOT_STATIC_LIBRARY==0)
     /* RDLD_DI_ORIGIN gives only library. RDLD_DI_LINKMAP gives all but needs #include <link.h>. */
     if (is_libmysqlclient_loaded == 1)
@@ -7246,7 +7246,7 @@ QFont MainWindow::get_fixed_font()
   int winner_font_points= 0;
   foreach (const QString &family, database.families())
   {
-#ifdef OCELOT_OS_NONLINUX
+#ifdef _WIN32
     {
       QString f= family.toUpper();
       if ((family == "FIXEDSYS") || (family == "MODERN")
@@ -15353,7 +15353,7 @@ void MainWindow::initial_asserts()
   /* Maximum QString length = sizeof(int)/4. Maximum LONGBLOB length = 2**32. So 32 bit int is ok. */
   assert(sizeof(int) >= 4);
 
-  #ifdef OCELOT_OS_LINUX
+  #if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
   #if defined(NDEBUG)
     if (MENU_FONT != 99) {printf("assert(MENU_FONT != 99);"); exit(1); }
   #else
@@ -30158,7 +30158,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
     }
 #endif /* OCELOT_THIRD_PARTY==1 */
 
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
     char *query;
     int query_len;
 #endif
@@ -30175,7 +30175,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
       There is a description re finding libmysqlclient if one types Help | libmysqlclient.
     */
 
-#ifdef OCELOT_OS_NONLINUX
+#ifdef _WIN32
   QLibrary lib;
 #endif
 
@@ -30193,7 +30193,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
       /* The last error was that we got the wrong library. Unrecoverable. */
       return;
     }
-#ifdef OCELOT_OS_NONLINUX
+#ifdef _WIN32
 #if (OCELOT_MYSQL_INCLUDE == 1)
     /* I don't know how Windows handles shared-library version numbers */
     if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileNameAndVersion("libmysql", 18);
@@ -30238,7 +30238,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
         ld_run_path_part= ld_run_path_part.trimmed();
         if (ld_run_path_part > "")
         {
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
 #if (OCELOT_MYSQL_INCLUDE == 1)
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient.so.18");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient.so");
@@ -30257,8 +30257,8 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
           if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
           else *is_library_loaded= 1;
           *library_handle= dlopen_handle;
-#endif //#ifdef OCELOT_OS_LINUX
-#ifdef OCELOT_OS_NONLINUX
+#endif //#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
+#ifdef _WIN32
 #if (OCELOT_MYSQL_INCLUDE == 1)
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) ld_run_path_part.append("/libmysqlclient");
           if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) ld_run_path_part.append("/libmysqlclient");
@@ -30271,7 +30271,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
           lib.setFileName(ld_run_path_part);
           *is_library_loaded= lib.load();
           error_string= lib.errorString();
-#endif //#ifdef OCELOT_OS_NONLINUX
+#endif //#ifdef _WIN32
           if (*is_library_loaded == 1) break;
         }
         if (*(ld_run_path + i) == '\0') break;
@@ -30289,7 +30289,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
     /* If it wasn't found via LD_RUN_PATH, use defaults e.g. LD_LIBRARY_PATH */
     if (*is_library_loaded == 0)
     {
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
 #if (OCELOT_MYSQL_INCLUDE == 1)
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) dlopen_handle= dlopen("libmysqlclient.so.18",  RTLD_DEEPBIND | RTLD_NOW);
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) dlopen_handle= dlopen("libmysqlclient.so",  RTLD_DEEPBIND | RTLD_NOW);
@@ -30306,8 +30306,8 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
       if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
       else *is_library_loaded= 1;
       *library_handle= dlopen_handle;
-#endif //#ifdef OCELOT_OS_LINUX
-#ifdef OCELOT_OS_NONLINUX
+#endif //#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
+#ifdef _WIN32
 #if (OCELOT_MYSQL_INCLUDE == 1)
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) lib.setFileName("libmysql");
       if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) lib.setFileName("libmysql");
@@ -30323,7 +30323,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
       *is_library_loaded= lib.load();
       error_string= lib.errorString();
-#endif //#ifdef OCELOT_OS_NONLINUX
+#endif //#ifdef _WIN32
     }
 
     if (*is_library_loaded == 0)
@@ -30334,7 +30334,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
     if (*is_library_loaded == 1)
     {
       QString s= "";
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
 #if (OCELOT_MYSQL_INCLUDE == 1)
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
       {
@@ -30448,8 +30448,8 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
         t__tnt_strerror= (ttnt_strerror) dlsym(dlopen_handle, "tnt_strerror"); if (dlerror() != 0) s.append("tnt_strerror ");
       }
 #endif
-#endif //#ifdef OCELOT_OS_LINUX
-#ifdef OCELOT_OS_NONLINUX
+#endif //#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
+#ifdef _WIN32
 #if (OCELOT_MYSQL_INCLUDE == 1)
       if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
       {
@@ -30514,7 +30514,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
          /* With Windows don't look for the Tarantool library, its code is in third_party.h */
       }
 #endif
-#endif //#ifdef OCELOT_OS_NONLINUX
+#endif //#ifdef _WIN32
       if (s > "")
       {
         {
@@ -45411,7 +45411,7 @@ Plugin::~Plugin()
 #ifdef _WIN32
   if ((plugin_library.fileName() != "") && (plugin_library.isLoaded())) plugin_library.unload();
 #endif
-#ifdef OCELOT_OS_LINUX
+#if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
   if (plugin_handle != NULL) dlclose(plugin_handle);
 #endif
 }
