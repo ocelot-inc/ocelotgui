@@ -5243,6 +5243,7 @@ public:
   QFont get_font_from_style_sheet(QString style_string);
   QString get_color_from_style_sheet(QString style_string);
   QString get_background_color_from_style_sheet(QString style_string);
+  void set_dialog_style_sheet();
   void set_dbms_version_mask(QString, int);
   int next_i(int, int);
   int next_i_v(int, int, int token_types[], int token_lengths[]);

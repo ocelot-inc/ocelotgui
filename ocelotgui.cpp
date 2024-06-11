@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: June 9 2024
+   Last modified: June 11 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -7113,14 +7113,6 @@ void MainWindow::assign_names_for_colors()
   Possibly I'd need to get a QFrame with a lineWidth() and frameWidth()?
   Possibly I should just assume that border width = 0px except for main window, and
   take out any mention of border in the Settings dialogs.
-  Re QPushButtons:
-    With Manjaro 21 + Gnome + Qt 5.15.4 the default background-color of QPushButton, and therefore of QComboBox
-    which has a component like a QPushButton, is dark and cannot be cahnged with ordinary setStyleSheet().
-    It can be "fixed" here in set_current_colors_and_font() with a one-line patch:
-    this->setStyleSheet("QPushButton, QComboBox {"border: 1px solid black}");
-    However, the result is that buttons look slightly different in other environments and there is no distinction
-    between :pressed and other subsets of QPushButton. And with Manjaro 24 + kde + Qt 5.15.13, or any other combo
-    I know of, the problem does not occur. So I won't add the one-line patch.
 */
 void MainWindow::set_current_colors_and_font(QFont fixed_font)
 {
@@ -7173,7 +7165,7 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   ocelot_explorer_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_explorer_font_weight= canonical_font_weight(QString::number(font.weight()));
 #endif
-
+  set_dialog_style_sheet();
   delete widget;
 }
 
@@ -7831,6 +7823,65 @@ QString MainWindow::get_background_color_from_style_sheet(QString style_string)
   int background_color_end= style_string.indexOf(";", background_color_start);
   QString color= style_string.mid(background_color_start + 17, background_color_end - (background_color_start + 17));
   return color;
+}
+
+/*
+  Set Qdialog colors and margins, and components of Qdialog e.g. QComboBox, based on some analogous grid settings
+  Re calls:
+    From set_current_colors_and_fonts(), that doesn't set all ocelot_grid_... stuff but some is set earlier.
+    From XSettings::ocelot_variable_set if (enums_for == OCELOT_VARIABLE_ENUM_SET_FOR_GRID) so grid change affects QDialog
+  Re QPushButtons:
+    With Manjaro 21 + Gnome + Qt 5.15.4 the default background-color of QPushButton, and therefore of QComboBox
+    which has a component like a QPushButton, is dark and cannot be cahnged with ordinary setStyleSheet().
+    (In this case changing QPushButton with setStyleSheet requires change to a border too.)
+    With Manjaro 24 + kde + Qt 5.15.13, or any other combo I know of, the problem does not occur.
+    Maybe it has something to do with a dark theme, maybe that could be changed looking at "breeze dark" or
+    "Plasma theme Qt)" or "GTK_THEME", maybe it's a Qt bug that only happened for a while.
+    But since I don't know, I decided to "fix" after version 2.4, and while I'm at it, allow setting all QDialog widgets.
+    Perhaps it would be better to have a new Settings box but it's easier to borrow from grid options.
+    So QComboBox will look slightly different now but still as readable and still distinguishing QPushButton types.
+    I thought this old explanation looks okay: https://forum.qt.io/topic/60546/qpushbutton-default-windows-style-sheet/9
+    I also removed setStyleSheet calls in row_form_box() since henceforth all dialog style changes are decided here.
+  Re weight: 400 is normal, 700 is bold. this is one way to distinguish QPushButton normal from QPushButton:default
+  Re QLabel: we don't change default border size thinking it looks better if we leave Settings and row_form_box alone
+  Re align: Now QLabel text and QTextEdit|QLineEdit are not top-aligned exactly the same way, a maddening behaviour change
+  Todo: prompt also looks bad but that's some sort of different problem, just because text color is white.
+  Todo: I suppose we could consider also taking grid font settings.
+*/
+void MainWindow::set_dialog_style_sheet()
+{
+  QString dialog_text_color= ocelot_grid_text_color; /* for the button of combo box's button */
+  QString dialog_background_color= ocelot_grid_background_color;
+  QString dialog_border_size= ocelot_grid_cell_border_size;
+  QString dialog_header_background_color= ocelot_grid_header_background_color; /* for the label */
+  QString dialog_border_color= ocelot_grid_cell_border_color;
+  QString dialog_border_size_times_3= QString::number(dialog_border_size.toInt() * 3);
+  QString dialog_outer_color= ocelot_grid_outer_color;
+  QString s0= "QDialog {background-color:" + dialog_outer_color + "}";
+  QString s1= "QDialog QComboBox {color:" + dialog_text_color
+          + "; background-color:" + dialog_background_color
+          + "; padding-right:" + "1px"
+          + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  QString s2= "QDialog QPushButton {color:" + dialog_text_color
+          + "; background-color:" +  dialog_background_color
+          + "; padding:" + dialog_border_size_times_3 + "px"
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  QString s3= "QDialog QPushButton:default {color:" + dialog_text_color
+          + "; background-color:" + dialog_background_color
+          + "; padding:" + "1px"
+          + "; font-weight:700; border:" + dialog_border_size_times_3 +"px double " + dialog_border_color + "}";
+  QString s4= "QDialog QLabel {color:" + dialog_text_color
+          + "; padding-top: 1px; padding-left: 0px"
+          + "; background-color:" + dialog_header_background_color + "}";
+  QString s5= "QDialog QTextEdit {color:" + dialog_text_color
+          + "; background-color:" + dialog_background_color
+          + "; padding-top: 1px; padding-left: 0px"
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  QString s6= "QDialog QLineEdit {color:" + dialog_text_color
+          + "; background-color:" + dialog_background_color
+          + "; padding-top: 1px; padding-left: 0px"
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  this->setStyleSheet(s0 + s1 + s2 + s3 + s4 + s5 + s6);
 }
 
 /*
@@ -23322,7 +23373,7 @@ Row_form_box::Row_form_box(int column_count, QString *row_form_label,
     hbox_layout[i]->setContentsMargins(QMargins(2, 2, 2, 2));
     hbox_layout[i]->setSizeConstraint(QLayout::SetFixedSize);  /* if not this then width = rest of dialog box */
     label[i]= new QLabel();
-    label[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
+//    label[i]->setStyleSheet(parent->ocelot_grid_header_style_string); /* set_dialog_stylesheet should do this now */
     label[i]->setMinimumHeight(component_height);
     label[i]->setText(row_form_label[i]);
     hbox_layout[i]->addWidget(label[i]);
@@ -23330,7 +23381,7 @@ Row_form_box::Row_form_box(int column_count, QString *row_form_label,
     if (row_form_is_password[i] == 1)
     {
       line_edit[i]= new QLineEdit();
-      line_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
+//      line_edit[i]->setStyleSheet(parent->ocelot_grid_style_string); /* set_dialog_stylesheet should do this now */
       line_edit[i]->insert(row_form_data[i]);
       line_edit[i]->setEchoMode(QLineEdit::Password); /* maybe PasswordEchoOnEdit would be better */
       line_edit[i]->setMaximumHeight(component_height);
@@ -23344,12 +23395,12 @@ Row_form_box::Row_form_box(int column_count, QString *row_form_label,
 
       if ((row_form_type[i] & READONLY_FLAG) != 0)
       {
-        text_edit[i]->setStyleSheet(parent->ocelot_grid_header_style_string);
+//        text_edit[i]->setStyleSheet(parent->ocelot_grid_header_style_string); /* set_dialog_stylesheet should do this now */
         text_edit[i]->setReadOnly(true);
       }
       else
       {
-        text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string);
+//        text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string); /* set_dialog_stylesheet should do this now */
         text_edit[i]->setReadOnly(false);
       }
       text_edit[i]->setText(row_form_data[i]);
@@ -41092,6 +41143,7 @@ if (qv == "no") printf("action_options_detach_statement_widget no\n"); else prin
   {
     ResultGrid* r;
     main_window->make_style_strings();
+    main_window->set_dialog_style_sheet(); /* QDialog and its components use grid settings */
     for (int i_r= 0; i_r < ocelot_ca.grid_actual_tabs; ++i_r)
     {
       r= qobject_cast<ResultGrid*>(main_window->result_grid_tab_widget->widget(i_r));
