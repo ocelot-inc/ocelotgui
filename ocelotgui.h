@@ -80,6 +80,12 @@
 #define OCELOT_PLUGIN 1
 #endif
 
+/* To remove the way that dialogs are handled in ocelotgui 2.5, #define OCELOT_DIALOG 0 */
+#ifndef OCELOT_DIALOG
+#define OCELOT_DIALOG 1
+#endif
+
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -5243,7 +5249,9 @@ public:
   QFont get_font_from_style_sheet(QString style_string);
   QString get_color_from_style_sheet(QString style_string);
   QString get_background_color_from_style_sheet(QString style_string);
+#if (OCELOT_DIALOG == 1)
   void set_dialog_style_sheet();
+#endif
   void set_dbms_version_mask(QString, int);
   int next_i(int, int);
   int next_i_v(int, int, int token_types[], int token_lengths[]);

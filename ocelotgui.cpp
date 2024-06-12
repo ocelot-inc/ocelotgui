@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: June 11 2024
+   Last modified: June 12 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -591,9 +591,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
-  ocelot_statement_prompt_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1]; /* set early because initialize_widget_statement() depends on this */
+  ocelot_statement_prompt_background_color= s_color_list[COLOR_SILVER*2 + 1]; /* set early because initialize_widget_statement() depends on this */
   ocelot_grid_focus_cell_background_color= s_color_list[COLOR_WHEAT*2 + 1];;
-  ocelot_grid_header_background_color= s_color_list[COLOR_LIGHTGRAY*2 + 1];
+  ocelot_grid_header_background_color= s_color_list[COLOR_SILVER*2 + 1]; /* before version-2.5 it was lightgray */
   ocelot_grid_outer_color= s_color_list[COLOR_LIGHTBLUE*2 + 1];;
   ocelot_grid_cell_border_color= s_color_list[COLOR_BLACK*2 + 1];
   ocelot_grid_cell_border_size= "1";
@@ -7165,7 +7165,9 @@ void MainWindow::set_current_colors_and_font(QFont fixed_font)
   ocelot_explorer_font_size= QString::number(font.pointSize()); /* Warning: this returns -1 if size was specified in pixels */
   ocelot_explorer_font_weight= canonical_font_weight(QString::number(font.weight()));
 #endif
+#if (OCELOT_DIALOG == 1)
   set_dialog_style_sheet();
+#endif
   delete widget;
 }
 
@@ -7825,6 +7827,7 @@ QString MainWindow::get_background_color_from_style_sheet(QString style_string)
   return color;
 }
 
+#if (OCELOT_DIALOG == 1)
 /*
   Set Qdialog colors and margins, and components of Qdialog e.g. QComboBox, based on some analogous grid settings
   Re calls:
@@ -7842,6 +7845,7 @@ QString MainWindow::get_background_color_from_style_sheet(QString style_string)
     So QComboBox will look slightly different now but still as readable and still distinguishing QPushButton types.
     I thought this old explanation looks okay: https://forum.qt.io/topic/60546/qpushbutton-default-windows-style-sheet/9
     I also removed setStyleSheet calls in row_form_box() since henceforth all dialog style changes are decided here.
+  Re hover: changes to black-on-white, might make it more readable occasionally
   Re weight: 400 is normal, 700 is bold. this is one way to distinguish QPushButton normal from QPushButton:default
   Re QLabel: we don't change default border size thinking it looks better if we leave Settings and row_form_box alone
   Re align: Now QLabel text and QTextEdit|QLineEdit are not top-aligned exactly the same way, a maddening behaviour change
@@ -7857,32 +7861,55 @@ void MainWindow::set_dialog_style_sheet()
   QString dialog_border_color= ocelot_grid_cell_border_color;
   QString dialog_border_size_times_3= QString::number(dialog_border_size.toInt() * 3);
   QString dialog_outer_color= ocelot_grid_outer_color;
-  QString s0= "QDialog {background-color:" + dialog_outer_color + "}";
-  QString s1= "QDialog QComboBox {color:" + dialog_text_color
+  QString hover_color= "black";
+  QString hover_background_color= "white";
+  QString sdi= "QDialog {background-color:" + dialog_outer_color + "}";
+  QString sco1= "QDialog QComboBox {color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding-right:" + "1px"
           + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString s2= "QDialog QPushButton {color:" + dialog_text_color
+  QString sco2= "QDialog QComboBox:hover {color:" + hover_color
+          + "; background-color:" + hover_background_color
+          + "; padding-right:" + "1px"
+          + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  QString spu1= "QDialog QPushButton {color:" + dialog_text_color
           + "; background-color:" +  dialog_background_color
           + "; padding:" + dialog_border_size_times_3 + "px"
           + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString s3= "QDialog QPushButton:default {color:" + dialog_text_color
+  QString spu2= "QDialog QPushButton:default {color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding:" + "1px"
           + "; font-weight:700; border:" + dialog_border_size_times_3 +"px double " + dialog_border_color + "}";
-  QString s4= "QDialog QLabel {color:" + dialog_text_color
+  QString spu3= "QDialog QPushButton:hover {color:" + hover_color
+          + "; background-color:" +  hover_background_color
+          + "; padding:" + dialog_border_size_times_3 + "px"
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  QString sla1= "QDialog QLabel {color:" + dialog_text_color
           + "; padding-top: 1px; padding-left: 0px"
           + "; background-color:" + dialog_header_background_color + "}";
-  QString s5= "QDialog QTextEdit {color:" + dialog_text_color
+  QString sla2= "QDialog QLabel:hover {color:" + hover_color
+          + "; padding-top: 1px; padding-left: 0px"
+          + "; color:" + hover_color
+          + "; background-color:" + hover_background_color + "}";
+  QString ste1= "QDialog QTextEdit {color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding-top: 1px; padding-left: 0px"
           + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString s6= "QDialog QLineEdit {color:" + dialog_text_color
+  QString ste2= "QDialog QTextEdit:hover {color:" + hover_color
+          + "; background-color:" + hover_background_color
+          + "; padding-top: 1px; padding-left: 0px"
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  QString sle1= "QDialog QLineEdit {color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding-top: 1px; padding-left: 0px"
           + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  this->setStyleSheet(s0 + s1 + s2 + s3 + s4 + s5 + s6);
+  QString sle2= "QDialog QLineEdit:hover {color:" + hover_color
+          + "; background-color:" + hover_background_color
+          + "; padding-top: 1px; padding-left: 0px"
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
+  this->setStyleSheet(sdi + sco1 + sco2 + spu1 + spu2 + spu3 + sla1 + sla2 + ste1 + ste2 + sle1 + sle2);
 }
+#endif //#if (OCELOT_DIALOG == 1)
 
 /*
   Get the next statement in a string.
@@ -23373,7 +23400,9 @@ Row_form_box::Row_form_box(int column_count, QString *row_form_label,
     hbox_layout[i]->setContentsMargins(QMargins(2, 2, 2, 2));
     hbox_layout[i]->setSizeConstraint(QLayout::SetFixedSize);  /* if not this then width = rest of dialog box */
     label[i]= new QLabel();
-//    label[i]->setStyleSheet(parent->ocelot_grid_header_style_string); /* set_dialog_stylesheet should do this now */
+#if (OCELOT_DIALOG != 1)
+    label[i]->setStyleSheet(parent->ocelot_grid_header_style_string); /* set_dialog_stylesheet should do this now */
+#endif
     label[i]->setMinimumHeight(component_height);
     label[i]->setText(row_form_label[i]);
     hbox_layout[i]->addWidget(label[i]);
@@ -23381,7 +23410,9 @@ Row_form_box::Row_form_box(int column_count, QString *row_form_label,
     if (row_form_is_password[i] == 1)
     {
       line_edit[i]= new QLineEdit();
-//      line_edit[i]->setStyleSheet(parent->ocelot_grid_style_string); /* set_dialog_stylesheet should do this now */
+#if (OCELOT_DIALOG != 1)
+      line_edit[i]->setStyleSheet(parent->ocelot_grid_style_string); /* set_dialog_stylesheet should do this now */
+#endif
       line_edit[i]->insert(row_form_data[i]);
       line_edit[i]->setEchoMode(QLineEdit::Password); /* maybe PasswordEchoOnEdit would be better */
       line_edit[i]->setMaximumHeight(component_height);
@@ -23395,12 +23426,16 @@ Row_form_box::Row_form_box(int column_count, QString *row_form_label,
 
       if ((row_form_type[i] & READONLY_FLAG) != 0)
       {
-//        text_edit[i]->setStyleSheet(parent->ocelot_grid_header_style_string); /* set_dialog_stylesheet should do this now */
+#if (OCELOT_DIALOG != 1)
+        text_edit[i]->setStyleSheet(parent->ocelot_grid_header_style_string); /* set_dialog_stylesheet should do this now */
+#endif
         text_edit[i]->setReadOnly(true);
       }
       else
       {
-//        text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string); /* set_dialog_stylesheet should do this now */
+#if (OCELOT_DIALOG != 1)
+        text_edit[i]->setStyleSheet(parent->ocelot_grid_style_string); /* set_dialog_stylesheet should do this now */
+#endif
         text_edit[i]->setReadOnly(false);
       }
       text_edit[i]->setText(row_form_data[i]);
@@ -41143,7 +41178,9 @@ if (qv == "no") printf("action_options_detach_statement_widget no\n"); else prin
   {
     ResultGrid* r;
     main_window->make_style_strings();
+#if (OCELOT_DIALOG == 1)
     main_window->set_dialog_style_sheet(); /* QDialog and its components use grid settings */
+#endif
     for (int i_r= 0; i_r < ocelot_ca.grid_actual_tabs; ++i_r)
     {
       r= qobject_cast<ResultGrid*>(main_window->result_grid_tab_widget->widget(i_r));
