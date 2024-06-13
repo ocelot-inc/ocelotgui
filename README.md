@@ -155,8 +155,6 @@ work, then installation is successful.
 Stop again with File|Exit or control-Q.
 </P>
 
-<P>Warning: Some menu shortcut keys may not work properly with Ubuntu 14.04.</P>
-
 <H2 ID="some-screenshots">Some screenshots</H2><HR>
 
 <A href="shot1.jpg"><img src="shot1.jpg" alt="shot1.jpg" align="left" height="150"></A>
@@ -174,7 +172,7 @@ Stop again with File|Exit or control-Q.
 
 <H2 ID="user-manual">User Manual</H2><HR><HR>
 
-<P>Version 2.4.0, March 18 2024</P>
+<P>Version 2.4.0, June 4 2024</P>
 
 <P>Copyright (c) 2024 by Peter Gulutzan. All rights reserved.</P>
   
@@ -2646,7 +2644,7 @@ release\ocelotgui.exe --ocelot_dbms=tarantool
 : Make sure you can unzip ocelotgui.zip with both 7-zip and winzip.
 copy release\ocelotgui.exe ocelotgui.exe
 del ocelotui.zip
-"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf     PKGBUILD        ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png explorer1.png explorer2.png explorer3.png explorer4.png explorer5.png explorer6.png explorer7.png explorer8.png explorer9.png
+"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf     PKGBUILD        ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png explorer1.png explorer2.png explorer3.png explorer4.png explorer5.png explorer6.png explorer7.png explorer8.png explorer9.png menunew.png plugin.c
 
 : What we actually put in the release looks like ocelotgui-2.4.0-1.ocelotgui.zip, so rename the .zip file at some point.
 
@@ -2762,7 +2760,7 @@ For example on Mageia:<PRE>
  urpmi libqt4-devel
  #Do the following if and only if build is for use with Qt5
  #The name of the following package varies,
- #it might be qt5-qtbase-devel
+ #it might be qt5-qtbase-devel (or qt6-qtbase-devel for Qt6)
  urpmi libqt5-devel</PRE></P>
 
 <P>On Fedora 35 which is an RPM-like system but might have Qt6 not Qt4 or Qt5:<PRE>
