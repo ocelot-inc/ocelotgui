@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: June 12 2024
+   Last modified: June 14 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -7412,7 +7412,11 @@ QString MainWindow::canonical_color_name(QString color_name_string)
   */
 
   QColor qq_color;
+#if (QT_VERSION >= 0x60600)
+  qq_color= QColor::fromString(co);
+#else
   qq_color.setNamedColor(co);
+#endif
   if (qq_color.isValid() == false) return "";                 /* bad color, maybe bad format */
   QString qq_color_name= qq_color.name();                      /* returns name as "#RRGGBB" */
 

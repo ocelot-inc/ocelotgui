@@ -300,7 +300,11 @@ int CodeEditor::prompt_translate_k(QString s, int i)
   if ((ok == false) || (line_number <= 0)) return 0; /* bad line number */
 
   QColor color;
+#if (QT_VERSION >= 0x60600)
+  color= QColor::fromString(string_for_color);
+#else
   color.setNamedColor(string_for_color);
+#endif
   if (color.isValid() == false) return 0; /* bad color */
 
   /* Find an unused point in k_line_number[], set it to line number. If all points are full, too bad. (Will fix soon!) */
