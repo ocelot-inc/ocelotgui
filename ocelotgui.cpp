@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: June 14 2024
+   Last modified: June 17 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -603,7 +603,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_grid_html_effects= "no";
   ocelot_grid_detached= "no";
   /* Probably result_grid_table_widget_saved_font only matters if the connection dialog box has to go up. */
-  QFont tmp_font;
+//  QFont tmp_font;
 //  QFont *saved_font;
 //  tmp_font= this->font();
 //  saved_font=&tmp_font;
@@ -37455,7 +37455,7 @@ QRect erd::next_available_rect_3(QRect last_rect, QRect this_rect, int t)
     /* Now you'll have to repeat with bigger x,y which is why n goes up */
   }
   qreal min_distance= 1000000;
-  int i_of_min_distance;
+  int i_of_min_distance= 0;
   for (int i= 0; i < array_of_rects.size(); ++i)
   {
     QLineF qlf= QLineF(last_rect.x(), last_rect.y(), array_of_rects[i].x(), array_of_rects[i].y());
@@ -45408,6 +45408,7 @@ Plugin::Plugin(MainWindow *m) /* constructor */
 #endif
   plugin_function_pointer= NULL;
   plugin_main_window= m;
+  plugin_type= PLUGIN_AT_PROGRAM_START;
 }
 
 /* Warning: assume statement_edit_widget exists but error messages won't appear until display happens. printf()? */

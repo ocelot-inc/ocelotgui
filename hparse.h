@@ -13407,7 +13407,7 @@ int MainWindow::hparse_f_find_define(int block_top,
       i= main_token_pointers[i];
       continue;
     }
-    if (hparse_f_is_identifier((main_token_types[i]) == true)
+    if ((hparse_f_is_identifier(main_token_types[i]) == true)
      && (main_token_reftypes[i] == reftype_define))
     {
       QString s= hparse_text_copy.mid(main_token_offsets[i], main_token_lengths[i]);
