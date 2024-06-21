@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: June 17 2024
+   Last modified: June 21 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -3793,7 +3793,7 @@ void MainWindow::menu_spec_make_menu()
                insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_PREVIOUS_STATEMENT]);
   blen+= sprintf(b + blen, "%s'action_edit_next_statement', '%s', '%s', 'action_edit_next_statement');",
                insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_NEXT_STATEMENT]);
-  blen+= sprintf(b + blen, "%s'action_edit_format', '%s', '%s', 'action_edit_formatl');",
+  blen+= sprintf(b + blen, "%s'action_edit_format', '%s', '%s', 'action_edit_format');",
                insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_FORMAT]);
   blen+= sprintf(b + blen, "%s'action_edit_zoomin', '%s', '%s', 'action_edit_zoomin');",
                insert, menu_strings[menu_off + MENU_EDIT], menu_strings[menu_off + MENU_EDIT_ZOOMIN]);
@@ -6690,6 +6690,12 @@ void MainWindow::action_redo()
         (Get the widget's ->styleSheet() as you do elsewhere.)
   Todo: check if ExpectedWidget can be affected here
   Todo: we could have is_can_find for menu_edit_action_find but at the moment it's always enabled
+  Todo: For CodeEditor we're saying is_can_format= is_can_zoomin= true;
+        because prompt is almost always there and zoomin|zoomout affects it too
+        but format doesn't really make sense if statement widget is empty.
+        We could in codeeditor.h have a slot for textChanged signal and, after
+        checking that the affected widget is in fact codeEditor, enable format
+        depending on isEmpty().
 */
 void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
 {
@@ -6713,7 +6719,7 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     if (doc->availableRedoSteps() <= 0) is_can_redo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
     is_can_paste= t->canPaste();
-    is_can_format= is_can_zoomin= is_can_zoomout= !doc->isEmpty();
+    is_can_format= is_can_zoomin= is_can_zoomout= true;
     is_can_autocomplete= !completer_widget->isHidden();
   }
   else if (strcmp(class_name, "TextEditHistory") == 0)
