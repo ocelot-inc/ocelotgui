@@ -5797,7 +5797,7 @@ private:
   void setup_generate_ender();
   int setup_generate_statements(int, QString, int);
   int setup_initialize_variables();
-  int setup_get_setup_group_name();
+  int setup_get_setup_group_name(int);
   QString setup_add_delimiters(QString);
   int setup_insert_into_statements(QString,int);
   int setup_insert_into_variables_user_variables(QString,int);

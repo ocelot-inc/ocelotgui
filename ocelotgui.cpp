@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: June 21 2024
+   Last modified: July 11 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -3533,7 +3533,7 @@ void MainWindow::fill_menu_2()
 
 void MainWindow::menu_spec_make_function()
 {
-  menu_function_struct_list.append({"action_file_connect", false, &MainWindow::action_file_connect, NULL});
+//dup?  menu_function_struct_list.append({"action_file_connect", false, &MainWindow::action_file_connect, NULL});
   menu_function_struct_list.append({"action_file_connect", false, &MainWindow::action_file_connect, NULL});
   menu_function_struct_list.append({"action_file_exit", false, &MainWindow::action_file_exit, NULL});
 #if (OCELOT_IMPORT_EXPORT == 1)
@@ -3573,7 +3573,7 @@ void MainWindow::menu_spec_make_function()
 #endif
   menu_function_struct_list.append({"action_options_detach_statement_widget", false, &MainWindow::action_options_detach_statement_widget, NULL});
 #if (OCELOT_EXPLORER == 1)
-  menu_function_struct_list.append({ "action_options_detach_explorer_widget", false, &MainWindow::action_options_detach_statement_widget, NULL});
+  menu_function_struct_list.append({ "action_options_detach_explorer_widget", false, &MainWindow::action_options_detach_explorer_widget, NULL});
 #endif
   menu_function_struct_list.append({"action_options_next_window", false, &MainWindow::action_options_next_window, NULL});
   menu_function_struct_list.append({"action_options_previous_window", false, &MainWindow::action_options_previous_window, NULL});
@@ -3597,7 +3597,7 @@ void MainWindow::menu_spec_make_function()
    menu_function_struct_list.append({"action_debug_continue", false, &MainWindow::action_debug_continue, NULL});
    menu_function_struct_list.append({"action_debug_next", false, &MainWindow::action_debug_next, NULL});
    menu_function_struct_list.append({"action_debug_step", false, &MainWindow::action_debug_step, NULL});
-   menu_function_struct_list.append({"action_debug_clear", false, &MainWindow::action_debug_step, NULL});
+   menu_function_struct_list.append({"action_debug_clear", false, &MainWindow::action_debug_clear, NULL});
    menu_function_struct_list.append({"action_debug_exit", false, &MainWindow::action_debug_exit, NULL});
    menu_function_struct_list.append({"action_debug_information", false, &MainWindow::action_debug_information, NULL});
    menu_function_struct_list.append({"action_debug_refresh_server_variables", false, &MainWindow::action_debug_refresh_server_variables, NULL});
@@ -9038,9 +9038,9 @@ void MainWindow::debug_setup_mysql_proc_insert()
           char tmp[512];
           MYSQL_ROW row_2= NULL;
           unsigned int num_rows_2= 0;
-          strcpy(tmp, "select routine_definition from information_schema.routines where routine_schema='");
+          strcpy(tmp, "select routine_definition from information_schema.routines where routine_schema COLLATE utf8_general_ci ='");
           strcat(tmp, row[0]);
-          strcat(tmp, "' and routine_name='");
+          strcat(tmp, "' and routine_name COLLATE utf8mb3_general_ci ='");
           strcat(tmp, row[1]);
           strcat(tmp, "'");
           if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], tmp)) num_rows_2= 0;
@@ -9250,7 +9250,7 @@ QString MainWindow::debug_privilege_check(int statement_type)
 
   /* First make sure xxxmdbug exists */
   num_rows= 0;
-  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from information_schema.schemata where schema_name = 'xxxmdbug'"))
+  if (lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "select * from information_schema.schemata where schema_name COLLATE utf8_general_ci = 'xxxmdbug'"))
   {
     s.append("Cannot select from information_schema");
     return s;
@@ -9312,7 +9312,7 @@ QString MainWindow::debug_privilege_check(int statement_type)
     if (lmysql->ldbms_mysql_errno(&mysql[MYSQL_MAIN_CONNECTION]) == 1044) s.append("Need execute privilege on xxxmdbug.setup. ");
     lmysql->ldbms_mysql_query(&mysql[MYSQL_MAIN_CONNECTION], "deallocate prepare xxxmdbug_stmt");
 
-    result_string= select_1_row("select count(*) from information_schema.tables where table_schema = 'xxxmdbug' and table_name = 'setup_log'" );
+    result_string= select_1_row("select count(*) from information_schema.tables where table_schema COLLATE utf8_general_ci = 'xxxmdbug' and table_name COLLATE utf8_general_ci = 'setup_log'" );
     if (result_string != "") s.append(result_string);
     else if (select_1_row_result_1.toInt() != 0)
     {
@@ -9337,7 +9337,7 @@ QString MainWindow::debug_privilege_check(int statement_type)
 
   /* TODO: Following isn't good. */
 
-  result_string= select_1_row("select count(*) from information_schema.routines where routine_schema = 'xxxmdbug' and routine_name = 'command'" );
+  result_string= select_1_row("select count(*) from information_schema.routines where routine_schema COLLATE utf8_general_ci = 'xxxmdbug' and routine_name COLLATE utf8mb3_general_ci = 'command'" );
   if (result_string != "") s.append(result_string);
   else if (select_1_row_result_1.toInt() == 0) s.append("Need execute privilege for xxxmdbug.*. ");
   return s;
@@ -9500,7 +9500,7 @@ int MainWindow::debug_parse_statement(QString text,
         {
           QString result_string;
           char query_for_select_check[1280];
-          sprintf(query_for_select_check, "select count(*) from information_schema.routines where routine_schema='%s' and routine_name='%s'", tmp_schema_name, tmp_routine_name);
+          sprintf(query_for_select_check, "select count(*) from information_schema.routines where routine_schema COLLATE utf8mb3_general_ci ='%s' and routine_name COLLATE utf8mb3_general_ci ='%s'", tmp_schema_name, tmp_routine_name);
           result_string= select_1_row(query_for_select_check);
           if (result_string != "") { strcpy(command_string, "Tried to check routine name but select from information_schema.routines failed"); return -1; }
           if (select_1_row_result_1.toInt() == 0)
@@ -9567,7 +9567,6 @@ int MainWindow::debug_parse_statement(QString text,
 int MainWindow::debug_error(char *text)
 {
 //  unsigned int statement_type;
-
   if (connections_is_connected[0] == 0)
   {
     /* Unfortunately this might not get through. */
@@ -9603,7 +9602,6 @@ int MainWindow::debug_error(char *text)
     put_message_in_result(text);
     return 1;
   }
-
   return 0;
 }
 
@@ -9626,7 +9624,6 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   {
     if (debug_error(command_string) != 0) return;
   }
-
   q_routine_schema= debug_q_schema_name_in_statement;
   q_routine_name= debug_q_routine_name_in_statement;
 
@@ -9649,6 +9646,9 @@ void MainWindow::debug_debug_go(QString text) /* called from execute_client_stat
   if (debuggee_state < 0) debuggee_state= DEBUGGEE_STATE_0;
   if (debuggee_state == DEBUGGEE_STATE_END) debuggee_state= DEBUGGEE_STATE_0;
   if (debug_error((char*)"") != 0) return;
+
+  /* Error check: if setup_log was deleted for some reason, that could cause a crash later */
+  if (setup_get_setup_group_name(TOKEN_KEYWORD_DEBUG_DEBUG) == 1) return;
 
   strcpy(routine_schema, q_routine_schema.toUtf8());
   strcpy(routine_name, q_routine_name.toUtf8());
@@ -9704,7 +9704,7 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   {
     sprintf(i_as_string, "%d", i);
     strcpy(call_statement, "select routine_schema, right(routine_name,length(routine_name)-12) from information_schema.routines ");
-    strcat(call_statement, "where routine_name like '");
+    strcat(call_statement, "where routine_name COLLATE utf8mb3_general_ci like '");
     strcat(call_statement, routine_name_for_search.toUtf8());
     strcat(call_statement, "' order by routine_name limit 1 offset ");
     strcat(call_statement, i_as_string);
@@ -9742,9 +9742,9 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   for (debug_widget_index= 0; debug_widget_index < DEBUG_TAB_WIDGET_MAX; ++debug_widget_index)
   {
     if (strcmp(debug_routine_name[debug_widget_index].toUtf8(), "") == 0) break;
-    strcpy(call_statement, "select routine_definition from information_schema.routines where routine_schema = '");
+    strcpy(call_statement, "select routine_definition from information_schema.routines where routine_schema COLLATE utf8_general_ci = '");
     strcat(call_statement, debug_routine_schema_name[debug_widget_index].toUtf8());
-    strcat(call_statement, "' and routine_name = '");
+    strcat(call_statement, "' and routine_name COLLATE utf8mb3_general_ci = '");
     strcat(call_statement, debug_routine_name[debug_widget_index].toUtf8());
     strcat(call_statement, "'");
     QString error_return= select_1_row(call_statement);
@@ -9844,11 +9844,11 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
     Wait till debuggee has indicated that it is about to call debuggee_wait_loop().
     Todo: Give a better diagnostic if this doesn't happen.
     Todo: Is it possible to fail anyway? If so, sleep + repeat?
-    Todo: This gives up after 1 second. Maybe on a heavily loaded machine that's too early?
+    Todo: This gives up after 3 seconds. Maybe on a heavily loaded machine that's too early?
   */
   for (int k= 0; k < 100; ++k)
   {
-    QThread48::msleep(10);
+    QThread48::msleep(30);
     if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP) break;
   }
   QThread48::msleep(10); /* in case debuggee_wait_loop() fails immediately */
@@ -9891,7 +9891,6 @@ if (lmysql->ldbms_mysql_real_query(&mysql[MYSQL_MAIN_CONNECTION], call_statement
   //  strcat(call_statement, ".");
   //}
   //strcat(call_statement, routine_name);
-
   if (debug_call_xxxmdbug_command(command_string) != 0)
   {
     /* Debug failed. Doubtless there's some sort of error message. Put it out now, debug_exit_go() won't override it. */
@@ -10022,7 +10021,6 @@ void MainWindow::debug_breakpoint_or_clear_go(int statement_type, QString text)
   {
     if (debug_error((char*)er_strings[er_off + ER_MISSING_ROUTINE_NAME]) != 0) return;
   }
-
   if (debug_error((char*)"") != 0) return;
 
   if (debug_call_xxxmdbug_command(command_string) != 0)
@@ -10564,6 +10562,8 @@ void MainWindow::action_debug_information(bool is_checked)
 
 /*
   Debug|Refresh server variables
+  Todo: If this is impossible to fix for MariaDB 11.5+, gray menu item.
+        If it is not impossible to fix, fix.
 */
 void MainWindow::action_debug_refresh_server_variables(bool is_checked)
 {
@@ -10573,6 +10573,8 @@ void MainWindow::action_debug_refresh_server_variables(bool is_checked)
   {
     if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
+  if ((dbms_version_mask & FLAG_VERSION_MARIADB_ALL) != 0)
+    if (debug_error((char*)"Disabled while server = MariaDB") != 0) return;
   if (debug_call_xxxmdbug_command("refresh server_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables;");
   action_execute(1);
@@ -10645,7 +10647,6 @@ void MainWindow::action_debug_refresh_call_stack(bool is_checked)
 int MainWindow::debug_call_xxxmdbug_command(const char *command)
 {
   char call_statement[512];
-
   char command_unstripped[512];
   QString s= command;
   s= connect_unstripper(s);
@@ -10663,7 +10664,6 @@ int MainWindow::debug_call_xxxmdbug_command(const char *command)
     return 1;
   }
   debug_statement= command;
-
   //put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, DIAGNOSTIC_0)???
 
   /* We no longer try to get the debuggee response with debug_information_status(). */
@@ -10765,7 +10765,6 @@ void MainWindow::action_debug_timer_status()
   strcpy(call_statement, "call xxxmdbug.command('");
   strcat(call_statement, debuggee_channel_name);
   strcat(call_statement, "', 'information status')");
-
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
     if (debuggee_state == DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP_ERROR)
@@ -10885,7 +10884,6 @@ void MainWindow::action_debug_timer_status()
     //printf("debuggee_information_status_last_command=%s.\n", debuggee_information_status_last_command);
     //printf("debuggee_information_status_last_command_result=%s.\n", debuggee_information_status_last_command_result);
     //printf("debuggee_information_status_commands_count=%s.\n", debuggee_information_status_commands_count);
-
   /* If a status message would probably confuse a rational user, change it. */
     if (strstr(debuggee_information_status_last_command_result, "completed CALL") != NULL)
       strcpy(debuggee_information_status_last_command_result, "Routine has stopped. Suggested next step is: $EXIT");
@@ -26425,8 +26423,8 @@ int MainWindow::setup_routine_list(QString text)
         s= "SELECT routine_schema,routine_name,routine_type,sql_mode " ;
         s= s + "FROM information_schema.routines WHERE ";
         s= s + "routine_schema COLLATE utf8_general_ci LIKE '" + connect_stripper(schema_name, false) + "' ";
-        s= s + "AND routine_name LIKE '" + connect_stripper(routine_name, false) + "'";
-        s= s + " AND (external_language IS NULL OR external_language='SQL')";
+        s= s + "AND routine_name COLLATE utf8mb3_general_ci LIKE '" + connect_stripper(routine_name, false) + "'";
+        s= s + " AND (external_language IS NULL OR external_language COLLATE utf8_general_ci ='SQL')";
         if (schema_name.contains("%"))
         {
           s= s + " AND routine_schema COLLATE utf8_general_ci <> 'information_schema'"
@@ -26436,7 +26434,7 @@ int MainWindow::setup_routine_list(QString text)
         }
         if (routine_name.contains("%"))
         {
-          s= s + " AND routine_name NOT LIKE 'xxxmdbug___%'";
+          s= s + " AND routine_name COLLATE utf8mb3_general_ci NOT LIKE 'xxxmdbug___%'";
         }
         s= s + ";";
         strcpy(select_statement, s.toUtf8());
@@ -27052,18 +27050,19 @@ int MainWindow::setup_initialize_variables()
    where type = first letter of mysql.proc.type so 'P' for procedure and 'F' for function.
    This format is expected by debuggee_wait_loop().
    In get_set_setup_group_name() all we do is get the 3-character string, @xxxmdbug_setup_group_name
+   We might call from $debug just to check if setup_log exists and break off early.
    Todo: explain what to do if set name reaches 'ZZZ'.
    Todo: Get group name again when you're ready to write.
          If it's not the same, debug_error("Concurrency error").
 */
-int MainWindow::setup_get_setup_group_name()
+int MainWindow::setup_get_setup_group_name(int who_is_calling)
 {
   int vxxx_as_number;
   int v_digit1,v_digit2,v_digit3;
   QString v_max_name= "";
   QString v_max_name_in_setup_log= "";
   QString s;
-  s= select_1_row("SELECT MAX(routine_name) FROM information_schema.routines WHERE routine_name LIKE 'xxxmdbug____%';");
+  s= select_1_row("SELECT MAX(routine_name) FROM information_schema.routines WHERE routine_name COLLATE utf8mb3_general_ci LIKE 'xxxmdbug____%';");
   if (s != "")
   {
     debug_error((char*)"Failed to read information_schema.routines");
@@ -27076,6 +27075,7 @@ int MainWindow::setup_get_setup_group_name()
     debug_error((char*)"Failed to read xxxmdbug.setup_log");
     return 1;
   }
+  if (who_is_calling != TOKEN_KEYWORD_DEBUG_SETUP) return 0;
   v_max_name_in_setup_log= select_1_row_result_1.toUpper();
   if ((v_max_name_in_setup_log > v_max_name)
    || (v_max_name == ""))
@@ -27223,7 +27223,7 @@ int MainWindow::setup_internal(QString command_string)
   {
     /* CALL xxxmdbug.privilege_checks(); */
     if (setup_create_setup_log_table() == 1) return 1;
-    if (setup_get_setup_group_name()) return 1; /* returns @xxxmdbug_setup_group_name = 3-character string for new set name. */
+    if (setup_get_setup_group_name(TOKEN_KEYWORD_DEBUG_SETUP)) return 1; /* returns @xxxmdbug_setup_group_name = 3-character string for new set name. */
     if (debug_track_user_variables > 0)
       debug_xxxmdbug_icc_core_surrogate_name=
           "xxxmdbug"
@@ -27417,10 +27417,10 @@ int MainWindow::setup_generate_icc_process_user_command_r_server_variables()
     QString s=
       QString("SELECT COUNT(*) ")
       + "FROM information_schema.routines "
-      + "WHERE routine_name = 'icc_process_user_command_r_server_variables' "
+      + "WHERE routine_name COLLATE utf8mb3_general_ci = 'icc_process_user_command_r_server_variables' "
       + "AND routine_schema COLLATE utf8_general_ci = 'xxxmdbug' "
-      + "AND routine_definition LIKE '%" + statement_edit_widget->dbms_version + "%' "
-      + "AND routine_definition LIKE '%" + debug_plugins + "%';";
+      + "AND routine_definition COLLATE utf8mb3_general_ci LIKE '%" + statement_edit_widget->dbms_version + "%' "
+      + "AND routine_definition COLLATE utf8mb3_general_ci LIKE '%" + debug_plugins + "%';";
     int query_len= s.toUtf8().size(); /* See comment "UTF8 Conversion" */
     char *query= new char[query_len + 1];
     memcpy(query, s.toUtf8().constData(), query_len + 1);
@@ -27635,7 +27635,7 @@ int MainWindow::setup_generate_icc_process_user_command_r_server_variables()
     if (v_is_settable != 0)
     {
       v_g_2= v_g_2
-             + "IF @xxxmdbug_token_value_2 = '"
+             + "IF CAST(@token_value_2 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = '"
              + v_variable_name
              + "' THEN SET "
              + v_variable_name
@@ -27710,9 +27710,9 @@ int MainWindow::setup_generate_icc_core()
           + "SET @xxxmdbug_icc_count=@xxxmdbug_icc_count+1;" + debug_lf
           + "x1: LOOP" + debug_lf
           + "  CALL xxxmdbug.icc_get_user_command(0);" + debug_lf
-          + "  IF @xxxmdbug_message <= 0x20 THEN LEAVE x1; END IF;" + debug_lf
-          + "  IF @xxxmdbug_token_value_1 IN ('continue','exit','leave','next','execute','skip','step') THEN LEAVE x1; END IF;"
-          + "  IF @xxxmdbug_token_value_2 = 'user_variables' THEN" + debug_lf
+          + "  IF CAST(@xxxmdbug_message AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci <= 0x20 THEN LEAVE x1; END IF;" + debug_lf
+          + "  IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci IN ('continue','exit','leave','next','execute','skip','step') THEN LEAVE x1; END IF;"
+          + "  IF CAST(@xxxmdbug_token_value_2 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'user_variables' THEN" + debug_lf
           + "    SET v_ret='';" + debug_lf;
 /* part 1 end */
   for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
@@ -27739,14 +27739,14 @@ int MainWindow::setup_generate_icc_core()
                        + "CALL xxxmdbug.icc_process_user_command();" + debug_lf
                        + "END IF;" + debug_lf;
 
-  v_g= v_g + "IF @xxxmdbug_token_value_1 = 'set' AND LEFT(@xxxmdbug_token_value_2,1) = '@' AND LEFT(@xxxmdbug_token_value_2,2) <> '@@' THEN" + debug_lf
+  v_g= v_g + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'set' AND LEFT(CAST(@xxxmdbug_token_value_2 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci,1) = '@' AND LEFT(CAST(@xxxmdbug_token_value_2 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci,2) <> '@@' THEN" + debug_lf
                        + "  SET @xxxmdbug_status_last_command = 'set';" + debug_lf
                        + "  SET @xxxmdbug_tmp_for_set='Fail';" + debug_lf;
   for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
   {
     QString v_variable_name= debug_tmp_user_variables.at(i);
     v_g= v_g
-                       + "  IF @xxxmdbug_token_value_2 = '"
+                       + "  IF CAST(@xxxmdbug_token_value_2 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = '"
                        +    v_variable_name
                        +    "' THEN CALL xxxmdbug.retype(); SET "
                        +    v_variable_name
@@ -27763,15 +27763,15 @@ int MainWindow::setup_generate_icc_core()
                        + "CALL xxxmdbug.icc_send_statement_status('icc_core');" + debug_lf
                        + "IF @xxxmdbug_breakpoint_check_result > 0 THEN" + debug_lf
                        + "x2: LOOP" + debug_lf
-                       + "IF @xxxmdbug_token_value_1 IN ('continue','exit','leave','next','execute','skip','step') THEN" + debug_lf
+                       + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci IN ('continue','exit','leave','next','execute','skip','step') THEN" + debug_lf
                        + "LEAVE x2;" + debug_lf
                        + "END IF;" + debug_lf
                        + "CALL xxxmdbug.icc_get_user_command(1);" + debug_lf
-                       + "IF @xxxmdbug_token_value_1 IN ('next','step') THEN CALL xxxmdbug.icc_process_user_command_step_or_next(); END IF;" + debug_lf
-                       + "IF @xxxmdbug_token_value_1 IN ('continue','exit','leave','next','execute','skip','step') THEN" + debug_lf
+                       + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci IN ('next','step') THEN CALL xxxmdbug.icc_process_user_command_step_or_next(); END IF;" + debug_lf
+                       + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci IN ('continue','exit','leave','next','execute','skip','step') THEN" + debug_lf
                        + "LEAVE x2;" + debug_lf
                        + "END IF;" + debug_lf
-                       + "IF @xxxmdbug_token_value_2 = 'user_variables' THEN" + debug_lf
+                       + "IF CAST(@xxxmdbug_token_value_2 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'user_variables' THEN" + debug_lf
                        + "SET v_ret='';" + debug_lf;
 /* part2 end */
   for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
@@ -27796,14 +27796,14 @@ int MainWindow::setup_generate_icc_core()
                         + "CALL xxxmdbug.icc_process_user_command();" + debug_lf
                         + "END IF;" + debug_lf;
   v_g= v_g
-                        + "IF @xxxmdbug_token_value_1 = 'set' AND LEFT(@xxxmdbug_token_value_2,1) = '@'  AND LEFT(@xxxmdbug_token_value_2,2) <> '@@' THEN" + debug_lf
+                        + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'set' AND LEFT(@xxxmdbug_token_value_2,1) = '@'  AND LEFT(@xxxmdbug_token_value_2,2) <> '@@' THEN" + debug_lf
                         + "SET @xxxmdbug_status_last_command = 'set';" + debug_lf
                         + "SET @xxxmdbug_tmp_for_set = 'Fail';" + debug_lf;
   for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
   {
     QString v_variable_name= debug_tmp_user_variables.at(i);
     v_g= v_g
-                        + "IF @xxxmdbug_token_value_2 = '"
+                        + "IF CAST(@xxxmdbug_token_value_2 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = '"
                         + v_variable_name
                         + "' THEN CALL xxxmdbug.retype(); SET "
                         + v_variable_name
@@ -27917,7 +27917,7 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
 
   /* Generate: "if (exit) signal" */
   /* todo: consider doing the signal in icc_core or icc_process_user_command but maybe then it won't be handled. */
-  debug_v_g= debug_v_g + "IF @xxxmdbug_token_value_1 = 'exit' THEN SIGNAL sqlstate '56780' SET mysql_errno = @xxxmdbug_signal_errno; END IF;";
+  debug_v_g= debug_v_g + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'exit' THEN SIGNAL sqlstate '56780' SET mysql_errno = @xxxmdbug_signal_errno; END IF;";
   for (int i= c_variable_names.count() - 1; i >= 0; --i)
   {
     QString v_variable_identifier= c_variable_names.at(i);
@@ -27938,7 +27938,7 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
   QString iterate;
   if (is_plsql) iterate= "CONTINUE ";
   else iterate= "ITERATE ";
-  debug_v_g= debug_v_g + "IF @xxxmdbug_breakpoint_check_result>0 AND (@xxxmdbug_token_value_1 = 'set' OR @xxxmdbug_token_value_1 = 'execute') THEN "
+  debug_v_g= debug_v_g + "IF @xxxmdbug_breakpoint_check_result>0 AND (CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'set' OR CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'execute') THEN "
              + iterate
              + inner_loop_label
              + "; END IF;" + debug_lf;
@@ -27997,7 +27997,7 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
       debug_error((char*)"debug_label_list.count() == 0");
       return 1;
     }
-    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN ";
+    debug_v_g= debug_v_g + debug_lf + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'leave' THEN ";
     if ((is_plsql) && (debug_label_list.count() == 1))
     {
       debug_v_g= debug_v_g +"GOTO xxxmdbug_routine_exit";
@@ -28013,13 +28013,13 @@ int MainWindow::setup_generate_statements_debuggable(int i_of_statement_start,
   }
   else
   {
-    debug_v_g= debug_v_g + debug_lf + "IF @xxxmdbug_token_value_1 = 'leave' THEN "
+    debug_v_g= debug_v_g + debug_lf + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'leave' THEN "
              + leave
              + inner_loop_label
              + "; END IF;" + debug_lf;
   }
   /* inner_loop: by leaving inner_loop before doing the instruction, we "skip over" it */
-  debug_v_g= debug_v_g + "IF @xxxmdbug_token_value_1 = 'skip' THEN "
+  debug_v_g= debug_v_g + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'skip' THEN "
            + leave
            + inner_loop_label
            + "; END IF;" + debug_lf;
