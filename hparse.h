@@ -4574,13 +4574,22 @@ int MainWindow::hparse_f_data_type(int context)
     {
       hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF");
       if (hparse_errno > 0) return -1;
-      /* Actually, following could be either table or cursor */
-      if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
+      if (is_row_seen == true)
       {
-        hparse_f_error();
-        return -1;
+        /* Actually, following could be either table or cursor */
+        if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE,TOKEN_REFTYPE_TABLE) == 0)
+        {
+          hparse_f_error();
+          return -1;
+        }
+        return TOKEN_KEYWORD_ROW;
       }
-      return TOKEN_KEYWORD_ROW;
+      else /* is_row_seen == false */ /* todo: actually at least one qualifier should be compulsory here */
+      {
+        if (hparse_f_qualified_name_of_operand(0, false,false,true) == 0) { hparse_f_error(); return -1; }
+        main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+        return TOKEN_KEYWORD_VARCHAR; /* todo: VARCHAR is just filler, try to see what column data type really is */
+      }
     }
     if ((is_row_seen == true) && (is_type_seen == false))
     {
