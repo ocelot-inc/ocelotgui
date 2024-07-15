@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: July 11 2024
+   Last modified: July 15 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -3468,7 +3468,7 @@ void MainWindow::create_menu()
 
 #if (OCELOT_IMPORT_EXPORT == 1)
   QMenu *menu_file_export= menu_spec_find_menu("menu_export");
-  if (menu_file_export != NULL) menu_file_export->setEnabled(false);
+  if (menu_file_export != NULL) menu_file_export->setEnabled(true); /* was false until 2024-07-15 */
 #endif
 
 
@@ -26072,8 +26072,8 @@ void MainWindow::connect_init(int connection_number)
   connections_is_connected[connection_number]= 1;
   if (connection_number == 0)
   {
-    QMenu* menu_file_export= menu_spec_find_menu("menu_export");
-    if (menu_file_export != NULL) menu_file_export->setEnabled(true);
+//    QMenu* menu_file_export= menu_spec_find_menu("menu_export");
+//    if (menu_file_export != NULL) menu_file_export->setEnabled(true); /* unnecessary, nowadays it's always true */
     if (ocelot_ca.auto_rehash != 0)
     {
       char error_or_ok_message[ER_MAX_LENGTH];
@@ -34564,6 +34564,8 @@ QString ResultGrid::copy_to_history(long int ocelot_history_max_row_count,
     if (main_exports.columns_escaped_by.size() > 0) escapers[e++]= main_exports.columns_escaped_by[0];
     if (main_exports.columns_terminated_by.size() > 0) escapers[e++]= main_exports.columns_terminated_by[0];
     if (main_exports.lines_terminated_by.size() > 0) escapers[e++]= main_exports.lines_terminated_by[0];
+    escapers[e]= '\0';
+
     if (QString::compare(main_exports.if_null, "DEFAULT", Qt::CaseInsensitive) == 0)
     {
       if (main_exports.columns_escaped_by.size() == 0)
@@ -34846,7 +34848,7 @@ QString ResultGrid::copy_to_history(long int ocelot_history_max_row_count,
         {
           char c= pcv[j];
           /* Warning: if we allowed non-ASCII characters we'd have to allow for multi-byte here. */
-          if ((c == main_exports.replace_string.at(0)) && (main_exports.replace_string.length() > 0))
+          if ((main_exports.replace_string.length() > 0) && (c == main_exports.replace_string.at(0)))
           {
             if (main_exports.with_string.length() > 0) *(pointer_to_history_line++)= main_exports.with_string.at(0);
             if (main_exports.with_string.length() > 1) *(pointer_to_history_line++)= main_exports.with_string.at(1);
@@ -34858,7 +34860,7 @@ QString ResultGrid::copy_to_history(long int ocelot_history_max_row_count,
               if (main_exports.columns_escaped_by.size() > 0) *(pointer_to_history_line++)= escape_char;
               *(pointer_to_history_line++)= '0';
             }
-            else if (escapers.contains(c))
+            else if (strchr(escapers.constData(), c) != NULL)
             {
               if (main_exports.columns_escaped_by.size() > 0) *(pointer_to_history_line++)= escape_char;
               *(pointer_to_history_line++)= c;
