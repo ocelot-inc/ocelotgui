@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: July 15 2024
+   Last modified: July 17 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -772,6 +772,13 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   statement_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(statement_edit_widget, SIGNAL(customContextMenuRequested(const QPoint &)),
       this, SLOT(menu_context(const QPoint &)));
+
+  connect(history_edit_widget, SIGNAL(copyAvailable(bool)), this, SLOT(copy_available(bool)));
+  connect(statement_edit_widget, SIGNAL(copyAvailable(bool)), this, SLOT(copy_available(bool)));
+#if (OCELOT_EXPLORER == 1)
+  connect(explorer_widget, SIGNAL(copyAvailable(bool)), this, SLOT(copy_available(bool)));
+#endif
+
   /*
     If the command-line option was -p but not a password, then password input is necessary
     so put up the connection dialog box. Otherwise try immediately to connect.
@@ -20490,6 +20497,17 @@ void MainWindow::menu_context(const QPoint &pos)
 {
   QMenu* menu_edit= menu_spec_find_menu("menu_edit");
   if (menu_edit != NULL) menu_edit->exec(statement_edit_widget->mapToGlobal(pos));
+}
+
+/*
+  Slot. We connect history_edit_widget, statement_edit_widget, explorer_widget, and r result grid (but actually its child
+  Result_qtextedit) gets the signal). It's mainly so that menu will say that cut and copy are enabled when select happens.
+  Alternative: selectionChanged() signal and then look for hasSelection()
+*/
+void MainWindow::copy_available(bool yes_no)
+{
+  (void) yes_no;
+  menu_activations(QApplication::focusWidget(), QEvent::None);
 }
 
 /******************** typer start ***********************************************/

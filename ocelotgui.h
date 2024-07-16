@@ -5705,6 +5705,7 @@ public slots: /* todo: check if should be private */
   void menu_spec_action_all(bool is_checked); /* the slot for every menu item */
   void action_i(int i, bool is_checked);
   void menu_context(const QPoint &);
+  void copy_available(bool yes_no);
 
 protected:
   bool eventFilter(QObject *obj, QEvent *ev);
