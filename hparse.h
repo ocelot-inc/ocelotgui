@@ -7317,6 +7317,7 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
         is_query= true;
     }
   }
+#if (OCELOT_MYSQL_INCLUDE == 1)
   if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
     if (is_semiselect_ok == true)
@@ -7329,7 +7330,7 @@ bool MainWindow::hparse_f_is_query(bool is_statement)
       }
     }
   }
-
+#endif
   if (is_query == false)
   {
     /* guaranteed to fail */

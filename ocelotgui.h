@@ -5542,9 +5542,10 @@ public:
   void export_set_checked();
 #endif
   int read_file(int keyword, QString file_name, QString table_name);
+#if (OCELOT_MYSQL_INCLUDE ==1)
   QByteArray read_file_skip(QByteArray, int, char *, int, QFile *, int *);
   int read_file_line_skip(char *, int, char *, int, char *, int *);
-
+#endif
 #if (OCELOT_EXPLORER == 1)
   int explorer_refresh_caller(char *);
   int explorer_refresh(char *);

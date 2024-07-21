@@ -195,7 +195,8 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
   set(CMAKE_BUILD_TYPE "Debug")
 endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
-cmake_minimum_required(VERSION 2.8.12)
+# Until 2024-07-21 this was cmake_minimum_required(VERSION 2.8.12) and that's fine but there were warnings.
+cmake_minimum_required(VERSION 3.5.0)
 
 project(ocelotgui)
 

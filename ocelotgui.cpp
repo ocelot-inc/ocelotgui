@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: July 17 2024
+   Last modified: July 21 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -1860,6 +1860,7 @@ void MainWindow::export_set_checked()
         delimiter //
         drop procedure p\G
         select 5;
+  Todo: we only do the INSERT "speedup" for MySQL/MariaDB, we should probably do it for all
 */
 int MainWindow::read_file(int keyword, QString s, QString table_name)
 {
@@ -1902,6 +1903,7 @@ have_leftover:
             else break;
           }
           if (sls == 0) continue;
+#if (OCELOT_MYSQL_INCLUDE == 1)
           if ((dbms_version_mask&FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
           {
             if ((source_line.left(1) == "#") || (source_line.left(3) == "-- ")) continue; /* MySQL-MariaDB only? */
@@ -1925,6 +1927,7 @@ have_leftover:
                continue;
              }
           }
+#endif
         }
         statement_edit_widget->insertPlainText(source_line);
       }
@@ -1955,6 +1958,7 @@ have_leftover:
   return 0;
 }
 
+#if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   Pass: statement. Initially must be INSERT statement but any non-compound non-client statement might be okay.
   Return: full statement and # of bytes left over after delimiter (-1 if eof)
@@ -2116,6 +2120,7 @@ skip_till_passed_expected_char:
   /* end of source_line, no delimiter seen */
   return -1;
 }
+#endif
 
 QString MainWindow::statement_format_rule_apply(QString main_token, int main_token_type, unsigned char main_token_reftype, unsigned int main_token_flag, int *rule_token_offsets, int *rule_token_lengths, int *rule_token_types)
 {
@@ -3570,12 +3575,14 @@ void MainWindow::menu_spec_make_function()
   menu_function_struct_list.append({"action_settings_history", false, &MainWindow::action_settings_history, NULL});
   menu_function_struct_list.append({"action_settings_grid", false, &MainWindow::action_settings_grid, NULL});
   menu_function_struct_list.append({"action_settings_statement", false, &MainWindow::action_settings_statement, NULL});
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   menu_function_struct_list.append({"action_settings_debug", false, &MainWindow::action_settings_debug, NULL});
+#endif
   menu_function_struct_list.append({"action_settings_extra_rule_1", false, &MainWindow::action_settings_extra_rule_1, NULL});
   menu_function_struct_list.append({"action_settings_explorer", false, &MainWindow::action_settings_explorer, NULL});
   menu_function_struct_list.append({"action_options_detach_history_widget", false, &MainWindow::action_options_detach_history_widget, NULL});
   menu_function_struct_list.append({"action_options_detach_grid_widget", false, &MainWindow::action_options_detach_grid_widget, NULL});
-#if (OCELOT_CHART_OR_QCHART == 1)
+#if (OCELOT_MYSQL_DEBUGGER == 1)
   menu_function_struct_list.append({"action_options_detach_debug_widget", false, &MainWindow::action_options_detach_debug_widget, NULL});
 #endif
   menu_function_struct_list.append({"action_options_detach_statement_widget", false, &MainWindow::action_options_detach_statement_widget, NULL});
@@ -4639,23 +4646,30 @@ int MainWindow::shortcut_set_via_keyword(int target, QString token3)
   Edit Menu Dispatcher
 
   We have only one edit menu, but we have multiple edit widgets.
-  So the connect-signal-slot code in create_menu() jumps to menu_edit slots.
+  So create_menu() has addresses for action_edit functions, which are no longer slots.
   The alternatives were: Multiple Document Interface, or multiple windows. I thought this was easier.
-  For example, for cut: the slot is action_edit_cut, it gets the focused widget and calls its cut().
+  For example, for cut: the function is action_edit_cut, it gets the focused widget and calls its cut().
   But Undo and Redo are complicated: for some widgets they're enabled, for some widgets they're not.
-  TODO: We are not enabling|disabling edit menu items properly. We should be saying (examples):
-        Initially, menu_edit_action_cut->setEnabled(false);
-        When creating any editor widget,
-          connect(widget, SIGNAL(copyAvailable(bool)),menu_edit_action_cut, SLOT(setEnabled(bool)));
-        When we want to know if something can be pasted,
-          connect(QApplication::clipboard(), SIGNAL(dataChanged()), this, SLOT(processClipboardChange()));
-          qMimeData* x= clipboard->mimeData();
-          qStringList* y= x->formats();
-          int z= y->size();
-          if (z > 0) menu_edit_action_paste->setEnabled();                 << wrong, you only know if paste is possible
-        If something is selected and focus changes: de-select      
+  Re cut or copy:
+    We connect history_edit_widget, statement_edit_widget, explorer_widget, and r result grid (but actually its child
+    Result_qtextedit) for signal copyAvailable to MainWindow::copy_available() slot which calls menu_activations().
+    It's mainly so that so that menu will say that cut and copy are enabled when mouse selection happens.
+    Alternative: selectionChanged() signal and then look for hasSelection().
+  Re paste:
+    We look at canPaste() which pretty well always is true. TOdo: When we really must know whether clipboard is empty
+      connect(QApplication::clipboard(), SIGNAL(dataChanged()), this, SLOT(processClipboardChange()));
+      qMimeData* x= clipboard->mimeData();
+      qStringList* y= x->formats();
+      int z= y->size();
+      if (z > 0) menu_edit_action_paste->setEnabled();                 << wrong, you only know if paste is possible
+    See also: void Result_qtextedit::paste().
+  Todo: If something is selected and focus changes: selection is now gone but is still decorated as if cut|copy possible.
   TODO: I have no idea what "else if (strcmp(class_name, "+") == 0)"
         is for, maybe it's a bug. Compare action_edit_redo().
+  Todo: We don't have a slot for debug, and of course don't have a slot for a widget that a plugin creates.
+        It would be better if we said connect() for copyAvailable in a constructor but I failed to get that to work.
+        Or it would be better if we said connect() for the whole QApplication but I failed to get that to work.
+  Todo: Some action_edit_* functions are near duplicates of each other, think how to reduce.
 */
 void MainWindow::action_edit_undo(bool is_checked)
 {
@@ -10576,12 +10590,14 @@ void MainWindow::action_debug_refresh_server_variables(bool is_checked)
 {
   (void)is_checked;
   log("action_debug_refresh_server_variables", 90);
+  if ((dbms_version_mask & FLAG_VERSION_MARIADB_ALL) != 0)
+  {
+    if (debug_error((char*)"Disabled while server = MariaDB. Try SELECT * FROM information_schema.global_variables;") != 0) return;
+  }
   if (debuggee_state != DEBUGGEE_STATE_DEBUGGEE_WAIT_LOOP)
   {
     if (debug_error((char*)er_strings[er_off + ER_NO_DEBUG_SESSION]) != 0) return;
   }
-  if ((dbms_version_mask & FLAG_VERSION_MARIADB_ALL) != 0)
-    if (debug_error((char*)"Disabled while server = MariaDB") != 0) return;
   if (debug_call_xxxmdbug_command("refresh server_variables") != 0) return;
   statement_edit_widget->insertPlainText("select * from xxxmdbug.server_variables;");
   action_execute(1);
@@ -20499,11 +20515,7 @@ void MainWindow::menu_context(const QPoint &pos)
   if (menu_edit != NULL) menu_edit->exec(statement_edit_widget->mapToGlobal(pos));
 }
 
-/*
-  Slot. We connect history_edit_widget, statement_edit_widget, explorer_widget, and r result grid (but actually its child
-  Result_qtextedit) gets the signal). It's mainly so that menu will say that cut and copy are enabled when select happens.
-  Alternative: selectionChanged() signal and then look for hasSelection()
-*/
+/* Slot. See comments with heading = Edit menu dispatcher before action_edit_undo(). */
 void MainWindow::copy_available(bool yes_no)
 {
   (void) yes_no;
@@ -27612,7 +27624,6 @@ int MainWindow::setup_generate_icc_process_user_command_r_server_variables()
         + xxxmdbug_comment
         + "DECLARE EXIT HANDLER FOR SQLEXCEPTION CALL xxxmdbug.icc_change_statement_status('Fail');" + debug_lf
         + "SET @xxxmdbug_tmp_for_set = 'Fail';" + debug_lf;
-
   for (int i= 0; i < c_variable_names.count(); ++i)
   {
     /* Test whether one can assign to the variable. If an exception happens,
@@ -30050,6 +30061,7 @@ void MainWindow::hparse_f_variables_append(int hparse_i_of_statement, QString hp
 
 ldbms::ldbms() : QWidget()
 {
+#if (OCELOT_MYSQL_INCLUDE == 1)
 #if (MINGW_MARIADB == 0)
   /* Probably-unnecessary initializations done to pacify cppcheck */
   dlopen_handle= 0;
@@ -30139,6 +30151,7 @@ ldbms::ldbms() : QWidget()
   t__tnt_select= NULL;
   t__tnt_error= NULL;
   t__tnt_strerror= NULL;
+#endif
 #endif
   return;
 }
