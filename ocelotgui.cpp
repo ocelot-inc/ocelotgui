@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: July 21 2024
+   Last modified: July 22 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -11270,9 +11270,10 @@ int MainWindow::action_execute_one_statement(QString text)
   unsigned short int is_vertical= ocelot_ca.vertical; /* true if --vertical or \G or ego */
   /*
     ecs_return = what execute_client_statement() returns = 0 "not client and needs server",
-    1 "handled entirely by client (so skip what follows), 2 "?", 3 "ocelot_query_select and does not need server"
+    1 "handled entirely by client (so skip what follows), 2 "?", 3 "set ocelot_query and does not need server"
+    4 "set ocelot_query and does need server"
   */
-  unsigned int ecs_return= 0; /* 1 means "is client statement", 2 dunno, 3 */
+  unsigned int ecs_return= 0;
   unsigned return_value= 0;
   int ocelot_query_result= 0;
   bool is_ocelot_query_in_client= false;
@@ -11472,8 +11473,12 @@ int MainWindow::action_execute_one_statement(QString text)
 #endif
         if (is_semiselect_seen == false)
         {
-          ocelot_query_result= execute_ocelot_query(query_utf16, MYSQL_MAIN_CONNECTION, &text, &is_ocelot_query_in_client,
+          if ((ecs_return != 3) && (ecs_return != 4)) ocelot_query_result= -1;
+          else
+{
+            ocelot_query_result= execute_ocelot_query(query_utf16, MYSQL_MAIN_CONNECTION, &text, &is_ocelot_query_in_client,
                                                     &fillup_result, &diagnostic_signal);
+}
           if (ocelot_query_result == ER_ERROR)
           {
             is_create_table_server= true; /* Fake. it's not create table server but should have same effect. */
@@ -12999,6 +13004,8 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       {
         return 3; /* meaning "no error if no connection and expect execute_ocelot_query to handle it" */
       }
+      if (sub_token_types[3] == TOKEN_KEYWORD_SHOW)
+        return 4; /* meaning "error if no connection and expect execute_ocelot_query to handle it" */
       return 0;
     }
     if ((sub_token_types[0] == TOKEN_KEYWORD_SET)
