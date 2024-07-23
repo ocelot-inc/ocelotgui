@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: July 22 2024
+   Last modified: July 23 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -11938,8 +11938,6 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
                                      bool *is_ocelot_query_in_client, QString *fillup_result, unsigned int *diagnostic_signal)
 {
   log("execute_ocelot_query", 80);
-  char *fks_query;
-  int fks_query_len;
   int counter;
   QString d_table_name, d_column_name, d_ordinal_position, d_constraint_name, d_referenced_table_name, d_referenced_column_name;
   QString fks;
@@ -12185,7 +12183,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
 #ifdef DBMS_TARANTOOL
 //  if (connections_dbms[connection_number] == DBMS_TARANTOOL) return -1;
 #endif
-  int real_return;
+//  int real_return;
 //  int token_offsets[MAX_OCELOT_STATEMENT_TOKENS];
 //  int token_lengths[MAX_OCELOT_STATEMENT_TOKENS];
 //  tokenize(query.data(),
@@ -12293,12 +12291,13 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
                   "constraint_name, "
                   "referenced_table_name, referenced_column_name "
                   "FROM information_schema.key_column_usage "
-                  "WHERE table_name = '";
+                  "WHERE CAST(table_name AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci= '";
    query2= query2 + table_name;
    query2= query2 + "' AND referenced_column_name IS NOT NULL ";
    if (schema_name == "") query2= query2 + " AND table_schema = database() ";
-   else query2= query2 + " AND table_schema = '" + schema_name + "' ";
+   else query2= query2 + " AND CAST(table_schema AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = '" + schema_name + "' ";
    query2= query2 + " ORDER BY 4, 3;";
+
 
   int rehash_scan_result= rehash_scan(error_or_ok_message, query2);
   if (rehash_scan_result != ER_OK_REHASH)
@@ -12307,7 +12306,15 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
     delete [] token_types;
     delete [] token_lengths;
     delete [] token_offsets;
-    return 1;
+    return ER_ERROR;
+  }
+  if (rehash_result_row_count < 2)
+  {
+    put_message_in_result("0 rows");
+    delete [] token_types;
+    delete [] token_lengths;
+    delete [] token_offsets;
+    return ER_ERROR;
   }
   long int r;
   char *row_pointer;
@@ -12332,7 +12339,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
       if (i == 5) d_referenced_column_name= QString(m);
       row_pointer+= column_length;
     }
-    if (r == 0) continue;
+    if (r == 0) continue; /* row #0 should be for header */
     if (counter > 0)
       fks= fks + "UNION ALL\n";
 //    if ((counter != 0) && (d_ordinal_position == "1"))
@@ -12356,15 +12363,12 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
   if (saved_rehash_result_row_count != 0) rehash_scan(error_or_ok_message, "");
   else rehash_garbage_collect();
 
-  fks_query_len= fks.toUtf8().size();                  /* See comment "UTF8 Conversion" */
-  fks_query= new char[fks_query_len + 1];
-  strcpy(fks_query, fks.toUtf8());
-  real_return= execute_real_query(fks_query, connection_number, alltext);
-  delete []fks_query;
   delete [] token_types;
   delete [] token_lengths;
   delete [] token_offsets;
-  return real_return;
+  /* Recursion, now that we have SELECT ... UNION SELECT ... which can be done without asking the server for more */
+  return execute_ocelot_query("SET ocelot_query = " + fks, connection_number, alltext,
+                                       is_ocelot_query_in_client, fillup_result, diagnostic_signal);
 }
 
 
