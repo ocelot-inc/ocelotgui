@@ -425,11 +425,14 @@ int MainWindow::hparse_f_accept(unsigned int flag_version, unsigned char reftype
   todo: there are other places where we might append a token
 */
 
+/*
+  Removed 2024-07-23. Duplicated by hparse_f_expected_clear() and nobody calls it now.
 void MainWindow::hparse_f_expected_initialize()
 {
   hparse_expected= "";
   completer_widget->clear_wrapper();
 }
+*/
 
 void MainWindow::hparse_f_expected_clear()
 {

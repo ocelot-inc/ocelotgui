@@ -11110,6 +11110,7 @@ int MainWindow::action_execute(int force)
   QString text;
   int return_value= 0;
   log("action_execute start", 90);
+  hparse_f_expected_clear(); /* added 2024-07-23. might be better to call at start of hparse_f_multi_block() though. */
   for (;;)
   {
     int returned_begin_count;

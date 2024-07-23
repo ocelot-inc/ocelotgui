@@ -5267,7 +5267,7 @@ public:
   int hparse_f_acceptn(int,QString,int);
   int hparse_f_acceptf(int pass_number, QString replacee);
   int hparse_f_accept_in_set(unsigned int,QStringList, int *i_of_matched);
-  void hparse_f_expected_initialize();
+  /* void hparse_f_expected_initialize(); Removed 2024-07-23 */
   void hparse_f_expected_clear();
   int hparse_f_expected_exact(int reftype);
   void hparse_f_expected_append(QString token, unsigned char reftype, int proposed_type);
