@@ -5971,9 +5971,33 @@ void MainWindow::hparse_f_alter_or_create_sequence(int statement_type)
   }
   bool is_start_seen= false, is_minvalue_seen= false, is_maxvalue_seen= false;
   bool is_increment_seen= false, is_cycle_seen= false, is_cache_seen= false;
-  bool is_restart_seen= false;
+  bool is_restart_seen= false; bool is_as_seen= false;
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_11_5) == 0) is_as_seen= true; /* i.e. don't look for AS if < 11.5 */
   for (;;)
   {
+    if (is_as_seen == false)
+    {
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS") == 1)
+      {
+        /* MariaDB manual is false, "INT3" etc. would be accepted, but we'll only take what's documented. */
+        if ((hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_TINYINT, "TINYINT") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SMALLINT, "SMALLINT") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_MEDIUMINT, "MEDIUMINT") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INT, "INT") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INTEGER") == 1)
+         || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BIGINT, "BIGINT") == 1))
+        {
+          main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+          if ((hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SIGNED, "SIGNED") == 1)
+           || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_UNSIGNED, "UNSIGNED") == 1))
+            {;}
+        }
+        else hparse_f_error();
+        if (hparse_errno > 0) return;
+        is_as_seen= true;
+        continue;
+      }
+    }
     if (is_start_seen == false)
     {
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_START, "START") == 1)
