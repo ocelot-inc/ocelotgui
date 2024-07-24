@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: July 23 2024
+   Last modified: July 24 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -16783,6 +16783,26 @@ void MainWindow::set_dbms_version_mask(QString version, int connection_number)
     {
       dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0);
       if (version.contains("8.0.31") == true) dbms_version_mask= (dbms_version_mask | FLAG_VERSION_MYSQL_8_0_31);
+    }
+    else if (version.contains("8.1.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0) | FLAG_VERSION_MYSQL_8_0_31 | FLAG_VERSION_MYSQL_8_1;
+    }
+    else if (version.contains("8.2.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MYSQL_8_0_31 | FLAG_VERSION_MYSQL_8_1 | FLAG_VERSION_MYSQL_8_2);
+    }
+    else if (version.contains("8.3.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MYSQL_8_0_31 | FLAG_VERSION_MYSQL_8_1 | FLAG_VERSION_MYSQL_8_2 | FLAG_VERSION_MYSQL_8_3);
+    }
+    else if (version.contains("8.4.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MYSQL_8_0_31 | FLAG_VERSION_MYSQL_8_1 | FLAG_VERSION_MYSQL_8_2 | FLAG_VERSION_MYSQL_8_3 | FLAG_VERSION_MYSQL_8_4);
+    }
+    else if (version.contains("9.0.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MYSQL_8_0_31 | FLAG_VERSION_MYSQL_8_1 | FLAG_VERSION_MYSQL_8_2 | FLAG_VERSION_MYSQL_8_3 | FLAG_VERSION_MYSQL_8_4 | FLAG_VERSION_MYSQL_9_0);
     }
     else if (version.contains("mysql", Qt::CaseInsensitive) == true)
     {

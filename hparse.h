@@ -5498,14 +5498,21 @@ void MainWindow::hparse_f_sql()
   else hparse_f_error();
 }
 
+/*
+  Todo: MySQL's manual seems  bit vague here -- should the channel always be a string literal or can it be an identifier?
+  I'm allowing both until I' sure, but prefer string.
+*/
 void MainWindow::hparse_f_for_channel()
 {
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR"))
   {
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHANNEL");
-    if (hparse_errno > 0) return;
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHANNEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
-    if (hparse_errno > 0) return;
+    if (hparse_errno > 0) return;  
+    if (hparse_f_literal(TOKEN_REFTYPE_CHANNEL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0)
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_CHANNEL,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
   }
 }
 
@@ -10834,33 +10841,72 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_RESET;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    do
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PERSIST") == 1) {;}
+    else
     {
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MASTER") == 1)
+      /* Bools to stop duplicates like "replica,replica" although actually MySQL and MariaDB allow them. */
+      bool is_master_seen= false; /* becomes true if either binary or master seen */
+      bool is_query_seen= false;
+      bool is_slave_seen= false; /* becomes true if either slave or replica seen */
+      if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) != 0) is_query_seen= true; /* i.e. MySQL 8.0+ disallows query cache */
+      do
       {
-        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
+        if (is_master_seen == false) /* MySQL prefers "binary" but allows "master" with warning, MariaDB only has "master" */
         {
-          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO") == 1)
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_BINARY, "BINARY") == 1)
           {
-            if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
-
+            hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOGS");
             if (hparse_errno > 0) return;
+            hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AND, "AND");
+            if (hparse_errno > 0) return;
+            hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "GTIDS");
+            if (hparse_errno > 0) return;
+            is_master_seen= true;
+          }
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MASTER") == 1)
+          {
+            is_master_seen= true;
+          }
+          if (is_master_seen == true)
+          {
+            if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO") == 1)
+            {
+              if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_NUMBER) == 0) hparse_f_error();
+              if (hparse_errno > 0) return;
+            }
+            continue;
           }
         }
-      }
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PERSIST") == 1) {;}
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "QUERY_CACHE") == 1) {;}
-      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SLAVE") == 1)
-      {
-        if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0)
+        if (is_slave_seen == false)  /* MySQL prefers "replica" but allows "slave" with warning, MariaDB seems neutral */
         {
-          hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING);
-          hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALL");
+          if ((hparse_f_accept(FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MARIADB_10_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICA") == 1)
+           || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SLAVE") == 1))
+          {
+            hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING); /* "connection_name" */
+            hparse_f_accept(FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ALL, "ALL");
+            if ((hparse_dbms_mask & (FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MARIADB_10_7)) != 0)
+            {
+              hparse_f_for_channel();
+              if (hparse_errno > 0) return;
+            }
+            is_slave_seen= true;
+            continue;
+          }
         }
-      }
-      else hparse_f_error();
-      if (hparse_errno > 0) return;
-    } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+        if (is_query_seen == false)
+        {
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_QUERY, "QUERY") == 1)
+          {
+            hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CACHE");
+            if (hparse_errno > 0) return;
+            is_query_seen= true;
+            continue;
+          }
+        }
+        hparse_f_error();
+        if (hparse_errno > 0) return;
+      } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+    }
   }
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_RESIGNAL, "RESIGNAL"))
   {
