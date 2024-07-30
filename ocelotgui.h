@@ -8632,21 +8632,21 @@ private:
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
-  short unsigned int *int_target;         /* e.g. NULL */
+  void *int_target; /* short unsigned int *int_target; */         /* e.g. NULL */
   int maximum;                            /* e.g. -1 because it's not an int target */
   unsigned char flags_style;              /* e.g. OCELOT_VARIABLE_FLAG_SET_COLOR */
   unsigned char enums_for;                /* e.g. OCELOT_VARIABLE_ENUM_SET_FOR_STATEMENT */
   unsigned short int k_i;                 /* keyword_index */
 };
 
-ocelot_variable_keywords *ocelot_variables;
 MainWindow *main_window;
 int ocelot_variables_create();
-int ocelot_variable_offset(int keyword_index);
+
 
 public:
 explicit XSettings(MainWindow *parent);
-
+int ocelot_variable_offset(int keyword_index);
+ocelot_variable_keywords *ocelot_variables;
 int ocelot_variable_set(int keyword_index, QString new_value);
 bool ocelot_variable_is_color(int keyword);
 bool ocelot_variable_is_font_weight(int keyword);

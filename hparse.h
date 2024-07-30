@@ -10848,6 +10848,7 @@ void MainWindow::hparse_f_statement(int block_top)
         hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "QUICK");
         hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXTENDED");
         hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "USE_FRM");
+        hparse_f_accept(FLAG_VERSION_MARIADB_11_5, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FORCE");
       }
       if (table_or_view == TOKEN_KEYWORD_VIEW)
       {

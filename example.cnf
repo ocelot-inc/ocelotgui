@@ -112,6 +112,7 @@ ocelot_client_side_functions=1
 ocelot_grid_tabs=10
 ocelot_log_level=100
 
+#Shortcut changes can also be done with SET ocelot_query=...
 ocelot_shortcut_connect="default"
 ocelot_shortcut_exit="default"
 ocelot_shortcut_undo="default"
