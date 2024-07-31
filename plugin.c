@@ -2,7 +2,7 @@
   plugin.c -- A set of example routines which demonstrate the ocelotgui plugin feature.
 
   Version: 2.4.0
-  Last modified: June 9 2024
+  Last modified: July 31 2024
 
 */
 
@@ -41,9 +41,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
   You can write "trigger" routines that ocelotgui calls at special points in its code,
   or you can write "menu" routines that users can add and pick.
   This file contains examples.
-  It is not yet part of an official release.
+  It is part of ocelotgui 2.4 and later.
   It assumes the operating system is Linux or Windows.
-  To try it out, you have to build ocelotgui from source at github.com/ocelot-inc/ocelotgui
   Making a C library:
     Copy plugin.c to your default directory.
     Copy ocelotgui.h and other .h files from the ocelotgui source to your default directory.
@@ -100,7 +99,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
       #(You can say Qt4Widgets or Qt6Widgets if you have a different Qt version.)
       find_package(Qt5Widgets REQUIRED)
       set(CMAKE_CXX_FLAGS "${Qt5Widgets_EXECUTABLE_COMPILE_FLAGS}")
-      #(The MySQL/MariaDB includes won't be included; thsi is just to save space.)
+      #(The MySQL/MariaDB includes won't be included; this is just to save space.)
       add_definitions(-DOCELOT_MYSQL_INCLUDE=0)
       add_library(plugin SHARED plugin.cpp)
       target_link_libraries(plugin Qt5::Widgets)
@@ -284,7 +283,7 @@ int text_changed(struct plugin_pass *plugin_pass)
 }
 
 /*
-  PLUGIN_FILLUP is what ocelotgui calls after it has a result set from any sort of query (including internal queries that usres don't see).
+  PLUGIN_FILLUP is what ocelotgui calls after it has a result set from any sort of query (including internal queries that users don't see).
   ocelot_plugin_pass has result_set_copy, result_row_count, result_column_count.
   The column format is always: (unsigned int) length, (char) flags e.g. whether it's NULL, (length chars) value
   Replace will be ignored.
