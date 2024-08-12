@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: July 29 2024
+   Last modified: August 12 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -575,7 +575,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ui->menuBar->setNativeMenuBar(false);
 #endif
 //SHIFTED!!  create_menu();
-
   setWindowTitle("ocelotgui");
   connections_is_connected[0]= 0;
   mysql_res= 0;
@@ -4368,8 +4367,9 @@ QAction* MainWindow::menu_spec_add_action(int i, QMenu *qmenu)
   We'll get here for every menu where menu_spec_struct_list[i].type == 0 (i.e. we don't check if == 2).
   Todo: it would be more useful if we knew which menu
   Todo: have a plugin here.
-  Todo: maybe this is a good time to see what is the focus widget, somewhere else we have a hard time knowing that
-        because the menu becomes the focus widget, if this shows what it was before then that will be handy
+  Todo: Although QApplication::focusWidget() seems to normally be NULL when we arrive here,
+        maybe this would be a good time to call menu_activations() if we can figure out what the
+        focus widget used to be, if we know what it was before then that will be handy
         e.g. action_edit_undo() looks at QApplication::focusWidget()
   Todo: I hope all the recent method-name changes aren't affecting what e.g. action_edit_undo() thinks is the name!
   Warning: if all that's happening is that the user is shifting the mouse around the top of the menu bar,
@@ -6688,7 +6688,7 @@ void MainWindow::action_redo()
 /*
   When focusOut happens for one of the main widgets (the ones that have
   an event filter on them), we might be switching to the menu bar.
-  (I wish I knew for sure, but if it's to something else, no harm done.)
+  (I know for sure if the caller is menu_about_to_show() but if it's to something else, no harm done.)
   On the edit menu, some items should be enabled or disabled (gray).
   Inefficient, but these actions don't happen dozens of times per second.
   Incredibly, installeventfilter for menuBar + look for focusIn or
@@ -6705,6 +6705,15 @@ void MainWindow::action_redo()
         menu_activations() for menu_activations(QEvent::focusIn)
         is a waste of time. Remember, though, that shortcuts often won't
         work if the menu item is disabled.
+  Re the loop: no break or return because e.g. id = "menu_edit_undo" might be true more than
+               once if user changes it with a plugin.
+  Re Paste: I now think it's better to check QClipboard empty rather than check a document's
+            canPaste() method. I think it's better to check in menu_activations() for focus change
+            and not via the slot for aboutToShow() because maybe that signal won't happen if application
+            loses then regains focus, and because when that signal happens the focus widget may be NULL.
+            Maybe there's no need to also check when clipboard change.
+            Anyway, the paste shortcut will work even if disabled because keypress_shortcut_handler sees it.
+            To test with initial empty clipboard, I used xclip -sel clip < /dev/null
   Todo: Incredibly, availableRedoSteps() only works for CodeEditor i.e.
         statement_edit_widget. I wish I knew why, but rather than spend
         more hours, will just assume redo is otherwise always okay.
@@ -6715,7 +6724,7 @@ void MainWindow::action_redo()
   Todo: Other edit menu items can be enabled|disabled:
         previous statement, next statement.
   Todo: if font_size already <= FONT_SIZE_MIN, disable zoomout.
-        if font_size already >= FONT_SIZE_MAX, disable zoomout.
+        if font_size already >= FONT_SIZE_MAX, disable zoomin.
         (Get the widget's ->styleSheet() as you do elsewhere.)
   Todo: check if ExpectedWidget can be affected here
   Todo: we could have is_can_find for menu_edit_action_find but at the moment it's always enabled
@@ -6725,9 +6734,12 @@ void MainWindow::action_redo()
         We could in codeeditor.h have a slot for textChanged signal and, after
         checking that the affected widget is in fact codeEditor, enable format
         depending on isEmpty().
+  Todo: what about "action_edit_select_all" and "action_edit_find"?
+  Warn: focus events happen for irrelevancy e.g. resize, for application end
 */
 void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
 {
+  if (focus_widget == NULL) return;
   bool is_can_undo= true, is_can_redo= true;
   bool is_can_copy= false, is_can_cut= false, is_can_paste= false;
   bool is_can_format= false, is_can_zoomin= false, is_can_zoomout= false;
@@ -6747,7 +6759,6 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
     if (doc->availableRedoSteps() <= 0) is_can_redo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
-    is_can_paste= t->canPaste();
     is_can_format= is_can_zoomin= is_can_zoomout= true;
     is_can_autocomplete= !completer_widget->isHidden();
   }
@@ -6757,7 +6768,6 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     QTextDocument *doc= t->document();
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
-    is_can_paste= t->canPaste();
     is_can_format= false;
     is_can_zoomin= is_can_zoomout= !doc->isEmpty();
   }
@@ -6768,7 +6778,6 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
     if (doc->availableUndoSteps() <= 0) is_can_undo= false;
     if (doc->availableRedoSteps() <= 0) is_can_redo= false;
     is_can_copy= is_can_cut= t->textCursor().hasSelection();
-    is_can_paste= t->canPaste();
     is_can_format= false;
     is_can_zoomin= is_can_zoomout= !doc->isEmpty();
   }
@@ -6776,24 +6785,22 @@ void MainWindow::menu_activations(QObject *focus_widget, QEvent::Type qe)
   {
     return;
   }
-  QAction *menu_edit_action_undo= menu_spec_find_action("action_edit_undo");
-  if (menu_edit_action_undo != NULL) menu_edit_action_undo->setEnabled(is_can_undo);
-  QAction *menu_edit_action_redo= menu_spec_find_action("action_edit_redo");
-  if (menu_edit_action_redo != NULL) menu_edit_action_redo->setEnabled(is_can_redo);
-  QAction *menu_edit_action_cut= menu_spec_find_action("action_edit_cut");
-  if (menu_edit_action_cut != NULL) menu_edit_action_cut->setEnabled(is_can_cut);
-  QAction *menu_edit_action_copy= menu_spec_find_action("action_edit_copy");
-  if (menu_edit_action_copy != NULL) menu_edit_action_copy->setEnabled(is_can_copy);
-  QAction *menu_edit_action_paste= menu_spec_find_action("action_edit_paste");
-  if (menu_edit_action_paste != NULL) menu_edit_action_paste->setEnabled(is_can_paste);
-  QAction *menu_edit_action_formatter= menu_spec_find_action("action_edit_format");
-  if (menu_edit_action_formatter != NULL) menu_edit_action_formatter->setEnabled(is_can_format);
-  QAction *menu_edit_action_zoomin= menu_spec_find_action("action_edit_zoomin");
-  if (menu_edit_action_zoomin != NULL) menu_edit_action_zoomin->setEnabled(is_can_zoomin);
-  QAction *menu_edit_action_zoomout= menu_spec_find_action("action_edit_zoomout");
-  if (menu_edit_action_zoomout != NULL) menu_edit_action_zoomout->setEnabled(is_can_zoomout);
-  QAction *menu_edit_action_autocomplete= menu_spec_find_action("action_edit_autocomplete");
-  if (menu_edit_action_autocomplete != NULL) menu_edit_action_autocomplete->setEnabled(is_can_autocomplete);
+  is_can_paste= !QApplication::clipboard()->text().isEmpty();
+  for (int i= 0; i < menu_spec_struct_list.size(); ++i)
+  {
+    QAction *qaction= menu_spec_struct_list[i].qaction;
+    if (qaction == NULL) continue;
+    QString id= menu_spec_struct_list[i].id;
+    if (id == "action_edit_undo") qaction->setEnabled(is_can_undo);
+    if (id == "action_edit_redo") qaction->setEnabled(is_can_redo);
+    if (id == "action_edit_cut") qaction->setEnabled(is_can_cut);
+    if (id == "action_edit_copy") qaction->setEnabled(is_can_copy);
+    if (id == "action_edit_paste") qaction->setEnabled(is_can_paste);
+    if (id == "action_edit_format") qaction->setEnabled(is_can_format);
+    if (id == "action_edit_zoomin") qaction->setEnabled(is_can_zoomin);
+    if (id == "action_edit_zoomout") qaction->setEnabled(is_can_zoomout);
+    if (id == "action_edit_autocomplete") qaction->setEnabled(is_can_autocomplete);
+  }
 }
 
 
