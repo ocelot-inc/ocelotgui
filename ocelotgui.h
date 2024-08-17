@@ -8122,6 +8122,8 @@ QRect next_available_rect(QRect last_rect, QRect this_rect, int t);
 QRect next_available_rect_2(QRect last_rect, QRect this_rect, int i_direction);
 QRect next_available_rect_3(QRect last_rect, QRect this_rect, int i_direction);
 bool is_available_rect(int x, int y);
+int bounding_rect_width(QFont qf, QString name);
+int bounding_rect_height(QFont qf, QString name);
 public:
 erd(ERDiagram *parent_erdiagram, MainWindow *parent_mainwindow, QString passed_schema_name, QString passed_query);
 private:

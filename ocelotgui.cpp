@@ -37589,6 +37589,46 @@ bool erd::is_available_rect(int x, int y)
 }
 
 /*
+  I wish I knew why sometimes I have to add a few pixels to what fm.boundingRect() returns.
+  For not fixed pitch i.e. proportional fonts, it's especially bad, fm.boundingRect() and size() and
+  width() and horizontalAdvance() and painter->boundingRect() all are too short.
+  Todo: this formula can add more than needed (especially with big fonts?), try to improve it
+  Todo: get fontinfo earlier and store it, no need to recalculate every time you call here
+  Todo: maybe horizontalAdvance() strting with Qt 5.11 is better than width()
+*/
+int erd::bounding_rect_width(QFont qf, QString name)
+{
+  int name_length= name.length();
+  if (name_length == 0) return 0; /* currently I think name_length == 0 is impossible but check anyway */
+  QFontInfo info(qf);
+  QFontMetrics fm(qf);
+  int width= fm.boundingRect(name).width();
+  if (info.italic() == true) width+= 1;
+  QChar right_char= name.at(name_length - 1);
+  int right_bearing= abs(fm.rightBearing(right_char));
+  width+= right_bearing;
+  if (info.fixedPitch() == false)
+  {
+    width+= name_length;
+    return width * 1.02;
+  }
+  return width * 1.02;
+}
+
+/*
+  Almost always, boundingRect() has the right height, which is 1 more than lineSpacing().
+  But I saw one surprise: 'Nimbus Mono PS [UKWN]', lineSpacing()=38, boundingRect(name).height()=33.
+  Todo: maybe we only need to call this once, unless font changes
+*/
+int erd::bounding_rect_height(QFont qf, QString name)
+{
+  QFontMetrics fm(qf);
+  int height= fm.boundingRect(name).height();
+  if (fm.lineSpacing() > height) height= fm.lineSpacing();
+  return height;
+}
+
+/*
   Fill erd_tables[].
   Ordinarily we take all tables in the schema, but if query contains "(table-list)" we take that.
   Re "I": If part_name = PRIMARY that means primary-key index (a MySQL/MariaDB convention).
@@ -37947,8 +37987,8 @@ void erd::set_table_rects()
   {
     unsigned int i_of_oei= erd_tables[i].i_of_oei;
     QString table_name= erd_mainwindow->oei[i_of_oei].object_name;
-    int content_width= fm.boundingRect(table_name).width();
-    int content_height= fm.boundingRect(table_name).height();
+    int content_width= bounding_rect_width(erd_default_font, table_name);
+    int content_height= bounding_rect_height(erd_default_font, table_name);
     int column_name_count= 0;
     QString column_name;
     for (int j= i_of_oei + 1;; ++j)
@@ -37966,9 +38006,9 @@ void erd::set_table_rects()
       }
       else continue;
 
-      int column_name_width= fm.boundingRect(column_name).width();
+      int column_name_width= bounding_rect_width(erd_default_font, column_name);
       if (column_name_width > content_width) content_width= column_name_width;
-      content_height+= fm.boundingRect(column_name).height();
+      content_height+= bounding_rect_height(erd_default_font, column_name);
       ++column_name_count;
     }
     int margin_count = 2 + column_name_count + 1; /* margin,tname,margin,line,margin,cnames+margins */
@@ -38263,7 +38303,7 @@ void erd::draw_table(QPainter *painter, int table_number)
   QFontMetrics fm= QFontMetrics(erd_default_font);
   {
     QString table_name= erd_mainwindow->oei[i_of_oei].object_name;
-    int table_name_height= fm.boundingRect(table_name).height();
+    int table_name_height= bounding_rect_height(erd_default_font, table_name);
     /* "+ 6" is a kludge */
     rect_table_name_height= erd_default_container_pen_width * 2 + ERD_MARGIN_Y * 2 + table_name_height + 6;
 
@@ -38278,12 +38318,12 @@ void erd::draw_table(QPainter *painter, int table_number)
                     y,
                     erd_tables[table_number].erd_rect.width(),
                     rect_table_name_height);
-
+    int table_name_width= bounding_rect_width(erd_default_font, table_name);
     /* Unfortunately we cannot pass TEXTEDITFRAME_CELL_TYPE_HEADER which would be more appropriate. */
     QRect qr_of_table= QRect(x + ERD_MARGIN_X + erd_default_container_pen_width,
                                y + ERD_MARGIN_Y + erd_default_container_pen_width,
-                               fm.boundingRect(table_name).width() + 1,
-                               fm.boundingRect(table_name).height());
+                               table_name_width,
+                               bounding_rect_height(erd_default_font, table_name));
     painter->drawRect(qr); /* draw rect with header background color */
     painter->setPen(erd_default_text_pen);
     erd_draw_text_prepare(painter, table_number, table_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_table);
@@ -38319,8 +38359,8 @@ void erd::draw_table(QPainter *painter, int table_number)
       column_name= erd_mainwindow->oei[i].part_type;
     }
     else continue;
-    int column_name_width= fm.boundingRect(column_name).width();
-    int column_name_height= fm.boundingRect(column_name).height();
+    int column_name_width= bounding_rect_width(erd_default_font, column_name);
+    int column_name_height= bounding_rect_height(erd_default_font, column_name);
     QRect qr_of_column= QRect(x + ERD_MARGIN_X + erd_default_container_pen_width,
                               y + ERD_MARGIN_Y,
                               column_name_width,
