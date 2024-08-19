@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: August 12 2024
+   Last modified: August 19 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -11285,11 +11285,12 @@ int MainWindow::action_execute_one_statement(QString text)
   MYSQL_RES *mysql_res_for_new_result_set= NULL;
   unsigned short int is_vertical= ocelot_ca.vertical; /* true if --vertical or \G or ego */
   /*
-    ecs_return = what execute_client_statement() returns = 0 "not client and needs server",
-    1 "handled entirely by client (so skip what follows), 2 "?", 3 "set ocelot_query and does not need server"
-    4 "set ocelot_query and does need server"
+    ecs_return = what execute_client_statement() returns = EC_0 "not client and needs server",
+    EC_1 "handled entirely by client (so skip what follows), EC_2 "?",
+    EC_3 "set ocelot_query and does not need server", EC_4 "set ocelot_query and does need server (foreign)"
+    EC_5 "set ocelot_query and does need server (erdiagram)"
   */
-  unsigned int ecs_return= 0;
+  unsigned int ecs_return= EC_0;
   unsigned return_value= 0;
   int ocelot_query_result= 0;
   bool is_ocelot_query_in_client= false;
@@ -11345,9 +11346,9 @@ int MainWindow::action_execute_one_statement(QString text)
   statement_edit_widget->start_time= QDateTime::currentMSecsSinceEpoch(); /* will be used for elapsed-time display */
   int additional_result= 0;
   ecs_return= execute_client_statement(text, &additional_result);
-  if (ecs_return == 3) is_ocelot_query_in_client= true;
+  if (ecs_return == EC_3) is_ocelot_query_in_client= true;
   QString result_set_for_history= "";
-  if (ecs_return != 1)
+  if (ecs_return != EC_1)
   {
     /* The statement was not handled entirely by the client, it must be passed to the DBMS. */
 
@@ -11367,9 +11368,9 @@ int MainWindow::action_execute_one_statement(QString text)
     if (is_ocelot_query_in_client == false)
     {
       /* If DBMS is not (yet) connected, except for certain SET ocelot_... statements, this is an error. */
-      if ((connections_is_connected[0] == 0) && (ecs_return != 0))
+      if ((connections_is_connected[0] == 0) && (ecs_return != EC_0))
       {
-        if (ecs_return == 2) make_and_put_message_in_result(ER_OK, 0, (char*)"");
+        if (ecs_return == EC_2) make_and_put_message_in_result(ER_OK, 0, (char*)"");
         else make_and_put_message_in_result(ER_NOT_CONNECTED, 0, (char*)"");
         do_something= false;
       }
@@ -11489,7 +11490,7 @@ int MainWindow::action_execute_one_statement(QString text)
 #endif
         if (is_semiselect_seen == false)
         {
-          if ((ecs_return != 3) && (ecs_return != 4)) ocelot_query_result= -1;
+          if ((ecs_return != EC_3) && (ecs_return != EC_4) && (ecs_return != EC_5)) ocelot_query_result= -1;
           else
 {
             ocelot_query_result= execute_ocelot_query(query_utf16, MYSQL_MAIN_CONNECTION, &text, &is_ocelot_query_in_client,
@@ -11504,6 +11505,7 @@ int MainWindow::action_execute_one_statement(QString text)
           {
             dbms_long_query_result= false;
           }
+          else if (ecs_return == EC_5) dbms_long_query_result= ocelot_query_result;
           else
           {
             if (ocelot_query_result == -1) execute_real_query(query_utf16, MYSQL_MAIN_CONNECTION, &text);
@@ -11749,7 +11751,7 @@ after_fillup:
 statement_is_over:
   /* statement is over */
   /* todo: bug: start of session has an elapsed time */
-  if ((ecs_return == 0) && (connections_dbms[0] == DBMS_TARANTOOL) && (ocelot_query_result != ER_ERROR))
+  if ((ecs_return == EC_0) && (connections_dbms[0] == DBMS_TARANTOOL) && (ocelot_query_result != ER_ERROR))
     put_diagnostics_in_result(MYSQL_MAIN_CONNECTION, diagnostic_signal);
 statement_is_aborted:
   log("action_execute_one_statement end", 80);
@@ -12280,6 +12282,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
     delete [] token_types;
     delete [] token_lengths;
     delete [] token_offsets;
+    *diagnostic_signal= DIAGNOSTIC_1;
     return ER_OK;
   }
 #endif
@@ -12577,7 +12580,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     if (connections_dbms[0] == DBMS_TARANTOOL) connect_tarantool(MYSQL_MAIN_CONNECTION, "DEFAULT", "DEFAULT", "DEFAULT", "DEFAULT");
 #endif
     if (ocelot_ca.prompt_is_default == true) prompt_default();
-    return 1;
+    return EC_1;
   }
   /* Todo: this isn't robust, it will fail if we ever allow other words e.g. IF NOT EXISTS after CREATE. */
   if ((statement_type == TOKEN_KEYWORD_CREATE)
@@ -12587,7 +12590,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
      || (sub_token_types[2] == TOKEN_KEYWORD_FUNCTION))
     {
       clf(text);
-      return 1;
+      return EC_1;
     }
   }
 
@@ -12622,7 +12625,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         if ((i >= MAX_SUB_TOKENS) || (sub_token_lengths[i] == 0))
         {
           make_and_put_message_in_result(ER_CREATE_SERVER_SYNTAX, 0, (char*)"");
-          return 1;
+          return EC_1;
         }
         curr= text.mid(sub_token_offsets[i], sub_token_lengths[i]);
         if (curr == ")") break;
@@ -12651,7 +12654,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         tarantool_server_name= "";
         connections_dbms[MYSQL_REMOTE_CONNECTION]= 0;
       }
-      return 1;
+      return EC_1;
     }
   }
 #endif
@@ -12661,7 +12664,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   ||  (statement_type == TOKEN_KEYWORD_EXIT))
   {
     action_file_exit(false);
-    return 1;
+    return EC_1;
   }
 
   /*
@@ -12671,7 +12674,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   */
   if (statement_type == TOKEN_KEYWORD_CLEAR)
   {
-    return 1;
+    return EC_1;
   }
 
 #if (OCELOT_MYSQL_INCLUDE == 1)
@@ -12685,7 +12688,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else
     {
       make_and_put_message_in_result(ER_USE, 0, (char*)"");
-      return 1;
+      return EC_1;
     }
     /* If database name is in quotes or delimited, strip. Todo: stripping might be necessary in lots of cases. */
     s= connect_stripper(s, false);
@@ -12706,12 +12709,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         if (i == ER_OK_REHASH)
         {
           put_message_in_result(error_or_ok_message);
-          return 1;
+          return EC_1;
         }
       }
       make_and_put_message_in_result(ER_DATABASE_CHANGED, 0, (char*)"");
     }
-    return 1;
+    return EC_1;
   }
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 
@@ -12725,7 +12728,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else
     {
       make_and_put_message_in_result(ER_SOURCE, 0, (char*)"");
-      return 1;
+      return EC_1;
     }
     s= connect_stripper(s, true);
     is_in_source_statement= true; /* So is_statement_complete() will say statement can end with ; */
@@ -12733,7 +12736,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     is_in_source_statement= false;
     /* Without the following, the final line of source would go into the history twice. */
     *additional_result= TOKEN_KEYWORD_SOURCE;
-    return 1;
+    return EC_1;
   }
 
   /* PROMPT or \R: mysql equivalent. */
@@ -12748,7 +12751,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     else if (i2 == 1)
     {
       prompt_default(); /* Just "prompt" or "prompt;" with no args */
-      return 1;
+      return EC_1;
     }
     else
     {
@@ -12757,14 +12760,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       ocelot_prompt= statement_edit_widget->prompt_default;
     emit statement_edit_widget->update_prompt_width(0); /* not necessary with Qt 5.2 */
       /* Todo: output a message */
-      return 1;
+      return EC_1;
     }
     statement_edit_widget->prompt_as_input_by_user= s;
     ocelot_prompt= s;
     emit statement_edit_widget->update_prompt_width(0); /* not necessary with Qt 5.2 */
     ocelot_ca.prompt_is_default= false;
     make_and_put_message_in_result(ER_OK, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
 
   /* WARNINGS or \W: mysql equivalent. This overrides a command-line option. */
@@ -12772,7 +12775,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     ocelot_ca.history_includes_warnings= 1;
     make_and_put_message_in_result(ER_OK, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
 
   /* NOWARNING or \w: mysql equivalent. This overrides a command-line option. */
@@ -12780,7 +12783,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     ocelot_ca.history_includes_warnings= 0;
     make_and_put_message_in_result(ER_OK, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
 
   /* DELIMITER or \d: mysql equivalent. */
@@ -12791,33 +12794,33 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     if (s_result == "")
     {
       make_and_put_message_in_result(ER_DELIMITER, 0, (char*)"");
-      return 1;
+      return EC_1;
     }
     ocelot_delimiter_str= s_result;
     make_and_put_message_in_result(ER_OK, 0, (char*)"");
-    return 1;
+    return EC_1;
     }
 
   /* Todo: the following are placeholders, we want actual actions like what mysql would do. */
   if (statement_type == TOKEN_KEYWORD_QUESTIONMARK)
   {
     make_and_put_message_in_result(ER_HELP, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_CHARSET)
   {
     make_and_put_message_in_result(ER_CHARSET, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_EDIT)
   {
     make_and_put_message_in_result(ER_EDIT, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_EGO)
   {
     make_and_put_message_in_result(ER_EGO, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_GO)
   {
@@ -12826,28 +12829,28 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   if (statement_type == TOKEN_KEYWORD_HELP_IN_CLIENT)
   {
     make_and_put_message_in_result(ER_HELP, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_NOPAGER)
   {
     make_and_put_message_in_result(ER_NOPAGER, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_NOTEE) /* see comment=tee+hist */
   {
     history_file_stop("TEE");
     make_and_put_message_in_result(ER_OK, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_PAGER)
   {
     make_and_put_message_in_result(ER_PAGER, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_PRINT)
   {
     make_and_put_message_in_result(ER_PRINT, 0, (char*)"");
-    return 1;
+    return EC_1;
   }
 #if (OCELOT_EXPLORER == 1)
   if (statement_type == TOKEN_KEYWORD_REFRESH)
@@ -12855,7 +12858,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
      char error_or_ok_message[ER_MAX_LENGTH];
      explorer_refresh_caller(error_or_ok_message); /* todo: this returns an int result which we don't use */
      put_message_in_result(error_or_ok_message);
-     return 1;
+     return EC_1;
    }
 #endif
   if (statement_type == TOKEN_KEYWORD_REHASH)   /* Regardless whether ocelot_ca.auto_rehash = 1 */
@@ -12863,7 +12866,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     char error_or_ok_message[ER_MAX_LENGTH];
     rehash_scan(error_or_ok_message, ""); /* We don't check if return = ER_OK but if it failed then rehash_result_row_count = 0 */
     put_message_in_result(error_or_ok_message);
-    return 1;
+    return EC_1;
   }
   /* TODO: "STATUS" should output as much information as the mysql client does. */
   /* Todo: connections_is_connected is still 1 after lost connection or SHUTDOWN, fix that somewhere */
@@ -12890,7 +12893,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 #endif
       put_message_in_result(buffer);
     }
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_SYSTEM)
   {
@@ -12924,7 +12927,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       /* We do not bother to check whether the command failed, display will be blank. */
     }
     delete [] command_string;
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_TEE) /* see comment=tee+hist */
   {
@@ -12942,61 +12945,61 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
     {
       make_and_put_open_message_in_result(ER_OK_PLUS, 0, rr);
     }
-    return 1;
+    return EC_1;
   }
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   if (statement_type == TOKEN_KEYWORD_DEBUG_DEBUG)
   {
     debug_debug_go(text);
-    return 1;
+    return EC_1;
   }
   if ((statement_type == TOKEN_KEYWORD_DEBUG_BREAKPOINT)
    || (statement_type == TOKEN_KEYWORD_DEBUG_CLEAR)
    || (statement_type == TOKEN_KEYWORD_DEBUG_TBREAKPOINT))
   {
     debug_breakpoint_or_clear_go(statement_type, text);
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SETUP)
   {
     debug_setup_go(text);
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_INSTALL)
   {
     debug_install_go();
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_EXIT)
   {
     debug_exit_go(0);
     debug_menu_enable_or_disable(TOKEN_KEYWORD_DEBUG_EXIT);
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_DELETE)
   {
     debug_delete_go();
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_EXECUTE)
   {
     debug_execute_go();
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SKIP)
   {
     debug_skip_go();
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SET)
   {
     debug_set_go(text);
-    return 1;
+    return EC_1;
   }
   if (statement_type == TOKEN_KEYWORD_DEBUG_SOURCE)
   {
     debug_source_go();
-    return 1;
+    return EC_1;
   }
   if ((statement_type == TOKEN_KEYWORD_DEBUG_CONTINUE)
    || (statement_type == TOKEN_KEYWORD_DEBUG_EXECUTE)
@@ -13008,7 +13011,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
   {
     /* All the other debug commands go to the same place. */
     debug_other_go(text);
-    return 1;
+    return EC_1;
   }
 #endif
   /* See whether general format is SET ocelot_... = value ;". Read comment with label = "client variables" */
@@ -13022,11 +13025,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
        || (sub_token_types[3] == TOKEN_KEYWORD_SELECT)
        || (sub_token_types[3] == TOKEN_KEYWORD_UPDATE))
       {
-        return 3; /* meaning "no error if no connection and expect execute_ocelot_query to handle it" */
+        return EC_3; /* meaning "no error if no connection and expect execute_ocelot_query to handle it" */
       }
       if (sub_token_types[3] == TOKEN_KEYWORD_SHOW)
-        return 4; /* meaning "error if no connection and expect execute_ocelot_query to handle it" */
-      return 0;
+      {
+        if (sub_token_types[4] == TOKEN_KEYWORD_ERDIAGRAM) return EC_5;
+        return EC_4; /* meaning "error if no connection and expect execute_ocelot_query to handle it" */
+      }
+      return EC_0;
     }
     if ((sub_token_types[0] == TOKEN_KEYWORD_SET)
       && (sub_token_types[1] >= TOKEN_KEYWORD_OCELOT_BATCH) && (sub_token_types[1] <= TOKEN_KEYWORD_OCELOT_XML))
@@ -13035,14 +13041,14 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       {
         int er= statement_format_rule_set(text);
         make_and_put_message_in_result(er, 0, (char*)"");
-        return 1;
+        return EC_1;
       }
 #if (OCELOT_IMPORT_EXPORT == 1)
       if (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_EXPORT)
       {
         import_export_rule_set(text);
         /* make_and_put_message_in_reult is done within import_export_rule_set */
-        return 1;
+        return EC_1;
       }
 #endif
       if (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_MAX_CONDITIONS)
@@ -13055,7 +13061,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
           char tmp_for_error[256];
           sprintf(tmp_for_error, "Error. MAX_MAX_CONDITIONS = %d\n", MAX_MAX_CONDITIONS);
           put_message_in_result(tmp_for_error);
-          return 1;
+          return EC_1;
         }
         if (conditional_settings.count() > ocelot_ca.max_conditions)
         {
@@ -13064,7 +13070,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
           explorer_show_after_change();
         }
         put_message_in_result("OK");
-        return 1;
+        return EC_1;
       }
 #if (OCELOT_CHART_OR_QCHART == 1)
       if (sub_token_types[1] == TOKEN_KEYWORD_OCELOT_GRID_CHART)
@@ -13138,7 +13144,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
           char msg[512];
           sprintf(msg, "Error: maximum number of conditional statements is %d. To increase, say SET ocelot_max_conditions=N;", ocelot_ca.max_conditions);
           put_message_in_result(msg);
-          return 1;
+          return EC_1;
         }
         er_of_set_statement= conditional_settings_insert(text);
         if (er_of_set_statement == ER_OK) explorer_show_after_change();
@@ -13159,10 +13165,10 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 
       /* if there's junk after assignments and where, it's ignored */
       make_and_put_message_in_result(er_of_set_statement, 0, (char*)"");
-      return 1;
+      return EC_1;
     }
   }
-  return 0; /* not client statement */
+  return EC_0; /* not client statement */
 }
 
 /*

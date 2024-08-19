@@ -5773,7 +5773,13 @@ private:
 #define DIAGNOSTIC_0 0
 #define DIAGNOSTIC_1 1
 #define DIAGNOSTIC_2 2
-
+/* Return from execute_client_statement to be compared with ecs_return */
+#define EC_0 0
+#define EC_1 1
+#define EC_2 2
+#define EC_3 3
+#define EC_4 4
+#define EC_5 5
 
   void make_and_put_message_in_result(unsigned int, int, char*);
   void make_and_put_open_message_in_result(unsigned int, int, QString);
