@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: August 19 2024
+   Last modified: August 25 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -4189,7 +4189,7 @@ void MainWindow::menu_spec_make_menu()
     {
       menu_spec_struct_list[k].qaction->setCheckable(true);
     }
-    if (menu_spec_struct_list[k].id == "action_options_result_grid_widget")
+    if (menu_spec_struct_list[k].id == "action_options_detach_grid_widget")
     {
       menu_spec_struct_list[k].qaction->setCheckable(true);
     }
@@ -6052,7 +6052,7 @@ void MainWindow::detach_widget(int widget_type, bool checked)
     widget_text= "debug widget";
     menu_options_detach_widget= MENU_OPTIONS_DETACH_DEBUG_WIDGET;
     widget_left= ocelot_debug_left; widget_top= ocelot_debug_top; widget_width= ocelot_debug_width; widget_height= ocelot_debug_height;
-    ocelot_ca.detach_statement_edit_widget= checked; /* Todo: should this be ocelot_ca.detach_debug_widget= checked? */
+    ocelot_ca.detach_debug_widget= checked;
   }
 #endif
 #if (OCELOT_EXPLORER == 1)
@@ -37598,6 +37598,8 @@ bool erd::is_available_rect(int x, int y)
   I wish I knew why sometimes I have to add a few pixels to what fm.boundingRect() returns.
   For not fixed pitch i.e. proportional fonts, it's especially bad, fm.boundingRect() and size() and
   width() and horizontalAdvance() and painter->boundingRect() all are too short.
+  If ERD_MARGIN_X == 0, even this isn't enough.
+  We don't say "if (info.italic() == true) width+= 1; since rightbearing has appropriate increase.
   Todo: this formula can add more than needed (especially with big fonts?), try to improve it
   Todo: get fontinfo earlier and store it, no need to recalculate every time you call here
   Todo: maybe horizontalAdvance() strting with Qt 5.11 is better than width()
@@ -37609,16 +37611,17 @@ int erd::bounding_rect_width(QFont qf, QString name)
   QFontInfo info(qf);
   QFontMetrics fm(qf);
   int width= fm.boundingRect(name).width();
-  if (info.italic() == true) width+= 1;
   QChar right_char= name.at(name_length - 1);
   int right_bearing= abs(fm.rightBearing(right_char));
-  width+= right_bearing;
+  QChar left_char= name.at(0);
+  int left_bearing= abs(fm.leftBearing(left_char));
+  width+= right_bearing + left_bearing;
   if (info.fixedPitch() == false)
   {
-    width+= name_length;
-    return width * 1.02;
+    width+= name_length + 1;
+    return width * 1.04;
   }
-  return width * 1.02;
+  return width * 1.03;
 }
 
 /*
@@ -38328,7 +38331,7 @@ void erd::draw_table(QPainter *painter, int table_number)
     /* Unfortunately we cannot pass TEXTEDITFRAME_CELL_TYPE_HEADER which would be more appropriate. */
     QRect qr_of_table= QRect(x + ERD_MARGIN_X + erd_default_container_pen_width,
                                y + ERD_MARGIN_Y + erd_default_container_pen_width,
-                               table_name_width,
+                               table_name_width + ERD_MARGIN_X, /* risk overwrite of right margin */
                                bounding_rect_height(erd_default_font, table_name));
     painter->drawRect(qr); /* draw rect with header background color */
     painter->setPen(erd_default_text_pen);
@@ -38369,7 +38372,7 @@ void erd::draw_table(QPainter *painter, int table_number)
     int column_name_height= bounding_rect_height(erd_default_font, column_name);
     QRect qr_of_column= QRect(x + ERD_MARGIN_X + erd_default_container_pen_width,
                               y + ERD_MARGIN_Y,
-                              column_name_width,
+                              column_name_width + ERD_MARGIN_X, /* risk overwrite of right margin */
                               column_name_height);
     erd_draw_text_prepare(painter, table_number, column_name, TEXTEDITFRAME_CELL_TYPE_DETAIL, qr_of_column);
     painter->drawText(qr_of_column, Qt::AlignLeft, column_name);
@@ -41163,7 +41166,6 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
         QAction *action_options_detach_statement_widget= main_window->menu_spec_find_action("action_options_detach_statement_widget");
         if (action_options_detach_statement_widget != NULL)
         {
-if (qv == "no") printf("action_options_detach_statement_widget no\n"); else printf("action_options_detach_statement_widget no\n");
           if (qv == "no") { action_options_detach_statement_widget->setChecked(false); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED, false); }
           else {action_options_detach_statement_widget->setChecked(true); main_window->detach_widget(TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED, true); }
         }
