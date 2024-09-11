@@ -930,7 +930,8 @@ static const char *s_color_list[]=
 #define MENU_GRID_HTML_EFFECTS 118 /* was MENU_PICK_NEW_FONT 111 until version 1.5 */
 #define MENU_CONNECTION_DIALOG_BOX 119
 #define MENU_FILE_CONNECT_HEADING 120
-#define MENU_END 121
+#define MENU_HELP_SESSION_TYPE 121 /* todo: someday move this up to after MENU_HELP_SETTINGS */
+#define MENU_END 122
 
 static const char *menu_strings[]=
 {
@@ -1056,6 +1057,7 @@ static const char *menu_strings[]=
     "Grid Html effects", /* Used to be "Pick new font". Since version 1.5 we don't call QFontDialog */
     "Connection Dialog Box",
     "File|Connect. Usually only the first 8 fields are important.",
+    "session_type",
     /* FRENCH */
     "Fichier", /* MENU_FILE */
     "Connexion", /* MENU_FILE_CONNECT */
@@ -1177,7 +1179,8 @@ static const char *menu_strings[]=
         "Réglages -- -- pour Explorateur",
         "Grille effets de html",
         "Connexion Boîte de dialogue",
-        "Fichier|Connexion. Habituellement, seuls les 8 premiers champs sont importants."
+        "Fichier|Connexion. Habituellement, seuls les 8 premiers champs sont importants.",
+        "session_type"
 };
 
 

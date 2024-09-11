@@ -120,6 +120,13 @@ typedef struct
 #define OCELOT_OS_FREEBSD
 #endif
 
+/* See comments before action_help_session_type */
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
+#define IS_X11_POSSIBLE 1
+#else
+#define IS_X11_POSSIBLE 0
+#endif
+
 /*
   The possible DBMS values.
   These are related to ocelot_dbms values.
@@ -969,6 +976,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR,
     TOKEN_KEYWORD_OCELOT_QUERY,
     TOKEN_KEYWORD_OCELOT_RAW,
+    TOKEN_KEYWORD_OCELOT_SESSION_TYPE,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE, /* KEYWORD_OCELOT_SHORTCUT_* items are obsolete, remove in next version */
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH,
     TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT,
@@ -1574,7 +1582,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1228
+#define KEYWORD_LIST_SIZE 1229
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -2264,6 +2272,7 @@ static const struct keywords strvalues[]=
     {"OCELOT_MENU_TEXT_COLOR", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR},
     {"OCELOT_QUERY", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_QUERY},
     {"OCELOT_RAW", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_RAW},
+    {"OCELOT_SESSION_TYPE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SESSION_TYPE},
     {"OCELOT_SHORTCUT_AUTOCOMPLETE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
     {"OCELOT_SHORTCUT_BATCH", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
     {"OCELOT_SHORTCUT_BREAKPOINT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
@@ -4626,6 +4635,7 @@ struct plugin_pass {
 #include <QActionGroup>
 #endif
 
+
 /* QRegExp is unavailable in Qt 6. Todo: We have never tested the replacemnt QRegularExpression code. */
 #if (QT_VERSION < 0x60000)
 #include <QRegExp>
@@ -5598,6 +5608,7 @@ public:
   void action_help_libmysqlclient(bool is_checked);
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   void action_help_settings(bool is_checked);
+  void action_help_session_type(bool is_checked);
 
   QTextCharFormat get_format_of_current_token(int token_type, int token_flags, QString mid_next_token);
   void action_undo();
@@ -8636,7 +8647,7 @@ private:
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXTRA_RULE_1 5
 #define OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT     6
 #define OCELOT_VARIABLE_ENUM_SET_FOR_EXPLORER     7
-#define OCELOT_VARIABLES_SIZE 145
+#define OCELOT_VARIABLES_SIZE 146
 
 struct ocelot_variable_keywords {
   QString *qstring_target;                /* e.g. &ocelot_statement_text_color */
