@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: September 11 2024
+   Last modified: September 16 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -500,12 +500,6 @@ int dbms_query_connection_number;
 volatile int dbms_long_query_result;
 volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
-#if (IS_X11_POSSIBLE == 1) /* see comments before action_help_session_type */
-int iteration_for_x11= 0;
-  bool is_session_type_wayland();
-#endif
-QString ocelot_session_type; /* see comments before action_help_session_type */
-
 /*
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -534,61 +528,23 @@ void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QSt
 }
 #endif
 
-MainWindow *main_window_1= NULL;
-
 int main(int argc, char *argv[])
 {
 #if (QT_VERSION >= 0x50000)
   qInstallMessageHandler(dump_qtmessage);
 #endif
-#if (IS_X11_POSSIBLE == 1) /* how simple were things pre-Wayland or Windows */
-  if (is_session_type_wayland() == false)
-#endif
-  {
-    QApplication app(argc, argv);
-    MainWindow w(argc, argv);
-#if (IS_X11_POSSIBLE == 1)
-    ++iteration_for_x11;
-#endif
-    /* We depended on w being maximized in resizeEvent() */
-#if (QT_VERSION >= 0x50000)
-    QScreen *screen= QGuiApplication::primaryScreen();
-    QRect screen_geometry= screen->geometry();
-    w.setGeometry(screen_geometry);
-#endif
-    w.showMaximized();
-    return app.exec();
-  }
-
-  QApplication *main_application;
-  main_application= new QApplication(argc, argv);
-  main_window_1= new MainWindow(argc, argv);
-#if (IS_X11_POSSIBLE == 1) /* see comments before action_help_session_type */
-  if (ocelot_session_type == "x11")
-  {
-    ++iteration_for_x11;
-    delete main_window_1;
-    delete main_application;
-    unsetenv("WAYLAND_DISPLAY");
-    putenv((char*)"XDG_SESSION_TYPE=x11");
-    main_application= new QApplication(argc, argv);
-    main_window_1= new MainWindow(argc, argv);
-  }
-  if (is_session_type_wayland() == true) printf("Warning: Wayland detected. See Help|session_type.\n");
-  else /* for some reason we have to encourage showmaximized with x11 */
-  {
-#if (QT_VERSION >= 0x50000)
-    QScreen *screen= QGuiApplication::primaryScreen();
-    QRect screen_geometry= screen->geometry();
-    main_window_1->setGeometry(screen_geometry);
-#endif
-  }
-#endif
-  main_window_1->showMaximized();
-  int return_value= main_application->exec();
-  if (main_window_1 != NULL) delete main_window_1;
-  return return_value;
+  QApplication main_application(argc, argv);
+  MainWindow w(argc, argv);
+  /* We depend on w being maximized in resizeEvent() */
+//#if (QT_VERSION >= 0x50000)
+//    QScreen *screen= QGuiApplication::primaryScreen();
+//    QRect screen_geometry= screen->geometry();
+//    main_window_1->setGeometry(screen_geometry);
+//#endif
+  w.showMaximized();
+  return main_application.exec();
 }
+
 
 
 MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
@@ -597,6 +553,13 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   log("MainWindow start", 90); /* Ordinarily this is less than ocelot_ca.log_level so won't appear */
   initial_asserts();  /* Check that some defined | constant values are okay. */  /* Initialization */
+#if (IS_X11_POSSIBLE == 1) /* see comments before action_options_detach_history_widget */
+  {
+    char tmp_wayland_warning[2048];
+    strcpy(tmp_wayland_warning, wayland_warning().toUtf8());
+    printf("%s\n", tmp_wayland_warning);
+  }
+#endif
   main_window_maximum_width= 0;
   main_window_maximum_height= 0;
   main_token_max_count= main_token_count_in_all= main_token_count_in_statement= main_token_number= 0;
@@ -757,9 +720,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     print_defaults();
     exit(0);
   }
-#if (IS_X11_POSSIBLE == 1) /* see comments before help_session_type */
-  if ((iteration_for_x11 == 0) && (ocelot_session_type == "x11")) return;
-#endif
   for (int q_i= 0; strcmp(string_languages[q_i]," ") > 0; ++q_i)
   {
     QString s= string_languages[q_i];
@@ -850,7 +810,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 MainWindow::~MainWindow()
 {
   delete ui;
-  main_window_1= NULL;
 }
 
 /*
@@ -3682,7 +3641,6 @@ void MainWindow::menu_spec_make_function()
    menu_function_struct_list.append({"action_help_libmysqlclient", false, &MainWindow::action_help_libmysqlclient, NULL});
 #endif
    menu_function_struct_list.append({"action_help_settings", false, &MainWindow::action_help_settings, NULL});
-   menu_function_struct_list.append({"action_help_session_type", false, &MainWindow::action_help_session_type, NULL});
 }
 
 /*
@@ -3989,8 +3947,6 @@ void MainWindow::menu_spec_make_menu()
 #endif
   blen+= sprintf(b + blen, "%s'action_help_settings', '%s', '%s', 'action_help_settings');",
                insert, menu_strings[menu_off + MENU_HELP], menu_strings[menu_off + MENU_HELP_SETTINGS]);
-  blen+= sprintf(b + blen, "%s'action_help_session_type', '%s', '%s', 'action_help_session_type');",
-               insert, menu_strings[menu_off + MENU_HELP], menu_strings[menu_off + MENU_HELP_SESSION_TYPE]);
 /*
   Here is a slightly older version of b[], copied here to make the effect of the above sprintfs a bit more readable.
   If ostrings.h didn't have an undocumented option for --ocelot_languages, this would be all we'd need.
@@ -5990,6 +5946,44 @@ void MainWindow::action_file_export_none(bool is_checked)
 */
 
 /*
+  Put comments re Wayland and x11 here.
+  The Problem:
+    Wayland https://en.wikipedia.org/wiki/Wayland_(protocol) is now default on some Linux distros.
+    Wayland does not allow applications to declare where top-level windows will go, this is deliberate.
+    This is a new problem because the older default x11 supported declaring.
+    This affects ocelotgui's detach option, it means users must drag to preferred positions.
+    Qt suggests startSystemMove or QDockWidget but at time of writing that causes bugs elsewhere.
+    Also, attempts to simulate mousepress and drag events in ocelotgui code have failed.
+  The solution (abandoned):
+    Some (all?) major Linux distros still support x11 as non-default, so switch to it thus:
+    unsetenv("WAYLAND_DISPLAY");
+    putenv((char*)"XDG_SESSION_TYPE=x11");
+    But this isn't default because it might not always work, so it's a user option.
+    This code is only present #if (IS_X11_POSSIBLE == 1) which is false on Windows.
+    There is a warning at program start and after detach|attach with SET.
+  The user option:
+    Advise in warning messges to say XDG_SESSION_TYPE_type=x11.
+  Todo: allow plugin to change session_type (this would have to change before QApplication starts)
+  Todo: allow session_type="x11" at program start i.e. make it default
+        this too would need to happen before QApplication start, maybe a cmake option
+  Todo: maybe wayland_warning() doesn't cover all possibilities, e.g. what's xdg_session_type=tty?
+*/
+
+#if (IS_X11_POSSIBLE == 1)
+QString MainWindow::wayland_warning() /* warning: at start we copy to a variable with char[2048] */
+{
+  QString xdg_session_type= getenv("XDG_SESSION_TYPE");
+  if (xdg_session_type.toLower() == "wayland") return
+"Warning: XDG_SESSION_TYPE=wayland. \
+So the 'detach' option won't put widgets' top and left in desired places, \
+although you can still drag them with the mouse. \
+If you must have the old behaviour, then before running ocelotgui try export XDG_SESSION_TYPE=x11 and unset WAYLAND_DISPLAY. \
+(The word 'try' is important because some OSes no longer support x11 well.)";
+  return "";
+}
+#endif
+
+/*
   Flags for setWindowFlags().
   Doesn't include Qt::WindowCloseButtonHint so there will be no close button.
   Doesn't include Qt::WindowStaysOnTopHint but in fact it will be on top of other widgets of app.
@@ -6162,10 +6156,10 @@ void MainWindow::detach_widget(int widget_type, bool checked)
       shrink= widget_rect.height();
       shrink+= QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
       int main_rect_height= main_rect.height() - shrink;
-      showNormal();
+      //showNormal();
       //hide();
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      //show();
+      show();
       y= main_point.y() + main_rect_height + QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
     }
     else shrink= 0;
@@ -6660,72 +6654,7 @@ void MainWindow::action_help_settings(bool is_checked)
   delete message_box;
 }
 
-/*
-  Put comments re session_type and Wayland and x11 here.
-  The Problem:
-    Wayland https://en.wikipedia.org/wiki/Wayland_(protocol) is now default on some Linux distros.
-    Wayland does not allow applications to declare where top-level windows will go, this is deliberate.
-    This is a new problem because the older default x11 supported declaring.
-    This affects ocelotgui's detach option, it means users must resize and drag to preferred positions.
-    Qt suggests startSystemMove or QDockWidget but at time of writing that causes bugs elsewhere.
-    Also, attempts to simulate mousepress and drag events in ocelotgui code have failed.
-  The solution (for now):
-    Some (all?) major Linux distros still support x11 as non-default, so switch to it thus:
-    unsetenv("WAYLAND_DISPLAY");
-    putenv((char*)"XDG_SESSION_TYPE=x11");
-    But this isn't default because it might not always work, so it's a user option.
-    This code is only present #if (IS_X11_POSSIBLE == 1) which is false on Windows.
-    There is a warning at program start and after detach|attach with SET.
-  The user option:
-    Advise in help|session_type to say xdg_session_type=x11.
-    User can put --session_type=x11 on commmand line or put ocelot_session_type=x11 in a .cfg file
-    Alas option checking happens after QApplication + MainWindow exist, then it's too late to change.
-    So if user does that, delete QApplication + MainWindow and start again, which of course is slow.
-    Todo: shift option checking up but that's a lot of change.
-    Todo: maybe in future there will be other options besides x11.
-    Todo: allow plugin to change session_type.
-  Todo: allow session_type="x11" at program start i.e. make it default
-    This is possible by saying Qtring session_type == "x11".
-    Perhaps there could be a CMakeLists.txt option -DOCELOT_SESSION_TYPE = ...
-    But we don't check session_type at start so this requires changes in int main() too.
-  example.cnf:
-    There is no example setting because the default is to set nothing. Todo: consider changing this.
-  Todo: test with FreeBSD and with Windows and with another Linux distro.
-  Todo: maybe is_session_type_wayland() doesn't cover all possibilities, e.g. what's xdg_session_type=tty?
-  Todo: does this affect plugin.c?
-*/
-void MainWindow::action_help_session_type(bool is_checked)
-{
- (void)is_checked;
-  Message_box *message_box;
-  QString the_text= "<b>session_type</b><br>";
-#if (IS_X11_POSSIBLE == true)
-  if (is_session_type_wayland() == true) the_text= the_text + "You're using Wayland.<br>";
-  else the_text= the_text + "You're not using Wayland so this text doesn't affect you at the moment.<br>";
-#else
-  the_text= the_text + "You're not using Wayland which is primarily for Linux so this text doesn't affect you.<br>";
-#endif
-  the_text= the_text +
-  "Wayland is fine except that the ocelotgui 'detach' feature won't put detached widgets in places you choose. \
-  You can still use the mouse to drag detached widgets to desired positions. \
-  Or, if your operating system also supports x11 (as most do) you can force x11 use ...\
-  Method 1: before running ocelotgui say export XDG_SESSION_TYPE=x11 and unset WAYLAND_DISPLAY. \
-  Method 2: start ocelotgui with an option i.e. ocelotgui --ocelot_session_type=x11. \
-  Method 3: in the [ocelot] section of your .my.cnf file add ocelot_session_type=x11. \
-  Do not use any of these methods if you already don't have Wayland.";
-  message_box= new Message_box("Help|Session_Type", the_text, 500, "", er_strings[er_off + ER_OK], "", this);
-  message_box->exec();
-  delete message_box;
-}
 
-#if (IS_X11_POSSIBLE == 1)
-bool is_session_type_wayland()
-{
-  QString xdg_session_type= getenv("XDG_SESSION_TYPE");
-  if (xdg_session_type.toLower() == "wayland") return true;
-  return false;
-}
-#endif
 
 /*
   Problem: to do syntax highlighting, one must have a slot
@@ -13237,7 +13166,12 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
         if ((main_token_types[iossc] == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
          || (main_token_types[iossc] == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
          || (main_token_types[iossc] == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED))
-            ++detached_count;
+        {
+          int i_of_yes_or_no= next_i(iossc, 2);
+          QString yes_or_no= text.mid(main_token_offsets[i_of_yes_or_no], main_token_lengths[i_of_yes_or_no]);
+          yes_or_no= connect_stripper(yes_or_no, true);
+          if (yes_or_no.toUpper() == "YES") ++detached_count;
+        }
 #endif
         if ((main_token_types[iossc] == TOKEN_TYPE_OPERATOR) || (main_token_lengths[iossc] == 0)) break;
         iossc= next_i(iossc, 1);
@@ -13294,8 +13228,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
 #if (IS_X11_POSSIBLE == 1)
     if ((er_of_set_statement == ER_OK) && (detached_count > 0))
     {
-      /* This message text is duplicated elsewhere */
-      if (is_session_type_wayland() == true) put_message_in_result("Warning: Wayland detected. See Help|session_type.\n");
+      if (wayland_warning() != "") put_message_in_result(wayland_warning());
       return EC_1;
     }
 #endif
@@ -15657,7 +15590,7 @@ void MainWindow::initial_asserts()
   /* and you should also look whether SET statements cause an overflow */
   /* See hparse.h comment "If you add to this, hparse_errmsg might not be big enough." */
   /* Temporarily uncomment the check later whether ocelot_keyword_lengths > MAX_HPARSE_ERRMSG_LENGTH */
-  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 153);
+  assert(TOKEN_KEYWORD_OCELOT_XML - TOKEN_KEYWORD_OCELOT_BATCH == 152);
 
   /* If the following assert happens, you put something before "?" in strvalues[]. */
   /* That is okay but you must ensure that the first non-placeholder is strvalues[TOKEN_KEYWORDS_START]. */
@@ -24430,6 +24363,8 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
           host = 'localhost' (which means protocol=SOCKET if mysql client, but we ignore that)
           user = Unix login name on Linux, although on Windows it would be 'ODBC'
           and there seem to be some getenv() calls in other clients that I didn't take into account.
+    Todo: iff ocelot_dbms=mariadb then ./ocelotgui --port=3307 should cause tcp
+          imitates a quirk of the MariaDB client, only if port is on command line and --protocol=socket isn't
   */
   ocelot_ca.no_defaults= 0;
   ocelot_defaults_file= "";
@@ -41136,7 +41071,6 @@ int XSettings::ocelot_variables_create()
     {&main_window->ocelot_menu_font_weight, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_FONT_WEIGHT, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_FONT_WEIGHT},
     {&main_window->ocelot_menu_text_color, NULL,  -1, OCELOT_VARIABLE_FLAG_SET_COLOR, OCELOT_VARIABLE_ENUM_SET_FOR_MENU, TOKEN_KEYWORD_OCELOT_MENU_TEXT_COLOR},
     {NULL, &ocelot_ca.raw, 1, 0, 0, TOKEN_KEYWORD_OCELOT_RAW},
-    {&ocelot_session_type, NULL, -1, 0, 0, TOKEN_KEYWORD_OCELOT_SESSION_TYPE},
     {NULL, ocelot_ca.shortcut_autocomplete, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_AUTOCOMPLETE},
     {NULL, ocelot_ca.shortcut_batch, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_BATCH},
     {NULL, ocelot_ca.shortcut_breakpoint, -1, 0, OCELOT_VARIABLE_ENUM_SET_FOR_SHORTCUT, TOKEN_KEYWORD_OCELOT_SHORTCUT_BREAKPOINT},
@@ -41205,7 +41139,7 @@ int XSettings::ocelot_variables_create()
     {NULL, &ocelot_ca.vertical,  1, 0, 0, TOKEN_KEYWORD_OCELOT_VERTICAL},
     {NULL, &ocelot_ca.xml,  1, 0, 0, TOKEN_KEYWORD_OCELOT_XML}
   };
-  int i= 146;
+  int i= 145;
   assert(sizeof(o_v) == sizeof(struct ocelot_variable_keywords) * i);
   memcpy(ocelot_variables, o_v, sizeof(o_v));
   return i;
@@ -41279,12 +41213,6 @@ int XSettings::ocelot_variable_set(int keyword_index, QString new_value)
       *int_target= i;
       if (keyword_index == TOKEN_KEYWORD_OCELOT_HTMLRAW) ocelot_ca.html= ocelot_ca.raw= i;
     }
-    return ER_OK;
-  }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_SESSION_TYPE)
-  {
-    /* Todo: check validity of qv here? */
-    ocelot_session_type= qv.toLower();
     return ER_OK;
   }
   if (keyword_index == TOKEN_KEYWORD_OCELOT_STATEMENT_FORMAT_RULE)
