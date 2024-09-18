@@ -122,9 +122,9 @@ typedef struct
 
 /* See comments before action_options_detach_history_widget */
 #if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
-#define IS_X11_POSSIBLE 1
+#define IS_WAYLAND_POSSIBLE 1
 #else
-#define IS_X11_POSSIBLE 0
+#define IS_WAYLAND_POSSIBLE 0
 #endif
 
 /*
@@ -5629,9 +5629,6 @@ public:
   void action_settings_extra_rule_1(bool is_checked);
   void action_edit_previous_statement(bool is_checked);
   void action_edit_next_statement(bool is_checked);
-#if (IS_X11_POSSIBLE == 1)
-  QString wayland_warning();
-#endif
   void action_options_detach_history_widget(bool is_checked);
   void action_options_detach_grid_widget(bool is_checked);
 #if (OCELOT_MYSQL_DEBUGGER == 1)

@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: September 16 2024
+   Last modified: September 18 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -500,6 +500,14 @@ int dbms_query_connection_number;
 volatile int dbms_long_query_result;
 volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 
+#if (IS_WAYLAND_POSSIBLE == 1)
+static char wayland_warning[]="Warning: XDG_SESSION_TYPE=wayland. \
+So the 'detach' option won't put widgets' top and left in desired places, \
+although you can still drag them with the mouse. \
+If you must have the old behaviour, then before running ocelotgui try export XDG_SESSION_TYPE=x11 and unset WAYLAND_DISPLAY. \
+(The word 'try' is important because some OSes no longer support x11 well.)";
+#endif
+
 /*
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -533,14 +541,21 @@ int main(int argc, char *argv[])
 #if (QT_VERSION >= 0x50000)
   qInstallMessageHandler(dump_qtmessage);
 #endif
+#if (IS_WAYLAND_POSSIBLE == 1) /* see comments before action_options_detach_history_widget */
+  {
+    QString xdg_session_type= getenv("XDG_SESSION_TYPE");
+    if (xdg_session_type.toLower() == "wayland") printf("%s.\n", wayland_warning);
+    else wayland_warning[0]= '\0';
+  }
+#endif
   QApplication main_application(argc, argv);
   MainWindow w(argc, argv);
   /* We depend on w being maximized in resizeEvent() */
-//#if (QT_VERSION >= 0x50000)
-//    QScreen *screen= QGuiApplication::primaryScreen();
-//    QRect screen_geometry= screen->geometry();
-//    main_window_1->setGeometry(screen_geometry);
-//#endif
+#if (QT_VERSION >= 0x50000)
+    QScreen *screen= QGuiApplication::primaryScreen();
+    QRect screen_geometry= screen->geometry();
+    w.setGeometry(screen_geometry);
+#endif
   w.showMaximized();
   return main_application.exec();
 }
@@ -553,13 +568,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   log("MainWindow start", 90); /* Ordinarily this is less than ocelot_ca.log_level so won't appear */
   initial_asserts();  /* Check that some defined | constant values are okay. */  /* Initialization */
-#if (IS_X11_POSSIBLE == 1) /* see comments before action_options_detach_history_widget */
-  {
-    char tmp_wayland_warning[2048];
-    strcpy(tmp_wayland_warning, wayland_warning().toUtf8());
-    printf("%s\n", tmp_wayland_warning);
-  }
-#endif
   main_window_maximum_width= 0;
   main_window_maximum_height= 0;
   main_token_max_count= main_token_count_in_all= main_token_count_in_statement= main_token_number= 0;
@@ -802,6 +810,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   {
     action_file_connect(false);
   }
+
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
   QTimer::singleShot(0, this, SLOT(initialize_after_main_window_show()));
   log("MainWindow end", 90);
@@ -821,6 +830,9 @@ MainWindow::~MainWindow()
   this will happen only after all the main events (show, paint, focusin, etc.) have already been processed.
   But I still needed to issue Messagebox_flash, a drastic way to force an update.
   There will be a lot of blinking. Probably not worth worrying about.
+  Re history_edit_widget adjustments:
+    Sometimes, seen with x11, at start, history_edit_widget cursor isn't quite at end even though there is
+    a call to set to verticalScrollBar()->maximum()) in action_execute(). Setting here seems to fix it.
 */
 void MainWindow::initialize_after_main_window_show()
 {
@@ -844,6 +856,8 @@ void MainWindow::initialize_after_main_window_show()
 #if (OCELOT_EXPLORER == 1)
   if (ocelot_explorer_detached == "yes") action_options_detach_explorer_widget(true);
 #endif
+  history_edit_widget->adjustSize();
+  history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
 }
 
 /*
@@ -5959,29 +5973,16 @@ void MainWindow::action_file_export_none(bool is_checked)
     unsetenv("WAYLAND_DISPLAY");
     putenv((char*)"XDG_SESSION_TYPE=x11");
     But this isn't default because it might not always work, so it's a user option.
-    This code is only present #if (IS_X11_POSSIBLE == 1) which is false on Windows.
+    This code is only present #if (IS_WAYLAND_POSSIBLE == 1) which is false on Windows.
     There is a warning at program start and after detach|attach with SET.
   The user option:
     Advise in warning messges to say XDG_SESSION_TYPE_type=x11.
   Todo: allow plugin to change session_type (this would have to change before QApplication starts)
   Todo: allow session_type="x11" at program start i.e. make it default
         this too would need to happen before QApplication start, maybe a cmake option
-  Todo: maybe wayland_warning() doesn't cover all possibilities, e.g. what's xdg_session_type=tty?
+  Todo: maybe the check for wayland_warning doesn't cover all possibilities, e.g. what's xdg_session_type=tty?
 */
 
-#if (IS_X11_POSSIBLE == 1)
-QString MainWindow::wayland_warning() /* warning: at start we copy to a variable with char[2048] */
-{
-  QString xdg_session_type= getenv("XDG_SESSION_TYPE");
-  if (xdg_session_type.toLower() == "wayland") return
-"Warning: XDG_SESSION_TYPE=wayland. \
-So the 'detach' option won't put widgets' top and left in desired places, \
-although you can still drag them with the mouse. \
-If you must have the old behaviour, then before running ocelotgui try export XDG_SESSION_TYPE=x11 and unset WAYLAND_DISPLAY. \
-(The word 'try' is important because some OSes no longer support x11 well.)";
-  return "";
-}
-#endif
 
 /*
   Flags for setWindowFlags().
@@ -11263,6 +11264,7 @@ QMenu *menu_help= menu_spec_find_menu("menu_help");
     action_settings_statement_edit_widget_text_changed(0, 0, 0);
     //widget_sizer();
     /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
+    /* See also similar call in initialize_after_main_window_show(). */
     history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
     history_edit_widget->show(); /* Todo: find out if this is really necessary */
     if (is_kill_requested == true) break;
@@ -13146,7 +13148,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       /* warning: assignements can succeed and later statement can fail */
       int er_of_set_statement= 0;
       int i_of_set_statement= main_token_number; /* start at beginning and skip till after set */
-#if (IS_X11_POSSIBLE == 1)
+#if (IS_WAYLAND_POSSIBLE == 1)
       int detached_count= 0;
 #endif
       while ((main_token_types[i_of_set_statement] < TOKEN_KEYWORD_OCELOT_BATCH)
@@ -13162,7 +13164,7 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
       int iossc= i_of_set_statement;
       for (;;)
       {
-#if (IS_X11_POSSIBLE == 1)
+#if (IS_WAYLAND_POSSIBLE == 1)
         if ((main_token_types[iossc] == TOKEN_KEYWORD_OCELOT_HISTORY_DETACHED)
          || (main_token_types[iossc] == TOKEN_KEYWORD_OCELOT_GRID_DETACHED)
          || (main_token_types[iossc] == TOKEN_KEYWORD_OCELOT_STATEMENT_DETACHED))
@@ -13225,10 +13227,10 @@ int MainWindow::execute_client_statement(QString text, int *additional_result)
      }
 #endif
       /* if there's junk after assignments and where, it's ignored */
-#if (IS_X11_POSSIBLE == 1)
+#if (IS_WAYLAND_POSSIBLE == 1)
     if ((er_of_set_statement == ER_OK) && (detached_count > 0))
     {
-      if (wayland_warning() != "") put_message_in_result(wayland_warning());
+      if (wayland_warning[0] != '\0') put_message_in_result(wayland_warning);
       return EC_1;
     }
 #endif
