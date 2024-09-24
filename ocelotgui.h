@@ -4634,7 +4634,7 @@ struct plugin_pass {
 #endif
 
 
-/* QRegExp is unavailable in Qt 6. Todo: We have never tested the replacemnt QRegularExpression code. */
+/* QRegExp is unavailable in Qt 6. Todo: We have never tested the replacement QRegularExpression code. */
 #if (QT_VERSION < 0x60000)
 #include <QRegExp>
 #endif

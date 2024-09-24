@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: September 18 2024
+   Last modified: September 24 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -504,8 +504,8 @@ volatile int dbms_long_query_state= LONG_QUERY_STATE_ENDED;
 static char wayland_warning[]="Warning: XDG_SESSION_TYPE=wayland. \
 So the 'detach' option won't put widgets' top and left in desired places, \
 although you can still drag them with the mouse. \
-If you must have the old behaviour, then before running ocelotgui try export XDG_SESSION_TYPE=x11 and unset WAYLAND_DISPLAY. \
-(The word 'try' is important because some OSes no longer support x11 well.)";
+If you must have the old behaviour, see whether your BSD or Linux distro \
+allows you to switch to x11.";
 #endif
 
 /*
@@ -544,7 +544,7 @@ int main(int argc, char *argv[])
 #if (IS_WAYLAND_POSSIBLE == 1) /* see comments before action_options_detach_history_widget */
   {
     QString xdg_session_type= getenv("XDG_SESSION_TYPE");
-    if (xdg_session_type.toLower() == "wayland") printf("%s.\n", wayland_warning);
+    if (xdg_session_type.toLower() == "wayland") printf("%s\n", wayland_warning);
     else wayland_warning[0]= '\0';
   }
 #endif
@@ -552,15 +552,27 @@ int main(int argc, char *argv[])
   MainWindow w(argc, argv);
   /* We depend on w being maximized in resizeEvent() */
 #if (QT_VERSION >= 0x50000)
-    QScreen *screen= QGuiApplication::primaryScreen();
-    QRect screen_geometry= screen->geometry();
-    w.setGeometry(screen_geometry);
+//    QScreen *screen= QGuiApplication::primaryScreen();
+//    QRect screen_geometry= screen->geometry();
+//    w.setGeometry(screen_geometry);
 #endif
   w.showMaximized();
   return main_application.exec();
 }
 
-
+/*
+  Todo: work on initial show() or showMaximized() or hide() or setVisible statements while MainWindow constructor goes on.
+  There is a w.showMaximized() in int main() which seems to be ineffective, the one after setCentralWidget() works more often.
+  The hide() in this constructor might be helping, but I'm not sure why.
+  When ocelotgui starts there is a top-left flash of a blank window, this might be because one of the widget constructors has a show().
+  But also there's a complete small MainWindow that luckily is wiped out, presumably the a showMaximiae().
+  before the widget is added to main_window.
+  Sometimes I was seeing all-black menus when hovering on the menu line, maybe that's gone.
+  Sometimes after detach with x11 I was seeing that something was underneath the detached widget, maybe that's gone.
+  I had to add adjustSize() for the history widget while initializing, maybe that's no longer necessary.
+  Caption of a detached widget might not appear immediately.'
+  Lots more tests needed with or without wayland, Qt5 or 6, Ubuntu or Fedora or Windows.
+*/
 
 MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   QMainWindow(parent),
@@ -568,6 +580,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   log("MainWindow start", 90); /* Ordinarily this is less than ocelot_ca.log_level so won't appear */
   initial_asserts();  /* Check that some defined | constant values are okay. */  /* Initialization */
+
   main_window_maximum_width= 0;
   main_window_maximum_height= 0;
   main_token_max_count= main_token_count_in_all= main_token_count_in_statement= main_token_number= 0;
@@ -606,7 +619,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   ocelot_dbms= "tarantool";
   connections_dbms[0]= DBMS_TARANTOOL;
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
-
   ocelot_grid_max_row_lines= 5; /* obsolete? */               /* maximum number of lines in 1 row. warn if this is exceeded? */
   ocelot_statement_prompt_background_color= s_color_list[COLOR_SILVER*2 + 1]; /* set early because initialize_widget_statement() depends on this */
   ocelot_grid_focus_cell_background_color= s_color_list[COLOR_WHEAT*2 + 1];;
@@ -649,6 +661,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   create_widget_debug();
 #endif
   main_window= new QWidget(this);                  /* 2015-08-25 added "this" */
+  main_window->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
   completer_widget= new Completer_widget(); completer_widget->construct(this);
   c_widget= new C_widget(); c_widget->construct(this); c_widget->setFont(fixed_font); c_widget->hide();
   ocelot_grid_cell_height= "default";              /* todo: should be changeable with Settings menu item */
@@ -780,7 +793,12 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #else
   main_window->setLayout(main_layout);
 #endif
+
   setCentralWidget(main_window);
+
+  this->showMaximized();
+  this->showMaximized();
+
   fill_menu_2();    /* Do this at a late stage because widgets must exist before we call connect() */
   history_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
   connect(history_edit_widget, SIGNAL(customContextMenuRequested(const QPoint &)),
@@ -856,7 +874,7 @@ void MainWindow::initialize_after_main_window_show()
 #if (OCELOT_EXPLORER == 1)
   if (ocelot_explorer_detached == "yes") action_options_detach_explorer_widget(true);
 #endif
-  history_edit_widget->adjustSize();
+//  history_edit_widget->adjustSize();
   history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
 }
 
@@ -6150,6 +6168,7 @@ void MainWindow::detach_widget(int widget_type, bool checked)
   if (checked)
   {
     menu_options_action_options_detach_widget->setText("attach " + widget_text);
+    //widget->setParent(0);
     widget->setWindowFlags(Qt::Window | DETACHED_WINDOW_FLAGS);
     widget->setWindowTitle(widget_text);
     if (widget_top == "default")
@@ -6157,10 +6176,18 @@ void MainWindow::detach_widget(int widget_type, bool checked)
       shrink= widget_rect.height();
       shrink+= QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
       int main_rect_height= main_rect.height() - shrink;
-      //showNormal();
+      showNormal();
       //hide();
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
-      show();
+      //show();
+      if (wayland_warning[0] != '\0')
+      {
+        hide();
+        int main_window_height= main_window->height() - shrink;
+        main_window->resize(main_rect.width(), main_window_height);
+        this->resize(main_rect.width(), main_rect_height);
+        show();
+      }
       y= main_point.y() + main_rect_height + QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
     }
     else shrink= 0;
