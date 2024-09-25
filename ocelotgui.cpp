@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: September 24 2024
+   Last modified: September 25 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -555,6 +555,8 @@ int main(int argc, char *argv[])
     QScreen *screen= QGuiApplication::primaryScreen();
     QRect screen_geometry= screen->geometry();
     w.setGeometry(screen_geometry);
+    w.setMinimumSize(0,0);
+    w.setMaximumSize(QWIDGETSIZE_MAX,QWIDGETSIZE_MAX);
 #endif
   w.showMaximized();
   return main_application.exec();
@@ -563,13 +565,14 @@ int main(int argc, char *argv[])
 /*
   It is difficult to get the initial MainWindow to start maximized always.
   The current method is, in int main(): setGeometry for whole screen, and then showMaximized().
+  Since setGeometry is a bit like setting fixed size, try to offset the setting by setting min + max size too.
   Do not change this method without testing in all of x11, wayland, Windows + Qt5, Qt6.
   Trouble especially can happen just after boot, and just after rebuild, maybe especially with x11.
   At one time it seemed that putting showMaximized() in constructor after setCentralWidget helped, but not enough.
   Sometimes I was seeing all-black menus when hovering on the menu line, maybe that's gone.
   Sometimes after detach with x11 I was seeing that something was underneath the detached widget, maybe that's gone.
   I had to add adjustSize() for the history widget while initializing, maybe that's no longer necessary.
-  Caption of a detached widget might not appear immediately.'
+  Caption of a detached widget might not appear immediately, perhaps in some scenario it's covered by main widget (?).
   Todo: When ocelotgui starts there is a top-left flash of a blank window, this might be because one of the widget
         constructors has a show(). But also there's a complete small MainWindow that luckily is wiped out,
         presumably by the showMaximize(), before the widget is added to main_window. Suppress this.
@@ -799,8 +802,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   setCentralWidget(main_window);
 
-//  this->showMaximized();
-//  this->showMaximized();
+  this->showMaximized();
 
   fill_menu_2();    /* Do this at a late stage because widgets must exist before we call connect() */
   history_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -841,6 +843,7 @@ MainWindow::~MainWindow()
 {
   delete ui;
 }
+
 
 /*
   Some actions must wait till after MainWindow::MainWindow() has made the main window.
