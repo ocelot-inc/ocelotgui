@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: September 25 2024
+   Last modified: September 30 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -8730,7 +8730,7 @@ void* debuggee_thread(void* unused)
       break;
     }
     debug_row= lmysql->ldbms_mysql_fetch_row(debug_res);
-    if (debug_row == NULL)
+    if ((debug_row == NULL) || (debug_row[0] == NULL))
     {
       debuggee_state= DEBUGGEE_STATE_MYSQL_FETCH_ROW_ERROR;
       strncpy(debuggee_state_error, lmysql->ldbms_mysql_error(&mysql[MYSQL_DEBUGGER_CONNECTION]), STRING_LENGTH_512 - 1);
@@ -8788,7 +8788,7 @@ void* debuggee_thread(void* unused)
         break;
       }
       debug_row= lmysql->ldbms_mysql_fetch_row(debug_res);
-      if (debug_row == NULL)
+      if ((debug_row == NULL) || (debug_row[0] == NULL))
       {
         unexpected_error= "mysql_fetch_row failed";
         lmysql->ldbms_mysql_free_result(debug_res);
@@ -8827,7 +8827,7 @@ void* debuggee_thread(void* unused)
       break;
     }
     debug_row= lmysql->ldbms_mysql_fetch_row(debug_res);
-    if (debug_row == NULL)
+    if ((debug_row == NULL) || (debug_row[0] == NULL))
     {
       unexpected_error= "mysql_fetch_row failed";
       lmysql->ldbms_mysql_free_result(debug_res);
@@ -27983,7 +27983,7 @@ int MainWindow::setup_generate_icc_core()
                         + "CALL xxxmdbug.icc_process_user_command();" + debug_lf
                         + "END IF;" + debug_lf;
   v_g= v_g
-                        + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'set' AND LEFT(@xxxmdbug_token_value_2,1) = '@'  AND LEFT(@xxxmdbug_token_value_2,2) <> '@@' THEN" + debug_lf
+                        + "IF CAST(@xxxmdbug_token_value_1 AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = 'set' AND CAST(LEFT(@xxxmdbug_token_value_2,1) AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci = '@'  AND CAST(LEFT(@xxxmdbug_token_value_2,2) AS CHAR(64) CHARACTER SET utf8mb4) COLLATE utf8mb4_general_ci <> '@@' THEN" + debug_lf
                         + "SET @xxxmdbug_status_last_command = 'set';" + debug_lf
                         + "SET @xxxmdbug_tmp_for_set = 'Fail';" + debug_lf;
   for (int i= 0; i < debug_tmp_user_variables.count(); ++i)
