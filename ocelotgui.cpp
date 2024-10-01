@@ -6186,6 +6186,7 @@ void MainWindow::detach_widget(int widget_type, bool checked)
       //hide();
       setGeometry(main_point.x(), main_point.y(), main_rect.width(), main_rect_height);
       //show();
+#if (IS_WAYLAND_POSSIBLE == 1)
       if (wayland_warning[0] != '\0')
       {
         hide();
@@ -6194,6 +6195,7 @@ void MainWindow::detach_widget(int widget_type, bool checked)
         this->resize(main_rect.width(), main_rect_height);
         show();
       }
+#endif
       y= main_point.y() + main_rect_height + QApplication::style()->pixelMetric(QStyle::PM_TitleBarHeight);
     }
     else shrink= 0;
