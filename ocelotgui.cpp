@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.4.0
-   Last modified: September 30 2024
+   Last modified: October 6 2024
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -544,7 +544,11 @@ int main(int argc, char *argv[])
 #if (IS_WAYLAND_POSSIBLE == 1) /* see comments before action_options_detach_history_widget */
   {
     QString xdg_session_type= getenv("XDG_SESSION_TYPE");
-    if (xdg_session_type.toLower() == "wayland") printf("%s\n", wayland_warning);
+    if (xdg_session_type.toLower() == "wayland")
+    {
+      //printf("%s\n", wayland_warning); /* This warning is disabled now but could be enabled again. */
+      ;
+    }
     else wayland_warning[0]= '\0';
   }
 #endif
@@ -571,7 +575,7 @@ int main(int argc, char *argv[])
   At one time it seemed that putting showMaximized() in constructor after setCentralWidget helped, but not enough.
   Sometimes I was seeing all-black menus when hovering on the menu line, maybe that's gone.
   Sometimes after detach with x11 I was seeing that something was underneath the detached widget, maybe that's gone.
-  I had to add adjustSize() for the history widget while initializing, maybe that's no longer necessary.
+  I had to add adjustSize() for the history widget while initializing.
   Caption of a detached widget might not appear immediately, perhaps in some scenario it's covered by main widget (?).
   Todo: When ocelotgui starts there is a top-left flash of a blank window, this might be because one of the widget
         constructors has a show(). But also there's a complete small MainWindow that luckily is wiped out,
@@ -880,7 +884,7 @@ void MainWindow::initialize_after_main_window_show()
 #if (OCELOT_EXPLORER == 1)
   if (ocelot_explorer_detached == "yes") action_options_detach_explorer_widget(true);
 #endif
-//  history_edit_widget->adjustSize();
+  history_edit_widget->adjustSize();
   history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
 }
 
@@ -2755,6 +2759,11 @@ bool MainWindow::is_statement_complete(QString text)
     change that to an entity immediately -- but maybe Qt will do that.
   Idea: use QTextCursor to change cursor in history if PgUp|PgDn in statement.
   Idea: multiple types of result: warning, error, result set
+  Todo: The mysql client will change .mysql_history replacing characters to \nnn e.g. space to \040.
+        This is a bug, see https://ocelot.ca/blog/blog/2015/08/04/mysql_histfile-and-mysql_history/
+        (but reports blame libedit and say it hasn't always been thus or isn't thus on all platforms).
+        But simply reading all \nnn as ASCII characters is insufficient since somebody might
+        deliberately say SELECT '\040\134'; etc. Proposal: new ocelot_histfileflags setting.
 */
 
 void MainWindow::initialize_widget_history()
@@ -24363,6 +24372,23 @@ TextEditFrame::TextEditFrame(QWidget *parent, ResultGrid *result_grid_widget, un
         The only complication I can think of is that, if I
         decide someday to support another DBMS, the MySQL
         stuff would still come in or have to be disabled.
+  Todo: 1. Handle --port=x differently if dbms=mariadb
+           With MariaDB client: mariadb --port=3307, even if --host=localhost,
+           but not if --protocol-socket, works -- assumes tcp!
+           With MySQL client: mysql --port=3307, even if not --host=localhost does not work -- assumes socket!
+           The MySQL manual https://dev.mysql.com/doc/refman/8.4/en/connecting.html is reasonably clear.
+           The MariaDB manual https://mariadb.com/kb/en/connecting-to-mariadb/ is vague.
+           On Windows this would be less of a problem.
+         2. Update blog post https://ocelot.ca/blog/blog/2015/07/19/connecting-to-mysql-or-mariadb-with-sockets-on-linux/
+            Explain the above. New blog post can whine about both MariaDB and Linux changes
+         3. Since the worst effect is when connecting to localhost, read /proc/PID/status to see whether the
+            name is mariadbd or mysqld. But that won't be enough because MariaDB can still have
+            server name = mysqld. (Dunno about percona.) See if you can be sure what it listens on, somehow.
+         4. MySQL and MariaDB read different option files with different groups. You might want to specify
+            "this is MariaDB" or "this is MySQL" or even "this is Tarantool" but checking for ocelot_dbms
+            can be too late because that itself can be in an option file. Maybe allow -DOCELOT_MARIADB_OPTIONS
+            or look for a hint e.g. the mere existence of group [client-server] indicates MariaDB was
+            installed or check what connector library you've got. Maybe just warn if connection fails?
 */
 
 //#include <dirent.h>
