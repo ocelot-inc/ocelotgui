@@ -1,8 +1,8 @@
 /*
   plugin.c -- A set of example routines which demonstrate the ocelotgui plugin feature.
 
-  Version: 2.4.0
-  Last modified: July 31 2024
+  Version: 2.5.0
+  Last modified: October 8 2024
 
 */
 
@@ -161,7 +161,7 @@ int before_insert(struct plugin_pass *plugin_pass)
   ocelotgui --ocelot_query="INSERT INTO plugins VALUES ('/home/pgulutzan/plugin/libplugin.so', 'make_menu');"
   The effect will be: The File menu is moved to after the Help menu.
   (Warning: if translating to words that are not Latin1, make sure that the editor environment is UTF-8.)
-  Warning: the example works at time of writing with ocelotgui 2.4.0 but there is no guarantee that all versions of ocelotgui will have this substring.
+  Warning: the example works at time of writing with ocelotgui 2.5.0 but there is no guarantee that all versions of ocelotgui will have this substring.
 */
 static char menu_buffer[10000]; /* arbitrary, current size of query is about 7500 for English */
 int make_menu(struct plugin_pass *plugin_pass)

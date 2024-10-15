@@ -348,8 +348,16 @@ chmod +x ./rpm_build.sh
 ./rpm_build.sh
 cp -p ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-$OCELOT_VERSION-1.x86_64.rpm ocelotgui-$OCELOT_VERSION-1.x86_64.rpm
 
+
+The assumption is that you got a GitHub personal access token
+by looking at your profile on github.com and then going to
+github.com/tokens
+and then using the generated token with
+export GH_TOKEN=<token>
+When you upload you probably need to be on a GitHub repository so cd and cp
+
 Upload ocelotgui-2.5.0-1.x86_64.rpm to internet.
-gh release upload 2.4.0 ocelotgui_2.5.0-1.s86_64.rpm
+gh release upload 2.4.0 ocelotgui-2.5.0-1.x86_64.rpm
 
 
 
