@@ -4,125 +4,23 @@ Last update: 2024-10-13
 Copyright: None
 Author: Peter Gulutzan
 
-This file has notes about building ocelotgui on several platforms.
+This file has notes about building ocelotgui on some Linux platforms.
 It may appear on GitHub (due to git add) but not in releases.
 It will not interest ordinary users.
 For ocelotgui version 2.5.0. When making a new version, change 2.5.0 to whatever the new version number is.
 
-We have VirtualBox with a Windows 10 host and several open source OS guests.
 
-We want to produce ocelotgui_2.5.0.orig.tar.gz, ocelotgui-2.5.0.tar.gz, ocelotgui_2.5.0-1_amd64.deb, ocelotgui_2.5.0-1_i386.deb,
-ocelotgui-2.5.0-1.x86_64.rpm, ocelotgpkgui-2.5.0-1.i686.rpm (removed), windows zip. For upload to github.com/ocelot-inc.
+Download github cli
+-------------------
 
-See also the comments in README.md, CMakeLists.txt, rpm_build.sh, deb_build.sh, debian/README.Debian, PKGBUILD, and windows.txt.
-Start with ocelotgui-2.5.0.tar.gz.
-
-We use GitHub for file transfers, but sometimes shared folders.
-So we usually start by creating ocelotgui-2.5.0.tar.gz on Ubuntu 18.04 64-bit,
-and putting it on the internet so that other computers can read it.
-
-------------
-
-The Windows directory is usually visible from Linux as /media/sf_pgulutzan.
-On some guests it is only visible for the root user.
-
-When finished building, git rm this file.
-
-Unusual prep work
------------------
-
-sudo date --set='nov 15 2022'
-%if 0%{?mdvver} > 1130
-Put .tar.gz in Releases before you try to make the .rpm files.
-
-Fedora 24 is no good at understanding %if(defines) so edit it out,
-
-Server
-------
-
-Windows MariaDB server:
-Download MariaDB server for Windows from downloads.mariadb.org (msi)
-Go to c:\users\pgulu\downloads and run the .msi
-It will put files in c:\Program Files\Mariadb 10.11
-Password = mariadb_rooter
-Supposedly we can connect with https://superuser.com/questions/310697/connect-to-the-host-machine-from-a-virtualbox-guest-os
-But for me it's not the gateway ip that I see with ipconfig, it's the ipv4 address 192.168.1.64
-So start server on windows with
-
-
-"C:\Program Files\MariaDB 10.11\bin\mysqld"
-and later for any distro guest you should be able to connect with
-ocelotgui --host=192.168.1.64 --port=3306 --user=root --password=mariadb_rooter
-
-Distro downloads
-----------------
-
-Getting a recent Linux download is usually just a matter of going to the download site
-and clicking for a 64-bit or 32-bit .iso. Debian is harder because they insist on BitTorrent.
-I downloaded from qbittorrent.org, I have c:\Program Files\qBitTorrent, I start it and click Files,
-then copy-paste a link to the first dvd .iso on cdimage.debian.org.
-
-
-MAKING A PACKAGE
-----------------
-
-2.5.0 CHECKLIST
----------------
-
-     1.x.x changed to 2.5.0 in all source and text files (grep for _MINOR too)
-     Copyright changed to current year, + final search for "2014-2019"
-     Date change. For example June 30 2019 to February 10 2021, and Jun 2019 to Feb 2021, and 30 Jun to 10 Feb (latest is February 13 2024)
-     README.htm and README.txt copied from README.md
-     ?? What is ./_CPack_Packages/Linux/RPM/SPECS/ocelotgui.spec?
-     If there are new files, check they're in ocelotgui.spec + CMakeLists.txt and Windows zip instructions
-     Test: build with -DOCELOT_THIRD_PARTY=0 (instructions for finding libtarantool are in the README file)
-     Test: go through EXAMPLE STATEMENTS IN MARIADB MANUAL which are in the active2 file
-     other, including recent Tarantool changes
-     build on other OSes, including Kaos with -DQT_VERSION=6
-     Read: README.md and all .txt files and readme_tarantool.htm
-
-    Don't forget directory ~/ocelotgui-tarantool.
-
-    Ensure you try with latest versions: MySQL 8.0.31, MariaDB 10.10.1, Tarantool 2.9
-    Ubuntu 17.04 Source Build so I can be sure about Qt
-    (Not much to see here) Follow OCELOTGUI: FINAL STEPS FOR 1.0 RELEASE
-    Follow RELEASE 1.0.8 and MAKING A PACKAGE (now in howtobuild.txt)
-    BUG:
-      ocelotgui-qt4: in history widget, display of special characters is bad e.g. if select 'ちチぢヂ'; is there
-      ... it's okay on the Dell
-
-    TEST: deb generated on Ubuntu 16 works on Acer and on Ubuntu 18/19 and on MX and on Debian
-    TEST: rpm generated on Fedora 26 works on Fedora 30 and on SUSE and on Mageia
-
-    Copy README.htm to www/index.htm within the HTML-table setup at the front and back.
-    Remember -- IMPORTANT -- you must replace the long "Building ocelotgui.exe from source" explanation with
-    <P>
-    The instructions for building ocelotgui.exe -- for Windows only -- are in
-    https://github.com/ocelot-inc/ocelotgui/blob/master/README.md#Appendix-4
-    </P>
-
-Compress
---------
-Only if necessary. Only needs to be done once, i.e. the compression should only be done for NEW .png or .jpg files.
-
-IF NECESSARY: Compress .png files with pngquant (already done but look if there are new files).
-Example for when the explorer*.png files were added:
-cp explorer1.png explorer1.png.bak ; pngquant 30-30 explorer1.png ; cp explorer1-fs8.png explorer1.png ; rm explorer1-fs8.png
-cp explorer2.png explorer2.png.bak ; pngquant 30-30 explorer2.png ; cp explorer2-fs8.png explorer2.png ; rm explorer2-fs8.png
-cp explorer3.png explorer3.png.bak ; pngquant 30-30 explorer3.png ; cp explorer3-fs8.png explorer3.png ; rm explorer3-fs8.png
-cp explorer4.png explorer4.png.bak ; pngquant 30-30 explorer4.png ; cp explorer4-fs8.png explorer4.png ; rm explorer4-fs8.png
-cp explorer5.png explorer5.png.bak ; pngquant 30-30 explorer5.png ; cp explorer5-fs8.png explorer5.png ; rm explorer5-fs8.png
-cp explorer6.png explorer6.png.bak ; pngquant 30-30 explorer6.png ; cp explorer6-fs8.png explorer6.png ; rm explorer6-fs8.png
-cp explorer7.png explorer7.png.bak ; pngquant 30-30 explorer7.png ; cp explorer7-fs8.png explorer7.png ; rm explorer7-fs8.png
-cp explorer8.png explorer8.png.bak ; pngquant 30-30 explorer8.png ; cp explorer8-fs8.png explorer8.png ; rm explorer8-fs8.png
-cp explorer9.png explorer9.png.bak ; pngquant 30-30 explorer9.png ; cp explorer9-fs8.png explorer9.png ; rm explorer9-fs8.png
-
-IF NECESSARY: Compress .jpg files with jpegoptim (already done to 50% but do more if rpmlint or lintian complains)
-IF NECESSARY: If rpmlint or lintian still complains, copy fewer .jpg files for use by README.htm.
-
+Download via https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+Later, wherever you see the phrase "Upload to internet"
+  gh release upload <tag> <files>... [flags]
+... but the upload is actually for the tag of an earlier version, since 2.5.0 doesn't fully exist till all is built.
+... I think you have to run this from an ocelotgui repository.
 
 ocelotgui_2.5.0.orig.tar.gz
---------------------
+---------------------------
 
 Machine: ubuntu_24_64 i.e. Ubuntu version 24 64-bit. This is the machine used for ordinary pushes.
 Contains: source.
@@ -237,6 +135,7 @@ cd /tmp
 tar -zcvf /tmp/ocelotgui-2.5.0.orig.tar.gz ocelotgui
 
 Upload ocelotgui-2.5.0.orig.tar.gz to internet.
+gh release upload 2.4.0 ocelotgui-2.5.0.orig.tar.gz
 
 ocelotgui_u16.tar.gz
 --------------------
@@ -247,7 +146,8 @@ Make ocelotgui-qt4, which only goes in the tar.gz not the orig.tar.gz.
 Add it to ocelotgui.
 So ocelotgui_u16.tar.gz is the same as ocelotgui-2.5.0.orig.tar.gz, plus one file: ocelotgui-qt4
 
-Download ocelotgui-2.5.0.orig.tar.gz
+Download :
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
 
 cd /tmp
 rm -r -f ocelotgui
@@ -275,39 +175,7 @@ cd /tmp
 tar -zcvf /tmp/ocelotgui_u16.tar.gz ocelotgui
 
 Upload ocelotgui_u16.tar.gz to internet.
-
-ocelotgui-2.5.0.tar.gz
-----------------------
-
-About the same as ocelotgui_u16.tar.gz but done with Ubuntu 18 and adds ocelotgui-qt5.
-
-Make ocelotgui-qt5, which only goes in the tar.gz not the orig.tar.gz.
-Add it to ocelotgui.
-So ocelotgui-2.5.0.tar.gz is the same as ocelotgui-2.5.0.orig.tar.gz, plus two files: ocelotgui-qt4 + ocelotgui-qt5.
-
-Download ocelotgui_u16.tar.gz
-
-cd /tmp
-rm -r -f ocelotgui
-tar -xzf ocelotgui_u16.tar.gz
-cd ocelotgui
-
-/usr/bin/qmake -config release
-make
-cp -p -v ocelotgui /tmp/ocelotgui-qt5
-cd /tmp
-rm -r -f ocelotgui
-tar -xzf ocelotgui_u16.tar.gz
-cp -p -v ocelotgui-qt5 ./ocelotgui/ocelotgui-qt5
-
-chmod -R a+r ocelotgui
-cd /tmp
-tar -zcvf /tmp/ocelotgui-2.5.0.tar.gz ocelotgui
-
-Upload ocelotgui-2.5.0.tar.gz to internet.
-
-
-Remove ocelotgui_u16.tar.gz from internet.
+gh release upload 2.4.0 ocelotgui_u16.tar.gz
 
 ocelotgui_2.5.0-1_amd64.deb
 ---------------------------
@@ -326,7 +194,9 @@ Preferred way: with deb_build.sh
 
 cd /tmp
 
-Download ocelotgui-2.5.0.orig.tar.gz from internet.
+Download :
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
+
 
 # Just to make sure sudo works
 sudo ls a
@@ -339,7 +209,7 @@ mv ocelotgui-$OCELOT_VERSION ocelotgui
 cd ocelotgui
 #chmod +x ./deb_build.sh
 ./deb_build.sh
-cp -p /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb $MEDIA/ocelotgui_$OCELOT_VERSION-1_amd64.deb
+cp -p /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb tmp/ocelotgui_$OCELOT_VERSION-1_amd64.deb
 lintian -I /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.changes
 lintian -I /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb
 
@@ -368,10 +238,50 @@ lintian -I ocelotgui_$OCELOT_VERSION-1_amd64.deb
 # I: ocelotgui source: out-of-date-standards-version 3.9.7 (released 2016-02-01) (current is 4.1.4)
 # I: ocelotgui source: testsuite-autopkgtest-missing
 
-cp -p /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb $MEDIA/ocelotgui_$OCELOT_VERSION-1_amd64.deb
-
+cp -p /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb tmp/ocelotgui_$OCELOT_VERSION-1_amd64.deb
 
 Upload ocelotgui_2.5.0-1_amd64.deb to internet.
+gh release upload 2.4.0 ocelotgui-2.50-1_amd64.deb
+
+ocelotgui-2.5.0.tar.gz
+----------------------
+
+About the same as ocelotgui_u16.tar.gz but done with Ubuntu 18 and adds ocelotgui-qt5.
+
+Make ocelotgui-qt5, which only goes in the tar.gz not the orig.tar.gz.
+Add it to ocelotgui.
+So ocelotgui-2.5.0.tar.gz is the same as ocelotgui-2.5.0.orig.tar.gz, plus two files: ocelotgui-qt4 + ocelotgui-qt5.
+
+Download :
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui_u16.tar.gz
+
+
+
+
+cd /tmp
+rm -r -f ocelotgui
+tar -xzf ocelotgui_u16.tar.gz
+cd ocelotgui
+
+#/usr/bin/qmake -config release
+cmake .
+make
+cp -p -v ocelotgui /tmp/ocelotgui-qt5
+cd /tmp
+rm -r -f ocelotgui
+tar -xzf ocelotgui_u16.tar.gz
+cp -p -v ocelotgui-qt5 ./ocelotgui/ocelotgui-qt5
+
+chmod -R a+r ocelotgui
+cd /tmp
+tar -zcvf /tmp/ocelotgui-2.5.0.tar.gz ocelotgui
+
+Upload ocelotgui-2.5.0.tar.gz to internet.
+gh release upload 2.4.0 ocelotgui-2.5.0.tar.gz
+
+Remove ocelotgui_u16.tar.gz from internet.
+
+
 
 ocelotgui_2.5.0-1_i386.deb
 --------------------------
@@ -381,7 +291,8 @@ Source: ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
 Result: ocelotgui_2.5.0-1_i386.deb, which is uploadable for release
 Todo: probably next time I should use deb_build.sh not debuild, as I did for the 64-bit .deb.
 
-Download ocelotgui_2.5.0.orig.tar.gz from internet. To ~
+Download : to ~
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
 
 export OCELOT_VERSION=2.5.0
 cd /tmp
@@ -400,22 +311,29 @@ lintian -I ocelotgui_$OCELOT_VERSION-1_i386.deb
 #ored-build-depends-on-obsolete-package
 #out-of-date-standards-version
 #testsuite-autopkgtest-missing
-cp -p ocelotgui_$OCELOT_VERSION-1_i386.deb $MEDIA/ocelotgui_$OCELOT_VERSION-1_i386.deb
+cp -p ocelotgui_$OCELOT_VERSION-1_i386.deb tmp/ocelotgui_$OCELOT_VERSION-1_i386.deb
 
 Upload ocelotgui_2.5.0-1_i386.deb to internet.
+gh release upload 2.4.0 ocelotgui-2.5.-1+i386.deb
+
 
 
 ocelotgui-2.5.0-1.x86_64.rpm
 ----------------------------
 
 Machine: Fedora (64-bit Fedora 24) Not Fedora 28, which I guess has a too-recent Qt version (Fedora 24 has Qt 5.6.2)
-Source: $MEDIA/ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
+Source: ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
 Result: ocelotgui-2.5.0-1.x86_64.rpm, which is uploadable for release
+
+
 
 ! This somewhat contradicts what's in ocelotgui.spec
 
-Download ocelotgui_2.5.0.orig.tar.gz to ~
 
+Download: to ~
+wget https://github.com/ocelot-inc/ocelotgui/releases/download/2.4.0/ocelotgui-2.5.0.orig.tar.gz
+
+#Why tar.gz not orig.tar.gz?
 export OCELOT_VERSION=2.5.0
 cd ~
 rm rpm_build.sh
@@ -424,825 +342,22 @@ rm ocelotgui-$OCELOT_VERSION.tar.gz
 rm -r -f ocelotgui-$OCELOT_VERSION
 cp -p ~/ocelotgui-$OCELOT_VERSION.tar.gz ocelotgui-$OCELOT_VERSION.tar.gz
 tar -xf ocelotgui-$OCELOT_VERSION.tar.gz
+#No chmod needed
 cp -p ~/ocelotgui/rpm_build.sh rpm_build.sh
 chmod +x ./rpm_build.sh
 ./rpm_build.sh
 cp -p ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-$OCELOT_VERSION-1.x86_64.rpm ocelotgui-$OCELOT_VERSION-1.x86_64.rpm
 
 Upload ocelotgui-2.5.0-1.x86_64.rpm to internet.
+gh release upload 2.4.0 ocelotgui_2.5.0-1.s86_64.rpm
 
 
-.zip
-----
+
+ocelotgui-2.5.0-1.ocelotgui.zip
+-------------------------------
 
 Machine: Windows 10.
 
-<< TODO >>
+Done in a different way.
 
-=============================================================================================
-
-In step 0 ocelotgui-qt5 is okay, but not the final copy, which we produce in step 1a.
-
-Machine: ubuntu (64-bit 18.04 bionic) -- and I mean Ubuntu not ubuntu_18_64
-Source: ~/ocelotgui, which is the same as what is on https://github.com/ocelot-inc/ocelotgui.
-
-DONE I think we should say rm .qmake.stash but need to test first.
-I think we should clean up when we finish, but we don't.
-
-By destroying moc_* and ui_* etc. we make Qt Creator unable to see the project any more.
-Maybe ocelotgui_backup has something useful. It doesn't seem disastrous if you click Configure.
-
-export OCELOT_VERSION=2.5.0
-export MEDIA=/media/pgulutzan/LEXAR
-rm /media/sf_pgulutzan/howtobuild.txt
-cp -p ~/howtobuild.txt $MEDIA/howtobuild.txt
-cp -p ~/howtobuild.txt /media/sf_pgulutzan/howtobuild.txt
-cd ~/ocelotgui
-rm ocelotgui-$OCELOT_VERSION.tar.gz
-rm ocelotgui_$OCELOT_VERSION.orig.tar.gz
-rm ocelotgui-qt4
-rm ocelotgui-qt5
-rm ocelotgui
-rm Makefile
-rm moc_*
-rm ui_*
-rm *.o
-rm .qmake.stash
-rm *~
-rm *.bak
-rm *.user
-make clean
-rm CMakeCache.txt
-rm cmake_install.cmake
-rm -r -f CMakeFiles
-/usr/bin/qmake-qt4 -config release
-make
-mv ocelotgui ocelotgui-qt4
-cp -p ocelotgui-qt4 $MEDIA/ocelotgui-qt4
-rm Makefile
-rm moc_*
-rm ui_*
-rm *.o
-rm .qmake.stash
-make clean
-rm CMakeCache.txt
-rm cmake_install.cmake
-rm -r -f CMakeFiles
-/usr/lib/qt5/bin/qmake -config release
-make
-mv ocelotgui ocelotgui-qt5
-cp -p ocelotgui-qt5 $MEDIA/ocelotgui-qt5
-
-
-
-
-cp -p ~/ocelotgui-$OCELOT_VERSION.tar.gz $MEDIA/ocelotgui-$OCELOT_VERSION.tar.gz
-
-cd /tmp
-rm -r -f ocelotgui-$OCELOT_VERSION
-mv ocelotgui ocelotgui-$OCELOT_VERSION
-tar -zcvf ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz ocelotgui-$OCELOT_VERSION
-
-cp -p ~/ocelotgui-$OCELOT_VERSION.tar.gz ~/Dropbox/ocelotgui-$OCELOT_VERSION.tar.gz
-cp -p ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz ~/Dropbox/ocelotgui_$OCELOT_VERSION.orig.tar.gz
-cp -p ~/ocelotgui-$OCELOT_VERSION.tar.gz      $MEDIA/ocelotgui-$OCELOT_VERSION.tar.gz
-cp -p ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz $MEDIA/ocelotgui_$OCELOT_VERSION.orig.tar.gz
-
-
-
-
-backup
-------
-
-On Ubuntu 20:
-export MEDIA=/media/D
-sudo cp -p ~/howtobuild.txt $MEDIA/howtobuild.txt
-sudo rm -r -f $MEDIA/ocelotgui
-sudo mkdir $MEDIA/ocelotgui
-cd ~/ocelotgui
-sudo cp -r -p * $MEDIA/ocelotgui
-and maybe umount $MEDIA
-
-On Ubuntu 18, when you have switched from Ubuntu 20 to Ubuntu 18:
-export MEDIA=/media/pgulutzan/LEXAR
-cd $MEDIA/ocelotgui
-cp -r -p * ~/ocelotgui
-
-kaos test (optional)
---------------------
-
-# updating is very slow but the point is that I want the latest Qt
-sudo pacman -Syu
-cd ~
-rm -r -f ~/tarantool
-git clone https://github.com/tarantool/tarantool.git tarantool
-cd ~/tarantool
-git pull
-git submodule update --init --recursive
-make clean
-rm CMakeCache.txt
-cmake .
-make
-rm -r -f ~/ocelotgui
-cp -r -p /run/media/pgulutzan/LEXAR/ocelotgui ~
-cd ~/ocelotgui
-qmake-qt6
-make clean
-rm CMakeCache.txt
-cmake . -DQT_VERSION=6
-make
-cd ~/tarantool_sandbox
-~/tarantool/src/tarantool
-box.cfg{listen=3302}
-box.schema.user.passwd('admin')
-... new terminal ...
-cd ~/ocelotgui
-./ocelotgui --ocelot_dbms=tarantool --user=admin --password=admin --port=3302
-...
-sudo umount /run/media/pgulutzan/LEXAR
-
-
-ocelotgui-qt4 and ocelotgui-qt5 executables (step 0)
-----------------------------------------------------
-
-Warning: see "backup" section above: On Ubuntu 18, when you have switched from Ubuntu 20 to Ubuntu 18, you need to copy again
-
-Make ocelotgui-qt4 and ocelotgui-qt5, which only go in the tar.gz not the orig.tar.gz.
-In step 0 ocelotgui-qt5 is okay, but not the final copy, which we produce in step 1a.
-
-Machine: ubuntu (64-bit 18.04 bionic) -- and I mean Ubuntu not ubuntu_18_64
-Source: ~/ocelotgui, which is the same as what is on https://github.com/ocelot-inc/ocelotgui.
-
-DONE I think we should say rm .qmake.stash but need to test first.
-I think we should clean up when we finish, but we don't.
-
-By destroying moc_* and ui_* etc. we make Qt Creator unable to see the project any more.
-Maybe ocelotgui_backup has something useful. It doesn't seem disastrous if you click Configure.
-
-export OCELOT_VERSION=2.5.0
-export MEDIA=/media/pgulutzan/LEXAR
-rm /media/sf_pgulutzan/howtobuild.txt
-cp -p ~/howtobuild.txt $MEDIA/howtobuild.txt
-cp -p ~/howtobuild.txt /media/sf_pgulutzan/howtobuild.txt
-cd ~/ocelotgui
-rm ocelotgui-$OCELOT_VERSION.tar.gz
-rm ocelotgui_$OCELOT_VERSION.orig.tar.gz
-rm ocelotgui-qt4
-rm ocelotgui-qt5
-rm ocelotgui
-rm Makefile
-rm moc_*
-rm ui_*
-rm *.o
-rm .qmake.stash
-rm *~
-rm *.bak
-rm *.user
-make clean
-rm CMakeCache.txt
-rm cmake_install.cmake
-rm -r -f CMakeFiles
-/usr/bin/qmake-qt4 -config release
-make
-mv ocelotgui ocelotgui-qt4
-cp -p ocelotgui-qt4 $MEDIA/ocelotgui-qt4
-rm Makefile
-rm moc_*
-rm ui_*
-rm *.o
-rm .qmake.stash
-make clean
-rm CMakeCache.txt
-rm cmake_install.cmake
-rm -r -f CMakeFiles
-/usr/lib/qt5/bin/qmake -config release
-make
-mv ocelotgui ocelotgui-qt5
-cp -p ocelotgui-qt5 $MEDIA/ocelotgui-qt5
-
-ocelotgui_2.5.0.orig.tar.gz and ocelotgui-2.5.0.tar.gz (Step 1)
-------------------------------------------------------
-
-Machine: ubuntu (64-bit 18.04 bionic) -- and I mean Ubuntu not ubuntu_18_64
-Source: ~/ocelotgui, which is the same as what is on https://github.com/ocelot-inc/ocelotgui.
-Result: ocelotgui-2.5.0.tar.gz, which is uploadable for release
-        ocelotgui_2.5.0.orig.tar.gz and is the source for .rpm and .deb production
-First: Follow the instructions of MAKING A PACKAGE -- re making sure version numbers and dates are okay!
-       2.5.0 CHECKLIST too
-Second: Count the files in the original directory, count the files in the tar.gz -- are we copying them all?
-
-This is a script that Ocelot uses to create the ocelotgui-2.5.0.tar.gz file.
-Ocelot's working directory is ~/ocelotgui.
-
-!! REMEMBER: FIRST CHANGE changelog, rpmchangelog, ocelotgui.spec, and anything containing the version (2.5.0 was the last one)
-!!           ++ also ocelotgui.1, CMakeLists.txt, *.txt, *.md, manual.htm, PKGBUILD
-!!           ++ CMakeLists.txt has CPACK_PACKAGE_VERSION_MAJOR|MINOR_PATCH
-!!           ++ there might be dates for example January 8 2019
-!!           You can try dch -i to see what gets produced for changelog
-!!           In 2.5.0 we will compile ocelotgui-qt4 and ocelotgui-qt5, and copy, they might work on non-rpm non-deb (?).
-!!           Some files must have "git add" done, e.g. the ones in the /debian sub-directory
-
-!! ocelotgui.tar.gz has ocelotgui-qt4 and ocelotgui-qt5, ocelotgui.orig.tar.gz does not
-
-# You might need to mount, if you are repeating step 1 after doing step 1b.
-# Todo: Probably you can remove debian/files, it is not present anyway.
-
-
-!!!! PLACE THE FOLLOWING STATEMENTS IN A FILE howtobuild.sh AND SAY howtobuild.sh -- COPY/PASTE TO SHELL CAN FAIL!
-!!!! (as far as the orig.tar.gz copy)
-!!!! Do not worry about errors mentioning debian/files but do worry about any other error messages.
-
-export OCELOT_VERSION=2.5.0
-export MEDIA=/media/pgulutzan/LEXAR
-
-#export D_DATE=20230307
-#export D_TIME=12:00:00
-#So we can later say
-#sudo date +%Y%m%d -s "D_DATE"
-#sudo date +%T -s "$D_TIME"
-# Set date from the command line date +%Y%m%d -s "20201029"
-
-cd /tmp
-rm -r -f ocelotgui
-mkdir -p ocelotgui
-chmod a+rx ocelotgui
-mkdir -p ocelotgui/debian
-mkdir -p ocelotgui/debian/patches
-mkdir -p ocelotgui/debian/source
-cd /tmp
-cp -p -n -v ~/ocelotgui/README.md ~/ocelotgui/README.txt
-cp -p -n -v ~/ocelotgui/README.md ~/ocelotgui/README.htm
-#cp ~/ocelotgui/copyright ocelotgui/debian/copyright
-#cp ~/ocelotgui/changelog ocelotgui/debian/changelog
-chmod +x ~/ocelotgui/ocelotgui-qt4
-chmod +x ~/ocelotgui/ocelotgui-qt5
-chmod +x ~/ocelotgui/rpm_build.sh
-chmod +x ~/ocelotgui/deb_build.sh
-cp -p -n -v ~/ocelotgui/ocelotgui.pro ocelotgui/ocelotgui.pro
-cp -p -n -v ~/ocelotgui/ocelotgui.h ocelotgui/ocelotgui.h
-cp -p -n -v ~/ocelotgui/ocelotgui.cpp ocelotgui/ocelotgui.cpp
-cp -p -n -v ~/ocelotgui/install_sql.cpp ocelotgui/install_sql.cpp
-cp -p -n -v ~/ocelotgui/codeeditor.h ocelotgui/codeeditor.h
-cp -p -n -v ~/ocelotgui/hparse.h ocelotgui/hparse.h
-cp -p -n -v ~/ocelotgui/ostrings.h ocelotgui/ostrings.h
-cp -p -n -v ~/ocelotgui/ocelotgui.ui ocelotgui/ocelotgui.ui
-cp -p -n -v ~/ocelotgui/LICENSE.GPL ocelotgui/LICENSE.GPL
-cp -p -n -v ~/ocelotgui/manual.htm ocelotgui/manual.htm
-cp -p -n -v ~/ocelotgui/README.txt ocelotgui/README.txt
-cp -p -n -v ~/ocelotgui/README.md ocelotgui/README.md
-cp -p -n -v ~/ocelotgui/README.htm ocelotgui/README.htm
-cp -p -n -v ~/ocelotgui/debugger_reference.txt ocelotgui/debugger_reference.txt
-cp -p -n -v ~/ocelotgui/windows.txt ocelotgui/windows.txt
-cp -p -n -v ~/ocelotgui/example.cnf ocelotgui/example.cnf
-cp -p -n -v ~/ocelotgui/PKGBUILD ocelotgui/PKGBUILD
-cp -p -n -v ~/ocelotgui/readmylogin.c ocelotgui/readmylogin.c
-cp -p -n -v ~/ocelotgui/options.txt ocelotgui/options.txt
-cp -p -n -v ~/ocelotgui/completer_1.png ocelotgui/completer_1.png
-cp -p -n -v ~/ocelotgui/completer_2.png ocelotgui/completer_2.png
-cp -p -n -v ~/ocelotgui/completer_3.png ocelotgui/completer_3.png
-cp -p -n -v ~/ocelotgui/conditional.png ocelotgui/conditional.png
-cp -p -n -v ~/ocelotgui/starting-dialog.png ocelotgui/starting-dialog.png
-cp -p -n -v ~/ocelotgui/starting.png ocelotgui/starting.png
-cp -p -n -v ~/ocelotgui/statement-widget-example.png ocelotgui/statement-widget-example.png
-cp -p -n -v ~/ocelotgui/result-widget-example.png ocelotgui/result-widget-example.png
-cp -p -n -v ~/ocelotgui/menu-file.png ocelotgui/menu-file.png
-cp -p -n -v ~/ocelotgui/menu-edit.png ocelotgui/menu-edit.png
-cp -p -n -v ~/ocelotgui/menu-run.png ocelotgui/menu-run.png
-cp -p -n -v ~/ocelotgui/menu-settings.png ocelotgui/menu-settings.png
-cp -p -n -v ~/ocelotgui/menu-options.png ocelotgui/menu-options.png
-cp -p -n -v ~/ocelotgui/menu-debug.png ocelotgui/menu-debug.png
-cp -p -n -v ~/ocelotgui/menu-help.png ocelotgui/menu-help.png
-cp -p -n -v ~/ocelotgui/debugger.png ocelotgui/debugger.png
-cp -p -n -v ~/ocelotgui/special-vertical.png ocelotgui/special-vertical.png
-cp -p -n -v ~/ocelotgui/special-images.png ocelotgui/special-images.png
-cp -p -n -v ~/ocelotgui/special-settings.png ocelotgui/special-settings.png
-cp -p -n -v ~/ocelotgui/special-detach.png ocelotgui/special-detach.png
-cp -p -n -v ~/ocelotgui/shot1.jpg ocelotgui/shot1.jpg
-cp -p -n -v ~/ocelotgui/shot2.jpg ocelotgui/shot2.jpg
-cp -p -n -v ~/ocelotgui/shot3.png ocelotgui/shot3.png
-cp -p -n -v ~/ocelotgui/shot4.jpg ocelotgui/shot4.jpg
-cp -p -n -v ~/ocelotgui/shot5.jpg ocelotgui/shot5.jpg
-cp -p -n -v ~/ocelotgui/shot6.jpg ocelotgui/shot6.jpg
-cp -p -n -v ~/ocelotgui/shot7.jpg ocelotgui/shot7.jpg
-cp -p -n -v ~/ocelotgui/shot8.jpg ocelotgui/shot8.jpg
-cp -p -n -v ~/ocelotgui/shot9.jpg ocelotgui/shot9.jpg
-cp -p -n -v ~/ocelotgui/shot10.jpg ocelotgui/shot10.jpg
-cp -p -n -v ~/ocelotgui/shot11.png ocelotgui/shot11.png
-cp -p -n -v ~/ocelotgui/explorer1.png ocelotgui/explorer1.png
-cp -p -n -v ~/ocelotgui/explorer2.png ocelotgui/explorer2.png
-cp -p -n -v ~/ocelotgui/explorer3.png ocelotgui/explorer3.png
-cp -p -n -v ~/ocelotgui/explorer4.png ocelotgui/explorer4.png
-cp -p -n -v ~/ocelotgui/explorer5.png ocelotgui/explorer5.png
-cp -p -n -v ~/ocelotgui/explorer6.png ocelotgui/explorer6.png
-cp -p -n -v ~/ocelotgui/explorer7.png ocelotgui/explorer7.png
-cp -p -n -v ~/ocelotgui/explorer8.png ocelotgui/explorer8.png
-cp -p -n -v ~/ocelotgui/explorer9.png ocelotgui/explorer9.png
-cp -p -n -v ~/ocelotgui/ocelotgui-logo.png ocelotgui/ocelotgui-logo.png
-cp -p -n -v ~/ocelotgui/ocelotgui_logo.png ocelotgui/ocelotgui_logo.png
-cp -p -n -v ~/ocelotgui/CMakeLists.txt ocelotgui/CMakeLists.txt
-cp -p -n -v ~/ocelotgui/COPYING ocelotgui/COPYING
-cp -p -n -v ~/ocelotgui/COPYING.thirdparty ocelotgui/COPYING.thirdparty
-cp -p -n -v ~/ocelotgui/ocelotgui.1 ocelotgui/ocelotgui.1
-cp -p -n -v ~/ocelotgui/copyright ocelotgui/copyright
-cp -p -n -v ~/ocelotgui/changelog ocelotgui/changelog
-cp -p -n -v ~/ocelotgui/rpmchangelog ocelotgui/rpmchangelog
-cp -p -n -v ~/ocelotgui/ocelotgui.desktop ocelotgui/ocelotgui.desktop
-cp -p -n -v ~/ocelotgui/ocelotgui.spec ocelotgui/ocelotgui.spec
-cp -p -n -v ~/ocelotgui/rpm_build.sh ocelotgui/rpm_build.sh
-cp -p -n -v ~/ocelotgui/deb_build.sh ocelotgui/deb_build.sh
-cp -p -n -v ~/ocelotgui/tarantool.txt ocelotgui/tarantool.txt
-cp -p -n -v ~/ocelotgui/third_party.h ocelotgui/third_party.h
-cp -p -n -v ~/ocelotgui/debian/README.Debian ocelotgui/debian/README.Debian
-cp -p -n -v ~/ocelotgui/debian/changelog ocelotgui/debian/changelog
-cp -p -n -v ~/ocelotgui/debian/compat ocelotgui/debian/compat
-cp -p -n -v ~/ocelotgui/debian/control ocelotgui/debian/control
-cp -p -n -v ~/ocelotgui/debian/copyright ocelotgui/debian/copyright
-cp -p -n -v ~/ocelotgui/debian/files ocelotgui/debian/files
-cp -p -n -v ~/ocelotgui/debian/rules ocelotgui/debian/rules
-cp -p -n -v ~/ocelotgui/debian/watch ocelotgui/debian/watch
-cp -p -n -v ~/ocelotgui/debian/patches/series ocelotgui/debian/patches/series
-cp -p -n -v ~/ocelotgui/debian/source/format ocelotgui/debian/source/format
-cp -p -n -v ~/ocelotgui/ocelotgui-qt4 ocelotgui/ocelotgui-qt4
-cp -p -n -v ~/ocelotgui/ocelotgui-qt5 ocelotgui/ocelotgui-qt5
-cp -p -n -v ~/ocelotgui/menunew.png ocelotgui/menunew.png
-cp -p -n -v ~/ocelotgui/plugin.c ocelotgui/plugin.c
-chmod -R a+r ocelotgui
-cd /tmp
-tar -zcvf ~/ocelotgui-$OCELOT_VERSION.tar.gz ocelotgui
-#cp -p -n -v ~/ocelotgui-$OCELOT_VERSION.tar.gz ~/Dropbox/ocelotgui-$OCELOT_VERSION.tar.gz
-cp -p ~/ocelotgui-$OCELOT_VERSION.tar.gz $MEDIA/ocelotgui-$OCELOT_VERSION.tar.gz
-
-cd /tmp
-rm -r -f ocelotgui-$OCELOT_VERSION
-mv ocelotgui ocelotgui-$OCELOT_VERSION
-rm -f ocelotgui-$OCELOT_VERSION/ocelotgui-qt4
-rm -f ocelotgui-$OCELOT_VERSION/ocelotgui-qt5
-tar -zcvf ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz ocelotgui-$OCELOT_VERSION
-
-cp -p ~/ocelotgui-$OCELOT_VERSION.tar.gz ~/Dropbox/ocelotgui-$OCELOT_VERSION.tar.gz
-cp -p ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz ~/Dropbox/ocelotgui_$OCELOT_VERSION.orig.tar.gz
-cp -p ~/ocelotgui-$OCELOT_VERSION.tar.gz      $MEDIA/ocelotgui-$OCELOT_VERSION.tar.gz
-cp -p ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz $MEDIA/ocelotgui_$OCELOT_VERSION.orig.tar.gz
-
-umount $MEDIA
-
-ocelotgui_2.5.0.orig.tar.gz and ocelotgui-2.5.0.tar.gz (Step 1a)
-------------------------------------------------------
-
-The purpose of doing this again is just so that orig.tar.gz will have an older Qt version
-for the Qt 5 executable ocelotgui-qt5. Thus it should run on a machine with Qt 5.5 or later.
-
-Machine: Ubuntu (64-bit 16.04) -- which happens to have Qt 5.5 libraries on it
-NB: I use guest ubuntu_16_64_tmp not ubuntu_16_64 which seems to be rotting
-
-export MEDIA=/media/pgulutzan/LEXAR
-cd ~
-rm ocelotgui-qt5
-rm -r -f ocelotgui
-cp -p $MEDIA/ocelotgui-2.5.0.tar.gz ocelotgui-2.5.0.tar.gz
-tar -xzf ocelotgui-2.5.0.tar.gz
-cd ocelotgui
-rm ocelotgui-qt5
-rm Makefile
-rm moc_*
-rm ui_*
-rm *.o
-rm .qmake.stash
-make clean
-rm CMakeCache.txt
-cmake .
-make
-mv ocelotgui ocelotgui-qt5
-cp -p ocelotgui-qt5 $MEDIA/ocelotgui-qt5
-umount $MEDIA
-
-ocelotgui_2.5.0.orig.tar.gz and ocelotgui-2.5.0.tar.gz (Step 1b)
-------------------------------------------------------
-
-Back on Ubuntu 18.
-Now we have a "better" ocelotgui-qt5, so repeating step 1 will be the same except for ocelotgui-qt5 in tar.gz.
-Warning: Copying to $MEDIA earlier probably turned off the +x flag.
-
-export MEDIA=/media/pgulutzan/LEXAR
-cp -p $MEDIA/ocelotgui-qt5 ~/ocelotgui/ocelotgui-qt5
-chmod +x ~/ocelotgui/ocelotgui-qt5
-
-Repeat step 1.
-
-
-ocelotgui_2.5.0-1_amd64.deb
----------------------------
-
-Machine: ubuntu_16_64 (64-bit 16.04 xenial)
-         Once again I use ubuntu_16_64, not ubuntu_16_64_tmp, ubuntu_16_64_tmp lacks some qt5 files
-Source: $MEDIA/ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
-Result: ocelotgui_2.5.0-1_amd64.deb, which is uploadable for release
-
-deb_build.sh is very slow but is the preferred way. Look at what piuparts info says at the end.
-debuild is faster but could pick up files that are not supposed to be in an official package.
-
-Preferred way: with deb_build.sh
-
-# Just to make sure sudo works
-sudo ls a
-export OCELOT_VERSION=2.5.0
-export MEDIA=/media/pgulutzan/LEXAR
-cd ~
-rm -r -f ocelotgui-2.5.0
-rm -r -f ocelotgui
-cp -p $MEDIA/ocelotgui_$OCELOT_VERSION.orig.tar.gz ocelotgui_$OCELOT_VERSION.orig.tar.gz
-tar -xzf ocelotgui_$OCELOT_VERSION.orig.tar.gz
-mv ocelotgui-$OCELOT_VERSION ocelotgui
-cd ocelotgui
-chmod +x ./deb_build.sh
-./deb_build.sh
-cp -p /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb $MEDIA/ocelotgui_$OCELOT_VERSION-1_amd64.deb
-lintian -I /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.changes
-lintian -I /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb
-
-Not preferred but quicker way: debuild
-
-export OCELOT_VERSION=2.5.0
-export MEDIA=/media/pgulutzan/LEXAR
-cd /tmp
-rm -r -f /tmp/debian3
-mkdir /tmp/debian3
-cd /tmp/debian3
-cp -p $MEDIA/ocelotgui_$OCELOT_VERSION.orig.tar.gz ocelotgui_$OCELOT_VERSION.orig.tar.gz
-tar -xf ocelotgui_$OCELOT_VERSION.orig.tar.gz
-cd ocelotgui-$OCELOT_VERSION/debian
-debuild
-cd /tmp/debian3
-lintian -I ocelotgui_$OCELOT_VERSION-1_amd64.changes
-lintian -I ocelotgui_$OCELOT_VERSION-1_amd64.deb
-
-#In final lines of output:
-#piuparts should say PASS: All tests.
-#lintian -I should say nothing. (Actually it is not working, I don't know why.)
-
-# You can expect:
-# pgulutzan@pgulutzan-VirtualBox:~/ocelotgui$ lintian -I /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.changes
-# I: ocelotgui source: ored-build-depends-on-obsolete-package build-depends: libmysqlclient-dev => default-libmysqlclient-dev
-# I: ocelotgui source: out-of-date-standards-version 3.9.7 (released 2016-02-01) (current is 4.1.4)
-# I: ocelotgui source: testsuite-autopkgtest-missing
-
-cp -p /tmp/debian3/ocelotgui_$OCELOT_VERSION-1_amd64.deb $MEDIA/ocelotgui_$OCELOT_VERSION-1_amd64.deb
-
-umount $MEDIA
-
-ocelotgui_2.5.0-1_i386.deb
---------------------------
-
-Machine: ubuntu_16_32 (32-bit 16.04 xenial)
-Source: $MEDIA/ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
-Result: ocelotgui_2.5.0-1_i386.deb, which is uploadable for release
-Todo: probably next time I should use deb_build.sh not debuild, as I did for the 64-bit .deb.
-
-I had to click on the USB icon on the side panel, so that /media/pgulutzan/LEXAR becomes visible.
-Even that was no enough, so I rebooted. Maybe removing and re-inserting the USB stick would have helped?
-
-export OCELOT_VERSION=2.5.0
-export MEDIA=/media/pgulutzan/LEXAR
-cd /tmp
-rm -r -f /tmp/debian3
-mkdir /tmp/debian3
-cd /tmp/debian3
-cp -p $MEDIA/ocelotgui_$OCELOT_VERSION.orig.tar.gz ocelotgui_$OCELOT_VERSION.orig.tar.gz
-tar -xf ocelotgui_$OCELOT_VERSION.orig.tar.gz
-cd ocelotgui-$OCELOT_VERSION/debian
-debuild
-cd /tmp/debian3
-lintian -I ocelotgui_$OCELOT_VERSION-1_i386.changes
-lintian -I ocelotgui_$OCELOT_VERSION-1_i386.deb
-#You can expect: (but for some reason on this machine not all of these things appear):
-#running debsign failed (happens before lintian errors)
-#ored-build-depends-on-obsolete-package
-#out-of-date-standards-version
-#testsuite-autopkgtest-missing
-cp -p ocelotgui_$OCELOT_VERSION-1_i386.deb $MEDIA/ocelotgui_$OCELOT_VERSION-1_i386.deb
-umount $MEDIA
-
-ocelotgui-2.5.0-1.x86_64.rpm
-----------------------------
-
-Machine: Fedora (64-bit Fedora 24) Not Fedora 28, which I guess has a too-recent Qt version (Fedora 24 has Qt 5.6.2)
-Source: $MEDIA/ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
-Result: ocelotgui-2.5.0-1.x86_64.rpm, which is uploadable for release
-
-! This somewhat contradicts what's in ocelotgui.spec
-
-! On Fedora 24+28 the clock is wrong so use date command to fix
-! On Fedora 24+26 I cannot sudo so remove the sudo instructions in rpm_build.sh first
-! This is a cursor-grabber guest so you will need to use the right Ctrl key to get out
-
-export MEDIA=/run/media/pgulutzan/LEXAR
-export OCELOT_VERSION=2.5.0
-cd ~
-rm rpm_build.sh
-rm -r -f ~/ocelotgui_rpm
-rm ocelotgui-$OCELOT_VERSION.tar.gz
-rm -r -f ocelotgui-$OCELOT_VERSION
-cp -p $MEDIA/ocelotgui-$OCELOT_VERSION.tar.gz ocelotgui-$OCELOT_VERSION.tar.gz
-tar -xf ocelotgui-$OCELOT_VERSION.tar.gz
-cp -p ~/ocelotgui/rpm_build.sh rpm_build.sh
-chmod +x ./rpm_build.sh
-./rpm_build.sh
-cp -p ~/ocelotgui_rpm//rp/rpmbuild/RPMS/x86_64/ocelotgui-$OCELOT_VERSION-1.x86_64.rpm ocelotgui-$OCELOT_VERSION-1.x86_64.rpm
-cp -p ocelotgui-$OCELOT_VERSION-1.x86_64.rpm $MEDIA/ocelotgui-$OCELOT_VERSION-1.x86_64.rpm
-umount $MEDIA
-
-I saw these problems:
-"
-/home/pgulutzan/ocelotgui.spec:169: W: non-standard-group Productivity/Databases/Clients
-/home/pgulutzan/ocelotgui.spec:171: W: non-standard-group Databases
-/home/pgulutzan/ocelotgui.spec:179: W: hardcoded-packager-tag Peter Gulutzan
-/home/pgulutzan/ocelotgui.spec: W: invalid-url Source0: https://github.com/ocelot-inc/ocelotgui/releases/download/2.5.0/ocelotgui-2.5.0.tar.gz HTTP Error 404: Not Found
-0 packages and 1 specfiles checked; 0 errors, 4 warnings.
-ocelotgui.x86_64: W: non-standard-group Databases
-ocelotgui.x86_64: E: changelog-time-in-future 2020-07-31
-1 packages and 0 specfiles checked; 1 errors, 1 warnings.
-"
-
-Later, rpm -i failed because something was already installed, but dnf install worked.
-
-NOTES ON OCELOTGUI.SPEC PROBLEMS
-
-Re ocelotgui.spec:
-TODO: ocelotgui: icon for rpm
-https://fedoraproject.org/wiki/Packaging:Guidelines?rd=Packaging/Guidelines#Desktop_files
-https://build.opensuse.org/package/view_file/home:strycore/lutris/lutris.spec?expand=0
-I have a file ocelotgui.desktop but maybe there is something wrong with the format.
-And anyway I'm not running install-desktop-file.
-
-"The solution is to copy (or make a symlink) of the file to your rpmbuild/SOURCES directory."
-OF COURSE. BUT THAT IS NOT POSSIBLE WITHIN THE .SPEC FILE, EH?
-
-Also try:
-rpmbuild -bs my_file.spec --define "_sourcedir $PWD"
-
-To uninstall RPM:
-rpm -e ocelotgui-$OCELOT_VERSION-1
-
-If we say "make install" it goes to /usr/local/bin/ocelotgui, but if we use deb|rpm install it goes to usr/bin.
-
-
-
-ocelotgui-2.5.0-1.i686.rpm
---------------------------
-
-!! WE HAVE REMOVED THIS !!
-Although production is possible, the file name has i586 rather than i686 and we need to find out why.
-
-std::bad_alloc followed by crash. So something to do with memory. I use new() and I don't check if it fails.
-I can produce, but after that it's no good.
-
-Machine: mageia_7_32 (Mageia 7 32-bit). Perhaps test on (Fedora_26_32)
-Source: $MEDIA/ocelotgui_2.5.0.orig.tar.gz (produced by Step 1 on Ubuntu 18.04)
-Result: ocelotgui-2.5.0-1.i586.rpm, which is uploadable for release
-
-! This somewhat contradicts what's in ocelotgui.spec
-! kwrite does not work on this guest
-! This is a cursor-grabber guest so you will need to use the right Ctrl key to get out
-
-rpm_build.sh must say libqt5-devel
-
-export MEDIA=/run/media/pgulutzan/LEXAR
-export OCELOT_VERSION=2.5.0
-cd ~
-rm rpm_build.sh
-rm -r -f ~/ocelotgui_rpm
-rm ocelotgui-$OCELOT_VERSION.tar.gz
-rm -r -f ocelotgui-$OCELOT_VERSION
-cp -p $MEDIA/ocelotgui-$OCELOT_VERSION.tar.gz ocelotgui-$OCELOT_VERSION.tar.gz
-tar -xf ocelotgui-$OCELOT_VERSION.tar.gz
-cp -p ~/ocelotgui/rpm_build.sh rpm_build.sh
-chmod +x ./rpm_build.sh
-./rpm_build.sh
-cp -p ~/ocelotgui_rpm//rp/rpmbuild/RPMS/i586/ocelotgui-$OCELOT_VERSION-1.i586.rpm ocelotgui-$OCELOT_VERSION-1.i586.rpm
-cp -p ocelotgui-$OCELOT_VERSION-1.i586.rpm $MEDIA/ocelotgui-$OCELOT_VERSION-1.i586.rpm
-umount $MEDIA
-
-SUSE 15, FOR TESTS ONLY
------------------------
-
-After enabling USB with VirtualBox Devices menu choice for Lexar,
-you have to click yes for the file manager, otherwise /run/media/pgulutan/LEXAR won't be seen.
-
-To get a terminal: right-click on desktop, run command, Konsole
-To download:
-  sudo rpm -e ocelotgui
-  sudo rpm -i /run/media/pgulutzan/LEXAR/ocelotgui-2.5.0-1.x86_64.rpm
-
-The first time I said ocelotgui, I wasn't getting any action with the
-keyboard. I had to click Settings and pick a font. That freed things.
-
-MANJARO, FOR TESTS ONLY
------------------------
-
-With manjaro_20_64 + xfce I want to try ocelotgui-qt5 then build.
-
-This is based on Arch and is rolling release. Qt version = 5.14 which is more recent than others.
-
-I could not access USB or shared host files, so the only test I can do is:
-download from github after completion.
-But manjaro_20_64 has dropbox, and so does the Ubuntu 18.0.
-Allow a few minutes for copies to settle.
-If they don't, then maybe dropbox isn't running?
-
-export MEDIA=/run/media/pgulutzan/LEXAR
-export OCELOT_VERSION=2.5.0
-cd ~
-cp -p $MEDIA/ocelotgui-$OCELOT_VERSION.tar.gz ocelotgui-$OCELOT_VERSION.tar.gz
-rm -r -f ocelotgui
-tar -xf ocelotgui-$OCELOT_VERSION.tar.gz
-cd ocelotgui
-./ocelotgui-qt5
-
-With Manjaro 21_64 + gnome I can also build, and the USB works. And I added PKGBUILD.
-
-FREEBSD
--------
-
-This is a copy of the active2.txt instruction section VIRTUALBOX FREEBSD VIRTUALBOX
-
-* Using your usual password is impossible. So use: d
-* I had to install xorg separately: pkg install xorg
-* To start with xorg:
-    (as root) sysrc dbus_enable="YES"
-              service dbus start
-    (as pgulutzan) startx
-* log in as root with password d
-  to become pgulutzan say: su pgulutzan
-  to become root again say: exit
-* I installed kate git qmake gcc cmake, and all the stuff in the Tarantool manual:
-  $ pkg install -y sudo git cmake gmake gcc coreutils \
-      readline ncurses libyaml openssl curl libunwind icu \
-      python27 py27-pip py27-setuptools py27-daemon \
-      py27-msgpack-python py27-yaml py27-argparse py27-six py27-gevent
-
-Now I can build Tarantool.
-
-I couldn't figure out how to share with Windows or mount a USB, so I depend on github.
-
-To build ocelotgui:
-pkg install mysql80-client mariadb103-client          << Surely I don't need both but mysql80-client lacked libmysqlclient.so (?)
-pkg install qt5
-So check for #ifdef __FreeBSD__ which we use to set OCELOT_OS_FREEBSD
-cd /home/pgulutzan
-git clone https://github.com/ocelot-inc/ocelotgui
-cd ocelotgui
-git pull
-cmake .
-make
-... That should work. The ocelotgui.h source file contains a line = #if defined(__FreeBSD__)
-
-It did work. But FreeBSD 12.1 was a failure.
-There was a hang when I said ./ocelotgui, and later I couldn't log in.
-By the way, pkg install qt5 on FreeBSD 12.1 will put a myysql client on /usr/local/lib/mysql/libmysqlclient.so
-so you could have said
-LD_RUN_PATH=/usr/local/lib/mysql ocelotgui
-
-WINDOWS
--------
-
-Source: ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz which was produced in step 1
-
-Instructions are in README.md.
-The only part you care about is "(making ocelotgui.exe)" unless you want latest Qt and/or latest MySQL/MariaDB connector.
-Warning: the zip has a list of files, if any files have been added/removed since the last version, you should check this list.
-Todo: We changed COPY to COPY /Y in one place. We should also have that in README.
-
-On Ubuntu 18, copy from ocelotgui to /media/sf_pgulutzan which is the directory shared on Windows as c:\users\pgulutzan
-But if it is missing, D:\ocelotgui has what you need
-If drive D: isn't visible on Windows, then click Devices and click on the USB so it's unchecked.
-Say (on Windows)
-C:
-cd \ocelotgui
-copy /Y D:\ocelotgui\*
-
-
-export OCELOT_VERSION=2.5.0
-cd /tmp
-rm -r -f 
-cp -p ~/ocelotgui_$OCELOT_VERSION.orig.tar.gz ocelotgui_$OCELOT_VERSION.orig.tar.gz
-rm -r -f ocelotgui-$OCELOT_VERSION
-tar -xf ocelotgui_$OCELOT_VERSION.orig.tar.gz
-cd ocelotgui-$OCELOT_VERSION
-rm -f /media/sf_pgulutzan/*
-# This doesn't copy subdirectories e.g. ocelotgui/debian but that is okay
-cp -p * /media/sf_pgulutzan
-cp -p ~/howtobuild.txt /media/sf_pgulutzan/howtobuild.txt
-
-Notice that howtobuild.txt (this file) is one of the files,
-so when you switch to Windows you can use wordpad to open using the Windows 'write' command:
-write c:\users\pgulutzan\howtobuild.txt
-then ^C and ^v to paste these commands.
-(Or, somebody said, Alt+Space to paste.)
-
-On Windows, copy from c:\users\pgulutzan to c:\ocelotgui
-C:
-cd \ocelotgui
-copy /Y c:\users\pgulutzan\*
-
-(NB: This will copy howtobuild.txt too, which presumably is the file you're reading.)
-
-Then follow the README.md instructions and get a .zip file.
-The following is copied from there ...
-
-: (This part appears for an earlier stage but seems to be necessary.)
-SET PATH=c:\Qt\Tools\mingw530_32\bin;c:\Qt\Tools\mingw530_32\opt\bin;%path%
-set LANG="en"
-set QT_INSTALL_PREFIX=c:\Qt\Qt5.9.1Static
-
-: We have built Qt as "release", but we do not want to use the
-: compiler flags that come with "release" because we need guard
-: bytes when we call MariaDB's mysql_init() function. Possibly
-: we only need to turn the flags off with #pragma when we're calling
-: certain MariaDB functions; possibly we'll try that someday.
-: We will not use the CMakeLists.txt file in the ocelotgui package,
-: that is for use with Linux. We will start with a modified ocelotgui.pro.
-: We will still need the MinGW bin and lib directories.
-: Earlier we said prefix is c:\Qt\Qt5.9.1static, that is the Qt directory we need.
-: There will be an error message when you say mingw32-make the first time; we ignore it.
-: There will be warnings during compile; we ignore them.
-
-: Change ocelotgui.pro so that after the Copyright + License notice it looks like this.
-: When we built we forgot to say DEFINES += STATIC, but for us it works anyway.
-QT += core gui widgets
-TARGET = ocelotgui
-TEMPLATE = app
-CONFIG += warn_on
-CONFIG += static
-CONFIG += console
-QMAKE_CXXFLAGS = -fpermissive
-QMAKE_CXXFLAGS_RELEASE -= -O1
-QMAKE_CXXFLAGS_RELEASE -= -O2
-QMAKE_CXXFLAGS_RELEASE -= -O3
-QMAKE_CXXFLAGS_RELEASE -= -Os
-QMAKE_CXXFLAGS_RELEASE += -O0
-QMAKE_CXXFLAGS_RELEASE += -g
-QMAKE_CXXFLAGS -= -O1
-QMAKE_CXXFLAGS -= -O2
-QMAKE_CXXFLAGS -= -O3
-QMAKE_CXXFLAGS -= -Os
-QMAKE_CXXFLAGS += -O0
-QMAKE_CXXFLAGS += -g
-DEFINES += OCELOT_THIRD_PARTY
-SOURCES += ocelotgui.cpp
-HEADERS += ocelotgui.h
-HEADERS += codeeditor.h
-HEADERS += install_sql.cpp
-HEADERS += hparse.h
-HEADERS += ostrings.h
-HEADERS += third_party.h
-FORMS += ocelotgui.ui
-INCLUDEPATH += "c:\mariadb\mariadb-connector-c-2.2.3-src\include"
-LIBS += -Lc:\mariadb\mariadb-connector-c-2.2.3-src\libmariadb -lmariadbclient
-
-c:
-cd c:\ocelotgui
-SET PATH=c:\Qt\Qt5.9.1Static\bin;c:\Qt\Qt5.9.1Static\lib;c:\Qt\Tools\mingw530_32\bin;c:\Qt\Tools\mingw530_32\lib;%path%
-mingw32-make clean
-qmake ocelotgui.pro
-mingw32-make
-
-: (Test)
-release\ocelotgui.exe --ocelot_dbms=tarantool
-
-: (Test)
-: I couldn't get the sha2 figured out quickly, let us defer this for the next version, I went with traditional
-: I didn't bother with the server stuff although I guess I enabled it
-: user = root, password = rootroot
-: Start the server by switching to Windows Power shell (admin), c:\Program Files\MySQL\MySQL Server 8.0\bin, then .\mysqld --initialize, then must .\mysqld
-: Now ocelotgui --user=root --password=rootroot succeeds, but set ocelot_explorer_visible='yes' failed, "Error: select failed". And yet I can select from information_schema!
-
-
-
-
-: (Making the .zip file)
-: The ocelotgui.zip package should be the same as what we distribute in the Windows release.
-: It includes several files which are used for Linux; this is harmless.
-: The file names are approximately the same as the ones on https://github.com/ocelot-inc/ocelotgui,
-: in fact this list is merely the result of concatenating "ocelotgui.exe" with an ocelotgui direcory listing.
-: Make sure you can unzip ocelotgui.zip with both 7-zip and winzip.
-copy /Y release\ocelotgui.exe ocelotgui.exe
-del ocelotgui.zip
-"C:\Program Files (x86)\7-Zip\7z" a -tzip ocelotgui.zip ocelotgui.exe changelog               manual.htm         ocelotgui-logo.png ocelotgui_logo.png           shot8.jpg CMakeLists.txt          menu-debug.png     ocelotgui.pro                   shot9.jpg codeeditor.h            menu-edit.png      ocelotgui.ui                  special-detach.png COPYING                 menu-file.png      options.txt                shot10.jpg             special-images.png COPYING.thirdparty      menu-help.png      ostrings.h                 shot11.png             special-settings.png copyright               menu-options.png   README.htm                 shot1.jpg              special-vertical.png debugger.png            menu-run.png       README.md                  shot2.jpg              starting-dialog.png debugger_reference.txt  menu-settings.png  README.txt                 shot3.png              starting.png example.cnf    PKGBUILD         ocelotgui.1        readmylogin.c              shot4.jpg              statement-widget-example.png hparse.h                ocelotgui.cpp      result-widget-example.png  shot5.jpg              third_party.h install_sql.cpp         ocelotgui.desktop  rpmchangelog               shot6.jpg              windows.txt LICENSE.GPL             ocelotgui.h                shot7.jpg tarantool.txt rpm_build.sh ocelotgui.spec completer_1.png completer_2.png completer_3.png conditional.png menu-edit-tarantool.png chart_options.txt explorer1.png plugin.c explorer2.png explorer3.png menunew.png explorer4.png completer_1-tarantool.png explorer5.png explorer6.png reserved_words.sql completer_2-tarantool.png explorer7.png explorer8.png result-widget-example-tarantool.png special-vertical-tarantool.png completer_3-tarantool.png explorer9.png hover-tarantool.png statement-widget-example-tarantool.png deb_build.sh max_row_count-tarantool.png 
-
-: What we actually put in the release looks like ocelotgui-2.5.0-1.ocelotgui.zip, so rename the .zip file at some point.
-
-COPY C:\ocelotgui\ocelotgui.zip c:\users\pgulutzan\ocelotgui.zip
-
-
-Back on Ubuntu 18: (or I guess now it's Ubuntu 20): (or use drive D:)
-export MEDIA=/media/pgulutzan/LEXAR
-export OCELOT_VERSION=2.5.0
-cp -p /media/sf_pgulutzan/ocelotgui.zip $MEDIA/ocelotgui-$OCELOT_VERSION-1.ocelotgui.zip
-
-
-
-The Release
------------
-
-(Copy the instructions from "To make a release" from active2.)
-
+But the upload of the zip should use gh too.
