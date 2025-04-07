@@ -140,6 +140,7 @@ typedef struct
   In set_dbms_version_mask we set for the version and for lower versions,
   e.g. if it's MySQL 5.6 we set both FLAG_VERSION_MYSQL_5_5 and
   FLAG_VERSION_MYSQL_5_6.
+  Currently the biggest flag value is 1048576 which is 2^20.
   Note: We often define the same number for different versions, for example for MySQL 5.5 and MySQL 5.6 it's 1,
         but if it's really necessary to distinguish versions we can use separate numbers, we have 32 bits.
   Note: MySQL 5.5 reached end-of-life in 2018, says https://endoflife.software/applications/databases/mysql
@@ -184,7 +185,8 @@ typedef struct
 #define FLAG_VERSION_MARIADB_11_5   512
 #define FLAG_VERSION_MARIADB_11_6   512
 #define FLAG_VERSION_MARIADB_11_ALL (FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1 | FLAG_VERSION_MARIADB_11_2| FLAG_VERSION_MARIADB_11_4| FLAG_VERSION_MARIADB_11_5| FLAG_VERSION_MARIADB_11_6)
-#define FLAG_VERSION_MARIADB_ALL    (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL)
+#define FLAG_VERSION_MARIADB_12_0   1048576
+#define FLAG_VERSION_MARIADB_ALL    (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL | FLAG_VERSION_MARIADB_12_0)
 #define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_MARIADB_ALL)
 #define FLAG_VERSION_TARANTOOL      1024
 #define FLAG_VERSION_LUA            2048

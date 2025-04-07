@@ -92,7 +92,7 @@
 # In fact there may be an effect on RUNPATH, overriding RUNPATH.
 # If you change this, test with "readelf -d ocelotgui | grep PATH".
 # Remember that .deb and .rpm packagers suggest avoiding rpath e.g.
-# https://en.opensuse.org/openSUSE:Packaging_Guidelines#Beware_of_Rpath
+# https://en.opensuse.org/openSUSE:Packaging_checks
 # I guess rpath gets stripped anyway but I think I'm passing a flag
 
 # CMAKE_BUILD_TYPE=<string>

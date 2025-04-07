@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: October 7 2024
+   Last modified: April 6 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -582,6 +582,12 @@ int main(int argc, char *argv[])
         presumably by the showMaximize(), before the widget is added to main_window. Suppress this.
   Todo: More tests needed. Maybe varying between kde + xfce + gnome + FreeBSD, most tests so far have been on gnome.
   Todo: Allow -geometry n+n+n+n, see that and other options: https://www.x.org/archive/X11R6.8.1/doc/X.7.html
+  Possible variant: Doesn't overwrite VirtualBox decorations. But this has not been tested with Wayland Windows etc.:
+    QScreen *screen= QGuiApplication::primaryScreen();
+    QRect available_geometry= screen->availableGeometry();
+    w.setGeometry(available_geometry);
+    w.setMinimumSize(0,0);
+    w.setMaximumSize(available_geometry.width(), available_geometry.height());
 */
 
 MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
@@ -11445,7 +11451,6 @@ int MainWindow::action_execute_one_statement(QString text)
   if (ecs_return != EC_1)
   {
     /* The statement was not handled entirely by the client, it must be passed to the DBMS. */
-
 #if (OCELOT_PLUGIN == 1)
   if (plugin_widget_list.size() > 0)
   {
@@ -16857,6 +16862,10 @@ void MainWindow::set_dbms_version_mask(QString version, int connection_number)
       else /* 11.3 + 11.4 */
         dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL);
       }
+    else if (version.startsWith("12.") == true)
+    {
+      dbms_version_mask= (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL | FLAG_VERSION_MARIADB_12_0);
+    }
     else
       /* 10.4 + 10.5 + 10.6 + 10.7 + 10.8 + 10.9 + 10.10 + 10.11 + 11.* all get the same value */
     {
@@ -31507,7 +31516,6 @@ QString ResultGrid::fillup(MYSQL_RES *mysql_res,
   /* TODO: put the copy_res_to_result stuff in a subsidiary private procedure. */
   lmysql= passed_lmysql;
   ocelot_client_side_functions_copy= ocelot_client_side_functions;
-
   grid_mysql_res= mysql_res;
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
@@ -31533,11 +31541,26 @@ QString ResultGrid::fillup(MYSQL_RES *mysql_res,
     ;
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
+  /*
+    Failure might be due to setting rsultset_metadata=none with recent MySQL versions but this message will be generic.
+  */
+  if (mysql_fields == NULL)
+  {
+    return "mysql_fetch_fields failed. result_metadata setting?";
+  }
+  /*
+    A nonsense result could cause a crash. With libmysqlclient.so.23 coming with MySQL 8.3, it's likely.
+  */
+  if (result_column_count > 0)
+  {
+    if ((mysql_fields[0].name_length > 9999) || (mysql_fields[0].db_length > 9999))
+      return "mysql_fetch_fields returned nonsense. libmysqlclient.so version?";
+  }
+
   result_max_column_widths= new unsigned int[result_column_count];
   result_field_types= new unsigned short int[result_column_count];
   result_field_charsetnrs= new unsigned int[result_column_count];
   result_field_flags= new unsigned int[result_column_count];
-
 #ifdef DBMS_TARANTOOL
   if (connections_dbms == DBMS_TARANTOOL)
   {
@@ -31657,7 +31680,6 @@ QString ResultGrid::fillup(MYSQL_RES *mysql_res,
     // ! we'd need to re-allocate result_set_copy_rows!
   }
 #endif
-
   if (copy_of_parent->conditional_settings.count() > 0)
   {
     /* Todo: filter conditional_settings so for some frames we won't need to check every time */
@@ -35693,13 +35715,11 @@ void ResultGrid::scan_field_names(
 {
   unsigned int i;
   unsigned int v_lengths;
-
   /*
     First loop: find how much to allocate. Allocate. Second loop: fill in with pointers within allocated area.
   */
   unsigned int total_size= 0;
   char *result_field_names_pointer;
-
   for (i= 0; i < p_result_column_count; ++i)                                /* first loop */
   {
       total_size+= sizeof(unsigned int);
