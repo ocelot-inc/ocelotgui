@@ -196,7 +196,7 @@ if (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 endif (CMAKE_GENERATOR STREQUAL "MinGW Makefiles")
 
 # Until 2024-07-21 this was cmake_minimum_required(VERSION 2.8.12) and that's fine but there were warnings.
-cmake_minimum_required(VERSION 3.5.0)
+cmake_minimum_required(VERSION 3.5.0...4.0.0)
 
 project(ocelotgui)
 

@@ -19754,6 +19754,8 @@ int MainWindow::tarantool_fetch_row_ext(const char *tarantool_tnt_reply_data,
     /* fromSecsSinceEpoch was introduced in Qt 5.8 (2017) */
 #if (QT_VERSION <= 0x050800)
     QDateTime dt= QDateTime::fromMSecsSinceEpoch(seconds * 1000);
+#elif (QT_VERSION >= 0x060803) /* https://doc.qt.io/qt-6/qdatetime-obsolete.html says 6.9 */
+    QDateTime dt= QDateTime::fromSecsSinceEpoch(seconds);
 #else
     QDateTime dt= QDateTime::fromSecsSinceEpoch(seconds, Qt::UTC);
 #endif
