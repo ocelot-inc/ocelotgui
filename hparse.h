@@ -2550,6 +2550,9 @@ void MainWindow::hparse_f_opr_18(int who_is_calling, int allow_flags) /* Precede
     }
   }
   if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1)
+#if (FLAG_VERSION_MARIADB_12_0 != 0)
+        || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CATALOG") == 1)
+#endif
         || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SCHEMA") == 1))
   {
     hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
@@ -7803,6 +7806,16 @@ int i_of_start_of_query= -1;
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CREATE") == 1) /* show create ... */
     {
+#if (FLAG_VERSION_MARIADB_12_0 != 0)
+      if (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CATALOG") == 1)
+      {
+        hparse_f_if_not_exists();
+        if (hparse_errno > 0) return 0;
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+        if (hparse_errno > 0) return 0;
+      }
+      else
+#endif
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1)
       {
         hparse_f_if_not_exists();
@@ -8141,6 +8154,14 @@ int i_of_start_of_query= -1;
       hparse_f_like_or_where();
       if (hparse_errno > 0) return 0;
     }
+#if (FLAG_VERSION_MARIADB_12_0 != 0)
+    /* todo: also SHOW CATALOG STATUS, eh? */
+    else if (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SERVER") == 1) /* show server ... */
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STATUS");
+      if (hparse_errno > 0) return 0;
+    }
+#endif
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SESSION") == 1) /* show session ... */
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "STATUS") == 1)
@@ -9330,6 +9351,16 @@ void MainWindow::hparse_f_statement(int block_top)
     bool fulltext_seen;
     hparse_f_alter_or_create_clause(TOKEN_KEYWORD_CREATE, &hparse_flags, &fulltext_seen);
     if (hparse_errno > 0) return;
+#if (FLAG_VERSION_MARIADB_12_0 != 0)
+    if (((hparse_flags & HPARSE_FLAG_DATABASE) != 0) && (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CATALOG") == 1))
+    {
+      hparse_f_if_not_exists();
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_INDEX, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;                                    /* catalog_name */
+    }
+    else
+#endif
     if (((hparse_flags & HPARSE_FLAG_DATABASE) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1))
     {
       hparse_f_create_database();
@@ -9921,6 +9952,19 @@ void MainWindow::hparse_f_statement(int block_top)
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ONLINE") == 1) online_seen= true;
       else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OFFLINE") == 1) online_seen= true;
     }
+#if (FLAG_VERSION_MARIADB_12_0 != 0)
+    if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CATALOG")))
+    {
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF_IN_IF_EXISTS, "IF") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
+        if (hparse_errno > 0) return;
+      }
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return;
+    }
+    else
+#endif
     if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE")))
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF_IN_IF_EXISTS, "IF") == 1)
@@ -14945,6 +14989,9 @@ int MainWindow::hparse_f_client_statement()
   else if ((slash_token == TOKEN_KEYWORD_USE) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_USE, "USE") == 1))
   {
     if (slash_token <= 0) main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT;
+#if (FLAG_VERSION_MARIADB_12_0 != 0)
+    hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CATALOG, "CATALOG");
+#endif
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
     {
       if (hparse_f_literal(TOKEN_REFTYPE_DATABASE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ANY) == 0) hparse_f_error();

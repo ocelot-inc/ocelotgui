@@ -127,6 +127,16 @@ typedef struct
 #define IS_WAYLAND_POSSIBLE 0
 #endif
 
+/* Copy of https://github.com/pgfindlib/pgfindlib.h */
+#ifndef OCELOT_PGFINDLIB
+#if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
+#define OCELOT_PGFINDLIB 1
+#include "pgfindlib.h"
+#endif
+#else
+#define OCELOT_PGFINDLIB 0
+#endif
+
 /*
   The possible DBMS values.
   These are related to ocelot_dbms values.
@@ -395,6 +405,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_CASCADE,
     TOKEN_KEYWORD_CASE,
     TOKEN_KEYWORD_CAST,
+    TOKEN_KEYWORD_CATALOG,
     TOKEN_KEYWORD_CEIL,
     TOKEN_KEYWORD_CEILING,
     TOKEN_KEYWORD_CENTROID,
@@ -1583,7 +1594,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1228
+#define KEYWORD_LIST_SIZE 1229
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -1695,6 +1706,7 @@ static const struct keywords strvalues[]=
       {"CASCADE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_CASCADE},
       {"CASE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CASE},
       {"CAST", FLAG_VERSION_TARANTOOL, FLAG_VERSION_ALL, TOKEN_KEYWORD_CAST},
+      {"CATALOG", FLAG_VERSION_MARIADB_12_0, FLAG_VERSION_ALL, TOKEN_KEYWORD_CATALOG},
       {"CEIL", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CEIL},
       {"CEILING", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CEILING},
       {"CENTROID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CENTROID}, /* deprecated in MySQL 5.7.6 */
@@ -5810,7 +5822,7 @@ private:
   QString get_version();
   void print_version();
   void print_help();
-  void print_defaults();
+  void print_defaults(int is_called_from_print_help);
   int setup_mysql_real_query(char*,char*);
   int setup_routine_list(QString);
   int setup_find(QString,QString);
@@ -6799,7 +6811,8 @@ void ldbms_get_library(QString ocelot_ld_run_path,
         int *is_library_loaded,
         void **library_handle,
         QString *return_string,
-        int which_library);
+        int which_library,
+        const char *so_buffer);
 #if (OCELOT_MYSQL_INCLUDE == 1)
 my_ulonglong ldbms_mysql_affected_rows(MYSQL *mysql);
 void ldbms_mysql_close(MYSQL *mysql);

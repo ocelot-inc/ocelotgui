@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: April 6 2025
+   Last modified: April 13 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -508,6 +508,10 @@ If you must have the old behaviour, see whether your BSD or Linux distro \
 allows you to switch to x11.";
 #endif
 
+#if (OCELOT_PGFINDLIB == 1)
+static char pgfindlib_standard_paths[]= " LD_AUDIT LD_PRELOAD DT_RPATH LD_LIBRARY_PATH DT_RUNPATH LD_RUN_PATH ld.so.cache default_paths LD_PGFINDLIB_PATH ";
+#endif
+
 /*
    Suppress useless messages
    https://bugreports.qt.io/browse/QTBUG-57180  (Windows startup)
@@ -754,7 +758,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 
   if (ocelot_ca.print_defaults != 0)                    /* e.g. if user said "ocelotgui --print_defaults" */
   {
-    print_defaults();
+    print_defaults(0);
     exit(0);
   }
   for (int q_i= 0; strcmp(string_languages[q_i]," ") > 0; ++q_i)
@@ -5628,7 +5632,8 @@ void MainWindow::action_file_exit(bool is_checked)
     /* Some code added 2015-08-25 due to valgrind */
     if (lmysql != 0) { delete lmysql; lmysql= 0; }
 #if defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD)
-    if (is_libmysqlclient_loaded == 1) { dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
+    if (is_libmysqlclient_loaded == 1)
+      {if (libmysqlclient_handle != NULL) dlclose(libmysqlclient_handle); is_libmysqlclient_loaded= 0; }
     if (is_libcrypto_loaded == 1) { dlclose(libcrypto_handle); is_libcrypto_loaded= 0; }
 #endif
   }
@@ -6494,7 +6499,7 @@ along with this program.  If not, see &lt;http://www.gnu.org/licenses/&gt;.";
 #if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
 #if (OCELOT_STATIC_LIBRARY==0)
     /* RDLD_DI_ORIGIN gives only library. RDLD_DI_LINKMAP gives all but needs #include <link.h>. */
-    if (is_libmysqlclient_loaded == 1)
+    if ((is_libmysqlclient_loaded == 1) && (libmysqlclient_handle != NULL))
     {
        struct link_map *map;
        the_text.append("(");
@@ -6647,6 +6652,12 @@ void MainWindow::action_help_libmysqlclient(bool is_checked)
   ... ocelotgui will also look for libmariadbclient.so or \
   libmariadb.so in the same fashion but will look first for \
   libmysqlclient.so unless one starts with ocelot_dbms='mariadb'.";
+#if (OCELOT_PGFINDLIB == 1)
+  the_text= the_text +
+  "<br>Update: Now on Linux and FreeBSD ocelotgui searches with \
+  pgfindlib(), see https://github.com/pgulutzan/pgfindlib \
+  and see what ocelotgui --print_defaults says.";
+#endif
   Message_box *message_box;
   message_box= new Message_box("Help|libmysqlclient", the_text, 500, "", er_strings[er_off + ER_OK], "", this);
   message_box->exec();
@@ -16595,6 +16606,17 @@ int MainWindow::connect_mysql(unsigned int connection_number)
 {
   QString ldbms_return_string;
   ldbms_return_string= "";
+#if (OCELOT_PGFINDLIB == 1)
+  char so_buffer[16384];
+  QString so_clauses= "FROM "
+              + ocelot_ld_run_path
+              + pgfindlib_standard_paths
+              + "WHERE libmysqlclient.so, libmariadb.so, libmariadbclient.so";
+  int rval= pgfindlib(so_clauses.toUtf8(), so_buffer, 16384);
+  if (rval != 0) strcpy(so_buffer, ""); /* this can never happen */
+#else
+  char so_buffer[]= "";
+#endif
 
   /* Find libmysqlclient. Prefer ld_run_path, within that prefer libmysqlclient.so.18.
     Generally libmysqlclient.so will have a symlink to libmariadb.so
@@ -16622,14 +16644,12 @@ int MainWindow::connect_mysql(unsigned int connection_number)
     if (i == 10){                                                   li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMARIADB; }
     if (i == 11){if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT18; }
     if (i == 12){if (connections_dbms[0] != DBMS_MARIADB) continue; li_path= ""                ; li_lib= WHICH_LIBRARY_LIBMYSQLCLIENT; }
-    lmysql->ldbms_get_library(li_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, li_lib);
+    lmysql->ldbms_get_library(li_path, &is_libmysqlclient_loaded, &libmysqlclient_handle, &ldbms_return_string, li_lib, so_buffer);
     if (is_libmysqlclient_loaded == 1)
     {
       break;
     }
   }
-
-
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
 
   if (is_libmysqlclient_loaded == -2)
@@ -17292,23 +17312,27 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   memset(&tarantool_tnt_reply, 0, sizeof(struct tnt_reply));
 
   /* Find libtarantool. Prefer ld_run_path. */
+  char so_buffer[]= "";
   if (is_libtarantool_loaded != 1)
   {
-    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libtarantool_loaded, &libtarantool_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOL);
-  }
-  if (is_libtarantool_loaded != 1)
-  {
-    lmysql->ldbms_get_library("", &is_libtarantool_loaded, &libtarantool_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOL);
+    QString so_clauses= "FROM "
+            + ocelot_ld_run_path
+            + pgfindlib_standard_paths
+            + "WHERE libtarantool.so";
+    char so_buffer[16384];
+    int rval= pgfindlib(so_clauses.toUtf8(), so_buffer, 16384);
+    if (rval != PGFINDLIB_OK) so_buffer[0]= '\0';
+    lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libtarantool_loaded, &libtarantool_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOL, so_buffer);
   }
   /* Find libtarantoolnet. Prefer ld_run_path. */
   /* Now libtarantool.so has everything so this is removed. */
   //if (is_libtarantoolnet_loaded != 1)
   //{
-  //  lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET);
+  //  lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET, so_buffer);
   //}
   //if (is_libtarantoolnet_loaded != 1)
   //{
-  //  lmysql->ldbms_get_library("", &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET);
+  //  lmysql->ldbms_get_library("", &is_libtarantoolnet_loaded, &libtarantoolnet_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOLNET, so_buffer);
   //}
 
   /* Todo: The following errors would be better if we put them in diagnostics the usual way. */
@@ -24952,13 +24976,17 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         ldbms_return_string= "";
 
         /* First find libcrypto.so */
+        char so_buffer[]= "";
         if (is_libcrypto_loaded != 1)
         {
-          lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
-        }
-        if (is_libcrypto_loaded != 1)
-        {
-          lmysql->ldbms_get_library("", &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO);
+            QString so_clauses= "FROM "
+                    + ocelot_ld_run_path
+                    + pgfindlib_standard_paths
+                    + "WHERE libcrypto.so";
+            char so_buffer[16384];
+            int rval= pgfindlib(so_clauses.toUtf8(), so_buffer, 16384);
+            if (rval != PGFINDLIB_OK) so_buffer[0]= '\0';
+          lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO, so_buffer);
         }
         if (is_libcrypto_loaded != 1)
         {
@@ -26373,17 +26401,32 @@ void MainWindow::print_help()
     for (int i= 0; i < qs.size(); ++i) {strcpy(tmp_group, qs.at(i).toUtf8()); printf(" %s", tmp_group); }
     printf("\n");
   }
-  print_defaults();
+  print_defaults(1);
 }
 
 /* --print_defaults */
-void MainWindow::print_defaults()
+void MainWindow::print_defaults(int is_called_from_print_help)
 {
   printf("Possible option values: same as possible option values for mysql client\n");
   printf("Option values after reading options files and command-line arguments:\n");
   printf("Option                            Value\n");
   printf("--------------------------------- ----------------------------------------\n");
   action_file_connect_once("Print");
+#ifdef OCELOT_PGFINDLIB
+  if (is_called_from_print_help == 0)
+  {
+    printf("\n");
+    printf(".so file list from https://github.com/pgulutzan/pgfindlib\n");
+    QString so_clauses= "FROM "
+            + ocelot_ld_run_path
+            + pgfindlib_standard_paths
+            + "WHERE libmysqlclient.so, libmariadb.so, libmariadbclient.so, libcrypto.so, libtarantool.so";
+    char so_buffer[16384];
+    int rval= pgfindlib(so_clauses.toUtf8(), so_buffer, 16384);
+    printf("so_buffer=%s.\n", so_buffer);
+    printf("rval=%d.\n", rval);
+  }
+#endif
 }
 
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -30368,8 +30411,13 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
         int *is_library_loaded,           /* points to is_libXXX_loaded */
         void **library_handle,            /* points to libXXX_handle */
         QString *return_string,
-        int which_library)                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
+        int which_library,                /* 0 = libmysqlclient. 1 = libcrypto, etc. */
+        const char *so_buffer)
 {
+  (void) so_buffer;
+#if (OCELOT_PGFINDLIB == 1)
+  (void) ocelot_ld_run_path;
+#endif
 #if (OCELOT_MYSQL_INCLUDE == 1)
 #if (OCELOT_STATIC_LIBRARY==1)
     if ((which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) || (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) || (which_library == WHICH_LIBRARY_LIBMARIADB))
@@ -30483,8 +30531,10 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
 #endif /* OCELOT_THIRD_PARTY==1 */
 
 #if (defined(OCELOT_OS_LINUX) || defined(OCELOT_OS_FREEBSD))
+#if (OCELOT_PGFINDLIB != 1)
     char *query;
     int query_len;
+#endif
 #endif
     QString error_string;
 
@@ -30533,6 +30583,38 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
     if (which_library == WHICH_LIBRARY_LIBMARIADB) lib.setFileName("libmariadb");
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
 #endif
+
+#if (OCELOT_PGFINDLIB == 1)
+  {
+    const char *so_to_find;
+    if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT) so_to_find= "libmysqlclient.so";
+    else if (which_library == WHICH_LIBRARY_LIBCRYPTO) so_to_find= "libcrypto.so";
+    else if (which_library == WHICH_LIBRARY_LIBMYSQLCLIENT18) so_to_find= "libmysqlclient.so.18";
+#ifdef DBMS_TARANTOOL
+    else if (which_library == WHICH_LIBRARY_LIBTARANTOOL) so_to_find= "libtarantool.so";
+#endif
+    else if (which_library == WHICH_LIBRARY_LIBMARIADB) so_to_find= "libmariadb.so";
+    else if (which_library == WHICH_LIBRARY_LIBMARIADBCLIENT) so_to_find= "libmariadbclient.so";
+    const char *so_found= strstr(so_buffer, so_to_find);
+    if (so_found != NULL)
+    {
+      char so_found_name[4096];
+      const char *so_start; const char *so_end; char *so_out;
+      for (so_start= so_found; *so_start != ','; --so_start) {;}
+      for (so_end= so_found; *so_end != ','; ++so_end) {;}
+      ++so_start;
+      for (so_out= so_found_name; so_start != so_end; ++so_start) *so_out++= *so_start;
+      *so_out= '\0';
+      dlopen_handle= dlopen(so_found_name,  RTLD_DEEPBIND | RTLD_NOW);
+      if (dlopen_handle == 0) {*is_library_loaded= 0; error_string= dlerror(); }
+      else *is_library_loaded= 1;
+      *library_handle= dlopen_handle;
+    }
+    else error_string= "no .so";
+  }
+#endif
+
+#if (OCELOT_PGFINDLIB != 1)
     /*
       Finding libmysqlclient
       I tried "qApp->addLibraryPath(ld_run_path);" but it failed.
@@ -30649,7 +30731,7 @@ void ldbms::ldbms_get_library(QString ocelot_ld_run_path,
       error_string= lib.errorString();
 #endif //#ifdef _WIN32
     }
-
+#endif // #if (OCELOT_PGFINDLIB != 1)
     if (*is_library_loaded == 0)
     {
       *return_string= error_string;
@@ -45809,3 +45891,9 @@ Plugin::~Plugin()
   #include "third_party.h"
 #endif
 #endif
+
+/* Copy of https://github.com/pgfindlib/pgfindlib.c */
+#if (OCELOT_PGFINDLIB == 1)
+#include "pgfindlib.c"
+#endif
+
