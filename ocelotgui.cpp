@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: April 13 2025
+   Last modified: April 16 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -559,12 +559,21 @@ int main(int argc, char *argv[])
   QApplication main_application(argc, argv);
   MainWindow w(argc, argv);
   /* We depend on w being maximized in resizeEvent() */
+  /* Change on 2025-04-16: use availableGeometry(). Todo: probably this should be changed on Windows too. */
 #if (QT_VERSION >= 0x50000)
-    QScreen *screen= QGuiApplication::primaryScreen();
-    QRect screen_geometry= screen->geometry();
-    w.setGeometry(screen_geometry);
-    w.setMinimumSize(0,0);
-    w.setMaximumSize(QWIDGETSIZE_MAX,QWIDGETSIZE_MAX);
+#ifdef _WIN32
+  QScreen *screen= QGuiApplication::primaryScreen();
+  QRect screen_geometry= screen->geometry();
+  w.setGeometry(screen_geometry);
+  w.setMinimumSize(0,0);
+  w.setMaximumSize(QWIDGETSIZE_MAX,QWIDGETSIZE_MAX);
+#else
+  QScreen *screen= QGuiApplication::primaryScreen();
+  QRect available_geometry= screen->availableGeometry();
+  w.setGeometry(available_geometry);
+  w.setMinimumSize(0,0);
+  w.setMaximumSize(available_geometry.width(), available_geometry.height());
+#endif
 #endif
   w.showMaximized();
   return main_application.exec();
@@ -586,12 +595,6 @@ int main(int argc, char *argv[])
         presumably by the showMaximize(), before the widget is added to main_window. Suppress this.
   Todo: More tests needed. Maybe varying between kde + xfce + gnome + FreeBSD, most tests so far have been on gnome.
   Todo: Allow -geometry n+n+n+n, see that and other options: https://www.x.org/archive/X11R6.8.1/doc/X.7.html
-  Possible variant: Doesn't overwrite VirtualBox decorations. But this has not been tested with Wayland Windows etc.:
-    QScreen *screen= QGuiApplication::primaryScreen();
-    QRect available_geometry= screen->availableGeometry();
-    w.setGeometry(available_geometry);
-    w.setMinimumSize(0,0);
-    w.setMaximumSize(available_geometry.width(), available_geometry.height());
 */
 
 MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :

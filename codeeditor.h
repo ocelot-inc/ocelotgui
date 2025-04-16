@@ -328,6 +328,7 @@ int CodeEditor::prompt_translate_k(QString s, int i)
   Take the width of the first line or the width of the last line, whichever is greater.
   Add the width of "B " if this CodeEditor is for a debug widget rather than for the statement widget.
   Re the isPunct() check: I found that if the last letter is . or [ etc. the width is too small, dunno why.
+  Change on 2025-04-16: return prompt_width + 1; instead of return prompt_width;
 */
 int CodeEditor::prompt_width_calculate()
 {
@@ -346,7 +347,7 @@ int CodeEditor::prompt_width_calculate()
 #if (OCELOT_MYSQL_DEBUGGER == 1)
   if (is_debug_widget == true) prompt_width+= fontMetrics().boundingRect("B ").width();
 #endif
-  return prompt_width;
+  return prompt_width + 1;
 }
 
 
