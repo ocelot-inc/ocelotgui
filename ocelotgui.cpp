@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: April 16 2025
+   Last modified: April 17 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -17315,7 +17315,6 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   memset(&tarantool_tnt_reply, 0, sizeof(struct tnt_reply));
 
   /* Find libtarantool. Prefer ld_run_path. */
-  char so_buffer[]= "";
   if (is_libtarantool_loaded != 1)
   {
     QString so_clauses= "FROM "
@@ -24924,6 +24923,8 @@ void MainWindow::connect_read_command_line(int argc, char *argv[])
     We get a list of readable groups via my_cnf_groups_list() based on these comments.
     Todo: It would be faster to call my_cnf_groups_list() only at start or when we change dbms or suffix.
     Todo: mysql client sees [] as an ignorable group, we don't see it at all, though I guess it's undocumented.
+    Changes 2025-04-17: Now we treat / * text * / as non-comment, and handle #comment differently if it's in mid-line.
+                        We still allow user=a b c d, I forget why.
 */
 void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 {
@@ -24979,7 +24980,6 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         ldbms_return_string= "";
 
         /* First find libcrypto.so */
-        char so_buffer[]= "";
         if (is_libcrypto_loaded != 1)
         {
             QString so_clauses= "FROM "
@@ -25073,15 +25073,22 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
     }
     if (fgets_result == NULL) break;
     QString s= line;
-    /* tokenize, ignore # comments or / * comments * /, treat '-' as part of token not operator */
+    /* tokenize a line, do not ignore # comments or / * comments * /, treat '-' as part of token not operator */
     tokenize(s.data(),
              s.size(),
              &token_lengths[0], &token_offsets[0], 100 - 1,
-            (QChar*)"33333", 2, "", 2);
+            (QChar*)"33333", 1, "", 2);
     /* Ignore blank lines and lines that start with ';' */
     if (token_lengths[0] == 0) continue;
     if (QString::compare(s.mid(token_offsets[0], token_lengths[0]), ";", Qt::CaseInsensitive) == 0) continue;
     /* Possible meaningful lines are: [ group ], ! include x, ! includedir x, variable = value */
+
+    /* This is how we treat #comments at start of line or during line, but after four tokens we stop checking. */
+    if (s.mid(token_offsets[0], 1) == "#") continue;
+    if ((token_lengths[1] > 0) && (s.mid(token_offsets[1], 1) == '#')) token_lengths[1]= token_lengths[2]= token_lengths[3]= 0;
+    if ((token_lengths[2] > 0) && (s.mid(token_offsets[2], 1) == '#')) token_lengths[2]= token_lengths[3]= 0;
+    if ((token_lengths[3] > 0) && (s.mid(token_offsets[3], 1) == '#')) token_lengths[3]= 0;
+
     token0_length= token_lengths[0];
     token0= s.mid(token_offsets[0], token0_length);
     token1_length= token_lengths[1];
