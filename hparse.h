@@ -6425,7 +6425,23 @@ void MainWindow::hparse_f_user_specification_list(int who_is_calling)
           }
           else hparse_f_error();
           if (hparse_errno > 0) return;
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_REPLACE, "REPLACE") == 1)
+          {
+            if (hparse_f_literal(TOKEN_REFTYPE_PASSWORD, FLAG_VERSION_MYSQL_8_0, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+          }
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "RETAIN") == 1)
+          {
+            hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_CURRENT, "CURRENT");
+            hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PASSWORD, "PASSWORD");
+          }
+          if (hparse_errno > 0) return;
           if ((auth_option_number < 3) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AND, "AND") == 1)) continue;
+        }
+        else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISCARD") == 1)
+        {
+          hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OLD");
+          hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_PASSWORD, "PASSWORD");
+          if (hparse_errno > 0) return;
         }
         break;
       }
