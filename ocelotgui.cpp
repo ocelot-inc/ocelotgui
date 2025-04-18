@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: April 17 2025
+   Last modified: April 18 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -575,7 +575,7 @@ int main(int argc, char *argv[])
   w.setMaximumSize(available_geometry.width(), available_geometry.height());
 #endif
 #endif
-  w.showMaximized();
+  //w.showMaximized(); /* 2025-04-18 there's a this->showMaximized() later on */
   return main_application.exec();
 }
 
@@ -593,6 +593,7 @@ int main(int argc, char *argv[])
   Todo: When ocelotgui starts there is a top-left flash of a blank window, this might be because one of the widget
         constructors has a show(). But also there's a complete small MainWindow that luckily is wiped out,
         presumably by the showMaximize(), before the widget is added to main_window. Suppress this.
+        Update 2025-04-18: moving the showMaximized() seems to have suppressed.
   Todo: More tests needed. Maybe varying between kde + xfce + gnome + FreeBSD, most tests so far have been on gnome.
   Todo: Allow -geometry n+n+n+n, see that and other options: https://www.x.org/archive/X11R6.8.1/doc/X.7.html
 */
@@ -758,7 +759,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     if (plugin_widget_list.size() != 0) plugin_widget_list[0]->caller(PLUGIN_AT_PROGRAM_START, &ocelot_plugin_pass);
   }
 #endif
-
   if (ocelot_ca.print_defaults != 0)                    /* e.g. if user said "ocelotgui --print_defaults" */
   {
     print_defaults(0);
@@ -816,10 +816,8 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #else
   main_window->setLayout(main_layout);
 #endif
-
   setCentralWidget(main_window);
-
-  this->showMaximized();
+//  this->showMaximized(); /* 2025-04-18 moved down */
 
   fill_menu_2();    /* Do this at a late stage because widgets must exist before we call connect() */
   history_edit_widget->setContextMenuPolicy(Qt::CustomContextMenu);
@@ -851,6 +849,7 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
     action_file_connect(false);
   }
 
+  this->showMaximized(); /* 2025-04-18 moved to here */
   statement_edit_widget->setFocus(); /* Show user we're ready to accept a statement in the statement edit widget */
   QTimer::singleShot(0, this, SLOT(initialize_after_main_window_show()));
   log("MainWindow end", 90);
@@ -2783,7 +2782,6 @@ void MainWindow::initialize_widget_history()
 {
   history_edit_widget->setStyleSheet(ocelot_history_style_string);
   history_edit_widget->setReadOnly(false);       /* if history shouldn't be editable, set to "true" here */
-  history_edit_widget->hide();                   /* hidden until a statement is executed */
   history_markup_make_strings();
   history_edit_widget->installEventFilter(this); /* must catch focusIn */
   return;
@@ -11330,7 +11328,7 @@ QMenu *menu_help= menu_spec_find_menu("menu_help");
     /* Try to set history cursor at end so last line is visible. Todo: Make sure this is the right time to do it. */
     /* See also similar call in initialize_after_main_window_show(). */
     history_edit_widget->verticalScrollBar()->setValue(history_edit_widget->verticalScrollBar()->maximum());
-    history_edit_widget->show(); /* Todo: find out if this is really necessary */
+    //history_edit_widget->show(); /* 2025-04-18 unnecessary since there is no history_edit_widget->hide(); */
     if (is_kill_requested == true) break;
   }
   log("action_execute end", 90);
