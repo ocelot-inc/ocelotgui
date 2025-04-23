@@ -150,7 +150,7 @@ typedef struct
   In set_dbms_version_mask we set for the version and for lower versions,
   e.g. if it's MySQL 5.6 we set both FLAG_VERSION_MYSQL_5_5 and
   FLAG_VERSION_MYSQL_5_6.
-  Currently the biggest flag value is 1048576 which is 2^20.
+  Currently the biggest flag value is 2097152 which is 2^21.
   Note: We often define the same number for different versions, for example for MySQL 5.5 and MySQL 5.6 it's 1,
         but if it's really necessary to distinguish versions we can use separate numbers, we have 32 bits.
   Note: MySQL 5.5 reached end-of-life in 2018, says https://endoflife.software/applications/databases/mysql
@@ -162,6 +162,9 @@ typedef struct
   Note: Tarantool 2.10 + Tarantool 2.11 all set FLAG_VERSION_TARANTOOL_2_10, we don't distinguish.
   Note: FLAG_VERSION_TARANTOOL_3_0 is currently the same as FLAG_VERSION_TARANTOOL_2_11 since our behaviour is the same.
   Note: Tarantool 3. any kind sets VERSION_TARANTOOL_3_0, we don't distinguish.
+  Note: MySQL/MariaDB share values e.g. FLAG_VERSION_MARIADB_11_0 and FLAG_VERSION_TARANTOOL_2_10 both are 1048576.
+        So we have to distinguish by checking what's being connected as well as what flag value matches.
+        For example in hparse.h we say things like "if ((hparse_dbms_mask & flag_version) == 0) return 0;"
 */
 #define DBMS_MYSQL 1
 #define DBMS_MARIADB 2
@@ -169,14 +172,18 @@ typedef struct
 #define FLAG_VERSION_MYSQL_5_5      1
 #define FLAG_VERSION_MYSQL_5_6      1
 #define FLAG_VERSION_MYSQL_5_7      2
+#define FLAG_VERSION_MYSQL_5_ALL    (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7)
 #define FLAG_VERSION_MYSQL_8_0      4
 #define FLAG_VERSION_MYSQL_8_0_31   8
 #define FLAG_VERSION_MYSQL_8_1      8
 #define FLAG_VERSION_MYSQL_8_2      8
 #define FLAG_VERSION_MYSQL_8_3      8
-#define FLAG_VERSION_MYSQL_8_4      8
-#define FLAG_VERSION_MYSQL_9_0      8
-#define FLAG_VERSION_MYSQL_ALL      (FLAG_VERSION_MYSQL_5_5 | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MYSQL_8_0_31| FLAG_VERSION_MYSQL_8_1| FLAG_VERSION_MYSQL_8_2| FLAG_VERSION_MYSQL_8_3| FLAG_VERSION_MYSQL_8_4| FLAG_VERSION_MYSQL_9_0)
+#define FLAG_VERSION_MYSQL_8_4      536870912
+#define FLAG_VERSION_MYSQL_8_ALL    (FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MYSQL_8_0_31 | FLAG_VERSION_MYSQL_8_1 | FLAG_VERSION_MYSQL_8_2 | FLAG_VERSION_MYSQL_8_3 | FLAG_VERSION_MYSQL_8_4)
+#define FLAG_VERSION_MYSQL_9_0      1073741824
+#define FLAG_VERSION_MYSQL_9_3      2147483648
+#define FLAG_VERSION_MYSQL_9_ALL    (FLAG_VERSION_MYSQL_9_0 | FLAG_VERSION_MYSQL_9_3)
+#define FLAG_VERSION_MYSQL_ALL      (FLAG_VERSION_MYSQL_5_ALL | FLAG_VERSION_MYSQL_8_ALL | FLAG_VERSION_MYSQL_9_ALL)
 #define FLAG_VERSION_MARIADB_5_5    16
 #define FLAG_VERSION_MARIADB_10_0   16
 #define FLAG_VERSION_MARIADB_10_1   32
@@ -188,14 +195,15 @@ typedef struct
 #define FLAG_VERSION_MARIADB_10_10  512
 #define FLAG_VERSION_MARIADB_10_11  512
 #define FLAG_VERSION_MARIADB_10_ALL (FLAG_VERSION_MARIADB_10_0 | FLAG_VERSION_MARIADB_10_1 | FLAG_VERSION_MARIADB_10_2_2 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_MARIADB_10_3 | FLAG_VERSION_MARIADB_10_7 | FLAG_VERSION_MARIADB_10_9 | FLAG_VERSION_MARIADB_10_10 | FLAG_VERSION_MARIADB_10_11)
-#define FLAG_VERSION_MARIADB_11_0   512
-#define FLAG_VERSION_MARIADB_11_1   512
-#define FLAG_VERSION_MARIADB_11_2   512
-#define FLAG_VERSION_MARIADB_11_4   512
-#define FLAG_VERSION_MARIADB_11_5   512
-#define FLAG_VERSION_MARIADB_11_6   512
-#define FLAG_VERSION_MARIADB_11_ALL (FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1 | FLAG_VERSION_MARIADB_11_2| FLAG_VERSION_MARIADB_11_4| FLAG_VERSION_MARIADB_11_5| FLAG_VERSION_MARIADB_11_6)
-#define FLAG_VERSION_MARIADB_12_0   1048576
+#define FLAG_VERSION_MARIADB_11_0   1048576
+#define FLAG_VERSION_MARIADB_11_1   2097152
+#define FLAG_VERSION_MARIADB_11_2   4194304
+#define FLAG_VERSION_MARIADB_11_4   8388608
+#define FLAG_VERSION_MARIADB_11_5   16777216
+#define FLAG_VERSION_MARIADB_11_6   33554432
+#define FLAG_VERSION_MARIADB_11_7   67108864
+#define FLAG_VERSION_MARIADB_11_ALL (FLAG_VERSION_MARIADB_11_0 | FLAG_VERSION_MARIADB_11_1 | FLAG_VERSION_MARIADB_11_2| FLAG_VERSION_MARIADB_11_4| FLAG_VERSION_MARIADB_11_5| FLAG_VERSION_MARIADB_11_6| FLAG_VERSION_MARIADB_11_7)
+#define FLAG_VERSION_MARIADB_12_0   268435456
 #define FLAG_VERSION_MARIADB_ALL    (FLAG_VERSION_MARIADB_5_5 | FLAG_VERSION_MARIADB_10_ALL | FLAG_VERSION_MARIADB_11_ALL | FLAG_VERSION_MARIADB_12_0)
 #define FLAG_VERSION_MYSQL_OR_MARIADB_ALL (FLAG_VERSION_MYSQL_ALL | FLAG_VERSION_MARIADB_ALL)
 #define FLAG_VERSION_TARANTOOL      1024
@@ -772,6 +780,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_LEFT,
     TOKEN_KEYWORD_LENGTH,
     TOKEN_KEYWORD_LEVEL,
+    TOKEN_KEYWORD_LIBRARY,
     TOKEN_KEYWORD_LIKE,
     TOKEN_KEYWORD_LIMIT,
     TOKEN_KEYWORD_LINE,
@@ -810,6 +819,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_MAKEDATE,
     TOKEN_KEYWORD_MAKETIME,
     TOKEN_KEYWORD_MAKE_SET,
+    TOKEN_KEYWORD_MANUAL,
     TOKEN_KEYWORD_MAP,
     TOKEN_KEYWORD_MARGIN, /* export */
     TOKEN_KEYWORD_MASTER_BIND,
@@ -1083,6 +1093,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_PACKAGE,
     TOKEN_KEYWORD_PAD, /* export */
     TOKEN_KEYWORD_PAGER,
+    TOKEN_KEYWORD_PARALLEL,
     TOKEN_KEYWORD_PARSER_TRACE,
     TOKEN_KEYWORD_PARTIAL,
     TOKEN_KEYWORD_PARTITION,
@@ -1130,6 +1141,7 @@ enum {                                        /* possible returns from token_typ
         TOKEN_KEYWORD_PROTOCOL,
     TOKEN_KEYWORD_PROXY,
     TOKEN_KEYWORD_PURGE,
+    TOKEN_KEYWORD_QUALIFY,
     TOKEN_KEYWORD_QUARTER,
     TOKEN_KEYWORD_QUERY,
         TOKEN_KEYWORD_QUICK,
@@ -1169,6 +1181,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_REPAIR,
     TOKEN_KEYWORD_REPEAT,
     TOKEN_KEYWORD_REPLACE,
+    TOKEN_KEYWORD_REPLICA,
+    TOKEN_KEYWORD_REPLICAS,
     TOKEN_KEYWORD_REPLICATION,
     TOKEN_KEYWORD_REPLICATION_SLAVE_ADMIN,
         TOKEN_KEYWORD_REPORT_DATA_TRUNCATION,
@@ -1387,6 +1401,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_TAB,
     TOKEN_KEYWORD_TABLE,
     TOKEN_KEYWORD_TABLES,
+    TOKEN_KEYWORD_TABLESAMPLE,
     TOKEN_KEYWORD_TABLESPACE,
     TOKEN_KEYWORD_TABLE_INFO,
     TOKEN_KEYWORD_TAN,
@@ -1462,6 +1477,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_VARYING,
     TOKEN_KEYWORD_VAR_POP,
     TOKEN_KEYWORD_VAR_SAMP,
+    TOKEN_KEYWORD_VECTOR,
         TOKEN_KEYWORD_VERBOSE,
     TOKEN_KEYWORD_VERSION,
     TOKEN_KEYWORD_VERSIONING,
@@ -1594,12 +1610,12 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1229
+#define KEYWORD_LIST_SIZE 1237
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
-   unsigned int reserved_flags;
-   unsigned int built_in_function_flags;
+   uint32_t reserved_flags; /* was unsigned int till 20250422 */
+   uint32_t built_in_function_flags; /* was unsigned int till 20250422 */
    unsigned short int token_keyword;
 };
 static const struct keywords strvalues[]=
@@ -2067,6 +2083,7 @@ static const struct keywords strvalues[]=
       {"LEFT", FLAG_VERSION_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_LEFT},
       {"LENGTH", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_LENGTH},
       {"LEVEL", 0, 0, TOKEN_KEYWORD_LEVEL},
+      {"LIBRARY", FLAG_VERSION_MYSQL_9_3, 0, TOKEN_KEYWORD_LIBRARY},
       {"LIKE", FLAG_VERSION_ALL, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_LIKE},
       {"LIMIT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_LIMIT},
       {"LINE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_LINE},
@@ -2105,6 +2122,7 @@ static const struct keywords strvalues[]=
       {"MAKEDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKEDATE},
       {"MAKETIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKETIME},
       {"MAKE_SET", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MAKE_SET},
+      {"MANUAL", FLAG_VERSION_MYSQL_8_4, 0, TOKEN_KEYWORD_MANUAL},
       {"MAP", 0, 0, TOKEN_KEYWORD_MAP},
       {"MARGIN", 0, 0, TOKEN_KEYWORD_MARGIN}, /* export */
       {"MASTER_BIND", FLAG_VERSION_MYSQL_5_6, 0, TOKEN_KEYWORD_MASTER_BIND},
@@ -2380,6 +2398,7 @@ static const struct keywords strvalues[]=
       {"PACKAGE", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_PACKAGE},
       {"PAD", 0, 0, TOKEN_KEYWORD_PAD}, /* export */
       {"PAGER", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_PAGER}, /* ocelotgui keyword */
+      {"PARALLEL", FLAG_VERSION_MYSQL_8_4, 0, TOKEN_KEYWORD_PARALLEL},
       {"PARSER_TRACE", 0, 0, TOKEN_KEYWORD_PARSER_TRACE},
       {"PARTIAL", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_PARTIAL},
       {"PARTITION", FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_5_6 | FLAG_VERSION_MARIADB_10_0, 0, TOKEN_KEYWORD_PARTITION},
@@ -2427,6 +2446,7 @@ static const struct keywords strvalues[]=
         {"PROTOCOL", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_PROTOCOL},
       {"PROXY", 0, 0, TOKEN_KEYWORD_PROXY},
       {"PURGE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_PURGE},
+      {"QUALIFY", FLAG_VERSION_MYSQL_8_4, 0, TOKEN_KEYWORD_QUALIFY},
       {"QUARTER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_QUARTER},
       {"QUERY", 0, 0, TOKEN_KEYWORD_QUERY},
         {"QUICK", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_QUICK},
@@ -2466,6 +2486,8 @@ static const struct keywords strvalues[]=
       {"REPAIR", 0, 0, TOKEN_KEYWORD_REPAIR},
       {"REPEAT", FLAG_VERSION_ALL | FLAG_VERSION_LUA, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_REPEAT},
       {"REPLACE", FLAG_VERSION_ALL, FLAG_VERSION_ALL, TOKEN_KEYWORD_REPLACE},
+      {"REPLICA", 0, 0, TOKEN_KEYWORD_REPLICA},
+      {"REPLICAS", 0, 0, TOKEN_KEYWORD_REPLICAS},
       {"REPLICATION", 0, 0, TOKEN_KEYWORD_REPLICATION},
           {"REPLICATION_SLAVE_ADMIN", 0, 0, TOKEN_KEYWORD_REPLICATION_SLAVE_ADMIN},
         {"REPORT_DATA_TRUNCATION", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_REPORT_DATA_TRUNCATION},
@@ -2684,6 +2706,7 @@ static const struct keywords strvalues[]=
       {"TAB", 0, 0, TOKEN_KEYWORD_TAB}, /* for format rule */
       {"TABLE", FLAG_VERSION_ALL | FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TABLE},
       {"TABLES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TABLES},
+      {"TABLESAMPLE", FLAG_VERSION_MYSQL_8_4, 0, TOKEN_KEYWORD_TABLESAMPLE},
       {"TABLESPACE", 0, 0, TOKEN_KEYWORD_TABLESPACE},
       {"TABLE_INFO", 0, 0, TOKEN_KEYWORD_TABLE_INFO},
       {"TAN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TAN},
@@ -2759,6 +2782,7 @@ static const struct keywords strvalues[]=
       {"VARYING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARYING},
       {"VAR_POP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VAR_POP},
       {"VAR_SAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VAR_SAMP},
+      {"VECTOR", FLAG_VERSION_MARIADB_11_7, 0, TOKEN_KEYWORD_VECTOR},
         {"VERBOSE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_VERBOSE},
       {"VERSION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_OPTION, TOKEN_KEYWORD_VERSION},
       {"VERSIONING", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_VERSIONING},
@@ -5296,6 +5320,8 @@ public:
   int hparse_f_acceptn(int,QString,int);
   int hparse_f_acceptf(int pass_number, QString replacee);
   int hparse_f_accept_in_set(unsigned int,QStringList, int *i_of_matched);
+  int hparse_f_accept_slave_or_replica(unsigned int flag_version);
+  int hparse_f_accept_slaves_or_replicas(unsigned int flag_version);
   /* void hparse_f_expected_initialize(); Removed 2024-07-23 */
   void hparse_f_expected_clear();
   int hparse_f_expected_exact(int reftype);
