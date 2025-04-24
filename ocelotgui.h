@@ -5382,7 +5382,7 @@ public:
   void hparse_f_show_columns();
   void hparse_f_if_not_exists();
   void hparse_f_indexes_or_keys();
-  void hparse_f_alter_or_create_clause(int,unsigned int*,bool*);
+  void hparse_f_alter_or_create_clause(int,unsigned int*,bool*,bool*);
   int hparse_f_semicolon_and_or_delimiter(int);
   int hparse_f_explainable_statement(int);
   void hparse_f_statement(int);
@@ -5429,7 +5429,7 @@ public:
   void hparse_f_create_function_clauses();
   void hparse_f_create_procedure_clauses();
   int hparse_f_index_column_expecter();
-  void hparse_f_index_columns(int,bool,bool,bool);
+  void hparse_f_index_columns(int,bool,bool,bool,bool);
   void hparse_f_alter_or_create_view();
   int hparse_f_analyze_or_optimize(int,int*);
   void hparse_f_install();

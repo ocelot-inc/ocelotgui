@@ -4427,6 +4427,13 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_VARBINARY;
   }
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VECTOR") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+    hparse_f_length(false, false, false);
+    if (hparse_errno > 0) return 0;
+    return TOKEN_KEYWORD_VECTOR;
+  }
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TINYBLOB") == 1) return TOKEN_KEYWORD_TINYBLOB;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BLOB") == 1) return TOKEN_KEYWORD_BLOB;
   if (hparse_f_accept(FLAG_VERSION_TARANTOOL_2_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VARBINARY") == 1) return TOKEN_KEYWORD_VARBINARY;
@@ -4707,7 +4714,7 @@ int MainWindow::hparse_f_create_definition(int keyword)
 {
   bool constraint_seen= false;
   bool fulltext_seen= false, foreign_seen= false;
-  bool unique_seen= false, check_seen= false, primary_seen= false;
+  bool unique_seen= false, check_seen= false, primary_seen= false, vector_seen= false;
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CONSTRAINT") == 1)
   {
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]") == 0)
@@ -4742,6 +4749,7 @@ int MainWindow::hparse_f_create_definition(int keyword)
         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)) check_seen= true;
   else if (((keyword == TOKEN_KEYWORD_ALTER) && (hparse_dbms_mask & FLAG_VERSION_TARANTOOL_2_2) != 0)
         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)) check_seen= true;
+  else if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VECTOR, "VECTOR") == 1)vector_seen= true;
   else return 3;
   if (check_seen == true)
   {
@@ -4758,6 +4766,11 @@ int MainWindow::hparse_f_create_definition(int keyword)
   }
   if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_OR_MARIADB_ALL) != 0)
   {
+    if (vector_seen == true)
+    {
+      hparse_f_expect(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX");
+      if (hparse_errno > 0) return 2;
+    }
     if ((fulltext_seen == true) || (unique_seen == true))
     {
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1) {;}
@@ -4766,7 +4779,7 @@ int MainWindow::hparse_f_create_definition(int keyword)
     hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_CONSTRAINT, TOKEN_REFTYPE_CONSTRAINT);
     if (hparse_errno > 0) return 2;
   }
-  hparse_f_index_columns(TOKEN_KEYWORD_TABLE, fulltext_seen, foreign_seen, primary_seen);
+  hparse_f_index_columns(TOKEN_KEYWORD_TABLE, fulltext_seen, foreign_seen, primary_seen, vector_seen);
   if (hparse_errno > 0) return 2;
   return 1;
 }
@@ -5880,7 +5893,8 @@ int MainWindow::hparse_f_index_column_expecter()
      might be a temporary bug, so check that it's still true.
    * alter table ... add primary (...) autoincrement will probably never happen but we should allow
 */
-void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, bool foreign_seen, bool primary_seen)
+void MainWindow::hparse_f_index_columns(int index_or_table,
+                                        bool fulltext_seen, bool foreign_seen, bool primary_seen, bool vector_seen)
 {
   if ((fulltext_seen == false) && (foreign_seen == false))
   {
@@ -5924,6 +5938,7 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
     }
     else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_COLUMN,TOKEN_TYPE_IDENTIFIER, "[identifier]");
     if (hparse_errno > 0) return;
+    if (vector_seen == true) break;
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(") == 1)
     {
       if (hparse_f_literal(TOKEN_REFTYPE_LENGTH, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
@@ -5950,7 +5965,7 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
     if (hparse_f_reference_definition() == 0) hparse_f_error();
     if (hparse_errno > 0) return;
   }
-  else /* if (foreign_seen == false) */
+  else if (vector_seen == false) /* if (foreign_seen == false) */
   {
     /* MySQL doesn't check whether these clauses are repeated, but we do. */
     bool key_seen= false, using_seen= false, comment_seen= false, with_seen= false;
@@ -5990,6 +6005,23 @@ void MainWindow::hparse_f_index_columns(int index_or_table, bool fulltext_seen, 
       }
       break;
     }
+  }
+  if (vector_seen == true)
+  {
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "M") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PARSER,TOKEN_TYPE_OPERATOR, "=");
+      if (hparse_errno > 0) return;
+      if (hparse_f_literal(TOKEN_REFTYPE_COMMENT, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+    }
+  }
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DISTANCE") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PARSER,TOKEN_TYPE_OPERATOR, "=");
+    if (hparse_errno > 0) return;
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EUCLIDEAN") == 0)
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_PARSER,TOKEN_TYPE_KEYWORD, "COSINE");
   }
 }
 
@@ -8928,12 +8960,14 @@ void MainWindow::hparse_f_indexes_or_keys() /* for SHOW {INDEX | INDEXES | KEYS}
 #define HPARSE_FLAG_PACKAGE    16384
 #define HPARSE_FLAG_ANY        65535
 
-void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned int *hparse_flags, bool *fulltext_seen)
+void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned int *hparse_flags,
+                                                 bool *fulltext_seen, bool *vector_seen)
 {
   bool algorithm_seen= false, definer_seen= false, sql_seen= false, temporary_seen= false;
   bool unique_seen= false, or_seen= false, ignore_seen= false, online_seen= false;
   bool aggregate_seen= false;
   *fulltext_seen= false;
+  *vector_seen= false;
   (*hparse_flags)= HPARSE_FLAG_ANY;
 
   /* CREATE LUA FUNCTION|PROCEDURE, a special client sttement for displaying a Lua function, excludes all other flags. */
@@ -9015,6 +9049,10 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned in
     else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNIQUE") == 1))
     {
       unique_seen= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
+    }
+    else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VECTOR") == 1))
+    {
+      unique_seen= true; (*vector_seen)= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
     else if ((((*hparse_flags) & HPARSE_FLAG_ROUTINE) != 0) && (aggregate_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AGGREGATE") == 1))
     {
@@ -9123,8 +9161,8 @@ void MainWindow::hparse_f_statement(int block_top)
   {
     hparse_statement_type= TOKEN_KEYWORD_ALTER;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
-    unsigned int hparse_flags; bool fulltext_seen;
-    hparse_f_alter_or_create_clause(TOKEN_KEYWORD_ALTER, &hparse_flags, &fulltext_seen);
+    unsigned int hparse_flags; bool fulltext_seen; bool vector_seen;
+    hparse_f_alter_or_create_clause(TOKEN_KEYWORD_ALTER, &hparse_flags, &fulltext_seen, &vector_seen);
     if ((((hparse_flags) & HPARSE_FLAG_DATABASE) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DATABASE") == 1))
     {
       hparse_f_alter_database();
@@ -9401,8 +9439,8 @@ void MainWindow::hparse_f_statement(int block_top)
     hparse_statement_type= TOKEN_KEYWORD_CREATE;
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_STATEMENT | TOKEN_FLAG_IS_DEBUGGABLE;
     unsigned int hparse_flags;
-    bool fulltext_seen;
-    hparse_f_alter_or_create_clause(TOKEN_KEYWORD_CREATE, &hparse_flags, &fulltext_seen);
+    bool fulltext_seen; bool vector_seen;
+    hparse_f_alter_or_create_clause(TOKEN_KEYWORD_CREATE, &hparse_flags, &fulltext_seen, &vector_seen);
     if (hparse_errno > 0) return;
 #if (FLAG_VERSION_MARIADB_12_0 != 0)
     if (((hparse_flags & HPARSE_FLAG_DATABASE) != 0) && (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CATALOG") == 1))
@@ -9466,7 +9504,7 @@ void MainWindow::hparse_f_statement(int block_top)
       main_token_flags[hparse_i]|= TOKEN_FLAG_IS_NEW;
       hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_INDEX, TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;                                    /* index_name */
-      hparse_f_index_columns(TOKEN_KEYWORD_INDEX, fulltext_seen, false, false);
+      hparse_f_index_columns(TOKEN_KEYWORD_INDEX, fulltext_seen, false, false, vector_seen);
       if (hparse_errno > 0) return;
       hparse_f_algorithm_or_lock();
     }
