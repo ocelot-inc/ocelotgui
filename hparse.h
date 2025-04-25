@@ -3427,21 +3427,29 @@ void MainWindow::hparse_f_alter_specification()
   }
   if ((default_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ALTER") == 1))
   {
-    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN");
-    if (hparse_f_qualified_name_of_operand(0, false,false,true) == 0) hparse_f_error();
-    if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
+    if (hparse_f_index_if_exists(FLAG_VERSION_MARIADB_10_6 | FLAG_VERSION_MYSQL_8_0) == 1) /* ... alter ... alter index|key */
     {
-      if (hparse_f_default_clause(TOKEN_KEYWORD_ALTER) == 0) hparse_f_error();
+      hparse_f_not_ignored(true);
       if (hparse_errno > 0) return;
     }
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DROP") == 1)
+    else
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT");
+      hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COLUMN");
+      if (hparse_f_qualified_name_of_operand(0, false,false,true) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
-      main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SET") == 1)
+      {
+        if (hparse_f_default_clause(TOKEN_KEYWORD_ALTER) == 0) hparse_f_error();
+        if (hparse_errno > 0) return;
+      }
+      else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DROP") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFAULT");
+        if (hparse_errno > 0) return;
+        main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
+      }
+      else hparse_f_error();
     }
-    else hparse_f_error();
     if (hparse_errno > 0) return;
     return;
   }
@@ -3562,9 +3570,8 @@ void MainWindow::hparse_f_alter_specification()
       hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY");
       if (hparse_errno > 0) return;
     }
-    else if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1) || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY") == 1))
+    else if (hparse_f_index_if_exists(FLAG_VERSION_MYSQL_OR_MARIADB_ALL) == 1) /* alter ... drop index index|key */
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_INDEX, TOKEN_TYPE_IDENTIFIER, "[identifier]");
       if (hparse_errno > 0) return;
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOREIGN") == 1)
@@ -3778,6 +3785,45 @@ int MainWindow::hparse_f_character_set()
   else return 0;
 }
 
+/*
+  For alter table ... alter|drop INDEX|KEY [IF EXISTS] index_name
+  Return 1 i.e. accepted even if error. The caller must add if hparse_errno > 0
+*/
+int MainWindow::hparse_f_index_if_exists(unsigned int flag_version)
+{
+ if ((hparse_f_accept(flag_version, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INDEX") == 1)
+  || (hparse_f_accept(flag_version, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY") == 1))
+ {
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_6) != 0)
+  {
+     hparse_f_if_exists();
+     if (hparse_errno > 0) return 1;
+  }
+   hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_INDEX, TOKEN_TYPE_IDENTIFIER, "[identifier]");
+   return 1;
+ }
+ return 0;
+}
+
+/* For alter table ... alter index ... [NOT] IGNORED if MariaDB, VISIBLE|INVISIBLE if MySQL */
+int MainWindow::hparse_f_not_ignored(bool is_compulsory)
+{
+  if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_6) != 0)
+  {
+    int not_was_seen= hparse_f_accept(FLAG_VERSION_MARIADB_10_6, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NOT, "NOT");
+    if (hparse_f_accept(FLAG_VERSION_MARIADB_10_6, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IGNORED") == 0)
+    {
+      if ((not_was_seen == 1) || (is_compulsory == true)) hparse_f_error();
+      return 0;
+    }
+    return 1;
+  }
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VISIBLE") == 1) return 1;
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INVISIBLE") == 1) return 1;
+  if (is_compulsory == true) hparse_f_error();
+  return 0;
+}
+
 void MainWindow::hparse_f_alter_database()
 {
   hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_DATABASE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
@@ -3954,6 +4000,16 @@ void MainWindow::hparse_f_definer()
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CURRENT_USER") == 1) {;}
   else if (hparse_f_user_or_role_name(TOKEN_REFTYPE_USER) == 1) {;}
   else hparse_f_error();
+}
+
+/* IF EXISTS clause. Todo: Maybe we could fit qualified_name_of_object or accept(identifier) into this. */
+void MainWindow::hparse_f_if_exists()
+{
+  if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF_IN_IF_EXISTS, "IF") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
+  }
+  /* caller should add if (hparse_errno > 0) return; */
 }
 
 void MainWindow::hparse_f_if_not_exists()
@@ -5968,7 +6024,7 @@ void MainWindow::hparse_f_index_columns(int index_or_table,
   else if (vector_seen == false) /* if (foreign_seen == false) */
   {
     /* MySQL doesn't check whether these clauses are repeated, but we do. */
-    bool key_seen= false, using_seen= false, comment_seen= false, with_seen= false;
+    bool key_seen= false, using_seen= false, comment_seen= false, with_seen= false, not_ignored_seen= false;
     for (;;)                                                             /* index_options */
     {
       if ((key_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "KEY_BLOCK_SIZE") == 1))
@@ -6003,6 +6059,14 @@ void MainWindow::hparse_f_index_columns(int index_or_table,
         if (hparse_errno > 0) return;
         continue;
       }
+      if ((not_ignored_seen == false) && (hparse_f_not_ignored(false) == 1))
+      {
+        not_ignored_seen= true;
+        if (hparse_errno > 0) return;
+        continue;
+      }
+
+
       break;
     }
   }

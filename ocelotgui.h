@@ -190,6 +190,7 @@ typedef struct
 #define FLAG_VERSION_MARIADB_10_2_2 64
 #define FLAG_VERSION_MARIADB_10_2_3 128
 #define FLAG_VERSION_MARIADB_10_3   256
+#define FLAG_VERSION_MARIADB_10_6   512
 #define FLAG_VERSION_MARIADB_10_7   512
 #define FLAG_VERSION_MARIADB_10_9   512
 #define FLAG_VERSION_MARIADB_10_10  512
@@ -5380,6 +5381,7 @@ public:
   void hparse_f_from_or_like_or_where();
   void hparse_f_infile_or_outfile();
   void hparse_f_show_columns();
+  void hparse_f_if_exists();
   void hparse_f_if_not_exists();
   void hparse_f_indexes_or_keys();
   void hparse_f_alter_or_create_clause(int,unsigned int*,bool*,bool*);
@@ -5391,6 +5393,8 @@ public:
   void hparse_f_assignment(int,int,bool,bool);
   void hparse_f_alter_table();
   int hparse_f_character_set();
+  int hparse_f_index_if_exists(unsigned int);
+  int hparse_f_not_ignored(bool is_compulsory);
   void hparse_f_alter_database();
   void hparse_f_alter_specification();
   void hparse_f_characteristics(int object_type);
