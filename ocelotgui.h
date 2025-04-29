@@ -190,6 +190,7 @@ typedef struct
 #define FLAG_VERSION_MARIADB_10_2_2 64
 #define FLAG_VERSION_MARIADB_10_2_3 128
 #define FLAG_VERSION_MARIADB_10_3   256
+#define FLAG_VERSION_MARIADB_10_5   512
 #define FLAG_VERSION_MARIADB_10_6   512
 #define FLAG_VERSION_MARIADB_10_7   512
 #define FLAG_VERSION_MARIADB_10_9   512
@@ -467,6 +468,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_CONDITION,
     TOKEN_KEYWORD_CONFLICT,
     TOKEN_KEYWORD_CONNECT,
+    TOKEN_KEYWORD_CONNECTION,
     TOKEN_KEYWORD_CONNECTION_ADMIN,
         TOKEN_KEYWORD_CONNECTION_ID,
     TOKEN_KEYWORD_CONNECT_ATTR_DELETE,
@@ -605,6 +607,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_EXTRACTVALUE,
     TOKEN_KEYWORD_FAIL,
     TOKEN_KEYWORD_FALSE,
+    TOKEN_KEYWORD_FEDERATED,
     TOKEN_KEYWORD_FETCH,
     TOKEN_KEYWORD_FIELD,
     TOKEN_KEYWORD_FIELDS,
@@ -1161,6 +1164,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_READS,
     TOKEN_KEYWORD_READ_DEFAULT_FILE,
     TOKEN_KEYWORD_READ_DEFAULT_GROUP,
+    TOKEN_KEYWORD_READ_ONLY,
     TOKEN_KEYWORD_READ_TIMEOUT,
     TOKEN_KEYWORD_READ_WRITE,
     TOKEN_KEYWORD_REAL,
@@ -1252,6 +1256,7 @@ enum {                                        /* possible returns from token_typ
         TOKEN_KEYWORD_SILENT,
     TOKEN_KEYWORD_SIMPLE,
     TOKEN_KEYWORD_SIN,
+    TOKEN_KEYWORD_SLAVE,
     TOKEN_KEYWORD_SLEEP,
     TOKEN_KEYWORD_SLOW,
     TOKEN_KEYWORD_SMALLINT,
@@ -1611,7 +1616,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1237
+#define KEYWORD_LIST_SIZE 1241
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -1772,6 +1777,7 @@ static const struct keywords strvalues[]=
       {"CONDITION", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_CONDITION},
       {"CONFLICT", 0, 0, TOKEN_KEYWORD_CONFLICT},
       {"CONNECT", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_CONNECT}, /* ocelotgui keyword */
+      {"CONNECTION", 0, 0, TOKEN_KEYWORD_CONNECTION},
           {"CONNECTION_ADMIN", 0, 0, TOKEN_KEYWORD_CONNECTION_ADMIN},
       {"CONNECTION_ID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_CONNECTION_ID},
         {"CONNECT_ATTR_DELETE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_CONNECT_ATTR_DELETE},
@@ -1909,6 +1915,7 @@ static const struct keywords strvalues[]=
       {"EXTRACTVALUE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_EXTRACTVALUE},
       {"FAIL", 0, 0, TOKEN_KEYWORD_FAIL},
       {"FALSE", FLAG_VERSION_ALL | FLAG_VERSION_LUA, 0, TOKEN_KEYWORD_FALSE},
+      {"FEDERATED", 0, 0, TOKEN_KEYWORD_FEDERATED},
       {"FETCH", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FETCH},
       {"FIELD", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FIELD},
       {"FIELDS", 0, 0, TOKEN_KEYWORD_FIELDS},
@@ -2466,6 +2473,7 @@ static const struct keywords strvalues[]=
       {"READS", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_READS},
     {"READ_DEFAULT_FILE", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_READ_DEFAULT_FILE},
     {"READ_DEFAULT_GROUP", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_READ_DEFAULT_GROUP},
+      {"READ_ONLY", 0, 0, TOKEN_KEYWORD_READ_ONLY},
     {"READ_TIMEOUT", FLAG_VERSION_CONNECT_OPTION, 0, TOKEN_KEYWORD_READ_TIMEOUT},
       {"READ_WRITE", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_READ_WRITE},
       {"REAL", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_REAL},
@@ -2557,6 +2565,7 @@ static const struct keywords strvalues[]=
         {"SILENT", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_SILENT},
       {"SIMPLE", FLAG_VERSION_TARANTOOL, 0, TOKEN_KEYWORD_SIMPLE},
       {"SIN", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SIN},
+      {"SLAVE", 0, 0, TOKEN_KEYWORD_SLAVE},
       {"SLEEP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SLEEP},
       {"SLOW", 0, 0, TOKEN_KEYWORD_SLOW},
       {"SMALLINT", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_SMALLINT},
@@ -5414,6 +5423,7 @@ public:
   void hparse_f_column_list(int,int);
   void hparse_f_engine();
   void hparse_f_table_or_partition_options(int);
+  void hparse_f_yesno();
   void hparse_f_partition_options();
   void hparse_f_partition_or_subpartition(int);
   void hparse_f_partition_or_subpartition_definition(int);
