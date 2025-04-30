@@ -1856,7 +1856,102 @@ int MainWindow::hparse_f_table_factor()
       return 1;
     }
   }
+  else if (hparse_f_table_json_table() == 1) return 1;
   return 0;
+}
+
+/*
+  Called from hparse_f_table_factor()
+  JSON_TABLE(json_doc, context_path COLUMNS (column_list)) [AS] alias
+  Warning: JSON_TABLE is not really reserved in MariaDB 10.6 but saying so simplifies.
+  Warning: MySQL manual says NESTED [PATH] but in fact it seems to be compulsory in 9.3.
+  Also NESTED is not reserved but assume it can't be an identifier.
+  Todo: there's no attempt to parse JSON strings but maybe at least think of a new reftype.
+*/
+int MainWindow::hparse_f_table_json_table()
+{
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_10_6|FLAG_VERSION_MYSQL_8_4, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INNER, "JSON_TABLE") == 0) return 0;
+  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+  if (hparse_errno > 0) return 0;
+  hparse_f_opr_1(0, 0);
+  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
+  if (hparse_errno > 0) return 0;
+  if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+  if (hparse_errno > 0) return 0;
+  hparse_f_table_json_table_columns();
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  if (hparse_errno > 0) return 0;
+  hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS");
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ALIAS_OF_TABLE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+  if (hparse_errno > 0) return 0;
+  return 1;
+}
+
+int MainWindow::hparse_f_table_json_table_columns()
+{
+  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_COLUMNS, "COLUMNS");
+  if (hparse_errno > 0) return 0;
+  hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+  if (hparse_errno > 0) return 0;
+  do
+  {
+    if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NESTED") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PATH");
+      if (hparse_errno > 0) return 0;
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+      if (hparse_errno > 0) return 0;
+      hparse_f_table_json_table_columns(); /* recursion */
+      if (hparse_errno > 0) return 0;
+    }
+    else
+    {
+      hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_PARAMETER_DEFINE,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      if (hparse_errno > 0) return 0;
+      if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FOR, "FOR") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_PARAMETER_DEFINE,TOKEN_TYPE_KEYWORD, "ORDINALITY");
+        if (hparse_errno > 0) return 0;
+      }
+      else
+      {
+        if (hparse_f_data_type(TOKEN_KEYWORD_COLUMN) == -1) hparse_f_error();
+        if (hparse_errno > 0) return 0;
+        bool exists_seen= false;
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXISTS, "EXISTS") == 1) exists_seen= true;
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_EXISTS, "PATH") == 1)
+        {
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+          if (hparse_errno > 0) return 0;
+          if (exists_seen == false)
+          {
+            bool empty_seen= false, error_seen= false;
+            for (;;)
+            {
+              if ((empty_seen == true) && (error_seen == true)) break;
+              bool null_seen= false;
+              if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_NULL, "NULL") == 1) null_seen= true;
+              else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DEFAULT, "DEFAULT") == 1)
+              {
+                if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+                null_seen= true;
+              }
+              else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ERROR") == 1) null_seen= true;
+              if (null_seen == false) break;
+              hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ON, "ON");
+              if (hparse_errno > 0) return 0;
+              if ((empty_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EMPTY") == 1)) empty_seen= true;
+              else if ((error_seen == false) && (hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ERROR") == 1)) error_seen= true;
+              else { hparse_f_error(); break; }
+            }
+          }
+        }
+      }
+    }
+  } while (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+  hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+  if (hparse_errno > 0) return 0;
+  return 1;
 }
 
 /*
@@ -4169,6 +4264,7 @@ int MainWindow::hparse_f_data_type(int context)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DECIMAL, "DECIMAL") == 1)
      || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_DOUBLE, "DOUBLE") == 1)
      || (hparse_f_accept(FLAG_VERSION_MARIADB_10_11, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INET4, "INET4") == 1)
+     || (hparse_f_accept(FLAG_VERSION_MARIADB_10_5, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INET6, "INET6") == 1)
      || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INT") == 1)
      || (hparse_f_accept(FLAG_VERSION_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTEGER, "INTEGER") == 1)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JSON, "JSON") == 1)
@@ -4632,6 +4728,12 @@ int MainWindow::hparse_f_data_type(int context)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     return TOKEN_KEYWORD_INET4;
+  }
+
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_10_5, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INET6") == 1)
+  {
+    main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
+    return TOKEN_KEYWORD_INET6;
   }
 
   /*
@@ -6843,6 +6945,7 @@ int MainWindow::is_token_priv(int token)
     if ((token == TOKEN_KEYWORD_BINLOG)
      || (token == TOKEN_KEYWORD_CONNECTION)
      || (token == TOKEN_KEYWORD_FEDERATED)
+     || (token == TOKEN_KEYWORD_READ)
      || (token == TOKEN_KEYWORD_READ_ONLY)
      || (token == TOKEN_KEYWORD_REPLICATION)
      || (token == TOKEN_KEYWORD_REPLICA)
@@ -7018,6 +7121,13 @@ void MainWindow::hparse_f_grant_or_revoke(int who_is_calling, bool *role_name_se
       else if ((is_role_ok == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PROXY") == 1))
       {
         priv_type= TOKEN_KEYWORD_PROXY;
+        is_maybe_all= false;
+      }
+      else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_11, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_READ, "READ") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_11, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ONLY");
+        hparse_f_expect(FLAG_VERSION_MARIADB_10_11, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ADMIN");
+        priv_type= TOKEN_KEYWORD_SUPER;
         is_maybe_all= false;
       }
       else if (hparse_f_accept(FLAG_VERSION_MARIADB_10_5, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_READ_ONLY, "READ_ONLY") == 1)
@@ -11606,10 +11716,10 @@ void MainWindow::hparse_f_statement(int block_top)
       } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
       if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNTIL") == 1)
       {
-        if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
+        if (((hparse_dbms_mask & (FLAG_VERSION_MYSQL_ALL|FLAG_VERSION_MARIADB_11_3)) != 0)
          && ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL_BEFORE_GTIDS") == 1)
           || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL_AFTER_GTIDS") == 1)
-          || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL_AFTER_MTS_GAPS") == 1)))
+          || (hparse_f_accept(FLAG_VERSION_MYSQL_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL_AFTER_MTS_GAPS") == 1)))
         {
           hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
           if (hparse_errno > 0) return;

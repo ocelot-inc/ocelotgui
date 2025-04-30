@@ -200,6 +200,7 @@ typedef struct
 #define FLAG_VERSION_MARIADB_11_0   1048576
 #define FLAG_VERSION_MARIADB_11_1   2097152
 #define FLAG_VERSION_MARIADB_11_2   4194304
+#define FLAG_VERSION_MARIADB_11_3   8388608
 #define FLAG_VERSION_MARIADB_11_4   8388608
 #define FLAG_VERSION_MARIADB_11_5   16777216
 #define FLAG_VERSION_MARIADB_11_6   33554432
@@ -696,6 +697,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_INDEX_INFO,
     TOKEN_KEYWORD_INDEX_LIST,
     TOKEN_KEYWORD_INET4,
+    TOKEN_KEYWORD_INET6,
     TOKEN_KEYWORD_INET6_ATON,
     TOKEN_KEYWORD_INET6_NTOA,
     TOKEN_KEYWORD_INET_ATON,
@@ -1616,7 +1618,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1241
+#define KEYWORD_LIST_SIZE 1242
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -2003,6 +2005,7 @@ static const struct keywords strvalues[]=
       {"INDEX_INFO", 0, 0, TOKEN_KEYWORD_INDEX_INFO},
       {"INDEX_LIST", 0, 0, TOKEN_KEYWORD_INDEX_LIST},
       {"INET4", 0, 0, TOKEN_KEYWORD_INET4}, /* MariaDB 10.11 */
+      {"INET6", 0, 0, TOKEN_KEYWORD_INET6}, /* MariaDB 10.5 */
       {"INET6_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_ATON},
       {"INET6_NTOA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET6_NTOA},
       {"INET_ATON", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_INET_ATON},
@@ -2064,7 +2067,7 @@ static const struct keywords strvalues[]=
       {"JSON_REPLACE", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_REPLACE},
       {"JSON_SEARCH", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_SEARCH},
       {"JSON_SET", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_SET},
-    {"JSON_TABLE", FLAG_VERSION_MYSQL_8_0, 0, TOKEN_KEYWORD_JSON_TABLE},
+      {"JSON_TABLE", FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MARIADB_10_6, FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MARIADB_10_6, TOKEN_KEYWORD_JSON_TABLE},
       {"JSON_TYPE", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_TYPE},
       {"JSON_UNQUOTE", 0, FLAG_VERSION_MYSQL_5_7, TOKEN_KEYWORD_JSON_UNQUOTE},
       {"JSON_VALID", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3 | FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_JSON_VALID},
@@ -5356,6 +5359,7 @@ public:
   void hparse_f_table_escaped_table_reference();
   int hparse_f_table_reference(int);
   int hparse_f_table_factor();
+  int hparse_f_table_json_table(); int hparse_f_table_json_table_columns();
   int hparse_f_table_join_table();
   int hparse_f_table_join_condition();
   void hparse_f_table_index_hint_list();
