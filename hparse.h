@@ -2464,6 +2464,18 @@ void MainWindow::hparse_f_opr_7(int who_is_calling, int allow_flags) /* Preceden
       if (hparse_errno > 0) return;
       continue;
     }
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MEMBER") == 1)
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF");
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "(");
+      if (hparse_errno > 0) return;
+      hparse_f_opr_8(who_is_calling, allow_flags & (~ALLOW_FLAG_IS_MULTI));
+      if (hparse_errno > 0) return;
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
+      if (hparse_errno > 0) return;
+      continue;
+    }
     break;
   }
 }
@@ -2811,12 +2823,15 @@ void MainWindow::hparse_f_over(int saved_hparse_i, int who_is_calling)
   bool function_is_aggregate= false;
   if ((main_token_types[saved_hparse_i] == TOKEN_KEYWORD_CUME_DIST)
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_DENSE_RANK)
-   || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_FIRST_VALUE))
-   || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_LAST_VALUE))
-   || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_LEAD))
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_FIRST_VALUE)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_LAG)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_LAST_VALUE)
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_LEAD)
    || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_MEDIAN))
-   || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_NTH_VALUE))
+   || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_NTH_VALUE)
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_NTILE)
+   || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_PERCENTILE_CONT))
+   || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_PERCENTILE_DISC))
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_PERCENT_RANK)
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_RANK)
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_ROW_NUMBER))
@@ -2829,6 +2844,8 @@ void MainWindow::hparse_f_over(int saved_hparse_i, int who_is_calling)
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_BIT_OR)
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_BIT_XOR)
    || (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_COUNT)
+   || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_JSON_ARRAYAGG))
+   || ((hparse_dbms_mask & FLAG_VERSION_MARIADB_10_3) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_JSON_OBJECTAGG))
    || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_MAX))
    || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_MIN))
    || ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) && (main_token_types[saved_hparse_i] == TOKEN_KEYWORD_NTH_VALUE))
