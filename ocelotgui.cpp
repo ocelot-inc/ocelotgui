@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: April 30 2025
+   Last modified: May 6 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -15023,6 +15023,11 @@ void MainWindow::make_and_append_message_in_result(
     todo: =[[...]]= and nested strings
     no backslash escapes e.g. \' \" \\ are not escaped single characters inside strings
 
+  If MySQL 9.0+:
+    $ at start and end of a token delimits JavaScript if follows AS i.e. 2 chars.
+    Code for this is marked by "if (OCELOT_JAVASCRIPT == 1)" but there is no check that we're running MySQL 9.0.
+    Put comments re OCELOT_JAVASCRIPT before hparse_f_as_javascript().
+
   Adjusting the tokenizer for Qt:
     With tokenize(QString text, char* comment_handling) we find the tokens of a string in statement.
     The results go to token_offsets[] and token_lengths[].
@@ -15063,6 +15068,15 @@ void MainWindow::tokenize(QChar *text, int text_length, int *token_lengths,
 next_token:
   token_lengths[token_number]= 0;
   token_offsets[token_number]= char_offset;
+#if (OCELOT_JAVASCRIPT == 1)
+  if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_9_0) != 0)
+   && (token_number > 2)
+   && (token_lengths[token_number - 2] == 2) /* presumably "AS" */
+   && (token_lengths[token_number - 1] > 1)
+   && (*(text + token_offsets[token_number - 1]) == '$')
+   && (*(text + token_offsets[token_number - 1] + token_lengths[token_number - 1] - 1) == '$'))
+     goto skip_till_javascript_end;
+#endif
 next_char:
   if (token_number >= (max_tokens - 1)) goto string_end;
   /* Following IFs happen to be in order by ASCII code */
@@ -15531,8 +15545,44 @@ n_byte_token_skip:
   if (token_lengths[token_number] > 0) ++token_number;
   char_offset+= n;
   goto next_token;
+#if (OCELOT_JAVASCRIPT == 1)
+skip_till_javascript_end:
+  int javascript_delimiter_token_length= token_lengths[token_number - 1];
+  QString javascript_delimiter;
+  for (int i= 0; i < javascript_delimiter_token_length; ++i)
+  {
+    QChar ch= text[token_offsets[token_number - 1] + i];
+    javascript_delimiter.append(ch);
+  }
+  char tmpj[1024];
+  strcpy(tmpj, javascript_delimiter.toUtf8());
+skip_till_javascript_end_2:
+  ++char_offset;
+  ++token_lengths[token_number];
+  if (char_offset >= text_length) goto string_end;
+  if (text[char_offset] == '\x00') goto string_end;
+  if (text[char_offset] != '$') goto skip_till_javascript_end_2;
+  if (token_lengths[token_number] + 1 < javascript_delimiter_token_length) goto skip_till_javascript_end_2;
+  QString javascript_token_end= "";
+  int token_offset_n= (char_offset + 1) - javascript_delimiter_token_length;
+  for (int i= 0; i < javascript_delimiter_token_length; ++i)
+  {
+    QChar ch= text[token_offset_n + i];
+    javascript_token_end.append(ch);
+  }
+  strcpy(tmpj, javascript_token_end.toUtf8());
+  if (javascript_token_end == javascript_delimiter)
+  {
+    /* Merge with prev token i.e. the delimiter */
+    ++char_offset;
+    token_lengths[token_number]= 0;
+    token_offsets[token_number]= char_offset;
+    token_lengths[token_number - 1]= char_offset - token_offsets[token_number - 1];
+    goto next_char;
+  }
+  goto skip_till_javascript_end_2;
+#endif
 }
-
 
 /*
   token_type() should be useful for syntax highlighting and for hovering.
@@ -15715,6 +15765,16 @@ void MainWindow::tokens_to_keywords(QString text, int start, bool ansi_quotes)
   {
     /* Get the next word. */
     s= text.mid(main_token_offsets[i2], main_token_lengths[i2]);
+#if (OCELOT_JAVASCRIPT == 1)
+    if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_9_0) != 0) /* This duplicates a test in tokenize() */
+     && (i2 > start)
+     && (main_token_lengths[i2 - 1] == 2) /* presumably "AS" */
+     && (main_token_lengths[i2] > 1)
+     && (text.mid(main_token_offsets[i2], 1) == "$")
+     && (text.mid(main_token_offsets[i2] + main_token_lengths[i2] - 1, 1) == "$"))
+      t= TOKEN_TYPE_LITERAL; /* i.e. not TOKEN_TYPE_LITERAL_WITH_BRACE? */
+    else
+#endif
     t= token_type(s.data(), main_token_lengths[i2], ansi_quotes);
     main_token_types[i2]= t;
     main_token_flags[i2]= 0;

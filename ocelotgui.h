@@ -85,6 +85,10 @@
 #define OCELOT_DIALOG 1
 #endif
 
+/* To remove handling of Javascript literals in MySQL 9.0+, #define OCELOT_JAVASCRIPT 0 */
+#ifndef OCELOT_JAVASCRIPT
+#define OCELOT_JAVASCRIPT 1
+#endif
 
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
@@ -181,8 +185,10 @@ typedef struct
 #define FLAG_VERSION_MYSQL_8_4      536870912
 #define FLAG_VERSION_MYSQL_8_ALL    (FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MYSQL_8_0_31 | FLAG_VERSION_MYSQL_8_1 | FLAG_VERSION_MYSQL_8_2 | FLAG_VERSION_MYSQL_8_3 | FLAG_VERSION_MYSQL_8_4)
 #define FLAG_VERSION_MYSQL_9_0      1073741824
+#define FLAG_VERSION_MYSQL_9_1      1073741824
+#define FLAG_VERSION_MYSQL_9_2      1073741824
 #define FLAG_VERSION_MYSQL_9_3      2147483648
-#define FLAG_VERSION_MYSQL_9_ALL    (FLAG_VERSION_MYSQL_9_0 | FLAG_VERSION_MYSQL_9_3)
+#define FLAG_VERSION_MYSQL_9_ALL    (FLAG_VERSION_MYSQL_9_0 | FLAG_VERSION_MYSQL_9_1 | FLAG_VERSION_MYSQL_9_2 | FLAG_VERSION_MYSQL_9_3)
 #define FLAG_VERSION_MYSQL_ALL      (FLAG_VERSION_MYSQL_5_ALL | FLAG_VERSION_MYSQL_8_ALL | FLAG_VERSION_MYSQL_9_ALL)
 #define FLAG_VERSION_MARIADB_5_5    16
 #define FLAG_VERSION_MARIADB_10_0   16
@@ -743,6 +749,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_IS_IPV6,
     TOKEN_KEYWORD_IS_USED_LOCK,
     TOKEN_KEYWORD_ITERATE,
+    TOKEN_KEYWORD_JAVASCRIPT,
     TOKEN_KEYWORD_JOIN,
     TOKEN_KEYWORD_JSON,
     TOKEN_KEYWORD_JSON_APPEND,
@@ -1339,6 +1346,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_STRCMP,
     TOKEN_KEYWORD_STRFTIME,
     TOKEN_KEYWORD_STRING,
+    TOKEN_KEYWORD_STRING_TO_VECTOR,
     TOKEN_KEYWORD_STR_TO_DATE,
     TOKEN_KEYWORD_ST_AREA,
     TOKEN_KEYWORD_ST_ASBINARY,
@@ -1521,6 +1529,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_VAR_POP,
     TOKEN_KEYWORD_VAR_SAMP,
     TOKEN_KEYWORD_VECTOR,
+    TOKEN_KEYWORD_VECTOR_DIM,
+    TOKEN_KEYWORD_VECTOR_TO_STRING,
     TOKEN_KEYWORD_VEC_DISTANCE,
         TOKEN_KEYWORD_VERBOSE,
     TOKEN_KEYWORD_VERSION,
@@ -1654,7 +1664,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1276
+#define KEYWORD_LIST_SIZE 1280
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -2085,6 +2095,7 @@ static const struct keywords strvalues[]=
       {"IS_IPV6", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_IPV6},
       {"IS_USED_LOCK", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_IS_USED_LOCK},
       {"ITERATE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_ITERATE},
+      {"JAVASCRIPT", 0, 0, TOKEN_KEYWORD_JAVASCRIPT},
       {"JOIN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_JOIN},
       {"JSON", 0, 0, TOKEN_KEYWORD_JSON},
       {"JSON_APPEND", 0, FLAG_VERSION_MYSQL_5_7 | FLAG_VERSION_MARIADB_10_2_3, TOKEN_KEYWORD_JSON_APPEND},
@@ -2683,6 +2694,7 @@ static const struct keywords strvalues[]=
       {"STRCMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STRCMP},
       {"STRFTIME", 0, FLAG_VERSION_TARANTOOL, TOKEN_KEYWORD_STRFTIME},
       {"STRING", FLAG_VERSION_TARANTOOL_2_2, 0, TOKEN_KEYWORD_STRING},
+      {"STRING_TO_VECTOR", 0, FLAG_VERSION_MYSQL_9_0, TOKEN_KEYWORD_STRING_TO_VECTOR},
       {"STR_TO_DATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_STR_TO_DATE},
       {"ST_AREA", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_AREA},
       {"ST_ASBINARY", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ST_ASBINARY},
@@ -2864,7 +2876,9 @@ static const struct keywords strvalues[]=
       {"VARYING", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_VARYING},
       {"VAR_POP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VAR_POP},
       {"VAR_SAMP", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VAR_SAMP},
-      {"VECTOR", FLAG_VERSION_MARIADB_11_7, 0, TOKEN_KEYWORD_VECTOR},
+      {"VECTOR", FLAG_VERSION_MARIADB_11_7 | FLAG_VERSION_MYSQL_9_0, 0, TOKEN_KEYWORD_VECTOR},
+      {"VECTOR_DIM", 0, FLAG_VERSION_MYSQL_9_0, TOKEN_KEYWORD_VECTOR_DIM},
+      {"VECTOR_TO_STRING", 0, FLAG_VERSION_MYSQL_9_0, TOKEN_KEYWORD_VECTOR_TO_STRING},
       {"VEC_DISTANCE", 0, FLAG_VERSION_MARIADB_11_8, TOKEN_KEYWORD_VEC_DISTANCE},
         {"VERBOSE", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_VERBOSE},
       {"VERSION", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL | FLAG_VERSION_OPTION, TOKEN_KEYWORD_VERSION},
@@ -5469,7 +5483,7 @@ public:
   void hparse_f_indexes_or_keys();
   void hparse_f_alter_or_create_clause(int,unsigned int*,bool*,bool*);
   int hparse_f_semicolon_and_or_delimiter(int);
-  int hparse_f_explainable_statement(int);
+  int hparse_f_explainable_statement(int,int);
   void hparse_f_statement(int);
   void hparse_f_pseudo_statement(int);
   void hparse_f_is_global_or_persist(bool *,bool *);
@@ -5481,6 +5495,8 @@ public:
   void hparse_f_alter_database();
   void hparse_f_alter_specification();
   void hparse_f_characteristics(int object_type);
+  int hparse_f_characteristic_language(int);
+  int hparse_f_as_javascript();
   int hparse_f_algorithm_or_lock();
   void hparse_f_definer();
   void hparse_f_character_set_or_collate();
@@ -5526,6 +5542,7 @@ public:
   void hparse_f_commit_or_rollback();
   int is_token_priv(int);
   void hparse_f_explain_or_describe(int);
+  int hparse_f_explain_format();
   void hparse_f_grant_or_revoke(int,bool*);
   void hparse_f_insert_or_replace();
   void hparse_f_conflict_clause();

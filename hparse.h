@@ -4005,11 +4005,10 @@ void MainWindow::hparse_f_characteristics(int object_type)
       if (hparse_errno > 0) return;
       continue;
     }
-    else if ((language_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LANGUAGE")))
+    else if ((language_seen == false) && (hparse_f_characteristic_language(3) == 1))
     {
-      language_seen= true;
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SQL");
       if (hparse_errno > 0) return;
+      language_seen= true;
       continue;
     }
     else if ((deterministic_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOT")))
@@ -4069,6 +4068,51 @@ void MainWindow::hparse_f_characteristics(int object_type)
     break;
   }
 }
+
+/* return 1 if LANGUAGE SQL|JAVASCRIPT, 1 + error if LANGUAGE other, 0 if not LANGUAGE */
+/* passed required_language can be 1 for SQL, 2 for JAVASCRIPT, 3 for either QL or JAVASCRIPT */
+int MainWindow::hparse_f_characteristic_language(int required_language)
+{
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LANGUAGE") == 0) return 0;
+  if (((required_language & 1) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_SQL, "SQL") == 1)) return 1;
+  if (((required_language & 2) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_9_2, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_JAVASCRIPT, "JAVASCRIPT") == 1)) return 1;
+  hparse_f_error();
+  return 1;
+}
+
+
+/*
+  Call from create function|procedure|library
+  If MySQL 9.0ff and this is CREATE LIBRARY or CREATE PROCEDURE|FUNCTION ... LANGUAGE JAVASCRIPT.
+  then next should be AS literal and literal can be either ordinary string or Javascript-code literal.
+  Return 0 if Javascript not expected, return 1 + possibly error if Javascript expected.
+  To see whether Javascript is expected, search backwards till LIBRARY|PROCEDURE|FUNCTION|start.
+  In MySQL 8 identifiers starting with $ are deprecated, in MySQL 9 identifiers starting and ending with $ are banned.
+  Todo: If code is simple and speed isn't important, convert it to SQL so there's no need for MySQL Enterprise.
+*/
+int MainWindow::hparse_f_as_javascript()
+{
+#if (OCELOT_JAVASCRIPT == 1)
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_9_0) == 0) return 0;
+  for (int i= hparse_i - 1; i > 0; --i)
+  {
+    if ((main_token_types[i] == TOKEN_KEYWORD_LIBRARY) || (main_token_types[i] == TOKEN_KEYWORD_JAVASCRIPT))
+    {
+      /* Javascript expected */
+      hparse_f_expect(FLAG_VERSION_MYSQL_9_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_AS, "AS");
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_9_0, TOKEN_REFTYPE_ANY, TOKEN_TYPE_LITERAL, "[literal]") == 1) return 1;
+//      if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_MYSQL_9_0, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+      return 1;
+    }
+    if ((main_token_types[i] == TOKEN_KEYWORD_CREATE) || (main_token_types[i] == TOKEN_KEYWORD_ALTER)) break;
+    if ((main_token_flags[i] & TOKEN_FLAG_IS_START_STATEMENT) != 0) break;
+  }
+  return 0;
+#else
+  return 0;
+#endif
+}
+
 
 int MainWindow::hparse_f_algorithm_or_lock()
 {
@@ -4599,7 +4643,7 @@ int MainWindow::hparse_f_data_type(int context)
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_VARBINARY;
   }
-  if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VECTOR") == 1)
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7|FLAG_VERSION_MYSQL_9_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VECTOR") == 1)
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_DATA_TYPE;
     hparse_f_length(false, false, false);
@@ -4927,7 +4971,7 @@ int MainWindow::hparse_f_create_definition(int keyword)
         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)) check_seen= true;
   else if (((keyword == TOKEN_KEYWORD_ALTER) && (hparse_dbms_mask & FLAG_VERSION_TARANTOOL_2_2) != 0)
         && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CHECK") == 1)) check_seen= true;
-  else if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VECTOR, "VECTOR") == 1)vector_seen= true;
+  else if (hparse_f_accept(FLAG_VERSION_MARIADB_11_7|FLAG_VERSION_MYSQL_9_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VECTOR, "VECTOR") == 1)vector_seen= true;
   else return 3;
   if (check_seen == true)
   {
@@ -5934,7 +5978,8 @@ void MainWindow::hparse_f_create_package(bool is_body)
       if (hparse_errno > 0) return;
       if (is_body)
       {
-        hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i);
+        if (hparse_f_as_javascript() == 1) {;}
+        else hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i);
         if (hparse_errno > 0) return;
       }
       first_word= 0;
@@ -6840,6 +6885,14 @@ void MainWindow::hparse_f_commit_or_rollback()
 */
 void MainWindow::hparse_f_explain_or_describe(int block_top)
 {
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ANALYZE, "ANALYZE") == 1)
+  {
+    hparse_f_explain_format();
+    if (hparse_errno > 0) return;
+    hparse_f_explainable_statement(block_top, TOKEN_KEYWORD_SELECT);
+    return;
+  }
+
   bool explain_type_seen= false;
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXTENDED") == 1)
   {
@@ -6849,13 +6902,8 @@ void MainWindow::hparse_f_explain_or_describe(int block_top)
   {
     explain_type_seen= true;
   }
-  else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FORMAT") == 1)
+  else if (hparse_f_explain_format() == 1)
   {
-    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
-    if (hparse_errno > 0) return;
-    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRADITIONAL") == 1) {;}
-    else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TREE") == 1) {;}
-    else hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "JSON");
     if (hparse_errno > 0) return;
     explain_type_seen= true;
   }
@@ -6890,8 +6938,22 @@ void MainWindow::hparse_f_explain_or_describe(int block_top)
     return;
   }
 explainable:
-  hparse_f_explainable_statement(block_top);
+  hparse_f_explainable_statement(block_top, TOKEN_KEYWORD_ALL);
   if (hparse_errno > 0) return;
+}
+
+/* For explain|desc ... format= */
+int MainWindow::hparse_f_explain_format()
+{
+  if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FORMAT") == 1)
+  {
+    hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, "=");
+    if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRADITIONAL") == 1) {;}
+    else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TREE") == 1) {;}
+    else hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "JSON");
+    return 1;
+  }
+  return 0;
 }
 
 /*
@@ -7950,7 +8012,7 @@ int i_of_start_of_query= -1;
           if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TRADITIONAL") == 0) hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "JSON");
           if (hparse_errno > 0) return 0;
         }
-        if (hparse_f_explainable_statement(block_top) == 1) goto return_1;
+        if (hparse_f_explainable_statement(block_top, TOKEN_KEYWORD_ALL) == 1) goto return_1;
         if (hparse_errno > 0) return 0;
       }
       hparse_f_error();
@@ -9222,6 +9284,7 @@ void MainWindow::hparse_f_indexes_or_keys() /* for SHOW {INDEX | INDEXES | KEYS}
 #define HPARSE_FLAG_INSTANCE   4096
 #define HPARSE_FLAG_SEQUENCE   8192
 #define HPARSE_FLAG_PACKAGE    16384
+#define HPARSE_FLAG_LIBRARY    32768
 #define HPARSE_FLAG_ANY        65535
 
 void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned int *hparse_flags,
@@ -9314,7 +9377,7 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned in
     {
       unique_seen= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
-    else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(FLAG_VERSION_MARIADB_11_7, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VECTOR") == 1))
+    else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(FLAG_VERSION_MARIADB_11_7|FLAG_VERSION_MYSQL_9_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "VECTOR") == 1))
     {
       unique_seen= true; (*vector_seen)= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
@@ -9359,9 +9422,20 @@ int MainWindow::hparse_f_semicolon_and_or_delimiter(int calling_statement_type)
   Return 1 if it was a statement, else return 0 (which might also mean error).
   Note: Actually MariaDB accepts INSERT and REPLACE, but doesn't document, so we don't accept.
 */
-int MainWindow::hparse_f_explainable_statement(int block_top)
+int MainWindow::hparse_f_explainable_statement(int block_top, int what_is_allowed)
 {
   QString hparse_token_upper= hparse_token.toUpper();
+  if (what_is_allowed == TOKEN_KEYWORD_SELECT) /* for explain analyze only select is allowed */
+  {
+    if (hparse_token_upper == "SELECT")
+    {
+      hparse_f_pseudo_statement(block_top);
+      if (hparse_errno > 0) return 0;
+      return 1;
+    }
+    hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SELECT");
+    return 0;
+  }
   if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_ALL) != 0)
   {
     if ((hparse_token_upper == "DELETE")
@@ -9756,7 +9830,8 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         hparse_f_create_function_clauses();
         if (hparse_errno > 0) return;
-        hparse_f_block(TOKEN_KEYWORD_FUNCTION, hparse_i);
+        if (hparse_f_as_javascript() == 1) {;}
+        else hparse_f_block(TOKEN_KEYWORD_FUNCTION, hparse_i);
         if (hparse_errno > 0) return;
       }
       hparse_dbms_mask &= (~FLAG_VERSION_LUA_OUTPUT);
@@ -9771,6 +9846,17 @@ void MainWindow::hparse_f_statement(int block_top)
       hparse_f_index_columns(TOKEN_KEYWORD_INDEX, fulltext_seen, false, false, vector_seen);
       if (hparse_errno > 0) return;
       hparse_f_algorithm_or_lock();
+    }
+    else if (((hparse_flags & HPARSE_FLAG_LIBRARY) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_9_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIBRARY") == 1))
+    {
+      hparse_f_if_not_exists();
+      if (hparse_errno > 0) return;
+      main_token_flags[hparse_i]|= TOKEN_FLAG_IS_NEW;
+      if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION, TOKEN_REFTYPE_ANY) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+      hparse_f_characteristic_language(2); /* error if LANGUAGE and not LANGUAGE JAVASCRIPT */
+      hparse_f_as_javascript();
+      if (hparse_errno > 0) return;
     }
     else if (((hparse_flags & HPARSE_FLAG_PACKAGE) != 0) && (hparse_f_accept(FLAG_VERSION_PLSQL | FLAG_VERSION_MARIADB_11_4, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PACKAGE") == 1))
     {
@@ -10148,7 +10234,7 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else if (((hparse_flags & HPARSE_FLAG_VIEW) != 0) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VIEW, "VIEW") == 1))
     {
-      if ((hparse_dbms_mask & (FLAG_VERSION_MARIADB_ALL | FLAG_VERSION_TARANTOOL)) != 0) hparse_f_if_not_exists();
+      if ((hparse_dbms_mask & (FLAG_VERSION_MARIADB_ALL | FLAG_VERSION_TARANTOOL | FLAG_VERSION_MYSQL_9_1)) != 0) hparse_f_if_not_exists();
       if (hparse_errno > 0) return;
       hparse_f_alter_or_create_view();
       if (hparse_errno > 0) return;
@@ -10367,6 +10453,12 @@ void MainWindow::hparse_f_statement(int block_top)
       {
         hparse_f_algorithm_or_lock();
       }
+    }
+    else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_9_2, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LIBRARY")))
+    {
+      hparse_f_if_exists();
+      if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_FUNCTION, TOKEN_REFTYPE_ANY) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
     }
     else if ((temporary_seen == false) && (online_seen == false) && (hparse_f_accept(FLAG_VERSION_PLSQL | FLAG_VERSION_MARIADB_11_4, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PACKAGE")))
     {
