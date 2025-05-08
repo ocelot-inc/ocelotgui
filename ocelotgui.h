@@ -891,6 +891,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_MID,
     TOKEN_KEYWORD_MIDDLEINT,
     TOKEN_KEYWORD_MIN,
+    TOKEN_KEYWORD_MINUS,
     TOKEN_KEYWORD_MINUTE,
     TOKEN_KEYWORD_MINUTE_MICROSECOND,
     TOKEN_KEYWORD_MINUTE_SECOND,
@@ -1664,7 +1665,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1280
+#define KEYWORD_LIST_SIZE 1281
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -2237,6 +2238,7 @@ static const struct keywords strvalues[]=
       {"MID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MID},
       {"MIDDLEINT", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MIDDLEINT},
       {"MIN", 0, FLAG_VERSION_ALL, TOKEN_KEYWORD_MIN},
+      {"MINUS", FLAG_VERSION_PLSQL, 0, TOKEN_KEYWORD_MINUS},
       {"MINUTE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_MINUTE},
       {"MINUTE_MICROSECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_MICROSECOND},
       {"MINUTE_SECOND", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_MINUTE_SECOND},

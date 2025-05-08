@@ -7649,6 +7649,10 @@ int MainWindow::hparse_f_unionize(bool is_top)
     is_except= true;
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0_31|FLAG_VERSION_TARANTOOL|FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTERSECT") == 1)
     is_intersect= true;
+  else if (hparse_f_accept(FLAG_VERSION_PLSQL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "MINUS") == 1)
+  {
+    is_union= true;
+  }
   if ((is_union == false) && (is_except == false) && (is_intersect == false))
   {
     return 1;
@@ -9766,25 +9770,83 @@ void MainWindow::hparse_f_statement(int block_top)
     }
     else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATION") == 1)
     {
-      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FILTER");
-      if (hparse_errno > 0) return;
-      do
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FILTER") == 1)
       {
-        if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_DO_DB") == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_IGNORE_DB") == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_DO_TABLE") == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_IGNORE_TABLE") == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_WILD_DO_TABLE") == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_WILD_IGNORE_TABLE") == 1) {;}
-        else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_REWRITE_DB") == 1) {;}
-        else hparse_f_error();
-        if (hparse_errno > 0) return;
-        /* TODO: Following is garbage. We need lists of databases or tables */
-        hparse_f_column_list(1, 0); /* Todo: take into account what kind of list it should be */
-        if (hparse_errno > 0) return;
-      } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+        do
+        {
+          if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_DO_DB") == 1) {;}
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_IGNORE_DB") == 1) {;}
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_DO_TABLE") == 1) {;}
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_IGNORE_TABLE") == 1) {;}
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_WILD_DO_TABLE") == 1) {;}
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_WILD_IGNORE_TABLE") == 1) {;}
+          else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REPLICATE_REWRITE_DB") == 1) {;}
+          else hparse_f_error();
+          if (hparse_errno > 0) return;
+          /* TODO: Following is garbage. We need lists of databases or tables */
+          hparse_f_column_list(1, 0); /* Todo: take into account what kind of list it should be */
+          if (hparse_errno > 0) return;
+        } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+      }
+      else if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SOURCE") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY, TOKEN_TYPE_KEYWORD, "TO");
+        /* todo: handle non-literals */
+        QStringList q= (QStringList()
+                        << "SOURCE_BIND"
+                        << "SOURCE_HOST"
+                        << "SOURCE_USER"
+                        << "SOURCE_PAD"
+                        << "SOURCE_PORT"
+                        << "PRIVILEGE_CHECKS_USER"
+                        << "REQUIRE_ROW_FORMAT"
+                        << "REQUIRE_TABLE_PRIMARY_KEY_CHECK"
+                        << "ASSIGN_GTIDS_TO_ANONYMOUS_TRANSACTIONS"
+                        << "SOURCE_LOG_FILE"
+                        << "SOURCE_LOG_POS"
+                        << "SOURCE_AUTO_POSITION"
+                        << "RELAY_LOG_FILE"
+                        << "RELAY_LOG_POS"
+                        << "SOURCE_HEARTBEAT_PERIOD"
+                        << "SOURCE_CONNECT_RETRY"
+                        << "SOURCE_RETRY_COUNT"
+                        << "SOURCE_CONNECTION_AUTO_FAILOVER"
+                        << "SOURCE_DELAY"
+                        << "SOURCE_COMPRESSION_ALGORITHMS"
+                        << "SOURCE_ZSTD_COMPRESSION_LEVEL"
+                        << "SOURCE_SSL"
+                        << "SOURCE_SSL_CA"
+                        << "SOURCE_SSL_CAPATH"
+                        << "SOURCE_SSL_CERT"
+                        << "SOURCE_HEARTBEAT_PERIOD"
+                        << "SOURCE_SSL_CRL"
+                        << "SOURCE_SSL_CRLPATH"
+                        << "SOURCE_SSL_KEY"
+                        << "SOURCE_SSL_CIPHER"
+                        << "SOURCE_SSL_VERIFY_SERVER_CERT"
+                        << "SOURCE_TLS_VERSION"
+                        << "SOURCE_TLS_CIPHERSUITES"
+                        << "SOURCE_PUBLIC_KEY_PATH"
+                        << "GET_SOURCE_PUBLIC_KEY"
+                        << "NETWORK_NAMESPACE"
+                        << "IGNORE_SERVER_IDS"
+                        << "GTID_ONLY"
+        );
+        int i_of_matched;
+        do
+        {
+          if (hparse_f_accept_in_set(FLAG_VERSION_MYSQL_8_0, q, &i_of_matched) == 0) hparse_f_error();
+          hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY, TOKEN_TYPE_OPERATOR, "=");
+          hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_LITERAL, "[literal]");
+          if (hparse_errno > 0) return;
+          q.removeAt(i_of_matched);
+        } while (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+      }
+      else hparse_f_error();
+      if (hparse_errno > 0) return;
+      hparse_f_for_channel();
+      if (hparse_errno > 0) return;
     }
-    else hparse_f_error();
   }
   /* "CHECK" is checked in hparse_f_query subroutines */
   /* "CHECKSUM" is checked in hparse_f_query subroutines */
