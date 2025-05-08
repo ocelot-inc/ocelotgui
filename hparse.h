@@ -6889,6 +6889,10 @@ void MainWindow::hparse_f_explain_or_describe(int block_top)
   {
     hparse_f_explain_format();
     if (hparse_errno > 0) return;
+    if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_9_0) != 0) && (hparse_f_into(TOKEN_KEYWORD_EXPLAIN) == 1))
+    {
+      if (hparse_errno > 0) return;
+    }
     hparse_f_explainable_statement(block_top, TOKEN_KEYWORD_SELECT);
     return;
   }
@@ -6907,6 +6911,11 @@ void MainWindow::hparse_f_explain_or_describe(int block_top)
     if (hparse_errno > 0) return;
     explain_type_seen= true;
   }
+  if (((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) != 0) && (hparse_f_into(TOKEN_KEYWORD_EXPLAIN) == 1))
+  {
+    if (hparse_errno > 0) return;
+  }
+
   if (explain_type_seen == false)
   {
     if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_TABLE, TOKEN_REFTYPE_TABLE) == 1)
@@ -7526,13 +7535,18 @@ int MainWindow::hparse_f_signal_or_resignal(int who_is_calling, int block_top)
   return 1;
 }
 
-/* An INTO clause may appear in two different places within a SELECT. */
+/* An INTO clause may appear in two different places within a SELECT. And EXPLAIN, where only a variable can follow. */
 /* Todo: Use TOKEN_REFTYPE_VARIABLE with hparse_f_qualified_name_of_operand() when it works correctly again. */
-int MainWindow::hparse_f_into()
+int MainWindow::hparse_f_into(int who_is_calling)
 {
   if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INTO"))
   {
     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+    if (who_is_calling == TOKEN_KEYWORD_EXPLAIN)
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+      return 1;
+    }
     if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OUTFILE") == 1)
     {
       if (hparse_f_literal(TOKEN_REFTYPE_FILE, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
@@ -8170,6 +8184,11 @@ int i_of_start_of_query= -1;
         if (hparse_errno > 0) return 0;
       }
     }
+    else if (hparse_f_accept(FLAG_VERSION_MARIADB_12_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "CATALOGS") == 1) /* show catalogs */
+    {
+      hparse_f_like_or_where();
+      if (hparse_errno > 0) return 0;
+    }
     else if (hparse_f_character_set() == 1) /* show character set */
     {
       hparse_f_like_or_where();
@@ -8749,7 +8768,7 @@ int MainWindow::hparse_f_select(bool is_top, bool is_statement)
   }
   int column_count=  hparse_f_expression_list(TOKEN_KEYWORD_SELECT);
   if (hparse_errno > 0) return 0;
-  hparse_f_into();
+  hparse_f_into(TOKEN_KEYWORD_SELECT);
   if (hparse_errno > 0) return 0;
   /* FROM + some subsequent clauses are optional if no columns seen */
   bool from_seen= false;
@@ -8863,7 +8882,7 @@ int MainWindow::hparse_f_late_select_clauses(bool is_top, int who_is_calling)
     if (hparse_errno > 0) return 0;
   }
   if ((is_top == true)
-   && (hparse_f_into() == 1))
+   && (hparse_f_into(who_is_calling) == 1))
   {
     is_union_illegal_later= true;
     if (hparse_errno > 0) return 0;
@@ -9285,14 +9304,15 @@ void MainWindow::hparse_f_indexes_or_keys() /* for SHOW {INDEX | INDEXES | KEYS}
 #define HPARSE_FLAG_SEQUENCE   8192
 #define HPARSE_FLAG_PACKAGE    16384
 #define HPARSE_FLAG_LIBRARY    32768
-#define HPARSE_FLAG_ANY        65535
+#define HPARSE_FLAG_REFERENCE  65536
+#define HPARSE_FLAG_ANY       131071
 
 void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned int *hparse_flags,
                                                  bool *fulltext_seen, bool *vector_seen)
 {
   bool algorithm_seen= false, definer_seen= false, sql_seen= false, temporary_seen= false;
   bool unique_seen= false, or_seen= false, ignore_seen= false, online_seen= false;
-  bool aggregate_seen= false;
+  bool aggregate_seen, spatial_seen= false;
   *fulltext_seen= false;
   *vector_seen= false;
   (*hparse_flags)= HPARSE_FLAG_ANY;
@@ -9311,7 +9331,14 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned in
   /* in MySQL OR REPLACE is only for views, in MariaDB OR REPLACE is for all creates */
   int or_replace_flags;
   if ((hparse_dbms_mask & FLAG_VERSION_MARIADB_ALL) != 0) or_replace_flags= HPARSE_FLAG_ANY;
-  else or_replace_flags= HPARSE_FLAG_VIEW;
+  else or_replace_flags= (HPARSE_FLAG_VIEW | HPARSE_FLAG_REFERENCE);
+
+  /* [SPATIAL] INDEX is normally okay, [SPATIAL] REFERENCE is only-if-MySQL-9.0 okay */
+  if ((hparse_dbms_mask & FLAG_VERSION_MYSQL_8_0) == 0)
+  {
+    (*hparse_flags)= (*hparse_flags) & ~HPARSE_FLAG_REFERENCE;
+    or_replace_flags= or_replace_flags & ~HPARSE_FLAG_REFERENCE;
+  }
 
   if (who_is_calling == TOKEN_KEYWORD_CREATE)
   {
@@ -9369,9 +9396,11 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned in
     {
       (*fulltext_seen)= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
     }
-    else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && ((*fulltext_seen) == false) && (unique_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SPATIAL") == 1))
+    else if ((((*hparse_flags) & (HPARSE_FLAG_INDEX | HPARSE_FLAG_REFERENCE)) != 0) && ((*fulltext_seen) == false) && (unique_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SPATIAL") == 1))
     {
-      (*fulltext_seen)= true; (*hparse_flags) &= HPARSE_FLAG_INDEX;
+      (*fulltext_seen)= true; (*hparse_flags) &= (HPARSE_FLAG_INDEX | HPARSE_FLAG_REFERENCE);
+      or_replace_flags= 0;
+      spatial_seen= true;
     }
     else if ((((*hparse_flags) & HPARSE_FLAG_INDEX) != 0) && (unique_seen == false) && ((*fulltext_seen) == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "UNIQUE") == 1))
     {
@@ -9387,6 +9416,7 @@ void MainWindow::hparse_f_alter_or_create_clause(int who_is_calling, unsigned in
     }
     else break;
   }
+  if (spatial_seen == false) (*hparse_flags)= (*hparse_flags) & ~HPARSE_FLAG_REFERENCE;
 }
 
 /*
@@ -9883,6 +9913,36 @@ void MainWindow::hparse_f_statement(int block_top)
       hparse_f_block(TOKEN_KEYWORD_PROCEDURE, hparse_i);
       if (hparse_errno > 0) return;
       hparse_dbms_mask &= (~FLAG_VERSION_LUA_OUTPUT);
+    }
+    else if (((hparse_flags & HPARSE_FLAG_REFERENCE) != 0) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REFERENCE") == 1))
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SYSTEM");
+      hparse_f_if_not_exists();
+      if (hparse_errno > 0) return;
+      if (hparse_f_literal(TOKEN_REFTYPE_SYSTEM, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
+      bool name_seen= false; bool definition_seen= false; bool organization_seen= false; bool description_seen= false;
+      for (;;)
+      {
+        bool organization_last_seen= false;
+        if (hparse_errno > 0) return;
+        if ((name_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NAME") == 1))
+          name_seen= true;
+        else if ((definition_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DEFINITION") == 1))
+          definition_seen= true;
+        else if ((organization_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "ORGANIZATION") == 1))
+          organization_seen= organization_last_seen= true;
+        else if ((description_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "DESCRIPTION") == 1))
+          description_seen= true;
+        else break;
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+        if (organization_last_seen == true)
+        {
+          /* todo: IDENTIFIED BY clauses have become frequent, stop duplicating the code for them */
+          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "IDENTIFIED");
+          hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "BY");
+          if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
+        }
+      }
     }
     else if (((hparse_dbms_mask & (FLAG_VERSION_MARIADB_ALL | FLAG_VERSION_MYSQL_8_0)) != 0) && ((hparse_flags & HPARSE_FLAG_USER) != 0) && (hparse_f_accept(FLAG_VERSION_MARIADB_ALL | FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_ROLE, "ROLE") == 1))
     {
@@ -10533,6 +10593,18 @@ void MainWindow::hparse_f_statement(int block_top)
         if (hparse_f_qualified_name_of_object(0, TOKEN_REFTYPE_DATABASE_OR_SEQUENCE, TOKEN_REFTYPE_SEQUENCE) == 0) hparse_f_error();
         if (hparse_errno > 0) return;
       } while (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ","));
+      if (hparse_errno > 0) return;
+    }
+    else if ((online_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SPATIAL")))
+    {
+      hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "REFERENCE");
+      hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "SYSTEM");
+      if (hparse_f_accept(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_IF_IN_IF_EXISTS, "IF") == 1)
+      {
+        hparse_f_expect(FLAG_VERSION_MYSQL_8_0, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "EXISTS");
+        if (hparse_errno > 0) return;
+      }
+      if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_MYSQL_8_0, TOKEN_LITERAL_FLAG_UNSIGNED_INTEGER) == 0) hparse_f_error();
       if (hparse_errno > 0) return;
     }
     else if ((online_seen == false) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TABLE")))

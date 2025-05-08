@@ -556,7 +556,7 @@ install(FILES ocelotgui.desktop DESTINATION ${CMAKE_INSTALL_DATADIR}/application
 install(FILES ocelotgui-logo.png DESTINATION ${CMAKE_INSTALL_DATADIR}/pixmaps)
 # So the only original files not copied are the source files:
 # CMakeLists.txt ocelotgui.pro ocelotgui.cpp ocelotgui.h codeeditor.h hparse.h ostrings.h
-# readmylogin.c ocelotgui.ui install_sql.cpp
+# readmylogin.c ocelotgui.ui install_sql.cpp pgfindlib.h
 # and maybe redundant doc files
 
 if (NOT PACKAGE_TYPE MATCHES "DEB")

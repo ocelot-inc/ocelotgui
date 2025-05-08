@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May 6 2025
+   Last modified: May7 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -127,6 +127,7 @@
     hparse.h            the recognizer
     ostrings.h          strings that contain English translatable text
     third_party.h       from tarantool-c, If cmake . -DOCELOT_THIRD_PARTY=0 then #include third_party.h won't happen
+    pgfindlib.h         look for .so libraries
 
   There are three main widgets, which generally appear top-to-bottom on
   the screen: history_edit_widget = an uncomplicated text edit which gets
@@ -15686,7 +15687,7 @@ void MainWindow::initial_asserts()
     assert(MENU_FONT != 0);  /* i.e. "if Windows, we don't care." */
   #endif
 
-  assert(TOKEN_REFTYPE_MAX == 91); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
+  assert(TOKEN_REFTYPE_MAX == 92); /* See comment after ocelotgui.h TOKEN_REFTYPE_MAX */
 
   //printf("TOKEN_KEYWORD__UTf8MB4 == %d\n", TOKEN_KEYWORD__UTF8MB4);
 
@@ -16591,6 +16592,7 @@ struct reftypewords {
     {"statement ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_STATEMENT},
     {"subpartition ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SUBPARTITION},
     {"switch ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SWITCH_NAME},
+    {"spatial-reference-system ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_SYSTEM},
     {"table ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE},
     {"table-or-column ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_COLUMN},
     {"table-or-column-or-function ", FLAG_VERSION_ALL, 0, TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION},
@@ -25161,9 +25163,9 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
 
     /* This is how we treat #comments at start of line or during line, but after four tokens we stop checking. */
     if (s.mid(token_offsets[0], 1) == "#") continue;
-    if ((token_lengths[1] > 0) && (s.mid(token_offsets[1], 1) == '#')) token_lengths[1]= token_lengths[2]= token_lengths[3]= 0;
-    if ((token_lengths[2] > 0) && (s.mid(token_offsets[2], 1) == '#')) token_lengths[2]= token_lengths[3]= 0;
-    if ((token_lengths[3] > 0) && (s.mid(token_offsets[3], 1) == '#')) token_lengths[3]= 0;
+    if ((token_lengths[1] > 0) && (s.mid(token_offsets[1], 1) == "#")) token_lengths[1]= token_lengths[2]= token_lengths[3]= 0;
+    if ((token_lengths[2] > 0) && (s.mid(token_offsets[2], 1) == "#")) token_lengths[2]= token_lengths[3]= 0;
+    if ((token_lengths[3] > 0) && (s.mid(token_offsets[3], 1) == "#")) token_lengths[3]= 0;
 
     token0_length= token_lengths[0];
     token0= s.mid(token_offsets[0], token0_length);

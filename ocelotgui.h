@@ -4392,6 +4392,7 @@ enum {
   TOKEN_REFTYPE_STATEMENT,
   TOKEN_REFTYPE_SUBPARTITION,
   TOKEN_REFTYPE_SWITCH_NAME,
+  TOKEN_REFTYPE_SYSTEM,
   TOKEN_REFTYPE_TABLE,
   TOKEN_REFTYPE_TABLE_OR_COLUMN,
   TOKEN_REFTYPE_TABLE_OR_COLUMN_OR_FUNCTION,
@@ -4412,7 +4413,7 @@ enum {
   TOKEN_REFTYPE_WRAPPER,
   TOKEN_REFTYPE_MAX
   /*
-    In ocelotgui.h we say "assert(TOKEN_REFTYPE_MAX == 91);".
+    In ocelotgui.cpp we say "assert(TOKEN_REFTYPE_MAX == 92);".
     If it blows, that means you changed the above enum list.
     Which is okay, but before you change the assert, make sure
     reftypewords list corresponds to the enum list!
@@ -5549,7 +5550,7 @@ public:
   void hparse_f_conflict_algorithm();
   void hparse_f_condition_information_item_name();
   int hparse_f_signal_or_resignal(int,int);
-  int hparse_f_into();
+  int hparse_f_into(int);
   void hparse_f_with_clause(int,bool);
   int hparse_f_values(bool);
   int hparse_f_unionize(bool);

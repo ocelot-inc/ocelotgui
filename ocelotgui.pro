@@ -31,6 +31,7 @@ HEADERS += install_sql.cpp
 HEADERS += hparse.h
 HEADERS += ostrings.h
 HEADERS += third_party.h
+HEADERS += pgfindlib.h
 
 FORMS    += ocelotgui.ui
 
