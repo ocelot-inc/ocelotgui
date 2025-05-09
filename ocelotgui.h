@@ -346,6 +346,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_ADD,
     TOKEN_KEYWORD_ADDDATE,
     TOKEN_KEYWORD_ADDTIME,
+    TOKEN_KEYWORD_ADD_MONTHS,
     TOKEN_KEYWORD_AES_DECRYPT,
     TOKEN_KEYWORD_AES_ENCRYPT,
     TOKEN_KEYWORD_AFTER,
@@ -1450,6 +1451,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_SYSTEM_TIME,
     TOKEN_KEYWORD_SYSTEM_USER,
     TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN,
+    TOKEN_KEYWORD_SYS_GUID,
     TOKEN_KEYWORD_TAB,
     TOKEN_KEYWORD_TABLE,
     TOKEN_KEYWORD_TABLES,
@@ -1477,6 +1479,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_TO,
     TOKEN_KEYWORD_TOUCHES,
     TOKEN_KEYWORD_TO_BASE64,
+    TOKEN_KEYWORD_TO_CHAR,
     TOKEN_KEYWORD_TO_DAYS,
     TOKEN_KEYWORD_TO_SECONDS,
     TOKEN_KEYWORD_TRAILING,
@@ -1516,6 +1519,8 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_UTC_TIMESTAMP,
     TOKEN_KEYWORD_UUID,
     TOKEN_KEYWORD_UUID_SHORT,
+    TOKEN_KEYWORD_UUID_V4,
+    TOKEN_KEYWORD_UUID_V7,
     TOKEN_KEYWORD_VACUUM,
     TOKEN_KEYWORD_VALIDATE_PASSWORD_STRENGTH,
     TOKEN_KEYWORD_VALIDATION,
@@ -1665,7 +1670,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1281
+#define KEYWORD_LIST_SIZE 1286
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -1699,6 +1704,7 @@ static const struct keywords strvalues[]=
       {"ADD", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, 0, TOKEN_KEYWORD_ADD},
       {"ADDDATE", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ADDDATE},
       {"ADDTIME", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_ADDTIME},
+      {"ADD_MONTHS", 0, FLAG_VERSION_PLSQL, TOKEN_KEYWORD_ADD_MONTHS},
       {"AES_DECRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AES_DECRYPT},
       {"AES_ENCRYPT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_AES_ENCRYPT},
       {"AFTER", 0, 0, TOKEN_KEYWORD_AFTER},
@@ -2799,6 +2805,7 @@ static const struct keywords strvalues[]=
       {"SYSTEM_TIME", 0, FLAG_VERSION_MARIADB_10_3, TOKEN_KEYWORD_SYSTEM_TIME},
       {"SYSTEM_USER", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_SYSTEM_USER},
           {"SYSTEM_VARIABLES_ADMIN", 0, 0, TOKEN_KEYWORD_SYSTEM_VARIABLES_ADMIN},
+      {"SYS_GUID", 0, FLAG_VERSION_PLSQL, TOKEN_KEYWORD_SYS_GUID},
       {"TAB", 0, 0, TOKEN_KEYWORD_TAB}, /* for format rule */
       {"TABLE", FLAG_VERSION_ALL | FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TABLE},
       {"TABLES", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_TABLES},
@@ -2826,6 +2833,7 @@ static const struct keywords strvalues[]=
       {"TO", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TO},
       {"TOUCHES", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TOUCHES}, /* deprecated in MySQL 5.7.6 */
       {"TO_BASE64", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_BASE64},
+      {"TO_CHAR", 0, FLAG_VERSION_PLSQL, TOKEN_KEYWORD_TO_CHAR},
       {"TO_DAYS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_DAYS},
       {"TO_SECONDS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_TO_SECONDS},
       {"TRAILING", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_TRAILING},
@@ -2865,6 +2873,8 @@ static const struct keywords strvalues[]=
       {"UTC_TIMESTAMP", FLAG_VERSION_MYSQL_OR_MARIADB_ALL, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UTC_TIMESTAMP},
       {"UUID", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UUID},
       {"UUID_SHORT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_UUID_SHORT},
+      {"UUID_V4", 0, FLAG_VERSION_MARIADB_11_7, TOKEN_KEYWORD_UUID_V4},
+      {"UUID_V7", 0, FLAG_VERSION_MARIADB_11_7, TOKEN_KEYWORD_UUID_V7},
       {"VACUUM", 0, 0, TOKEN_KEYWORD_VACUUM},
       {"VALIDATE_PASSWORD_STRENGTH", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_VALIDATE_PASSWORD_STRENGTH},
       {"VALIDATION", 0, 0, TOKEN_KEYWORD_VALIDATION},
@@ -5523,7 +5533,7 @@ public:
   int hparse_f_partition_list(bool, bool);
   void hparse_f_algorithm();
   void hparse_f_sql();
-  void hparse_f_for_channel();
+  void hparse_f_for_channel(unsigned int);
   void hparse_f_interval_quantity(int);
   void hparse_f_alter_or_create_event(int);
   void hparse_f_alter_or_create_sequence(int);

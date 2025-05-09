@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May7 2025
+   Last modified: May 9 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -15725,7 +15725,7 @@ void MainWindow::initial_asserts()
      p_item= (char*) bsearch(k, strvalues, KEYWORD_LIST_SIZE, sizeof(struct keywords), (int(*)(const void*, const void*)) strcmp);
      assert(p_item != NULL);
      index= ((((unsigned long)p_item - (unsigned long)strvalues)) / sizeof(struct keywords));
-     printf("ii=%d, index=%ld, k=%s. l=%s.\n", ii, index, k, l);
+     printf("ii=%d, index=%lu, k=%s. l=%s.\n", ii, index, k, l);
      if (index != strvalues[ii].token_keyword) exit(0);
      assert(index == strvalues[ii].token_keyword);
      strcpy(l, k);
