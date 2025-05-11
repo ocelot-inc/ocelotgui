@@ -2154,6 +2154,22 @@ int MainWindow::hparse_f_table_index_list()
   return return_value;
 }
 
+/* FOR PORTION OF period FROM expr1 TO expr2 */
+void MainWindow::hparse_f_portion(int who_is_calling)
+{
+  if (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FOR") == 1)
+  {
+     main_token_flags[hparse_i_of_last_accepted] |= TOKEN_FLAG_IS_START_CLAUSE;
+     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "PORTION");
+     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "OF");
+     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_CONSTRAINT,TOKEN_TYPE_IDENTIFIER, "[identifier]");
+     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM");
+     hparse_f_opr_1(who_is_calling, 0);
+     hparse_f_expect(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "TO");
+     hparse_f_opr_1(who_is_calling, 0);
+   }
+}
+
 /*
   Operators, in order of precedence as in
   http://dev.mysql.com/doc/refman/5.7/en/operator-precedence.html
@@ -5098,7 +5114,6 @@ void MainWindow::hparse_f_column_definition(int last_word)
     if (hparse_errno > 0) return;
     generated_seen= true;
   }
-  else if (last_word == TOKEN_KEYWORD_START) hparse_f_error();
   else if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "AS") == 1)
   {
     generated_seen= true;
@@ -10423,8 +10438,11 @@ void MainWindow::hparse_f_statement(int block_top)
      || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "FROM") == 1))
     {
       bool multi_seen= false;
-      if (hparse_f_qualified_name_with_star() == 0) hparse_f_error();
+      if (hparse_f_table_factor() == 0) hparse_f_error(); /* 2025-05-11 was hparse_f_qualified_name_with_star */
       if (hparse_errno > 0) return;
+      hparse_f_portion(TOKEN_KEYWORD_DELETE);
+      if (hparse_errno > 0) return;
+
       if ((hparse_dbms_mask & FLAG_VERSION_TARANTOOL) != 0)
       {
         hparse_f_table_index_hint_list();
@@ -12134,6 +12152,8 @@ void MainWindow::hparse_f_statement(int block_top)
     {
       /* todo: this sees some choices that are only valid with SELECT */
       if (hparse_f_table_reference(0) == 0) hparse_f_error();
+      if (hparse_errno > 0) return;
+      hparse_f_portion(TOKEN_KEYWORD_UPDATE);
       if (hparse_errno > 0) return;
     }
     bool multi_seen= false;

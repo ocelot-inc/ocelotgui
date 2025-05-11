@@ -642,6 +642,7 @@ enum {                                        /* possible returns from token_typ
     TOKEN_KEYWORD_FOREIGN,
     TOKEN_KEYWORD_FOREIGN_KEY_LIST,
     TOKEN_KEYWORD_FORMAT,
+    TOKEN_KEYWORD_FORMAT_BYTES,
     TOKEN_KEYWORD_FORMAT_PICO_TIME,
     TOKEN_KEYWORD_FOUND,
     TOKEN_KEYWORD_FOUND_ROWS,
@@ -1670,7 +1671,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1286
+#define KEYWORD_LIST_SIZE 1287
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -1995,6 +1996,7 @@ static const struct keywords strvalues[]=
       {"FOREIGN", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_FOREIGN},
       {"FOREIGN_KEY_LIST", 0, 0, TOKEN_KEYWORD_FOREIGN_KEY_LIST},
       {"FORMAT", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FORMAT},
+      {"FORMAT_BYTES", 0, FLAG_VERSION_MARIADB_11_8, TOKEN_KEYWORD_FORMAT_BYTES},
       {"FORMAT_PICO_TIME", 0, FLAG_VERSION_MARIADB_11_0, TOKEN_KEYWORD_FORMAT_PICO_TIME},
       {"FOUND", 0, 0, TOKEN_KEYWORD_FOUND},
       {"FOUND_ROWS", 0, FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_KEYWORD_FOUND_ROWS},
@@ -5462,6 +5464,7 @@ public:
   void hparse_f_table_index_hint_list();
   int hparse_f_table_index_hint();
   int hparse_f_table_index_list();
+  void hparse_f_portion(int);
   int hparse_f_comp_op();
   void hparse_f_opr_1(int,int),hparse_f_opr_2(int,int),hparse_f_opr_3(int,int),hparse_f_opr_4(int,int);
   void hparse_f_opr_5(int,int),hparse_f_opr_6(int,int),hparse_f_opr_7(int,int);
