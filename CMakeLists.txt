@@ -366,6 +366,12 @@ if (Qt6Widgets_FOUND)
   qt6_wrap_ui(UI_OCELOTGUI ocelotgui.ui)
 endif(Qt6Widgets_FOUND)
 
+if (Qt6Widgets_FOUND)
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0)
+    message(FATAL_ERROR "For Qt 6, minimum GCC compiler version is 9.0")
+  endif()
+endif(Qt6Widgets_FOUND)
+
 # -DOCELOT_CPPCHECK=1 is only occasionally used by the producer of ocelotgui. If it is on:
 #  Since third_party.h has errors that the producer won't fix, -DOCELOT_THIRD_PARTY=0 is necessary
 #  cppcheck must be installed, e.g. with sudo apt-get install cppcheck, otherwise make will fail
