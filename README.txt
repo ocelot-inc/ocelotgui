@@ -97,7 +97,7 @@ If not, your Linux distro's repositories will contain it,
 usually with a package name like "libmysqlclient-dev" or "libmysqlclient-devel".</P>
 With Fedora the package name may be "mariadb-devel" and the library
 name may be "libmariadb.so" or "libmariadbclient.so".</P>
-<P>A tip for Mageia 5: You can use "urpmf <library name>" to find
+<P>A tip for Mageia: You can use "urpmf <library name>" to find
 what packages contain libmysqlclient.so.
 If the answer is lib64mariadb18, you can install it with:
 sudo urpmi lib64mariadb18.</P>
@@ -2760,8 +2760,12 @@ For example on Mageia:<PRE>
  urpmi libqt4-devel
  #Do the following if and only if build is for use with Qt5
  #The name of the following package varies,
- #it might be qt5-qtbase-devel (or qt6-qtbase-devel for Qt6)
- urpmi libqt5-devel</PRE></P>
+ #it might be qt5-qtbase-devel
+ urpmi libqt5-devel
+ #Do the following if and only if build is for use with Qt6
+ #The name of the following package varies,
+ #it might be qt6-qtbase-devel
+ #urpmi libqt6-devel</PRE></P>
 
 <P>On Fedora 35 which is an RPM-like system but might have Qt6 not Qt4 or Qt5:<PRE>
 sudo dnf install qt6-qtbase qt-devel qt6-qtbase-devel</PRE></P>

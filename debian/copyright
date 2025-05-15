@@ -3,7 +3,7 @@ Upstream-Name: ocelotgui
 Source: http://ocelot.ca and http://github.com/ocelot-inc/ocelotgui
 Comment: See the LICENSE.GPL file for explanation why Peter Gulutzan chose GPL-2.
 
-Files: ocelotgui.cpp ocelotgui.h hparse.h ostrings.h readmylogin.c
+Files: ocelotgui.cpp ocelotgui.h hparse.h ostrings.h readmylogin.c pgfindlib.h pgfindlib.c
        *.png *.jpg *.pro *.txt *.ui *.htm *.md *.sh ocelotgui* *changelog* debian/* debian/source/* *.cnf
        COPYING* LICENSE* copyright
 Copyright: Copyright 2022 by Peter Gulutzan. <ocelot.ca>

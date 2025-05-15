@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May 11 2025
+   Last modified: May 14 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -674,6 +674,9 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
   result_grid_tab_widget= new QTabWidget48(this); /* 2015-08-25 added "this" */
   result_grid_tab_widget->hide();
   main_layout= new QVBoxLayout();
+  /* todo: setSpacing and setContentsMargins like this will give us a few more pixels but I'd prefer user settings */
+  main_layout->setSpacing(1);
+  main_layout->setContentsMargins(QMargins(1, 1, 1, 1));
   history_edit_widget= new TextEditHistory(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -6631,29 +6634,31 @@ void MainWindow::action_help_libmysqlclient(bool is_checked)
 {
   (void)is_checked;
   QString the_text= "<b>libmysqlclient</b><br>\
-  Before ocelotgui can try to connect to a MySQL server, \
-  it needs a shared library named libmysqlclient \
-  (file name on Linux is 'libmysqlclient.so' and/or 'libmysqlclient.so.18'). \
+  Before ocelotgui can try to connect to a MySQL or MariaDB server, \
+  it needs a client shared library named libmysqlclient.so or \
+  libmariadb.so or something similar. \
   If a mysql client was installed, possibly due to install \
   of a package named 'libmysqlclient-dev' or something similar, \
   then this file exists ... somewhere. \
-  ocelotgui searches for libmysqlclient.so in these directories:<br> \
-  (1) as specified by environment variable LD_RUN_PATH<br> \
-  (2) as specified by environment variable LD_LIBRARY_PATH<br> \
-  (3) as specified during build in file ocelotgui.pro, \
+  ocelotgui searches for a client shared library in these directories:<br> \
+  (1) per option ld_run_path on command line or .cnf file<br> \
+      (or environment variable LD_RUN_PATH)<br> \
+  (2) per environment variable LD_LIBRARY_PATH<br> \
+  (3) per specifications in file ocelotgui.pro or CMakeLists.txt, \
   which are by default hard-coded as: /usr/local/lib \
   /usr/mysql/lib /usr/local/mysql/lib /usr/lib /usr/local/lib/mysql \
   /usr/lib/mysql /usr/local /usr/local/mysql /usr/local /usr, etc.<br> \
-  If a message appears saying libmysqlclient cannot be found, \
-  or if there is a suspicion that an obsolete copy of libmysqlclient \
-  was found, a possible solution is:<br> \
-  1. Find the right libmysqlclient.so with Linux 'find' or 'locate'. \
+  (4) in standard places.<br> \
+  If a message appears saying a client shared library cannot be found, \
+  or if there is a suspicion that an obsolete copy of the client \
+  shared library was found, a possible solution is:<br> \
+  1. Find the right .so with Linux 'find' or 'locate'. \
   Suppose it is /home/jeanmartin/libmysqlclient.so.<br> \
   2. Specify the library when starting ocelotgui, thus:<br> \
   LD_RUN_PATH=/home/jeanmartin ocelotgui<br> \
-  ... ocelotgui will also look for libmariadbclient.so or \
-  libmariadb.so in the same fashion but will look first for \
-  libmysqlclient.so unless one starts with ocelot_dbms='mariadb'.";
+  ... ocelotgui will look for both libmaria* and libmysql* .so files \
+  but will look first for libmysql* .so files\
+  unless one starts with ocelot_dbms='mariadb'.";
 #if (OCELOT_PGFINDLIB == 1)
   the_text= the_text +
   "<br>Update: Now on Linux and FreeBSD ocelotgui searches with \
@@ -26511,6 +26516,7 @@ void MainWindow::print_defaults(int is_called_from_print_help)
             + "WHERE libmysqlclient.so, libmariadb.so, libmariadbclient.so, libcrypto.so, libtarantool.so";
     char so_buffer[16384];
     int rval= pgfindlib(so_clauses.toUtf8(), so_buffer, 16384);
+    if (ocelot_ld_run_path != "") printf("ocelot_ld_run_path=%s.\n", ocelot_ld_run_path.toUtf8().data());
     printf("so_buffer=%s.\n", so_buffer);
     printf("rval=%d.\n", rval);
   }

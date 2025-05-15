@@ -111,6 +111,8 @@ cp -p $SOURCE/debian/source/format /tmp/ocelotgui-$VERSION/debian/source/format
 cp -p $SOURCE/deb_build.sh /tmp/ocelotgui-$VERSION/deb_build.sh
 cp -p $SOURCE/menunew.png /tmp/ocelotgui-$VERSION/menunew.png
 cp -p $SOURCE/plugin.c /tmp/ocelotgui-$VERSION/plugin.c
+cp -p $SOURCE/pgfindlib.h /tmp/ocelotgui-$VERSION/pgfindlib.h
+cp -p $SOURCE/pgfindlib.c /tmp/ocelotgui-$VERSION/pgfindlib.c
 
 cd /tmp
 
