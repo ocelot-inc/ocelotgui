@@ -423,7 +423,18 @@ void CodeEditor::highlightCurrentLine()
 }
 
 
-/* The prompt_widget_paintevent() is called from prompt_widget whenever it receives a paint event. */
+/*
+  The prompt_widget_paintevent() is called from prompt_widget whenever it receives a paint event.
+  Re prompt_text_height:
+    For noto color emoji and noto sans signwriting fonts, and probably others,
+    fontMetrics().height() is not enough. Usually blockBoundingRect(block).height() = fontMetrics().height() + 4.
+    Usually fontMetrics().boundingRect(s).height()) = fontMetrics().height() but not always,
+    and with noto color emoji foundMetrics().boundingRec(s).height() > blockBoundingRect().height().
+    Starting 2025-05-15, let's use blockBoundingRect().height() instead of fontMetrics().height() if it's greater.
+    Some fonts e.g. rasa and saab are too high but that seems to be characteristic of not just the prompt.
+  Todo: for oblique fonts the width can be more than enough but drawing is right-justified and misses final character.
+*/
+
 void CodeEditor::prompt_widget_paintevent(QPaintEvent *event)
 {
   QColor bgcolor;
@@ -462,6 +473,8 @@ void CodeEditor::prompt_widget_paintevent(QPaintEvent *event)
       textcolor= this->statement_edit_widget_left_treatment1_textcolor;
       prompt_text= prompt_translate(blockNumber + 1);
       QString s= prompt_text;
+      int prompt_text_height= (int) blockBoundingRect(block).height();
+      if (fontMetrics().height() > prompt_text_height) prompt_text_height= fontMetrics().height();
       /* QString number= QString::number(blockNumber + 1); */
 #if (OCELOT_MYSQL_DEBUGGER == 1)
       /* hmm, actually this loop could stop when k_line_number[k_index] == -1 too */
@@ -470,16 +483,17 @@ void CodeEditor::prompt_widget_paintevent(QPaintEvent *event)
         if (blockNumber == k_line_number[k_index] - 1)
         {
           painter.setPen(QColor(k_color[k_index]));
-          painter.drawText(0, top, 10, fontMetrics().height(), Qt::AlignLeft, k_string[k_index]);
+          painter.drawText(0, top, 10, prompt_text_height, Qt::AlignLeft, k_string[k_index]);
           break;
         }
       }
 #endif
       painter.setPen(textcolor);
-      painter.drawText(0, top, prompt_widget->width(), fontMetrics().height(),
+      painter.drawText(0, top, prompt_widget->width(), prompt_text_height,
                        Qt::AlignRight, s);
     }
     block= block.next();
+
     top= bottom;
     bottom= top + (int) blockBoundingRect(block).height();
     ++blockNumber;
