@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May 15 2025
+   Last modified: May 18 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -673,10 +673,14 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 #endif
   result_grid_tab_widget= new QTabWidget48(this); /* 2015-08-25 added "this" */
   result_grid_tab_widget->hide();
-  main_layout= new QVBoxLayout();
-  /* todo: setSpacing and setContentsMargins like this will give us a few more pixels but I'd prefer user settings */
-  main_layout->setSpacing(1);
-  main_layout->setContentsMargins(QMargins(1, 1, 1, 1));
+  /* main_layout spacing and margin are zero in ocelotgui.ui layoutDefault property */
+  /* and set to 0 in every way I know but I don't know which has effect and I see a few waste pixels anyway */
+  /* especially at the bottom -- maybe a widget isn't expanding? todo: do only what's needed, and fewer pixels */
+  this->setContentsMargins(QMargins(0, 0, 0, 0));
+  main_layout= new QVBoxLayout(this);
+  main_layout->setSpacing(0);
+  main_layout->setMargin(0);
+  main_layout->setContentsMargins(QMargins(0, 0, 0, 0));
   history_edit_widget= new TextEditHistory(this);         /* 2015-08-25 added "this" */
   statement_edit_widget= new CodeEditor(this);
 #if (OCELOT_MYSQL_DEBUGGER == 1)
@@ -8014,6 +8018,7 @@ QString MainWindow::get_background_color_from_style_sheet(QString style_string)
   Re align: Now QLabel text and QTextEdit|QLineEdit are not top-aligned exactly the same way, a maddening behaviour change
   Todo: prompt also looks bad but that's some sort of different problem, just because text color is white.
   Todo: I suppose we could consider also taking grid font settings.
+        But SET ocelot_query = UPDATE widgets ... might supersede that.
 */
 void MainWindow::set_dialog_style_sheet()
 {
@@ -8027,12 +8032,14 @@ void MainWindow::set_dialog_style_sheet()
   QString hover_color= "black";
   QString hover_background_color= "white";
   QString sdi= "QDialog {background-color:" + dialog_outer_color + "}";
-  QString sco1= "QDialog QComboBox {color:" + dialog_text_color
+  QString sco1= "QDialog {color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding-right:" + "1px"
           + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString sco2= "QDialog QComboBox:hover {color:" + hover_color
-          + "; background-color:" + hover_background_color
+  QString sco2= "QDialog QComboBox QAbstractItemView {color:" + dialog_text_color
+          + "; background-color:" + dialog_background_color
+          + "; selection-color:" + hover_color
+          + "; selection-background-color:" + hover_background_color
           + "; padding-right:" + "1px"
           + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
   QString spu1= "QDialog QPushButton {color:" + dialog_text_color
@@ -12065,7 +12072,24 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
            and push+pop might be slow if there are lots of statements in the input
   Sometimes we might replace query_in_client so that fillup_in_client() will do something local.
   Sometimes connect_unstripper() will be needed
-
+  Todo: widgets table:
+    SET ocelot_query = SELECT * FROM widgets;
+    class      subclass  subcontrol state property value
+    -----      --------  ---------- ----- -------- -----
+    CodeEditor QComboBox item       hover color    red
+    Mostly this will be for what we can do with setStyleSheet().
+    Class name is case sensitive
+    Alternate table names: classes, stylesheets
+    Also support UPDATE widgets, which would be equivalent to SET ocelot_grid_... etc.
+    Also support INSERT but it would only make sense when adding a new subcontrol+state.
+    As well as the things that we have in Settings, we'd have QDialog.
+    Instead of CodeEditor, we could have CodeEditor#object_name
+    Alternate column: properties instead of property+value
+    Possible value = "same as GridWidget header", in which case if grid widget changes, so does this
+    Internal, experimental, undocumented, requires knowing names of widgets
+    If you eventually want to be more specific, you'll have to subclass with nice names.
+    See https://doc.qt.io/qt-6/stylesheet-syntax.html
+    See dialog_style_sheet()
 */
 /* the late tokenize only does 10 words, which is enough since I think tokenize() will ignore comments */
 #define MAX_OCELOT_STATEMENT_TOKENS 20
