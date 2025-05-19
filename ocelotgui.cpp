@@ -8031,53 +8031,79 @@ void MainWindow::set_dialog_style_sheet()
   QString dialog_outer_color= ocelot_grid_outer_color;
   QString hover_color= "black";
   QString hover_background_color= "white";
-  QString sdi= "QDialog {background-color:" + dialog_outer_color + "}";
-  QString sco1= "QDialog {color:" + dialog_text_color
-          + "; background-color:" + dialog_background_color
-          + "; padding-right:" + "1px"
-          + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString sco2= "QDialog QComboBox QAbstractItemView {color:" + dialog_text_color
+
+
+
+wsl.append({"QDialog ", "", "", "", "",
+              "{background-color:" + dialog_outer_color + "}"});
+wsl.append({"QDialog ", "", "", "", "",
+        "{color:" + dialog_text_color
+        + "; background-color:" + dialog_background_color
+        + "; padding-right:" + "1px"
+        + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QComboBox ", "QAbstractItemView ", "", "",
+          "{color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; selection-color:" + hover_color
           + "; selection-background-color:" + hover_background_color
           + "; padding-right:" + "1px"
-          + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString spu1= "QDialog QPushButton {color:" + dialog_text_color
+          + "; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QPushButton ", "", "", "",
+          "{color:" + dialog_text_color
           + "; background-color:" +  dialog_background_color
           + "; padding:" + dialog_border_size_times_3 + "px"
-          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString spu2= "QDialog QPushButton:default {color:" + dialog_text_color
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QPushButton", "", "", ":default ",
+          "{color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding:" + "1px"
-          + "; font-weight:700; border:" + dialog_border_size_times_3 +"px double " + dialog_border_color + "}";
-  QString spu3= "QDialog QPushButton:hover {color:" + hover_color
+          + "; font-weight:700; border:" + dialog_border_size_times_3 +"px double " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QPushButton", "", "", ":hover ",
+          "{color:" + hover_color
           + "; background-color:" +  hover_background_color
           + "; padding:" + dialog_border_size_times_3 + "px"
-          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString sla1= "QDialog QLabel {color:" + dialog_text_color
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QLabel ", "", "", "",
+         "{color:" + dialog_text_color
           + "; padding-top: 1px; padding-left: 0px"
-          + "; background-color:" + dialog_header_background_color + "}";
-  QString sla2= "QDialog QLabel:hover {color:" + hover_color
+          + "; background-color:" + dialog_header_background_color + "}"});
+wsl.append({"QDialog ", "QLabel", "", "", ":hover ",
+          "{color:" + hover_color
           + "; padding-top: 1px; padding-left: 0px"
           + "; color:" + hover_color
-          + "; background-color:" + hover_background_color + "}";
-  QString ste1= "QDialog QTextEdit {color:" + dialog_text_color
+          + "; background-color:" + hover_background_color + "}"});
+wsl.append({"QDialog ", "QTextEdit ", "", "", "",
+          "{color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding-top: 1px; padding-left: 0px"
-          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString ste2= "QDialog QTextEdit:hover {color:" + hover_color
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QTextEdit", "", "", ":hover ",
+          "{color:" + hover_color
           + "; background-color:" + hover_background_color
           + "; padding-top: 1px; padding-left: 0px"
-          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString sle1= "QDialog QLineEdit {color:" + dialog_text_color
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QLineEdit ", "", "", "",
+          "{color:" + dialog_text_color
           + "; background-color:" + dialog_background_color
           + "; padding-top: 1px; padding-left: 0px"
-          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  QString sle2= "QDialog QLineEdit:hover {color:" + hover_color
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+wsl.append({"QDialog ", "QLineEdit", "", "", ":hover ",
+          "{color:" + hover_color
           + "; background-color:" + hover_background_color
           + "; padding-top: 1px; padding-left: 0px"
-          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}";
-  this->setStyleSheet(sdi + sco1 + sco2 + spu1 + spu2 + spu3 + sla1 + sla2 + ste1 + ste2 + sle1 + sle2);
+          + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
+
+QString sheet1= "";
+for (int i= 0; i < wsl.size(); ++i)
+{
+  sheet1.append(wsl.at(i).main_class);
+  sheet1.append(wsl.at(i).subclass);
+  sheet1.append(wsl.at(i).subsubclass);
+  sheet1.append(wsl.at(i).subcontrol);
+  sheet1.append(wsl.at(i).state);
+  sheet1.append(wsl.at(i).properties);
+}
+  this->setStyleSheet(sheet1);
 }
 #endif //#if (OCELOT_DIALOG == 1)
 
@@ -12074,9 +12100,9 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
   Sometimes connect_unstripper() will be needed
   Todo: widgets table:
     SET ocelot_query = SELECT * FROM widgets;
-    class      subclass  subcontrol state property value
-    -----      --------  ---------- ----- -------- -----
-    CodeEditor QComboBox item       hover color    red
+    class      subclass  subsubclass      subcontrol state property          value
+    -----      --------  ----------------- ---------- ----- ---------------  -----
+    QDialog    QComboBox QAbstractItemView item       hover selection-color  red
     Mostly this will be for what we can do with setStyleSheet().
     Class name is case sensitive
     Alternate table names: classes, stylesheets
@@ -12281,6 +12307,28 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
             if (i == 0) query= query + " AS library";
             query= query + "," + connect_unstripper(plugin_widget->id);
             if (i == 0) query= query + " AS action";
+          }
+        }
+      }
+      else if (query.mid(token_offsets[6], token_lengths[6]).toUpper() == "WIDGETS")
+      {
+        if (wsl.count() == 0) /* impossible */
+        {
+          query= "SELECT 'Empty result set' AS EMPTY_SET";
+        }
+        else
+        {
+          query= "";
+          for (int i= 0; i  < wsl.count(); ++i)
+          {
+            if (i > 0) query= query + " UNION ALL ";
+            query= query + "SELECT ";
+            query= query + " '"  + wsl.at(i).main_class + "'";  if (i == 0) query= query +  "AS class";
+            query= query + ", '" + wsl.at(i).subclass + "'";    if (i == 0) query= query + " AS subclass";
+            query= query + ", '" + wsl.at(i).subsubclass + "'"; if (i == 0) query= query + " AS subsubclass";
+            query= query + ", '" + wsl.at(i).subcontrol + "'";  if (i == 0) query= query + " AS subcontrol";
+            query= query + ", '" + wsl.at(i).state + "'";       if (i == 0) query= query + " AS state";
+            query= query + ", '" + wsl.at(i).properties+ "'";   if (i == 0) query= query + " AS properties";
           }
         }
       }

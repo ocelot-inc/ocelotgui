@@ -5410,6 +5410,17 @@ public:
   void menu_set_enabled(QString menu_id, bool is_enable_or_disable);
   int main_window_maximum_width;
   int main_window_maximum_height;
+
+  struct widgets_struct {
+    QString main_class;
+    QString subclass;
+    QString subsubclass;
+    QString subcontrol;
+    QString state;
+    QString properties;
+  };
+  QList<struct widgets_struct> wsl;
+
   void component_size_calc(int *character_height, int *borders_height);
   QFont get_font_from_style_sheet(QString style_string);
   QString get_color_from_style_sheet(QString style_string);

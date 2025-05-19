@@ -14958,8 +14958,9 @@ int MainWindow::hparse_f_client_set_query()
       if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") != 1)
 #endif
       {
-        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "CONDITIONAL_SETTINGS") != 1)
-          hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS");
+        if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "CONDITIONAL_SETTINGS") == 1) {;}
+        else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS") == 1) {;}
+        else hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "WIDGETS");
       }
       if (hparse_errno > 0) return 1;
     }
