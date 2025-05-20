@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May 18 2025
+   Last modified: May 20 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -8012,7 +8012,7 @@ QString MainWindow::get_background_color_from_style_sheet(QString style_string)
     So QComboBox will look slightly different now but still as readable and still distinguishing QPushButton types.
     I thought this old explanation looks okay: https://forum.qt.io/topic/60546/qpushbutton-default-windows-style-sheet/9
     I also removed setStyleSheet calls in row_form_box() since henceforth all dialog style changes are decided here.
-  Re hover: changes to black-on-white, might make it more readable occasionally
+  Re hover: changes to black-on-white, might make it more readable occasionally, seems not to work with Qt4
   Re weight: 400 is normal, 700 is bold. this is one way to distinguish QPushButton normal from QPushButton:default
   Re QLabel: we don't change default border size thinking it looks better if we leave Settings and row_form_box alone
   Re align: Now QLabel text and QTextEdit|QLineEdit are not top-aligned exactly the same way, a maddening behaviour change
@@ -12524,7 +12524,7 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
     delete [] token_offsets;
     return ER_ERROR;
   }
-  long int r;
+  long unsigned int r;
   char *row_pointer;
   int column_length;
   fks= "";
@@ -17472,6 +17472,7 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
   /* Find libtarantool. Prefer ld_run_path. */
   if (is_libtarantool_loaded != 1)
   {
+#if (OCELOT_PGFINDLIB == 1)
     QString so_clauses= "FROM "
             + ocelot_ld_run_path
             + pgfindlib_standard_paths
@@ -17479,6 +17480,9 @@ int MainWindow::connect_tarantool(unsigned int connection_number,
     char so_buffer[16384];
     int rval= pgfindlib(so_clauses.toUtf8(), so_buffer, 16384);
     if (rval != PGFINDLIB_OK) so_buffer[0]= '\0';
+#else
+  char so_buffer[]= "";
+#endif
     lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libtarantool_loaded, &libtarantool_handle, &ldbms_return_string, WHICH_LIBRARY_LIBTARANTOOL, so_buffer);
   }
   /* Find libtarantoolnet. Prefer ld_run_path. */
@@ -25137,6 +25141,7 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
         /* First find libcrypto.so */
         if (is_libcrypto_loaded != 1)
         {
+#if (OCELOT_PGFINDLIB == 1)
             QString so_clauses= "FROM "
                     + ocelot_ld_run_path
                     + pgfindlib_standard_paths
@@ -25144,6 +25149,9 @@ void MainWindow::connect_read_my_cnf(const char *file_name, int is_mylogin_cnf)
             char so_buffer[16384];
             int rval= pgfindlib(so_clauses.toUtf8(), so_buffer, 16384);
             if (rval != PGFINDLIB_OK) so_buffer[0]= '\0';
+#else
+  char so_buffer[]= "";
+#endif
           lmysql->ldbms_get_library(ocelot_ld_run_path, &is_libcrypto_loaded, &libcrypto_handle, &ldbms_return_string, WHICH_LIBRARY_LIBCRYPTO, so_buffer);
         }
         if (is_libcrypto_loaded != 1)
@@ -26577,7 +26585,7 @@ void MainWindow::print_defaults(int is_called_from_print_help)
   printf("Option                            Value\n");
   printf("--------------------------------- ----------------------------------------\n");
   action_file_connect_once("Print");
-#ifdef OCELOT_PGFINDLIB
+#if (OCELOT_PGFINDLIB == 1)
   if (is_called_from_print_help == 0)
   {
     printf("\n");
@@ -26592,6 +26600,8 @@ void MainWindow::print_defaults(int is_called_from_print_help)
     printf("so_buffer=%s.\n", so_buffer);
     printf("rval=%d.\n", rval);
   }
+#else
+  printf("(pgfindlib not set\n");
 #endif
 }
 

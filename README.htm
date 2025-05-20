@@ -2540,7 +2540,7 @@ mingw32-make install
 : (Building the MariaDB library)
 
 : You will need MariaDB Connector/C source and library unless you turn off MYSQL_INCLUDE.
-: We used version 3.3.8 Stable. Perhaps other versions work too. 
+: We used version 3.4.5 Stable. Perhaps other versions work too. 
 : Never use a client library associated with MariaDB 10.1.7.
 
 : Make a directory c:\mariadb.
@@ -2551,16 +2551,16 @@ mkdir mariadb
 cd mariadb
 
 : (Get MariaDB Connector/C source) Go to mariadb.org/download
-: Pick Connector, then MariaDB Connector/C 3.3.8 + Source + gzipped tar file
-: Result file should be connector-c/mariadb-connector-c-3.3.8-src.tar.gz
+: Pick Connector, then MariaDB Connector/C 3.4.5 + Source + gzipped tar file
+: Result file should be connector-c/mariadb-connector-c-3.4.5-src.tar.gz
 : Put it on c:\mariadb.
 : Unzip.
-"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.3.8-src.tar.gz
-"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.3.8-src.tar
+"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.4.5-src.tar.gz
+"C:\Program Files (x86)\7-Zip\7z" x mariadb-connector-c-3.4.5-src.tar
 
 : (Get MariaDB Connector/C library) Go to https://mariadb.com/downloads/connectors/
 : Pick Version = 3.3.8-GA, OS = MS Windows (32-bit)
-: Result file should be mariadb-connector-c-3.3.8-win32.msi
+: Result file should be mariadb-connector-c-3.4.5-win32.msi
 : Run the .msi file to install. Assumed result direcctory =
 : c:\Program Files (x86)\MariaDB\MariaDB Connector C
 
@@ -2571,11 +2571,11 @@ Copy "c:\Program Files (x86)\MariaDB\MariaDB Connector C\lib\libmariadb.dll" mar
 del mariadb.def
 gendef libmariadb.dll 
 dlltool -k --output-lib libmariadb.a --def libmariadb.def
-COPY c:\mariadb\libmariadb.a c:\mariadb\mariadb-connector-c-3.3.8-src\libmariadb\libmariadbclient.a
+COPY c:\mariadb\libmariadb.a c:\mariadb\mariadb-connector-c-3.4.5-src\libmariadb\libmariadbclient.a
 : See also the comments in ocelotgui.h + ocelotgui.cpp near the word MINGW_MARIADB.
 
 : Now you should have a file for static linking named
-: mariadb\mariadb-connector-c-3.3.8-src\libmariadb\libmariadbclient.a
+: mariadb\mariadb-connector-c-3.4.5-src\libmariadb\libmariadbclient.a
 
 : (making ocelotgui.exe)
 
@@ -2590,6 +2590,7 @@ COPY c:\mariadb\libmariadb.a c:\mariadb\mariadb-connector-c-3.3.8-src\libmariadb
 : Earlier we said prefix is c:\Qt\Qt5.9.1static, that is the Qt directory we need.
 : There will be an error message when you say mingw32-make the first time; we ignore it.
 : There will be warnings during compile; we ignore them.
+: If mariadb_version.h is not found, copy it from elsewhere or derive from version.h.in.
 : Probably cmake is available, if not, get from cmake.org/download and put on system path.
 
 : Change ocelotgui.pro so that after the Copyright + License notice it looks like this.
@@ -2622,8 +2623,8 @@ HEADERS += hparse.h
 HEADERS += ostrings.h
 HEADERS += third_party.h
 FORMS += ocelotgui.ui
-INCLUDEPATH += "c:\mariadb\mariadb-connector-c-3.3.8-src\include"
-LIBS += -Lc:\mariadb\mariadb-connector-c-3.3.8-src\libmariadb -lmariadbclient
+INCLUDEPATH += "c:\mariadb\mariadb-connector-c-3.4.5-src\include"
+LIBS += -Lc:\mariadb\mariadb-connector-c-3.4.5-src\libmariadb -lmariadbclient
 
 
 c:
