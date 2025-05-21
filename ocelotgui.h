@@ -5426,7 +5426,7 @@ public:
   QString get_color_from_style_sheet(QString style_string);
   QString get_background_color_from_style_sheet(QString style_string);
 #if (OCELOT_DIALOG == 1)
-  void set_dialog_style_sheet();
+  void set_dialog_style_sheet(); void enact_dialog_style_sheet();
 #endif
   void set_dbms_version_mask(QString, int);
   int next_i(int, int);

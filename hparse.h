@@ -14903,13 +14903,15 @@ int MainWindow::hparse_f_client_set_query()
   /* INSERT INTO plugins|menus VALUES (string[,string...]) -- SQLish but so restricted we won't use the main INSERT routine */
   if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INSERT, "INSERT") == 1)
   {
-    int table_type= 0; /* 0 if menu, TOKEN_KEYWORD_PLUGINS if plugin */
+    int table_type= 0; /* 0 if menu, 1 if widgets, TOKEN_KEYWORD_PLUGINS if plugin */
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_INTO, "INTO");
     if (hparse_errno > 0) return 1;
     if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "PLUGINS") == 1)
       table_type= TOKEN_KEYWORD_PLUGINS;
     else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "MENUS") == 1)
       table_type= 0;
+    else if (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_TABLE,TOKEN_TYPE_IDENTIFIER, "WIDGETS") == 1)
+      table_type= 1;
     else hparse_f_error();
     if (hparse_errno > 0) return 1;
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_VALUES, "VALUES");
@@ -14925,7 +14927,7 @@ int MainWindow::hparse_f_client_set_query()
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ACTION_STRING) == 0) hparse_f_error();
       if (hparse_errno > 0) return 1;
     }
-    else /* MENUS */
+    else if (table_type == 0) /* MENUS */
     {
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ID_STRING) == 0) hparse_f_error();
       if (hparse_errno > 0) return 1;
@@ -14941,6 +14943,15 @@ int MainWindow::hparse_f_client_set_query()
       if (hparse_errno > 0) return 1;
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_ACTION_STRING) == 0) hparse_f_error();
       if (hparse_errno > 0) return 1;
+    }
+    else /* WIDGETS */
+    {
+      for (int i= 0;; ++i)
+      {
+        if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
+        if (i == 5) break;
+        hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ",");
+      }
     }
     hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_OPERATOR, ")");
     if (hparse_errno > 0) return 1;

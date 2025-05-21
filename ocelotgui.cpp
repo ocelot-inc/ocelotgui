@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May 20 2025
+   Last modified: May 21 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -8092,17 +8092,20 @@ wsl.append({"QDialog ", "QLineEdit", "", "", ":hover ",
           + "; background-color:" + hover_background_color
           + "; padding-top: 1px; padding-left: 0px"
           + "; font-weight:400; border:" + dialog_border_size + "px solid " + dialog_border_color + "}"});
-
-QString sheet1= "";
-for (int i= 0; i < wsl.size(); ++i)
-{
-  sheet1.append(wsl.at(i).main_class);
-  sheet1.append(wsl.at(i).subclass);
-  sheet1.append(wsl.at(i).subsubclass);
-  sheet1.append(wsl.at(i).subcontrol);
-  sheet1.append(wsl.at(i).state);
-  sheet1.append(wsl.at(i).properties);
+  enact_dialog_style_sheet(); /* call setStyleSheet for all the wsl items */
 }
+void MainWindow::enact_dialog_style_sheet()
+{
+  QString sheet1= "";
+  for (int i= 0; i < wsl.size(); ++i)
+  {
+    sheet1.append(wsl.at(i).main_class);
+    sheet1.append(wsl.at(i).subclass);
+    sheet1.append(wsl.at(i).subsubclass);
+    sheet1.append(wsl.at(i).subcontrol);
+    sheet1.append(wsl.at(i).state);
+    sheet1.append(wsl.at(i).properties);
+  }
   this->setStyleSheet(sheet1);
 }
 #endif //#if (OCELOT_DIALOG == 1)
@@ -12205,6 +12208,39 @@ int MainWindow::execute_ocelot_query(QString query, int connection_number, const
       int er= menu_spec_insert_one(id, menu_title, menuitem, function);
       if (er == ER_OK) put_message_in_result("OK, 1 row");
       else put_message_in_result("Error");
+      *diagnostic_signal= DIAGNOSTIC_1;
+      is_early_return= true;
+    }
+    else if (table == "WIDGETS")
+    {
+      /* There's no checking of insert into widgets in hparse or here or in setStyleSheet */
+      /* We just have it so one can try things like (notice the trail space): */
+      /* set ocelot_query=insert into widgets values ('QDialog ','QComboBox ','QAbstractItemView ','','','{background-color:red}'); */
+      /* get wsl members stripping lead/trail ''s */
+      QString main_class= query.mid(token_offsets[8] + 1, token_lengths[8] - 2);
+      QString subclass= query.mid(token_offsets[10] + 1, token_lengths[10] - 2);
+      QString subsubclass= query.mid(token_offsets[12] + 1, token_lengths[12] - 2);
+      QString subcontrol= query.mid(token_offsets[14] + 1, token_lengths[14] - 2);
+      QString state= query.mid(token_offsets[16] + 1, token_lengths[16] - 2);
+      QString properties= query.mid(token_offsets[18] + 1, token_lengths[18] - 2);
+      for (int i= 0; i < wsl.size(); ++i)
+      {
+        if (main_class == wsl.at(i).main_class)
+        {
+          if ((subclass == wsl.at(i).subclass)
+           && (subsubclass == wsl.at(i).subsubclass)
+           && (subcontrol == wsl.at(i).subcontrol)
+           && (state == wsl.at(i).state))
+          {
+            wsl.removeAt(i);
+          }
+        }
+      }
+      wsl.append({main_class, subclass, subsubclass, subcontrol, state, properties});
+      enact_dialog_style_sheet();
+      int er= 0;
+      if (er == ER_OK) put_message_in_result("OK, 1 row");
+//      else put_message_in_result("Error");
       *diagnostic_signal= DIAGNOSTIC_1;
       is_early_return= true;
     }
