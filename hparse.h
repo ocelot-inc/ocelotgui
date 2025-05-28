@@ -4144,8 +4144,11 @@ int MainWindow::hparse_f_algorithm_or_lock()
         main_token_flags[hparse_i_of_last_accepted] &= (~TOKEN_FLAG_IS_FUNCTION);
         break;
       }
-      if (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INPLACE") == 1) break;
-      if (hparse_f_expect(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COPY") == 1) break;
+      if ((hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INPLACE") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "COPY") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MYSQL_8_0 | FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "INSTANT") == 1)
+       || (hparse_f_accept(FLAG_VERSION_MARIADB_10_3, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "NOCOPY") == 1)) break;
+      hparse_f_error();
       if (hparse_errno > 0) return 0;
     }
     if ((lock_seen == false) && (hparse_f_accept(FLAG_VERSION_MYSQL_OR_MARIADB_ALL, TOKEN_REFTYPE_ANY,TOKEN_TYPE_KEYWORD, "LOCK") == 1))
@@ -6509,7 +6512,7 @@ void MainWindow::hparse_f_require(int who_is_calling, bool proxy_seen, bool role
          requirement_seen= true;
       else
       {
-        /* Maybe we should be using something like hparse_pick_from_list here. */
+        /* Maybe we should be using something like hparse_f_pick_from_list_of_strings here. */
         QStringList tokens= (QStringList() << "CIPHER" << "ISSUER" << "SUBJECT");
         for (;;)
         {
@@ -14772,7 +14775,7 @@ int MainWindow::hparse_f_client_set_export()
 
   {
     QStringList q= (QStringList() << "text" << "table" << "html" << "none");
-    int picked= hparse_pick_from_list(q);
+    int picked= hparse_f_pick_from_list_of_strings(q);
     if (picked == -1)
     {
       hparse_f_error();
@@ -14848,7 +14851,7 @@ int MainWindow::hparse_f_client_set_export()
         hparse_f_expect(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY,TOKEN_KEYWORD_FILE, "EXISTS");
         if (hparse_errno > 0) break;
         QStringList q= (QStringList() << "append" << "error" << "replace");
-        if (hparse_pick_from_list(q) == -1)
+        if (hparse_f_pick_from_list_of_strings(q) == -1)
         {
           hparse_f_error();
           break;
@@ -14858,7 +14861,7 @@ int MainWindow::hparse_f_client_set_export()
     else
     {
       QStringList q= (QStringList() << "yes" << "no");
-      if (hparse_pick_from_list(q) == -1)
+      if (hparse_f_pick_from_list_of_strings(q) == -1)
       {
         hparse_f_error();
         break;
@@ -15066,7 +15069,7 @@ int MainWindow::hparse_f_client_set_query()
       if (menu_spec_struct_list[i].menu_type == MENU_SPEC_TYPE_MENUITEM)
        q.append(menu_spec_struct_list[i].id);
     }
-    if (hparse_pick_from_list(q) == -1) hparse_f_error();
+    if (hparse_f_pick_from_list_of_strings(q) == -1) hparse_f_error();
     if (hparse_errno > 0) return 0;
     return TOKEN_KEYWORD_SET;
     return 1;
@@ -15282,7 +15285,7 @@ int MainWindow::hparse_f_client_set()
   }
   if (q.count() > 0)
   {
-    if (hparse_pick_from_list(q) == -1)
+    if (hparse_f_pick_from_list_of_strings(q) == -1)
     {
       if (hparse_f_literal(TOKEN_REFTYPE_ANY, FLAG_VERSION_ALL, TOKEN_LITERAL_FLAG_STRING) == 0) hparse_f_error();
     }
@@ -15303,10 +15306,10 @@ int MainWindow::hparse_f_client_set()
 
 /*
   For picking a string literal when there are fixed choices.
-  Used for colors + fonts.
-  Todo: use for more. Pass a flag if it's to be enclosed in ''s. Pass a flag if it's to be sorted.
+  Used for colors + fonts. Returns after first hit.
+  Todo: use for more. Pass a flag if it's to be enclosed in ''s (or make a new function). Pass a flag if it's to be sorted.
 */
-int MainWindow::hparse_pick_from_list(QStringList q)
+int MainWindow::hparse_f_pick_from_list_of_strings(QStringList q)
 {
   for (int q_i= 0; q_i < q.size(); ++q_i)
   {
@@ -15533,7 +15536,7 @@ int MainWindow::hparse_f_client_statement()
           {
             //The following lines would be good if we could be sure we were looking at context menu
             //QStringList q= explorer_text_list();
-            //if (hparse_pick_from_list(q) == -1) hparse_f_error();
+            //if (hparse_f_pick_from_list_of_strings(q) == -1) hparse_f_error();
             if ((assignee_keyword != TOKEN_KEYWORD_OCELOT_GRID_CHART) && (hparse_f_accept(FLAG_VERSION_ALL, TOKEN_REFTYPE_ANY, TOKEN_KEYWORD_VALUE, "VALUE") == 1)) tlf= TOKEN_LITERAL_FLAG_STRING_OR_NUMBER_OR_CONSTANT;
           }
           if (tlf == -1) hparse_f_error(); /* for none of the recommended comparisons */

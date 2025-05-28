@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May 21 2025
+   Last modified: May 28 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -269,6 +269,7 @@ static struct connect_arguments ocelot_ca {
   .pipe= 0,
   .plugin_dir_as_utf8= 0,
   .print_defaults= 0,
+  .progress_reports= 0,
   .prompt_is_default= true,
   .quick= 0,
   .raw= 0,
@@ -541,6 +542,12 @@ void dump_qtmessage(QtMsgType type, const QMessageLogContext &context, const QSt
 }
 #endif
 
+#if (OCELOT_PROGRESS_REPORTS == 1)
+static MainWindow* main_window_instance;
+static  char report_string[1024];
+Progress_report *progress_report_window= NULL;
+#endif
+
 int main(int argc, char *argv[])
 {
 #if (QT_VERSION >= 0x50000)
@@ -559,6 +566,10 @@ int main(int argc, char *argv[])
 #endif
   QApplication main_application(argc, argv);
   MainWindow w(argc, argv);
+#if (OCELOT_PROGRESS_REPORTS == 1)
+  main_window_instance= &w;
+#endif
+
   /* We depend on w being maximized in resizeEvent() */
   /* Change on 2025-04-16: use availableGeometry(). Todo: probably this should be changed on Windows too. */
 #if (QT_VERSION >= 0x50000)
@@ -605,7 +616,6 @@ MainWindow::MainWindow(int argc, char *argv[], QWidget *parent) :
 {
   log("MainWindow start", 90); /* Ordinarily this is less than ocelot_ca.log_level so won't appear */
   initial_asserts();  /* Check that some defined | constant values are okay. */  /* Initialization */
-
   main_window_maximum_width= 0;
   main_window_maximum_height= 0;
   main_token_max_count= main_token_count_in_all= main_token_count_in_statement= main_token_number= 0;
@@ -3636,7 +3646,7 @@ void MainWindow::menu_spec_make_function()
   menu_function_struct_list.append({"action_file_export_html", false, &MainWindow::action_file_export_html, NULL});
   menu_function_struct_list.append({"action_file_export_none", false, &MainWindow::action_file_export_none, NULL});
 #endif
-  menu_function_struct_list.append({"action_edit_undo", false, &MainWindow::action_edit_undo, NULL});
+                  menu_function_struct_list.append({"action_edit_undo", false, &MainWindow::action_edit_undo, NULL});
   menu_function_struct_list.append({"action_edit_redo", false, &MainWindow::action_edit_redo, NULL});
   menu_function_struct_list.append({"action_edit_cut", false, &MainWindow::action_edit_cut, NULL});
   menu_function_struct_list.append({"action_edit_copy", false, &MainWindow::action_edit_copy, NULL});
@@ -5344,7 +5354,7 @@ void MainWindow::action_file_connect_once(QString message)
   //row_form_is_password= 0;
   //row_form_data= 0;
   //row_form_width= 0;
-  column_count= 85; /* If you add or remove items, you have to change this */
+  column_count= 86; /* If you add or remove items, you have to change this */
   row_form_label= new QString[column_count];
   row_form_type= new int[column_count];
   row_form_is_password= new int[column_count];
@@ -5405,6 +5415,7 @@ void MainWindow::action_file_connect_once(QString message)
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PIPE].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.pipe); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PLUGIN_DIR].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_plugin_dir; row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PRINT_DEFAULTS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.print_defaults); row_form_width[i]= '\x05';
+  row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PROGRESS_REPORTS].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.progress_reports); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_PROMPT].chars).toLower(); row_form_type[i]= 0; row_form_is_password[i]= 0; row_form_data[i]= ocelot_prompt; row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_QUICK].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.quick); row_form_width[i]= '\x05';
   row_form_label[++i]= QString(strvalues[TOKEN_KEYWORD_RAW].chars).toLower(); row_form_type[i]= NUM_FLAG; row_form_is_password[i]= 0; row_form_data[i]= QString::number(ocelot_ca.raw); row_form_width[i]= '\x05';
@@ -12051,6 +12062,9 @@ int MainWindow::execute_real_query(QString query, int connection_number, const Q
 #endif //#if (OCELOT_MYSQL_INCLUDE == 1)
   }
   delete []dbms_query;
+#if (OCELOT_PROGRESS_REPORTS == 1)
+  if (progress_report_window != NULL) { delete progress_report_window; progress_report_window= NULL; }
+#endif
   log("execute_real_query return", 80);
   return dbms_long_query_result;
 }
@@ -24097,6 +24111,24 @@ Small_dialog::~Small_dialog()
 
 /******************** Small_dialog end   ************************************/
 
+/******************** Progress_reports start************************************/
+
+#if (OCELOT_PROGRESS_REPORTS == 1)
+/* See long comment elsewhere beginning with the words Progress Reports */
+Progress_report::Progress_report(MainWindow *parent, QString passed_value) /* constructor */
+{
+  setText(passed_value);
+}
+
+Progress_report::~Progress_report()
+{
+  ;
+}
+
+#endif //if (OCELOT_PROGRESS_REPORTS == 1)
+
+/******************** Progress_reports end   ************************************/
+
 /******************** Context_menu start   ************************************/
 
 /* Comments about Context_menu should be in ocelotgui.h before the words "class Context_menu: public QWidget" */
@@ -25934,6 +25966,7 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     return;
   }
   if (keyword_index == TOKEN_KEYWORD_PRINT_DEFAULTS) {ocelot_ca.print_defaults= is_enable; return; }
+  if (keyword_index == TOKEN_KEYWORD_PROGRESS_REPORTS) {ocelot_ca.progress_reports= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PROMPT) { ocelot_prompt= token2; ocelot_ca.prompt_is_default= false; return; }
   if (keyword_index == TOKEN_KEYWORD_PROTOCOL)
   {
@@ -26167,6 +26200,53 @@ unsigned int MainWindow::get_ocelot_protocol_as_int(QString ocelot_protocol)
   return 0;
 }
 
+#if (OCELOT_PROGRESS_REPORTS == 1)
+/*
+  Progress Reports
+  MariaDB only. See https://mariadb.com/kb/en/progress-reporting/
+  --progress_reports is not default as in mariadb client, as MySQL server knows nothing about it and might have a different
+  meaning for 1UL << 29, CLIENT_PROGRESS client flag during mysql_real_connect. But --disable-progress_reports would be safer.
+  (I think the client library handles mysql_options() so even if it succeeds we don't know the server will understand.)
+  (We don't yet know in advance that server is MariaDB, although maybe --ocelot_dbms=mariadb or socket check could say.)
+  If (ocelot_ca.progress_reports == 1) and mysql_options(... 5999 ...) == 0 success, pass client_flags | 1UL << 29
+  == CLIENT_PROGRESS to mysql_real_connect though in a test I found that's not necessary, only mysql_options(... 5999 ...) is.
+  For tests use --progress_reports and CREATE INDEX ... ALGORITHM=COPY or ALTER TABLE.
+  Todo: why does mysql use obsolete_client_progress? see and https://jira.mariadb.org/browse/MDEV-9117
+  Todo: if the library is mysql, mysql_options(...5999 ...) will fail, perhaps there could be a warning somewhere.
+  Todo: what is MARIADB_CLIENT_PROGRESS? https://mariadb.com/kb/en/connection/#capabilities
+        but msysql_real_connect fails if I use it
+  Todo: worry if we're doing something while main window is being closed
+  Todo: worry if we're doing something and get called again, maybe we we should block ... or is it synchronous?
+  Todo: Progress_report class is just a QLabel with text that we delete and recreate (and delete in execute_real_query).
+        Something that's stable and shows at least a progress bar would be better. One possibility:
+        pass list of numbers, run ocelot_query = select list-of-numbers; turn on charting and let class Chart do the rest.
+  Todo: worry that ~Progress_report() might not get called atprogram end, i.e. deletion might not occur
+  Todo: worry that main_window_instance is &w and w is on the stack, although it should be at very top of stack
+*/
+
+void MainWindow::progress_report_in_window_nonstatic()
+{
+  if (progress_report_window != NULL) { delete progress_report_window; progress_report_window= NULL; }
+  progress_report_window= new Progress_report(this, report_string);
+  progress_report_window->show();
+}
+
+void MainWindow::progress_report_in_window_static(MainWindow* mainWindow)
+{
+  mainWindow->progress_report_in_window_nonstatic();
+}
+
+static void progress_report_callback(const MYSQL *mysql, uint stage, uint max_stage,
+                            double progress, const char *proc_info,
+                            uint proc_info_length)
+{
+  sprintf(report_string, "/* Stage: %d of %d '%.*s' %6.3g%% of stage done */\n",
+                      stage, max_stage, proc_info_length, proc_info,
+                      progress);
+  MainWindow::progress_report_in_window_static(main_window_instance);
+}
+#endif // #if (OCELOT_PROGRESS_REPORTS == 1)
+
 #if (OCELOT_MYSQL_INCLUDE == 1)
 /*
   Todo: this routine calls mysql_options() iff option value != 0,
@@ -26290,6 +26370,16 @@ int options_and_connect(
 
   if (ocelot_ca.opt_can_handle_expired_passwords != 0)
     real_connect_flags|= (1UL << 22); /* CLIENT_CAN_HANDLE_EXPIRED_PASSWORDS */
+
+#if (OCELOT_PROGRESS_REPORTS == 1)
+  if (ocelot_ca.progress_reports != 0) /* See the long comment beginning with the words "Progress Reports" */
+  {
+    if (lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_5999, (void *)progress_report_callback) == 0)
+    {
+      real_connect_flags|= (1UL << 29); /* CLIENT_PROGRESS */
+    }
+  }
+#endif
 
   MYSQL *connect_result;
   char *socket_parameter= ocelot_ca.unix_socket_as_utf8;
@@ -31236,7 +31326,7 @@ my_ulonglong ldbms::ldbms_mysql_num_rows(MYSQL_RES *result)
   return t__mysql_num_rows(result);
 }
 
-int ldbms::ldbms_mysql_options(MYSQL *mysql, enum ocelot_option option, const char *arg)
+int ldbms::ldbms_mysql_options(MYSQL *mysql, enum ocelot_option option, const void *arg)
 {
   return t__mysql_options(mysql, option, arg);
 }
@@ -44556,7 +44646,6 @@ bool Chart::eventFilter(QObject *obj, QEvent *event)
 #endif
 
 #endif //if (OCELOT_CHART == 1)
-
 
 
 #if (OCELOT_QWT_INCLUDE == 1)

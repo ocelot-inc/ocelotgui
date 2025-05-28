@@ -90,6 +90,15 @@
 #define OCELOT_JAVASCRIPT 1
 #endif
 
+/* To remove handling of --progress_reports for MariaDB, #define OCELOT_PROGRESS_REPORTS 0 */
+#if (OCELOT_MYSQL_INCLUDE == 1)
+#ifndef OCELOT_PROGRESS_REPORTS
+#define OCELOT_PROGRESS_REPORTS 1
+#endif
+#else
+#define OCELOT_PROGRESS_REPORTS 0
+#endif
+
 #if (OCELOT_MYSQL_INCLUDE == 0)
 typedef struct
 {
@@ -1180,6 +1189,7 @@ enum {                                        /* possible returns from token_typ
         TOKEN_KEYWORD_PRINT_DEFAULTS,
     TOKEN_KEYWORD_PROCEDURE,
     TOKEN_KEYWORD_PROCESS,
+    TOKEN_KEYWORD_PROGRESS_REPORTS,
     TOKEN_KEYWORD_PROMPT,
         TOKEN_KEYWORD_PROTOCOL,
     TOKEN_KEYWORD_PROXY,
@@ -1671,7 +1681,7 @@ enum {                                        /* possible returns from token_typ
 /* Todo: use "const" and "static" more often */
 
 /* Do not change this #define without seeing its use in e.g. initial_asserts(). */
-#define KEYWORD_LIST_SIZE 1287
+#define KEYWORD_LIST_SIZE 1288
 #define MAX_KEYWORD_LENGTH 46
 struct keywords {
    char  chars[MAX_KEYWORD_LENGTH];
@@ -2535,6 +2545,7 @@ static const struct keywords strvalues[]=
         {"PRINT_DEFAULTS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PRINT_DEFAULTS},
       {"PROCEDURE", FLAG_VERSION_ALL, 0, TOKEN_KEYWORD_PROCEDURE},
       {"PROCESS", 0, 0, TOKEN_KEYWORD_PROCESS},
+      {"PROGRESS_REPORTS", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PROGRESS_REPORTS},
       {"PROMPT", FLAG_VERSION_OPTION, 0, TOKEN_KEYWORD_PROMPT}, /* ocelotgui keyword */
         {"PROTOCOL", FLAG_VERSION_SET_OPTION, 0, TOKEN_KEYWORD_PROTOCOL},
       {"PROXY", 0, 0, TOKEN_KEYWORD_PROXY},
@@ -4553,6 +4564,7 @@ struct connect_arguments {
   unsigned short pipe;                   /* --pipe */
   char* plugin_dir_as_utf8;        /* --plugin_dir=s for MYSQL_PLUGIN_DIR */
   unsigned short print_defaults;   /* --print_defaults */
+  unsigned short progress_reports; /* --progress_reports */
   /* QString prompt */                       /* --prompt=s */
   unsigned char prompt_is_default; /* was bool */
   unsigned short quick;            /* --quick */
@@ -4782,7 +4794,6 @@ struct plugin_pass {
 #if (OCELOT_IMPORT_EXPORT == 1)
 #include <QActionGroup>
 #endif
-
 
 /* QRegExp is unavailable in Qt 6. Todo: We have never tested the replacement QRegularExpression code. */
 #if (QT_VERSION < 0x60000)
@@ -5118,6 +5129,9 @@ class Result_changes;
 #if (OCELOT_EXPLORER == 1)
 class Small_dialog_box;
 class Context_menu;
+#endif
+#if (OCELOT_PROGRESS_REPORTS == 1)
+class Progress_report;
 #endif
 #if (OCELOT_CHART == 1)
 class Chart;
@@ -5659,7 +5673,7 @@ public:
 #endif
   int hparse_f_client_set_rule();
   int hparse_f_client_set_query();
-  int hparse_pick_from_list(QStringList);
+  int hparse_f_pick_from_list_of_strings(QStringList);
   int hparse_f_client_set();
   int hparse_f_client_statement();
   void hparse_f_parse_hint_line_create();
@@ -5903,6 +5917,10 @@ private:
 public:
   Ui::MainWindow *ui;
   void put_message_in_result(QString);
+#if (OCELOT_PROGRESS_REPORTS == 1)
+  void progress_report_in_window_nonstatic();
+  static void progress_report_in_window_static(MainWindow* mainWindow);
+#endif
 private:
   int history_markup_previous_or_next();
   void initialize_widget_history();
@@ -6733,7 +6751,7 @@ enum ocelot_option
   OCELOT_OPTION_40=40,  /* unused. in MySQL, opt_net_buffer_length */
   OCELOT_OPTION_41=41,  /* unused. in MySQL, opt_tls_version */
   OCELOT_OPTION_42=42,  /* in MySQL 5.7.11+, opt_ssl_mode */
-  OCELOT_OPTION_5999=5999,  /*unused. In MariaDB, progress_callback */
+  OCELOT_OPTION_5999=5999,  /* See long comment beginning with the words "Progress Reports". In MariaDB, progress_callback */
   OCELOT_OPTION_6000=6000,  /* unused. In MariaDB, nonblock */
   OCELOT_OPTION_6001=6001, /* unused. in MariaDB, thread_specific_memory */
   OCELOT_OPTION_7019=7019  /* unused, in MariaDB, found_rows */
@@ -6777,7 +6795,7 @@ public:
   typedef int             (*tmysql_next_result)  (MYSQL *);
   typedef unsigned int    (*tmysql_num_fields)   (MYSQL_RES *);
   typedef my_ulonglong    (*tmysql_num_rows)     (MYSQL_RES *);
-  typedef int             (*tmysql_options)      (MYSQL *, enum ocelot_option, const char *);
+  typedef int             (*tmysql_options)      (MYSQL *, enum ocelot_option, const void *);
   typedef int             (*tmysql_ping)         (MYSQL *);
   typedef int             (*tmysql_query)        (MYSQL *, const char *);
   typedef MYSQL*          (*tmysql_real_connect) (MYSQL *, const char *,
@@ -6995,7 +7013,7 @@ MY_BOOL ldbms_mysql_more_results(MYSQL *mysql);
 int ldbms_mysql_next_result(MYSQL *mysql);
 unsigned int ldbms_mysql_num_fields(MYSQL_RES *result);
 my_ulonglong ldbms_mysql_num_rows(MYSQL_RES *result);
-int ldbms_mysql_options(MYSQL *mysql, enum ocelot_option option, const char *arg);
+int ldbms_mysql_options(MYSQL *mysql, enum ocelot_option option, const void *arg);
 int ldbms_mysql_ping(MYSQL *mysql);
 int ldbms_mysql_query(MYSQL *mysql, const char *stmt_str);
 MYSQL *ldbms_mysql_real_connect(MYSQL *mysql, const char *host, const char *user, const char *passwd, const char *db, unsigned int port, const char *unix_socket, unsigned long client_flag);
@@ -8846,6 +8864,21 @@ int ocelot_variables_size();
 
 };
 #endif //#ifndef XSETTINGS_H
+
+#if (OCELOT_PROGRESS_REPORTS == 1)
+#ifndef PROGRESS_REPORTS_H
+#define PROGRESS_REPORTS_H
+class Progress_report: public QLabel
+{
+  Q_OBJECT
+
+public:
+Progress_report(MainWindow *parent, QString passed_value);
+~Progress_report();
+
+};
+#endif // #ifndef PROGRESS_REPORTS_H
+#endif // #if (OCELOT_PROGRESS_REPORTS == 1)
 
 #if (OCELOT_EXPLORER == 1)
 #ifndef SMALL_DIALOG_H
