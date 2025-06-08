@@ -2,7 +2,7 @@
   ocelotgui -- GUI Front End for MySQL or MariaDB
 
    Version: 2.5.0
-   Last modified: May 28 2025
+   Last modified: June 8 2025
 */
 /*
   Copyright (c) 2024 by Peter Gulutzan. All rights reserved.
@@ -295,6 +295,7 @@ static struct connect_arguments ocelot_ca {
   .syslog= 0,
   .table= 0,
   .history_tee_file_is_open= false,
+  .opt_tls_version_as_utf8= 0,
   .unbuffered= 0,
   .verbose= 0,
   .version= 0,
@@ -24729,6 +24730,7 @@ void MainWindow::connect_mysql_options_2(int argc, char *argv[])
   ocelot_opt_ssl_key= "";
   ocelot_opt_ssl_mode= "";
   /* ocelot_ca.opt_ssl_verify_server_cert= 0; */ /* already initialized */
+  ocelot_opt_tls_version= "";
   /* ocelot_ca.opt_use_result= 0; */ /* already initialized */
   /* ocelot_ca.opt_write_timeout= 0; */ /* already initialized */
   ocelot_plugin_dir= "";
@@ -25687,6 +25689,7 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
   char key2[MAX_KEYWORD_LENGTH + 1];
   int keyword_index;
   keyword_index= get_keyword_index(token0_as_utf8, key2);
+
   /*
     Shortenings.
     These are obsolete, one should say --password= not -pas=, but we continue to accept them.
@@ -25744,157 +25747,186 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
       keyword_index= TOKEN_KEYWORD_WAIT;
   }
 
-  if (keyword_index == TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR) { ocelot_ca.abort_source_on_error= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_AUTO_REHASH) { ocelot_ca.auto_rehash= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT) { ocelot_ca.auto_vertical_output= is_enable; return; }
+  /* List of options used by connect_set_variable(). Todo: #undef? */
+  #define OPTION_TO_TOKEN2  1
+  #define OPTION_TO_IS_ENABLE 2
+  #define OPTION_TO_INT_TOKEN2 3
+  #define OPTION_TO_0 4
+  struct option_keywords {
+     uint16_t keyword_index; /* e.g. TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR */
+     void *option_address;   /* e.g. &ocelot_ca.abort_source_on_error (connect_arguments) */
+     char what_to_do;        /* 0 nothing, 1 set to QString token2, 2 set to is_enable, 3 set to short|int|long(token2) */
+     uint8_t option_sizeof;
+     char dbms_version;  /* e.g. mysql but usually it's 0 and always it's ignored, this is just fyi */
+  };
+  struct option_keywords option_keywords_list[]={
+  {TOKEN_KEYWORD_ABORT_SOURCE_ON_ERROR, &ocelot_ca.abort_source_on_error, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.abort_source_on_error), 'A'},
+  {TOKEN_KEYWORD_AUTO_REHASH, &ocelot_ca.auto_rehash, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.auto_rehash), 'A'},
+  {TOKEN_KEYWORD_AUTO_VERTICAL_OUTPUT, &ocelot_ca.auto_vertical_output, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.auto_vertical_output), 'A'},
+  {TOKEN_KEYWORD_BINARY_MODE, &ocelot_ca.binary_mode, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.binary_mode), 'A'},
+  {TOKEN_KEYWORD_BIND, &ocelot_opt_bind, OPTION_TO_TOKEN2, sizeof(ocelot_opt_bind), 'A'},  /* not available in mysql client */
+  {TOKEN_KEYWORD_BIND_ADDRESS, &ocelot_bind_address, OPTION_TO_IS_ENABLE, sizeof(ocelot_bind_address), 'A'},
+  {TOKEN_KEYWORD_CONNECT_EXPIRED_PASSWORD, &ocelot_ca.opt_can_handle_expired_passwords, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.opt_can_handle_expired_passwords), 'A'}, /* not available in mysql client before version 5.7 */
+  {TOKEN_KEYWORD_CHARACTER_SETS_DIR, &ocelot_set_charset_dir, OPTION_TO_TOKEN2, sizeof(ocelot_set_charset_dir), 'A'},
+  {TOKEN_KEYWORD_COLUMN_NAMES, &ocelot_ca.result_grid_column_names, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.result_grid_column_names), 'A'},
+  {TOKEN_KEYWORD_COLUMN_TYPE_INFO, &ocelot_ca.column_type_info, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.column_type_info), 'A'},
+  {TOKEN_KEYWORD_COMMENTS, &ocelot_ca.comments, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.comments), 'A'},
+  {TOKEN_KEYWORD_COMPRESS, &ocelot_ca.opt_compress, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.opt_compress), 'A'},
+  {TOKEN_KEYWORD_CONNECT_ATTR_DELETE, &ocelot_opt_connect_attr_delete, OPTION_TO_TOKEN2, sizeof(ocelot_opt_connect_attr_delete), 'A'}, /* not available in mysql client */
+  {TOKEN_KEYWORD_CONNECT_ATTR_RESET, &ocelot_ca.opt_connect_attr_reset, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.opt_connect_attr_reset), 'A'}, /* not available in mysql client */
+  {TOKEN_KEYWORD_CONNECT_TIMEOUT, &ocelot_ca.opt_connect_timeout, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.opt_connect_timeout), 'A'},
+  {TOKEN_KEYWORD_DATABASE, &ocelot_database, OPTION_TO_TOKEN2, sizeof(ocelot_database), 'A'},
+  {TOKEN_KEYWORD_DEBUG, &ocelot_debug, OPTION_TO_TOKEN2, sizeof(ocelot_debug), 'A'},
+  {TOKEN_KEYWORD_DEBUG_INFO, &ocelot_ca.debug_info, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.debug_info), 'A'},
+  {TOKEN_KEYWORD_DEFAULT_AUTH, &ocelot_default_auth, OPTION_TO_TOKEN2, sizeof(ocelot_default_auth), 'A'},
+  {TOKEN_KEYWORD_DEFAULT_CHARACTER_SET, &ocelot_set_charset_name, OPTION_TO_TOKEN2, sizeof(ocelot_set_charset_name), 'A'},
+  {TOKEN_KEYWORD_DEFAULTS_EXTRA_FILE, &ocelot_defaults_extra_file, OPTION_TO_TOKEN2, sizeof(ocelot_defaults_extra_file), 'A'},
+  {TOKEN_KEYWORD_DEFAULTS_FILE, &ocelot_defaults_file, OPTION_TO_TOKEN2, sizeof(ocelot_defaults_file), 'A'},
+  {TOKEN_KEYWORD_DEFAULTS_GROUP_SUFFIX, &ocelot_defaults_group_suffix, OPTION_TO_TOKEN2, sizeof(ocelot_defaults_group_suffix), 'A'},
+  {TOKEN_KEYWORD_DELIMITER, &ocelot_delimiter_str, OPTION_TO_TOKEN2, sizeof(ocelot_delimiter_str), 'A'},
+  {TOKEN_KEYWORD_ENABLE_CLEARTEXT_PLUGIN, &ocelot_ca.enable_cleartext_plugin, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.enable_cleartext_plugin), 'A'},
+  {TOKEN_KEYWORD_EXECUTE, &ocelot_execute, OPTION_TO_IS_ENABLE, sizeof(ocelot_execute), 'A'},
+  {TOKEN_KEYWORD_FORCE, &ocelot_ca.force, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.force), 'A'},
+  {TOKEN_KEYWORD_HELP,&ocelot_ca.help, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.help), 'A'},
+  {TOKEN_KEYWORD_HISTFILE, &ocelot_history_hist_file_name, OPTION_TO_TOKEN2, sizeof(ocelot_history_hist_file_name), 'A'},
+  {TOKEN_KEYWORD_HISTIGNORE, &ocelot_histignore, OPTION_TO_TOKEN2, sizeof(ocelot_histignore), 'A'},
+  {TOKEN_KEYWORD_HOST,&ocelot_host, OPTION_TO_TOKEN2, sizeof(ocelot_host), 'A'},
+  {TOKEN_KEYWORD_HTML, &ocelot_ca.html, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.html), 'A'},
+  {TOKEN_KEYWORD_SAFE_UPDATES, &ocelot_ca.safe_updates, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.safe_updates), 'A'}, /* Actually this could be "i-am-a-dummy" */
+  {TOKEN_KEYWORD_IGNORE_SPACES, &ocelot_ca.ignore_spaces, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.ignore_spaces), 'A'},
+  {TOKEN_KEYWORD_LD_RUN_PATH, &ocelot_ld_run_path, OPTION_TO_TOKEN2, sizeof(ocelot_ld_run_path), 'A'},
+  {TOKEN_KEYWORD_INIT_COMMAND, &ocelot_init_command, OPTION_TO_TOKEN2, sizeof(ocelot_init_command), 'A'},
+  {TOKEN_KEYWORD_LINE_NUMBERS, &ocelot_ca.line_numbers, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.line_numbers), 'A'},
+  {TOKEN_KEYWORD_LOGIN_PATH, &ocelot_login_path, OPTION_TO_TOKEN2, sizeof(ocelot_login_path), 'A'},
+  {TOKEN_KEYWORD_MAX_ALLOWED_PACKET, &ocelot_ca.max_allowed_packet_arg, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.max_allowed_packet_arg), 'A'},
+  {TOKEN_KEYWORD_MAX_JOIN_SIZE, &ocelot_ca.max_join_size, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.max_join_size), 'A'},
+  {TOKEN_KEYWORD_NAMED_COMMANDS, &ocelot_ca.named_commands, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.named_commands), 'A'},
+  {TOKEN_KEYWORD_NET_BUFFER_LENGTH, &ocelot_ca.net_buffer_length_arg, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.net_buffer_length_arg), 'A'},
+  {TOKEN_KEYWORD_NO_AUTO_REHASH, &ocelot_ca.auto_rehash, OPTION_TO_0, sizeof(ocelot_ca.auto_rehash), 'A'},
+  {TOKEN_KEYWORD_NO_BEEP, &ocelot_ca.no_beep, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.no_beep), 'A'},
+  {TOKEN_KEYWORD_NO_DEFAULTS, &ocelot_ca.no_defaults, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.no_defaults), 'A'},
+  {TOKEN_KEYWORD_NO_NAMED_COMMANDS, &ocelot_ca.named_commands, OPTION_TO_0, sizeof(ocelot_ca.named_commands), 'A'},
+  {TOKEN_KEYWORD_OCELOT_QUERY, &ocelot_query, OPTION_TO_TOKEN2, sizeof(ocelot_query), 'A'},
+  {TOKEN_KEYWORD_ONE_DATABASE, &ocelot_ca.one_database, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.one_database), 'A'},
+  {TOKEN_KEYWORD_PAGER, &ocelot_pager, OPTION_TO_IS_ENABLE, sizeof(ocelot_pager), 'A'},
+  {TOKEN_KEYWORD_PIPE, &ocelot_ca.opt_named_pipe, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.opt_named_pipe), 'A'},/* Not sure about this. Windows. Same as protocol? */
+  {TOKEN_KEYWORD_PLUGIN_DIR, &ocelot_plugin_dir, OPTION_TO_TOKEN2, sizeof(ocelot_plugin_dir), 'A'},
+  {TOKEN_KEYWORD_PORT, &ocelot_ca.port, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.port), 'A'},
+  {TOKEN_KEYWORD_PRINT_DEFAULTS, &ocelot_ca.print_defaults, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.print_defaults), 'A'},
+  {TOKEN_KEYWORD_PROGRESS_REPORTS, &ocelot_ca.progress_reports, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.progress_reports), 'A'},
+  {TOKEN_KEYWORD_QUICK, &ocelot_ca.quick, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.quick), 'A'},
+  /* todo: TOKEN_KEYWORD_QUICK_MAX_COLUMN_WIDTH */
+  {TOKEN_KEYWORD_RAW, &ocelot_ca.raw, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.raw), 'A'},
+  {TOKEN_KEYWORD_READ_DEFAULT_FILE, &ocelot_read_default_file, OPTION_TO_TOKEN2, sizeof(ocelot_read_default_file), 'A'},/* not available in mysql client */
+  {TOKEN_KEYWORD_READ_DEFAULT_GROUP, &ocelot_read_default_group, OPTION_TO_TOKEN2, sizeof(ocelot_read_default_group), 'A'},/* not available in mysql client */
+  {TOKEN_KEYWORD_READ_TIMEOUT, &ocelot_ca.opt_read_timeout, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.opt_read_timeout), 'A'}, /* not available in mysql client */
+  {TOKEN_KEYWORD_RECONNECT, &ocelot_ca.opt_reconnect, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.opt_reconnect), 'A'},
+  {TOKEN_KEYWORD_REPORT_DATA_TRUNCATION, &ocelot_ca.report_data_truncation, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.report_data_truncation), 'A'},
+  {TOKEN_KEYWORD_SAFE_UPDATES, &ocelot_ca.safe_updates, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.safe_updates), 'A'},
+  /* todo: TOKEN_KEYWORD_SANDBOX */
+  /* todo: TOKEN_SERVER_SCRIPT_DIR */
+  {TOKEN_KEYWORD_SECURE_AUTH, &ocelot_ca.secure_auth, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.secure_auth), 'A'},
+  {TOKEN_KEYWORD_SERVER_PUBLIC_KEY, &ocelot_server_public_key, OPTION_TO_TOKEN2, sizeof(ocelot_server_public_key), 'A'}, /* not available in mysql client */
+  {TOKEN_KEYWORD_SELECT_LIMIT, &ocelot_ca.select_limit, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.select_limit), 'A'},
+  {TOKEN_KEYWORD_SHARED_MEMORY_BASE_NAME, &ocelot_shared_memory_base_name, OPTION_TO_TOKEN2, sizeof(ocelot_shared_memory_base_name), 'A'},
+  {TOKEN_KEYWORD_SHOW_WARNINGS, &ocelot_ca.history_includes_warnings, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.history_includes_warnings), 'A'},
+  {TOKEN_KEYWORD_SIGINT_IGNORE, &ocelot_ca.sigint_ignore, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.sigint_ignore), 'A'},
+  {TOKEN_KEYWORD_SILENT, &ocelot_ca.silent, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.silent), 'A'},
+  {TOKEN_KEYWORD_SOCKET, &ocelot_unix_socket, OPTION_TO_TOKEN2, sizeof(ocelot_unix_socket), 'A'},
+  {TOKEN_KEYWORD_SSL, &ocelot_opt_ssl, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl), 'A'},
+  {TOKEN_KEYWORD_SSL_CA, &ocelot_opt_ssl_ca, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_ca), 'A'},
+  /* todo: TOKEN_KEYWORD_SSL_FP */
+  /* todo: TOKEN_KEYWORD_SSL_FPLIST */
+  {TOKEN_KEYWORD_SSL_CAPATH, &ocelot_opt_ssl_capath, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_capath), 'A'},
+  {TOKEN_KEYWORD_SSL_CERT, &ocelot_opt_ssl_cert, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_cert), 'A'},
+  {TOKEN_KEYWORD_SSL_CIPHER, &ocelot_opt_ssl_cipher, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_cipher), 'A'},
+  {TOKEN_KEYWORD_SSL_CRL, &ocelot_opt_ssl_crl, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_crl), 'A'},
+  {TOKEN_KEYWORD_SSL_CRLPATH, &ocelot_opt_ssl_crlpath, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_crlpath), 'A'},
+  {TOKEN_KEYWORD_SSL_KEY, &ocelot_opt_ssl_key, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_key), 'A'},
+  {TOKEN_KEYWORD_SSL_MODE, &ocelot_opt_ssl_mode, OPTION_TO_TOKEN2, sizeof(ocelot_opt_ssl_mode), 'A'},
+  {TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT, &ocelot_ca.opt_ssl_verify_server_cert, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.opt_ssl_verify_server_cert), 'A'},
+  {TOKEN_KEYWORD_SYSLOG, &ocelot_ca.syslog, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.syslog), 'A'},
+  {TOKEN_KEYWORD_TABLE, &ocelot_ca.table, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.table), 'A'},
+  {TOKEN_KEYWORD_TLS_VERSION, &ocelot_opt_tls_version, OPTION_TO_TOKEN2, sizeof(ocelot_opt_tls_version), 'A'},
+  {TOKEN_KEYWORD_UNBUFFERED, &ocelot_ca.unbuffered, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.unbuffered), 'A'},
+  {TOKEN_KEYWORD_USE_RESULT, &ocelot_ca.opt_use_result, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.opt_use_result), 'A'},/* not available in mysql client */
+  {TOKEN_KEYWORD_USER, &ocelot_user, OPTION_TO_TOKEN2, sizeof(ocelot_user), 'A'},
+  {TOKEN_KEYWORD_VERBOSE, &ocelot_ca.verbose, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.verbose), 'A'},
+  {TOKEN_KEYWORD_VERSION, &ocelot_ca.version, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.version), 'A'},
+  /* todo: check that this finds both --vertical and -E */ /* for vertical */
+  {TOKEN_KEYWORD_VERTICAL, &ocelot_ca.vertical, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.vertical), 'A'},
+  {TOKEN_KEYWORD_WAIT, &ocelot_ca.wait, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.wait), 'A'},
+  {TOKEN_KEYWORD_WRITE_TIMEOUT, &ocelot_ca.opt_write_timeout, OPTION_TO_INT_TOKEN2, sizeof(ocelot_ca.opt_write_timeout), 'A'},
+  {TOKEN_KEYWORD_XML, &ocelot_ca.xml, OPTION_TO_IS_ENABLE, sizeof(ocelot_ca.xml), 'A'},
+  {0, 0, 0, 0, 0} /* todo: don't use 0 to find end, use sizeof */
+  };
+#ifdef ADDITIONAL_ASSERTS
+  for (int ii= TOKEN_KEYWORD_QUESTIONMARK; ii < KEYWORD_LIST_SIZE; ++ii)
+   {
+     int index= strvalues[ii].token_keyword;
+     char *k= (char*) &strvalues[ii].chars;
+    if ((index >= TOKEN_KEYWORD_OCELOT_BATCH) && (index <= TOKEN_KEYWORD_OCELOT_XML)) continue;
+    if ((strvalues[ii].reserved_flags & FLAG_VERSION_OPTION) != 0)
+    {
+      for (unsigned int o_k_i= 0;; ++o_k_i)
+      {
+        if (0 == option_keywords_list[o_k_i].keyword_index)
+        {
+          printf("FLAG_VERSION_OPTION != 0 but item not in option_keywords_list: %s.\n", k);
+          break;
+        }
+        if (index == option_keywords_list[o_k_i].keyword_index) break;
+      }
+    }
+  }
+#endif
+
+  /* search option_keywords_list
+  Todo: skip the search if FLAG_VERSION_OPTION == 0
+  Todo: bsearch, which only is possible if you have a check that all keywords are in order, additional_asserts
+      ... or, better: add something in strvalues keywords list to point to keyword_options_list
+  Todo: some way to check, or a big warning, that what you cast to is what it's defined as
+  Todo: if it's true you can return but a few items require extra handling:
+    Special: batch, local_infile, no_tee, ocelot_dbms, ocelot_client_side_functions, ocelot_export, password, prompt, protocol, tee
+    then anything starting with "ocelot_" that we leave to ocelot_variable_set() which should also bsearch.
+  */
+  for (unsigned int o_k_i= 0;; ++o_k_i)
+  {
+    if (0 == option_keywords_list[o_k_i].keyword_index) break;
+    if ((uint32_t) keyword_index == option_keywords_list[o_k_i].keyword_index)
+    {
+      if (option_keywords_list[o_k_i].what_to_do == OPTION_TO_TOKEN2) *(QString *)option_keywords_list[o_k_i].option_address= token2;
+      else /* OPTION_TO_IS_ENABLE | OPTION_TO_INT_TOKEN2 | OPTION_TO_0 */
+      {
+        uint64_t val;
+        if (option_keywords_list[o_k_i].what_to_do == OPTION_TO_IS_ENABLE) val= is_enable;
+        if (option_keywords_list[o_k_i].what_to_do == OPTION_TO_0) val= 0;
+        if (option_keywords_list[o_k_i].what_to_do == OPTION_TO_INT_TOKEN2) val= to_long(token2);
+        if (option_keywords_list[o_k_i].option_sizeof == 8) *(uint64_t *)option_keywords_list[o_k_i].option_address= val;
+        if (option_keywords_list[o_k_i].option_sizeof == 4) {uint32_t x= val; *(uint32_t *)option_keywords_list[o_k_i].option_address= x; }
+        if (option_keywords_list[o_k_i].option_sizeof == 2) {uint16_t x= val; *(uint16_t *)option_keywords_list[o_k_i].option_address= x; }
+        if (option_keywords_list[o_k_i].option_sizeof == 1) {uint8_t x= val; *(uint8_t *)option_keywords_list[o_k_i].option_address= x; }
+      }
+      return;
+    }
+  }
+  /* not in main list, check specials and ocelot_* */
   if (keyword_index == TOKEN_KEYWORD_BATCH)
   {
     ocelot_ca.batch= is_enable;
     ocelot_ca.silent= is_enable;
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_BINARY_MODE) { ocelot_ca.binary_mode= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_BIND) /* not available in mysql client */
-  {
-    ocelot_opt_bind= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_BIND_ADDRESS) { ocelot_bind_address= is_enable; return; }
-
-  if (keyword_index == TOKEN_KEYWORD_CONNECT_EXPIRED_PASSWORD) /* not available in mysql client before version 5.7 */
-  {
-    ocelot_ca.opt_can_handle_expired_passwords= is_enable;
-    return;
-  }
-
-  if (keyword_index == TOKEN_KEYWORD_CHARACTER_SETS_DIR)
-  {
-    ocelot_set_charset_dir= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_COLUMN_NAMES) {
-    ocelot_ca.result_grid_column_names= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_COLUMN_TYPE_INFO) { ocelot_ca.column_type_info= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_COMMENTS)
-  {
-    ocelot_ca.comments= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_COMPRESS)
-  {
-    ocelot_ca.opt_compress= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_CONNECT_ATTR_DELETE) /* not available in mysql client */
-  {
-    ocelot_opt_connect_attr_delete= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_CONNECT_ATTR_RESET) /* not available in mysql client */
-  {
-    ocelot_ca.opt_connect_attr_reset= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_CONNECT_TIMEOUT)
-  {
-    ocelot_ca.opt_connect_timeout= to_long(token2);
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_DATABASE)
-  {
-    ocelot_database= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_DEBUG) { ocelot_debug= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_DEBUG_INFO) { ocelot_ca.debug_info= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_DEFAULT_AUTH)
-  {
-    ocelot_default_auth= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_DEFAULT_CHARACTER_SET)
-  {
-    ocelot_set_charset_name= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_DEFAULTS_EXTRA_FILE)
-  {
-    ocelot_defaults_extra_file= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_DEFAULTS_FILE)
-  {
-    ocelot_defaults_file= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_DEFAULTS_GROUP_SUFFIX)
-  {
-    ocelot_defaults_group_suffix= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_DELIMITER)
-  {
-    ocelot_delimiter_str= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_ENABLE_CLEARTEXT_PLUGIN)
-  {
-    ocelot_ca.enable_cleartext_plugin= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_EXECUTE) { ocelot_execute= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_FORCE) { ocelot_ca.force= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_HELP) { ocelot_ca.help= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_HISTFILE) { ocelot_history_hist_file_name= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_HISTIGNORE) { ocelot_histignore= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_HOST)
-  {
-    ocelot_host= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_HTML) { ocelot_ca.html= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_SAFE_UPDATES) /* Actually this could be "i-am-a-dummy" */
-  {
-    ocelot_ca.safe_updates= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_IGNORE_SPACES) { ocelot_ca.ignore_spaces= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_LD_RUN_PATH) { ocelot_ld_run_path= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_INIT_COMMAND)
-  {
-    ocelot_init_command= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_LINE_NUMBERS) { ocelot_ca.line_numbers= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_LOCAL_INFILE)
   {
     if (token2 > "") ocelot_ca.opt_local_infile= to_long(token2);
     else ocelot_ca.opt_local_infile= is_enable;
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_LOGIN_PATH) { ocelot_login_path= token2; return; }
-  if (keyword_index == TOKEN_KEYWORD_MAX_ALLOWED_PACKET) { ocelot_ca.max_allowed_packet_arg= to_long(token2); return; }
-  if (keyword_index == TOKEN_KEYWORD_MAX_JOIN_SIZE)
-  {
-    ocelot_ca.max_join_size= to_long(token2);
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_NAMED_COMMANDS) { ocelot_ca.named_commands= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_NET_BUFFER_LENGTH) { ocelot_ca.net_buffer_length_arg= to_long(token2); return; }
-  if (keyword_index == TOKEN_KEYWORD_NO_AUTO_REHASH) { ocelot_ca.auto_rehash= 0; return; }
-  if (keyword_index == TOKEN_KEYWORD_NO_BEEP)
-  {
-    ocelot_ca.no_beep= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_NO_DEFAULTS) { ocelot_ca.no_defaults= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_NO_NAMED_COMMANDS) { ocelot_ca.named_commands= 0; return; }
   if (keyword_index == TOKEN_KEYWORD_NO_TEE) { history_file_stop("TEE"); return; }/* see comment=tee+hist */
-
-  QString ccn;
+  //QString ccn;
   /* Changes to ocelot_* settings. But we don't check that they're in the [ocelot] group. */
   /* Todo: validity checks */
-
   if (keyword_index == TOKEN_KEYWORD_OCELOT_DBMS)
   {
     /* Warning: what we do here may be overridden after connection, by set_dbms_version_mask() */
@@ -25907,12 +25939,12 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     {
       connections_dbms[0]= DBMS_MARIADB;
     }
-#ifdef DBMS_TARANTOOL
+  #ifdef DBMS_TARANTOOL
     else if (ocelot_dbms.contains("tarantool", Qt::CaseInsensitive) == true)
     {
       connections_dbms[0]= DBMS_TARANTOOL;
     }
-#endif
+  #endif
     else connections_dbms[0]= DBMS_MYSQL; /* default */
 #if (OCELOT_MYSQL_INCLUDE == 0)
     connections_dbms[0]= DBMS_TARANTOOL; /* default if no MySQL */
@@ -25927,22 +25959,12 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
   }
 #endif
   if (keyword_index == TOKEN_KEYWORD_OCELOT_CLIENT_SIDE_FUNCTIONS) { ocelot_ca.client_side_functions= is_enable; return; }
-  else
+  /* Anything that starts with "ocelot_" except "ocelot_dbms" "ocelot_client_side_functions" "ocelot_export" */
+  if (xsettings_widget->ocelot_variable_set(keyword_index, token2) != ER_OVERFLOW)
   {
-    /* Anything that starts with "ocelot_" except "ocelot_dbms" "ocelot_client_side_functions" "ocelot_export" */
-    if (xsettings_widget->ocelot_variable_set(keyword_index, token2) != ER_OVERFLOW)
-    {
-      /* It might not be ER_OK but we ignore errors here */
-      return;
-    }
-  }
-  if (keyword_index == TOKEN_KEYWORD_OCELOT_QUERY)
-  {
-    ocelot_query= token2;
+    /* It might not be ER_OK but we ignore errors here */
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_ONE_DATABASE) { ocelot_ca.one_database= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_PAGER) { ocelot_pager= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PASSWORD)
   {
     ocelot_password= token2;
@@ -25950,23 +25972,6 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     if ((is_enable == 1) && (token1 != "=")) ocelot_password_was_specified= 2;
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_PIPE) /* Not sure about this. Windows. Same as protocol? */
-  {
-    ocelot_ca.opt_named_pipe= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_PLUGIN_DIR)
-  {
-    ocelot_plugin_dir= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_PORT)
-  {
-    ocelot_ca.port= to_long(token2);
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_PRINT_DEFAULTS) {ocelot_ca.print_defaults= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_PROGRESS_REPORTS) {ocelot_ca.progress_reports= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_PROMPT) { ocelot_prompt= token2; ocelot_ca.prompt_is_default= false; return; }
   if (keyword_index == TOKEN_KEYWORD_PROTOCOL)
   {
@@ -25974,161 +25979,10 @@ void MainWindow::connect_set_variable(QString token0, QString token1, QString to
     ocelot_ca.protocol_as_int= get_ocelot_protocol_as_int(ocelot_protocol);
     return;
   }
-  if (keyword_index == TOKEN_KEYWORD_QUICK) { ocelot_ca.quick= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_RAW) { ocelot_ca.raw= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_READ_DEFAULT_FILE) /* not available in mysql client */
-  {
-    ocelot_read_default_file= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_READ_DEFAULT_GROUP) /* not available in mysql client */
-  {
-    ocelot_read_default_group= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_READ_TIMEOUT) /* not available in mysql client */
-  {
-    ocelot_ca.opt_read_timeout= to_long(token2);
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_RECONNECT)
-  {
-    ocelot_ca.opt_reconnect= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_REPORT_DATA_TRUNCATION)/* not available in mysql client */
-  {
-    ocelot_ca.report_data_truncation= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SAFE_UPDATES)
-  {
-    ocelot_ca.safe_updates= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SECURE_AUTH)
-  {
-    ocelot_ca.secure_auth= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SERVER_PUBLIC_KEY) /* not available in mysql client */
-  {
-    ocelot_server_public_key= token2;
-    return;
-  }
-   if (keyword_index == TOKEN_KEYWORD_SELECT_LIMIT)
-  {
-    ocelot_ca.select_limit= to_long(token2);
-    return;
-  }
-
-  if (keyword_index == TOKEN_KEYWORD_SHARED_MEMORY_BASE_NAME)
-  {
-    ocelot_shared_memory_base_name= token2;
-    return;
-    }
-  if (keyword_index == TOKEN_KEYWORD_SHOW_WARNINGS)
-  {
-    ocelot_ca.history_includes_warnings= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SIGINT_IGNORE) { ocelot_ca.sigint_ignore= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_SILENT)
-  {
-    ocelot_ca.silent= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SOCKET)
-  {
-    ocelot_unix_socket= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL)
-  {
-    ocelot_opt_ssl= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_CA)
-  {
-    ocelot_opt_ssl_ca= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_CAPATH)
-  {
-    ocelot_opt_ssl_capath= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_CERT)
-  {
-    ocelot_opt_ssl_cert= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_CIPHER)
-  {
-    ocelot_opt_ssl_cipher= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_CRL)
-  {
-    ocelot_opt_ssl_crl= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_CRLPATH)
-  {
-    ocelot_opt_ssl_crlpath= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_KEY)
-  {
-    ocelot_opt_ssl_key= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_MODE)
-  {
-    ocelot_opt_ssl_mode= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SSL_VERIFY_SERVER_CERT)
-  {
-    ocelot_ca.opt_ssl_verify_server_cert= to_long(token2);
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_SYSLOG) { ocelot_ca.syslog= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_TABLE) { ocelot_ca.table= is_enable; return; }
   if (keyword_index == TOKEN_KEYWORD_TEE)
   {
     QString rr;
     history_file_start("TEE", token2, &rr); /* todo: check whether history_file_start returned 0 which is an error */ /* see comment=tee+hist */
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_UNBUFFERED) { ocelot_ca.unbuffered= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_USE_RESULT)/* not available in mysql client */
-  {
-    ocelot_ca.opt_use_result= to_long(token2);
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_USER)
-  {
-    ocelot_user= token2;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_VERBOSE) { ocelot_ca.verbose= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_VERSION) { ocelot_ca.version= is_enable; return; }
-  /* todo: check that this finds both --vertical and -E */ /* for vertical */
-  if (keyword_index == TOKEN_KEYWORD_VERTICAL) { ocelot_ca.vertical= is_enable; return; }
-  if (keyword_index == TOKEN_KEYWORD_WAIT)
-  {
-    ocelot_ca.wait= is_enable;
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_WRITE_TIMEOUT)
-  {
-    ocelot_ca.opt_write_timeout= to_long(token2);
-    return;
-  }
-  if (keyword_index == TOKEN_KEYWORD_XML)
-  {
-    ocelot_ca.xml= is_enable;
     return;
   }
 }
@@ -26182,6 +26036,7 @@ void MainWindow::connect_make_statement()
   if (ocelot_opt_ssl_crlpath > "") statement_text= statement_text + "ssl_crlpath=" + ocelot_opt_ssl_crlpath;
   if (ocelot_opt_ssl_key > "") statement_text= statement_text + "ssl_key=" + ocelot_opt_ssl_key;
   if (ocelot_opt_ssl_mode > "") statement_text= statement_text + "ssl_mode=" + ocelot_opt_ssl_mode;
+  if (ocelot_opt_tls_version > "") statement_text= statement_text + "tls_version=" + ocelot_opt_tls_version;
   if (ocelot_ca.opt_ssl_verify_server_cert > 0) statement_text= statement_text + "ssl_verify_server_cert=" + ocelot_ca.opt_ssl_verify_server_cert;
   msgBox.setText(statement_text);
   msgBox.exec();
@@ -26346,6 +26201,7 @@ int options_and_connect(
   {
     if (ocelot_ca.opt_ssl_verify_server_cert > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_21, (char*) &ocelot_ca.opt_ssl_verify_server_cert);
   }
+  if (ocelot_ca.opt_tls_version_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_41, (char*) &ocelot_ca.opt_tls_version_as_utf8);
   if (ocelot_ca.opt_write_timeout > 0) lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_12, (char*) &ocelot_ca.opt_write_timeout);
   if (ocelot_ca.plugin_dir_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_22, ocelot_ca.plugin_dir_as_utf8);
   if (ocelot_ca.read_default_file_as_utf8[0] != '\0') lmysql->ldbms_mysql_options(&mysql[connection_number], OCELOT_OPTION_4, ocelot_ca.read_default_file_as_utf8);
@@ -26489,6 +26345,7 @@ void MainWindow::delete_utf8_copies()
   if (ocelot_ca.read_default_group_as_utf8 != 0) { delete [] ocelot_ca.read_default_group_as_utf8; ocelot_ca.read_default_group_as_utf8= 0; }
   if (ocelot_ca.read_default_file_as_utf8 != 0) { delete [] ocelot_ca.read_default_file_as_utf8; ocelot_ca.read_default_file_as_utf8= 0; }
   if (ocelot_ca.server_public_key_as_utf8 != 0) { delete [] ocelot_ca.server_public_key_as_utf8; ocelot_ca.server_public_key_as_utf8= 0; }
+  if (ocelot_ca.opt_tls_version_as_utf8 != 0) { delete [] ocelot_ca.opt_tls_version_as_utf8; ocelot_ca.opt_tls_version_as_utf8= 0; }
   if (ocelot_ca.unix_socket_as_utf8 != 0) { delete [] ocelot_ca.unix_socket_as_utf8; ocelot_ca.unix_socket_as_utf8= 0; }
   if (ocelot_ca.set_charset_dir_as_utf8 != 0) { delete [] ocelot_ca.set_charset_dir_as_utf8; ocelot_ca.set_charset_dir_as_utf8= 0; }
   if (ocelot_ca.set_charset_name_as_utf8 != 0) { delete [] ocelot_ca.set_charset_name_as_utf8; ocelot_ca.set_charset_name_as_utf8= 0; }
@@ -26568,6 +26425,10 @@ void MainWindow::copy_connect_strings_to_utf8()
   int tmp_opt_ssl_mode_len= ocelot_opt_ssl_mode.toUtf8().size();
   ocelot_ca.opt_ssl_mode_as_utf8= new char[tmp_opt_ssl_mode_len + 1];
   memcpy(ocelot_ca.opt_ssl_mode_as_utf8, ocelot_opt_ssl_mode.toUtf8().constData(), tmp_opt_ssl_mode_len + 1);
+
+  int tmp_opt_tls_version_len= ocelot_opt_tls_version.toUtf8().size();
+  ocelot_ca.opt_tls_version_as_utf8= new char[tmp_opt_tls_version_len + 1];
+  memcpy(ocelot_ca.opt_tls_version_as_utf8, ocelot_opt_tls_version.toUtf8().constData(), tmp_opt_tls_version_len + 1);
 
   int tmp_plugin_dir_len= ocelot_plugin_dir.toUtf8().size();
   ocelot_ca.plugin_dir_as_utf8= new char[tmp_plugin_dir_len + 1];
